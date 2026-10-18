@@ -10,6 +10,8 @@ import {
   WorkspaceCreationState,
   WorkspaceInput,
   WorkspacePlan,
+  WorkspacePlanLock,
+  WorkspacePlanLockSelectionInput,
   WorkspaceProduct,
   WorkspaceSlugCheckInput,
   WorkspaceSlugCheckOutput,
@@ -32,6 +34,16 @@ export class WorkspaceRpcs extends RpcGroup.make(
   Rpc.make("GetWorkspacePlan", {
     payload: WorkspaceInput,
     success: WorkspacePlan,
+    error: WorkspaceServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("GetWorkspacePlanLock", {
+    payload: WorkspaceInput,
+    success: WorkspacePlanLock,
+    error: WorkspaceServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("SetWorkspacePlanLockSelection", {
+    payload: WorkspacePlanLockSelectionInput,
+    success: WorkspacePlanLock,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("CheckWorkspaceSlug", {

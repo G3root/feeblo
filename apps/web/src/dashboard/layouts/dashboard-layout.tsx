@@ -22,6 +22,7 @@ import { useCallback, useMemo } from "react";
 
 import { AppSidebar } from "~/components/common/app-sidebar";
 import { NotificationsMenu } from "~/components/common/notifications-menu";
+import { PlanLockBanner } from "~/features/billing/components/plan-lock-banner";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";
 import { CreateBoardDialog } from "~/features/board/components/create-board-dialog";
 import { DeleteBoardDialog } from "~/features/board/components/delete-board-dialog";
@@ -150,6 +151,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                   className="min-h-0 flex-1 overflow-hidden"
                                   fill
                                 >
+                                  <PlanLockBanner />
                                   {children}
                                 </ScrollArea>
                               </SidebarInset>

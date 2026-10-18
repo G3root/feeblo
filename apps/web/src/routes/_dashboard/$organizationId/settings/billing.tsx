@@ -21,6 +21,7 @@ import {
   CurrentPlanStat,
   PlanGridSkeleton,
 } from "~/features/billing/components/billing-plan-summary";
+import { DowngradePlanCard } from "~/features/billing/components/downgrade-plan-card";
 import {
   startBillingCheckout,
   startBillingPortal,
@@ -234,6 +235,10 @@ function BillingSettingsContent({
               ) : null}
             </CardPanel>
           </Card>
+
+          {hasPaidPlan ? (
+            <DowngradePlanCard organizationId={organizationId} />
+          ) : null}
 
           <Card className="border-border border shadow-none ring-0">
             <CardHeader>

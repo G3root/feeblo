@@ -5,6 +5,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { ReservedSubdomainError } from "../site/subdomain/errors";
 import { SubdomainValidationService } from "../site/subdomain/service";
@@ -50,12 +51,12 @@ describe("free workspace limit", () => {
   /** A workspace owned by `userId`, optionally on an active paid plan. */
   const createOwnedWorkspace = (
     userId: string,
-    options: { paid?: boolean } = {}
+    options: { paid?: boolean; createdAt?: Date } = {}
   ) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const organizationId = yield* WorkspaceId.generate;
-      const now = yield* DateTime.nowAsDate;
+      const now = options.createdAt ?? (yield* DateTime.nowAsDate);
 
       yield* db.insert(schema.organizationTable).values({
         id: organizationId,
@@ -114,6 +115,11 @@ describe("free workspace limit", () => {
     Layer.provide(RepositoryTest)
   );
 
+  const EntitlementTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provideMerge(Database.PgliteDatabaseLive)
+  );
+
   const MockSubdomainValidationLayer = Layer.effect(
     SubdomainValidationService,
     Effect.succeed({
@@ -137,7 +143,8 @@ describe("free workspace limit", () => {
     RepositoryTest,
     Database.PgliteDatabaseLive,
     MockSubdomainValidationLayer,
-    WorkspacePolicyTest
+    WorkspacePolicyTest,
+    EntitlementTest
   );
 
   layer(TestLayer)("handlers", (it) => {
@@ -324,6 +331,100 @@ describe("free workspace limit", () => {
 
         expect(state.canCreate).toBe(true);
         expect(state.freeWorkspaces).toHaveLength(1);
+      })
+    );
+
+    const makeMemberSession = (
+      userId: string,
+      organizationId: string
+    ): Session => ({
+      ...makeBareSession(userId),
+      organizations: [{ id: organizationId }],
+      memberships: [
+        {
+          membershipId: `membership_${organizationId}`,
+          organizationId,
+          role: "owner",
+        },
+      ],
+    });
+
+    it.effect("projects the workspace lock with the free preview", () =>
+      Effect.gen(function* () {
+        const handlers = yield* WorkspaceRpcHandlersEffect;
+        const userId = "user_plan_lock_projection";
+        yield* seedUser(userId);
+        yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-01T00:00:00Z"),
+        });
+        yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-02T00:00:00Z"),
+        });
+        yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-03T00:00:00Z"),
+        });
+        const fourth = yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-04T00:00:00Z"),
+        });
+
+        const lock = yield* handlers
+          .GetWorkspacePlanLock({ organizationId: fourth })
+          .pipe(
+            Effect.provideService(
+              CurrentSession,
+              makeMemberSession(userId, fourth)
+            )
+          );
+
+        const workspaces = (state: typeof lock.current) =>
+          state.features.find((feature) => feature.feature === "workspaces");
+
+        expect(lock.current.plan).toBe("free");
+        expect(workspaces(lock.current)).toMatchObject({
+          count: 4,
+          lockedIds: [fourth],
+        });
+        // On free the preview is the current state, not a second evaluation.
+        expect(lock.preview).toEqual(lock.current);
+      })
+    );
+
+    it.effect("keeps the workspace the owner selects and locks another", () =>
+      Effect.gen(function* () {
+        const handlers = yield* WorkspaceRpcHandlersEffect;
+        const userId = "user_plan_lock_selection";
+        yield* seedUser(userId);
+        yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-01T00:00:00Z"),
+        });
+        yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-02T00:00:00Z"),
+        });
+        const third = yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-03T00:00:00Z"),
+        });
+        const fourth = yield* createOwnedWorkspace(userId, {
+          createdAt: dateAt("2026-01-04T00:00:00Z"),
+        });
+        const provided = Effect.provideService(
+          CurrentSession,
+          makeMemberSession(userId, fourth)
+        );
+
+        const updated = yield* handlers
+          .SetWorkspacePlanLockSelection({
+            organizationId: fourth,
+            featureKey: "workspaces",
+            resourceIds: [fourth],
+          })
+          .pipe(provided);
+
+        const workspaces = updated.current.features.find(
+          (feature) => feature.feature === "workspaces"
+        );
+        // The selection keeps the fourth and the two oldest, so the third is
+        // the one that falls out.
+        expect(workspaces?.lockedIds).toEqual([third]);
       })
     );
   });

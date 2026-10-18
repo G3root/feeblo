@@ -46,6 +46,7 @@ import { Route as DashboardOrganizationIdSettingsDevelopersRouteImport } from ".
 import { Route as DashboardOrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/_dashboard/$organizationId/settings/feedback-tags"
 import { Route as DashboardOrganizationIdSettingsMembersRouteImport } from "./routes/_dashboard/$organizationId/settings/members"
 import { Route as DashboardOrganizationIdSettingsNotificationsRouteImport } from "./routes/_dashboard/$organizationId/settings/notifications"
+import { Route as DashboardOrganizationIdSettingsPlanLimitsRouteImport } from "./routes/_dashboard/$organizationId/settings/plan-limits"
 import { Route as DashboardOrganizationIdSettingsPreferencesRouteImport } from "./routes/_dashboard/$organizationId/settings/preferences"
 import { Route as DashboardOrganizationIdSettingsProfileRouteImport } from "./routes/_dashboard/$organizationId/settings/profile"
 import { Route as DashboardOrganizationIdSettingsRoadmapRouteImport } from "./routes/_dashboard/$organizationId/settings/roadmap"
@@ -275,6 +276,12 @@ const DashboardOrganizationIdSettingsNotificationsRoute =
     path: "/notifications",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
+const DashboardOrganizationIdSettingsPlanLimitsRoute =
+  DashboardOrganizationIdSettingsPlanLimitsRouteImport.update({
+    id: "/plan-limits",
+    path: "/plan-limits",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
 const DashboardOrganizationIdSettingsPreferencesRoute =
   DashboardOrganizationIdSettingsPreferencesRouteImport.update({
     id: "/preferences",
@@ -497,6 +504,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
+  "/$organizationId/settings/plan-limits": typeof DashboardOrganizationIdSettingsPlanLimitsRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
   "/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
@@ -563,6 +571,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
+  "/$organizationId/settings/plan-limits": typeof DashboardOrganizationIdSettingsPlanLimitsRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
   "/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
@@ -632,6 +641,7 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   "/_dashboard/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/_dashboard/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
+  "/_dashboard/$organizationId/settings/plan-limits": typeof DashboardOrganizationIdSettingsPlanLimitsRoute
   "/_dashboard/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
   "/_dashboard/$organizationId/settings/profile": typeof DashboardOrganizationIdSettingsProfileRoute
   "/_dashboard/$organizationId/settings/roadmap": typeof DashboardOrganizationIdSettingsRoadmapRoute
@@ -702,6 +712,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/notifications"
+    | "/$organizationId/settings/plan-limits"
     | "/$organizationId/settings/preferences"
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
@@ -768,6 +779,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/feedback-tags"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/notifications"
+    | "/$organizationId/settings/plan-limits"
     | "/$organizationId/settings/preferences"
     | "/$organizationId/settings/profile"
     | "/$organizationId/settings/roadmap"
@@ -836,6 +848,7 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/settings/feedback-tags"
     | "/_dashboard/$organizationId/settings/members"
     | "/_dashboard/$organizationId/settings/notifications"
+    | "/_dashboard/$organizationId/settings/plan-limits"
     | "/_dashboard/$organizationId/settings/preferences"
     | "/_dashboard/$organizationId/settings/profile"
     | "/_dashboard/$organizationId/settings/roadmap"
@@ -1136,6 +1149,13 @@ declare module "@tanstack/react-router" {
       path: "/notifications"
       fullPath: "/$organizationId/settings/notifications"
       preLoaderRoute: typeof DashboardOrganizationIdSettingsNotificationsRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
+    "/_dashboard/$organizationId/settings/plan-limits": {
+      id: "/_dashboard/$organizationId/settings/plan-limits"
+      path: "/plan-limits"
+      fullPath: "/$organizationId/settings/plan-limits"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsPlanLimitsRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
     "/_dashboard/$organizationId/settings/preferences": {
@@ -1452,6 +1472,7 @@ interface DashboardOrganizationIdSettingsRouteChildren {
   DashboardOrganizationIdSettingsFeedbackTagsRoute: typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
   DashboardOrganizationIdSettingsMembersRoute: typeof DashboardOrganizationIdSettingsMembersRoute
   DashboardOrganizationIdSettingsNotificationsRoute: typeof DashboardOrganizationIdSettingsNotificationsRoute
+  DashboardOrganizationIdSettingsPlanLimitsRoute: typeof DashboardOrganizationIdSettingsPlanLimitsRoute
   DashboardOrganizationIdSettingsPreferencesRoute: typeof DashboardOrganizationIdSettingsPreferencesRoute
   DashboardOrganizationIdSettingsProfileRoute: typeof DashboardOrganizationIdSettingsProfileRoute
   DashboardOrganizationIdSettingsRoadmapRoute: typeof DashboardOrganizationIdSettingsRoadmapRoute
@@ -1490,6 +1511,8 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
       DashboardOrganizationIdSettingsMembersRoute,
     DashboardOrganizationIdSettingsNotificationsRoute:
       DashboardOrganizationIdSettingsNotificationsRoute,
+    DashboardOrganizationIdSettingsPlanLimitsRoute:
+      DashboardOrganizationIdSettingsPlanLimitsRoute,
     DashboardOrganizationIdSettingsPreferencesRoute:
       DashboardOrganizationIdSettingsPreferencesRoute,
     DashboardOrganizationIdSettingsProfileRoute:
@@ -1584,12 +1607,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from "./router.tsx"
-import type { createStart } from "@tanstack/react-start"
-declare module "@tanstack/react-start" {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
