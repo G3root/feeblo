@@ -34,6 +34,7 @@ import {
   Home,
   InternetIcon,
   LayoutThreeColumnIcon,
+  LockIcon,
   Megaphone03Icon,
   MessageMultiple01Icon,
   Plus,
@@ -54,6 +55,7 @@ import {
 } from "~/features/board/dialog-stores";
 import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { usePlanLock } from "~/hooks/use-plan-lock";
 import { usePublicSiteUrl } from "~/hooks/use-site";
 
 import { NavUser } from "./nav-user";
@@ -229,6 +231,16 @@ function CreateBoardButton() {
 function BoardList() {
   const organizationId = useOrganizationId();
   const boardQuery = useOrgBoards(organizationId);
+  const lock = usePlanLock();
+  const lockedBoardIds = useMemo(
+    () =>
+      new Set(
+        lock.data?.current.features.find(
+          (feature) => feature.feature === "feedbackBoards"
+        )?.lockedIds ?? []
+      ),
+    [lock.data]
+  );
   // The shared org-boards query is unordered; the sidebar keeps its
   // newest-first order locally.
   const boards = useMemo(
@@ -262,6 +274,7 @@ function BoardList() {
         <BoardItem
           boardPublicId={board.id}
           boardSlug={board.slug}
+          isLocked={lockedBoardIds.has(board.id)}
           key={board.id}
           name={board.name}
         />
@@ -273,10 +286,17 @@ function BoardList() {
 interface BoardItemProp {
   boardPublicId: string;
   boardSlug: string;
+  /** The board is beyond the free plan's slot limit and therefore read-only. */
+  isLocked?: boolean;
   name: string;
 }
 
-function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
+function BoardItem({
+  boardPublicId,
+  isLocked = false,
+  name,
+  boardSlug,
+}: BoardItemProp) {
   const organizationId = useOrganizationId();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -294,7 +314,15 @@ function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
               to="/$organizationId/board/$boardSlug"
               {...props}
             >
-              <span>{name}</span>
+              <span className="flex items-center gap-2">
+                {name}
+                {isLocked ? (
+                  <HugeiconsIcon
+                    className="text-muted-foreground size-3.5"
+                    icon={LockIcon}
+                  />
+                ) : null}
+              </span>
             </Link>
           )}
         />
