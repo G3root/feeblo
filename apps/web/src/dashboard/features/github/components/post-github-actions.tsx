@@ -42,32 +42,36 @@ import {
   GitHubRepositoryField,
 } from "./github-post-issue-fields";
 
-type GitHubPostAction = "create" | "link" | null;
-
-/** GitHub-owned issue actions contributed to the generic linked-resource menu. */
+/**
+ * GitHub-owned issue actions contributed to the generic linked-resource menu.
+ *
+ * The dialog is deliberately not rendered here: this element lives inside the
+ * menu popup, and a menu item click unmounts the popup. The host owns the
+ * dialog state and renders `GitHubPostIssueDialog` outside the menu so it
+ * survives the popup closing.
+ */
 export function GitHubPostResourceActions({
+  onSelectAction,
   organizationId,
-  postId,
 }: {
+  readonly onSelectAction: (action: GitHubPostIssueAction) => void;
   readonly organizationId: string;
-  readonly postId: string;
 }) {
   return (
     <GitHubPostResourceActionsContent
+      onSelectAction={onSelectAction}
       organizationId={organizationId}
-      postId={postId}
     />
   );
 }
 
 function GitHubPostResourceActionsContent({
+  onSelectAction,
   organizationId,
-  postId,
 }: {
+  readonly onSelectAction: (action: GitHubPostIssueAction) => void;
   readonly organizationId: string;
-  readonly postId: string;
 }) {
-  const [action, setAction] = useState<GitHubPostAction>(null);
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
   const hasActiveConnection = Result.builder(connectionsResult)
     .onInitial(
@@ -103,31 +107,25 @@ function GitHubPostResourceActionsContent({
   }
   return (
     <>
-      <MenuItem onClick={() => setAction("create")}>
+      <MenuItem onClick={() => onSelectAction("create")}>
         <HugeiconsIcon icon={PlusSignIcon} />
         Create a new GitHub issue
       </MenuItem>
-      <MenuItem onClick={() => setAction("link")}>
+      <MenuItem onClick={() => onSelectAction("link")}>
         <HugeiconsIcon icon={Link01Icon} />
         Link an existing GitHub issue
       </MenuItem>
-      {action ? (
-        <GitHubPostIssueDialog
-          action={action}
-          onOpenChange={(open) => {
-            if (!open) {
-              setAction(null);
-            }
-          }}
-          organizationId={organizationId}
-          postId={postId}
-        />
-      ) : null}
     </>
   );
 }
 
-function GitHubPostIssueDialog({
+/**
+ * The create/link GitHub issue dialog for one post.
+ *
+ * Rendered by the post detail route outside the linked-resource menu, because a
+ * menu item click unmounts the popup that hosts the actions.
+ */
+export function GitHubPostIssueDialog({
   action,
   organizationId,
   postId,

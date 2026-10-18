@@ -2,6 +2,7 @@ import type { TContact } from "@feeblo/domain/contact/schema";
 import type { TOrganizationMember } from "@feeblo/domain/membership/schema";
 import type { TPostActivityKind } from "@feeblo/domain/post-activity/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import {
   ActivityTimeline,
   ActivityTimelineItem,
@@ -281,7 +282,7 @@ export function PostActivityList({
       new Map(
         statuses.map((status) => [
           status.id,
-          status.type.replaceAll("_", " ").toLowerCase(),
+          status.label || formatPostStatus(status.type),
         ])
       ),
     [statuses]

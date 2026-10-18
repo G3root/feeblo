@@ -273,7 +273,7 @@ test.describe("comment as status update", () => {
       // exactly one status transition and three comment entries.
       await page.getByRole("tab", { name: "Activity" }).click();
       await expect(
-        activityItem(page, /changed the status from pending to in progress/)
+        activityItem(page, /changed the status from Pending to In Progress/)
       ).toHaveCount(1);
       await expect(activityItem(page, /added a comment/)).toHaveCount(3);
     }

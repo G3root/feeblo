@@ -54,6 +54,7 @@ import {
 } from "~/features/board/dialog-stores";
 import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { usePlan } from "~/hooks/use-plan";
 import { usePublicSiteUrl } from "~/hooks/use-site";
 
 import { NavUser } from "./nav-user";
@@ -448,6 +449,15 @@ function MyBoardLink() {
 
 function UpgradePlanButton() {
   const store = useUpgradePlanDialogContext();
+  const plan = usePlan().data?.plan;
+
+  // The dialog sells the plans above the current one, so it is only an upgrade
+  // path on Free. Paid workspaces manage their subscription from billing
+  // settings instead, and the button would otherwise offer a plan they hold.
+  if (plan !== "free") {
+    return null;
+  }
+
   return (
     <>
       <SidebarMenuItem>

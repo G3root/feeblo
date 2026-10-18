@@ -1,5 +1,6 @@
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { BoardId, PostStatusId } from "@feeblo/id";
+import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -33,17 +34,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as Result from "effect/reactivity/AsyncResult";
 import * as Schema from "effect/Schema";
-import {
-  startTransition,
-  useMemo,
-  useOptimistic,
-  useRef,
-  useState,
-} from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   type GitHubConnection,
   type GitHubPostStatus,
+  type GitHubPublishSettings,
   type GitHubSyncRule,
   gitHubBoardsAtom,
   gitHubReactivityKeys,
@@ -362,26 +358,41 @@ function GitHubPublishingSettings({
     .exhaustive();
   const repositories = useAsyncList(repositoriesResult);
   const boards = useAsyncList(boardsResult);
-  const [optimisticSettings, setOptimisticSettings] = useOptimistic(
-    settings,
-    (_current, next: NonNullable<typeof settings>) => next
-  );
+  // The settings query refreshes from the mutation's reactivity keys, and that
+  // refresh resolves after the write promise does. Holding the draft until the
+  // server value catches up keeps the switch from snapping back to the stale
+  // value in the gap, which `useOptimistic` alone cannot cover.
+  const [pendingSettings, setPendingSettings] =
+    useState<GitHubPublishSettings | null>(null);
+  // Once the refreshed value carries the save, the overlay is done. Clear it
+  // during render (React re-renders before committing) so the authoritative
+  // value lands in the same commit instead of an effect pass that commits the
+  // overlay first.
+  if (
+    pendingSettings !== null &&
+    settings !== null &&
+    publishSettingsEqual(settings, pendingSettings)
+  ) {
+    setPendingSettings(null);
+  }
+  const optimisticSettings = pendingSettings ?? settings;
 
-  const save = (next: NonNullable<typeof settings>) => {
-    startTransition(async () => {
-      setOptimisticSettings(next);
+  const save = (next: GitHubPublishSettings) => {
+    setPendingSettings(next);
+    void (async () => {
       try {
         await updateSettings({
           payload: { ...args, ...next },
           reactivityKeys: gitHubReactivityKeys(args.organizationId),
         });
       } catch {
+        setPendingSettings(null);
         toastManager.add({
           title: "Could not save GitHub publishing settings",
           type: "error",
         });
       }
-    });
+    })();
   };
   if (!optimisticSettings) {
     return (
@@ -547,6 +558,30 @@ type GitHubSyncRuleDraft = {
   readonly enabled: boolean;
 };
 
+function publishSettingsEqual(
+  server: GitHubPublishSettings,
+  pending: GitHubPublishSettings
+): boolean {
+  return (
+    server.enabled === pending.enabled &&
+    server.boardScope === pending.boardScope &&
+    server.boardId === pending.boardId &&
+    server.repositoryOwner === pending.repositoryOwner &&
+    server.repositoryName === pending.repositoryName
+  );
+}
+
+function syncRuleDraftEqual(
+  server: GitHubSyncRuleDraft,
+  pending: GitHubSyncRuleDraft
+): boolean {
+  return (
+    server.postStatusId === pending.postStatusId &&
+    server.upvoterNotificationPolicy === pending.upvoterNotificationPolicy &&
+    server.enabled === pending.enabled
+  );
+}
+
 function GitHubSyncRules({
   args,
 }: {
@@ -649,9 +684,8 @@ function GitHubSyncRuleSlot({
   const deleteRule = useAtomSet(deleteGitHubSyncRuleAtom, {
     mode: "promise",
   });
-  // Optimistic draft derived from the server rule. Field changes render
-  // immediately and reset to the server value once the refresh lands (or a
-  // failed save reverts the rule).
+  // Draft derived from the server rule, overlaid by the pending draft above
+  // while a save is settling.
   // The workspace's default status, not the first row: this is where a new
   // sync rule files issues until an admin picks another, and reordering
   // statuses must not change that.
@@ -671,14 +705,20 @@ function GitHubSyncRuleSlot({
       rule?.upvoterNotificationPolicy,
     ]
   );
-  const [draft, setDraftOptimistic] = useOptimistic(
-    baseDraft,
-    (_current, next: GitHubSyncRuleDraft) => next
+  // The same refresh-gap as the publish settings above, one rule at a time:
+  // hold the draft until the refreshed rule matches what was saved, then clear
+  // it during render.
+  const [pendingDraft, setPendingDraft] = useState<GitHubSyncRuleDraft | null>(
+    null
   );
+  if (pendingDraft !== null && syncRuleDraftEqual(baseDraft, pendingDraft)) {
+    setPendingDraft(null);
+  }
+  const draft = pendingDraft ?? baseDraft;
   const ruleId = rule?.id ?? createdRuleId;
   const save = (next: GitHubSyncRuleDraft) => {
-    startTransition(async () => {
-      setDraftOptimistic(next);
+    setPendingDraft(next);
+    void (async () => {
       setSaving(true);
       try {
         if (ruleId === null) {
@@ -735,6 +775,7 @@ function GitHubSyncRuleSlot({
           });
         }
       } catch {
+        setPendingDraft(null);
         toastManager.add({
           title:
             ruleId === null
@@ -745,7 +786,7 @@ function GitHubSyncRuleSlot({
       } finally {
         setSaving(false);
       }
-    });
+    })();
   };
   const statusesReady = !statusesLoading && statuses.length > 0;
   const remove = async () => {
@@ -763,6 +804,7 @@ function GitHubSyncRuleSlot({
         reactivityKeys: gitHubReactivityKeys(args.organizationId),
       });
       setCreatedRuleId(null);
+      setPendingDraft(null);
       createInFlightRef.current = null;
       toastManager.add({
         title: "GitHub synchronization rule removed",
@@ -801,7 +843,8 @@ function GitHubSyncRuleSlot({
           );
         }}
         options={statuses.map(
-          (status) => [status.id, status.type.replaceAll("_", " ")] as const
+          (status) =>
+            [status.id, status.label || formatPostStatus(status.type)] as const
         )}
         value={draft.postStatusId}
       />

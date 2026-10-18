@@ -19,9 +19,13 @@ import {
   useLiveQuery,
 } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
-import { GitHubPostResourceActions } from "~/features/github/components/post-github-actions";
+import {
+  GitHubPostIssueDialog,
+  GitHubPostResourceActions,
+} from "~/features/github/components/post-github-actions";
+import type { GitHubPostIssueAction } from "~/features/github/shared-form";
 import { PostExternalResources } from "~/features/integrations/components/post-external-resources";
 import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
 import {
@@ -146,6 +150,11 @@ function RouteComponent() {
   const githubResourcesPolicy = usePolicy(
     hasPermission(organizationId, "integrations.manage")
   );
+  // The dialog lives here rather than inside the linked-resource menu: a menu
+  // item click closes (and unmounts) the popup, so a dialog mounted in the
+  // actions node would disappear with it.
+  const [githubIssueAction, setGithubIssueAction] =
+    useState<GitHubPostIssueAction | null>(null);
 
   const { data: postRow, isLoading: isPostLoading } = useLiveQuery({
     queryKey: [
@@ -309,13 +318,26 @@ function RouteComponent() {
                 <PostExternalResources
                   actions={
                     <GitHubPostResourceActions
+                      onSelectAction={setGithubIssueAction}
                       organizationId={organizationId}
-                      postId={post.id}
                     />
                   }
                   organizationId={organizationId}
                   postId={post.id}
                 />
+
+                {githubIssueAction === null ? null : (
+                  <GitHubPostIssueDialog
+                    action={githubIssueAction}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        setGithubIssueAction(null);
+                      }
+                    }}
+                    organizationId={organizationId}
+                    postId={post.id}
+                  />
+                )}
               </>
             )}
 
