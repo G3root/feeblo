@@ -13,8 +13,10 @@ import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   BellDotIcon,
+  Clock01Icon,
   CommentAdd01Icon,
   GitMergeIcon,
+  LockIcon,
   Megaphone01Icon,
   Note01Icon,
   Progress01Icon,
@@ -58,6 +60,8 @@ const NOTIFICATION_KIND_ICONS = {
   "feedback.status_changed": Progress01Icon,
   "feedback.submitted": Note01Icon,
   "feedback.unmerged": Undo02Icon,
+  "plan.ending": Clock01Icon,
+  "plan.locked": LockIcon,
 } satisfies Record<TNotificationEventType, IconSvgElement>;
 
 /**

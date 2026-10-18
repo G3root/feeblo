@@ -16,6 +16,10 @@ export const NotificationEventType = S.Literals([
   "feedback.unmerged",
   "changelog.published",
   "changelog.updated",
+  // Plan lifecycle: the paid period is about to end, and the fall to free has
+  // locked resources. Both go to owners and admins (the people who can act).
+  "plan.ending",
+  "plan.locked",
 ]);
 
 export type TNotificationEventType = S.Schema.Type<

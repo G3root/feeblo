@@ -216,6 +216,7 @@ const makeNotificationService = Effect.gen(function* () {
       .pipe(Effect.map((rows) => rows[0]));
 
   return {
+    create,
     notifySubmission: ({
       actorUserId,
       organizationId,
