@@ -1,10 +1,12 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { defineSurfacePair } from "../surface";
+import { WorkspaceRepository } from "../workspace/repository";
 import { PostStatusRepository } from "./repository";
 import { PostStatusRpcs } from "./rpcs";
 import type {
@@ -22,12 +24,20 @@ type PostStatusRpcTag = RpcTagsOf<typeof PostStatusRpcs>;
 
 export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostStatusRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
   // Statuses are the workspace's own vocabulary, the same kind of thing as
   // tags, changelog categories and roadmap columns, so they are managed at the
   // same level: manager and above.
   const manage = (organizationId: string) =>
     Policy.canPermission(organizationId, "statuses.*");
+  // Creating and editing statuses is a write; deleting one is cleanup and
+  // stays open so a locked workspace can still reduce its vocabulary.
+  const manageWritable = (organizationId: string) =>
+    Policy.all(
+      manage(organizationId),
+      entitlementPolicy.assertWorkspaceWritable(organizationId)
+    );
 
   // -- Surface-parameterized reads --
   //
@@ -58,7 +68,7 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
     ListPostStatusesPublic: listStatuses.public,
     CreatePostStatus: (args: TPostStatusCreate) =>
       repository.create(args).pipe(
-        Policy.withPolicy(manage(args.organizationId)),
+        Policy.withPolicy(manageWritable(args.organizationId)),
         withRemapDbErrors({
           action: "create",
           entity: "PostStatus",
@@ -78,14 +88,14 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
       repository
         .update(args)
         .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
+          Policy.withPolicy(manageWritable(args.organizationId)),
           withRemapDbErrors("PostStatus", "update")
         ),
     SetPostStatusDefault: (args: TPostStatusMakeDefault) =>
       repository
         .makeDefault(args)
         .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
+          Policy.withPolicy(manageWritable(args.organizationId)),
           withRemapDbErrors("PostStatus", "update")
         ),
     DeletePostStatus: (args: TPostStatusDelete) =>
@@ -106,7 +116,7 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
       repository
         .reorder(args)
         .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
+          Policy.withPolicy(manageWritable(args.organizationId)),
           withRemapDbErrors("PostStatus", "update")
         ),
   };
@@ -116,5 +126,7 @@ export const PostStatusRpcHandlers = PostStatusRpcs.toLayer(
   PostStatusRpcHandlersEffect
 ).pipe(
   // Layer.provide(SitePolicy.layer),
+  Layer.provide(EntitlementPolicy.layer),
+  Layer.provide(WorkspaceRepository.layer),
   Layer.provide(PostStatusRepository.layer)
 );

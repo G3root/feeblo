@@ -1,4 +1,6 @@
-import { describe, expect, it } from "@effect/vitest";
+import { expect, layer } from "@effect/vitest";
+import { Database } from "@feeblo/db";
+import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import {
   WebhookDeliveryHistoryPage,
   WebhookEndpoint,
@@ -8,11 +10,23 @@ import {
   CurrentSession,
   type Session,
 } from "@feeblo/domain/session-middleware";
+import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import { WebhookManagementRpcHandlersEffect } from "./webhook-rpc-handlers";
+
+/**
+ * The real plan-lock policy over an empty PGlite database. The organizations
+ * these tests use have no subscription and no members, so the lock resolves
+ * free and writable, which is what the permission assertions need.
+ */
+const EntitlementPolicyTest = EntitlementPolicy.layer.pipe(
+  Layer.provide(WorkspaceRepository.layer),
+  Layer.provideMerge(Database.PgliteDatabaseLive)
+);
 
 const sessionFor = (
   organizationId: string,
@@ -31,7 +45,7 @@ const sessionFor = (
   },
 });
 
-describe("WebhookManagementRpcHandlers", () => {
+layer(EntitlementPolicyTest)("WebhookManagementRpcHandlers", (it) => {
   it.effect(
     "permits admins, denies members, and forwards the requested organization unchanged",
     () =>
