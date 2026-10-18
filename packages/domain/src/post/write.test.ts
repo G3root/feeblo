@@ -414,5 +414,66 @@ describe("PostWriteService", () => {
         ]);
       })
     );
+
+    it.effect("refuses an update to a post on a locked board", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const writes = yield* PostWriteService;
+        const db = yield* currentDb;
+        const postId = yield* PostId.generate;
+        const now = yield* DateTime.nowAsDate;
+
+        const addBoardAt = (days: number) =>
+          Effect.gen(function* () {
+            const id = yield* BoardId.generate;
+            const createdAt = DateTime.toDateUtc(
+              DateTime.addDuration(
+                DateTime.fromDateUnsafe(now),
+                Duration.days(days)
+              )
+            );
+
+            yield* db.insert(schema.boardTable).values({
+              id,
+              name: `Board ${id}`,
+              slug: id,
+              visibility: "PUBLIC",
+              organizationId: fixture.organizationId,
+              createdAt,
+              updatedAt: createdAt,
+            });
+
+            return { createdAt, id };
+          });
+
+        yield* addBoardAt(1);
+        const locked = yield* addBoardAt(2);
+
+        yield* db.insert(schema.postTable).values({
+          id: postId,
+          boardId: locked.id,
+          organizationId: fixture.organizationId,
+          title: "Locked post",
+          content: "Body",
+          slug: postId,
+          statusId: fixture.statusId,
+          createdAt: locked.createdAt,
+          updatedAt: locked.createdAt,
+        });
+
+        const error = yield* Effect.flip(
+          writes.update(
+            {
+              id: postId,
+              organizationId: fixture.organizationId,
+              title: "Locked post v2",
+            },
+            memberActor(fixture)
+          )
+        );
+
+        expect(error._tag).toBe("PlanLockedError");
+      })
+    );
   });
 });

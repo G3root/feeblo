@@ -142,9 +142,11 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       const freeWorkspaces = yield* Effect.forEach(
         ownedWorkspaces,
         (workspace) =>
-          workspaceRepository
-            .findPlanByOrganizationId({ organizationId: workspace.id })
-            .pipe(Effect.map(({ plan }) => ({ ...workspace, plan })))
+          workspace.id === input.organizationId
+            ? Effect.succeed({ ...workspace, plan: input.plan })
+            : workspaceRepository
+                .findPlanByOrganizationId({ organizationId: workspace.id })
+                .pipe(Effect.map(({ plan }) => ({ ...workspace, plan })))
       ).pipe(
         Effect.map((workspaces) =>
           workspaces

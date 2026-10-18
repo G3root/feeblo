@@ -400,6 +400,48 @@ describe("plan lock policy", () => {
       })
     );
 
+    it.effect(
+      "counts the previewed workspace as free while it is still paid",
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* EntitlementPolicy;
+          const userId = yield* makeUser;
+
+          const target = yield* makeWorkspaceOwnedBy(
+            userId,
+            dateAt("2026-01-01T00:00:00Z")
+          );
+          const second = yield* makeWorkspaceOwnedBy(
+            userId,
+            dateAt("2026-01-02T00:00:00Z")
+          );
+          const third = yield* makeWorkspaceOwnedBy(
+            userId,
+            dateAt("2026-01-03T00:00:00Z")
+          );
+          const fourth = yield* makeWorkspaceOwnedBy(
+            userId,
+            dateAt("2026-01-04T00:00:00Z")
+          );
+          yield* addActiveSubscription(target, "starter");
+
+          const preview = yield* policy.getPlanLockPreview({
+            organizationId: target,
+            userId,
+          });
+
+          // The target workspace is still paid today, but the preview of the
+          // downgrade has to count it with its free siblings, not behind them.
+          expect(feature(preview, "workspaces")).toEqual({
+            feature: "workspaces",
+            limit: 3,
+            count: 4,
+            keptIds: [target, second, third],
+            lockedIds: [fourth],
+          });
+        })
+    );
+
     it.effect("refuses a write to a locked board but not to a kept one", () =>
       Effect.gen(function* () {
         const policy = yield* EntitlementPolicy;

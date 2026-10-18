@@ -743,6 +743,15 @@ const makePostWriteService = Effect.gen(function* () {
       const userId = member?.userId ?? null;
       const columns = actorColumns(actor);
 
+      // A post on a board the plan locked is read-only even when this update
+      // does not name a board: a title, status, or content edit is still a
+      // write to the locked post. The destination board, when one is named,
+      // is validated separately below.
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.id,
+      });
+
       if (args.boardId !== undefined) {
         yield* requireBoard({
           boardId: args.boardId,
