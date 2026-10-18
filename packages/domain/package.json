@@ -178,6 +178,9 @@
     "./email-subscription/repository": {
       "default": "./src/email-subscription/repository.ts"
     },
+    "./entitlement/maintenance": {
+      "default": "./src/entitlement/maintenance.ts"
+    },
     "./entitlement/policies": {
       "default": "./src/entitlement/policies.ts"
     },

@@ -1,7 +1,8 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
+import { entitledSubscriptionCondition } from "@feeblo/db/schema/billing";
 import { PlanLockSelectionId } from "@feeblo/id";
 import { PRIVILEGED_ROLES } from "@feeblo/permissions";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, not, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -111,6 +112,7 @@ export const listPlanLockPrivilegedMembers = Effect.fn(
     .select({
       id: schema.memberTable.id,
       role: schema.memberTable.role,
+      userId: schema.memberTable.userId,
       createdAt: schema.memberTable.createdAt,
     })
     .from(schema.memberTable)
@@ -120,6 +122,97 @@ export const listPlanLockPrivilegedMembers = Effect.fn(
         inArray(schema.memberTable.role, [...PRIVILEGED_ROLES])
       )
     );
+});
+
+/**
+ * Workspaces holding more privileged members than `limit` counts, for the
+ * maintenance pass's demotion sweep. The predicate is the same
+ * `inArray(role, PRIVILEGED_ROLES)` the counter uses, so the sweep demotes
+ * exactly the set the creation gate would refuse.
+ */
+export const findPlanLockPrivilegedOverLimitOrganizations = Effect.fn(
+  "PlanLockRepository.findPrivilegedOverLimitOrganizations"
+)(function* (limit: number) {
+  const db = yield* currentDb;
+  const rows = yield* db
+    .select({ organizationId: schema.memberTable.organizationId })
+    .from(schema.memberTable)
+    .where(inArray(schema.memberTable.role, [...PRIVILEGED_ROLES]))
+    .groupBy(schema.memberTable.organizationId)
+    .having(sql`count(*) > ${limit}`);
+
+  return rows.map(({ organizationId }) => organizationId);
+});
+
+/**
+ * Entitled subscriptions that already asked Polar to stop at period end and
+ * end inside the warning window. The pre-expiry notice's input.
+ */
+export const findPlanLockSubscriptionsEndingSoon = Effect.fn(
+  "PlanLockRepository.findSubscriptionsEndingSoon"
+)(function* (input: { readonly now: Date; readonly until: Date }) {
+  const db = yield* currentDb;
+  return yield* db
+    .select({
+      id: schema.subscriptionTable.id,
+      organizationId: schema.subscriptionTable.organizationId,
+      currentPeriodEnd: schema.subscriptionTable.currentPeriodEnd,
+    })
+    .from(schema.subscriptionTable)
+    .where(
+      and(
+        eq(schema.subscriptionTable.cancelAtPeriodEnd, true),
+        inArray(schema.subscriptionTable.status, [
+          "active",
+          "trialing",
+          "past_due",
+        ]),
+        gte(schema.subscriptionTable.currentPeriodEnd, input.now),
+        lte(schema.subscriptionTable.currentPeriodEnd, input.until)
+      )
+    );
+});
+
+/**
+ * Subscriptions whose entitled period ended inside the lookback window — the
+ * downgrades the post-lock notice describes. `entitledSubscriptionCondition`
+ * is the one definition of "currently entitled", so this picks up exactly the
+ * rows plan resolution no longer counts.
+ */
+export const findPlanLockRecentlyUnentitledSubscriptions = Effect.fn(
+  "PlanLockRepository.findRecentlyUnentitledSubscriptions"
+)(function* (input: { readonly now: Date; readonly since: Date }) {
+  const db = yield* currentDb;
+  return yield* db
+    .select({
+      id: schema.subscriptionTable.id,
+      organizationId: schema.subscriptionTable.organizationId,
+      currentPeriodEnd: schema.subscriptionTable.currentPeriodEnd,
+      endedAt: schema.subscriptionTable.endedAt,
+    })
+    .from(schema.subscriptionTable)
+    .where(
+      and(
+        not(entitledSubscriptionCondition(input.now)),
+        gte(schema.subscriptionTable.currentPeriodEnd, input.since),
+        lte(schema.subscriptionTable.currentPeriodEnd, input.now)
+      )
+    );
+});
+
+/** Demotes admins the maintenance pass found over the privileged-member cap. */
+export const demotePlanLockMembers = Effect.fn(
+  "PlanLockRepository.demoteMembers"
+)(function* (memberIds: readonly string[]) {
+  if (memberIds.length === 0) {
+    return;
+  }
+
+  const db = yield* currentDb;
+  yield* db
+    .update(schema.memberTable)
+    .set({ role: "manager" })
+    .where(inArray(schema.memberTable.id, [...memberIds]));
 });
 
 /**
