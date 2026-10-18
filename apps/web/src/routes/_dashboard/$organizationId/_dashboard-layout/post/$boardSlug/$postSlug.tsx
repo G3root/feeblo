@@ -141,6 +141,17 @@ export const Route = createFileRoute(
   },
 });
 
+/**
+ * A GitHub issue dialog request, paired with the post it was opened for.
+ *
+ * The route component survives post navigation, so the post id travels with
+ * the action: a dialog can only ever submit against the post that opened it.
+ */
+type GitHubIssueDialog = {
+  readonly action: GitHubPostIssueAction;
+  readonly postId: string;
+};
+
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
@@ -153,8 +164,8 @@ function RouteComponent() {
   // The dialog lives here rather than inside the linked-resource menu: a menu
   // item click closes (and unmounts) the popup, so a dialog mounted in the
   // actions node would disappear with it.
-  const [githubIssueAction, setGithubIssueAction] =
-    useState<GitHubPostIssueAction | null>(null);
+  const [githubIssueDialog, setGithubIssueDialog] =
+    useState<GitHubIssueDialog | null>(null);
 
   const { data: postRow, isLoading: isPostLoading } = useLiveQuery({
     queryKey: [
@@ -182,6 +193,11 @@ function RouteComponent() {
 
   const board = postRow?.board;
   const post = postRow?.post;
+  // Drop a dialog opened on another post (or while the next one loads) so it
+  // cannot outlive the post it belongs to.
+  if (githubIssueDialog !== null && githubIssueDialog.postId !== post?.id) {
+    setGithubIssueDialog(null);
+  }
   const activityQuery = useMemo(
     () =>
       createPostActivityQuery({
@@ -318,7 +334,9 @@ function RouteComponent() {
                 <PostExternalResources
                   actions={
                     <GitHubPostResourceActions
-                      onSelectAction={setGithubIssueAction}
+                      onSelectAction={(action) =>
+                        setGithubIssueDialog({ action, postId: post.id })
+                      }
                       organizationId={organizationId}
                     />
                   }
@@ -326,16 +344,16 @@ function RouteComponent() {
                   postId={post.id}
                 />
 
-                {githubIssueAction === null ? null : (
+                {githubIssueDialog === null ? null : (
                   <GitHubPostIssueDialog
-                    action={githubIssueAction}
+                    action={githubIssueDialog.action}
                     onOpenChange={(open) => {
                       if (!open) {
-                        setGithubIssueAction(null);
+                        setGithubIssueDialog(null);
                       }
                     }}
                     organizationId={organizationId}
-                    postId={post.id}
+                    postId={githubIssueDialog.postId}
                   />
                 )}
               </>
