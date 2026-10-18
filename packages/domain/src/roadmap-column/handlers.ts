@@ -20,9 +20,17 @@ import type {
 export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
   const columns = yield* RoadmapColumnRepository;
   const sitePolicy = yield* SitePolicy;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
   const manage = (organizationId: string) =>
     Policy.canPermission(organizationId, "roadmap.*");
+  // Creating and editing columns is a write; deleting one is cleanup and
+  // stays open so a locked workspace can still reduce its roadmap.
+  const manageWritable = (organizationId: string) =>
+    Policy.all(
+      manage(organizationId),
+      entitlementPolicy.assertWorkspaceWritable(organizationId)
+    );
   return {
     ListRoadmapColumns: (args: TRoadmapColumnList) =>
       columns
@@ -48,14 +56,14 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
       columns
         .create(args)
         .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
+          Policy.withPolicy(manageWritable(args.organizationId)),
           withRemapDbErrors("RoadmapColumn", "create")
         ),
     UpdateRoadmapColumn: (args: TRoadmapColumnUpdate) =>
       columns
         .update(args)
         .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
+          Policy.withPolicy(manageWritable(args.organizationId)),
           withRemapDbErrors("RoadmapColumn", "update")
         ),
     DeleteRoadmapColumn: (args: TRoadmapColumnDelete) =>

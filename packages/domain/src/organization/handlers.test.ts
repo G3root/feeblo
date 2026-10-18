@@ -6,7 +6,9 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import { OrganizationRpcHandlersEffect } from "./handlers";
 import { OrganizationRepository } from "./repository";
 
@@ -78,7 +80,15 @@ describe("OrganizationRpcHandlers", () => {
     Layer.provide(Database.PgliteDatabaseLive)
   );
 
-  const TestLayer = Layer.merge(RepositoryTest, Database.PgliteDatabaseLive);
+  const EntitlementTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provideMerge(Database.PgliteDatabaseLive)
+  );
+  const TestLayer = Layer.mergeAll(
+    RepositoryTest,
+    Database.PgliteDatabaseLive,
+    EntitlementTest
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("ListOrganizations", () => {

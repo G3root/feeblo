@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
@@ -14,6 +15,7 @@ export const WebhookManagementErrors = Schema.Union([
   InternalServerError,
   NotFoundError,
   PolicyDeniedError,
+  PlanLockedError,
   UnauthorizedError,
 ]);
 export type WebhookManagementError = typeof WebhookManagementErrors.Type;
