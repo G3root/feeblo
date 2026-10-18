@@ -44,6 +44,11 @@ const makeBoardPolicy = Effect.gen(function* () {
   const canUpdate = (args: TCanUpdate) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "boards.update"),
+      entitlementPolicy.assertBoardWritable({
+        boardId: args.boardId,
+        nextVisibility: args.visibility,
+        organizationId: args.organizationId,
+      }),
       Effect.gen(function* () {
         if (args.visibility !== "PRIVATE") {
           return;

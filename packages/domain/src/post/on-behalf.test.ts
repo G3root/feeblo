@@ -189,10 +189,10 @@ describe("PostRpcHandlers on-behalf", () => {
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
-  const HandlerTest = Layer.mergeAll(
-    PostPolicy.layer,
-    EntitlementPolicy.layer
-  ).pipe(Layer.provideMerge(RepositoriesTest));
+  const HandlerTest = PostPolicy.layer.pipe(
+    Layer.provideMerge(EntitlementPolicy.layer),
+    Layer.provideMerge(RepositoriesTest)
+  );
 
   const TestLayer = PostWriteService.layer.pipe(
     Layer.provideMerge(

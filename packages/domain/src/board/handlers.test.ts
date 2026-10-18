@@ -130,7 +130,7 @@ describe("BoardRpcHandlers", () => {
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = BoardPolicy.layer.pipe(
-    Layer.provide(EntitlementPolicy.layer),
+    Layer.provideMerge(EntitlementPolicy.layer),
     Layer.provideMerge(RepositoriesTest)
   );
 

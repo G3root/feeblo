@@ -4,6 +4,7 @@ import { pipe } from "effect/Function";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import type { Surface } from "../surface";
 import { PostRepository } from "./repository";
@@ -60,6 +61,7 @@ type TIsUnlocked = {
 
 const makePostPolicy = Effect.gen(function* () {
   const repository = yield* PostRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const isCreator = (args: TIsCreator) =>
     Policy.policy((user) =>
@@ -120,11 +122,17 @@ const makePostPolicy = Effect.gen(function* () {
     );
 
   const isUnlocked = (args: TIsUnlocked) =>
-    Policy.policy(() =>
-      repository.isUnlocked({
-        id: args.postId,
-        organizationId: args.organizationId,
-      })
+    Policy.all(
+      Policy.policy(() =>
+        repository.isUnlocked({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      ),
+      // A merged post and a locked post are different refusals: the first is a
+      // content state, the second a plan state. The shared post write path
+      // checks board locks for create/update as well (see `write.ts`).
+      entitlementPolicy.assertPostBoardWritable(args)
     );
 
   /**
@@ -146,11 +154,14 @@ const makePostPolicy = Effect.gen(function* () {
     );
 
   const isUnlockedPublic = (args: TIsUnlocked) =>
-    Policy.policy(() =>
-      repository.isUnlockedPublic({
-        id: args.postId,
-        organizationId: args.organizationId,
-      })
+    Policy.all(
+      Policy.policy(() =>
+        repository.isUnlockedPublic({
+          id: args.postId,
+          organizationId: args.organizationId,
+        })
+      ),
+      entitlementPolicy.assertPostBoardWritable(args)
     );
 
   /**

@@ -2,12 +2,14 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { CompanyRepository } from "./repository";
 import type { TCompanyDelete } from "./schema";
 
 const makeCompanyPolicy = Effect.gen(function* () {
   const repository = yield* CompanyRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const belongsToOrganization = (args: TCompanyDelete) =>
     Policy.policy(() => repository.exists(args));
@@ -22,6 +24,10 @@ const makeCompanyPolicy = Effect.gen(function* () {
   const canUpdate = (args: TCompanyDelete) =>
     Policy.all(
       Policy.canPermission(args.organizationId, "companies.update"),
+      entitlementPolicy.assertCrmEntryWritable({
+        organizationId: args.organizationId,
+        resourceId: args.id,
+      }),
       belongsToOrganization(args)
     );
 

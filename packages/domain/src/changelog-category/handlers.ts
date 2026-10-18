@@ -74,12 +74,15 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         ),
 
     UpdateChangelogCategory: (args: TChangelogCategoryUpdate) =>
-      repository
-        .update(args)
-        .pipe(
-          Policy.withPolicy(categoryPolicy.canUpdate(args.organizationId)),
-          withRemapDbErrors("ChangelogCategory", "update")
+      repository.update(args).pipe(
+        Policy.withPolicy(
+          categoryPolicy.canUpdate({
+            categoryId: args.id,
+            organizationId: args.organizationId,
+          })
         ),
+        withRemapDbErrors("ChangelogCategory", "update")
+      ),
 
     DeleteChangelogCategory: (args: TChangelogCategoryDelete) =>
       repository

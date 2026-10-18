@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import { PolicyDeniedError } from "../policy";
 import {
   BadRequestError,
@@ -37,6 +38,7 @@ export const BoardServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  PlanLockedError,
   BoardNotFoundError,
   FailedToCreateBoardError,
   FailedToUpdateBoardError,

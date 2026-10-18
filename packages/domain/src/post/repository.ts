@@ -13,6 +13,7 @@ import {
   isNull,
   ne,
   notExists,
+  notInArray,
   or,
   type SQL,
   sql,
@@ -42,6 +43,8 @@ interface TPostUpdateInput {
 
 interface TPostFindMany {
   boardId?: string | null | undefined;
+  /** Boards the public plan lock took offline; ignored for internal lists. */
+  excludeBoardIds?: readonly string[] | undefined;
   organizationId: string;
 }
 
@@ -76,6 +79,8 @@ interface TPostDeleteResult {
 }
 
 interface TPostFindPublicBySlug {
+  /** Boards the public plan lock took offline; ignored for internal reads. */
+  excludeBoardIds?: readonly string[] | undefined;
   organizationId: string;
   slug: string;
 }
@@ -618,7 +623,11 @@ const makePostRepository = Effect.gen(function* () {
         .where(whereClause);
     },
 
-    findManyPublic: ({ boardId, organizationId }: TPostFindMany) => {
+    findManyPublic: ({
+      boardId,
+      excludeBoardIds,
+      organizationId,
+    }: TPostFindMany) => {
       const where: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
         // Superseded content stays queryable internally but must not remain
@@ -630,6 +639,9 @@ const makePostRepository = Effect.gen(function* () {
         where.push(eq(schema.postTable.boardId, boardId));
       }
       where.push(eq(schema.boardTable.visibility, "PUBLIC"));
+      if (excludeBoardIds !== undefined && excludeBoardIds.length > 0) {
+        where.push(notInArray(schema.postTable.boardId, [...excludeBoardIds]));
+      }
 
       const whereClause = and(...where);
 
@@ -652,7 +664,11 @@ const makePostRepository = Effect.gen(function* () {
      * (public boards only, no archived or merged posts) keyed by slug.
      * Resolves to `undefined` when no public post matches.
      */
-    findPublicBySlug: ({ organizationId, slug }: TPostFindPublicBySlug) => {
+    findPublicBySlug: ({
+      excludeBoardIds,
+      organizationId,
+      slug,
+    }: TPostFindPublicBySlug) => {
       const whereClause = and(
         eq(schema.postTable.organizationId, organizationId),
         eq(schema.postTable.slug, slug),
@@ -660,7 +676,10 @@ const makePostRepository = Effect.gen(function* () {
         // internally but must not be publicly readable.
         sql`${schema.postTable.archivedAt} is null`,
         sql`${schema.postTable.mergedIntoPostId} is null`,
-        eq(schema.boardTable.visibility, "PUBLIC")
+        eq(schema.boardTable.visibility, "PUBLIC"),
+        ...(excludeBoardIds !== undefined && excludeBoardIds.length > 0
+          ? [notInArray(schema.postTable.boardId, [...excludeBoardIds])]
+          : [])
       );
 
       return db

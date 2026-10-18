@@ -65,6 +65,10 @@ const ALLOWED_USER_FACING_TAGS = new Set<string>([
   "SubjectNotFoundError",
   "InvalidSubjectError",
   "CrmEntryLimitReachedError",
+  // Plan locking is an actionable refusal: the resource is inside a workspace
+  // that holds more than its plan allows, and the fix is upgrading or freeing
+  // a slot, not asking another member for access.
+  "PlanLockedError",
 ]);
 
 function extractUserMessage(cause: unknown): string | undefined {

@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import {
   CrmEntryLimitReachedError,
   InvalidSubjectError,
@@ -82,6 +83,7 @@ export const PostServiceErrors = Schema.Union([
   InternalServerError,
   PostAlreadyExistsError,
   PolicyDeniedError,
+  PlanLockedError,
   PostNotFoundError,
   FailedToCreatePostError,
   FailedToDeletePostError,

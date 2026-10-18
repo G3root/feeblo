@@ -2,6 +2,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { PostRepository } from "../post/repository";
 import type { Surface } from "../surface";
@@ -24,6 +25,7 @@ type TCanVoteOnBehalf = {
 
 const makeUpvotePolicy = Effect.gen(function* () {
   const repository = yield* PostRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
 
   const canList = (args: TCanList) => {
     if (args.source === "public") {
@@ -42,7 +44,8 @@ const makeUpvotePolicy = Effect.gen(function* () {
             id: args.postId,
             organizationId: args.organizationId,
           })
-        )
+        ),
+        entitlementPolicy.assertPostBoardWritable(args)
       );
     }
 
@@ -53,7 +56,8 @@ const makeUpvotePolicy = Effect.gen(function* () {
           id: args.postId,
           organizationId: args.organizationId,
         })
-      )
+      ),
+      entitlementPolicy.assertPostBoardWritable(args)
     );
   };
 
@@ -72,7 +76,8 @@ const makeUpvotePolicy = Effect.gen(function* () {
           id: args.postId,
           organizationId: args.organizationId,
         })
-      )
+      ),
+      entitlementPolicy.assertPostBoardWritable(args)
     );
 
   return {

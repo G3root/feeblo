@@ -255,10 +255,10 @@ describe("PostRpcHandlers", () => {
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
-  const HandlerTest = Layer.mergeAll(
-    PostPolicy.layer,
-    EntitlementPolicy.layer
-  ).pipe(Layer.provideMerge(RepositoriesTest));
+  const HandlerTest = PostPolicy.layer.pipe(
+    Layer.provideMerge(EntitlementPolicy.layer),
+    Layer.provideMerge(RepositoriesTest)
+  );
 
   const IntegrationEventRecorderTest = Layer.succeed(
     IntegrationEventRecorder,
@@ -328,10 +328,13 @@ describe("PostRpcHandlers", () => {
     })
   ).pipe(Layer.provide(PostPolicy.layer));
 
-  const GatedHandlerTest = Layer.mergeAll(
-    Layer.provideMerge(GatedPostPolicy, MergeRaceGateLive),
-    EntitlementPolicy.layer
-  ).pipe(Layer.provideMerge(RepositoriesTest));
+  const GatedHandlerTest = Layer.provideMerge(
+    GatedPostPolicy,
+    MergeRaceGateLive
+  ).pipe(
+    Layer.provideMerge(EntitlementPolicy.layer),
+    Layer.provideMerge(RepositoriesTest)
+  );
 
   const GatedTestLayer = PostWriteService.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(GatedHandlerTest, HandlerRuntimeTest))
@@ -425,6 +428,10 @@ describe("PostRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PRIVATE");
+          // A private board is a paid capability; the refusal under test is
+          // the membership one, so the workspace has to be allowed to have
+          // the board in the first place.
+          yield* activateStarterPlan(fixture.organizationId);
           const postId = yield* PostId.generate;
           const error = yield* Effect.flip(
             handlers
@@ -961,6 +968,7 @@ describe("PostRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
+          yield* activateStarterPlan(fixture.organizationId);
           const privateBoardId = yield* addBoard(fixture, "PRIVATE");
           const privatePostId = yield* PostId.generate;
 
@@ -1155,10 +1163,87 @@ describe("PostRpcHandlers", () => {
     });
 
     describe("ListPostsPublic", () => {
+      it.effect(
+        "hides posts on plan-locked boards from the public endpoint",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture("PUBLIC");
+            const boardDates = [
+              "2026-01-01T00:00:00Z",
+              "2026-01-02T00:00:00Z",
+              "2026-01-03T00:00:00Z",
+            ];
+            const boardIds = ["board_keep_a", "board_keep_b", "board_locked"];
+            const postCreatedAt = DateTime.toDateUtc(
+              DateTime.makeUnsafe("2026-02-01T00:00:00Z")
+            );
+
+            // Three public boards on the free plan: the two oldest stay, the
+            // newest two are locked. The test clock's fixture board predates all
+            // three, so the kept pair is it plus `board_keep_a`.
+            for (const [index, boardId] of boardIds.entries()) {
+              const createdAt = DateTime.toDateUtc(
+                DateTime.makeUnsafe(boardDates[index] ?? "2026-01-01T00:00:00Z")
+              );
+              yield* db.insert(schema.boardTable).values({
+                id: boardId,
+                name: boardId,
+                slug: boardId,
+                visibility: "PUBLIC",
+                organizationId: fixture.organizationId,
+                createdAt,
+                updatedAt: createdAt,
+              });
+            }
+
+            for (const boardId of [...boardIds, fixture.boardId]) {
+              yield* db.insert(schema.postTable).values({
+                id: `post_${boardId}`,
+                boardId,
+                content: "Content",
+                organizationId: fixture.organizationId,
+                slug: `post-${boardId}`,
+                statusId: fixture.statusId,
+                title: `Post ${boardId}`,
+                createdAt: postCreatedAt,
+                updatedAt: postCreatedAt,
+              });
+            }
+
+            const posts = yield* handlers
+              .ListPostsPublic({
+                boardId: null,
+                organizationId: fixture.organizationId,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+
+            expect(new Set(posts.map((post) => post.boardId))).toEqual(
+              new Set([fixture.boardId, "board_keep_a"])
+            );
+
+            const error = yield* Effect.flip(
+              handlers
+                .GetPostPublic({
+                  organizationId: fixture.organizationId,
+                  slug: "post-board_locked",
+                })
+                .pipe(
+                  Effect.provideService(OptionalCurrentSession, Option.none())
+                )
+            );
+            expect(error._tag).toBe("PostNotFoundError");
+          })
+      );
+
       it.effect("does not expose posts from private boards", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
+          yield* activateStarterPlan(fixture.organizationId);
           const privateBoardId = yield* addBoard(fixture, "PRIVATE");
           const publicPostId = yield* PostId.generate;
           const privatePostId = yield* PostId.generate;
@@ -2303,6 +2388,7 @@ describe("PostRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* PostRpcHandlersEffect;
             const fixture = yield* makeFixture("PUBLIC");
+            yield* activateStarterPlan(fixture.organizationId);
             const privateBoardId = yield* addBoard(fixture, "PRIVATE");
             const publicPostId = yield* PostId.generate;
             const privatePostId = yield* PostId.generate;

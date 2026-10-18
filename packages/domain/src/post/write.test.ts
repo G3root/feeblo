@@ -11,6 +11,7 @@ import {
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -128,6 +129,44 @@ describe("PostWriteService", () => {
       return id;
     });
 
+  const activateStarterPlan = (organizationId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      const productId = `product_${organizationId}`;
+
+      yield* db.insert(schema.productTable).values({
+        id: productId,
+        name: "Starter",
+        isRecurring: true,
+        isArchived: false,
+        externalOrganizationId: "feeblo",
+        visibility: "public",
+        metadata: { plan: "starter", variant: "monthly" },
+        createdAt: now,
+        updatedAt: now,
+      });
+      yield* db.insert(schema.subscriptionTable).values({
+        id: `subscription_${organizationId}`,
+        externalId: `external_${organizationId}`,
+        organizationId,
+        amount: 1000,
+        cancelAtPeriodEnd: false,
+        currency: "usd",
+        recurringInterval: "month",
+        recurringIntervalCount: 1,
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: DateTime.toDateUtc(
+          DateTime.addDuration(DateTime.fromDateUnsafe(now), Duration.days(30))
+        ),
+        customerId: `customer_${organizationId}`,
+        productId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
   const IntegrationEventRecorderTest = Layer.succeed(
     IntegrationEventRecorder,
     IntegrationEventRecorder.of({
@@ -237,6 +276,10 @@ describe("PostWriteService", () => {
       () =>
         Effect.gen(function* () {
           const fixture = yield* makeFixture("PRIVATE");
+          // A private board is a paid capability: on free it is read-only by
+          // the plan lock, and this test is about a machine key's attribution
+          // on a writable board.
+          yield* activateStarterPlan(fixture.organizationId);
           const writes = yield* PostWriteService;
           const db = yield* currentDb;
           const postId = yield* PostId.generate;
@@ -281,6 +324,7 @@ describe("PostWriteService", () => {
       () =>
         Effect.gen(function* () {
           const fixture = yield* makeFixture("PRIVATE");
+          yield* activateStarterPlan(fixture.organizationId);
           const writes = yield* PostWriteService;
           const db = yield* currentDb;
           const postId = yield* PostId.generate;

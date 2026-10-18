@@ -33,6 +33,49 @@ import { runDataImportPass } from "./worker";
 
 const recordedIntegrationEvents: unknown[] = [];
 
+/**
+ * Puts the workspace on Starter. Importing more public boards than free allows
+ * is a paid capability now: the excess boards are read-only on free, so a test
+ * about routing rows to created boards has to run where creation is allowed.
+ */
+const activateStarterPlan = (organizationId: string) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const now = yield* DateTime.nowAsDate;
+    const productId = `product_${organizationId}`;
+
+    yield* db.insert(schema.productTable).values({
+      id: productId,
+      name: "Starter",
+      isRecurring: true,
+      isArchived: false,
+      externalOrganizationId: "feeblo",
+      visibility: "public",
+      metadata: { plan: "starter", variant: "monthly" },
+      createdAt: now,
+      updatedAt: now,
+    });
+    yield* db.insert(schema.subscriptionTable).values({
+      id: `subscription_${organizationId}`,
+      externalId: `external_${organizationId}`,
+      organizationId,
+      amount: 1000,
+      cancelAtPeriodEnd: false,
+      currency: "usd",
+      recurringInterval: "month",
+      recurringIntervalCount: 1,
+      status: "active",
+      currentPeriodStart: now,
+      currentPeriodEnd: DateTime.toDateUtc(
+        DateTime.addDuration(DateTime.fromDateUnsafe(now), Duration.days(30))
+      ),
+      customerId: `customer_${organizationId}`,
+      productId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  });
+
 const makeFixture = () =>
   Effect.gen(function* () {
     const db = yield* currentDb;
@@ -327,6 +370,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
     Effect.gen(function* () {
       recordedIntegrationEvents.length = 0;
       const fixture = yield* makeFixture();
+      yield* activateStarterPlan(fixture.organizationId);
       yield* stageAndConfirm(
         fixture,
         [

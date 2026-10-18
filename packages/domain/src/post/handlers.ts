@@ -58,6 +58,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostRepository;
   const activityRepository = yield* PostActivityRepository;
   const postPolicy = yield* PostPolicy;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
 
@@ -383,13 +384,23 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     },
 
     ListPostsPublic: listPublicEntry.entry((args) =>
-      withPublicViewer({
-        read: () =>
-          repository.findManyPublic({
-            organizationId: args.organizationId,
-            boardId: args.boardId,
-          }),
-        redact: redactCreatorIdentities,
+      Effect.gen(function* () {
+        // A board the plan lock took offline is not publicly readable, so its
+        // posts are excluded from the list rather than filtered afterward:
+        // the exclusion stays inside the query, and paging stays correct.
+        const lockedBoardIds = yield* entitlementPolicy.listLockedBoardIds(
+          args.organizationId
+        );
+
+        return yield* withPublicViewer({
+          read: () =>
+            repository.findManyPublic({
+              organizationId: args.organizationId,
+              boardId: args.boardId,
+              excludeBoardIds: [...lockedBoardIds],
+            }),
+          redact: redactCreatorIdentities,
+        });
       })
     ),
 
@@ -412,23 +423,30 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     },
 
     GetPostPublic: getPublicEntry.entry((args) =>
-      // Same visibility rule as ListPostsPublic: board visibility is enforced
-      // inside `findPublicBySlug` (public boards only).
-      withPublicViewer({
-        read: () =>
-          Effect.gen(function* () {
-            const post = yield* repository.findPublicBySlug({
-              organizationId: args.organizationId,
-              slug: args.slug,
-            });
-            if (post === undefined) {
-              return yield* new PostNotFoundError({
-                message: "Post not found",
+      // Same visibility rule as ListPostsPublic: board visibility and the
+      // plan lock are enforced inside `findPublicBySlug`.
+      Effect.gen(function* () {
+        const lockedBoardIds = yield* entitlementPolicy.listLockedBoardIds(
+          args.organizationId
+        );
+
+        return yield* withPublicViewer({
+          read: () =>
+            Effect.gen(function* () {
+              const post = yield* repository.findPublicBySlug({
+                organizationId: args.organizationId,
+                slug: args.slug,
+                excludeBoardIds: [...lockedBoardIds],
               });
-            }
-            return post;
-          }),
-        redact: redactCreatorIdentity,
+              if (post === undefined) {
+                return yield* new PostNotFoundError({
+                  message: "Post not found",
+                });
+              }
+              return post;
+            }),
+          redact: redactCreatorIdentity,
+        });
       })
     ),
 

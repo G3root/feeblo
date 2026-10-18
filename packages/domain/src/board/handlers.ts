@@ -21,6 +21,7 @@ import type {
 export const BoardRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* BoardRepository;
   const boardPolicy = yield* BoardPolicy;
+  const entitlementPolicy = yield* EntitlementPolicy;
   // const sitePolicy = yield* SitePolicy;
   return {
     ListBoards: (args: TBoardList) =>
@@ -33,18 +34,26 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("Board", "select")
         ),
     ListBoardsPublic: (args: TBoardList) =>
-      repository
-        .findMany({
-          organizationId: args.organizationId,
-          visibility: "PUBLIC",
-        })
-        .pipe(
-          RateLimit.withPublicRpcRateLimit({
-            name: "ListBoardsPublic",
-            level: "read",
+      Effect.gen(function* () {
+        const [boards, lockedBoardIds] = yield* Effect.all([
+          repository.findMany({
+            organizationId: args.organizationId,
+            visibility: "PUBLIC",
           }),
-          withRemapDbErrors("Board", "select")
-        ),
+          entitlementPolicy.listLockedBoardIds(args.organizationId),
+        ]);
+
+        // A board beyond the free slot limit is not served publicly: to the
+        // portal it is as if it does not exist. The dashboard's `ListBoards`
+        // keeps returning it so the owner can export or delete it.
+        return boards.filter((board) => !lockedBoardIds.has(board.id));
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          name: "ListBoardsPublic",
+          level: "read",
+        }),
+        withRemapDbErrors("Board", "select")
+      ),
     DeleteBoard: (args: TBoardDelete) => {
       return repository
         .delete({

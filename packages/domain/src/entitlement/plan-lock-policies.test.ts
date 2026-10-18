@@ -64,7 +64,11 @@ const makeWorkspace = Effect.gen(function* () {
   return { organizationId, userId };
 });
 
-const addBoard = (organizationId: string, createdAt: Date) =>
+const addBoard = (
+  organizationId: string,
+  createdAt: Date,
+  visibility: "PUBLIC" | "PRIVATE" = "PUBLIC"
+) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
     const id = yield* BoardId.generate;
@@ -73,7 +77,39 @@ const addBoard = (organizationId: string, createdAt: Date) =>
       id,
       name: `Board ${id}`,
       slug: id,
-      visibility: "PUBLIC",
+      visibility,
+      organizationId,
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    return id;
+  });
+
+const addChangelogCategory = (organizationId: string, createdAt: Date) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const id = `category_${(yield* BoardId.generate).slice(4)}`;
+
+    yield* db.insert(schema.changelogCategoryTable).values({
+      id,
+      name: id,
+      icon: "circle",
+      organizationId,
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    return id;
+  });
+
+const addContact = (organizationId: string, createdAt: Date) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const id = `contact_${(yield* BoardId.generate).slice(4)}`;
+
+    yield* db.insert(schema.contactTable).values({
+      id,
       organizationId,
       createdAt,
       updatedAt: createdAt,
@@ -361,6 +397,182 @@ describe("plan lock policy", () => {
           keptIds: [first, second, third],
           lockedIds: [fourth],
         });
+      })
+    );
+
+    it.effect("refuses a write to a locked board but not to a kept one", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const { organizationId } = yield* makeWorkspace;
+
+        const oldest = yield* addBoard(
+          organizationId,
+          dateAt("2026-01-01T00:00:00Z")
+        );
+        yield* addBoard(organizationId, dateAt("2026-01-02T00:00:00Z"));
+        const newest = yield* addBoard(
+          organizationId,
+          dateAt("2026-01-03T00:00:00Z")
+        );
+
+        yield* policy.assertBoardWritable({ boardId: oldest, organizationId });
+
+        const error = yield* Effect.flip(
+          policy.assertBoardWritable({ boardId: newest, organizationId })
+        );
+        expect(error._tag).toBe("PlanLockedError");
+      })
+    );
+
+    it.effect("unlocks a board the owner selected to keep", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const { organizationId, userId } = yield* makeWorkspace;
+
+        yield* addBoard(organizationId, dateAt("2026-01-01T00:00:00Z"));
+        yield* addBoard(organizationId, dateAt("2026-01-02T00:00:00Z"));
+        const newest = yield* addBoard(
+          organizationId,
+          dateAt("2026-01-03T00:00:00Z")
+        );
+
+        yield* policy.setPlanLockSelection({
+          featureKey: "feedbackBoards",
+          organizationId,
+          resourceIds: [newest],
+          userId,
+        });
+
+        yield* policy.assertBoardWritable({
+          boardId: newest,
+          organizationId,
+        });
+      })
+    );
+
+    it.effect(
+      "locks a private board on free but allows publishing it into a slot",
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* EntitlementPolicy;
+          const { organizationId } = yield* makeWorkspace;
+
+          const privateBoard = yield* addBoard(
+            organizationId,
+            dateAt("2026-01-01T00:00:00Z"),
+            "PRIVATE"
+          );
+
+          const error = yield* Effect.flip(
+            policy.assertBoardWritable({
+              boardId: privateBoard,
+              organizationId,
+            })
+          );
+          expect(error._tag).toBe("PlanLockedError");
+          // The `feature` field is on the tag branch; `message` is on both, so
+          // the assertion can read it without a narrowing that the error
+          // union's unrelated driver member does not support.
+          expect("message" in error ? error.message : "").toContain("private");
+
+          yield* policy.assertBoardWritable({
+            boardId: privateBoard,
+            nextVisibility: "PUBLIC",
+            organizationId,
+          });
+        })
+    );
+
+    it.effect("refuses a post write when its board is locked", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const db = yield* currentDb;
+        const { organizationId } = yield* makeWorkspace;
+
+        const lockedBoard = yield* addBoard(
+          organizationId,
+          dateAt("2026-01-03T00:00:00Z")
+        );
+        yield* addBoard(organizationId, dateAt("2026-01-01T00:00:00Z"));
+        yield* addBoard(organizationId, dateAt("2026-01-02T00:00:00Z"));
+
+        const postId = `post_${lockedBoard}`;
+        const statusId = `status_${organizationId}`;
+        const createdAt = dateAt("2026-01-03T00:00:00Z");
+        yield* db.insert(schema.postStatusTable).values({
+          id: statusId,
+          type: "PENDING",
+          orderIndex: 0,
+          organizationId,
+        });
+        yield* db.insert(schema.postTable).values({
+          id: postId,
+          boardId: lockedBoard,
+          organizationId,
+          title: "Locked post",
+          content: "Content",
+          slug: postId,
+          statusId,
+          createdAt,
+          updatedAt: createdAt,
+        });
+
+        const error = yield* Effect.flip(
+          policy.assertPostBoardWritable({ organizationId, postId })
+        );
+        expect(error._tag).toBe("PlanLockedError");
+      })
+    );
+
+    it.effect("refuses a write to an over-limit changelog category", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const { organizationId } = yield* makeWorkspace;
+
+        for (const day of [1, 2, 3]) {
+          yield* addChangelogCategory(
+            organizationId,
+            dateAt(`2026-01-0${day}T00:00:00Z`)
+          );
+        }
+        const fourth = yield* addChangelogCategory(
+          organizationId,
+          dateAt("2026-01-04T00:00:00Z")
+        );
+
+        const error = yield* Effect.flip(
+          policy.assertChangelogCategoryWritable({
+            categoryId: fourth,
+            organizationId,
+          })
+        );
+        expect(error._tag).toBe("PlanLockedError");
+      })
+    );
+
+    it.effect("refuses a write to an over-limit CRM entry", () =>
+      Effect.gen(function* () {
+        const policy = yield* EntitlementPolicy;
+        const { organizationId } = yield* makeWorkspace;
+
+        for (let index = 0; index < 10; index++) {
+          yield* addContact(
+            organizationId,
+            dateAt(`2026-01-${String(index + 1).padStart(2, "0")}T00:00:00Z`)
+          );
+        }
+        const eleventh = yield* addContact(
+          organizationId,
+          dateAt("2026-02-01T00:00:00Z")
+        );
+
+        const error = yield* Effect.flip(
+          policy.assertCrmEntryWritable({
+            organizationId,
+            resourceId: eleventh,
+          })
+        );
+        expect(error._tag).toBe("PlanLockedError");
       })
     );
   });

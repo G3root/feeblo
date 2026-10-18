@@ -26,6 +26,7 @@ import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import {
   resolveOnBehalfSubject,
   subscribeOnBehalfSubject,
@@ -237,6 +238,7 @@ const makePostWriteService = Effect.gen(function* () {
   const emailOutbox = yield* EmailOutboxRepository;
   const emailOutboxConfig = yield* EmailOutboxConfig;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
   const integrationEventRecorder = yield* IntegrationEventRecorder;
   const activityRepository = yield* PostActivityRepository;
   const repository = yield* PostRepository;
@@ -425,6 +427,14 @@ const makePostWriteService = Effect.gen(function* () {
       if (board._tag === "None") {
         return yield* new BadRequestError({ message: "Board not found" });
       }
+      // A board locked by the plan is as unwritable as a missing one for every
+      // post write, whichever credential asked: this is the one place the
+      // dashboard RPCs, the Public API, the widget, and inbound chat all pass
+      // through.
+      yield* entitlementPolicy.assertBoardWritable({
+        boardId: args.boardId,
+        organizationId: args.organizationId,
+      });
       return board.value;
     });
 

@@ -10,13 +10,17 @@ import {
 } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { WorkspaceRepository } from "../workspace/repository";
+import { PlanLockedError } from "./errors";
 import {
+  computePlanLockFeatureState,
   computePlanLockState,
   type PlanLockFeatureInput,
   type PlanLockResource,
   type PlanLockSelectionSubject,
 } from "./lock";
 import {
+  findPlanLockBoard,
+  findPlanLockPostBoardId,
   listPlanLockBoards,
   listPlanLockChangelogCategories,
   listPlanLockCrmEntries,
@@ -277,6 +281,200 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       });
     });
 
+  /**
+   * The ids a feature's free-plan lock blocks. Empty when the plan is not
+   * free or the count is within the limit, so the common write path pays the
+   * plan lookup and at most one list. A paid plan never locks existing rows;
+   * only the fall to `free` applies the limit (`./lock.ts`).
+   */
+  const listLockedResourceIds = (input: {
+    readonly organizationId: string;
+    readonly feature: "feedbackBoards" | "changelogCategories" | "crmEntries";
+  }) =>
+    Effect.gen(function* () {
+      const { plan } = yield* workspaceRepository.findPlanByOrganizationId({
+        organizationId: input.organizationId,
+      });
+
+      if (plan !== "free") {
+        return new Set<string>();
+      }
+
+      const resources = yield* Effect.gen(function* () {
+        switch (input.feature) {
+          case "feedbackBoards":
+            return yield* listPlanLockBoards(input.organizationId);
+          case "changelogCategories":
+            return yield* listPlanLockChangelogCategories(input.organizationId);
+          case "crmEntries":
+            return yield* listPlanLockCrmEntries(input.organizationId);
+        }
+      });
+      const limit = PLAN_ENTITLEMENTS[plan].limits[input.feature];
+
+      if (limit === null || resources.length <= limit) {
+        return new Set<string>();
+      }
+
+      const selectionRows = yield* listPlanLockSelection({
+        scope: "organization",
+        subjectId: input.organizationId,
+      });
+      const featureState = computePlanLockFeatureState({
+        feature: input.feature,
+        limit,
+        resources,
+        selectedIds: selectedResourceIds(selectionRows, input.feature),
+      });
+
+      return new Set(featureState.lockedIds);
+    });
+
+  /**
+   * Refuses a write to a locked board. A private board is locked by the
+   * `privateBoards` capability on free regardless of the board count; a public
+   * board beyond the count limit is locked wherever it sits outside the keeper
+   * set. A missing board is not this check's problem: the caller's own
+   * not-found handling answers it.
+   *
+   * `nextVisibility` is the update's target when the caller is changing
+   * visibility. Publishing a private board is the one write the capability
+   * lock must not refuse: it is how the owner converts a locked private board
+   * into a slot-consuming public one. It still needs a free slot, so the
+   * publish-and-instantly-relock surprise cannot happen.
+   */
+  const assertBoardWritable = (input: {
+    readonly organizationId: string;
+    readonly boardId: string;
+    readonly nextVisibility?: "PUBLIC" | "PRIVATE";
+  }) =>
+    Effect.gen(function* () {
+      const board = yield* findPlanLockBoard(input);
+
+      if (board === undefined) {
+        return;
+      }
+
+      const { plan } = yield* workspaceRepository.findPlanByOrganizationId({
+        organizationId: input.organizationId,
+      });
+
+      if (plan !== "free") {
+        return;
+      }
+
+      const limit = PLAN_ENTITLEMENTS[plan].limits.feedbackBoards ?? 0;
+
+      if (board.visibility === "PRIVATE") {
+        if (input.nextVisibility !== "PUBLIC") {
+          return yield* new PlanLockedError({
+            feature: "privateBoards",
+            message:
+              "This board is private and the workspace is on the Free plan. Upgrade to make it editable again.",
+          });
+        }
+
+        const publicBoards = yield* listPlanLockBoards(input.organizationId);
+
+        if (publicBoards.length >= limit) {
+          return yield* new PlanLockedError({
+            feature: "feedbackBoards",
+            message:
+              "The Free plan has no board slot left for this board. Remove another public board first.",
+          });
+        }
+
+        return;
+      }
+
+      const publicBoards = yield* listPlanLockBoards(input.organizationId);
+
+      if (publicBoards.length <= limit) {
+        return;
+      }
+
+      const selectionRows = yield* listPlanLockSelection({
+        scope: "organization",
+        subjectId: input.organizationId,
+      });
+      const lockedBoardIds = new Set(
+        computePlanLockFeatureState({
+          feature: "feedbackBoards",
+          limit,
+          resources: publicBoards,
+          selectedIds: selectedResourceIds(selectionRows, "feedbackBoards"),
+        }).lockedIds
+      );
+
+      if (lockedBoardIds.has(input.boardId)) {
+        return yield* new PlanLockedError({
+          feature: "feedbackBoards",
+          message:
+            "This board is read-only because the workspace has more boards than the Free plan allows. Upgrade or remove another board to use it again.",
+        });
+      }
+    });
+
+  /** The public boards a free workspace's slot lock blocks, for read filters. */
+  const listLockedBoardIds = (organizationId: string) =>
+    listLockedResourceIds({ organizationId, feature: "feedbackBoards" });
+
+  /** Refuses a post-scoped write when the post's board is locked. */
+  const assertPostBoardWritable = (input: {
+    readonly organizationId: string;
+    readonly postId: string;
+  }) =>
+    Effect.gen(function* () {
+      const boardId = yield* findPlanLockPostBoardId(input);
+
+      if (boardId === undefined) {
+        return;
+      }
+
+      yield* assertBoardWritable({
+        organizationId: input.organizationId,
+        boardId,
+      });
+    });
+
+  const assertChangelogCategoryWritable = (input: {
+    readonly organizationId: string;
+    readonly categoryId: string;
+  }) =>
+    Effect.gen(function* () {
+      const lockedCategoryIds = yield* listLockedResourceIds({
+        organizationId: input.organizationId,
+        feature: "changelogCategories",
+      });
+
+      if (lockedCategoryIds.has(input.categoryId)) {
+        return yield* new PlanLockedError({
+          feature: "changelogCategories",
+          message:
+            "This changelog category is read-only because the workspace has more categories than the Free plan allows.",
+        });
+      }
+    });
+
+  const assertCrmEntryWritable = (input: {
+    readonly organizationId: string;
+    readonly resourceId: string;
+  }) =>
+    Effect.gen(function* () {
+      const lockedCrmEntryIds = yield* listLockedResourceIds({
+        organizationId: input.organizationId,
+        feature: "crmEntries",
+      });
+
+      if (lockedCrmEntryIds.has(input.resourceId)) {
+        return yield* new PlanLockedError({
+          feature: "crmEntries",
+          message:
+            "This contact or company is read-only because the workspace has more CRM entries than the Free plan allows.",
+        });
+      }
+    });
+
   const canUsePrivateBoards = (organizationId: string) =>
     Effect.gen(function* () {
       const { entitlements } = yield* findEntitlements(organizationId);
@@ -517,6 +715,11 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     getPlanLock,
     getPlanLockPreview,
     setPlanLockSelection,
+    assertBoardWritable,
+    assertPostBoardWritable,
+    assertChangelogCategoryWritable,
+    assertCrmEntryWritable,
+    listLockedBoardIds,
   };
 });
 

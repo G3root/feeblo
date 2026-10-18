@@ -2,7 +2,9 @@ import { currentDb, schema, transaction } from "@feeblo/db";
 import { PlanLockSelectionId } from "@feeblo/id";
 import { PRIVILEGED_ROLES } from "@feeblo/permissions";
 import { and, eq, inArray } from "drizzle-orm";
+import * as EffectArray from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 
 import type { LimitFeatureKey } from "../plan-entitlements";
 import type { PlanLockSelectionSubject } from "./lock";
@@ -38,7 +40,15 @@ export const listPlanLockBoards = Effect.fn("PlanLockRepository.listBoards")(
         createdAt: schema.boardTable.createdAt,
       })
       .from(schema.boardTable)
-      .where(eq(schema.boardTable.organizationId, organizationId));
+      .where(
+        and(
+          eq(schema.boardTable.organizationId, organizationId),
+          // Private boards are capability-locked on free, not slot-locked, so
+          // they never consume a board slot and never appear in the keeper
+          // math; the resolver reports them as locked through `privateBoards`.
+          eq(schema.boardTable.visibility, "PUBLIC")
+        )
+      );
   }
 );
 
@@ -124,6 +134,55 @@ export const listPlanLockSelection = Effect.fn(
     })
     .from(schema.planLockSelectionTable)
     .where(subjectCondition(subject));
+});
+
+/**
+ * The board fields a lock check needs: whether it is over the board count
+ * (which only needs the id) and whether it is private (which needs the
+ * visibility, because a private board is capability-locked on free no matter
+ * how few boards the workspace has).
+ */
+export const findPlanLockBoard = Effect.fn("PlanLockRepository.findBoard")(
+  function* (input: { organizationId: string; boardId: string }) {
+    const db = yield* currentDb;
+    const rows = yield* db
+      .select({
+        id: schema.boardTable.id,
+        visibility: schema.boardTable.visibility,
+      })
+      .from(schema.boardTable)
+      .where(
+        and(
+          eq(schema.boardTable.id, input.boardId),
+          eq(schema.boardTable.organizationId, input.organizationId)
+        )
+      )
+      .limit(1);
+
+    return Option.getOrUndefined(EffectArray.get(rows, 0));
+  }
+);
+
+/**
+ * Resolves the board a post lives on, so a post-scoped write can check the
+ * board lock without the caller having loaded the board.
+ */
+export const findPlanLockPostBoardId = Effect.fn(
+  "PlanLockRepository.findPostBoardId"
+)(function* (input: { organizationId: string; postId: string }) {
+  const db = yield* currentDb;
+  const rows = yield* db
+    .select({ boardId: schema.postTable.boardId })
+    .from(schema.postTable)
+    .where(
+      and(
+        eq(schema.postTable.id, input.postId),
+        eq(schema.postTable.organizationId, input.organizationId)
+      )
+    )
+    .limit(1);
+
+  return Option.getOrUndefined(EffectArray.get(rows, 0))?.boardId;
 });
 
 /**

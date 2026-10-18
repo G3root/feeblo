@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { PlanLockedError } from "../entitlement/errors";
 import {
   CrmEntryLimitReachedError,
   InvalidSubjectError,
@@ -12,6 +13,7 @@ export const UpvoteServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
   PolicyDeniedError,
+  PlanLockedError,
   // On-behalf voter management resolves a subject and can reject invalid
   // identifiers with the shared identity failures.
   SubjectNotFoundError,

@@ -27,8 +27,11 @@ const makeChangelogCategoryPolicy = Effect.gen(function* () {
   const canDelete = (organizationId: string) =>
     Policy.canPermission(organizationId, "changelog-categories.*");
 
-  const canUpdate = (organizationId: string) =>
-    Policy.canPermission(organizationId, "changelog-categories.*");
+  const canUpdate = (args: { organizationId: string; categoryId: string }) =>
+    Policy.all(
+      Policy.canPermission(args.organizationId, "changelog-categories.*"),
+      entitlementPolicy.assertChangelogCategoryWritable(args)
+    );
 
   /**
    * Category assignments on changelogs are manager-scoped: changelog.* or

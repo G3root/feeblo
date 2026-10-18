@@ -12,6 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { EntitlementPolicy } from "../entitlement/policies";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import {
@@ -19,6 +20,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { WorkspaceRepository } from "../workspace/repository";
 import { PostReactionRpcHandlersEffect } from "./handlers";
 import { PostReactionRepository } from "./repository";
 
@@ -123,7 +125,14 @@ describe("PostReactionRpcHandlers", () => {
     PostRepository.layer,
     PostReactionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
-  const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
+  const EntitlementTest = EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provide(Database.PgliteDatabaseLive)
+  );
+  const TestLayer = PostPolicy.layer.pipe(
+    Layer.provideMerge(EntitlementTest),
+    Layer.provideMerge(Repositories)
+  );
 
   layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
     "handlers",

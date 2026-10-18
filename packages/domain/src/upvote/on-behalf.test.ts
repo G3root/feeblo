@@ -18,11 +18,13 @@ import * as Option from "effect/Option";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { UserRepository } from "../user/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { UpvoteRpcHandlersEffect } from "./handlers";
 import { UpvotePolicy } from "./policies";
 import { UpvoteRepository } from "./repository";
@@ -183,10 +185,12 @@ describe("UpvoteRpcHandlers on-behalf", () => {
       )
     ),
     ResolvePrincipalService.layer,
-    UserRepository.layer
+    UserRepository.layer,
+    WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = UpvotePolicy.layer.pipe(
+    Layer.provideMerge(EntitlementPolicy.layer),
     Layer.provideMerge(RepositoriesTest)
   );
 

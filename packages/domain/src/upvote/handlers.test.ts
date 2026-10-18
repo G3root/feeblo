@@ -9,12 +9,14 @@ import {
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
+import { EntitlementPolicy } from "../entitlement/policies";
 import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -25,6 +27,7 @@ import {
   type Session,
 } from "../session-middleware";
 import { UserRepository } from "../user/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import { UpvoteRpcHandlersEffect } from "./handlers";
 import { UpvotePolicy } from "./policies";
 import { UpvoteRepository } from "./repository";
@@ -157,6 +160,49 @@ describe("UpvoteRpcHandlers", () => {
       return id;
     });
 
+  /**
+   * Puts the workspace on Starter. A private board is a paid capability and
+   * is read-only on free, so a test about private-board read hiding has to
+   * build the private board the way a paying workspace would.
+   */
+  const grantStarterPlan = (organizationId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      const productId = `product_starter_${organizationId}`;
+
+      yield* db.insert(schema.productTable).values({
+        id: productId,
+        name: "Starter",
+        isRecurring: true,
+        isArchived: false,
+        externalOrganizationId: "feeblo",
+        visibility: "public",
+        metadata: { plan: "starter", variant: "monthly" },
+        createdAt: now,
+        updatedAt: now,
+      });
+      yield* db.insert(schema.subscriptionTable).values({
+        id: `subscription_${organizationId}`,
+        externalId: `external_${organizationId}`,
+        organizationId,
+        amount: 2900,
+        cancelAtPeriodEnd: false,
+        currency: "usd",
+        recurringInterval: "month",
+        recurringIntervalCount: 1,
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: DateTime.toDateUtc(
+          DateTime.addDuration(DateTime.fromDateUnsafe(now), Duration.days(30))
+        ),
+        customerId: `customer_${organizationId}`,
+        productId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    });
+
   const RepositoriesTest = Layer.mergeAll(
     PostRepository.layer,
     UpvoteRepository.layer,
@@ -170,10 +216,12 @@ describe("UpvoteRpcHandlers", () => {
       )
     ),
     ResolvePrincipalService.layer,
-    UserRepository.layer
+    UserRepository.layer,
+    WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const HandlerTest = UpvotePolicy.layer.pipe(
+    Layer.provideMerge(EntitlementPolicy.layer),
     Layer.provideMerge(RepositoriesTest)
   );
 
@@ -544,6 +592,7 @@ describe("UpvoteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
+          yield* grantStarterPlan(fixture.organizationId);
           const privateBoardId = yield* addBoard(fixture, "PRIVATE");
           const postId = yield* PostId.generate;
 
