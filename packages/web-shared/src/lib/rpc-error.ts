@@ -106,6 +106,32 @@ function getCauseMessage(cause: Cause.Cause<unknown>): string | undefined {
 }
 
 /**
+ * True when a thrown `fetchRpc` failure is the plan lock refusing a write.
+ *
+ * Accepts both an `RpcError` and a raw `Cause`, because TanStack DB's
+ * persistence promise rethrows whichever the transport surfaced. The tag is
+ * matched by name (a decoded error has no prototype), and callers route it to
+ * the upgrade dialog rather than a generic failure toast.
+ */
+export function isPlanLockedError<T>(error: T): boolean {
+  if (isRpcErrorTag(error, "PlanLockedError")) {
+    return true;
+  }
+
+  if (!Cause.isCause(error)) {
+    return false;
+  }
+
+  const failure = Cause.findErrorOption(error);
+  if (Option.isNone(failure)) {
+    return false;
+  }
+
+  const decoded = decodeUserFacingError(failure.value);
+  return Option.isSome(decoded) && decoded.value._tag === "PlanLockedError";
+}
+
+/**
  * Safely converts an unknown value thrown by `fetchRpc` into UI-safe copy.
  *
  * Extracts a user-facing `reason` / `message` from known domain failures

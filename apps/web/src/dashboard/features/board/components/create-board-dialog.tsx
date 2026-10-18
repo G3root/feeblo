@@ -21,6 +21,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
+import { isPlanLockedError } from "@feeblo/web-shared/rpc-error";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@xstate/store-react";
@@ -88,7 +89,15 @@ function CreateBoardForm() {
           title: "Board created successfully",
           type: "success",
         });
-      } catch {
+      } catch (error) {
+        // A locked board (or workspace) is not a generic failure: the fix is
+        // upgrading, so the upgrade dialog is the answer, not a toast.
+        if (isPlanLockedError(error)) {
+          store.send({ type: "toggle" });
+          upgradePlanStore.send({ type: "toggle" });
+          return;
+        }
+
         toastManager.add({
           title: "Failed to create board",
           type: "error",
