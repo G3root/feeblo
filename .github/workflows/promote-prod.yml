@@ -2,17 +2,18 @@ name: Promote prod
 
 # `prod` is the branch Cloudflare's Git integration watches for the dashboard
 # Worker (`apps/web/wrangler.jsonc`, Worker `feeblo`). It is not a development
-# branch and it is never merged: it only ever moves to the commit of a release
-# tag, so every promotion is a fast-forward and no promotion can need a force
-# push. The checks below refuse anything else — a tag cut from a branch other
-# than `main`, or a `prod` that has drifted off `main` — so a diverged `prod`
-# fails this job instead of being overwritten.
+# branch and it is never merged: it only ever moves to a commit `main` already
+# contains — the commit of a release tag, or the tip of `main` when no tag is
+# given — so every promotion is a fast-forward and no promotion can need a
+# force push. The checks below refuse anything else — a tag cut from a branch
+# other than `main`, or a `prod` that has drifted off `main` — so a diverged
+# `prod` fails this job instead of being overwritten.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to promote (for example v1.2.0)
-        required: true
+        description: Release tag to promote (for example v1.2.0). Leave empty to promote the tip of main.
+        required: false
         type: string
       dry_run:
         description: Check only, do not move prod
@@ -31,7 +32,7 @@ permissions:
 
 jobs:
   promote:
-    name: Move prod to ${{ inputs.tag }}
+    name: Move prod to ${{ inputs.tag || 'main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -51,42 +52,53 @@ jobs:
           # default) because the last step pushes with them.
           fetch-depth: 0
 
-      - name: Verify the tag is on main and prod can fast-forward to it
+      - name: Verify the target is on main and prod can fast-forward to it
         env:
           TAG: ${{ inputs.tag }}
           GH_TOKEN: ${{ github.token }}
         run: |
           git fetch origin main prod --tags --quiet
 
-          # `publish-images.yml` builds images only for `v*` tags, so an
-          # `sdk@*` tag would promote a commit whose server image was never
-          # published.
-          case "$TAG" in
-            v*) ;;
-            *) echo "::error::${TAG} is not a v* release tag"; exit 1 ;;
-          esac
+          if [ -n "${TAG}" ]; then
+            subject="${TAG}"
 
-          # `git rev-parse --verify` accepts revision syntax, so `v1.2.0~1` or
-          # `v1.2.0^{commit}` would pass it and resolve a commit no tag points
-          # at. `git show-ref --verify` matches the ref name exactly, and the
-          # peel stays anchored to the validated `refs/tags/` name.
-          git show-ref --verify --quiet "refs/tags/${TAG}" 2>/dev/null \
-            || { echo "::error::${TAG} is not an exact tag ref name"; exit 1; }
-          target="$(git rev-parse "refs/tags/${TAG}^{commit}")" \
-            || { echo "::error::${TAG} does not point at a commit"; exit 1; }
+            # `publish-images.yml` builds images only for `v*` tags, so an
+            # `sdk@*` tag would promote a commit whose server image was never
+            # published.
+            case "$TAG" in
+              v*) ;;
+              *) echo "::error::${TAG} is not a v* release tag"; exit 1 ;;
+            esac
 
-          # Images are published on `release: published`, so a missing Release
-          # and a draft both mean no image exists. This token can see a draft,
-          # so `isDraft` has to be checked explicitly.
-          draft="$(gh release view "${TAG}" --json isDraft --jq '.isDraft' 2>/dev/null)" \
-            || { echo "::error::${TAG} has no GitHub Release"; exit 1; }
-          [ "$draft" = "false" ] \
-            || { echo "::error::${TAG} is only a draft release; its images were never published"; exit 1; }
+            # `git rev-parse --verify` accepts revision syntax, so `v1.2.0~1` or
+            # `v1.2.0^{commit}` would pass it and resolve a commit no tag points
+            # at. `git show-ref --verify` matches the ref name exactly, and the
+            # peel stays anchored to the validated `refs/tags/` name.
+            git show-ref --verify --quiet "refs/tags/${TAG}" 2>/dev/null \
+              || { echo "::error::${TAG} is not an exact tag ref name"; exit 1; }
+            target="$(git rev-parse "refs/tags/${TAG}^{commit}")" \
+              || { echo "::error::${TAG} does not point at a commit"; exit 1; }
 
-          git merge-base --is-ancestor "$target" origin/main \
-            || { echo "::error::${TAG} is not on main, so promoting it would fork prod off main"; exit 1; }
+            # Images are published on `release: published`, so a missing Release
+            # and a draft both mean no image exists. This token can see a draft,
+            # so `isDraft` has to be checked explicitly.
+            draft="$(gh release view "${TAG}" --json isDraft --jq '.isDraft' 2>/dev/null)" \
+              || { echo "::error::${TAG} has no GitHub Release"; exit 1; }
+            [ "$draft" = "false" ] \
+              || { echo "::error::${TAG} is only a draft release; its images were never published"; exit 1; }
+
+            git merge-base --is-ancestor "$target" origin/main \
+              || { echo "::error::${TAG} is not on main, so promoting it would fork prod off main"; exit 1; }
+          else
+            # No tag: promote the tip of `main`. Every successful `main` build
+            # is published as the `edge` image, so this commit has one too.
+            subject="main"
+            target="$(git rev-parse "origin/main^{commit}")" \
+              || { echo "::error::origin/main does not point at a commit"; exit 1; }
+          fi
+
           git merge-base --is-ancestor origin/prod "$target" \
-            || { echo "::error::prod is not behind ${TAG}; release a revert instead of rewinding prod"; exit 1; }
+            || { echo "::error::prod is not behind ${subject}; release a revert instead of rewinding prod"; exit 1; }
 
           echo "target=${target}" >> "$GITHUB_ENV"
 
@@ -99,8 +111,13 @@ jobs:
           TAG: ${{ inputs.tag }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          if [ "${DRY_RUN}" = "true" ]; then
-            echo "Dry run: \`prod\` would move to \`${TAG}\` (\`${target}\`). Re-run with **dry run** unchecked to move it." >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${TAG}" ]; then
+            subject="${TAG}"
           else
-            echo "\`prod\` moved to \`${TAG}\` (\`${target}\`); Cloudflare will build it." >> "$GITHUB_STEP_SUMMARY"
+            subject="main"
+          fi
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Dry run: \`prod\` would move to \`${subject}\` (\`${target}\`). Re-run with **dry run** unchecked to move it." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "\`prod\` moved to \`${subject}\` (\`${target}\`); Cloudflare will build it." >> "$GITHUB_STEP_SUMMARY"
           fi
