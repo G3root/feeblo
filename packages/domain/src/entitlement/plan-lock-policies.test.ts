@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, UserId, WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -61,7 +62,7 @@ const makeWorkspace = Effect.gen(function* () {
     dateAt("2026-01-01T00:00:00Z")
   );
 
-  return { organizationId, userId };
+  return { organizationId };
 });
 
 const addBoard = (
@@ -182,12 +183,50 @@ const feature = (state: PlanLockState, key: LimitFeatureKey) => {
   return found;
 };
 
+/** Adds a member with a role that is not `owner`. */
+const dbInsertMember = (
+  organizationId: string,
+  userId: string,
+  role: "admin" | "manager"
+) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const now = yield* DateTime.nowAsDate;
+
+    yield* db.insert(schema.memberTable).values({
+      id: `member_${role}_${userId}`,
+      organizationId,
+      userId,
+      role,
+      createdAt: now,
+    });
+  });
+
+/** The `workspaces` keeper selection rows, as the table holds them. */
+const dbSelectSelection = () =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    const rows = yield* db
+      .select({
+        featureKey: schema.planLockSelectionTable.featureKey,
+        resourceId: schema.planLockSelectionTable.resourceId,
+        userId: schema.planLockSelectionTable.userId,
+      })
+      .from(schema.planLockSelectionTable)
+      .where(eq(schema.planLockSelectionTable.featureKey, "workspaces"));
+
+    return rows.map((row) => ({
+      featureKey: row.featureKey,
+      resourceId: row.resourceId,
+      userId: row.userId,
+    }));
+  });
 describe("plan lock policy", () => {
   layer(TestLayer)("plan-aware lock state", (it) => {
     it.effect("locks boards beyond the free limit and keeps the oldest", () =>
       Effect.gen(function* () {
         const policy = yield* EntitlementPolicy;
-        const { organizationId, userId } = yield* makeWorkspace;
+        const { organizationId } = yield* makeWorkspace;
 
         const oldest = yield* addBoard(
           organizationId,
@@ -202,7 +241,7 @@ describe("plan lock policy", () => {
           dateAt("2026-01-03T00:00:00Z")
         );
 
-        const state = yield* policy.getPlanLock({ organizationId, userId });
+        const state = yield* policy.getPlanLock({ organizationId });
 
         expect(state.plan).toBe("free");
         expect(feature(state, "feedbackBoards")).toEqual({
@@ -220,7 +259,7 @@ describe("plan lock policy", () => {
       () =>
         Effect.gen(function* () {
           const policy = yield* EntitlementPolicy;
-          const { organizationId, userId } = yield* makeWorkspace;
+          const { organizationId } = yield* makeWorkspace;
 
           yield* addBoard(organizationId, dateAt("2026-01-01T00:00:00Z"));
           yield* addBoard(organizationId, dateAt("2026-01-02T00:00:00Z"));
@@ -230,10 +269,9 @@ describe("plan lock policy", () => {
           );
           yield* addActiveSubscription(organizationId, "starter");
 
-          const current = yield* policy.getPlanLock({ organizationId, userId });
+          const current = yield* policy.getPlanLock({ organizationId });
           const preview = yield* policy.getPlanLockPreview({
             organizationId,
-            userId,
           });
 
           expect(current.plan).toBe("starter");
@@ -250,7 +288,7 @@ describe("plan lock policy", () => {
       () =>
         Effect.gen(function* () {
           const policy = yield* EntitlementPolicy;
-          const { organizationId, userId } = yield* makeWorkspace;
+          const { organizationId } = yield* makeWorkspace;
 
           const oldest = yield* addBoard(
             organizationId,
@@ -267,12 +305,11 @@ describe("plan lock policy", () => {
 
           yield* policy.setPlanLockSelection({
             organizationId,
-            userId,
             featureKey: "feedbackBoards",
             resourceIds: [newest],
           });
 
-          const state = yield* policy.getPlanLock({ organizationId, userId });
+          const state = yield* policy.getPlanLock({ organizationId });
 
           expect(feature(state, "feedbackBoards")).toEqual({
             feature: "feedbackBoards",
@@ -287,14 +324,13 @@ describe("plan lock policy", () => {
     it.effect("rejects a selection naming a foreign resource", () =>
       Effect.gen(function* () {
         const policy = yield* EntitlementPolicy;
-        const { organizationId, userId } = yield* makeWorkspace;
+        const { organizationId } = yield* makeWorkspace;
 
         yield* addBoard(organizationId, dateAt("2026-01-01T00:00:00Z"));
 
         const error = yield* Effect.flip(
           policy.setPlanLockSelection({
             organizationId,
-            userId,
             featureKey: "feedbackBoards",
             resourceIds: ["brd_not_in_this_workspace"],
           })
@@ -307,7 +343,7 @@ describe("plan lock policy", () => {
     it.effect("rejects more keepers than the free limit allows", () =>
       Effect.gen(function* () {
         const policy = yield* EntitlementPolicy;
-        const { organizationId, userId } = yield* makeWorkspace;
+        const { organizationId } = yield* makeWorkspace;
 
         const first = yield* addBoard(
           organizationId,
@@ -325,7 +361,6 @@ describe("plan lock policy", () => {
         const error = yield* Effect.flip(
           policy.setPlanLockSelection({
             organizationId,
-            userId,
             featureKey: "feedbackBoards",
             resourceIds: [first, second, third],
           })
@@ -338,7 +373,7 @@ describe("plan lock policy", () => {
     it.effect("holds owners aside from the admin keeper limit", () =>
       Effect.gen(function* () {
         const policy = yield* EntitlementPolicy;
-        const { organizationId, userId } = yield* makeWorkspace;
+        const { organizationId } = yield* makeWorkspace;
 
         const firstAdmin = yield* addPrivilegedMember(
           organizationId,
@@ -349,7 +384,7 @@ describe("plan lock policy", () => {
           dateAt("2026-02-02T00:00:00Z")
         );
 
-        const state = yield* policy.getPlanLock({ organizationId, userId });
+        const state = yield* policy.getPlanLock({ organizationId });
 
         // The owner counts against the plan's two privileged members, so the
         // keeper limit for admins is one and the newest admin is locked.
@@ -387,7 +422,6 @@ describe("plan lock policy", () => {
 
         const state = yield* policy.getPlanLock({
           organizationId: first,
-          userId,
         });
 
         expect(feature(state, "workspaces")).toEqual({
@@ -427,7 +461,6 @@ describe("plan lock policy", () => {
 
           const preview = yield* policy.getPlanLockPreview({
             organizationId: target,
-            userId,
           });
 
           // The target workspace is still paid today, but the preview of the
@@ -439,6 +472,68 @@ describe("plan lock policy", () => {
             keptIds: [target, second, third],
             lockedIds: [fourth],
           });
+        })
+    );
+
+    it.effect(
+      "resolves the workspace cap against the owner, not against the caller",
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* EntitlementPolicy;
+          const ownerUserId = yield* makeUser;
+
+          const target = yield* makeWorkspaceOwnedBy(
+            ownerUserId,
+            dateAt("2026-01-01T00:00:00Z")
+          );
+          const second = yield* makeWorkspaceOwnedBy(
+            ownerUserId,
+            dateAt("2026-01-02T00:00:00Z")
+          );
+          const third = yield* makeWorkspaceOwnedBy(
+            ownerUserId,
+            dateAt("2026-01-03T00:00:00Z")
+          );
+          const fourth = yield* makeWorkspaceOwnedBy(
+            ownerUserId,
+            dateAt("2026-01-04T00:00:00Z")
+          );
+
+          // An admin of the workspace, who owns workspaces of their own. The
+          // cap is the owner's, so the admin's account must not enter into it.
+          const adminUserId = yield* makeUser;
+          yield* makeWorkspaceOwnedBy(
+            adminUserId,
+            dateAt("2026-01-05T00:00:00Z")
+          );
+          yield* dbInsertMember(target, adminUserId, "admin");
+
+          const state = yield* policy.getPlanLock({ organizationId: target });
+
+          expect(feature(state, "workspaces")).toEqual({
+            feature: "workspaces",
+            limit: 3,
+            count: 4,
+            keptIds: [target, second, third],
+            lockedIds: [fourth],
+          });
+
+          // The keeper selection is the owner's account choice, so it is
+          // written under the owner and not under whoever asked.
+          yield* policy.setPlanLockSelection({
+            featureKey: "workspaces",
+            organizationId: target,
+            resourceIds: [fourth],
+          });
+
+          const rows = yield* dbSelectSelection();
+          expect(rows).toEqual([
+            {
+              featureKey: "workspaces",
+              resourceId: fourth,
+              userId: ownerUserId,
+            },
+          ]);
         })
     );
 
@@ -469,7 +564,7 @@ describe("plan lock policy", () => {
     it.effect("unlocks a board the owner selected to keep", () =>
       Effect.gen(function* () {
         const policy = yield* EntitlementPolicy;
-        const { organizationId, userId } = yield* makeWorkspace;
+        const { organizationId } = yield* makeWorkspace;
 
         yield* addBoard(organizationId, dateAt("2026-01-01T00:00:00Z"));
         yield* addBoard(organizationId, dateAt("2026-01-02T00:00:00Z"));
@@ -482,7 +577,6 @@ describe("plan lock policy", () => {
           featureKey: "feedbackBoards",
           organizationId,
           resourceIds: [newest],
-          userId,
         });
 
         yield* policy.assertBoardWritable({

@@ -122,6 +122,35 @@ export const listPlanLockPrivilegedMembers = Effect.fn(
     );
 });
 
+/**
+ * The user ids holding the `owner` role in a workspace.
+ *
+ * The workspace cap is per owner (ADR 0013), so the lock is resolved against
+ * the workspace's owners rather than against whoever asked: an admin reading
+ * the plan lock is looking at their own account's workspaces unless the owner
+ * is the subject, and a keeper selection written under the wrong account
+ * would move a workspace nobody was looking at.
+ *
+ * The role can be a comma-joined list, which is why the filter splits rather
+ * than comparing.
+ */
+export const listPlanLockWorkspaceOwnerUserIds = Effect.fn(
+  "PlanLockRepository.listWorkspaceOwnerUserIds"
+)(function* (organizationId: string) {
+  const db = yield* currentDb;
+  const rows = yield* db
+    .select({
+      role: schema.memberTable.role,
+      userId: schema.memberTable.userId,
+    })
+    .from(schema.memberTable)
+    .where(eq(schema.memberTable.organizationId, organizationId));
+
+  return rows
+    .filter(({ role }) => role.split(",").includes("owner"))
+    .map(({ userId }) => userId);
+});
+
 /** The owner's keeper selection for one subject, across every feature. */
 export const listPlanLockSelection = Effect.fn(
   "PlanLockRepository.listSelection"
