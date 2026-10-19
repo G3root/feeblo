@@ -5,6 +5,7 @@ import * as OpenApi from "effect/http-api/OpenApi";
 import * as Schema from "effect/Schema";
 
 import { DataValidationError } from "../contact/errors";
+import { PlanLockedError } from "../entitlement/errors";
 import { RateLimitErrors } from "../rate-limit";
 import {
   InternalServerError,
@@ -44,6 +45,10 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
         InternalServerError,
         UnauthorizedError,
         RateLimitErrors,
+        // The board the submission names is read-only because the workspace
+        // holds more boards than its plan allows. Declared so the refusal is
+        // the 403 it is, rather than the 500 an undeclared failure becomes.
+        PlanLockedError,
       ]),
     })
       .annotate(OpenApi.Title, "Create Feedback")

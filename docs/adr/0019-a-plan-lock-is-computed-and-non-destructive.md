@@ -24,6 +24,8 @@ The keeper selection is the only persisted piece because it is the only part tha
 
 The database handle is read per call in `entitlement/repository.ts` rather than captured in a layered service. Bundling a new service into `EntitlementPolicy.layer` would add `Database` to that layer's requirements and change every existing composition; the methods that actually read the database are the honest place for the requirement.
 
+The cost of that choice is worth recording: the `Database` requirement lands on the _policy method signatures_, so `BoardPolicy.canUpdate`, `PostPolicy.isUnlocked` and `UpvotePolicy.canToggle` all carry it, and a composition of one of those policies needs a database in its context whether or not it reads one. A policy that is an authorization check quietly acquiring a database requirement is a surprise; it is the price of not touching twenty-odd compositions, and it is paid knowingly rather than by accident.
+
 ## Consequences
 
 - Adding a `LimitFeatureKey` fails to compile until `computePlanLockState`'s caller supplies that feature's resource list: the feature record is total on purpose.

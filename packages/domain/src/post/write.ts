@@ -430,7 +430,11 @@ const makePostWriteService = Effect.gen(function* () {
       // A board locked by the plan is as unwritable as a missing one for every
       // post write, whichever credential asked: this is the one place the
       // dashboard RPCs, the Public API, the widget, and inbound chat all pass
-      // through.
+      // through. A workspace the plan locked is the same case one level up,
+      // and it is checked here for the same reason: the dashboard's policies
+      // catch it, but the widget and inbound chat have no policies of their
+      // own, so the shared path is the only place they pass through.
+      yield* entitlementPolicy.assertWorkspaceWritable(args.organizationId);
       yield* entitlementPolicy.assertBoardWritable({
         boardId: args.boardId,
         organizationId: args.organizationId,
@@ -742,6 +746,15 @@ const makePostWriteService = Effect.gen(function* () {
       const member = actor.kind === "member" ? actor : null;
       const userId = member?.userId ?? null;
       const columns = actorColumns(actor);
+
+      // A post on a board the plan locked is read-only even when this update
+      // does not name a board: a title, status, or content edit is still a
+      // write to the locked post. The destination board, when one is named,
+      // is validated separately below.
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.id,
+      });
 
       if (args.boardId !== undefined) {
         yield* requireBoard({
@@ -1197,6 +1210,19 @@ const makePostWriteService = Effect.gen(function* () {
       const columns = actorColumns(actor);
       const member = actor.kind === "member" ? actor : null;
 
+      // A merge writes to both posts: the source is archived and its
+      // engagement moves, and the target's row changes. Either board being
+      // plan-locked refuses it, the same as every other write through this
+      // service, before the repository takes its row locks.
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.sourcePostId,
+      });
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.targetPostId,
+      });
+
       const outboxId = yield* transaction(
         Effect.gen(function* () {
           yield* repository.merge(args);
@@ -1277,6 +1303,25 @@ const makePostWriteService = Effect.gen(function* () {
       const notifications = yield* Effect.serviceOption(NotificationService);
       const columns = actorColumns(actor);
       const member = actor.kind === "member" ? actor : null;
+
+      // An unmerge writes to both posts: the source is restored and the
+      // target gives the tagged engagement back. The target is only knowable
+      // from the source row; a missing or unmerged source has no target and
+      // falls through to the repository's own error, as it did before.
+      const mergedIntoPostId = yield* repository.findMergedIntoPostId({
+        id: args.sourcePostId,
+        organizationId: args.organizationId,
+      });
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.sourcePostId,
+      });
+      if (mergedIntoPostId !== null && mergedIntoPostId !== undefined) {
+        yield* entitlementPolicy.assertPostBoardWritable({
+          organizationId: args.organizationId,
+          postId: mergedIntoPostId,
+        });
+      }
 
       const outboxId = yield* transaction(
         Effect.gen(function* () {

@@ -147,6 +147,17 @@ const CAPABILITY_FEATURE_ORDER = defineFeatureOrder<CapabilityFeatureKey>()([
   "widgetSso",
 ] as const);
 
+/**
+ * Every plan feature key, as a runtime list.
+ *
+ * The limit features and the capabilities together, so a schema that names the
+ * feature a plan lock refused on cannot fall out of step with the catalog.
+ */
+export const PLAN_FEATURE_KEYS = [
+  ...LIMIT_FEATURE_ORDER,
+  ...CAPABILITY_FEATURE_ORDER,
+] as const satisfies readonly PlanFeatureKey[];
+
 export const PLAN_ENTITLEMENTS = {
   free: {
     limits: {
