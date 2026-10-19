@@ -430,7 +430,11 @@ const makePostWriteService = Effect.gen(function* () {
       // A board locked by the plan is as unwritable as a missing one for every
       // post write, whichever credential asked: this is the one place the
       // dashboard RPCs, the Public API, the widget, and inbound chat all pass
-      // through.
+      // through. A workspace the plan locked is the same case one level up,
+      // and it is checked here for the same reason: the dashboard's policies
+      // catch it, but the widget and inbound chat have no policies of their
+      // own, so the shared path is the only place they pass through.
+      yield* entitlementPolicy.assertWorkspaceWritable(args.organizationId);
       yield* entitlementPolicy.assertBoardWritable({
         boardId: args.boardId,
         organizationId: args.organizationId,

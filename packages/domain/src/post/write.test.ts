@@ -444,6 +444,61 @@ describe("PostWriteService", () => {
       })
     );
 
+    it.effect("refuses a write into a workspace the plan locked", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const writes = yield* PostWriteService;
+        const db = yield* currentDb;
+        const postId = yield* PostId.generate;
+
+        // The owner holds more free workspaces than the plan allows, and
+        // this workspace is the extra one. The board itself is fine — it is
+        // the workspace that is read-only. The other three are older, so
+        // the keeper set is the three of them and this workspace is the one
+        // outside it.
+        const now = yield* DateTime.nowAsDate;
+        for (let index = 1; index <= 3; index += 1) {
+          const organizationId = yield* WorkspaceId.generate;
+          const createdAt = DateTime.toDateUtc(
+            DateTime.addDuration(
+              DateTime.fromDateUnsafe(now),
+              Duration.days(-index)
+            )
+          );
+          yield* db.insert(schema.organizationTable).values({
+            id: organizationId,
+            name: "Older workspace",
+            slug: organizationId,
+            createdAt,
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: `membership_${organizationId}`,
+            organizationId,
+            userId: fixture.userId,
+            role: "owner",
+            createdAt,
+          });
+        }
+
+        const error = yield* Effect.flip(
+          writes.create(
+            {
+              assetIds: [],
+              boardId: fixture.boardId,
+              content: "Body",
+              id: postId,
+              organizationId: fixture.organizationId,
+              statusId: fixture.statusId,
+              title: "Into a locked workspace",
+            },
+            memberActor(fixture)
+          )
+        );
+
+        expect(error._tag).toBe("PlanLockedError");
+      })
+    );
+
     it.effect("refuses a merge when either post's board is locked", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture();
