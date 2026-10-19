@@ -14,6 +14,7 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 
 import { BoardRepository } from "../board/repository";
+import { EntitlementPolicy } from "../entitlement/policies";
 import {
   CrmEntryLimitReachedError,
   InvalidSubjectError,
@@ -26,6 +27,7 @@ import {
 import { PostWriteService, type PostWriteActor } from "../post/write";
 import { TagRepository } from "../tag/repository";
 import { UserRepository } from "../user/repository";
+import { WorkspaceRepository } from "../workspace/repository";
 import {
   DATA_IMPORT_BATCH_SIZE,
   DATA_IMPORT_LEASE_MS,
@@ -191,6 +193,14 @@ type BatchBoardResolution = {
   readonly byKey: ReadonlyMap<string, string>;
   /** The ids in `byKey`; a row's staged id outside this set is stale. */
   readonly existingIds: ReadonlySet<string>;
+  /**
+   * Why a named board could not be created, when the plan refused it.
+   *
+   * `null` when every named board was created or already existed. The rows
+   * that name a board the plan refused cannot be placed, and this is the
+   * reason the import report gives them.
+   */
+  readonly planRefusal: string | null;
 };
 
 /**
@@ -208,6 +218,12 @@ type BatchBoardResolution = {
  * is then stale rather than binding, and the row is resolved by name like any
  * other — the board is recreated if it is still missing. Boards win or lose
  * as rows, never as the whole pass.
+ *
+ * The plan's board limit applies here exactly as it does on the dashboard: an
+ * import may not create a board the dashboard would refuse, because a board
+ * created past the limit is read-only the moment it exists, and the rows that
+ * named it could not land on it. The refused rows are reported with the
+ * reason rather than dropped.
  */
 const resolveBatchBoards = ({
   job,
@@ -218,10 +234,11 @@ const resolveBatchBoards = ({
 }): Effect.Effect<
   BatchBoardResolution,
   EffectDrizzleQueryError | LegidError,
-  BoardRepository
+  BoardRepository | EntitlementPolicy
 > =>
   Effect.gen(function* () {
     const boards = yield* BoardRepository;
+    const entitlementPolicy = yield* EntitlementPolicy;
     const byKey = new Map<string, string>();
     const existingIds = new Set<string>();
 
@@ -259,7 +276,43 @@ const resolveBatchBoards = ({
       }
     }
 
+    // The dashboard's own board-create rule, applied to the boards this import
+    // is about to create. The count is the workspace's board count plus the
+    // ones this pass has already made, so the limit is reached the same way it
+    // would be through the dashboard.
+    let boardCount = yield* boards.countByOrganizationId({
+      organizationId: job.organizationId,
+    });
+    let planRefusal: string | null = null;
+
     for (const name of wanted.values()) {
+      // The dashboard's own board-create rule, applied to the board this pass
+      // is about to create. The count is the workspace's board count plus the
+      // ones this pass has already made, so the limit is reached the same way
+      // it would be through the dashboard.
+      const refusal = yield* entitlementPolicy
+        .canCreateBoard({
+          boardCount: Effect.succeed(boardCount),
+          organizationId: job.organizationId,
+          visibility: "PUBLIC",
+        })
+        .pipe(
+          Effect.map(() => null),
+          Effect.catchTag("PolicyDenied", (error) =>
+            Effect.succeed(
+              error.reason ??
+                "This workspace's plan has no room for another board."
+            )
+          )
+        );
+
+      if (refusal !== null) {
+        // The plan has no room for another board. The rows naming it cannot
+        // land, and the import report says why.
+        planRefusal = refusal;
+        break;
+      }
+
       const created = yield* boards
         .create({
           creatorId: job.createdByUserId,
@@ -271,6 +324,7 @@ const resolveBatchBoards = ({
         })
         .pipe(Effect.orElseSucceed((): [] => []));
       if (created.length > 0) {
+        boardCount += created.length;
         remember(created);
         continue;
       }
@@ -283,7 +337,7 @@ const resolveBatchBoards = ({
       );
     }
 
-    return { byKey, existingIds };
+    return { byKey, existingIds, planRefusal };
   });
 
 /**
@@ -333,7 +387,9 @@ const applyPendingRow = ({
         : boardResolution.byKey.get(boardKey(payload.boardName));
     if (boardId === undefined) {
       yield* repository.markRowFailed({
-        message: "The row's board could not be resolved.",
+        message:
+          boardResolution.planRefusal ??
+          "The row's board could not be resolved.",
         rowId: row.id,
       });
       return { kind: "failed" } satisfies RowOutcome;
@@ -681,10 +737,15 @@ export const runDataImportMaintenance: Effect.Effect<
  * assembled where the worker lives. The composition root merges this with
  * `PostWriteService` and the optional fan-outs the write path reads from the
  * request context.
+ *
+ * `EntitlementPolicy` is here because the import creates boards, and the
+ * dashboard's board-create rule — the plan's board limit — is the same rule
+ * that decides whether an import may create one.
  */
 export const DataImportWorkerLive = Layer.mergeAll(
   BoardRepository.layer,
   DataTransferRepository.layer,
+  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
   PostStatusRepository.layer,
   TagRepository.layer,
   UserRepository.layer
