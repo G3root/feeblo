@@ -1,7 +1,6 @@
-import type { LimitFeatureKey } from "@feeblo/domain-contracts/plan";
-
 import {
   LIMIT_FEATURE_KEYS,
+  type LimitFeatureKey,
   type OrganizationPlan,
 } from "../plan-entitlements";
 
@@ -92,13 +91,16 @@ export const orderLockResources = (
  * Selection ids that no longer exist are ignored rather than counted, so
  * deleting a kept resource promotes the next locked one on the same read that
  * removes it. A limit of `null` or a count within the limit keeps everything.
+ *
+ * The resources are taken in the order `orderLockResources` gives them, so the
+ * caller that already sorted does not pay for a second sort.
  */
 export const computeKeptIds = (input: {
-  readonly resources: readonly PlanLockResource[];
   readonly limit: number | null;
+  readonly orderedResources: readonly PlanLockResource[];
   readonly selectedIds: readonly string[];
 }): readonly string[] => {
-  const ordered = orderLockResources(input.resources);
+  const ordered = input.orderedResources;
 
   if (input.limit === null) {
     return ordered.map(({ id }) => id);
@@ -134,7 +136,12 @@ export const computeKeptIds = (input: {
 export const computePlanLockFeatureState = (
   input: PlanLockFeatureInput & { readonly feature: LimitFeatureKey }
 ): PlanLockFeatureState => {
-  const keptIds = computeKeptIds(input);
+  const ordered = orderLockResources(input.resources);
+  const keptIds = computeKeptIds({
+    limit: input.limit,
+    orderedResources: ordered,
+    selectedIds: input.selectedIds,
+  });
   const kept = new Set(keptIds);
 
   return {
@@ -142,9 +149,7 @@ export const computePlanLockFeatureState = (
     limit: input.limit,
     count: input.resources.length,
     keptIds,
-    lockedIds: orderLockResources(input.resources)
-      .map(({ id }) => id)
-      .filter((id) => !kept.has(id)),
+    lockedIds: ordered.map(({ id }) => id).filter((id) => !kept.has(id)),
   };
 };
 
@@ -166,25 +171,22 @@ export const computePlanLockState = (input: {
     plan: input.plan,
     features: LIMIT_FEATURE_KEYS.map((feature): PlanLockFeatureState => {
       const featureInput = input.features[feature];
-      const state = computePlanLockFeatureState({ feature, ...featureInput });
 
-      if (locks) {
-        return state;
+      // A paid plan is display-only: keep everything, lock nothing. The
+      // keeper math is not run at all there, because its answer is discarded.
+      if (!locks) {
+        return {
+          feature,
+          limit: featureInput.limit,
+          count: featureInput.resources.length,
+          keptIds: orderLockResources(featureInput.resources).map(
+            ({ id }) => id
+          ),
+          lockedIds: [],
+        };
       }
 
-      // A paid plan is display-only: keep everything, lock nothing.
-      return {
-        ...state,
-        keptIds: orderLockResources(featureInput.resources).map(({ id }) => id),
-        lockedIds: [],
-      };
+      return computePlanLockFeatureState({ feature, ...featureInput });
     }),
   };
 };
-
-/** How many resources the gate currently blocks across every feature. */
-export const countLockedResources = (state: PlanLockState): number =>
-  state.features.reduce(
-    (total, feature) => total + feature.lockedIds.length,
-    0
-  );
