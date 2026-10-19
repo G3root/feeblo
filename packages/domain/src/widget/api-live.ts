@@ -102,6 +102,33 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
 });
 
 /**
+ * The workspace's public boards, minus the ones the plan locked.
+ *
+ * A board beyond the free slot limit is read-only, and a locked board is
+ * treated as not found on public surfaces. Offering it would collect a
+ * submission the shared write path then refuses, so the widget's board list is
+ * where the lock is applied rather than at the write.
+ */
+export const listWidgetBoards = Effect.fn("Widget.listBoards")(function* ({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
+  const repository = yield* BoardRepository;
+  const entitlementPolicy = yield* EntitlementPolicy;
+  const boards = yield* repository.findMany({
+    organizationId,
+    visibility: "PUBLIC",
+  });
+  const lockedBoardIds =
+    yield* entitlementPolicy.listLockedBoardIds(organizationId);
+
+  return boards
+    .filter((board) => !lockedBoardIds.has(board.id))
+    .map(({ visibility: _visibility, ...board }) => board);
+});
+
+/**
  * The widget HTTP surface, composed once.
  *
  * The feedback write is the shared post write path (`post/write.ts`), built
@@ -160,7 +187,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
           Effect.provideService(JwtSecretRepository, jwtSecretRepository),
           Effect.provideService(OrganizationRepository, organizationRepository),
           Effect.provideService(PostStatusRepository, postStatusRepository),
-          Effect.provideService(SitePolicy, sitePolicy)
+          Effect.provideService(SitePolicy, sitePolicy),
+          Effect.provideService(EntitlementPolicy, entitlementPolicy)
         );
 
       return handlers
@@ -198,15 +226,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
           )
         )
         .handle("listBoards", ({ payload }) =>
-          Effect.gen(function* () {
-            const repository = yield* BoardRepository;
-            const boards = yield* repository.findMany({
-              organizationId: payload.organizationId,
-              visibility: "PUBLIC",
-            });
-
-            return boards.map(({ visibility: _visibility, ...board }) => board);
-          }).pipe(
+          listWidgetBoards(payload).pipe(
             RateLimit.withPublicHttpRateLimit({
               name: "WidgetListBoards",
               level: "read",
