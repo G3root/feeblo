@@ -113,18 +113,20 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
         ),
     GetWorkspacePlanLock: (args: TWorkspaceInput) =>
       Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const input = {
+        // The lock is a property of the workspace, not of the caller: the
+        // policy resolves the workspace's owners itself, so an admin reading
+        // it sees the owner's cap and not their own account's.
+        const current = yield* entitlementPolicy.getPlanLock({
           organizationId: args.organizationId,
-          userId: session.session.userId,
-        };
-        const current = yield* entitlementPolicy.getPlanLock(input);
+        });
         // On free the preview is the current state; only a paid workspace
         // needs the second, free-evaluated computation.
         const preview =
           current.plan === "free"
             ? current
-            : yield* entitlementPolicy.getPlanLockPreview(input);
+            : yield* entitlementPolicy.getPlanLockPreview({
+                organizationId: args.organizationId,
+              });
 
         return {
           current: toWorkspacePlanLockState(current),
@@ -136,20 +138,17 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
       ),
     SetWorkspacePlanLockSelection: (args: TWorkspacePlanLockSelectionInput) =>
       Effect.gen(function* () {
-        const session = yield* CurrentSession;
-        const input = {
-          organizationId: args.organizationId,
-          userId: session.session.userId,
-        };
         const current = yield* entitlementPolicy.setPlanLockSelection({
-          ...input,
           featureKey: args.featureKey,
+          organizationId: args.organizationId,
           resourceIds: args.resourceIds,
         });
         const preview =
           current.plan === "free"
             ? current
-            : yield* entitlementPolicy.getPlanLockPreview(input);
+            : yield* entitlementPolicy.getPlanLockPreview({
+                organizationId: args.organizationId,
+              });
 
         return {
           current: toWorkspacePlanLockState(current),
