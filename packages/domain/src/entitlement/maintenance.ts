@@ -10,18 +10,13 @@ import {
   type LimitFeatureKey,
 } from "../plan-entitlements";
 import { WorkspaceRepository } from "../workspace/repository";
-import type { PlanLockFeatureState } from "./lock";
-import { computePlanLockFeatureState } from "./lock";
+import { EntitlementPolicy } from "./policies";
 import {
   demotePlanLockMembers,
   findPlanLockPrivilegedOverLimitOrganizations,
   findPlanLockRecentlyUnentitledSubscriptions,
   findPlanLockSubscriptionsEndingSoon,
-  listPlanLockBoards,
-  listPlanLockChangelogCategories,
-  listPlanLockCrmEntries,
   listPlanLockPrivilegedMembers,
-  listPlanLockSelection,
 } from "./repository";
 
 /** How often the maintenance pass sweeps. End-of-period notices are days
@@ -58,99 +53,17 @@ const privilegedRecipients = (organizationId: string) =>
     Effect.map((members) => members.map(({ userId }) => userId))
   );
 
-/** The org-level features' lock states for one workspace, free-plan limits. */
-const describeOrganizationLock = Effect.fn("PlanLockMaintenance.describeLock")(
-  function* (organizationId: string) {
-    const limits = PLAN_ENTITLEMENTS.free.limits;
-    const selection = yield* listPlanLockSelection({
-      scope: "organization",
-      subjectId: organizationId,
-    });
-    const selectedIds = (feature: LimitFeatureKey) =>
-      selection
-        .filter((row) => row.featureKey === feature)
-        .map(({ resourceId }) => resourceId);
-
-    const [boards, categories, crmEntries, privilegedMembers] =
-      yield* Effect.all([
-        listPlanLockBoards(organizationId),
-        listPlanLockChangelogCategories(organizationId),
-        listPlanLockCrmEntries(organizationId),
-        listPlanLockPrivilegedMembers(organizationId),
-      ]);
-
-    const owners = privilegedMembers.filter((member) =>
-      member.role.split(",").includes("owner")
-    );
-    const admins = privilegedMembers
-      .filter((member) => !member.role.split(",").includes("owner"))
-      .map(({ id, createdAt }) => ({ id, createdAt }));
-    const privilegedLimit = limits.privilegedMembers;
-
-    const features: readonly PlanLockFeatureState[] = [
-      computePlanLockFeatureState({
-        feature: "feedbackBoards",
-        limit: limits.feedbackBoards,
-        resources: boards,
-        selectedIds: selectedIds("feedbackBoards"),
-      }),
-      computePlanLockFeatureState({
-        feature: "privilegedMembers",
-        limit:
-          privilegedLimit === null
-            ? null
-            : Math.max(privilegedLimit - owners.length, 0),
-        resources: admins,
-        selectedIds: selectedIds("privilegedMembers"),
-      }),
-      computePlanLockFeatureState({
-        feature: "changelogCategories",
-        limit: limits.changelogCategories,
-        resources: categories,
-        selectedIds: selectedIds("changelogCategories"),
-      }),
-      computePlanLockFeatureState({
-        feature: "crmEntries",
-        limit: limits.crmEntries,
-        resources: crmEntries,
-        selectedIds: selectedIds("crmEntries"),
-      }),
-    ];
-
-    return features;
-  }
-);
-
 /**
- * One workspace's verdict for the demotion sweep. Returns the admin member
- * ids to demote: the owner always counts as kept, the owner's explicit
- * selection comes next, and the oldest admins fill the remaining slots.
+ * One workspace's lock state on the free plan.
+ *
+ * The policy owns the keeper math, so the pass reads the same state the gate
+ * enforces rather than a second implementation of it: a notice that says two
+ * admins locked while the sweep demotes three is the drift this avoids.
  */
-const overLimitAdminIds = Effect.fn("PlanLockMaintenance.overLimitAdminIds")(
+const freePlanLockState = Effect.fn("PlanLockMaintenance.freePlanLockState")(
   function* (organizationId: string) {
-    const members = yield* listPlanLockPrivilegedMembers(organizationId);
-    const owners = members.filter((member) =>
-      member.role.split(",").includes("owner")
-    );
-    const admins = members
-      .filter((member) => !member.role.split(",").includes("owner"))
-      .map(({ id, createdAt }) => ({ id, createdAt }));
-    const planLimit = PLAN_ENTITLEMENTS.free.limits.privilegedMembers;
-    const selection = yield* listPlanLockSelection({
-      scope: "organization",
-      subjectId: organizationId,
-    });
-
-    const state = computePlanLockFeatureState({
-      feature: "privilegedMembers",
-      limit: planLimit === null ? null : Math.max(planLimit - owners.length, 0),
-      resources: admins,
-      selectedIds: selection
-        .filter((row) => row.featureKey === "privilegedMembers")
-        .map(({ resourceId }) => resourceId),
-    });
-
-    return state.lockedIds;
+    const entitlementPolicy = yield* EntitlementPolicy;
+    return yield* entitlementPolicy.getPlanLockPreview({ organizationId });
   }
 );
 
@@ -171,7 +84,12 @@ const demoteOverLimitAdmins = Effect.fn("PlanLockMaintenance.demoteAdmins")(
       return [];
     }
 
-    const memberIds = yield* overLimitAdminIds(organizationId);
+    const state = yield* freePlanLockState(organizationId);
+    const privileged = state.features.find(
+      (feature) => feature.feature === "privilegedMembers"
+    );
+    const memberIds = privileged?.lockedIds ?? [];
+
     yield* demotePlanLockMembers(memberIds);
     return [...memberIds];
   }
@@ -257,9 +175,8 @@ const notifyLockedSubscriptions = Effect.fn(
           return;
         }
 
-        const features = yield* describeOrganizationLock(
-          subscription.organizationId
-        );
+        const features = (yield* freePlanLockState(subscription.organizationId))
+          .features;
         const locked = features.filter(
           (feature) => feature.lockedIds.length > 0
         );

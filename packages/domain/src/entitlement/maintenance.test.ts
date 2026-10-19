@@ -10,10 +10,12 @@ import * as Layer from "effect/Layer";
 import { NotificationService } from "../notification/service";
 import { WorkspaceRepository } from "../workspace/repository";
 import { runPlanLockMaintenance } from "./maintenance";
+import { EntitlementPolicy } from "./policies";
 
 const TestLayer = Layer.mergeAll(
   NotificationService.layer,
-  WorkspaceRepository.layer
+  WorkspaceRepository.layer,
+  EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
 ).pipe(Layer.provideMerge(Database.PgliteDatabaseLive));
 
 const dateAt = (instant: string): Date =>

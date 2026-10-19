@@ -13,6 +13,7 @@ import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { planLockMaintenance } from "@feeblo/domain/entitlement/maintenance";
+import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
@@ -199,10 +200,15 @@ export const program = Effect.gen(function* () {
 
   // The plan lock's scheduled half: end-of-period notices, the admin
   // demotion sweep, and the post-downgrade notice. Its own runtime keeps the
-  // notification service and the workspace repository beside the other
-  // forked workers; Database and Crypto come from this program's context.
+  // notification service, the workspace repository, and the entitlement
+  // policy beside the other forked workers; Database and Crypto come from this
+  // program's context.
   const planLockRuntime = yield* Layer.build(
-    Layer.mergeAll(NotificationService.layer, WorkspaceRepository.layer)
+    Layer.mergeAll(
+      NotificationService.layer,
+      WorkspaceRepository.layer,
+      EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
+    )
   );
   yield* planLockMaintenance.pipe(
     Effect.provide(planLockRuntime),
