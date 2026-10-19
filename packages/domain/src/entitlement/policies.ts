@@ -15,6 +15,7 @@ import {
   computePlanLockFeatureState,
   computePlanLockState,
   type PlanLockFeatureInput,
+  type PlanLockFeatureState,
   type PlanLockResource,
   type PlanLockSelectionSubject,
 } from "./lock";
@@ -65,6 +66,19 @@ type TCanCreateCrmEntry = {
   organizationId: string;
 };
 
+/**
+ * The limit features a resource-scoped lock applies to.
+ *
+ * `privilegedMembers` and `workspaces` are excluded because neither is
+ * gated per resource: the first counts a workspace's admins, the second
+ * counts an owner's workspaces. Both are decided elsewhere, and naming them
+ * here would invite a caller to ask for a lock that does not exist.
+ */
+type LockableLimitFeatureKey = Exclude<
+  LimitFeatureKey,
+  "privilegedMembers" | "workspaces"
+>;
+
 const makeEntitlementPolicy = Effect.gen(function* () {
   const workspaceRepository = yield* WorkspaceRepository;
 
@@ -92,18 +106,52 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       .map(({ resourceId }) => resourceId);
 
   /**
-   * The owner's free workspaces, newest of the plan lookups included. Paid
+   * The account the `workspaces` keeper selection belongs to.
+   *
+   * The cap is per owner (ADR 0013), so the selection is an owner's account
+   * choice and not a workspace one. A workspace with more than one owner has
+   * no single account to select against, so the choice is refused rather than
+   * written under one of the owners by accident.
+   */
+  const resolveWorkspaceOwnerUserId = (organizationId: string) =>
+    Effect.gen(function* () {
+      const ownerUserIds =
+        yield* listPlanLockWorkspaceOwnerUserIds(organizationId);
+
+      if (ownerUserIds.length !== 1) {
+        return yield* new Policy.PolicyDeniedError({
+          reason:
+            "This workspace has more than one owner, and the workspace keeper set belongs to one owner's account.",
+        });
+      }
+
+      return ownerUserIds[0] ?? "";
+    });
+
+  /**
+   * The owner's free workspaces, with the plan of each resolved. Paid
    * workspaces are not counted and do not raise the cap (ADR 0013), so this is
    * exactly the resource set the `workspaces` limit counts.
+   *
+   * The workspace being evaluated takes the plan under evaluation rather than
+   * its own, so a downgrade preview counts the workspace it is about as free
+   * even while it is still paid.
    */
-  const listOwnedFreeWorkspaces = (userId: string) =>
+  const listOwnedFreeWorkspaces = (input: {
+    readonly organizationId: string;
+    readonly plan: OrganizationPlan;
+    readonly userId: string;
+  }) =>
     Effect.gen(function* () {
-      const ownedWorkspaces =
-        yield* workspaceRepository.findOwnedWorkspaces(userId);
+      const ownedWorkspaces = yield* workspaceRepository.findOwnedWorkspaces(
+        input.userId
+      );
       const workspaces = yield* Effect.forEach(ownedWorkspaces, (workspace) =>
-        workspaceRepository
-          .findPlanByOrganizationId({ organizationId: workspace.id })
-          .pipe(Effect.map(({ plan }) => ({ ...workspace, plan })))
+        workspace.id === input.organizationId
+          ? Effect.succeed({ ...workspace, plan: input.plan })
+          : workspaceRepository
+              .findPlanByOrganizationId({ organizationId: workspace.id })
+              .pipe(Effect.map(({ plan }) => ({ ...workspace, plan })))
       );
 
       return workspaces
@@ -111,25 +159,70 @@ const makeEntitlementPolicy = Effect.gen(function* () {
         .map(({ id, createdAt }) => ({ id, createdAt }));
     });
 
-  /** One plan evaluation's `workspaces` inputs, against a user's owned set. */
-  const getWorkspacesFeatureInput = (input: {
+  /**
+   * The `workspaces` feature over the workspace's owners.
+   *
+   * The cap is per owner, so a workspace with several owners has one keeper
+   * set per owner and no single one of them is *the* answer. The state
+   * reported is the strict one: a workspace stays usable only while every
+   * owner keeps it, and a workspace any owner does not keep is locked. That is
+   * the same rule the workspace lock enforces, so the plan page and the gate
+   * cannot disagree.
+   */
+  const getWorkspacesFeatureState = (input: {
+    readonly organizationId: string;
+    readonly ownerUserIds: readonly string[];
     readonly plan: OrganizationPlan;
-    readonly userId: string;
   }) =>
     Effect.gen(function* () {
-      const [freeWorkspaces, userSelection] = yield* Effect.all([
-        listOwnedFreeWorkspaces(input.userId),
-        listPlanLockSelection({
-          scope: "user",
-          subjectId: input.userId,
-        }),
-      ]);
+      const limit = PLAN_ENTITLEMENTS[input.plan].limits.workspaces;
+
+      const states = yield* Effect.forEach(input.ownerUserIds, (ownerUserId) =>
+        Effect.gen(function* () {
+          const [freeWorkspaces, userSelection] = yield* Effect.all([
+            listOwnedFreeWorkspaces({
+              organizationId: input.organizationId,
+              plan: input.plan,
+              userId: ownerUserId,
+            }),
+            listPlanLockSelection({
+              scope: "user",
+              subjectId: ownerUserId,
+            }),
+          ]);
+
+          return computePlanLockFeatureState({
+            feature: "workspaces",
+            limit,
+            resources: freeWorkspaces,
+            selectedIds: selectedResourceIds(userSelection, "workspaces"),
+          });
+        })
+      );
+
+      // Every workspace the owners hold, and the ones all of them keep.
+      const allIds = new Set<string>();
+      for (const state of states) {
+        for (const id of state.keptIds) allIds.add(id);
+        for (const id of state.lockedIds) allIds.add(id);
+      }
+
+      const keptIds = new Set(states.at(0)?.keptIds ?? []);
+      for (const state of states.slice(1)) {
+        for (const id of [...keptIds]) {
+          if (!state.keptIds.includes(id)) {
+            keptIds.delete(id);
+          }
+        }
+      }
 
       return {
-        limit: PLAN_ENTITLEMENTS[input.plan].limits.workspaces,
-        resources: freeWorkspaces,
-        selectedIds: selectedResourceIds(userSelection, "workspaces"),
-      } satisfies PlanLockFeatureInput;
+        feature: "workspaces",
+        limit,
+        count: allIds.size,
+        keptIds: [...keptIds],
+        lockedIds: [...allIds].filter((id) => !keptIds.has(id)),
+      } satisfies PlanLockFeatureState;
     });
 
   /**
@@ -140,7 +233,6 @@ const makeEntitlementPolicy = Effect.gen(function* () {
    */
   const findPlanLock = (input: {
     readonly organizationId: string;
-    readonly userId: string;
     readonly plan: OrganizationPlan;
   }) =>
     Effect.gen(function* () {
@@ -150,7 +242,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
         crmEntries,
         privilegedMembers,
         organizationSelection,
-        workspacesFeature,
+        ownerUserIds,
       ] = yield* Effect.all([
         listPlanLockBoards(input.organizationId),
         listPlanLockChangelogCategories(input.organizationId),
@@ -160,10 +252,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
           scope: "organization",
           subjectId: input.organizationId,
         }),
-        getWorkspacesFeatureInput({
-          plan: input.plan,
-          userId: input.userId,
-        }),
+        listPlanLockWorkspaceOwnerUserIds(input.organizationId),
       ]);
 
       // An owner is privileged but not demotable, so the keeper limit for
@@ -178,6 +267,12 @@ const makeEntitlementPolicy = Effect.gen(function* () {
 
       const planLimits = PLAN_ENTITLEMENTS[input.plan].limits;
       const privilegedLimit = planLimits.privilegedMembers;
+
+      const workspacesFeature = yield* getWorkspacesFeatureState({
+        organizationId: input.organizationId,
+        ownerUserIds,
+        plan: input.plan,
+      });
 
       const features = {
         feedbackBoards: {
@@ -212,17 +307,28 @@ const makeEntitlementPolicy = Effect.gen(function* () {
           resources: crmEntries,
           selectedIds: selectedResourceIds(organizationSelection, "crmEntries"),
         },
-        workspaces: workspacesFeature,
+        workspaces: {
+          limit: workspacesFeature.limit,
+          resources: [],
+          selectedIds: [],
+        },
       } satisfies Record<LimitFeatureKey, PlanLockFeatureInput>;
 
-      return computePlanLockState({ plan: input.plan, features });
+      const state = computePlanLockState({ plan: input.plan, features });
+
+      // The `workspaces` feature is computed over the owners above rather
+      // than through the record, so its state replaces the empty one the
+      // record carries.
+      return {
+        ...state,
+        features: state.features.map((feature) =>
+          feature.feature === "workspaces" ? workspacesFeature : feature
+        ),
+      };
     });
 
   /** The lock state for the workspace's current plan. */
-  const getPlanLock = (input: {
-    readonly organizationId: string;
-    readonly userId: string;
-  }) =>
+  const getPlanLock = (input: { readonly organizationId: string }) =>
     Effect.gen(function* () {
       const { plan } = yield* workspaceRepository.findPlanByOrganizationId({
         organizationId: input.organizationId,
@@ -235,10 +341,8 @@ const makeEntitlementPolicy = Effect.gen(function* () {
    * `getPlanLock` when the workspace is already free; the difference is the
    * downgrade wizard's preview while the workspace is still paid.
    */
-  const getPlanLockPreview = (input: {
-    readonly organizationId: string;
-    readonly userId: string;
-  }) => findPlanLock({ ...input, plan: "free" });
+  const getPlanLockPreview = (input: { readonly organizationId: string }) =>
+    findPlanLock({ ...input, plan: "free" });
 
   /**
    * Replaces the keeper selection for one feature and returns the refreshed
@@ -247,10 +351,16 @@ const makeEntitlementPolicy = Effect.gen(function* () {
    * for: a professional workspace may keep 50 boards, but its free fallback
    * is two, and the wizard must not let the owner pick fifty keepers first.
    * Authorization (owner/admin) is the caller's policy, not this method's.
+   *
+   * The subject of the selection follows the feature: an organization-scoped
+   * feature selects against the workspace, and the owner-scoped `workspaces`
+   * feature selects against the workspace's owner, because the cap it locks is
+   * per owner rather than per workspace (ADR 0013). A workspace with more
+   * than one owner has no single account to select against, so the selection
+   * is refused rather than written to the wrong one.
    */
   const setPlanLockSelection = (input: {
     readonly organizationId: string;
-    readonly userId: string;
     readonly featureKey: LimitFeatureKey;
     readonly resourceIds: readonly string[];
   }) =>
@@ -288,7 +398,12 @@ const makeEntitlementPolicy = Effect.gen(function* () {
 
       const subject: PlanLockSelectionSubject =
         input.featureKey === "workspaces"
-          ? { scope: "user", subjectId: input.userId }
+          ? {
+              scope: "user",
+              subjectId: yield* resolveWorkspaceOwnerUserId(
+                input.organizationId
+              ),
+            }
           : { scope: "organization", subjectId: input.organizationId };
 
       yield* replacePlanLockSelection({
@@ -297,28 +412,25 @@ const makeEntitlementPolicy = Effect.gen(function* () {
         resourceIds: uniqueResourceIds,
       });
 
-      return yield* getPlanLock({
-        organizationId: input.organizationId,
-        userId: input.userId,
-      });
+      return yield* getPlanLock({ organizationId: input.organizationId });
     });
 
   /**
-   * The ids a feature's free-plan lock blocks. Empty when the plan is not
-   * free or the count is within the limit, so the common write path pays the
-   * plan lookup and at most one list. A paid plan never locks existing rows;
-   * only the fall to `free` applies the limit (`./lock.ts`).
+   * The ids a feature's free-plan lock blocks, for a plan the caller already
+   * knows.
+   *
+   * Empty when the plan is not free or the count is within the limit, so the
+   * common write path pays the plan lookup and at most one list. A paid plan
+   * never locks existing rows; only the fall to `free` applies the limit
+   * (`./lock.ts`).
    */
-  const listLockedResourceIds = (input: {
+  const lockedResourceIdsForPlan = (input: {
+    readonly feature: LockableLimitFeatureKey;
     readonly organizationId: string;
-    readonly feature: "feedbackBoards" | "changelogCategories" | "crmEntries";
+    readonly plan: OrganizationPlan;
   }) =>
     Effect.gen(function* () {
-      const { plan } = yield* workspaceRepository.findPlanByOrganizationId({
-        organizationId: input.organizationId,
-      });
-
-      if (plan !== "free") {
+      if (input.plan !== "free") {
         return new Set<string>();
       }
 
@@ -332,7 +444,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
             return yield* listPlanLockCrmEntries(input.organizationId);
         }
       });
-      const limit = PLAN_ENTITLEMENTS[plan].limits[input.feature];
+      const limit = PLAN_ENTITLEMENTS[input.plan].limits[input.feature];
 
       if (limit === null || resources.length <= limit) {
         return new Set<string>();
@@ -350,6 +462,19 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       });
 
       return new Set(featureState.lockedIds);
+    });
+
+  /** The ids a feature's free-plan lock blocks. */
+  const listLockedResourceIds = (input: {
+    readonly feature: LockableLimitFeatureKey;
+    readonly organizationId: string;
+  }) =>
+    Effect.gen(function* () {
+      const { plan } = yield* workspaceRepository.findPlanByOrganizationId({
+        organizationId: input.organizationId,
+      });
+
+      return yield* lockedResourceIdsForPlan({ ...input, plan });
     });
 
   /**
@@ -409,24 +534,11 @@ const makeEntitlementPolicy = Effect.gen(function* () {
         return;
       }
 
-      const publicBoards = yield* listPlanLockBoards(input.organizationId);
-
-      if (publicBoards.length <= limit) {
-        return;
-      }
-
-      const selectionRows = yield* listPlanLockSelection({
-        scope: "organization",
-        subjectId: input.organizationId,
+      const lockedBoardIds = yield* lockedResourceIdsForPlan({
+        feature: "feedbackBoards",
+        organizationId: input.organizationId,
+        plan,
       });
-      const lockedBoardIds = new Set(
-        computePlanLockFeatureState({
-          feature: "feedbackBoards",
-          limit,
-          resources: publicBoards,
-          selectedIds: selectedResourceIds(selectionRows, "feedbackBoards"),
-        }).lockedIds
-      );
 
       if (lockedBoardIds.has(input.boardId)) {
         return yield* new PlanLockedError({
@@ -456,22 +568,15 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       const ownerUserIds =
         yield* listPlanLockWorkspaceOwnerUserIds(organizationId);
 
-      for (const ownerId of ownerUserIds) {
-        const workspacesInput = yield* getWorkspacesFeatureInput({
-          plan: "free",
-          userId: ownerId,
-        });
-        const state = computePlanLockFeatureState({
-          feature: "workspaces",
-          ...workspacesInput,
-        });
+      // The same state the plan page reports: a workspace any owner does not
+      // keep is locked, so the page and the gate cannot disagree.
+      const state = yield* getWorkspacesFeatureState({
+        organizationId,
+        ownerUserIds,
+        plan: "free",
+      });
 
-        if (state.lockedIds.includes(organizationId)) {
-          return true;
-        }
-      }
-
-      return false;
+      return state.lockedIds.includes(organizationId);
     });
 
   /**
@@ -526,42 +631,55 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       });
     });
 
+  /**
+   * Refuses a write to a resource the feature's lock blocks.
+   *
+   * The one shape every resource-scoped refusal takes: the feature names the
+   * lock, the message names the remedy, and the check itself is the keeper
+   * math the lock state is built from.
+   */
+  const assertFeatureResourceWritable = (input: {
+    readonly feature: LockableLimitFeatureKey;
+    readonly message: string;
+    readonly organizationId: string;
+    readonly resourceId: string;
+  }) =>
+    Effect.gen(function* () {
+      const lockedResourceIds = yield* listLockedResourceIds({
+        feature: input.feature,
+        organizationId: input.organizationId,
+      });
+
+      if (lockedResourceIds.has(input.resourceId)) {
+        return yield* new PlanLockedError({
+          feature: input.feature,
+          message: input.message,
+        });
+      }
+    });
+
   const assertChangelogCategoryWritable = (input: {
     readonly organizationId: string;
     readonly categoryId: string;
   }) =>
-    Effect.gen(function* () {
-      const lockedCategoryIds = yield* listLockedResourceIds({
-        organizationId: input.organizationId,
-        feature: "changelogCategories",
-      });
-
-      if (lockedCategoryIds.has(input.categoryId)) {
-        return yield* new PlanLockedError({
-          feature: "changelogCategories",
-          message:
-            "This changelog category is read-only because the workspace has more categories than the Free plan allows.",
-        });
-      }
+    assertFeatureResourceWritable({
+      feature: "changelogCategories",
+      message:
+        "This changelog category is read-only because the workspace has more categories than the Free plan allows.",
+      organizationId: input.organizationId,
+      resourceId: input.categoryId,
     });
 
   const assertCrmEntryWritable = (input: {
     readonly organizationId: string;
     readonly resourceId: string;
   }) =>
-    Effect.gen(function* () {
-      const lockedCrmEntryIds = yield* listLockedResourceIds({
-        organizationId: input.organizationId,
-        feature: "crmEntries",
-      });
-
-      if (lockedCrmEntryIds.has(input.resourceId)) {
-        return yield* new PlanLockedError({
-          feature: "crmEntries",
-          message:
-            "This contact or company is read-only because the workspace has more CRM entries than the Free plan allows.",
-        });
-      }
+    assertFeatureResourceWritable({
+      feature: "crmEntries",
+      message:
+        "This contact or company is read-only because the workspace has more CRM entries than the Free plan allows.",
+      organizationId: input.organizationId,
+      resourceId: input.resourceId,
     });
 
   const canUsePrivateBoards = (organizationId: string) =>

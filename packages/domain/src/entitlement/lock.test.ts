@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   computeKeptIds,
   computePlanLockState,
-  countLockedResources,
   orderLockResources,
   planLocksResources,
   type PlanLockFeatureInput,
@@ -40,30 +39,39 @@ const features = (input: PlanLockFeatureInput) => ({
 
 describe("plan lock math", () => {
   it("keeps everything when the limit is null", () => {
-    expect(computeKeptIds({ resources, limit: null, selectedIds: [] })).toEqual(
-      ["brd_oldest", "brd_middle", "brd_newest"]
-    );
+    expect(
+      computeKeptIds({
+        orderedResources: orderLockResources(resources),
+        limit: null,
+        selectedIds: [],
+      })
+    ).toEqual(["brd_oldest", "brd_middle", "brd_newest"]);
   });
 
   it("keeps everything while the count is within the limit", () => {
-    expect(computeKeptIds({ resources, limit: 3, selectedIds: [] })).toEqual([
-      "brd_oldest",
-      "brd_middle",
-      "brd_newest",
-    ]);
+    expect(
+      computeKeptIds({
+        orderedResources: orderLockResources(resources),
+        limit: 3,
+        selectedIds: [],
+      })
+    ).toEqual(["brd_oldest", "brd_middle", "brd_newest"]);
   });
 
   it("keeps the oldest resources when over the limit and nothing is selected", () => {
-    expect(computeKeptIds({ resources, limit: 2, selectedIds: [] })).toEqual([
-      "brd_oldest",
-      "brd_middle",
-    ]);
+    expect(
+      computeKeptIds({
+        orderedResources: orderLockResources(resources),
+        limit: 2,
+        selectedIds: [],
+      })
+    ).toEqual(["brd_oldest", "brd_middle"]);
   });
 
   it("caps a selection at the limit in stable resource order", () => {
     expect(
       computeKeptIds({
-        resources,
+        orderedResources: orderLockResources(resources),
         limit: 2,
         selectedIds: ["brd_newest", "brd_middle", "brd_oldest"],
       })
@@ -73,7 +81,7 @@ describe("plan lock math", () => {
   it("fills the remaining slots oldest-first around a selection", () => {
     expect(
       computeKeptIds({
-        resources,
+        orderedResources: orderLockResources(resources),
         limit: 2,
         selectedIds: ["brd_newest"],
       })
@@ -83,7 +91,7 @@ describe("plan lock math", () => {
   it("ignores a selected id that no longer exists", () => {
     expect(
       computeKeptIds({
-        resources,
+        orderedResources: orderLockResources(resources),
         limit: 2,
         selectedIds: ["brd_deleted"],
       })
@@ -101,7 +109,11 @@ describe("plan lock math", () => {
       "brd_b",
     ]);
     expect(
-      computeKeptIds({ resources: tied, limit: 1, selectedIds: [] })
+      computeKeptIds({
+        orderedResources: orderLockResources(tied),
+        limit: 1,
+        selectedIds: [],
+      })
     ).toEqual(["brd_a"]);
   });
 
@@ -127,7 +139,6 @@ describe("plan lock math", () => {
       keptIds: ["brd_oldest", "brd_middle"],
       lockedIds: ["brd_newest"],
     });
-    expect(countLockedResources(state)).toBe(1);
   });
 
   it("keeps every resource and locks none on a paid plan", () => {
@@ -141,6 +152,5 @@ describe("plan lock math", () => {
 
     expect(boards?.lockedIds).toEqual([]);
     expect(boards?.keptIds).toEqual(["brd_oldest", "brd_middle", "brd_newest"]);
-    expect(countLockedResources(state)).toBe(0);
   });
 });

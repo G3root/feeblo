@@ -123,10 +123,17 @@ export const listPlanLockPrivilegedMembers = Effect.fn(
 });
 
 /**
- * The user ids holding the `owner` role in a workspace. The workspace cap is
- * per owner (ADR 0013), so the whole-workspace lock asks every owner whether
- * this workspace is outside their keeper set; the role can be a comma-joined
- * list, which is why the filter splits rather than comparing.
+ * The user ids holding the `owner` role in a workspace.
+ *
+ * The workspace cap is per owner (ADR 0013), so the lock is resolved against
+ * the workspace's owners rather than against whoever asked: an admin reading
+ * the plan lock is looking at their own account's workspaces unless the owner
+ * is the subject, and a keeper selection written under the wrong account
+ * would move a workspace nobody was looking at.
+ *
+ * The whole-workspace lock asks every owner whether this workspace is outside
+ * their keeper set; the role can be a comma-joined list, which is why the
+ * filter splits rather than comparing.
  */
 export const listPlanLockWorkspaceOwnerUserIds = Effect.fn(
   "PlanLockRepository.listWorkspaceOwnerUserIds"

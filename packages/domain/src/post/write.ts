@@ -743,6 +743,15 @@ const makePostWriteService = Effect.gen(function* () {
       const userId = member?.userId ?? null;
       const columns = actorColumns(actor);
 
+      // A post on a board the plan locked is read-only even when this update
+      // does not name a board: a title, status, or content edit is still a
+      // write to the locked post. The destination board, when one is named,
+      // is validated separately below.
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.id,
+      });
+
       if (args.boardId !== undefined) {
         yield* requireBoard({
           boardId: args.boardId,
@@ -1197,6 +1206,19 @@ const makePostWriteService = Effect.gen(function* () {
       const columns = actorColumns(actor);
       const member = actor.kind === "member" ? actor : null;
 
+      // A merge writes to both posts: the source is archived and its
+      // engagement moves, and the target's row changes. Either board being
+      // plan-locked refuses it, the same as every other write through this
+      // service, before the repository takes its row locks.
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.sourcePostId,
+      });
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.targetPostId,
+      });
+
       const outboxId = yield* transaction(
         Effect.gen(function* () {
           yield* repository.merge(args);
@@ -1277,6 +1299,25 @@ const makePostWriteService = Effect.gen(function* () {
       const notifications = yield* Effect.serviceOption(NotificationService);
       const columns = actorColumns(actor);
       const member = actor.kind === "member" ? actor : null;
+
+      // An unmerge writes to both posts: the source is restored and the
+      // target gives the tagged engagement back. The target is only knowable
+      // from the source row; a missing or unmerged source has no target and
+      // falls through to the repository's own error, as it did before.
+      const mergedIntoPostId = yield* repository.findMergedIntoPostId({
+        id: args.sourcePostId,
+        organizationId: args.organizationId,
+      });
+      yield* entitlementPolicy.assertPostBoardWritable({
+        organizationId: args.organizationId,
+        postId: args.sourcePostId,
+      });
+      if (mergedIntoPostId !== null && mergedIntoPostId !== undefined) {
+        yield* entitlementPolicy.assertPostBoardWritable({
+          organizationId: args.organizationId,
+          postId: mergedIntoPostId,
+        });
+      }
 
       const outboxId = yield* transaction(
         Effect.gen(function* () {

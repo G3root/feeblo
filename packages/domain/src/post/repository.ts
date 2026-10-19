@@ -379,6 +379,25 @@ const makePostRepository = Effect.gen(function* () {
         .for("update")
         .pipe(Effect.map((rows) => rows[0])),
 
+    /**
+     * The post a merged source points at, read without locking so the plan
+     * lock can check both posts before `unmerge` takes its row locks. `null`
+     * for an unmerged post and `undefined` for a missing one, the two states
+     * `unmerge` itself reports.
+     */
+    findMergedIntoPostId: ({ id, organizationId }: TPostById) =>
+      db
+        .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, id),
+            eq(schema.postTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]?.mergedIntoPostId)),
+
     findStatusId: ({ id, organizationId }: TPostById) =>
       db
         .select({ statusId: schema.postTable.statusId })

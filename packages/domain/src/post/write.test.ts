@@ -21,6 +21,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { grantStarterPlan } from "../entitlement/test-harness";
 import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostSubscriptionRepository } from "../post-subscription/repository";
@@ -129,42 +130,33 @@ describe("PostWriteService", () => {
       return id;
     });
 
-  const activateStarterPlan = (organizationId: string) =>
+  /**
+   * A public board created `days` after the fixture's own, so the fixture
+   * stays the oldest keeper and the later boards can fall beyond the free
+   * plan's limit.
+   */
+  const addBoardAt = (fixture: Fixture, days: number) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
-      const now = yield* DateTime.nowAsDate;
-      const productId = `product_${organizationId}`;
+      const id = yield* BoardId.generate;
+      const createdAt = DateTime.toDateUtc(
+        DateTime.addDuration(
+          DateTime.fromDateUnsafe(yield* DateTime.nowAsDate),
+          Duration.days(days)
+        )
+      );
 
-      yield* db.insert(schema.productTable).values({
-        id: productId,
-        name: "Starter",
-        isRecurring: true,
-        isArchived: false,
-        externalOrganizationId: "feeblo",
-        visibility: "public",
-        metadata: { plan: "starter", variant: "monthly" },
-        createdAt: now,
-        updatedAt: now,
+      yield* db.insert(schema.boardTable).values({
+        id,
+        name: `Board ${id}`,
+        slug: id,
+        visibility: "PUBLIC",
+        organizationId: fixture.organizationId,
+        createdAt,
+        updatedAt: createdAt,
       });
-      yield* db.insert(schema.subscriptionTable).values({
-        id: `subscription_${organizationId}`,
-        externalId: `external_${organizationId}`,
-        organizationId,
-        amount: 1000,
-        cancelAtPeriodEnd: false,
-        currency: "usd",
-        recurringInterval: "month",
-        recurringIntervalCount: 1,
-        status: "active",
-        currentPeriodStart: now,
-        currentPeriodEnd: DateTime.toDateUtc(
-          DateTime.addDuration(DateTime.fromDateUnsafe(now), Duration.days(30))
-        ),
-        customerId: `customer_${organizationId}`,
-        productId,
-        createdAt: now,
-        updatedAt: now,
-      });
+
+      return { createdAt, id };
     });
 
   const IntegrationEventRecorderTest = Layer.succeed(
@@ -279,7 +271,7 @@ describe("PostWriteService", () => {
           // A private board is a paid capability: on free it is read-only by
           // the plan lock, and this test is about a machine key's attribution
           // on a writable board.
-          yield* activateStarterPlan(fixture.organizationId);
+          yield* grantStarterPlan(fixture.organizationId);
           const writes = yield* PostWriteService;
           const db = yield* currentDb;
           const postId = yield* PostId.generate;
@@ -324,7 +316,7 @@ describe("PostWriteService", () => {
       () =>
         Effect.gen(function* () {
           const fixture = yield* makeFixture("PRIVATE");
-          yield* activateStarterPlan(fixture.organizationId);
+          yield* grantStarterPlan(fixture.organizationId);
           const writes = yield* PostWriteService;
           const db = yield* currentDb;
           const postId = yield* PostId.generate;
@@ -413,6 +405,213 @@ describe("PostWriteService", () => {
           expect.objectContaining({ type: "post.status_changed" }),
         ]);
       })
+    );
+
+    it.effect("refuses an update to a post on a locked board", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const writes = yield* PostWriteService;
+        const db = yield* currentDb;
+        const postId = yield* PostId.generate;
+
+        yield* addBoardAt(fixture, 1);
+        const locked = yield* addBoardAt(fixture, 2);
+
+        yield* db.insert(schema.postTable).values({
+          id: postId,
+          boardId: locked.id,
+          organizationId: fixture.organizationId,
+          title: "Locked post",
+          content: "Body",
+          slug: postId,
+          statusId: fixture.statusId,
+          createdAt: locked.createdAt,
+          updatedAt: locked.createdAt,
+        });
+
+        const error = yield* Effect.flip(
+          writes.update(
+            {
+              id: postId,
+              organizationId: fixture.organizationId,
+              title: "Locked post v2",
+            },
+            memberActor(fixture)
+          )
+        );
+
+        expect(error._tag).toBe("PlanLockedError");
+      })
+    );
+
+    it.effect("refuses a merge when either post's board is locked", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const writes = yield* PostWriteService;
+        const db = yield* currentDb;
+
+        yield* addBoardAt(fixture, 1);
+        const locked = yield* addBoardAt(fixture, 2);
+
+        const keptPostId = yield* PostId.generate;
+        const lockedPostId = yield* PostId.generate;
+        yield* writes.create(
+          {
+            assetIds: [],
+            boardId: fixture.boardId,
+            content: "Body",
+            id: keptPostId,
+            organizationId: fixture.organizationId,
+            statusId: fixture.statusId,
+            title: "Kept post",
+          },
+          memberActor(fixture)
+        );
+        yield* db.insert(schema.postTable).values({
+          id: lockedPostId,
+          boardId: locked.id,
+          organizationId: fixture.organizationId,
+          title: "Locked post",
+          content: "Body",
+          slug: lockedPostId,
+          statusId: fixture.statusId,
+          createdAt: locked.createdAt,
+          updatedAt: locked.createdAt,
+        });
+
+        const sourceError = yield* Effect.flip(
+          writes.merge(
+            {
+              organizationId: fixture.organizationId,
+              sourcePostId: lockedPostId,
+              targetPostId: keptPostId,
+            },
+            memberActor(fixture)
+          )
+        );
+        expect(sourceError._tag).toBe("PlanLockedError");
+
+        const targetError = yield* Effect.flip(
+          writes.merge(
+            {
+              organizationId: fixture.organizationId,
+              sourcePostId: keptPostId,
+              targetPostId: lockedPostId,
+            },
+            memberActor(fixture)
+          )
+        );
+        expect(targetError._tag).toBe("PlanLockedError");
+      })
+    );
+
+    it.effect(
+      "refuses an unmerge when either post's board is locked and keeps the not-merged error",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* makeFixture();
+          const writes = yield* PostWriteService;
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* addBoardAt(fixture, 1);
+          const locked = yield* addBoardAt(fixture, 2);
+
+          const insertPost = (args: {
+            readonly boardId: string;
+            readonly createdAt: Date;
+            readonly id: string;
+            readonly mergedIntoPostId?: string | undefined;
+          }) =>
+            db.insert(schema.postTable).values({
+              id: args.id,
+              boardId: args.boardId,
+              organizationId: fixture.organizationId,
+              title: `Post ${args.id}`,
+              content: "Body",
+              slug: args.id,
+              statusId: fixture.statusId,
+              createdAt: args.createdAt,
+              updatedAt: args.createdAt,
+              ...(args.mergedIntoPostId !== undefined && {
+                archivedAt: args.createdAt,
+                mergedAt: args.createdAt,
+                mergedIntoPostId: args.mergedIntoPostId,
+              }),
+            });
+
+          // Source on the locked board, target on a kept board.
+          const keptTargetId = yield* PostId.generate;
+          const lockedSourceId = yield* PostId.generate;
+          yield* insertPost({
+            boardId: fixture.boardId,
+            createdAt: now,
+            id: keptTargetId,
+          });
+          yield* insertPost({
+            boardId: locked.id,
+            createdAt: locked.createdAt,
+            id: lockedSourceId,
+            mergedIntoPostId: keptTargetId,
+          });
+
+          const sourceError = yield* Effect.flip(
+            writes.unmerge(
+              {
+                organizationId: fixture.organizationId,
+                sourcePostId: lockedSourceId,
+              },
+              memberActor(fixture)
+            )
+          );
+          expect(sourceError._tag).toBe("PlanLockedError");
+
+          // Source on a kept board, target on the locked board.
+          const keptSourceId = yield* PostId.generate;
+          const lockedTargetId = yield* PostId.generate;
+          yield* insertPost({
+            boardId: locked.id,
+            createdAt: locked.createdAt,
+            id: lockedTargetId,
+          });
+          yield* insertPost({
+            boardId: fixture.boardId,
+            createdAt: now,
+            id: keptSourceId,
+            mergedIntoPostId: lockedTargetId,
+          });
+
+          const targetError = yield* Effect.flip(
+            writes.unmerge(
+              {
+                organizationId: fixture.organizationId,
+                sourcePostId: keptSourceId,
+              },
+              memberActor(fixture)
+            )
+          );
+          expect(targetError._tag).toBe("PlanLockedError");
+
+          // A source that is not merged has no target to check, so it keeps
+          // the repository's existing refusal.
+          const plainPostId = yield* PostId.generate;
+          yield* insertPost({
+            boardId: fixture.boardId,
+            createdAt: now,
+            id: plainPostId,
+          });
+
+          const notMergedError = yield* Effect.flip(
+            writes.unmerge(
+              {
+                organizationId: fixture.organizationId,
+                sourcePostId: plainPostId,
+              },
+              memberActor(fixture)
+            )
+          );
+          expect(notMergedError._tag).toBe("FailedToMergePostError");
+        })
     );
   });
 });

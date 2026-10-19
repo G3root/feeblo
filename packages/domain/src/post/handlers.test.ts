@@ -28,6 +28,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { grantStarterPlan } from "../entitlement/test-harness";
 import { ResolvePrincipalService } from "../identity/service";
 import { NotificationService } from "../notification/service";
 import * as Policy from "../policy";
@@ -200,41 +201,6 @@ describe("PostRpcHandlers", () => {
       });
 
       return id;
-    });
-
-  const activateStarterPlan = (organizationId: string) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      const now = yield* DateTime.nowAsDate;
-      const productId = `product_${organizationId}`;
-      yield* db.insert(schema.productTable).values({
-        id: productId,
-        name: "Starter",
-        isRecurring: true,
-        isArchived: false,
-        externalOrganizationId: "feeblo",
-        visibility: "public",
-        metadata: { plan: "starter", variant: "monthly" },
-        createdAt: now,
-        updatedAt: now,
-      });
-      yield* db.insert(schema.subscriptionTable).values({
-        id: `subscription_${organizationId}`,
-        externalId: `external_${organizationId}`,
-        organizationId,
-        amount: 1000,
-        cancelAtPeriodEnd: false,
-        currency: "usd",
-        recurringInterval: "month",
-        recurringIntervalCount: 1,
-        status: "active",
-        currentPeriodStart: now,
-        currentPeriodEnd: dateAt(now.getTime() + 86_400_000),
-        customerId: `customer_${organizationId}`,
-        productId,
-        createdAt: now,
-        updatedAt: now,
-      });
     });
 
   const RepositoriesTest = Layer.mergeAll(
@@ -431,7 +397,7 @@ describe("PostRpcHandlers", () => {
           // A private board is a paid capability; the refusal under test is
           // the membership one, so the workspace has to be allowed to have
           // the board in the first place.
-          yield* activateStarterPlan(fixture.organizationId);
+          yield* grantStarterPlan(fixture.organizationId);
           const postId = yield* PostId.generate;
           const error = yield* Effect.flip(
             handlers
@@ -968,7 +934,7 @@ describe("PostRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
-          yield* activateStarterPlan(fixture.organizationId);
+          yield* grantStarterPlan(fixture.organizationId);
           const privateBoardId = yield* addBoard(fixture, "PRIVATE");
           const privatePostId = yield* PostId.generate;
 
@@ -1243,7 +1209,7 @@ describe("PostRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
-          yield* activateStarterPlan(fixture.organizationId);
+          yield* grantStarterPlan(fixture.organizationId);
           const privateBoardId = yield* addBoard(fixture, "PRIVATE");
           const publicPostId = yield* PostId.generate;
           const privatePostId = yield* PostId.generate;
@@ -1435,7 +1401,7 @@ describe("PostRpcHandlers", () => {
             yield* TestClock.setTime(firstChangeAt);
             const handlers = yield* PostRpcHandlersEffect;
             const fixture = yield* makeFixture();
-            yield* activateStarterPlan(fixture.organizationId);
+            yield* grantStarterPlan(fixture.organizationId);
             const postId = yield* PostId.generate;
             const reviewStatusId = yield* PostStatusId.generate;
             const plannedStatusId = yield* PostStatusId.generate;
@@ -1501,7 +1467,7 @@ describe("PostRpcHandlers", () => {
             const db = yield* currentDb;
             const handlers = yield* PostRpcHandlersEffect;
             const fixture = yield* makeFixture();
-            yield* activateStarterPlan(fixture.organizationId);
+            yield* grantStarterPlan(fixture.organizationId);
             const postId = yield* PostId.generate;
             const closedStatusId = yield* PostStatusId.generate;
             yield* db.insert(schema.postStatusTable).values({
@@ -2388,7 +2354,7 @@ describe("PostRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* PostRpcHandlersEffect;
             const fixture = yield* makeFixture("PUBLIC");
-            yield* activateStarterPlan(fixture.organizationId);
+            yield* grantStarterPlan(fixture.organizationId);
             const privateBoardId = yield* addBoard(fixture, "PRIVATE");
             const publicPostId = yield* PostId.generate;
             const privatePostId = yield* PostId.generate;
@@ -2440,7 +2406,7 @@ describe("PostRpcHandlers", () => {
           const db = yield* currentDb;
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture();
-          yield* activateStarterPlan(fixture.organizationId);
+          yield* grantStarterPlan(fixture.organizationId);
           const sourcePostId = yield* PostId.generate;
           const targetPostId = yield* PostId.generate;
           for (const [id, title] of [

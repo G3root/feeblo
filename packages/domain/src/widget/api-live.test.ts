@@ -1,11 +1,12 @@
 import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { ChangelogId, WorkspaceId } from "@feeblo/id";
+import { ChangelogId, WorkspaceId, BoardId } from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as Layer from "effect/Layer";
 
+import { BoardRepository } from "../board/repository";
 import { ChangelogRepository } from "../changelog/repository";
 import { ClientIp } from "../client-ip";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -15,7 +16,7 @@ import { InternalServerError } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
-import { listWidgetUpdates } from "./api-live";
+import { listWidgetBoards, listWidgetUpdates } from "./api-live";
 
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
@@ -31,7 +32,12 @@ const SitePolicyLayer = SitePolicy.layer.pipe(
 const TestLayer = Layer.mergeAll(
   Database.PgliteDatabaseLive,
   ChangelogRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
-  SitePolicyLayer.pipe(Layer.provideMerge(Database.PgliteDatabaseLive))
+  SitePolicyLayer.pipe(Layer.provideMerge(Database.PgliteDatabaseLive)),
+  BoardRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+  EntitlementPolicy.layer.pipe(
+    Layer.provide(WorkspaceRepository.layer),
+    Layer.provide(Database.PgliteDatabaseLive)
+  )
 );
 
 layer(TestLayer)("widget updates", (it) => {
@@ -238,6 +244,55 @@ layer(TestLayer)("widget updates", (it) => {
       });
 
       expect(yield* listWidgetUpdates({ organizationId })).toEqual([]);
+    })
+  );
+
+  it.effect("hides the boards the plan locked from the board list", () =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const organizationId = yield* WorkspaceId.generate;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.organizationTable).values({
+        id: organizationId,
+        name: "Locked org",
+        slug: organizationId,
+        createdAt: now,
+      });
+      // The free plan keeps two boards usable. The workspace has three, so the
+      // newest is outside the keeper set and read-only.
+      yield* db.insert(schema.boardTable).values([
+        {
+          id: yield* BoardId.generate,
+          name: "Oldest",
+          slug: "oldest",
+          visibility: "PUBLIC",
+          organizationId,
+          createdAt: dateAt(now.getTime()),
+        },
+        {
+          id: yield* BoardId.generate,
+          name: "Middle",
+          slug: "middle",
+          visibility: "PUBLIC",
+          organizationId,
+          createdAt: dateAt(now.getTime() + 60_000),
+        },
+        {
+          id: yield* BoardId.generate,
+          name: "Locked",
+          slug: "locked",
+          visibility: "PUBLIC",
+          organizationId,
+          createdAt: dateAt(now.getTime() + 120_000),
+        },
+      ]);
+
+      const boards = yield* listWidgetBoards({ organizationId });
+
+      // The locked board is not offered: the widget's list is where a read-only
+      // board is applied, because a submission to it is refused at the write.
+      expect(boards.map((board) => board.name)).toEqual(["Oldest", "Middle"]);
     })
   );
 

@@ -16,6 +16,7 @@ import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { grantStarterPlan } from "../entitlement/test-harness";
 import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostStatusRepository } from "../post-status/repository";
@@ -32,49 +33,6 @@ import { DataTransferRepository } from "./repository";
 import { runDataImportPass } from "./worker";
 
 const recordedIntegrationEvents: unknown[] = [];
-
-/**
- * Puts the workspace on Starter. Importing more public boards than free allows
- * is a paid capability now: the excess boards are read-only on free, so a test
- * about routing rows to created boards has to run where creation is allowed.
- */
-const activateStarterPlan = (organizationId: string) =>
-  Effect.gen(function* () {
-    const db = yield* currentDb;
-    const now = yield* DateTime.nowAsDate;
-    const productId = `product_${organizationId}`;
-
-    yield* db.insert(schema.productTable).values({
-      id: productId,
-      name: "Starter",
-      isRecurring: true,
-      isArchived: false,
-      externalOrganizationId: "feeblo",
-      visibility: "public",
-      metadata: { plan: "starter", variant: "monthly" },
-      createdAt: now,
-      updatedAt: now,
-    });
-    yield* db.insert(schema.subscriptionTable).values({
-      id: `subscription_${organizationId}`,
-      externalId: `external_${organizationId}`,
-      organizationId,
-      amount: 1000,
-      cancelAtPeriodEnd: false,
-      currency: "usd",
-      recurringInterval: "month",
-      recurringIntervalCount: 1,
-      status: "active",
-      currentPeriodStart: now,
-      currentPeriodEnd: DateTime.toDateUtc(
-        DateTime.addDuration(DateTime.fromDateUnsafe(now), Duration.days(30))
-      ),
-      customerId: `customer_${organizationId}`,
-      productId,
-      createdAt: now,
-      updatedAt: now,
-    });
-  });
 
 const makeFixture = () =>
   Effect.gen(function* () {
@@ -372,7 +330,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
     Effect.gen(function* () {
       recordedIntegrationEvents.length = 0;
       const fixture = yield* makeFixture();
-      yield* activateStarterPlan(fixture.organizationId);
+      yield* grantStarterPlan(fixture.organizationId);
       yield* stageAndConfirm(
         fixture,
         [
@@ -414,6 +372,48 @@ layer(TestLayer)("DataImportWorker", (it) => {
       });
       expect(created?.slug).toBe("bugs");
     })
+  );
+
+  it.effect(
+    "does not create a board the plan has no room for, and says why",
+    () =>
+      Effect.gen(function* () {
+        recordedIntegrationEvents.length = 0;
+        const fixture = yield* makeFixture();
+        // The fixture workspace is on the free plan, which keeps two boards.
+        // It already has one, so the import may make one more and the second
+        // is refused.
+        const job = yield* stageAndConfirm(
+          fixture,
+          [
+            "title,board",
+            "New board post,Bugs",
+            "Another new board post,Ideas",
+          ].join("\n")
+        );
+
+        const outcome = yield* runDataImportPass(yield* claim("worker-1"));
+        expect(outcome).toMatchObject({ createdCount: 1, errorCount: 1 });
+
+        const db = yield* currentDb;
+        const boards = yield* db
+          .select()
+          .from(schema.boardTable)
+          .where(eq(schema.boardTable.organizationId, fixture.organizationId));
+        // The refused board was never created: a board created past the limit
+        // is read-only the moment it exists, and the row could not land on it.
+        expect(boards.map((board) => board.name).sort()).toEqual([
+          "Bugs",
+          "Test board",
+        ]);
+
+        const rows = yield* db
+          .select()
+          .from(schema.dataImportRowTable)
+          .where(eq(schema.dataImportRowTable.jobId, job.id));
+        const failed = rows.find((row) => row.outcome === "failed");
+        expect(failed?.message).toContain("feedback boards");
+      })
   );
 
   it.effect("recreates a board deleted after the import was staged", () =>

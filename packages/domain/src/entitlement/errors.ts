@@ -1,5 +1,7 @@
 import * as Schema from "effect/Schema";
 
+import { PLAN_FEATURE_KEYS } from "../plan-entitlements";
+
 /**
  * A write was refused because the resource is read-only under the plan lock.
  *
@@ -14,8 +16,14 @@ export class PlanLockedError extends Schema.TaggedError<PlanLockedError>()(
   "PlanLockedError",
   {
     message: Schema.optional(Schema.String),
-    /** The `LimitFeatureKey` or capability that locked the resource. */
-    feature: Schema.optional(Schema.String),
+    /**
+     * The limit feature or capability that locked the resource.
+     *
+     * `PlanFeatureKey` rather than a free string: the surface that reads it
+     * maps a feature to the remedy it offers, and a feature the code does not
+     * know about should not compile past that mapping.
+     */
+    feature: Schema.optional(Schema.Literals(PLAN_FEATURE_KEYS)),
   },
   { httpApiStatus: 403, identifier: "PlanLockedError" }
 ) {}
