@@ -256,12 +256,16 @@ const runMigrate = async () => {
     process.exit(0);
   }
 
-  const connection = postgres(DB_URL, { max: 1 });
-  const db = prodDrizzle({ client: connection });
-
   // `max: 1` matters here, not just for tidiness: the advisory lock below is
   // session-scoped, and a pooled migrator could take it on one connection and
-  // run the migrations on another.
+  // run the migrations on another. `max_lifetime: null` matters for the same
+  // reason: postgres.js retires a connection after a random 30–60 minutes by
+  // default, and a recycled connection takes the advisory lock and the
+  // `lock_timeout` below with it — a long batch would keep running without
+  // either. Idle recycling needs no override; it is already off by default.
+  const connection = postgres(DB_URL, { max: 1, max_lifetime: null });
+  const db = prodDrizzle({ client: connection });
+
   await connection.unsafe(`SET lock_timeout = '${migrationLockTimeout}'`);
 
   console.log("Waiting for the migration lock...");
@@ -273,10 +277,23 @@ const runMigrate = async () => {
 
     await prodMigrate(db, migratorConfig);
 
+    // Concurrent index builds wait as long as the table needs. Autovacuum holds
+    // `ShareUpdateExclusiveLock` for as long as it runs, and that wait conflicts
+    // with a concurrent build — but it does not block ordinary reads or writes,
+    // and the migration lock already keeps a second migrator out, so a deadline
+    // here would abort a legitimate build rather than protect anything. It is
+    // also the more expensive outcome: a failed concurrent build leaves an
+    // invalid index behind and costs a rebuild.
+    await connection.unsafe(`SET lock_timeout = 0`);
     await connection.unsafe(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
     for (const [indexName, createStatement] of concurrentIndexes) {
       await buildIndexConcurrently(connection, indexName, createStatement);
     }
+
+    // Back to the deadline for the remaining DDL: a validation stuck behind a
+    // long transaction should fail the deploy, and unlike a concurrent build it
+    // leaves nothing half-built when it does.
+    await connection.unsafe(`SET lock_timeout = '${migrationLockTimeout}'`);
     await connection.unsafe(`
       ALTER TABLE "post"
       VALIDATE CONSTRAINT "post_embedding_metadata_chk"
