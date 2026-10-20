@@ -85,12 +85,19 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
                 permissions: toPublicApiScopeStatements(granted),
               },
             }),
-          catch: (cause) =>
-            new InternalServerError({
-              message: "Failed to create API key",
-              detail: String(cause),
-            }),
-        });
+          catch: (cause) => cause,
+        }).pipe(
+          // The cause can carry plugin, ACL, or adapter detail. `detail` is
+          // serialized into the RPC response, so keep the diagnostic in the
+          // server log and answer with the fixed message.
+          Effect.tapError((cause) =>
+            Effect.logError("Failed to create API key", cause)
+          ),
+          Effect.mapError(
+            () =>
+              new InternalServerError({ message: "Failed to create API key" })
+          )
+        );
 
         // The plugin's table has no acting-user column, so the creator is
         // recorded right after the insert. Attribution is best-effort: the
