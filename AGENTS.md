@@ -94,6 +94,8 @@ Tests use `@effect/vitest`:
 
 Match errors by tag, not by prototype: `Schema.is(SomeError)(error)` or `Predicate.isTagged(error, "SomeError")`. A decoded error is a plain object carrying `_tag` with no prototype, so `instanceof` answers `false` for a real one and the branch silently takes its fallback. Read randomness, time, and environment through Effect services (`Crypto`, `Clock`, `Config`), not the globals; `packages/domain/src/jwt-secret/repository.ts` is a good example.
 
+A database transaction is retried. `transaction()` in `@feeblo/db` re-runs the whole transaction on `40P01` (deadlock), `40001` (serialization failure) and `55P03` (lock timeout), so a transaction body must be database work only: no HTTP call, no provider client, no filesystem write, because a retry replays it. Every connection carries a 5-second `lock_timeout` and a 30-second idle-in-transaction timeout, so a lock wait fails a request instead of holding a pooled connection forever. A lock that only serializes a count-and-write pair on one workspace is `FOR NO KEY UPDATE`; `FOR UPDATE` is for the case where blocking child inserts is the point, which today is only the account-deletion membership re-check. See `docs/adr/0020`.
+
 ## Architecture
 
 Dependency direction: apps → `packages/domain` → `{db, id, permissions, utils, domain-contracts}`. **Packages never import apps** — that holds today and should keep holding. Client-side packages (`apps/web`, `apps/public-feature-board`, `post-ui`, `web-shared`, `ui`, `feedback-widget`, `sdk`) must not import `@feeblo/db` at all; an `oxlint` boundary override enforces it. Import schemas and vocabulary from `@feeblo/domain` instead.
