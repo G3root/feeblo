@@ -17,10 +17,11 @@ import {
   SidebarTrigger,
 } from "@feeblo/ui/sidebar";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
-import { useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 
 import { AppSidebar } from "~/components/common/app-sidebar";
+import { MobileNav } from "~/components/common/mobile-nav";
 import { NotificationsMenu } from "~/components/common/notifications-menu";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";
 import { CreateBoardDialog } from "~/features/board/components/create-board-dialog";
@@ -140,7 +141,21 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                               <SidebarInset className="h-full min-h-0 overflow-hidden">
                                 <header className="flex h-(--header-height) shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
                                   <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
-                                    <SidebarTrigger className="-ml-1" />
+                                    <SidebarTrigger className="-ml-1 hidden md:inline-flex" />
+                                    <Link
+                                      aria-label="Feeblo dashboard"
+                                      className="-ml-1 rounded-md md:hidden"
+                                      params={{ organizationId }}
+                                      to="/$organizationId"
+                                    >
+                                      <img
+                                        alt=""
+                                        className="size-7 rounded-md"
+                                        height={28}
+                                        src="/favicon.svg"
+                                        width={28}
+                                      />
+                                    </Link>
                                     <div className="ml-auto">
                                       <NotificationsMenu />
                                     </div>
@@ -150,12 +165,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                 <OverPlanBanner />
 
                                 <ScrollArea
-                                  className="min-h-0 flex-1 overflow-hidden"
+                                  className="min-h-0 flex-1 overflow-hidden max-md:pb-20"
                                   fill
                                 >
                                   {children}
                                 </ScrollArea>
                               </SidebarInset>
+                              <MobileNav />
                               <CreateBoardDialog />
                               <CreateRoadmapDialog />
                               <DeleteRoadmapDialog />
