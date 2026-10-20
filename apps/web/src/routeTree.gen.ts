@@ -26,6 +26,7 @@ import { Route as SSplatRouteImport } from "./routes/s/$"
 import { Route as SRobotsDottxtRouteImport } from "./routes/s/robots[.]txt"
 import { Route as SSitemapDotxmlRouteImport } from "./routes/s/sitemap[.]xml"
 import { Route as DashboardOrganizationIdDashboardLayoutRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout"
+import { Route as DashboardOrganizationIdOverPlanRouteImport } from "./routes/_dashboard/$organizationId/over-plan"
 import { Route as DashboardOrganizationIdSettingsRouteImport } from "./routes/_dashboard/$organizationId/settings"
 import { Route as DashboardInvitationInvitationIdRouteImport } from "./routes/_dashboard/invitation/$invitationId"
 import { Route as SBBoardSlugRouteImport } from "./routes/s/b/$boardSlug"
@@ -160,6 +161,12 @@ const SSitemapDotxmlRoute = SSitemapDotxmlRouteImport.update({
 const DashboardOrganizationIdDashboardLayoutRoute =
   DashboardOrganizationIdDashboardLayoutRouteImport.update({
     id: "/_dashboard-layout",
+    getParentRoute: () => DashboardOrganizationIdRoute,
+  } as any)
+const DashboardOrganizationIdOverPlanRoute =
+  DashboardOrganizationIdOverPlanRouteImport.update({
+    id: "/over-plan",
+    path: "/over-plan",
     getParentRoute: () => DashboardOrganizationIdRoute,
   } as any)
 const DashboardOrganizationIdSettingsRoute =
@@ -479,6 +486,7 @@ export interface FileRoutesByFullPath {
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s/": typeof SIndexRoute
+  "/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
   "/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
   "/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
   "/s/b/$boardSlug": typeof SBBoardSlugRoute
@@ -546,6 +554,7 @@ export interface FileRoutesByTo {
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s": typeof SIndexRoute
+  "/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
   "/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
   "/s/b/$boardSlug": typeof SBBoardSlugRoute
   "/s/changelog/$changelogSlug": typeof SChangelogChangelogSlugRoute
@@ -614,6 +623,7 @@ export interface FileRoutesById {
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s/": typeof SIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout": typeof DashboardOrganizationIdDashboardLayoutRouteWithChildren
+  "/_dashboard/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
   "/_dashboard/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
   "/_dashboard/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
   "/s/b/$boardSlug": typeof SBBoardSlugRoute
@@ -684,6 +694,7 @@ export interface FileRouteTypes {
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/s/"
+    | "/$organizationId/over-plan"
     | "/$organizationId/settings"
     | "/invitation/$invitationId"
     | "/s/b/$boardSlug"
@@ -751,6 +762,7 @@ export interface FileRouteTypes {
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/s"
+    | "/$organizationId/over-plan"
     | "/invitation/$invitationId"
     | "/s/b/$boardSlug"
     | "/s/changelog/$changelogSlug"
@@ -818,6 +830,7 @@ export interface FileRouteTypes {
     | "/s/sitemap.xml"
     | "/s/"
     | "/_dashboard/$organizationId/_dashboard-layout"
+    | "/_dashboard/$organizationId/over-plan"
     | "/_dashboard/$organizationId/settings"
     | "/_dashboard/invitation/$invitationId"
     | "/s/b/$boardSlug"
@@ -996,6 +1009,13 @@ declare module "@tanstack/react-router" {
       path: ""
       fullPath: "/$organizationId"
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutRouteImport
+      parentRoute: typeof DashboardOrganizationIdRoute
+    }
+    "/_dashboard/$organizationId/over-plan": {
+      id: "/_dashboard/$organizationId/over-plan"
+      path: "/over-plan"
+      fullPath: "/$organizationId/over-plan"
+      preLoaderRoute: typeof DashboardOrganizationIdOverPlanRouteImport
       parentRoute: typeof DashboardOrganizationIdRoute
     }
     "/_dashboard/$organizationId/settings": {
@@ -1531,6 +1551,7 @@ const DashboardOrganizationIdSettingsRouteWithChildren =
 
 interface DashboardOrganizationIdRouteChildren {
   DashboardOrganizationIdDashboardLayoutRoute: typeof DashboardOrganizationIdDashboardLayoutRouteWithChildren
+  DashboardOrganizationIdOverPlanRoute: typeof DashboardOrganizationIdOverPlanRoute
   DashboardOrganizationIdSettingsRoute: typeof DashboardOrganizationIdSettingsRouteWithChildren
 }
 
@@ -1538,6 +1559,7 @@ const DashboardOrganizationIdRouteChildren: DashboardOrganizationIdRouteChildren
   {
     DashboardOrganizationIdDashboardLayoutRoute:
       DashboardOrganizationIdDashboardLayoutRouteWithChildren,
+    DashboardOrganizationIdOverPlanRoute: DashboardOrganizationIdOverPlanRoute,
     DashboardOrganizationIdSettingsRoute:
       DashboardOrganizationIdSettingsRouteWithChildren,
   }

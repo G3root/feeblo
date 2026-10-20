@@ -10,6 +10,7 @@ import { Link } from "@tanstack/react-router";
 import { SettingsSidebar } from "~/components/common/settings-sidebar";
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { UpgradePlanDialogProvider } from "~/features/billing/dialog-stores";
+import { OverPlanBanner } from "~/features/plan-compliance/components/over-plan-banner";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 
 export function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -41,6 +42,7 @@ export function SettingsLayout({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
           </header>
+          <OverPlanBanner />
           <ScrollArea className="min-h-0 flex-1 overflow-hidden" fill>
             {children}
           </ScrollArea>

@@ -77,6 +77,28 @@ export interface AnalyticsEvents {
   org_renamed: { success: boolean };
   org_switched: { success: boolean };
 
+  // ── Plans ────────────────────────────────────────────────────────────────
+  over_plan_gate_viewed: {
+    plan: "free" | "starter" | "professional";
+    violation_count: number;
+  };
+  over_plan_remediation_action: {
+    action:
+      | "make_board_public"
+      | "delete_board"
+      | "make_roadmap_public"
+      | "delete_roadmap"
+      | "demote_admin"
+      | "cancel_invitation"
+      | "delete_changelog_category"
+      | "delete_contact"
+      | "delete_company";
+    success: boolean;
+  };
+  over_plan_remediation_completed: {
+    plan: "free" | "starter" | "professional";
+  };
+
   // ── Email ────────────────────────────────────────────────────────────────
   email_notification_preference_changed: {
     enabled: boolean;

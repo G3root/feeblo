@@ -56,6 +56,10 @@ export const PlanComplianceViolationKind = S.Literals([
   "crmEntries",
 ]);
 
+export type TPlanComplianceViolationKind = S.Schema.Type<
+  typeof PlanComplianceViolationKind
+>;
+
 /**
  * One entitlement finding.
  *

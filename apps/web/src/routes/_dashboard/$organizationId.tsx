@@ -1,11 +1,44 @@
 import { useAuth } from "@feeblo/web-shared/auth-context";
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { groupPostHogOrganization } from "~/components/posthog-provider";
 import { AuthGate } from "~/features/auth/components/organization-auth-gate";
+import { isOverPlanPathAllowed } from "~/features/plan-compliance/lib/over-plan-routes";
+import { planComplianceCollectionFor } from "~/lib/collections";
 
 export const Route = createFileRoute("/_dashboard/$organizationId")({
+  beforeLoad: async ({ location, params }) => {
+    const collection = planComplianceCollectionFor(params.organizationId);
+
+    try {
+      await collection.preload();
+    } catch {
+      // The gate is a product contract, not a security boundary. A snapshot
+      // that cannot be read lets the page render; the server policies still
+      // refuse every write that would deepen an over-plan state.
+      return;
+    }
+
+    const compliance = collection.get(params.organizationId);
+
+    if (
+      compliance === undefined ||
+      compliance.violations.length === 0 ||
+      isOverPlanPathAllowed(
+        location.pathname,
+        params.organizationId,
+        compliance
+      )
+    ) {
+      return;
+    }
+
+    throw redirect({
+      to: "/$organizationId/over-plan",
+      params: { organizationId: params.organizationId },
+    });
+  },
   component: OrganizationLayoutRoute,
 });
 

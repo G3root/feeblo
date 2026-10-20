@@ -31,6 +31,7 @@ import {
   DeleteBoardDialogProvider,
   RenameBoardDialogProvider,
 } from "~/features/board/dialog-stores";
+import { OverPlanBanner } from "~/features/plan-compliance/components/over-plan-banner";
 import { CreateRoadmapDialog } from "~/features/roadmap/components/create-roadmap-dialog";
 import { DeleteRoadmapDialog } from "~/features/roadmap/components/delete-roadmap-dialog";
 import { EditRoadmapDialog } from "~/features/roadmap/components/edit-roadmap-dialog";
@@ -145,6 +146,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                     </div>
                                   </div>
                                 </header>
+
+                                <OverPlanBanner />
 
                                 <ScrollArea
                                   className="min-h-0 flex-1 overflow-hidden"

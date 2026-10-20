@@ -1,6 +1,6 @@
 # Over-Plan Gate & Remediation Plan
 
-> **Status:** Design agreed through a grilling round on 2026-10-19. Implementation not started. No migration, no dependency change.
+> **Status:** Slices 1–4 implemented on branch `feat/over-plan-gate` on 2026-10-19. `pnpm check`, the new domain tests, and the web unit tests pass. The manual pass against a seeded downgraded workspace and e2e coverage are still pending. No migration, no dependency change.
 
 ## Objective
 
