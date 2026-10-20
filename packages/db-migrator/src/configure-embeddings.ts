@@ -39,6 +39,12 @@ const main = async () => {
 
   const sql = postgres(databaseUrl, { max: 1 });
   try {
+    // `ALTER COLUMN ... TYPE` takes ACCESS EXCLUSIVE on `post` for the whole
+    // rewrite, and that lock request queues every later read and write behind
+    // it. Without a deadline a maintenance command waiting for the lock holds
+    // the table hostage for as long as it waits; with one it fails, rolls back
+    // (the whole command is inside `sql.begin`), and can be retried.
+    await sql`SET lock_timeout = '30s'`;
     await sql`CREATE EXTENSION IF NOT EXISTS vector`;
     const [{ count }] = await sql<[{ count: number }]>`
       SELECT count(*)::integer AS count

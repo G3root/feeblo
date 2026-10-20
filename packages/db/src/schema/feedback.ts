@@ -436,6 +436,7 @@ export const postTagTable = pgTable(
   (table) => [
     index("post_tag_postId_idx").on(table.postId),
     index("post_tag_tagId_idx").on(table.tagId),
+    index("post_tag_organizationId_idx").on(table.organizationId),
     index("post_tag_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("post_tag_postId_tagId_uidx").on(table.postId, table.tagId),
   ]
@@ -575,6 +576,9 @@ export const postTable = pgTable(
       table.boardId,
       table.createdAt
     ),
+    index("post_boardId_idx").on(table.boardId),
+    index("post_creatorId_idx").on(table.creatorId),
+    index("post_creatorMemberId_idx").on(table.creatorMemberId),
     index("post_statusId_idx").on(table.statusId),
     index("post_archivedAt_idx").on(table.archivedAt),
     index("post_mergedIntoPostId_idx").on(table.mergedIntoPostId),
@@ -656,6 +660,7 @@ export const upvoteTable = pgTable(
       table.postId
     ),
     index("upvote_postId_idx").on(table.postId),
+    index("upvote_memberId_idx").on(table.memberId),
     index("upvote_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
   ]
@@ -694,6 +699,7 @@ export const postReactionTable = pgTable(
   },
   (table) => [
     index("postReaction_postId_idx").on(table.postId),
+    index("postReaction_memberId_idx").on(table.memberId),
     index("postReaction_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("postReaction_userId_postId_emoji_uidx").on(
       table.userId,
@@ -739,6 +745,8 @@ export const postSubscriptionTable = pgTable(
   (table) => [
     index("post_subscription_postId_idx").on(table.postId),
     index("post_subscription_userId_idx").on(table.userId),
+    index("post_subscription_memberId_idx").on(table.memberId),
+    index("post_subscription_organizationId_idx").on(table.organizationId),
     index("post_subscription_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("post_subscription_postId_userId_uidx").on(
       table.postId,
@@ -771,6 +779,7 @@ export const changelogSubscriptionTable = pgTable(
   (table) => [
     index("changelog_subscription_organizationId_idx").on(table.organizationId),
     index("changelog_subscription_userId_idx").on(table.userId),
+    index("changelog_subscription_memberId_idx").on(table.memberId),
     uniqueIndex("changelog_subscription_organizationId_userId_uidx").on(
       table.organizationId,
       table.userId
@@ -834,6 +843,9 @@ export const commentTable = pgTable(
     ),
     index("comment_postId_pinnedAt_idx").on(table.postId, table.pinnedAt),
     index("comment_mergedFromPostId_idx").on(table.mergedFromPostId),
+    index("comment_parentCommentId_idx").on(table.parentCommentId),
+    index("comment_userId_idx").on(table.userId),
+    index("comment_memberId_idx").on(table.memberId),
     uniqueIndex("comment_post_pinned_uidx")
       .on(table.postId)
       .where(sql`${table.pinnedAt} IS NOT NULL`),
@@ -864,6 +876,7 @@ export const commentReactionTable = pgTable(
   },
   (table) => [
     index("commentReaction_commentId_idx").on(table.commentId),
+    index("commentReaction_memberId_idx").on(table.memberId),
     uniqueIndex("commentReaction_userId_commentId_emoji_uidx").on(
       table.userId,
       table.commentId,
@@ -1034,6 +1047,9 @@ export const changelogCategoryLinkTable = pgTable(
   (table) => [
     index("changelog_category_link_changelogId_idx").on(table.changelogId),
     index("changelog_category_link_categoryId_idx").on(table.categoryId),
+    index("changelog_category_link_organizationId_idx").on(
+      table.organizationId
+    ),
     uniqueIndex("changelog_category_link_changelogId_categoryId_uidx").on(
       table.changelogId,
       table.categoryId
@@ -1535,6 +1551,7 @@ export const notificationPreferenceTable = pgTable(
       .notNull(),
   },
   (table) => [
+    index("notification_preference_userId_idx").on(table.userId),
     uniqueIndex("notification_preference_org_user_channel_category_uidx").on(
       table.organizationId,
       table.userId,

@@ -221,6 +221,7 @@ export const invitationTable = pgTable(
   (table) => [
     index("invitation_organizationId_idx").on(table.organizationId),
     index("invitation_email_idx").on(table.email),
+    index("invitation_inviterId_idx").on(table.inviterId),
   ]
 );
 
