@@ -107,7 +107,7 @@ afterAll(async () => {
   rmSync(databaseDirectory, { force: true, recursive: true });
 });
 
-describe("api-key plugin wiring", () => {
+describe("auth plugin wiring", () => {
   const makeAuth = () =>
     betterAuth({
       database: drizzleAdapter(db, {

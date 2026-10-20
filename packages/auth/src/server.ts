@@ -942,7 +942,7 @@ export const initAuthHandler = (
 
         // The plugin's member-mutation routes authorize on the coarse
         // organization ACL, which lets an admin manage a peer admin; the
-        // dashboard's RPCs additionally enforce rank and last-owner. Close the
+        // dashboard's RPCs additionally enforce the rank rule. Close the
         // duplicate write path instead of reimplementing the policy here (see
         // the module's comment).
         memberManagementGuard(),
