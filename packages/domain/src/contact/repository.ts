@@ -393,11 +393,17 @@ const makeContactRepository = Effect.gen(function* () {
         return Option.fromNullishOr(created);
       }),
 
-    findManyContacts: (organizationId: string) =>
-      db
+    findManyContacts: (
+      organizationId: string,
+      options?: { limit?: number }
+    ) => {
+      const query = db
         .select()
         .from(schema.contactTable)
-        .where(eq(schema.contactTable.organizationId, organizationId)),
+        .where(eq(schema.contactTable.organizationId, organizationId));
+
+      return options?.limit === undefined ? query : query.limit(options.limit);
+    },
 
     /**
      * Org-scoped people-picker query backing the on-behalf author combobox.

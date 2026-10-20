@@ -1396,6 +1396,58 @@ export function workspacePlanCollection(scope: DashboardCollectionScope) {
   );
 }
 
+/**
+ * The workspace's live over-plan findings, one row per workspace.
+ *
+ * The gate reads this on every dashboard route. The RPC counts first and
+ * fetches resource previews only when a finding is already over, so a
+ * compliant workspace costs a handful of indexed counts and nothing else.
+ * `staleTime` is infinite on purpose: the plan changes through a webhook, and
+ * the gate refetches this collection after every remediation action, so there
+ * is nothing to poll.
+ */
+export function planComplianceCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("planComplianceCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey(scope, "plan-compliance"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.GetWorkspacePlanCompliance({ organizationId }),
+          {
+            signal: ctx.signal,
+          }
+        );
+        return [data];
+      },
+      getKey: (item) => item.organizationId,
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  );
+}
+
+/**
+ * The plan-compliance collection for an explicit workspace.
+ *
+ * Route loaders run before the URL reflects the navigation, so they cannot use
+ * `dashboardCollections`, whose scope comes from the live pathname. Naming the
+ * workspace is what keeps a gate check on the destination from reading the
+ * source organization's snapshot.
+ */
+export const planComplianceCollectionFor = (organizationId: string) =>
+  getBrowserDbClient().collection(
+    planComplianceCollection({ organizationId, postSlug: undefined })
+  );
+
 export function postSubscriptionCollection(scope: DashboardCollectionScope) {
   const id = slugScopedCollectionId("postSubscriptionCollection", scope);
 
@@ -2263,6 +2315,11 @@ export const dashboardCollections = {
   get workspacePlanCollection() {
     return getBrowserDbClient().collection(
       workspacePlanCollection(currentScope())
+    );
+  },
+  get planComplianceCollection() {
+    return getBrowserDbClient().collection(
+      planComplianceCollection(currentScope())
     );
   },
 };

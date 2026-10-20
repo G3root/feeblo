@@ -162,6 +162,42 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
         .where(eq(schema.changelogCategoryTable.organizationId, organizationId))
         .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
 
+    /** Changelog entries filed under each category, for the remediation gate. */
+    countLinksByCategoryIds: ({
+      categoryIds,
+      organizationId,
+    }: {
+      categoryIds: readonly string[];
+      organizationId: string;
+    }) =>
+      categoryIds.length === 0
+        ? Effect.succeed<Record<string, number>>({})
+        : db
+            .select({
+              categoryId: schema.changelogCategoryLinkTable.categoryId,
+              count: count(),
+            })
+            .from(schema.changelogCategoryLinkTable)
+            .where(
+              and(
+                eq(
+                  schema.changelogCategoryLinkTable.organizationId,
+                  organizationId
+                ),
+                inArray(schema.changelogCategoryLinkTable.categoryId, [
+                  ...categoryIds,
+                ])
+              )
+            )
+            .groupBy(schema.changelogCategoryLinkTable.categoryId)
+            .pipe(
+              Effect.map((rows) =>
+                Object.fromEntries(
+                  rows.map((row) => [row.categoryId, row.count])
+                )
+              )
+            ),
+
     create: ({ id, name, iconType, icon, organizationId }: TCreate) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;

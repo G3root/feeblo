@@ -8,6 +8,7 @@ import {
   ChangelogId,
   CommentId,
   CommentReactionId,
+  ContactId,
   MemberId,
   PostId,
   PostReactionId,
@@ -41,6 +42,7 @@ import {
   changelogTable,
   commentReactionTable,
   commentTable,
+  contactTable,
   DEFAULT_CHANGELOG_CATEGORIES,
   DEFAULT_POST_STATUSES,
   memberTable,
@@ -62,6 +64,23 @@ const TEST_USER = {
   password: "TestPassword123!",
   name: "Test User",
 };
+
+/**
+ * A second account whose workspace is deliberately over the Free plan, so the
+ * over-plan gate (and every remediation action) can be exercised locally
+ * without going through a paid plan and a downgrade.
+ */
+const OVER_PLAN_USER = {
+  email: "overplan@feeblo.dev",
+  password: TEST_USER.password,
+  name: "Over Plan Demo",
+};
+
+/** The owner is the third admin role; these two complete the overage. */
+const OVER_PLAN_ADMIN_EMAILS = ["alex@feeblo.dev", "sam@feeblo.dev"] as const;
+
+/** Free allows 10 CRM entries; one more is enough to show the finding. */
+const OVER_PLAN_CONTACT_COUNT = 11;
 
 const TEAM_USERS = [
   {
@@ -1241,6 +1260,125 @@ const seedChangelogs = ({
     console.log(`   Seeded ${CHANGELOG_SEEDS.length} changelogs`);
   });
 
+/**
+ * Seeds a Free workspace that holds exactly the state the plan does not cover:
+ * four boards (one private), three admin roles, four changelog categories, a
+ * private roadmap, and eleven CRM entries.
+ *
+ * The rows are inserted directly on purpose. Every server policy that blocks
+ * these shapes on Free still applies to the dashboard; the fixture only needs
+ * to reproduce the state a downgrade would leave behind.
+ */
+const seedOverPlanWorkspace = (auth: SeedAuth) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+    const now = new Date();
+    const user = yield* ensureUser(OVER_PLAN_USER, auth);
+    const org = yield* ensureOrganization(user.id, "Over Plan Demo");
+    const ownerMember = yield* ensureMember({
+      organizationId: org.id,
+      userId: user.id,
+      role: "owner",
+    });
+
+    const site = yield* ensureSite({
+      organizationId: org.id,
+      name: org.name,
+      subdomain: `${faker.word.adjective()}-${faker.word.noun()}`,
+    });
+
+    const publicBoards = yield* ensureBoards({
+      organizationId: org.id,
+      names: ["Feedback", "Requests", "Ideas"],
+    });
+
+    const privateBoardId = yield* BoardId.generate;
+    yield* db.insert(boardTable).values({
+      id: privateBoardId,
+      name: "Secret board",
+      slug: "secret-board",
+      visibility: "PRIVATE",
+      organizationId: org.id,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const posts = yield* ensurePosts({
+      organizationId: org.id,
+      boardIds: [privateBoardId],
+      count: 4,
+      creatorId: user.id,
+      ...(ownerMember && { creatorMemberId: ownerMember.id }),
+    });
+
+    for (const email of OVER_PLAN_ADMIN_EMAILS) {
+      const admin = yield* ensureUser(
+        { email, name: email, password: TEST_USER.password },
+        auth
+      );
+      yield* ensureMember({
+        organizationId: org.id,
+        userId: admin.id,
+        role: "admin",
+      });
+    }
+
+    // The default seed already creates New, Improved, and Fixed.
+    yield* db.insert(changelogCategoryTable).values({
+      id: yield* ChangelogCategoryId.generate,
+      organizationId: org.id,
+      name: "Experimental",
+      iconType: "color",
+      icon: "oklch(0.7 0.15 300)",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    yield* db.insert(roadmapTable).values({
+      id: yield* RoadmapId.generate,
+      organizationId: org.id,
+      name: "Secret roadmap",
+      slug: "secret-roadmap",
+      description: null,
+      isPrimary: false,
+      mode: "status",
+      visibility: "private",
+      filter: { version: 1, operator: "and", conditions: [] },
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    for (let index = 0; index < OVER_PLAN_CONTACT_COUNT; index++) {
+      yield* db.insert(contactTable).values({
+        id: yield* ContactId.generate,
+        organizationId: org.id,
+        name: faker.person.fullName(),
+        email: `overplan-${index}@example.com`,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    console.log("\n6) Seeding the over-plan workspace");
+    console.log(
+      `   User: ${OVER_PLAN_USER.email} / ${OVER_PLAN_USER.password}`
+    );
+    console.log(`   Organization: ${org.name} (${org.id})`);
+    console.log(
+      `   Boards: ${publicBoards.length + 1} (1 private, ${posts.length} posts)`
+    );
+    console.log("   Admin roles: 3 (owner + 2 admins)");
+    console.log("   Changelog categories: 4");
+    console.log(`   CRM entries: ${OVER_PLAN_CONTACT_COUNT}`);
+    console.log("   Private roadmap: 1");
+    console.log(`   Public board: http://${site.subdomain}.localhost:3001`);
+    console.log(
+      `   Dashboard: http://localhost:3001/${org.id} (redirects to /over-plan)`
+    );
+
+    return org;
+  });
+
 const seed = (auth: SeedAuth) =>
   Effect.gen(function* () {
     console.log("Starting database seed...\n");
@@ -1434,9 +1572,14 @@ const seed = (auth: SeedAuth) =>
       posts: mainPosts,
     });
 
+    yield* seedOverPlanWorkspace(auth);
+
     console.log("\nSeed completed successfully.");
     console.log(`Primary user email: ${TEST_USER.email}`);
     console.log(`Primary user password: ${TEST_USER.password}`);
+    console.log(
+      `Over-plan demo: ${OVER_PLAN_USER.email} / ${OVER_PLAN_USER.password}`
+    );
   });
 
 const SeedLayer = Database.DatabaseContextLive;

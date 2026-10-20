@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -192,6 +192,24 @@ const makeBoardRepository = Effect.gen(function* () {
         .from(schema.boardTable)
         .where(eq(schema.boardTable.organizationId, organizationId))
         .pipe(Effect.map((boards) => boards.length)),
+
+    countByVisibility: ({
+      organizationId,
+      visibility,
+    }: {
+      organizationId: string;
+      visibility: "PUBLIC" | "PRIVATE";
+    }) =>
+      db
+        .select({ count: count() })
+        .from(schema.boardTable)
+        .where(
+          and(
+            eq(schema.boardTable.organizationId, organizationId),
+            eq(schema.boardTable.visibility, visibility)
+          )
+        )
+        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
 
     delete: ({ id, organizationId }: TBoardDelete) =>
       db

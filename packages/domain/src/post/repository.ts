@@ -6,6 +6,7 @@ import {
   and,
   asc,
   cosineDistance,
+  count,
   desc,
   eq,
   inArray,
@@ -314,6 +315,38 @@ const makePostRepository = Effect.gen(function* () {
     });
 
   return {
+    /**
+     * Post totals per board, for the remediation gate's delete confirmation.
+     * Scoped to the organization so a board id from another workspace cannot
+     * return a count; a board with no posts is absent from the result.
+     */
+    countByBoardIds: ({
+      boardIds,
+      organizationId,
+    }: {
+      boardIds: readonly string[];
+      organizationId: string;
+    }) =>
+      boardIds.length === 0
+        ? Effect.succeed<Record<string, number>>({})
+        : db
+            .select({
+              boardId: schema.postTable.boardId,
+              count: count(),
+            })
+            .from(schema.postTable)
+            .where(
+              and(
+                eq(schema.postTable.organizationId, organizationId),
+                inArray(schema.postTable.boardId, [...boardIds])
+              )
+            )
+            .groupBy(schema.postTable.boardId)
+            .pipe(
+              Effect.map((rows) =>
+                Object.fromEntries(rows.map((row) => [row.boardId, row.count]))
+              )
+            ),
     /**
      * Authenticated single-post fetch backing the `GetPost` RPC. Scoped to
      * the organization (membership is enforced by the handler's policy);

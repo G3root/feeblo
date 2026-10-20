@@ -42,6 +42,24 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Binding**: a future durable local-to-remote entity relationship used by bidirectional sync. It is not implemented for V1; Slack and Discord identities currently resolve through the user table (email match where available, or stable synthetic email).
 
+### Membership
+
+**Member**: A person with access to a workspace. Membership is unlimited on every plan. _Avoid_: user, seat, account
+
+**Admin role**: A member holding `owner` or `admin`; the unit the plan's admin-role allowance counts. _Avoid_: privileged member, seat, admin seat
+
+### Plans
+
+**Plan**: The subscription tier a workspace belongs to — Free, Starter, or Professional. _Avoid_: tier, package, subscription
+
+**Entitlement**: A capability or allowance a plan grants. A capability is on or off; a limit is a count. _Avoid_: feature flag, quota
+
+**Over-plan**: A workspace that holds more boards, admin roles, changelog categories, or CRM entries than its plan allows, or a private board or roadmap its plan does not include. _Avoid_: downgraded, over quota, over limit
+
+**Remediation**: The act of bringing an over-plan workspace back inside its plan, by changing or deleting its own state, or by upgrading. _Avoid_: restore, cleanup, fix
+
+**Remediation action**: One explicit change that resolves a single over-plan finding — making a board or roadmap public, demoting an admin role, cancelling an admin invitation, or deleting a resource. _Avoid_: fix, step, task
+
 ### Public API
 
 **Public API**: The versioned, key-authenticated HTTP surface under `/api/v1` that lets a workspace read its own data programmatically. It is distinct from the public portal, which is open to anyone, and from the dashboard transport, which is session-authenticated RPC. _Avoid_: Customer API, Developer API, platform API, open API
