@@ -390,6 +390,48 @@ describe("PlanCompliance", () => {
       })
     );
 
+    it.effect(
+      "previews private boards that fall outside the general board page",
+      () =>
+        Effect.gen(function* () {
+          const planCompliance = yield* PlanCompliance;
+          const { now, organizationId } = yield* makeOrganization();
+          const db = yield* currentDb;
+
+          const boardRows = Array.from({ length: 201 }, (_, index) => ({
+            id: `board_${organizationId}_${index}`,
+            name: index === 200 ? "Hidden board" : `Board ${index}`,
+            slug: `board_${organizationId}_${index}`,
+            visibility:
+              index === 200 ? ("PRIVATE" as const) : ("PUBLIC" as const),
+            organizationId,
+            createdAt: now,
+            updatedAt: now,
+          }));
+
+          yield* db.insert(schema.boardTable).values(boardRows);
+
+          const snapshot = yield* planCompliance.snapshot({
+            includeResources: true,
+            organizationId,
+          });
+          const privateBoards = byKind(snapshot, "privateBoards");
+
+          // The private board is the 201st row, outside the 200-row general
+          // preview. It still has to appear in the finding it belongs to.
+          expect(byKind(snapshot, "boards")?.resources).toHaveLength(200);
+          expect(
+            byKind(snapshot, "boards")?.resources.some(
+              (resource) => resource.label === "Hidden board"
+            )
+          ).toBe(false);
+          expect(privateBoards?.count).toBe(1);
+          expect(
+            privateBoards?.resources.map((resource) => resource.label)
+          ).toEqual(["Hidden board"]);
+        })
+    );
+
     it.effect("withholds resource rows from a caller who cannot act", () =>
       Effect.gen(function* () {
         const planCompliance = yield* PlanCompliance;

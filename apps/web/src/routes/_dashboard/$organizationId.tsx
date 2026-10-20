@@ -1,3 +1,4 @@
+import type { TWorkspacePlanCompliance } from "@feeblo/domain/plan-compliance/schema";
 import { useAuth } from "@feeblo/web-shared/auth-context";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -9,18 +10,20 @@ import { planComplianceCollectionFor } from "~/lib/collections";
 
 export const Route = createFileRoute("/_dashboard/$organizationId")({
   beforeLoad: async ({ location, params }) => {
-    const collection = planComplianceCollectionFor(params.organizationId);
+    let compliance: TWorkspacePlanCompliance | undefined;
 
     try {
+      // Both the collection lookup and the preload can fail before the route
+      // renders; the gate must not brick the dashboard when either does.
+      const collection = planComplianceCollectionFor(params.organizationId);
       await collection.preload();
+      compliance = collection.get(params.organizationId);
     } catch {
       // The gate is a product contract, not a security boundary. A snapshot
       // that cannot be read lets the page render; the server policies still
       // refuse every write that would deepen an over-plan state.
       return;
     }
-
-    const compliance = collection.get(params.organizationId);
 
     if (
       compliance === undefined ||

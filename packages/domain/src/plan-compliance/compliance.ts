@@ -133,13 +133,31 @@ const makePlanCompliance = Effect.gen(function* () {
       limits.feedbackBoards !== null && boardCount > limits.feedbackBoards;
 
     if (hasPrivateBoards || overBoardLimit) {
-      const boards = args.includeResources
-        ? yield* boardRepository.findMany({ organizationId })
-        : [];
+      const boards =
+        args.includeResources && overBoardLimit
+          ? yield* boardRepository.findMany({ organizationId })
+          : [];
       const preview = boards.slice(0, RESOURCE_PREVIEW_LIMIT);
+
+      // A private board can sit beyond the general board preview. Fetch the
+      // private page separately so the finding always has rows to act on, and
+      // count posts over the union so both previews share one query.
+      const privateBoards =
+        args.includeResources && hasPrivateBoards
+          ? yield* boardRepository.findMany({
+              organizationId,
+              visibility: "PRIVATE",
+            })
+          : [];
+      const privatePreview = privateBoards.slice(0, RESOURCE_PREVIEW_LIMIT);
+
       const postCounts = args.includeResources
         ? yield* postRepository.countByBoardIds({
-            boardIds: preview.map((board) => board.id),
+            boardIds: [
+              ...new Set(
+                [...preview, ...privatePreview].map((board) => board.id)
+              ),
+            ],
             organizationId,
           })
         : {};
@@ -150,10 +168,7 @@ const makePlanCompliance = Effect.gen(function* () {
           count: privateBoardCount,
           limit: null,
           resources: args.includeResources
-            ? toBoardResources(
-                preview.filter((board) => board.visibility === "PRIVATE"),
-                postCounts
-              )
+            ? toBoardResources(privatePreview, postCounts)
             : [],
         });
       }
