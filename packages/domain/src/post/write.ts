@@ -1022,11 +1022,13 @@ const makePostWriteService = Effect.gen(function* () {
                 scheduledAt: now,
               })
               .pipe(
-                Effect.mapError(
-                  () =>
+                Effect.mapError((error) =>
+                  attachCause(
                     new InternalServerError({
                       message: "Could not record post closure email intent.",
-                    })
+                    }),
+                    error
+                  )
                 )
               );
             outboxId =
@@ -1059,11 +1061,13 @@ const makePostWriteService = Effect.gen(function* () {
                 ),
               })
               .pipe(
-                Effect.mapError(
-                  () =>
+                Effect.mapError((error) =>
+                  attachCause(
                     new InternalServerError({
                       message: "Could not record post status email intent.",
-                    })
+                    }),
+                    error
+                  )
                 )
               );
             outboxId = result._tag === "Written" ? result.intent.id : undefined;
@@ -1249,11 +1253,13 @@ const makePostWriteService = Effect.gen(function* () {
               scheduledAt: now,
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message: "Could not record post merge email intent.",
-                  })
+                  }),
+                  error
+                )
               )
             );
           return result._tag === "Inserted" ? result.intent.id : undefined;
@@ -1321,11 +1327,13 @@ const makePostWriteService = Effect.gen(function* () {
               scheduledAt: now,
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message: "Could not record post unmerge email intent.",
-                  })
+                  }),
+                  error
+                )
               )
             );
           return result._tag === "Inserted" ? result.intent.id : undefined;

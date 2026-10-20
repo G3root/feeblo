@@ -1,4 +1,4 @@
-import { transaction } from "@feeblo/db";
+import { attachCause, transaction } from "@feeblo/db";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -71,11 +71,13 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
               ),
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message: "Could not record the post email subscription.",
-                  })
+                  }),
+                  error
+                )
               )
             );
         })
@@ -103,12 +105,14 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
               userId: session.session.userId,
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message:
                       "Could not unsubscribe the post email subscription.",
-                  })
+                  }),
+                  error
+                )
               )
             );
         })

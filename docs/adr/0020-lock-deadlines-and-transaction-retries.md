@@ -6,7 +6,7 @@ Three rules about row locks, applied wherever the repository takes or waits on o
 
 **Every Postgres connection carries a lock deadline.** `PgClientLive` sets `lock_timeout = 5s` and `idle_in_transaction_session_timeout = 30s` in the startup packet (`packages/db/src/database.ts`), so they apply to every pooled connection without a caller opting in.
 
-**A transaction aborted by Postgres is retried.** `withTransactionAbortRetry` re-runs the whole transaction on SQLSTATE `40P01` (deadlock), `40001` (serialization failure) or `55P03` (lock timeout), twice, with jittered exponential backoff. It wraps `transaction()`, the shared boundary in `@feeblo/db`; repositories that call `db.transaction` directly wrap their own call.
+**A transaction aborted by Postgres is retried.** `withTransactionAbortRetry` re-runs the whole transaction on SQLSTATE `40P01` (deadlock), `40001` (serialization failure) or `55P03` (lock timeout), twice, with jittered exponential backoff. It wraps `transaction()`, the shared boundary in `@feeblo/db`; repositories that call `db.transaction` directly wrap their own call. The predicate reads the failure's `cause` chain, so an error mapping inside a transaction must keep the failure it replaced (`attachCause`) or the boundary sees a message-only error and answers 500.
 
 **A mutex on the organization row is `FOR NO KEY UPDATE`.** `FOR UPDATE` is reserved for the one place where blocking child inserts is the point — the account-deletion re-check. The locks that only serialize a count-and-write pair take `no key update`: workspace creation (`lockUser`), the submission-window upsert, roadmap create/delete, membership role changes, the post-status position sequence, and `makeDefault`.
 
