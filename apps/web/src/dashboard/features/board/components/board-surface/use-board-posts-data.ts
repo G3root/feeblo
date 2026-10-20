@@ -16,7 +16,6 @@ import {
 import { useDeferredValue, useMemo } from "react";
 
 import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
-import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import type {
@@ -25,30 +24,6 @@ import type {
   BoardTagOperator,
 } from "../../state/board-store-context";
 import type { BoardPostRow } from "./types";
-
-/**
- * Warms exactly the collections `useBoardPostsData` subscribes to. Board
- * and feedback routes call this in `beforeLoad` so lane data arrives with
- * the route instead of after mount; the layout only preloads shell-level
- * collections (organization, board, plan).
- *
- * TanStack DB is deliberately overfetched here: full org collections sync
- * once, then every filter/search/sort runs as an incremental live query
- * (D2 differential dataflow) with no further network trips. Keep it that
- * way — do not "optimize" this into paginated server queries without
- * replacing the whole board data model.
- */
-export async function preloadBoardPostsDataCollections(): Promise<void> {
-  await Promise.all([
-    dashboardCollections.boardCollection.preload(),
-    dashboardCollections.deleteEligibilityCollection.preload(),
-    dashboardCollections.postCollection.preload(),
-    dashboardCollections.postStatusCollection.preload(),
-    dashboardCollections.tagCollection.preload(),
-    dashboardCollections.postTagCollection.preload(),
-    dashboardCollections.upvoteCollection.preload(),
-  ]);
-}
 
 const STATUSES_BY_PRESET = {
   active: ["PLANNED", "IN_PROGRESS"],

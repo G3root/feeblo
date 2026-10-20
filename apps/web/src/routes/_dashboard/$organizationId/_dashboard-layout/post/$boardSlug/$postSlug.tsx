@@ -12,12 +12,7 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Activity01Icon, Comment01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  and,
-  createLiveQueryCollection,
-  eq,
-  useLiveQuery,
-} from "@tanstack/react-db";
+import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 
@@ -43,101 +38,18 @@ import {
 } from "~/features/post/components/post-page-sections";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
-import { dashboardCollections } from "~/lib/collections";
+import { preloadPostDetail } from "~/lib/preloads";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
-
-/**
- * These collections are configured with `syncMode: "on-demand"`, so calling
- * `collection.preload()` on them is a no-op — their slug-scoped subset is only
- * fetched when a live query actually subscribes. That query normally lives in
- * the route component, which only mounts *after* `defaultPendingComponent` is
- * replaced, which is why reactions/comments/subscriptions historically loaded
- * late. Building the slug-scoped live queries here (matching the filters the
- * components use) and preloading them in `beforeLoad` pulls those subsets in
- * alongside the eager collections, before the pending shell clears.
- */
-function createPostSubsetQueries(organizationId: string, postSlug: string) {
-  return {
-    // Full-post body for the detail view. The org-scoped list collection
-    // carries slim rows (no `content`); this slug-scoped query resolves the
-    // body through `GetPost` alongside the other subsets so it arrives
-    // before the pending shell clears.
-    postDetail: createLiveQueryCollection((query) =>
-      query
-        .from({ post: dashboardCollections.postDetailCollection })
-        .where(({ post }) =>
-          and(eq(post.organizationId, organizationId), eq(post.slug, postSlug))
-        )
-    ),
-    commentReactions: createLiveQueryCollection((query) =>
-      query
-        .from({
-          commentReaction: dashboardCollections.commentReactionCollection,
-        })
-        .where(({ commentReaction }) =>
-          and(
-            eq(commentReaction.organizationId, organizationId),
-            eq(commentReaction.postSlug, postSlug)
-          )
-        )
-    ),
-    comments: createLiveQueryCollection((query) =>
-      query
-        .from({ comment: dashboardCollections.commentCollection })
-        .where(({ comment }) =>
-          and(
-            eq(comment.organizationId, organizationId),
-            eq(comment.postSlug, postSlug)
-          )
-        )
-    ),
-    postReactions: createLiveQueryCollection((query) =>
-      query
-        .from({ postReaction: dashboardCollections.postReactionCollection })
-        .where(({ postReaction }) =>
-          and(
-            eq(postReaction.organizationId, organizationId),
-            eq(postReaction.postSlug, postSlug)
-          )
-        )
-    ),
-    // PostSubscription has no `postSlug` column; its query key falls back to
-    // the current URL slug, which is what the SubscribeToggle component relies
-    // on too. An org-scoped load is enough to resolve that same slug key.
-    postSubscription: createLiveQueryCollection((query) =>
-      query
-        .from({ subscription: dashboardCollections.postSubscriptionCollection })
-        .where(({ subscription }) =>
-          eq(subscription.organizationId, organizationId)
-        )
-    ),
-  };
-}
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 )({
   component: RouteComponent,
   beforeLoad: async ({ params }) => {
-    const subsetQueries = createPostSubsetQueries(
-      params.organizationId,
-      params.postSlug
-    );
-
-    await Promise.all([
-      dashboardCollections.boardCollection.preload(),
-      dashboardCollections.deleteEligibilityCollection.preload(),
-      dashboardCollections.postCollection.preload(),
-      dashboardCollections.postStatusCollection.preload(),
-      dashboardCollections.postTagCollection.preload(),
-      dashboardCollections.tagCollection.preload(),
-      dashboardCollections.upvoteCollection.preload(),
-      subsetQueries.postDetail.preload(),
-      subsetQueries.comments.preload(),
-      subsetQueries.commentReactions.preload(),
-      subsetQueries.postReactions.preload(),
-      subsetQueries.postSubscription.preload(),
-    ]);
+    await preloadPostDetail({
+      organizationId: params.organizationId,
+      postSlug: params.postSlug,
+    });
   },
 });
 
