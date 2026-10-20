@@ -4,6 +4,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { publicPostVisibility } from "../post/public-visibility";
 import type {
   TChangelogPostCreate,
   TChangelogPostDelete,
@@ -50,7 +51,7 @@ const makeChangelogPostRepository = Effect.gen(function* () {
           and(
             eq(schema.changelogPostTable.organizationId, organizationId),
             eq(schema.changelogTable.status, "published"),
-            eq(schema.boardTable.visibility, "PUBLIC")
+            publicPostVisibility
           )
         ),
 
@@ -91,8 +92,7 @@ const makeChangelogPostRepository = Effect.gen(function* () {
           and(
             eq(schema.changelogPostTable.organizationId, organizationId),
             eq(schema.changelogPostTable.changelogId, changelogId),
-            eq(schema.boardTable.visibility, "PUBLIC"),
-            isNull(schema.postTable.mergedIntoPostId)
+            publicPostVisibility
           )
         )
         .orderBy(desc(schema.changelogPostTable.createdAt)),

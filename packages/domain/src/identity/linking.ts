@@ -3,6 +3,7 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
+import { publicPostVisibility } from "../post/public-visibility";
 import { isShadowUserEmail, isSyntheticEmail } from "./emails";
 import { SubjectNotFoundError } from "./errors";
 
@@ -376,7 +377,7 @@ const activateDeferredSubscriptionsForContact = (args: {
         and(
           eq(schema.postTable.organizationId, organizationId),
           inArray(schema.postTable.id, postIds),
-          eq(schema.boardTable.visibility, "PUBLIC")
+          publicPostVisibility
         )
       );
     const publicIds = new Set(publicPosts.map((row) => row.id));

@@ -28,7 +28,10 @@ import * as Option from "effect/Option";
 
 import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
 import { FailedToMergePostError, PostAlreadyExistsError } from "./errors";
-import { publicPostVisibility } from "./public-visibility";
+import {
+  activePostVisibility,
+  publicPostVisibility,
+} from "./public-visibility";
 import type { TPostAdminUpdate } from "./schema";
 
 interface TPostUpdateInput {
@@ -752,8 +755,7 @@ const makePostRepository = Effect.gen(function* () {
     }: TPostSuggestionCandidates) => {
       const where: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
-        sql`${schema.postTable.archivedAt} is null`,
-        sql`${schema.postTable.mergedIntoPostId} is null`,
+        activePostVisibility,
       ];
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
@@ -796,25 +798,6 @@ const makePostRepository = Effect.gen(function* () {
             .limit(limit)
         : query.orderBy(desc(schema.postTable.updatedAt)).limit(limit);
     },
-
-    isPublicPost: ({ id, organizationId }: TPostById) =>
-      Effect.gen(function* () {
-        const rows = yield* db
-          .select({ id: schema.postTable.id })
-          .from(schema.postTable)
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .where(
-            and(
-              eq(schema.postTable.id, id),
-              eq(schema.postTable.organizationId, organizationId),
-              eq(schema.boardTable.visibility, "PUBLIC")
-            )
-          );
-        return rows.length > 0;
-      }),
 
     isUnlocked: ({ id, organizationId }: TPostById) =>
       Effect.gen(function* () {
