@@ -91,7 +91,9 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
           // serialized into the RPC response, so keep the diagnostic in the
           // server log and answer with the fixed message.
           Effect.tapError((cause) =>
-            Effect.logError("Failed to create API key", cause)
+            Effect.logError("Failed to create API key", cause).pipe(
+              Effect.annotateLogs({ organizationId })
+            )
           ),
           Effect.mapError(
             () =>
