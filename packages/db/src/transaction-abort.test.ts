@@ -5,17 +5,13 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Ref from "effect/Ref";
 
-import {
-  isRetryableTransactionAbort,
-  sqlStateOf,
-  withTransactionAbortRetry,
-} from "./transaction-abort";
+import { withTransactionAbortRetry } from "./transaction-abort";
 
 /**
  * The shape a driver error takes when drizzle's Effect adapter reports it: the
  * pg error sits directly on `cause`.
  */
-const drizzleQueryError = (code: string) =>
+const driverFailure = (code: string) =>
   new EffectDrizzleQueryError({
     query: 'insert into "post" ...',
     params: [],
@@ -26,67 +22,49 @@ const drizzleQueryError = (code: string) =>
  * The shape Effect SQL reports when the failure reached it as a Cause: the
  * driver error is nested under `reasons[].error`.
  */
-const causeWrappedError = (code: string) => {
-  const failure = Cause.fail({ code, detail: "deadlock detected" });
+const causeWrappedFailure = (code: string) => {
+  const failure = Cause.fail({ code, detail: "aborted" });
   return { "~effect/Cause": "~effect/Cause", reasons: failure.reasons };
 };
 
 /**
  * The shape a failure takes once a `SqlError` has wrapped the driver error.
  */
-const sqlErrorWrappedError = (code: string) =>
+const sqlErrorWrappedFailure = (code: string) =>
   new EffectDrizzleQueryError({
     query: "select 1",
     params: [],
     cause: { cause: { cause: { code } } },
   });
 
-describe("sqlStateOf", () => {
-  it("reads the SQLSTATE from every wrapper shape the driver reports", () => {
-    expect(sqlStateOf(drizzleQueryError("40P01"))).toBe("40P01");
-    expect(sqlStateOf(causeWrappedError("40001"))).toBe("40001");
-    expect(sqlStateOf(sqlErrorWrappedError("55P03"))).toBe("55P03");
-  });
-
-  it("answers undefined for a failure that is not a retryable abort", () => {
-    expect(sqlStateOf(new Error("connection refused"))).toBeUndefined();
-    expect(sqlStateOf(drizzleQueryError("23505"))).toBeUndefined();
-    expect(sqlStateOf(undefined)).toBeUndefined();
-    expect(sqlStateOf("40P01")).toBeUndefined();
-  });
-
-  it("terminates on a self-referential cause instead of recursing forever", () => {
-    const cyclic = Object.assign({}, { cause: {} });
-    cyclic.cause = cyclic;
-    expect(sqlStateOf(cyclic)).toBeUndefined();
-  });
-});
-
-describe("isRetryableTransactionAbort", () => {
-  it("treats the three aborts Postgres rolls back cleanly as retryable", () => {
-    expect(isRetryableTransactionAbort(drizzleQueryError("40P01"))).toBe(true);
-    expect(isRetryableTransactionAbort(drizzleQueryError("40001"))).toBe(true);
-    expect(isRetryableTransactionAbort(drizzleQueryError("55P03"))).toBe(true);
-  });
-
-  it("does not retry a deterministic failure", () => {
-    expect(isRetryableTransactionAbort(drizzleQueryError("23505"))).toBe(false);
-    expect(isRetryableTransactionAbort(new Error("boom"))).toBe(false);
-  });
-});
+/**
+ * A transaction that always fails with `failure`, counting how many times it
+ * ran.
+ *
+ * The retry policy is private, so the tests observe it the way a caller does:
+ * how many times the transaction ran, and what came out when it never
+ * succeeded.
+ */
+const failedTransaction = <E>(
+  failure: E,
+  attempts: Ref.Ref<number>
+): Effect.Effect<never, E> =>
+  Ref.update(attempts, (count) => count + 1).pipe(
+    Effect.andThen(Effect.fail(failure))
+  );
 
 describe("withTransactionAbortRetry", () => {
   // `it.live`, not `it.effect`: the retry policy sleeps, and the test clock
   // would suspend rather than advance it. The whole file runs in well under a
-  // second even on a live clock.
-  it.live("re-runs the transaction and succeeds on the retry", () =>
+  // second on a live clock, and the assertions are attempt counts, not timing.
+  it.live("re-runs a transaction Postgres aborted and succeeds", () =>
     Effect.gen(function* () {
       const attempts = yield* Ref.make(0);
       const result = yield* withTransactionAbortRetry(
         Effect.gen(function* () {
           const attempt = yield* Ref.updateAndGet(attempts, (n) => n + 1);
           if (attempt === 1) {
-            return yield* drizzleQueryError("40P01");
+            return yield* driverFailure("40P01");
           }
           return attempt;
         })
@@ -97,14 +75,35 @@ describe("withTransactionAbortRetry", () => {
     })
   );
 
-  it.live("re-runs a transaction that timed out waiting for a lock", () =>
+  // One case per wrapper shape, because reading a fixed path would silently
+  // miss two of the three failures production actually produces.
+  it.live("retries a deadlock reported by drizzle", () =>
     Effect.gen(function* () {
       const attempts = yield* Ref.make(0);
       yield* withTransactionAbortRetry(
-        Effect.gen(function* () {
-          yield* Ref.update(attempts, (n) => n + 1);
-          return yield* drizzleQueryError("55P03");
-        })
+        failedTransaction(driverFailure("40P01"), attempts)
+      ).pipe(Effect.exit);
+
+      expect(yield* Ref.get(attempts)).toBe(3);
+    })
+  );
+
+  it.live("retries a serialization failure reported as a cause", () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0);
+      yield* withTransactionAbortRetry(
+        failedTransaction(causeWrappedFailure("40001"), attempts)
+      ).pipe(Effect.exit);
+
+      expect(yield* Ref.get(attempts)).toBe(3);
+    })
+  );
+
+  it.live("retries a lock timeout reported through a SqlError", () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0);
+      yield* withTransactionAbortRetry(
+        failedTransaction(sqlErrorWrappedFailure("55P03"), attempts)
       ).pipe(Effect.exit);
 
       expect(yield* Ref.get(attempts)).toBe(3);
@@ -115,10 +114,7 @@ describe("withTransactionAbortRetry", () => {
     Effect.gen(function* () {
       const attempts = yield* Ref.make(0);
       const exit = yield* withTransactionAbortRetry(
-        Effect.gen(function* () {
-          yield* Ref.update(attempts, (n) => n + 1);
-          return yield* drizzleQueryError("40001");
-        })
+        failedTransaction(driverFailure("40001"), attempts)
       ).pipe(Effect.exit);
 
       expect(Exit.isFailure(exit)).toBe(true);
@@ -126,17 +122,41 @@ describe("withTransactionAbortRetry", () => {
     })
   );
 
-  it.live("does not retry a deterministic failure", () =>
+  it.live("does not retry a failure that is not a transaction abort", () =>
     Effect.gen(function* () {
       const attempts = yield* Ref.make(0);
       yield* withTransactionAbortRetry(
-        Effect.gen(function* () {
-          yield* Ref.update(attempts, (n) => n + 1);
-          return yield* drizzleQueryError("23505");
-        })
+        failedTransaction(driverFailure("23505"), attempts)
       ).pipe(Effect.exit);
 
       expect(yield* Ref.get(attempts)).toBe(1);
     })
+  );
+
+  it.live("does not retry a failure that is not an object", () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0);
+      yield* withTransactionAbortRetry(
+        failedTransaction("not a database error", attempts)
+      ).pipe(Effect.exit);
+
+      expect(yield* Ref.get(attempts)).toBe(1);
+    })
+  );
+
+  it.live(
+    "terminates on a self-referential cause instead of recursing forever",
+    () =>
+      Effect.gen(function* () {
+        const cyclic = Object.assign({}, { cause: {} });
+        cyclic.cause = cyclic;
+
+        const attempts = yield* Ref.make(0);
+        yield* withTransactionAbortRetry(
+          failedTransaction(cyclic, attempts)
+        ).pipe(Effect.exit);
+
+        expect(yield* Ref.get(attempts)).toBe(1);
+      })
   );
 });
