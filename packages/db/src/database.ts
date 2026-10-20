@@ -14,6 +14,7 @@ import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/sql/SqlError";
 
 import { relations } from "./relations";
+import { withTransactionAbortRetry } from "./transaction-abort";
 
 // Detect whether the configured DATABASE_URL points at an embedded PGlite
 // instance (`pglite:/path/...`) instead of a real PostgreSQL server.
@@ -87,14 +88,49 @@ export const PgliteClientLive = PgliteClient.layerFrom(
   )
 );
 
+/**
+ * How long a statement may wait for a row lock before Postgres aborts it.
+ *
+ * Without a deadline a waiter holds its pooled connection indefinitely. The
+ * pool is ten connections per process, and the write paths serialize per
+ * workspace on the organization row, so ten blocked requests would starve
+ * every other tenant of the same process — a lock wait on one workspace
+ * becoming an outage on all of them. The value is longer than any healthy
+ * write transaction (the longest is a post create with notification fan-out)
+ * and short enough that a request fails instead of hanging.
+ */
+const lockTimeout = "5s";
+
+/**
+ * How long a transaction may sit idle — open, holding its locks, running no
+ * statement — before Postgres terminates it.
+ *
+ * A leaked transaction is the one leak a pooling client cannot recover from on
+ * its own: the connection stays checked out and its row locks stay held, so
+ * every other writer queues behind a fiber that may never resume.
+ */
+const idleInTransactionTimeout = "30s";
+
 // Configure the Postgres client layer.
 //
 // `PgClient` owns the wire protocol as of rc.117 and no longer accepts `pg`
 // type parsers, so the former `types` shim is gone. Timestamp columns now
 // decode to `Date` rather than the raw strings that shim forced; the domain
 // schemas read them through `Schema.Union([Schema.Date, Schema.DateFromString])`.
+//
+// The two timeouts travel in the startup packet, so every pooled connection
+// carries them and no caller has to remember to set them per transaction.
+// `lock_timeout` surfaces as SQLSTATE `55P03`, which `withTransactionAbortRetry`
+// retries and `withRemapDbErrors` turns into a 500 once the retries run out —
+// far better than a request that never returns.
 export const PgClientLive = SQLPG.PgClient.layerConfig({
   url: Config.Redacted("DATABASE_URL"),
+  startupParameters: {
+    idle_in_transaction_session_timeout: Config.succeed(
+      idleInTransactionTimeout
+    ),
+    lock_timeout: Config.succeed(lockTimeout),
+  },
 });
 
 /** Connection health-check that retries with jittered backoff on startup. */
@@ -191,11 +227,17 @@ export const currentDb: Effect.Effect<
 // Run an effect inside a database transaction. Effect SQL routes every query
 // using this client's fiber-local transaction connection and turns nested
 // calls into savepoints.
+//
+// The retry re-runs the whole transaction, which is the only recovery for a
+// deadlock or a lock timeout: Postgres has already rolled it back, so nothing
+// from the first attempt is visible to the second. Repositories that call
+// `db.transaction` directly instead of this helper should wrap the call in
+// `withTransactionAbortRetry` for the same reason.
 export function transaction<A, E, R>(
   effect: Effect.Effect<A, E, R>
 ): Effect.Effect<A, E | SqlError, R | Database> {
   return Effect.gen(function* () {
     const db = yield* Database;
     return yield* db.transaction(() => effect);
-  });
+  }).pipe(withTransactionAbortRetry);
 }
