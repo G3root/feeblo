@@ -419,6 +419,45 @@ describe("CommentRpcHandlers", () => {
         })
       );
 
+      it.effect("does not expose comments from archived or merged posts", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+
+          yield* handlers
+            .CreateComment(
+              commentCreateInput(fixture, commentId, "Comments on a post")
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const now = yield* DateTime.nowAsDate;
+          yield* db
+            .update(schema.postTable)
+            .set({ archivedAt: now })
+            .where(eq(schema.postTable.id, fixture.postId));
+
+          // The post is no longer publicly readable, so its comments are not
+          // either; the dashboard keeps them for restore.
+          const publicComments = yield* handlers
+            .ListCommentsPublic({
+              organizationId: fixture.organizationId,
+              slug: fixture.postSlug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(publicComments).toHaveLength(0);
+
+          const memberComments = yield* handlers
+            .ListComments({
+              organizationId: fixture.organizationId,
+              slug: fixture.postSlug,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          expect(memberComments).toHaveLength(1);
+        })
+      );
+
       it.effect(
         "re-anchors a public reply beneath its nearest visible ancestor when an intermediary is internal",
         () =>

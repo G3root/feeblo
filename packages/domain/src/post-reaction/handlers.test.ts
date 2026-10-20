@@ -7,6 +7,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -256,6 +257,35 @@ describe("PostReactionRpcHandlers", () => {
           );
           expect(publicResult).toEqual({ reacted: true, emoji: "fire" });
           expect(privateError._tag).toBe("PolicyDenied");
+        })
+      );
+      it.effect("hides reactions on an archived post", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostReactionRpcHandlersEffect;
+          const f = yield* fixture("PUBLIC");
+
+          yield* handlers
+            .TogglePostReaction({
+              organizationId: f.organizationId,
+              postId: f.postId,
+              emoji: "rocket",
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+
+          const now = yield* DateTime.nowAsDate;
+          yield* db
+            .update(schema.postTable)
+            .set({ archivedAt: now })
+            .where(eq(schema.postTable.id, f.postId));
+
+          const publicReactions = yield* handlers
+            .ListPostReactionsPublic({
+              organizationId: f.organizationId,
+              slug: f.postSlug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(publicReactions).toHaveLength(0);
         })
       );
     }

@@ -1,6 +1,15 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import { and, desc, eq, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -180,7 +189,13 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
-            eq(schema.boardTable.visibility, "PUBLIC")
+            eq(schema.boardTable.visibility, "PUBLIC"),
+            // Same rule as `PostRepository.findManyPublic`: a superseded post
+            // (archived or merged away) is not publicly readable, so the
+            // comments anchored to it must not be either. `GetPostPublic`
+            // already 404s for it; this read has to agree.
+            isNull(schema.postTable.archivedAt),
+            isNull(schema.postTable.mergedIntoPostId)
           )
         )
         .orderBy(

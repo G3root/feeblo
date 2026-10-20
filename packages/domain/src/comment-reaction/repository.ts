@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { CommentReactionId } from "@feeblo/id";
 import type { ReactionEmoji } from "@feeblo/utils/reaction";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -114,7 +114,12 @@ const makeCommentReactionRepository = Effect.gen(function* () {
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
             eq(schema.commentTable.visibility, "PUBLIC"),
-            eq(schema.boardTable.visibility, "PUBLIC")
+            eq(schema.boardTable.visibility, "PUBLIC"),
+            // A superseded post is not publicly readable, so its comment
+            // reactions are not either (the same rule `findManyPublic`
+            // applies to posts and comments).
+            isNull(schema.postTable.archivedAt),
+            isNull(schema.postTable.mergedIntoPostId)
           )
         )
         .pipe(

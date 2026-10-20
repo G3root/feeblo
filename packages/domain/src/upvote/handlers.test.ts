@@ -425,8 +425,20 @@ describe("UpvoteRpcHandlers", () => {
             userId: null,
             memberId: null,
           });
-          // Display fields stay public (voter dialog).
-          expect(upvotes[0]?.user.name).toBe("Test User");
+          // An organization-wide public read powers the board's per-post
+          // counts and the viewer's own state; it must not double as a roster
+          // of other voters' display fields.
+          expect(upvotes[0]?.user).toEqual({ name: null, image: null });
+
+          // A post-scoped read is the voter dialog's: there the display
+          // fields are part of the public UI.
+          const postUpvotes = yield* handlers
+            .ListUpvotesPublic({
+              organizationId: fixture.organizationId,
+              postId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(postUpvotes[0]?.user.name).toBe("Test User");
         })
       );
 
@@ -536,7 +548,9 @@ describe("UpvoteRpcHandlers", () => {
               userId: null,
               memberId: null,
             });
-            expect(other?.user.name).toBe("Other User");
+            // Unscoped: no voter display fields for anyone (see the roster
+            // test above). The post-scoped read keeps them.
+            expect(other?.user).toEqual({ name: null, image: null });
           })
       );
 
@@ -579,6 +593,68 @@ describe("UpvoteRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           expect(memberUpvotes).toHaveLength(1);
+        })
+      );
+
+      it.effect("hides upvotes on archived and merged posts", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* UpvoteRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const archivedPostId = yield* PostId.generate;
+          const mergedPostId = yield* PostId.generate;
+          const survivorPostId = yield* PostId.generate;
+
+          yield* createPost(fixture, archivedPostId, "Archived post");
+          yield* createPost(fixture, mergedPostId, "Merged post");
+          yield* createPost(fixture, survivorPostId, "Survivor post");
+
+          for (const postId of [archivedPostId, mergedPostId]) {
+            yield* handlers
+              .ToggleUpvote({
+                organizationId: fixture.organizationId,
+                postId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+          }
+
+          const now = yield* DateTime.nowAsDate;
+          yield* db
+            .update(schema.postTable)
+            .set({ archivedAt: now })
+            .where(eq(schema.postTable.id, archivedPostId));
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: now,
+              mergedAt: now,
+              mergedIntoPostId: survivorPostId,
+            })
+            .where(eq(schema.postTable.id, mergedPostId));
+
+          // A superseded post has no public page, so neither its votes nor
+          // any other public projection of it may be readable by slug/id.
+          for (const postId of [archivedPostId, mergedPostId]) {
+            const publicUpvotes = yield* handlers
+              .ListUpvotesPublic({
+                organizationId: fixture.organizationId,
+                postId,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+            expect(publicUpvotes).toHaveLength(0);
+          }
+
+          // The dashboard still reads them (it is how the post is restored).
+          const memberUpvotes = yield* handlers
+            .ListUpvotes({
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+          expect(memberUpvotes).toHaveLength(2);
         })
       );
     });

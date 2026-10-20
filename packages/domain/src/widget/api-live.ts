@@ -343,7 +343,15 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   // The SSO contact upsert creates through the shared intake
                   // module, which reads the plan decision from the context.
                   Effect.provideService(EntitlementPolicy, entitlementPolicy),
-                  Effect.mapError(
+                  // A rejected or malformed SSO token is the caller's mistake,
+                  // and the endpoint publishes both tags for it: answer with
+                  // the real 401/400 instead of folding them into a 500 that
+                  // says the server failed and can never be retried. Only the
+                  // contact-store failures left in this effect are internal.
+                  Effect.catchIf(
+                    (error) =>
+                      !Schema.is(UnauthorizedError)(error) &&
+                      !Schema.is(DataValidationError)(error),
                     () =>
                       new InternalServerError({
                         message: "Failed to create feedback contact",

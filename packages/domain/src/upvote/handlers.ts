@@ -160,6 +160,12 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
         read: () =>
           repository.list({
             organizationId: args.organizationId,
+            // The board page reads every vote to derive per-post counts and
+            // the viewer's own state; only a post-scoped read (the voter
+            // dialog) needs the voter's name and avatar. An unscoped public
+            // read must not double as an organization-wide roster.
+            includeVoterIdentities:
+              args.postId !== undefined || args.slug !== undefined,
             publicOnly: true,
             ...(args.postId && { postId: args.postId }),
             ...(args.slug && { slug: args.slug }),

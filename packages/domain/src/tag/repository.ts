@@ -1,7 +1,18 @@
 import { currentDb, schema } from "@feeblo/db";
 import { PostTagId, TagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, asc, desc, eq, exists, inArray, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -403,8 +414,15 @@ const makeTagRepository = Effect.gen(function* () {
           and(
             eq(schema.postTagTable.organizationId, organizationId),
             ...(slug ? [eq(schema.postTable.slug, slug)] : []),
+            // A public read applies the same superseded-content rule as
+            // `PostRepository.findManyPublic`: an archived or merged post has
+            // no public page, so its tag assignments are not public either.
             ...(options?.publicOnly
-              ? [eq(schema.boardTable.visibility, "PUBLIC")]
+              ? [
+                  eq(schema.boardTable.visibility, "PUBLIC"),
+                  isNull(schema.postTable.archivedAt),
+                  isNull(schema.postTable.mergedIntoPostId),
+                ]
               : [])
           )
         ),

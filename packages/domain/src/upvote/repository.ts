@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UpvoteId } from "@feeblo/id";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -15,6 +15,17 @@ interface TUpvoteList {
   slug?: string;
   /** Restricts the list to upvotes on public boards (used by public endpoints). */
   publicOnly?: boolean;
+  /**
+   * Whether the voter's display fields (`name`, `image`) are selected.
+   *
+   * A post-scoped public read backs the voter dialog, which shows them. An
+   * organization-wide public read backs the board's per-post counts and the
+   * viewer's own vote state; nothing renders another voter there, so selecting
+   * the roster would turn a public page load into a scrape of every voter's
+   * name and avatar. Callers on the public surface pass `false` when neither
+   * `postId` nor `slug` scopes the read; the dashboard always keeps them.
+   */
+  includeVoterIdentities?: boolean;
 }
 
 interface TUpvoteToggle {
@@ -41,7 +52,13 @@ const makeUpvoteRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    list: ({ organizationId, publicOnly = false, postId, slug }: TUpvoteList) =>
+    list: ({
+      organizationId,
+      includeVoterIdentities = true,
+      publicOnly = false,
+      postId,
+      slug,
+    }: TUpvoteList) =>
       db
         .select({
           id: schema.upvoteTable.id,
@@ -50,8 +67,12 @@ const makeUpvoteRepository = Effect.gen(function* () {
           userId: schema.upvoteTable.userId,
           mergedFromPostId: schema.upvoteTable.mergedFromPostId,
           user: {
-            name: schema.userTable.name,
-            image: schema.userTable.image,
+            name: includeVoterIdentities
+              ? schema.userTable.name
+              : sql<string | null>`CAST(NULL AS TEXT)`,
+            image: includeVoterIdentities
+              ? schema.userTable.image
+              : sql<string | null>`CAST(NULL AS TEXT)`,
           },
           memberId: schema.upvoteTable.memberId,
           createdAt: schema.upvoteTable.createdAt,
@@ -73,7 +94,16 @@ const makeUpvoteRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.upvoteTable.organizationId, organizationId),
-            ...(publicOnly ? [eq(schema.boardTable.visibility, "PUBLIC")] : []),
+            // Public reads apply the same superseded-content rule as
+            // `PostRepository.findManyPublic`: an archived or merged post is
+            // no longer publicly readable, so its votes must not be either.
+            ...(publicOnly
+              ? [
+                  eq(schema.boardTable.visibility, "PUBLIC"),
+                  isNull(schema.postTable.archivedAt),
+                  isNull(schema.postTable.mergedIntoPostId),
+                ]
+              : []),
             ...(postId ? [eq(schema.upvoteTable.postId, postId)] : []),
             ...(slug ? [eq(schema.postTable.slug, slug)] : [])
           )
