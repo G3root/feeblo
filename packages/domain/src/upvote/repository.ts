@@ -1,11 +1,13 @@
 import { currentDb, schema } from "@feeblo/db";
 import { UpvoteId } from "@feeblo/id";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+
+import { publicPostVisibility } from "../post/public-visibility";
 
 interface TUpvoteList {
   organizationId: string;
@@ -94,16 +96,9 @@ const makeUpvoteRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.upvoteTable.organizationId, organizationId),
-            // Public reads apply the same superseded-content rule as
-            // `PostRepository.findManyPublic`: an archived or merged post is
-            // no longer publicly readable, so its votes must not be either.
-            ...(publicOnly
-              ? [
-                  eq(schema.boardTable.visibility, "PUBLIC"),
-                  isNull(schema.postTable.archivedAt),
-                  isNull(schema.postTable.mergedIntoPostId),
-                ]
-              : []),
+            // Public reads apply the same visibility rule as the public post
+            // reads, so votes on a superseded post are not returned either.
+            ...(publicOnly ? [publicPostVisibility] : []),
             ...(postId ? [eq(schema.upvoteTable.postId, postId)] : []),
             ...(slug ? [eq(schema.postTable.slug, slug)] : [])
           )

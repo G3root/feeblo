@@ -460,8 +460,11 @@ describe("UpvoteRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
 
-            // The repository filters treat an empty slug as absent, so it is
-            // an organization-wide read; identity selection must agree.
+            // The schema rejects an empty slug at the wire boundary; a direct
+            // handler caller can still reach this path, so the projection
+            // degrades to the unscoped, identity-free read rather than trust
+            // it. Identity selection and the filters share one truthiness
+            // check.
             const upvotes = yield* handlers
               .ListUpvotesPublic({
                 organizationId: fixture.organizationId,

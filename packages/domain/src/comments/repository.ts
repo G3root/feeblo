@@ -1,21 +1,14 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import type { InsertComment } from "@feeblo/db/schema/feedback";
-import {
-  and,
-  desc,
-  eq,
-  isNotNull,
-  isNull,
-  or,
-  sql,
-  type SQL,
-} from "drizzle-orm";
+import { and, desc, eq, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+
+import { publicPostVisibility } from "../post/public-visibility";
 
 interface DeleteCommentArgs {
   id: string;
@@ -189,13 +182,10 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
-            eq(schema.boardTable.visibility, "PUBLIC"),
-            // Same rule as `PostRepository.findManyPublic`: a superseded post
-            // (archived or merged away) is not publicly readable, so the
-            // comments anchored to it must not be either. `GetPostPublic`
-            // already 404s for it; this read has to agree.
-            isNull(schema.postTable.archivedAt),
-            isNull(schema.postTable.mergedIntoPostId)
+            // A superseded post has no public page, so the comments anchored
+            // to it are not publicly readable either. `GetPostPublic` already
+            // 404s for it; this read has to agree.
+            publicPostVisibility
           )
         )
         .orderBy(

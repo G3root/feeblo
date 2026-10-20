@@ -1,18 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { PostTagId, TagId } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  exists,
-  inArray,
-  isNull,
-  ne,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, exists, inArray, ne, or, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -21,6 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { PolicyDeniedError } from "../policy";
+import { publicPostVisibility } from "../post/public-visibility";
 import { FailedToCreateTagError, PostIsMergedError } from "./errors";
 import type { TPostTagList } from "./schema";
 
@@ -165,12 +155,9 @@ const makeTagRepository = Effect.gen(function* () {
                 .where(
                   and(
                     eq(schema.postTagTable.tagId, schema.tagTable.id),
-                    eq(schema.boardTable.visibility, "PUBLIC"),
-                    // Match `PostRepository.findManyPublic`: a tag linked only
-                    // to a superseded post has no public page to appear on, so
-                    // it must not stay in the public tag list either.
-                    isNull(schema.postTable.archivedAt),
-                    isNull(schema.postTable.mergedIntoPostId)
+                    // A tag linked only to a superseded post has no public
+                    // page to appear on, so it is not in the public list.
+                    publicPostVisibility
                   )
                 )
             )
@@ -419,16 +406,9 @@ const makeTagRepository = Effect.gen(function* () {
           and(
             eq(schema.postTagTable.organizationId, organizationId),
             ...(slug ? [eq(schema.postTable.slug, slug)] : []),
-            // A public read applies the same superseded-content rule as
-            // `PostRepository.findManyPublic`: an archived or merged post has
-            // no public page, so its tag assignments are not public either.
-            ...(options?.publicOnly
-              ? [
-                  eq(schema.boardTable.visibility, "PUBLIC"),
-                  isNull(schema.postTable.archivedAt),
-                  isNull(schema.postTable.mergedIntoPostId),
-                ]
-              : [])
+            // A public read applies the same visibility rule as the public
+            // post reads.
+            ...(options?.publicOnly ? [publicPostVisibility] : [])
           )
         ),
 

@@ -122,6 +122,7 @@ export const PostSuggestions = S.Struct({
 
 export type TPostSuggestions = S.Schema.Type<typeof PostSuggestions>;
 
+/** The dashboard's post delete: one post, or a non-empty batch for bulk selection. */
 export const PostDelete = S.Struct({
   // A bulk delete must name at least one post. An empty array used to pass
   // the creator policies vacuously (`posts.length === ids.length`), which is
