@@ -22,6 +22,7 @@ import { MembershipRpcHandlers } from "./membership/handlers";
 import { NotificationPreferenceRpcHandlers } from "./notification-preference/handlers";
 import { NotificationRpcHandlers } from "./notification/handlers";
 import { OrganizationRpcHandlers } from "./organization/handlers";
+import { PlanComplianceRpcHandlers } from "./plan-compliance/handlers";
 import { PostActivityRpcHandlers } from "./post-activity/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { PostStatusRpcHandlers } from "./post-status/handlers";
@@ -74,6 +75,7 @@ export const RpcHandlerRegistrations = {
   Notification: NotificationRpcHandlers,
   NotificationPreference: NotificationPreferenceRpcHandlers,
   Organization: OrganizationRpcHandlers,
+  PlanCompliance: PlanComplianceRpcHandlers,
   CommentReaction: CommentReactionRpcHandlers,
   Comment: CommentRpcHandlers,
   Company: CompanyRpcHandlers,

@@ -295,11 +295,17 @@ const makeCompanyRepository = Effect.gen(function* () {
         return Option.fromNullishOr(created);
       }),
 
-    findManyCompanies: (organizationId: string) =>
-      db
+    findManyCompanies: (
+      organizationId: string,
+      options?: { limit?: number }
+    ) => {
+      const query = db
         .select(COMPANY_FIELDS)
         .from(schema.companyTable)
-        .where(eq(schema.companyTable.organizationId, organizationId)),
+        .where(eq(schema.companyTable.organizationId, organizationId));
+
+      return options?.limit === undefined ? query : query.limit(options.limit);
+    },
 
     /**
      * One page of the workspace's companies, newest first.

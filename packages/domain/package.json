@@ -394,6 +394,9 @@
     "./organization/repository": {
       "default": "./src/organization/repository.ts"
     },
+    "./plan-compliance/schema": {
+      "default": "./src/plan-compliance/schema.ts"
+    },
     "./plan-entitlements": {
       "default": "./src/plan-entitlements.ts"
     },

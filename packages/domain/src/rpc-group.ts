@@ -22,6 +22,7 @@ import { MembershipRpcs } from "./membership/rpcs";
 import { NotificationPreferenceRpcs } from "./notification-preference/rpcs";
 import { NotificationRpcs } from "./notification/rpcs";
 import { OrganizationRpcs } from "./organization/rpcs";
+import { PlanComplianceRpcs } from "./plan-compliance/rpcs";
 import { PostActivityRpcs } from "./post-activity/rpcs";
 import { PostReactionRpcs } from "./post-reaction/rpcs";
 import { PostStatusRpcs } from "./post-status/rpcs";
@@ -69,6 +70,7 @@ export const RpcGroups = [
   ["Notification", NotificationRpcs],
   ["NotificationPreference", NotificationPreferenceRpcs],
   ["Organization", OrganizationRpcs],
+  ["PlanCompliance", PlanComplianceRpcs],
   ["CommentReaction", CommentReactionRpcs],
   ["Comment", CommentRpcs],
   ["Company", CompanyRpcs],

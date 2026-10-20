@@ -3,7 +3,7 @@ import {
   ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
   schema,
 } from "@feeblo/db";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -66,6 +66,29 @@ const makeRoadmapRepository = Effect.gen(function* () {
 
   return {
     findMany,
+    countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
+      db
+        .select({ count: count() })
+        .from(schema.roadmapTable)
+        .where(eq(schema.roadmapTable.organizationId, organizationId))
+        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
+    countByVisibility: ({
+      organizationId,
+      visibility,
+    }: {
+      organizationId: string;
+      visibility: TRoadmapVisibility;
+    }) =>
+      db
+        .select({ count: count() })
+        .from(schema.roadmapTable)
+        .where(
+          and(
+            eq(schema.roadmapTable.organizationId, organizationId),
+            eq(schema.roadmapTable.visibility, visibility)
+          )
+        )
+        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
     getById: ({ id, organizationId }: { id: string; organizationId: string }) =>
       db
         .select({

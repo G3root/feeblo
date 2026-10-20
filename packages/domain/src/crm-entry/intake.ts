@@ -55,10 +55,12 @@ const lockWorkspace = (organizationId: string) =>
  * Contacts and companies, counted together.
  *
  * Two queries rather than one union, because each then uses its own
- * `organizationId` index. Only meaningful inside the transaction that holds
- * the workspace lock; `requireRoom` is the only caller.
+ * `organizationId` index. The create path calls it inside the transaction
+ * that holds the workspace lock (`requireRoom`); the plan-compliance snapshot
+ * calls it outside one for a read-only count. `requireRoom` is the only
+ * caller that needs the lock, and the only one that writes.
  */
-const countCrmEntries = (organizationId: string) =>
+export const countCrmEntries = (organizationId: string) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
     const [companyRows, contactRows] = yield* Effect.all([
