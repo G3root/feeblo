@@ -224,21 +224,29 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
   /**
    * Locks the organization row until the caller's transaction ends.
    *
-   * The same device the roadmap repository uses for its per-organization
-   * invariants: a condition that spans rows cannot be enforced by row locks on
-   * those rows, because a lookup that matches nothing proves nothing. It
-   * serializes submission-window creation per workspace.
+   * The same device the roadmap and workspace repositories use for their
+   * per-organization invariants: a condition that spans rows cannot be
+   * enforced by row locks on those rows, because a lookup that matches nothing
+   * proves nothing. Here it serializes submission-window creation per
+   * workspace, so two submissions arriving together append to one window
+   * instead of opening two.
    *
-   * It must be taken before the transaction's first child insert. An insert
-   * into a table referencing the organization holds a key-share on the org row,
-   * and a key-share conflicts with this lock: a transaction that inserts first
-   * and locks second deadlocks against a concurrent one doing the same, and
-   * Postgres aborts one of the two creates. See `post/write.ts` for the call
-   * that puts it first.
+   * `no key update`, not `update`: two of these still conflict with each other,
+   * which is all the serialization needs, but neither conflicts with the
+   * key-share every insert into an organization-referencing table takes. The
+   * stronger lock would make a post create block every unrelated write in the
+   * workspace — comments, upvotes, invitations, uploads — for the length of the
+   * whole transaction, notification fan-out included.
+   *
+   * The weaker lock also removes the ordering rule the stronger one needed. A
+   * key-share no longer conflicts with this lock, so a caller that inserts a
+   * child row first and locks second cannot deadlock against another create
+   * doing the same; `post/write.ts` still takes it first, because the window
+   * upsert needs the lock held, not because the order is load-bearing.
    */
   const lockOrganization = (organizationId: string) =>
     db.execute(
-      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR UPDATE`
+      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
     );
 
   const recordIntent = Effect.fn("EmailOutboxRepository.recordIntent")(
@@ -445,12 +453,8 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     // created together otherwise race past the pending-window lookup below —
     // which locks nothing when no window exists — and can each open their own
     // window across a burst-boundary instant, doubling the workspace's email
-    // rate. The create path takes this lock before its first child insert (see
-    // `post/write.ts`), which is what keeps it deadlock-free: taken only here,
-    // after that insert, the lock would conflict with the other transaction's
-    // org key-share and abort one of the two creates. This re-lock is a no-op
-    // round trip when the caller already holds it, and it serializes standalone
-    // callers that have not inserted a child row.
+    // rate. This re-lock is a no-op round trip when the caller already holds
+    // it, and it serializes callers whose transaction has not taken it yet.
     yield* lockOrganization(organizationId);
 
     /**

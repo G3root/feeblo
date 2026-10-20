@@ -2,6 +2,7 @@ import {
   currentDb,
   ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
   schema,
+  withTransactionAbortRetry,
 } from "@feeblo/db";
 import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
@@ -38,12 +39,18 @@ export const toMutableRoadmapFilter = (filter: TSimpleRoadmapFilter) => ({
  * selection. Locking the organization row makes primary deletion, successor
  * selection, and promotion atomic relative to every other create/delete for
  * the same organization.
+ *
+ * `no key update`, not `update`: two of these still conflict with each other,
+ * which is the whole serialization, but neither conflicts with the key-share
+ * that inserting a roadmap (or any other organization-referencing row) takes.
+ * The stronger lock would make a roadmap write block every child insert in the
+ * workspace, and it would make lock order matter for callers that insert first.
  */
 const makeRoadmapRepository = Effect.gen(function* () {
   const db = yield* currentDb;
   const lockOrganization = (organizationId: string) =>
     db.execute(
-      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR UPDATE`
+      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
     );
   const findMany = ({
     organizationId,
@@ -114,115 +121,119 @@ const makeRoadmapRepository = Effect.gen(function* () {
      * create can never claim primary in the gap between delete and promotion.
      */
     deleteWithPrimaryHandoff: ({ id, organizationId }: TRoadmapDelete) =>
-      db.transaction(() =>
-        Effect.gen(function* () {
-          const now = yield* DateTime.nowAsDate;
-          yield* lockOrganization(organizationId);
+      db
+        .transaction(() =>
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            yield* lockOrganization(organizationId);
 
-          const [roadmap] = yield* db
-            .select({
-              id: schema.roadmapTable.id,
-              isPrimary: schema.roadmapTable.isPrimary,
-            })
-            .from(schema.roadmapTable)
-            .where(
-              and(
-                eq(schema.roadmapTable.id, id),
-                eq(schema.roadmapTable.organizationId, organizationId)
+            const [roadmap] = yield* db
+              .select({
+                id: schema.roadmapTable.id,
+                isPrimary: schema.roadmapTable.isPrimary,
+              })
+              .from(schema.roadmapTable)
+              .where(
+                and(
+                  eq(schema.roadmapTable.id, id),
+                  eq(schema.roadmapTable.organizationId, organizationId)
+                )
               )
-            )
-            .limit(1);
+              .limit(1);
 
-          yield* db
-            .delete(schema.roadmapTable)
-            .where(
-              and(
-                eq(schema.roadmapTable.id, id),
-                eq(schema.roadmapTable.organizationId, organizationId)
+            yield* db
+              .delete(schema.roadmapTable)
+              .where(
+                and(
+                  eq(schema.roadmapTable.id, id),
+                  eq(schema.roadmapTable.organizationId, organizationId)
+                )
               )
-            )
-            .pipe(Effect.asVoid);
-
-          if (!roadmap?.isPrimary) {
-            return;
-          }
-
-          const [next] = yield* db
-            .select({ id: schema.roadmapTable.id })
-            .from(schema.roadmapTable)
-            .where(
-              and(
-                eq(schema.roadmapTable.organizationId, organizationId),
-                ne(schema.roadmapTable.id, id)
-              )
-            )
-            .orderBy(
-              asc(schema.roadmapTable.createdAt),
-              asc(schema.roadmapTable.id)
-            )
-            .limit(1);
-
-          if (!next) {
-            return;
-          }
-
-          yield* db
-            .update(schema.roadmapTable)
-            .set({ isPrimary: true, updatedAt: now })
-            .where(eq(schema.roadmapTable.id, next.id))
-            .pipe(Effect.asVoid);
-        })
-      ),
-    create: (input: TRoadmapCreate) =>
-      db.transaction(() =>
-        Effect.gen(function* () {
-          // Serialize with deletes so the primary claim below always observes
-          // the post-delete state: without the lock, a create could fall back
-          // to a non-primary insert while a concurrent primary delete was still
-          // uncommitted, leaving the organization with no primary at all.
-          yield* lockOrganization(input.organizationId);
-
-          const values = {
-            id: input.id,
-            organizationId: input.organizationId,
-            name: input.name,
-            slug: input.slug,
-            description: input.description ?? null,
-            mode: input.mode,
-            visibility: input.visibility,
-            filter: toMutableRoadmapFilter(input.filter),
-          };
-          const insert = (isPrimary: boolean) =>
-            db
-              .insert(schema.roadmapTable)
-              .values({ ...values, isPrimary })
               .pipe(Effect.asVoid);
 
-          if (input.isPrimary) {
-            // Claim primary status atomically instead of racing count-then-create:
-            // the partial unique index roadmap_primary_organizationId_uidx allows
-            // at most one primary per organization, so when a concurrent create
-            // already claimed it this insert fails with a unique violation and we
-            // fall back to a regular (non-primary) create. Each attempt runs in
-            // its own savepoint (nested db.transaction) so the failed insert does
-            // not abort the enclosing transaction.
-            yield* db
-              .transaction(() => insert(true))
-              .pipe(
-                Effect.catchIf(
-                  (error) =>
-                    isUniqueViolation(error) &&
-                    getUniqueViolationConstraint(error) ===
-                      ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
-                  () => db.transaction(() => insert(false))
-                )
-              );
-            return;
-          }
+            if (!roadmap?.isPrimary) {
+              return;
+            }
 
-          yield* db.transaction(() => insert(false));
-        })
-      ),
+            const [next] = yield* db
+              .select({ id: schema.roadmapTable.id })
+              .from(schema.roadmapTable)
+              .where(
+                and(
+                  eq(schema.roadmapTable.organizationId, organizationId),
+                  ne(schema.roadmapTable.id, id)
+                )
+              )
+              .orderBy(
+                asc(schema.roadmapTable.createdAt),
+                asc(schema.roadmapTable.id)
+              )
+              .limit(1);
+
+            if (!next) {
+              return;
+            }
+
+            yield* db
+              .update(schema.roadmapTable)
+              .set({ isPrimary: true, updatedAt: now })
+              .where(eq(schema.roadmapTable.id, next.id))
+              .pipe(Effect.asVoid);
+          })
+        )
+        .pipe(withTransactionAbortRetry),
+    create: (input: TRoadmapCreate) =>
+      db
+        .transaction(() =>
+          Effect.gen(function* () {
+            // Serialize with deletes so the primary claim below always observes
+            // the post-delete state: without the lock, a create could fall back
+            // to a non-primary insert while a concurrent primary delete was still
+            // uncommitted, leaving the organization with no primary at all.
+            yield* lockOrganization(input.organizationId);
+
+            const values = {
+              id: input.id,
+              organizationId: input.organizationId,
+              name: input.name,
+              slug: input.slug,
+              description: input.description ?? null,
+              mode: input.mode,
+              visibility: input.visibility,
+              filter: toMutableRoadmapFilter(input.filter),
+            };
+            const insert = (isPrimary: boolean) =>
+              db
+                .insert(schema.roadmapTable)
+                .values({ ...values, isPrimary })
+                .pipe(Effect.asVoid);
+
+            if (input.isPrimary) {
+              // Claim primary status atomically instead of racing count-then-create:
+              // the partial unique index roadmap_primary_organizationId_uidx allows
+              // at most one primary per organization, so when a concurrent create
+              // already claimed it this insert fails with a unique violation and we
+              // fall back to a regular (non-primary) create. Each attempt runs in
+              // its own savepoint (nested db.transaction) so the failed insert does
+              // not abort the enclosing transaction.
+              yield* db
+                .transaction(() => insert(true))
+                .pipe(
+                  Effect.catchIf(
+                    (error) =>
+                      isUniqueViolation(error) &&
+                      getUniqueViolationConstraint(error) ===
+                        ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX,
+                    () => db.transaction(() => insert(false))
+                  )
+                );
+              return;
+            }
+
+            yield* db.transaction(() => insert(false));
+          })
+        )
+        .pipe(withTransactionAbortRetry),
     update: (input: Omit<TRoadmapUpdate, "isPrimary">) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
