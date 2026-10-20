@@ -8,6 +8,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { publicPostVisibility } from "../post/public-visibility";
+
 interface TCommentReactionList {
   organizationId: string;
   slug: string;
@@ -114,7 +116,9 @@ const makeCommentReactionRepository = Effect.gen(function* () {
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
             eq(schema.commentTable.visibility, "PUBLIC"),
-            eq(schema.boardTable.visibility, "PUBLIC")
+            // A superseded post is not publicly readable, so its comment
+            // reactions are not either.
+            publicPostVisibility
           )
         )
         .pipe(

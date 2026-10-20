@@ -10,6 +10,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { PolicyDeniedError } from "../policy";
+import { publicPostVisibility } from "../post/public-visibility";
 import { FailedToCreateTagError, PostIsMergedError } from "./errors";
 import type { TPostTagList } from "./schema";
 
@@ -154,7 +155,9 @@ const makeTagRepository = Effect.gen(function* () {
                 .where(
                   and(
                     eq(schema.postTagTable.tagId, schema.tagTable.id),
-                    eq(schema.boardTable.visibility, "PUBLIC")
+                    // A tag linked only to a superseded post has no public
+                    // page to appear on, so it is not in the public list.
+                    publicPostVisibility
                   )
                 )
             )
@@ -403,9 +406,9 @@ const makeTagRepository = Effect.gen(function* () {
           and(
             eq(schema.postTagTable.organizationId, organizationId),
             ...(slug ? [eq(schema.postTable.slug, slug)] : []),
-            ...(options?.publicOnly
-              ? [eq(schema.boardTable.visibility, "PUBLIC")]
-              : [])
+            // A public read applies the same visibility rule as the public
+            // post reads.
+            ...(options?.publicOnly ? [publicPostVisibility] : [])
           )
         ),
 

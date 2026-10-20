@@ -25,6 +25,13 @@ export const Upvote = S.Struct({
 
 export type TUpvote = S.Schema.Type<typeof Upvote>;
 
+/**
+ * The dashboard and public upvote list query.
+ *
+ * `postId` or `slug` narrows the read to one post. An unscoped public read
+ * returns the vote rows that power per-post counts without carrying any
+ * voter's display fields.
+ */
 export const UpvoteList = S.Struct({
   organizationId: WorkspaceId.schema,
   postId: S.optional(PostId.schema),
@@ -32,8 +39,12 @@ export const UpvoteList = S.Struct({
    * Restricts the list to one post by slug. Public detail pages resolve their
    * votes through the route slug, so they never pull every vote in the
    * organization just to count one post.
+   *
+   * An empty string is rejected at the boundary: "absent" and "empty" must not
+   * mean different things to the repository filter and the identity
+   * projection (an empty slug is not a scope).
    */
-  slug: S.optional(S.String),
+  slug: S.optional(S.String.check(S.isMinLength(1))),
 });
 
 export type TUpvoteList = S.Schema.Type<typeof UpvoteList>;

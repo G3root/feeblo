@@ -28,6 +28,7 @@ import * as Option from "effect/Option";
 
 import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
 import { FailedToMergePostError, PostAlreadyExistsError } from "./errors";
+import { publicPostVisibility } from "./public-visibility";
 import type { TPostAdminUpdate } from "./schema";
 
 interface TPostUpdateInput {
@@ -654,15 +655,11 @@ const makePostRepository = Effect.gen(function* () {
     findManyPublic: ({ boardId, organizationId }: TPostFindMany) => {
       const where: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
-        // Superseded content stays queryable internally but must not remain
-        // publicly listed (same rule as `findSuggestionCandidates`).
-        sql`${schema.postTable.archivedAt} is null`,
-        sql`${schema.postTable.mergedIntoPostId} is null`,
+        publicPostVisibility,
       ];
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
       }
-      where.push(eq(schema.boardTable.visibility, "PUBLIC"));
 
       const whereClause = and(...where);
 
@@ -689,11 +686,7 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = and(
         eq(schema.postTable.organizationId, organizationId),
         eq(schema.postTable.slug, slug),
-        // Same rule as `findManyPublic`: superseded content stays queryable
-        // internally but must not be publicly readable.
-        sql`${schema.postTable.archivedAt} is null`,
-        sql`${schema.postTable.mergedIntoPostId} is null`,
-        eq(schema.boardTable.visibility, "PUBLIC")
+        publicPostVisibility
       );
 
       return db

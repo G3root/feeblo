@@ -8,6 +8,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { publicPostVisibility } from "../post/public-visibility";
+
 interface TPostReactionList {
   organizationId: string;
   slug: string;
@@ -86,7 +88,9 @@ const makePostReactionRepository = Effect.gen(function* () {
             and(
               eq(schema.postTable.slug, slug),
               eq(schema.postTable.organizationId, organizationId),
-              eq(schema.boardTable.visibility, "PUBLIC")
+              // A superseded post is not publicly readable, so its reactions
+              // are not either.
+              publicPostVisibility
             )
           )
           .limit(1)
@@ -121,7 +125,7 @@ const makePostReactionRepository = Effect.gen(function* () {
             and(
               eq(schema.postTable.organizationId, organizationId),
               eq(schema.postReactionTable.postId, post.value.id),
-              eq(schema.boardTable.visibility, "PUBLIC")
+              publicPostVisibility
             )
           );
 

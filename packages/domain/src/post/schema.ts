@@ -122,10 +122,13 @@ export const PostSuggestions = S.Struct({
 
 export type TPostSuggestions = S.Schema.Type<typeof PostSuggestions>;
 
-export const PostIds = S.Array(S.String);
-
+/** The dashboard's post delete: one post, or a non-empty batch for bulk selection. */
 export const PostDelete = S.Struct({
-  id: S.Union([PostId.schema, S.Array(PostId.schema)]),
+  // A bulk delete must name at least one post. An empty array used to pass
+  // the creator policies vacuously (`posts.length === ids.length`), which is
+  // not ownership; the length filter makes the request unrepresentable while
+  // keeping the client-side `string[]` type.
+  id: S.Union([PostId.schema, S.Array(PostId.schema).check(S.isMinLength(1))]),
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
 });

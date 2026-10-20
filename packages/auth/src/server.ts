@@ -66,6 +66,7 @@ import {
 } from "./organization-roles";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
+import { memberManagementGuard } from "./plugins/member-management-guard";
 import { mapPolicyDeniedToApiError } from "./policy-api-error";
 import { AUTH_SESSION_DURATION_SECONDS } from "./session";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
@@ -938,6 +939,13 @@ export const initAuthHandler = (
             );
           },
         }),
+
+        // The plugin's member-mutation routes authorize on the coarse
+        // organization ACL, which lets an admin manage a peer admin; the
+        // dashboard's RPCs additionally enforce the rank rule. Close the
+        // duplicate write path instead of reimplementing the policy here (see
+        // the module's comment).
+        memberManagementGuard(),
 
         // Organization-owned machine credentials for the Public API. The
         // plugin owns credential material; every authorization decision stays

@@ -25,6 +25,7 @@ import { streamImportProblemsCsv } from "./import-problems-csv";
 import { DataImportService } from "./import-service";
 import { DATA_IMPORT_MAX_BYTES } from "./limits";
 import { toDataImportJobSummary } from "./mappers";
+import { canImportPosts } from "./policies";
 import { DataTransferRepository } from "./repository";
 
 /**
@@ -117,6 +118,14 @@ export const DataTransferApiLive = HttpApiBuilder.group(
               message: "You are not a member of this organization",
             });
           }
+
+          // The service re-applies this inside the stage transaction; doing it
+          // here first means a member without `boards.importPosts` is refused
+          // before the server stats, reads, and decodes the upload.
+          yield* canImportPosts(organizationId).pipe(
+            Effect.provideService(CurrentSession, session)
+          );
+
           if (!ALLOWED_IMPORT_CONTENT_TYPES.has(file.contentType)) {
             return yield* new BadRequestError({
               message: "Upload a CSV file.",
