@@ -185,13 +185,22 @@ describe("attachCause", () => {
 
   it.live("keeps the abort reachable through a chain of wrappers", () =>
     Effect.gen(function* () {
-      const inner = attachCause(new Error("recorder"), driverFailure("40P01"));
-      const outer = attachCause(new Error("post write"), inner);
+      // The depth a comment status update produces: the database failure, the
+      // recorder's wrapper, the event wrapper, the intent wrapper, and the
+      // operation's own error. The walk has to reach the bottom of that, so a
+      // caller cannot shorten the chain by re-wrapping without the cause.
+      const recorder = attachCause(
+        new Error("recorder"),
+        driverFailure("40P01")
+      );
+      const event = attachCause(new Error("event"), recorder);
+      const intent = attachCause(new Error("intent"), event);
+      const operation = attachCause(new Error("operation"), intent);
 
       const attempts = yield* Ref.make(0);
-      yield* withTransactionAbortRetry(failedTransaction(outer, attempts)).pipe(
-        Effect.exit
-      );
+      yield* withTransactionAbortRetry(
+        failedTransaction(operation, attempts)
+      ).pipe(Effect.exit);
 
       expect(yield* Ref.get(attempts)).toBe(3);
     })

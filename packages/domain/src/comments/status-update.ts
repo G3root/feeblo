@@ -185,11 +185,13 @@ export const applyCommentStatusUpdate = (
             scheduledAt: now,
           })
           .pipe(
-            Effect.mapError(
-              () =>
+            Effect.mapError((error) =>
+              attachCause(
                 new InternalServerError({
                   message: "Could not record post closure email intent.",
-                })
+                }),
+                error
+              )
             )
           );
         return result._tag === "Inserted" ? result.intent.id : undefined;
@@ -217,11 +219,13 @@ export const applyCommentStatusUpdate = (
           ),
         })
         .pipe(
-          Effect.mapError(
-            () =>
+          Effect.mapError((error) =>
+            attachCause(
               new InternalServerError({
                 message: "Could not record post status email intent.",
-              })
+              }),
+              error
+            )
           )
         );
       return result._tag === "Written" ? result.intent.id : undefined;
@@ -238,11 +242,17 @@ export const applyCommentStatusUpdate = (
 
     return { outboxId, statusUpdateId };
   }).pipe(
-    Effect.mapError(
-      () =>
+    // The outermost mapping of the operation, and the one that decides whether a
+    // transaction abort reaches the boundary that retries it: every failure below
+    // — a direct database failure or one a mapping already wrapped — keeps its
+    // own error type and message, and the failure it replaced stays attached.
+    Effect.mapError((error) =>
+      attachCause(
         new FailedToCreateCommentError({
           message: "Failed to apply status update to post",
-        })
+        }),
+        error
+      )
     )
   );
 };
