@@ -165,7 +165,12 @@ const makeTagRepository = Effect.gen(function* () {
                 .where(
                   and(
                     eq(schema.postTagTable.tagId, schema.tagTable.id),
-                    eq(schema.boardTable.visibility, "PUBLIC")
+                    eq(schema.boardTable.visibility, "PUBLIC"),
+                    // Match `PostRepository.findManyPublic`: a tag linked only
+                    // to a superseded post has no public page to appear on, so
+                    // it must not stay in the public tag list either.
+                    isNull(schema.postTable.archivedAt),
+                    isNull(schema.postTable.mergedIntoPostId)
                   )
                 )
             )

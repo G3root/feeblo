@@ -442,6 +442,39 @@ describe("UpvoteRpcHandlers", () => {
         })
       );
 
+      it.effect(
+        "strips voter identities when an empty slug leaves the read unscoped",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* UpvoteRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+
+            yield* createPost(fixture, postId, "Test post");
+            yield* handlers
+              .ToggleUpvote({
+                organizationId: fixture.organizationId,
+                postId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            // The repository filters treat an empty slug as absent, so it is
+            // an organization-wide read; identity selection must agree.
+            const upvotes = yield* handlers
+              .ListUpvotesPublic({
+                organizationId: fixture.organizationId,
+                slug: "",
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+            expect(upvotes).toHaveLength(1);
+            expect(upvotes[0]?.user).toEqual({ name: null, image: null });
+          })
+      );
+
       it.effect("honors the postId filter", () =>
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;

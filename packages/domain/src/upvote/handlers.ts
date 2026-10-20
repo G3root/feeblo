@@ -164,8 +164,11 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
             // the viewer's own state; only a post-scoped read (the voter
             // dialog) needs the voter's name and avatar. An unscoped public
             // read must not double as an organization-wide roster.
-            includeVoterIdentities:
-              args.postId !== undefined || args.slug !== undefined,
+            //
+            // Derived from the same truthiness the two filters below use, so
+            // an empty `slug` (which they treat as absent) cannot re-enable
+            // the display fields on an otherwise unscoped read.
+            includeVoterIdentities: Boolean(args.postId || args.slug),
             publicOnly: true,
             ...(args.postId && { postId: args.postId }),
             ...(args.slug && { slug: args.slug }),
