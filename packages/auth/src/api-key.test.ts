@@ -25,19 +25,27 @@ import {
   ORGANIZATION_ROLES,
   organizationAccessControl,
 } from "./organization-roles";
+import {
+  MEMBER_MUTATION_ROUTE_DISABLED,
+  memberManagementGuard,
+} from "./plugins/member-management-guard";
 import { mapPolicyDeniedToApiError } from "./policy-api-error";
 
 /**
- * Integration test for the api-key plugin wiring: the real plugin, the real
+ * Integration test for the auth plugin wiring: the real plugins, the real
  * better-auth organization ACL, the real adapter, on PGlite.
  *
- * It exists because the plugin authorizes every organization-owned key
+ * It exists because the api-key plugin authorizes every organization-owned key
  * operation against this package's organization ACL — it evaluates
  * `hasPermission({ permissions: { apiKey: [action] } })` on the acting member's
  * role. A role without the `apiKey` statement cannot mint a credential, and
  * better-auth's `allowCreatorAllPermissions` would mask a missing grant for the
  * organization creator, so the happy path here is exercised as an **admin**
  * (not the creator) and the denial path as a **manager**.
+ *
+ * The same harness covers `memberManagementGuard`, which closes the plugin's
+ * member-mutation routes because their ACL is coarser than the dashboard's rank
+ * policy.
  */
 const databaseDirectory = mkdtempSync(join(tmpdir(), "feeblo-auth-apikey-"));
 
@@ -133,6 +141,8 @@ describe("api-key plugin wiring", () => {
         }),
         // The shipping plugin configuration, so this test covers what runs.
         publicApiKeyPlugin,
+        // The member mutations the dashboard answers through its own RPCs.
+        memberManagementGuard(),
       ],
     });
 
@@ -668,4 +678,154 @@ describe("api-key plugin wiring", () => {
     },
     perTestTimeout
   );
+
+  /**
+   * The organization plugin's member mutations authorize on the coarse ACL,
+   * which lets an admin manage a peer admin; the dashboard's RPCs additionally
+   * apply the rank rule. `memberManagementGuard` closes those routes so the
+   * peer cannot be managed through the plugin at all.
+   */
+  describe("member-management routes", () => {
+    const postMemberMutation = (
+      auth: ReturnType<typeof makeAuth>,
+      path: "/update-member-role" | "/remove-member",
+      options: {
+        readonly cookie: string;
+        readonly organizationId: string;
+        readonly targetMemberId: string;
+      }
+    ) => {
+      const headers = new Headers({
+        "content-type": "application/json",
+        cookie: options.cookie,
+        origin: "http://localhost:3000",
+      });
+      const body =
+        path === "/update-member-role"
+          ? {
+              memberId: options.targetMemberId,
+              organizationId: options.organizationId,
+              role: "contributor",
+            }
+          : {
+              memberIdOrEmail: options.targetMemberId,
+              organizationId: options.organizationId,
+            };
+
+      return auth.handler(
+        new Request(`http://localhost:3000/api/auth/organization${path}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(body),
+        })
+      );
+    };
+
+    /** A signed-in caller joined to the workspace with `role`. */
+    const signUpAdmin = async (
+      auth: ReturnType<typeof makeAuth>,
+      organizationId: string
+    ) => {
+      const signUp = await auth.api.signUpEmail({
+        body: {
+          email: `admin-${organizationId}@example.com`,
+          password: "password-1234",
+          name: "Calling Admin",
+        },
+        returnHeaders: true,
+      });
+      await runtime.runPromise(
+        db.insert(schema.memberTable).values({
+          id: `caller_${organizationId}`,
+          organizationId,
+          userId: signUp.response.user.id,
+          role: "admin",
+          createdAt: new Date(),
+        })
+      );
+      return sessionCookieFrom(signUp.headers);
+    };
+
+    /** A peer admin with no session, so the caller has something to target. */
+    const seedPeerAdmin = async (organizationId: string) => {
+      const userId = `peer_${organizationId}`;
+      const membershipId = `peer_membership_${organizationId}`;
+      const now = new Date();
+      await runtime.runPromise(
+        db.insert(schema.userTable).values({
+          id: userId,
+          email: `${userId}@example.com`,
+          name: "Peer Admin",
+        })
+      );
+      await runtime.runPromise(
+        db.insert(schema.memberTable).values({
+          id: membershipId,
+          organizationId,
+          userId,
+          role: "admin",
+          createdAt: now,
+        })
+      );
+      return membershipId;
+    };
+
+    it(
+      "refuses an admin demoting a peer admin",
+      async () => {
+        const auth = makeAuth();
+        const organizationId = await seedOrganization("guard_demote");
+        const cookie = await signUpAdmin(auth, organizationId);
+        const peerMembershipId = await seedPeerAdmin(organizationId);
+
+        const response = await postMemberMutation(auth, "/update-member-role", {
+          cookie,
+          organizationId,
+          targetMemberId: peerMembershipId,
+        });
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({
+          code: MEMBER_MUTATION_ROUTE_DISABLED,
+        });
+        const peer = await runtime.runPromise(
+          db
+            .select({ role: schema.memberTable.role })
+            .from(schema.memberTable)
+            .where(eq(schema.memberTable.id, peerMembershipId))
+        );
+        expect(peer.at(0)?.role).toBe("admin");
+      },
+      perTestTimeout
+    );
+
+    it(
+      "refuses an admin removing a peer admin",
+      async () => {
+        const auth = makeAuth();
+        const organizationId = await seedOrganization("guard_remove");
+        const cookie = await signUpAdmin(auth, organizationId);
+        const peerMembershipId = await seedPeerAdmin(organizationId);
+
+        const response = await postMemberMutation(auth, "/remove-member", {
+          cookie,
+          organizationId,
+          targetMemberId: peerMembershipId,
+        });
+
+        expect(response.status).toBe(403);
+        expect(await response.json()).toMatchObject({
+          code: MEMBER_MUTATION_ROUTE_DISABLED,
+        });
+        const peer = await runtime.runPromise(
+          db
+            .select({ id: schema.memberTable.id })
+            .from(schema.memberTable)
+            .where(eq(schema.memberTable.id, peerMembershipId))
+        );
+        expect(peer).toHaveLength(1);
+      },
+      perTestTimeout
+    );
+  });
 });
