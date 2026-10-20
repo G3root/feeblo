@@ -4,13 +4,14 @@ import {
   schema,
   withTransactionAbortRetry,
 } from "@feeblo/db";
-import { and, asc, count, eq, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, ne } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { lockOrganizationRow } from "../row-locks";
 import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
 import type {
   TRoadmapCreate,
@@ -31,27 +32,19 @@ export const toMutableRoadmapFilter = (filter: TSimpleRoadmapFilter) => ({
 });
 
 /**
- * Serializes roadmap create/delete per organization by locking the
- * organization row for the duration of the transaction. The single-primary
- * invariant is a per-organization, table-level condition, so row locks on
- * individual roadmaps cannot enforce it: two concurrent deletes could each
- * lock a different roadmap row, then delete it, and race on successor
- * selection. Locking the organization row makes primary deletion, successor
- * selection, and promotion atomic relative to every other create/delete for
- * the same organization.
+ * Serializes roadmap create/delete per organization by holding the workspace's
+ * row lock for the duration of the transaction.
  *
- * `no key update`, not `update`: two of these still conflict with each other,
- * which is the whole serialization, but neither conflicts with the key-share
- * that inserting a roadmap (or any other organization-referencing row) takes.
- * The stronger lock would make a roadmap write block every child insert in the
- * workspace, and it would make lock order matter for callers that insert first.
+ * The single-primary invariant is a per-organization, table-level condition, so
+ * row locks on individual roadmaps cannot enforce it: two concurrent deletes
+ * could each lock a different roadmap row, then delete it, and race on successor
+ * selection. Holding the workspace lock makes primary deletion, successor
+ * selection, and promotion atomic relative to every other create/delete in that
+ * workspace. `row-locks.ts` owns the lock strength.
  */
 const makeRoadmapRepository = Effect.gen(function* () {
   const db = yield* currentDb;
-  const lockOrganization = (organizationId: string) =>
-    db.execute(
-      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
-    );
+
   const findMany = ({
     organizationId,
     visibility,
@@ -125,7 +118,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
         .transaction(() =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
-            yield* lockOrganization(organizationId);
+            yield* db.execute(lockOrganizationRow(organizationId));
 
             const [roadmap] = yield* db
               .select({
@@ -190,7 +183,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
             // the post-delete state: without the lock, a create could fall back
             // to a non-primary insert while a concurrent primary delete was still
             // uncommitted, leaving the organization with no primary at all.
-            yield* lockOrganization(input.organizationId);
+            yield* db.execute(lockOrganizationRow(input.organizationId));
 
             const values = {
               id: input.id,

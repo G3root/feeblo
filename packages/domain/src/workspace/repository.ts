@@ -12,7 +12,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -20,6 +20,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { lockOrganizationRow, lockUserRow } from "../row-locks";
 import { FailedToCreateWorkspaceError } from "./errors";
 
 interface CreateWorkspaceArgs {
@@ -43,41 +44,21 @@ const makeWorkspaceRepository = Effect.gen(function* () {
      * (CRM entries, privileged roles) cannot be enforced by row locks on the
      * rows it counts, because a lookup that matches nothing proves nothing.
      * Locking the organization row serializes each count-and-write pair per
-     * workspace. Take it before the transaction's first child insert — an
-     * insert into a table referencing the organization holds a key-share on
-     * this row that conflicts with the lock, so locking after the insert
-     * deadlocks two concurrent creates against each other.
-     *
-     * `no key update` rather than `update`: every table in the workspace
-     * references this row, and the stronger lock would block unrelated child
-     * inserts that merely take a key-share on it. The lock still serializes
-     * the count-and-write pairs, which are the only writers that touch the
-     * organization row's own columns.
+     * workspace. `row-locks.ts` owns the lock strength and why it is that
+     * strength.
      */
     lockOrganization: (organizationId: string) =>
-      db.execute(
-        sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
-      ),
+      db.execute(lockOrganizationRow(organizationId)),
 
     /**
      * Locks the user row until the caller's transaction ends.
      *
-     * The same device as `lockOrganization`, one scope up: a per-user
-     * workspace cap counts rows across workspaces, so no single workspace row
-     * can serialize it. Locking the user serializes each count-and-create
-     * pair per owner, and a concurrent attempt waits here until the first
-     * commits, then counts its insert.
-     *
-     * `no key update` for the same reason as `lockOrganization`: creating a
-     * workspace inserts a `member` row that takes a key-share on this user,
-     * so the stronger lock would block unrelated member inserts that merely
-     * reference the user. Take it before the transaction's first child
-     * insert.
+     * The same device, one scope up: a per-user workspace cap counts rows across
+     * workspaces, so no single workspace row can serialize it. Locking the user
+     * serializes each count-and-create pair per owner, and a concurrent attempt
+     * waits here until the first commits, then counts its insert.
      */
-    lockUser: (userId: string) =>
-      db.execute(
-        sql`SELECT id FROM ${schema.userTable} WHERE id = ${userId} FOR NO KEY UPDATE`
-      ),
+    lockUser: (userId: string) => db.execute(lockUserRow(userId)),
 
     /**
      * Workspaces where the user holds the owner role, with their names.

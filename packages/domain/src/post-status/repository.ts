@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { lockOrganizationRow } from "../row-locks";
 import { BadRequestError, NotFoundError } from "../rpc-errors";
 import type {
   TPostStatusCreate,
@@ -57,30 +58,6 @@ const nextOrderIndex = () =>
 
 const makePostStatusRepository = Effect.gen(function* () {
   const db = yield* currentDb;
-
-  /**
-   * Locks the organization row until the caller's transaction ends.
-   *
-   * `nextOrderIndex` is a count-and-write: it reads the workspace's highest
-   * position and writes the next one, guarded by the unique index on
-   * `(organization_id, order_index)`. The read alone proves nothing — two
-   * concurrent callers both see the same maximum and one of them loses to the
-   * index — so the per-workspace sequence is serialized on the organization
-   * row, the same device `workspace/repository.ts` documents for its
-   * per-workspace limits. `reorder` needs the same lock for a second reason: it
-   * parks a section on negative positions mid-transaction, and a `nextOrderIndex`
-   * read landing inside that window would compute a negative position and
-   * persist it.
-   *
-   * `no key update`, not `update`: only the sequence needs serializing, and the
-   * stronger lock would conflict with the key-share every insert into an
-   * organization-referencing table takes — including the post insert that lands
-   * while a status is being renamed.
-   */
-  const lockOrganization = (organizationId: string) =>
-    db.execute(
-      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`
-    );
 
   const findMany = ({ organizationId }: TPostStatusList) =>
     db
@@ -168,9 +145,10 @@ const makePostStatusRepository = Effect.gen(function* () {
       db
         .transaction((tx) =>
           Effect.gen(function* () {
-            // Held for the rest of the transaction so the `nextOrderIndex` read
-            // below is the workspace's real maximum when it runs.
-            yield* lockOrganization(organizationId);
+            // `nextOrderIndex` is a count-and-write guarded by the unique
+            // index on (organization_id, order_index), so the count is only
+            // authoritative while this lock is held. See `row-locks.ts`.
+            yield* db.execute(lockOrganizationRow(organizationId));
 
             const current = yield* tx
               .select({
@@ -411,8 +389,8 @@ const makePostStatusRepository = Effect.gen(function* () {
           Effect.gen(function* () {
             // Serializes against `update`, which computes the next position from
             // the same sequence: the negative parking below is not a state another
-            // transaction may observe.
-            yield* lockOrganization(organizationId);
+            // transaction may observe. See `row-locks.ts`.
+            yield* db.execute(lockOrganizationRow(organizationId));
 
             const rows = yield* tx
               .select({
