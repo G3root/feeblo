@@ -129,7 +129,7 @@ export const e2eRoadmapSeedRouter = HttpRouter.use((router) =>
 
 const SetPlanPayload = Schema.Struct({
   organizationId: WorkspaceId.schema,
-  plan: Schema.Literals(["starter", "professional"]),
+  plan: Schema.Literals(["free", "starter", "professional"]),
 });
 
 /**
@@ -137,8 +137,9 @@ const SetPlanPayload = Schema.Struct({
  * when the server runs with E2E_ROUTES_ENABLED=true, so production never
  * serves it (see `makePublicRouters` and the production refusal in
  * `ServerConfig`). Lets Playwright specs put a workspace on a paid plan
- * (Starter or Professional) so entitlement-gated features like widget SSO can
- * be tested end-to-end without going through the Polar checkout flow.
+ * (Starter or Professional) or take it back to Free, so entitlement-gated
+ * features and the over-plan gate can be tested end-to-end without going
+ * through the Polar checkout flow.
  */
 export const e2eSetPlanRouter = HttpRouter.use((router) =>
   Effect.gen(function* () {
@@ -169,6 +170,12 @@ export const e2eSetPlanRouter = HttpRouter.use((router) =>
             yield* db
               .delete(schema.productTable)
               .where(eq(schema.productTable.id, productId));
+
+            // Free is the absence of an entitled subscription; the deletes
+            // above are the whole state change.
+            if (payload.plan === "free") {
+              return;
+            }
 
             yield* db.insert(schema.productTable).values({
               id: productId,

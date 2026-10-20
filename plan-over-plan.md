@@ -1,6 +1,6 @@
 # Over-Plan Gate & Remediation Plan
 
-> **Status:** Slices 1–4 implemented on branch `feat/over-plan-gate` on 2026-10-19. `pnpm check`, the new domain tests, and the web unit tests pass. The manual pass against a seeded downgraded workspace and e2e coverage are still pending. No migration, no dependency change.
+> **Status:** Slices 1–4 implemented on branch `feat/over-plan-gate` on 2026-10-19. `pnpm check`, the domain and web unit tests, and `e2e/tests/over-plan.spec.ts` pass. No migration, no dependency change.
 
 ## Objective
 
@@ -85,6 +85,7 @@ Each row is one action against one resource, calling the existing RPC. No new wr
 | Make a board public | "Its N posts and their voters become publicly readable. This cannot be undone once indexed." | `UpdateBoard` with `visibility: "PUBLIC"` |
 | Delete a board | Type the board name; "deletes N posts, their comments and votes" | `DeleteBoard` |
 | Make a roadmap public | "It becomes visible on the public roadmap." | `UpdateRoadmap` with `visibility: "public"` |
+| Delete a roadmap | Plain confirm | `DeleteRoadmap` |
 | Demote an admin | "They lose admin access immediately." | `UpdateOrganizationMemberRole` to `manager` |
 | Cancel an admin invitation | Plain confirm | `CancelOrganizationInvitation` |
 | Delete a changelog category | Type the category name; "removes it from N changelogs" | `DeleteChangelogCategory` |
@@ -185,7 +186,7 @@ The banner: "This workspace is over its {plan} plan — {N} {items} need attenti
 
 1. **Domain snapshot** — `plan-compliance/` module, repository counts, `countCrmEntries` export, RPC registration, tests.
 2. **Dashboard routing** — collection, allowlist predicate + tests, `$organizationId` preload and redirect, gate route, banner on allowlisted pages.
-3. **Actions** — the eight actions, typed confirmations, invalidation, rank-disabled rows, navigation on resolution.
+3. **Actions** — the nine actions, typed confirmations, invalidation, rank-disabled rows, navigation on resolution.
 4. **Polish** — PostHog events (`over_plan_gate_viewed`, `over_plan_remediation_completed`, `over_plan_remediation_action` with `kind`), copy, and the degraded links.
 
 ## Verification
@@ -193,4 +194,4 @@ The banner: "This workspace is over its {plan} plan — {N} {items} need attenti
 - `pnpm check` for each slice.
 - `packages/domain/src/plan-compliance/compliance.test.ts` on PGlite, `it.effect` + `layer`: free workspace with each violation kind; starter limits; professional limits; compliant workspace returns no violations and no resource fetches; non-billing caller gets empty `resources`; the `>=` boundary (exactly at limit is not a violation); private board counted in both groups.
 - `over-plan-routes.test.ts`: allowlist true/false per path and per snapshot, including the self-exempt gate and personal settings.
-- Manual pass against a seeded downgraded workspace before slice 3 is called done. E2E is optional and needs a fixture that forces the plan, so it is not part of the first cut.
+- `e2e/tests/over-plan.spec.ts`: creates a workspace, puts it on Starter through the test-only `/__e2e/set-plan` route (extended to accept `free` so the spec can perform the real downgrade), creates a private board, removes the subscription, and then asserts the redirect, the blocked and allowed pages, the public board staying live, both typed confirmations, and the gate closing after the last finding.
