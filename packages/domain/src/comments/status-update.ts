@@ -1,4 +1,4 @@
-import { currentDb, schema } from "@feeblo/db";
+import { attachCause, currentDb, schema } from "@feeblo/db";
 import { BoardId, PostStatusId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
@@ -148,11 +148,13 @@ export const applyCommentStatusUpdate = (
       statusId: yield* PostStatusId.parse(statusRow.value.id),
       title: postRow.value.title,
     }).pipe(
-      Effect.mapError(
-        () =>
+      Effect.mapError((error) =>
+        attachCause(
           new FailedToCreateCommentError({
             message: "Failed to apply status update to post",
-          })
+          }),
+          error
+        )
       )
     );
 
@@ -224,11 +226,13 @@ export const applyCommentStatusUpdate = (
         );
       return result._tag === "Written" ? result.intent.id : undefined;
     }).pipe(
-      Effect.mapError(
-        () =>
+      Effect.mapError((error) =>
+        attachCause(
           new FailedToCreateCommentError({
             message: "Failed to apply status update to post",
-          })
+          }),
+          error
+        )
       )
     );
 

@@ -146,8 +146,9 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
           },
         }),
         Effect.mapError(
-          () =>
+          (error) =>
             new IntegrationEventRecordingError({
+              cause: error,
               message: "Could not record integration event",
             })
         )

@@ -1,4 +1,4 @@
-import { Database, schema, transaction } from "@feeblo/db";
+import { attachCause, Database, schema, transaction } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { htmlToExcerpt } from "@feeblo/utils/html";
@@ -342,12 +342,15 @@ const makePostWriteService = Effect.gen(function* () {
       });
     }).pipe(
       Effect.mapError((error) =>
-        Predicate.isTagged(error, "PostIntegrationEventRecordingError") &&
-        error.kind === "lookup"
-          ? new FailedToUpdatePostError()
-          : new InternalServerError({
-              message: "Could not record integration event.",
-            })
+        attachCause(
+          Predicate.isTagged(error, "PostIntegrationEventRecordingError") &&
+            error.kind === "lookup"
+            ? new FailedToUpdatePostError()
+            : new InternalServerError({
+                message: "Could not record integration event.",
+              }),
+          error
+        )
       )
     );
 
@@ -631,12 +634,14 @@ const makePostWriteService = Effect.gen(function* () {
                       ),
                     })
                     .pipe(
-                      Effect.mapError(
-                        () =>
+                      Effect.mapError((error) =>
+                        attachCause(
                           new InternalServerError({
                             message:
                               "Could not record the post creator email subscription.",
-                          })
+                          }),
+                          error
+                        )
                       )
                     );
                 }
@@ -667,11 +672,13 @@ const makePostWriteService = Effect.gen(function* () {
                 postId: args.id,
               })
               .pipe(
-                Effect.mapError(
-                  () =>
+                Effect.mapError((error) =>
+                  attachCause(
                     new InternalServerError({
                       message: "Could not record submission email intent.",
-                    })
+                    }),
+                    error
+                  )
                 )
               );
             yield* Option.match(notifications, {

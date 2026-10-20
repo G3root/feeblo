@@ -122,6 +122,23 @@ const abortCodeOf = (
 };
 
 /**
+ * Attaches the failure an already-mapped error replaces.
+ *
+ * For an `Effect.mapError` inside a transaction. `Schema.TaggedError` carries no
+ * cause unless the schema declares a field for one, and declaring one on a
+ * client-facing error would ship the driver failure — SQL text included — in the
+ * response. The attachment is therefore a plain property: the retry's walk reads
+ * it, the error's schema never encodes it, and the caller sees the shape its
+ * contract promised.
+ *
+ * @param error - The error to return, already shaped for the caller.
+ * @param cause - The failure it replaces, kept for the retry and for diagnosis.
+ * @returns `error`, with `cause` attached.
+ */
+export const attachCause = <E extends Error, C>(error: E, cause: C): E =>
+  Object.assign(error, { cause });
+
+/**
  * Three attempts at most: the initial one and two retries. An abort means the
  * transaction did no work, so a retry costs one round-trip plus the jitter; a
  * fourth attempt would only add latency to a request already under contention.

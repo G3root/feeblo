@@ -265,10 +265,18 @@ export interface IntegrationDeliveryAttempt extends Schema.Schema.Type<
   typeof IntegrationDeliveryAttempt
 > {}
 
-/** Persistence failure while atomically recording an event and its matched deliveries. */
+/**
+ * Persistence failure while atomically recording an event and its matched
+ * deliveries.
+ *
+ * `cause` carries the failure this replaces. It is what keeps a transaction
+ * abort recognisable to the transaction boundary that retries it — a wrapper
+ * without it turns a retryable abort into a 500 — and it stays diagnostic detail
+ * for every other failure.
+ */
 export class IntegrationEventRecordingError extends Schema.TaggedError<IntegrationEventRecordingError>()(
   "IntegrationEventRecordingError",
-  { message: Schema.String }
+  { cause: Schema.optional(Schema.Unknown), message: Schema.String }
 ) {}
 
 /** Result of transactional event fan-out; zero means no active route matched. */

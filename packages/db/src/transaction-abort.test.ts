@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Ref from "effect/Ref";
 
-import { withTransactionAbortRetry } from "./transaction-abort";
+import { attachCause, withTransactionAbortRetry } from "./transaction-abort";
 
 /**
  * The shape a driver error takes when drizzle's Effect adapter reports it: the
@@ -158,5 +158,42 @@ describe("withTransactionAbortRetry", () => {
 
         expect(yield* Ref.get(attempts)).toBe(1);
       })
+  );
+});
+
+describe("attachCause", () => {
+  it.live(
+    "keeps the abort reachable through the error a mapping returned",
+    () =>
+      Effect.gen(function* () {
+        // The shape a boundary produces: a contract error wrapping the failure it
+        // replaced. `Schema.TaggedError` drops a cause it does not declare, so the
+        // attachment has to be explicit.
+        const mapped = attachCause(
+          new Error("Could not record integration event."),
+          driverFailure("55P03")
+        );
+
+        const attempts = yield* Ref.make(0);
+        yield* withTransactionAbortRetry(
+          failedTransaction(mapped, attempts)
+        ).pipe(Effect.exit);
+
+        expect(yield* Ref.get(attempts)).toBe(3);
+      })
+  );
+
+  it.live("keeps the abort reachable through a chain of wrappers", () =>
+    Effect.gen(function* () {
+      const inner = attachCause(new Error("recorder"), driverFailure("40P01"));
+      const outer = attachCause(new Error("post write"), inner);
+
+      const attempts = yield* Ref.make(0);
+      yield* withTransactionAbortRetry(failedTransaction(outer, attempts)).pipe(
+        Effect.exit
+      );
+
+      expect(yield* Ref.get(attempts)).toBe(3);
+    })
   );
 });

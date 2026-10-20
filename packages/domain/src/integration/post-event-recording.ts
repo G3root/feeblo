@@ -9,10 +9,16 @@ import * as Schema from "effect/Schema";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { PostRepository } from "../post/repository";
 
-/** Failure while assembling or recording a post integration event. */
+/**
+ * Failure while assembling or recording a post integration event.
+ *
+ * `cause` carries the failure this replaces, so a transaction abort stays
+ * recognisable to the transaction boundary that retries it.
+ */
 export class PostIntegrationEventRecordingError extends Schema.TaggedError<PostIntegrationEventRecordingError>()(
   "PostIntegrationEventRecordingError",
   {
+    cause: Schema.optional(Schema.Unknown),
     kind: Schema.Literals(["infrastructure", "lookup", "recording"]),
     message: Schema.String,
   }
@@ -208,8 +214,9 @@ export const recordPostIntegrationEvent = Effect.fn(
       })
       .pipe(
         Effect.mapError(
-          () =>
+          (error) =>
             new PostIntegrationEventRecordingError({
+              cause: error,
               kind: "recording",
               message: "Could not record integration event",
             })
@@ -224,6 +231,7 @@ export const recordPostIntegrationEvent = Effect.fn(
         Schema.is(PostIntegrationEventRecordingError)(error)
           ? error
           : new PostIntegrationEventRecordingError({
+              cause: error,
               kind: "infrastructure",
               message: "Post integration event could not be assembled",
             })

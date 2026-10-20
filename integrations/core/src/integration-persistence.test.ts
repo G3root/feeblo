@@ -11,10 +11,12 @@ import {
   type LegidOf,
 } from "@feeblo/id";
 import { eq, inArray } from "drizzle-orm";
+import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 import {
   IntegrationCapabilityKey,
@@ -160,6 +162,40 @@ const makePostCreatedEvent = Effect.gen(function* () {
 
 describe("integration persistence", () => {
   layer(TestLayer)("event recording and delivery leases", (it) => {
+    it.effect(
+      "keeps the database failure attached to the recording error",
+      () =>
+        Effect.gen(function* () {
+          const recorder = yield* IntegrationEventRecorder;
+          const route = yield* seedRoute();
+          const input = yield* makePostCreatedEvent;
+          const event = {
+            ...input.event,
+            organizationId: route.organizationId,
+          };
+
+          yield* transaction(recorder.recordIntegrationEvent({ event }));
+
+          // The same event id again violates the event primary key. The recorder
+          // translates that failure into its own error type, and the transaction
+          // boundary can only tell a retryable abort apart from this if the
+          // failure it replaced is still attached.
+          const failure = yield* Effect.flip(
+            transaction(recorder.recordIntegrationEvent({ event }))
+          );
+
+          expect(failure._tag).toBe("IntegrationEventRecordingError");
+          expect(Schema.is(EffectDrizzleQueryError)(failure.cause)).toBe(true);
+
+          // The recorded event's pending delivery is due immediately and the
+          // claim below is not organization-scoped, so the row has to go with the
+          // test. The delivery cascades with its event.
+          const db = yield* currentDb;
+          yield* db
+            .delete(schema.integrationEventTable)
+            .where(eq(schema.integrationEventTable.id, event.id));
+        })
+    );
     it.effect(
       "rolls event and delivery fan-out back with the source transaction",
       () =>
