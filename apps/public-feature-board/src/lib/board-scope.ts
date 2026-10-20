@@ -1,15 +1,24 @@
 import { getCachedAuthSession } from "@feeblo/web-shared/auth-session";
+import {
+  COLLECTION_CONTEXT_DEPENDENCY,
+  COLLECTION_QUERY_CLIENT_DEPENDENCY,
+  createCollectionContext,
+  type CollectionContext,
+} from "@feeblo/web-shared/collection-context";
 import { postSlugFromPath } from "@feeblo/web-shared/collections";
 import type { DbClient } from "@tanstack/react-db";
 
 /**
- * The board's request scope, as a `DbClient` dependency.
+ * The board's collection context.
  *
- * A public board document is scoped to one organization (the host's
- * subdomain) and one viewed entity (the post or changelog slug in the URL).
- * Collections read both through this object instead of `window`, which is what
- * lets the same descriptors materialize on the server, where there is no
- * `window` and no client-side navigation.
+ * It is the shared {@link CollectionContext} implemented over the board's URL
+ * shape: the organization the host resolved, and the post or changelog slug in
+ * the URL. Collections read both through this object instead of `window`,
+ * which is what lets the same descriptors materialize on the server, where
+ * there is no `window` and no client-side navigation.
+ *
+ * The dashboard implements the same interface over its route, so one
+ * `DbClient` carries whichever surface's context the document renders.
  *
  * The object is created once per `DbClient` — per request on the server, per
  * document in the browser — so the mutable organization id it carries cannot
@@ -19,27 +28,19 @@ import type { DbClient } from "@tanstack/react-db";
  * current location at query time, exactly as they were before, and the server
  * resolves them from the request URL.
  */
-export interface BoardScope {
-  getOrganizationId(): string | undefined;
-  setOrganizationId(organizationId: string | undefined): void;
-  getPostSlug(): string | undefined;
-  getChangelogSlug(): string | undefined;
-  /**
-   * Records that a server preload for this request timed out or failed, so the
-   * document it produces is incomplete and must not be cached or indexed.
-   */
-  markPreloadDegraded(): void;
-  isPreloadDegraded(): boolean;
-}
-
-/** `DbClient` dependency key holding the board's {@link BoardScope}. */
-export const BOARD_SCOPE_DEPENDENCY = "boardScope";
-
-/** `DbClient` dependency key holding the request's TanStack Query client. */
-export const BOARD_QUERY_CLIENT_DEPENDENCY = "queryClient";
+export type BoardScope = CollectionContext;
 
 /**
- * Creates the scope for one `DbClient`.
+ * The names the board's collections and tests already use for the shared keys.
+ *
+ * Aliases rather than separate keys: a document renders either the dashboard
+ * or a public board, and both clients publish the context under the same key.
+ */
+export const BOARD_SCOPE_DEPENDENCY = COLLECTION_CONTEXT_DEPENDENCY;
+export const BOARD_QUERY_CLIENT_DEPENDENCY = COLLECTION_QUERY_CLIENT_DEPENDENCY;
+
+/**
+ * Creates the board's context for one `DbClient`.
  *
  * `pathname` is called per lookup rather than captured so a browser client
  * (which spans navigations) always resolves the slug of the page it is on. The
@@ -51,21 +52,15 @@ export function createBoardScope(options: {
   organizationId?: string;
   pathname: () => string | undefined;
 }): BoardScope {
-  let organizationId = options.organizationId;
-  let preloadDegraded = false;
   const { pathname } = options;
 
-  return {
+  return createCollectionContext({
+    organizationId: options.organizationId,
     getChangelogSlug: () => {
       const currentPathname = pathname();
       return currentPathname === undefined
         ? undefined
         : postSlugFromPath(currentPathname, "changelog", 1);
-    },
-    getOrganizationId: () => organizationId,
-    isPreloadDegraded: () => preloadDegraded,
-    markPreloadDegraded: () => {
-      preloadDegraded = true;
     },
     getPostSlug: () => {
       const currentPathname = pathname();
@@ -73,14 +68,11 @@ export function createBoardScope(options: {
         ? undefined
         : postSlugFromPath(currentPathname, "p", 1);
     },
-    setOrganizationId: (next) => {
-      organizationId = next;
-    },
-  };
+  });
 }
 
 /**
- * Publishes the resolved site's organization id onto the client's scope.
+ * Publishes the resolved site's organization id onto the client's context.
  *
  * Called before any collection materializes, because the organization id is
  * part of every collection's query key. The layout publishes it on the server

@@ -82,6 +82,10 @@
       "types": "./src/lib/collections.ts",
       "default": "./src/lib/collections.ts"
     },
+    "./collection-context": {
+      "types": "./src/lib/collection-context.ts",
+      "default": "./src/lib/collection-context.ts"
+    },
     "./sitemap": {
       "types": "./src/lib/sitemap.ts",
       "default": "./src/lib/sitemap.ts"

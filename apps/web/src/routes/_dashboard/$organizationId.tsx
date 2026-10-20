@@ -1,5 +1,9 @@
 import type { TWorkspacePlanCompliance } from "@feeblo/domain/plan-compliance/schema";
 import { useAuth } from "@feeblo/web-shared/auth-context";
+import {
+  COLLECTION_CONTEXT_DEPENDENCY,
+  type CollectionContext,
+} from "@feeblo/web-shared/collection-context";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 
@@ -9,7 +13,16 @@ import { isOverPlanPathAllowed } from "~/features/plan-compliance/lib/over-plan-
 import { planComplianceCollectionFor } from "~/lib/collections";
 
 export const Route = createFileRoute("/_dashboard/$organizationId")({
-  beforeLoad: async ({ location, params }) => {
+  beforeLoad: async ({ context, location, params }) => {
+    // The dashboard's organization is its URL's first segment, which the
+    // client's context resolves when a collection materializes. Clear any
+    // value a public board published on this shared client (the board is
+    // served under `/s`), so a dashboard page can never inherit the board's
+    // organization.
+    context.dbClient
+      .requireDependency<CollectionContext>(COLLECTION_CONTEXT_DEPENDENCY)
+      .setOrganizationId(undefined);
+
     let compliance: TWorkspacePlanCompliance | undefined;
 
     try {

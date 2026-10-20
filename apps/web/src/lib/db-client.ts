@@ -1,30 +1,60 @@
 import {
-  BOARD_QUERY_CLIENT_DEPENDENCY,
-  BOARD_SCOPE_DEPENDENCY,
-  createBoardScope,
-} from "@feeblo/public-feature-board/board-scope";
+  COLLECTION_CONTEXT_DEPENDENCY,
+  COLLECTION_QUERY_CLIENT_DEPENDENCY,
+  createCollectionContext,
+} from "@feeblo/web-shared/collection-context";
+import {
+  firstPathSegment,
+  postSlugFromPath,
+} from "@feeblo/web-shared/collections";
 import { DbClient } from "@tanstack/react-db";
 import type { QueryClient } from "@tanstack/react-query";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
 /**
- * The current-pathname accessor for the public board's slug scope.
+ * The current-pathname accessor for the slug-scoped collections.
  *
- * The board's collections resolve "which post/changelog entry am I on" from the
- * URL, because their query keys are built lazily (from a subset request, not
- * from a route). The browser reads the live location, since one client spans
+ * Both surfaces resolve "which post/changelog entry am I on" from the URL,
+ * because their query keys are built lazily (from a subset request, not from a
+ * route). The browser reads the live location, since one client spans
  * navigations; the server *captures* the request's pathname while the router is
- * being built, because scope lookups also run after the render (subset
+ * being built, because context lookups also run after the render (subset
  * unloading, collection cleanup) where no request context exists — and it is
  * the visitor's public spelling, which is what `postSlugFromPath` expects.
  */
-const getBoardPathname = createIsomorphicFn()
+const getPagePathname = createIsomorphicFn()
   .client(() => () => window.location.pathname)
   .server(() => {
     const { pathname } = new URL(getRequest().url);
     return () => pathname;
   });
+
+/**
+ * The collection context for this document or request.
+ *
+ * The slugs come from the URL at query time. The organization comes from the
+ * committed URL too: its organization route clears any value the board published, so a
+ * dashboard document never inherits a board's organization, and a navigation
+ * scopes collections to the new organization only after the URL commits.
+ *
+ * The app serves two URL shapes. A dashboard post lives at
+ * `/:organizationId/…/post/:boardSlug/:postSlug`; a public post at `/p/:slug`,
+ * whose internal `/s` prefix may already be rewritten away on the server. The
+ * dashboard shape is tried first, and the fallback only resolves on a board
+ * document, where no `post` segment exists.
+ */
+function createPageContext() {
+  const pathname = getPagePathname();
+
+  return createCollectionContext({
+    getChangelogSlug: () => postSlugFromPath(pathname(), "changelog", 1),
+    getOrganizationId: () => firstPathSegment(pathname()),
+    getPostSlug: () =>
+      postSlugFromPath(pathname(), "post", 2) ??
+      postSlugFromPath(pathname(), "p", 1),
+  });
+}
 
 /**
  * One `DbClient` per app instance in the browser, one per request on the
@@ -37,11 +67,11 @@ const getBoardPathname = createIsomorphicFn()
  * request. The server keys the client on the request object instead, which is
  * stable for the life of a request and collectable once it ends.
  *
- * The client carries the board's scope dependencies, and the dashboard's
- * collection descriptors read their `QueryClient` from the same instance. One
- * client means `useDbClient()`, the board's `beforeLoad`, and the dashboard's
- * `dashboardCollections` accessor cannot end up with three clients and three
- * copies of every row.
+ * The client carries the page's collection context, and both the board's
+ * descriptors and the dashboard's collection accessor read it from the same
+ * instance. One client means `useDbClient()`, the board's `beforeLoad`, and the
+ * dashboard's `dashboardCollections` accessor cannot end up with three clients
+ * and three copies of every row.
  *
  * The `QueryClient` arrives as a thunk so a cache hit never builds one:
  * `getContext()` creates a fresh `QueryClient` on every server call.
@@ -54,10 +84,8 @@ const getBoardPathname = createIsomorphicFn()
 export const getDbClient = createIsomorphicFn()
   .client((getQueryClient: () => QueryClient): DbClient => {
     browserDbClient ??= new DbClient({
-      [BOARD_QUERY_CLIENT_DEPENDENCY]: getQueryClient(),
-      [BOARD_SCOPE_DEPENDENCY]: createBoardScope({
-        pathname: getBoardPathname(),
-      }),
+      [COLLECTION_QUERY_CLIENT_DEPENDENCY]: getQueryClient(),
+      [COLLECTION_CONTEXT_DEPENDENCY]: createPageContext(),
     });
 
     return browserDbClient;
@@ -71,10 +99,8 @@ export const getDbClient = createIsomorphicFn()
     }
 
     const client = new DbClient({
-      [BOARD_QUERY_CLIENT_DEPENDENCY]: getQueryClient(),
-      [BOARD_SCOPE_DEPENDENCY]: createBoardScope({
-        pathname: getBoardPathname(),
-      }),
+      [COLLECTION_QUERY_CLIENT_DEPENDENCY]: getQueryClient(),
+      [COLLECTION_CONTEXT_DEPENDENCY]: createPageContext(),
     });
     requestDbClients.set(request, client);
 

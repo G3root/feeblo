@@ -72,6 +72,27 @@ export function organizationScopedKey(
 }
 
 /**
+ * The decoded first path segment, or undefined for the root path.
+ *
+ * The dashboard's organization is the first segment of every route it owns.
+ * The public board receives its organization from the host instead, so it does
+ * not use this.
+ */
+export function firstPathSegment(pathname: string): string | undefined {
+  const segment = pathname.split("/").find((part) => part.length > 0);
+
+  if (!segment) {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Extracts a post slug from a URL path of the shape
  * `/…/:markerSegment/…/:slug` where the slug sits `slugOffset` segments after
  * the marker (`/post/:boardSlug/:postSlug` on the dashboard, `/p/:slug` on the

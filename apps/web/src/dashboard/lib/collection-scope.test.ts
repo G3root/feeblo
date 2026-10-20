@@ -133,10 +133,15 @@ describe("collections module invariants", () => {
     "utf8"
   );
 
-  /** Splits `export function NAME(...) { ... }` blocks by brace matching. */
+  /**
+   * Splits `function NAME(...) { ... }` blocks by brace matching.
+   *
+   * The descriptors are module-private — `dashboardCollections` is the only
+   * interface a caller sees — so this reads them without requiring an export.
+   */
   function descriptorBlocks(): Array<{ name: string; body: string }> {
     const blocks: Array<{ name: string; body: string }> = [];
-    const re = /export function (\w+Collection)\(/g;
+    const re = /^(?:export )?(?:async )?function (\w+Collection)\(/gm;
     let match: RegExpExecArray | null;
     while ((match = re.exec(source))) {
       const braceOpen = source.indexOf("{", match.index);
@@ -165,7 +170,7 @@ describe("collections module invariants", () => {
 
   it("keys every route-slug-scoped collection by slug", () => {
     const slugScoped = blocks.filter((b) =>
-      /getCurrentPostSlug\(\)|scopePostSlug\(|slugScopedQueryKey\(/.test(b.body)
+      /getPostSlug\(\)|scopePostSlug\(|slugScopedQueryKey\(/.test(b.body)
     );
 
     expect(slugScoped.length).toBeGreaterThan(0);
