@@ -453,12 +453,16 @@ export function PostCreateForm() {
         </div>
       </DialogPanel>
 
-      <DialogFooter className="grid grid-cols-2 items-center">
-        <div className="flex justify-start">
-          <div className="flex items-center gap-2">
+      <DialogFooter className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="min-w-0 flex-1 basis-28">
             <PostBoardField boards={boards} form={form} />
+          </div>
+          <div className="min-w-0 flex-1 basis-28">
             <PostStatusField form={form} statuses={postStatuses} />
-            {createOnBehalfPolicy.allowed ? (
+          </div>
+          {createOnBehalfPolicy.allowed ? (
+            <div className="min-w-0 flex-1 basis-28">
               <form.AppField name="author">
                 {(field) => {
                   const selection = hasOnBehalfAuthorValue(field.state.value)
@@ -485,10 +489,10 @@ export function PostCreateForm() {
                   );
                 }}
               </form.AppField>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 sm:shrink-0">
           <PostCreateMoreField form={form} />
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (

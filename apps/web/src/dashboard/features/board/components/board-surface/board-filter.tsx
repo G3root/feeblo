@@ -263,14 +263,20 @@ function BoardFilterActiveRow() {
   const tagNameMap = new Map(tags.map((tag) => [tag.id, tag.name]));
 
   return (
-    <div className="border-border/60 bg-muted/20 flex items-start justify-between gap-3 rounded-2xl border px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="border-border/60 bg-muted/20 flex flex-col gap-2 rounded-2xl border px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {hasStatusFilter ? <BoardFilterStatusGroup /> : null}
         {hasTagFilter ? (
           <BoardFilterLabelsGroup tagNameMap={tagNameMap} />
         ) : null}
       </div>
-      <Button onClick={clearAllFilters} size="sm" type="button" variant="ghost">
+      <Button
+        className="shrink-0 self-end sm:self-auto"
+        onClick={clearAllFilters}
+        size="sm"
+        type="button"
+        variant="ghost"
+      >
         Clear
       </Button>
     </div>
@@ -354,7 +360,11 @@ function BoardFilterLabelsGroup({
 }
 
 function BoardFilterActiveGroup({ children }: { children: ReactNode }) {
-  return <Group className="bg-background/90 rounded-full">{children}</Group>;
+  return (
+    <Group className="bg-background/90 max-w-full overflow-x-auto rounded-full">
+      {children}
+    </Group>
+  );
 }
 
 function BoardFilterReadonlySegment({

@@ -168,8 +168,8 @@ function ChangelogContent() {
 
   return (
     <ChangelogPageLayout>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-4 sm:items-end">
+        <div className="flex w-full items-center justify-between gap-3 sm:block sm:w-auto sm:space-y-3">
           <h2 className="text-base font-semibold tracking-tight">
             {m.yummy_silly_hedgehog()}
           </h2>
@@ -270,7 +270,7 @@ function ChangelogFilterToolbar({
   const search = useSelector(store, (state) => state.context.search);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex w-full items-center gap-2 sm:w-auto">
       <ChangelogCategoryFilter />
       {hasActiveCategoryFilter ? (
         <Button
@@ -283,7 +283,7 @@ function ChangelogFilterToolbar({
           <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
         </Button>
       ) : null}
-      <div className="w-full sm:w-72">
+      <div className="min-w-0 flex-1 sm:w-72 sm:flex-none">
         <InputGroup>
           <InputGroupAddon>
             <InputGroupText>

@@ -4,6 +4,16 @@ import { createStore } from "@xstate/store";
 import { useSelector } from "@xstate/store-react";
 
 export type BoardDisplayMode = "list" | "grid";
+export type BoardOrderDirection = "asc" | "desc";
+export type BoardOrderField =
+  | "createdAt"
+  | "title"
+  | "updatedAt"
+  | "upvoteCount";
+export type BoardOrdering = {
+  direction: BoardOrderDirection;
+  field: BoardOrderField;
+};
 export type BoardPostStatusFilter = "all" | "active" | "backlog";
 export type BoardStatusOperator = "isAnyOf" | "isNot";
 export type BoardTagOperator =
@@ -14,6 +24,10 @@ export type BoardTagOperator =
 
 const DEFAULT_STATUS_OPERATOR: BoardStatusOperator = "isAnyOf";
 const DEFAULT_TAG_OPERATOR: BoardTagOperator = "includeAllOf";
+const DEFAULT_ORDERING: BoardOrdering = {
+  direction: "desc",
+  field: "createdAt",
+};
 
 export type BoardView = {
   filters: {
@@ -38,6 +52,7 @@ type BoardStoreContext = {
   boardId?: string;
   bulkDeleteOpen: boolean;
   displayMode: BoardDisplayMode;
+  ordering: BoardOrdering;
   selectedPosts: SelectedBoardPost[];
 };
 
@@ -45,6 +60,7 @@ export type BoardStoreDefaultValue = {
   activeView: BoardView;
   boardId?: string;
   displayMode?: BoardDisplayMode;
+  ordering?: BoardOrdering;
 };
 
 const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
@@ -66,6 +82,7 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       boardId: defaultValue?.boardId ?? "",
       bulkDeleteOpen: false,
       displayMode: defaultValue?.displayMode ?? "list",
+      ordering: defaultValue?.ordering ?? DEFAULT_ORDERING,
       selectedPosts: [],
     } as BoardStoreContext,
     on: {
@@ -86,6 +103,25 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
         ...context,
         displayMode: event.mode,
       }),
+      setOrderField: (context, event: { field: BoardOrderField }) => ({
+        ...context,
+        ordering: {
+          ...context.ordering,
+          field: event.field,
+        },
+      }),
+      toggleOrderDirection: (context) => {
+        const direction: BoardOrderDirection =
+          context.ordering.direction === "asc" ? "desc" : "asc";
+
+        return {
+          ...context,
+          ordering: {
+            ...context.ordering,
+            direction,
+          },
+        };
+      },
       clearFilters: (context) => ({
         ...context,
         activeView: {
@@ -255,6 +291,11 @@ export function useSelectedPostIds() {
 export function useBoardDisplayMode() {
   const store = useBoardStore();
   return useSelector(store, (state) => state.context.displayMode);
+}
+
+export function useBoardOrdering() {
+  const store = useBoardStore();
+  return useSelector(store, (state) => state.context.ordering);
 }
 
 export function useActiveBoardView() {

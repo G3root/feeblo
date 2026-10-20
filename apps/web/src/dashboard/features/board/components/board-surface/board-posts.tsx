@@ -3,6 +3,7 @@ import { Suspense, lazy, useMemo } from "react";
 import {
   useActiveBoardView,
   useBoardDisplayMode,
+  useBoardOrdering,
 } from "../../state/board-store-context";
 import { BoardListView } from "./board-list-view";
 import { BoardPostBulkActions } from "./board-post-bulk-actions";
@@ -28,6 +29,7 @@ export function BoardPosts({
   organizationId: string;
 }) {
   const mode = useBoardDisplayMode();
+  const ordering = useBoardOrdering();
   const activeView = useActiveBoardView();
   const {
     postStatus: postStatusFilter,
@@ -39,6 +41,7 @@ export function BoardPosts({
   } = activeView.filters;
   const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
     boardId,
+    ordering,
     organizationId,
     postStatusFilter,
     search,

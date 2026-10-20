@@ -27,7 +27,7 @@ export function PostCreateDialog() {
   const open = useSelector(store, (state) => state.context.open);
   return (
     <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
-      <DialogPopup className="w-full max-w-187.5 md:min-h-150">
+      <DialogPopup className="w-full max-w-187.5 max-sm:h-[calc(100dvh-3rem)] md:min-h-150">
         <DialogHeader>
           <DialogTitle>{m.lucky_game_cowfish()}</DialogTitle>
           <DialogDescription>{m.wide_inner_jurgen()}</DialogDescription>
