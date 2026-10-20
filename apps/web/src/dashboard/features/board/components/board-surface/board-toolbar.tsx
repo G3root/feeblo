@@ -110,8 +110,8 @@ export function BoardToolbar({
                   </Link>
                 ))}
           </div>
-          <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-            <div className="w-full sm:w-72">
+          <div className="ml-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto">
+            <div className="min-w-0 flex-1 sm:w-72 sm:flex-none">
               <BoardSearchInput />
             </div>
             <BoardFilter.Trigger />

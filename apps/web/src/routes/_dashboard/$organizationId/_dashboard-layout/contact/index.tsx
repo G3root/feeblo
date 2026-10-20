@@ -7,6 +7,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import {
   Table,
   TableBody,
@@ -188,28 +189,38 @@ function ContactPage() {
         </div>
         <PolicyGuard policy={hasPermission(organizationId, "contacts.create")}>
           {({ allowed }) => (
-            <Tooltip>
-              <TooltipTrigger
-                render={(props) => (
-                  <Button
-                    {...props}
-                    disabled={!allowed}
-                    onClick={openCreateDialog}
-                    type="button"
-                    variant="brand"
-                  >
-                    <HugeiconsIcon icon={UserAdd01Icon} />
-                    Create contact
-                  </Button>
-                )}
-              />
-              {hasReachedCrmLimit ? (
-                <TooltipPopup>
-                  CRM entry limit reached ({totalCrmEntries} of {crmLimit}
-                  used) — upgrade to add more contacts.
-                </TooltipPopup>
-              ) : null}
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger
+                  render={(props) => (
+                    <Button
+                      {...props}
+                      className="max-md:hidden"
+                      disabled={!allowed}
+                      onClick={openCreateDialog}
+                      type="button"
+                      variant="brand"
+                    >
+                      <HugeiconsIcon icon={UserAdd01Icon} />
+                      Create contact
+                    </Button>
+                  )}
+                />
+                {hasReachedCrmLimit ? (
+                  <TooltipPopup>
+                    CRM entry limit reached ({totalCrmEntries} of {crmLimit}
+                    used) — upgrade to add more contacts.
+                  </TooltipPopup>
+                ) : null}
+              </Tooltip>
+              <FloatingActionButton
+                disabled={!allowed}
+                icon={<HugeiconsIcon icon={UserAdd01Icon} />}
+                onClick={openCreateDialog}
+              >
+                Create contact
+              </FloatingActionButton>
+            </>
           )}
         </PolicyGuard>
       </div>

@@ -1,4 +1,5 @@
 import { Button } from "@feeblo/ui/button";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import {
   Menu,
   MenuItem,
@@ -97,19 +98,26 @@ export function RoadmapDetailActions({
 
           <div
             aria-hidden
-            className="bg-border hidden h-6 w-px shrink-0 sm:block"
+            className="bg-border hidden h-6 w-px shrink-0 md:block"
           />
 
           <Button
-            aria-label="Create new roadmap"
+            className="max-md:hidden"
             disabled={!allowed}
             onClick={() => createStore.send({ type: "toggle" })}
             size="sm"
             variant="brand"
           >
             <HugeiconsIcon icon={Plus} />
-            <span className="hidden sm:inline">New Roadmap</span>
+            New Roadmap
           </Button>
+          <FloatingActionButton
+            disabled={!allowed}
+            icon={<HugeiconsIcon icon={Plus} />}
+            onClick={() => createStore.send({ type: "toggle" })}
+          >
+            New Roadmap
+          </FloatingActionButton>
         </div>
       )}
     </PolicyGuard>
