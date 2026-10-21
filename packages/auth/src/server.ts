@@ -43,7 +43,7 @@ import {
   type GenericOAuthUserInfo,
   genericOAuth,
 } from "better-auth/plugins/generic-oauth";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -374,18 +374,12 @@ export const initAuthHandler = (
           message: `${workspaceNames.join(", ")} still has other members. Remove them in Members settings, or delete the workspace, before deleting your account.`,
         });
 
-      const countMembers = (organizationId: string, lock: boolean) =>
-        Effect.gen(function* () {
-          const members = db
-            .select({ id: schema.memberTable.id })
-            .from(schema.memberTable)
-            .where(eq(schema.memberTable.organizationId, organizationId));
-          if (!lock) {
-            return (yield* members).length;
-          }
-          // `FOR UPDATE` only means anything inside the deletion transaction.
-          return (yield* members.for("update")).length;
-        });
+      const countMembers = (organizationId: string) =>
+        db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.organizationId, organizationId))
+          .pipe(Effect.map((members) => members.length));
 
       const ownedWorkspaces = await callbackRuntime.runPromise(
         Effect.gen(function* () {
@@ -400,7 +394,12 @@ export const initAuthHandler = (
               schema.organizationTable,
               eq(schema.organizationTable.id, schema.memberTable.organizationId)
             )
-            .where(eq(schema.memberTable.userId, userId));
+            .where(eq(schema.memberTable.userId, userId))
+            // Ordered so the locks below are taken in one order. A workspace can
+            // have several owners, so two owners deleting their accounts can own
+            // the same pair of workspaces; without a fixed order each could hold
+            // the first one the other is waiting for.
+            .orderBy(asc(schema.organizationTable.id));
           return memberships.filter((membership) =>
             membership.role.split(",").includes("owner")
           );
@@ -416,7 +415,7 @@ export const initAuthHandler = (
         Effect.gen(function* () {
           const blocking: string[] = [];
           for (const workspace of ownedWorkspaces) {
-            if ((yield* countMembers(workspace.id, false)) > 1) {
+            if ((yield* countMembers(workspace.id)) > 1) {
               blocking.push(workspace.name);
             }
           }
@@ -428,12 +427,27 @@ export const initAuthHandler = (
       }
 
       // Every deletion commits or none does, and the membership count is
-      // re-checked under a lock: an invitation accepted between the check above
-      // and here must fail the whole deletion rather than take a workspace away
-      // from the member who just joined. The revocation rows are written in
-      // this transaction, before the organization row (and its cascaded
-      // subscriptions) disappears, so a rollback leaves no queue work and no
-      // revoked subscription for a workspace that survives.
+      // re-checked after the workspace's own row is locked: an invitation
+      // accepted between the check above and here must fail the whole deletion
+      // rather than take a workspace away from the member who just joined.
+      //
+      // The organization-row lock is what makes that re-check authoritative, and
+      // it is enough on its own: accepting an invitation inserts a `member` row,
+      // whose foreign-key check needs a key-share on this same organization row,
+      // and a key-share conflicts with `FOR UPDATE`. A member insert still
+      // uncommitted therefore blocks the lock acquisition, and by the time it is
+      // granted the insert has committed and the count below sees it. Locking the
+      // member rows as well was redundant and made this transaction deadlock-prone:
+      // `post_subscription`, `upvote`, `post_reaction` and `changelog_subscription`
+      // declare their user and member foreign keys before their organization one,
+      // so an insert into them takes the member key-share first and then waits for
+      // the organization key-share held here, while this transaction waits for
+      // `FOR UPDATE` on that same member row.
+      //
+      // The revocation rows are written in this transaction, before the
+      // organization row (and its cascaded subscriptions) disappears, so a
+      // rollback leaves no queue work and no revoked subscription for a
+      // workspace that survives.
       const deletedWorkspaceIds = await callbackRuntime.runPromise(
         transaction(
           Effect.gen(function* () {
@@ -448,7 +462,7 @@ export const initAuthHandler = (
               if (locked === undefined) {
                 continue;
               }
-              if ((yield* countMembers(workspace.id, true)) > 1) {
+              if ((yield* countMembers(workspace.id)) > 1) {
                 nowBlocking.push(workspace.name);
               } else {
                 deletable.push(workspace.id);

@@ -14,6 +14,7 @@ import {
   type EmailAddress,
   parseEmailAddress,
 } from "../email-subscription/schema";
+import { lockOrganizationRow } from "../row-locks";
 import {
   submissionWindowBurst,
   submissionWindowCeiling,
@@ -221,26 +222,6 @@ export const emailDeliveryMessageId = (
 const makeEmailOutboxRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
 
-  /**
-   * Locks the organization row until the caller's transaction ends.
-   *
-   * The same device the roadmap repository uses for its per-organization
-   * invariants: a condition that spans rows cannot be enforced by row locks on
-   * those rows, because a lookup that matches nothing proves nothing. It
-   * serializes submission-window creation per workspace.
-   *
-   * It must be taken before the transaction's first child insert. An insert
-   * into a table referencing the organization holds a key-share on the org row,
-   * and a key-share conflicts with this lock: a transaction that inserts first
-   * and locks second deadlocks against a concurrent one doing the same, and
-   * Postgres aborts one of the two creates. See `post/write.ts` for the call
-   * that puts it first.
-   */
-  const lockOrganization = (organizationId: string) =>
-    db.execute(
-      sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR UPDATE`
-    );
-
   const recordIntent = Effect.fn("EmailOutboxRepository.recordIntent")(
     function* (input: RecordEmailIntentInput) {
       const payload = yield* decodeIntentPayload(
@@ -445,13 +426,14 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     // created together otherwise race past the pending-window lookup below —
     // which locks nothing when no window exists — and can each open their own
     // window across a burst-boundary instant, doubling the workspace's email
-    // rate. The create path takes this lock before its first child insert (see
-    // `post/write.ts`), which is what keeps it deadlock-free: taken only here,
-    // after that insert, the lock would conflict with the other transaction's
-    // org key-share and abort one of the two creates. This re-lock is a no-op
-    // round trip when the caller already holds it, and it serializes standalone
-    // callers that have not inserted a child row.
-    yield* lockOrganization(organizationId);
+    // rate. This re-lock is a no-op round trip when the caller already holds
+    // it, and it serializes callers whose transaction has not taken it yet.
+    // Serializes submission-window creation per workspace across transactions.
+    // Two submissions arriving together would otherwise race past the
+    // pending-window lookup below — which locks nothing when no window exists —
+    // and each open its own window, doubling the workspace's email rate. The
+    // lock is a no-op round trip when the caller already holds it.
+    yield* db.execute(lockOrganizationRow(organizationId));
 
     /**
      * Appends this submission to a locked window row.
@@ -1204,7 +1186,17 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
 
   return {
     recordIntent,
-    lockOrganization,
+
+    /**
+     * Locks the workspace until the caller's transaction ends.
+     *
+     * `post/write.ts` takes it before the post insert so the submission window
+     * it creates later in the same transaction is serialized per workspace.
+     * `row-locks.ts` owns the lock strength.
+     */
+    lockOrganization: (organizationId: string) =>
+      db.execute(lockOrganizationRow(organizationId)),
+
     upsertPendingStatusChange,
     upsertPendingSubmissionWindow,
     findPending,

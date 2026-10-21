@@ -1,4 +1,4 @@
-import { Database, schema, transaction } from "@feeblo/db";
+import { attachCause, Database, schema, transaction } from "@feeblo/db";
 import { BoardId, PostId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
 import { htmlToExcerpt } from "@feeblo/utils/html";
@@ -342,12 +342,15 @@ const makePostWriteService = Effect.gen(function* () {
       });
     }).pipe(
       Effect.mapError((error) =>
-        Predicate.isTagged(error, "PostIntegrationEventRecordingError") &&
-        error.kind === "lookup"
-          ? new FailedToUpdatePostError()
-          : new InternalServerError({
-              message: "Could not record integration event.",
-            })
+        attachCause(
+          Predicate.isTagged(error, "PostIntegrationEventRecordingError") &&
+            error.kind === "lookup"
+            ? new FailedToUpdatePostError()
+            : new InternalServerError({
+                message: "Could not record integration event.",
+              }),
+          error
+        )
       )
     );
 
@@ -505,14 +508,15 @@ const makePostWriteService = Effect.gen(function* () {
 
       const persisted = yield* transaction(
         Effect.gen(function* () {
-          // First lock, first: the submission window is created later in this
-          // transaction, and its per-workspace serialization holds the
-          // organization row. Taking it before the post insert keeps two
-          // concurrent creates from deadlocking — each insert's foreign-key
-          // check holds a key-share on the org row that conflicts with this
-          // lock, so locking after the insert would make each transaction wait
-          // for the other and Postgres would abort one of them. The
-          // roadmap repository takes the same lock in the same position.
+          // The submission window is created later in this transaction, and
+          // its per-workspace serialization holds the organization row, so take
+          // it here — before the post insert — rather than at the point of use.
+          // The order is no longer a deadlock guard: the lock is a `no key
+          // update`, so the key-share each child insert takes does not conflict
+          // with it. It is kept because the window upsert below needs the lock
+          // held for the rest of the transaction, and because holding it from
+          // the start keeps every org-lock holder acquiring it before any row
+          // the post touches.
           yield* emailOutbox.lockOrganization(args.organizationId);
 
           // On-behalf attribution resolves the customer inside the same
@@ -630,12 +634,14 @@ const makePostWriteService = Effect.gen(function* () {
                       ),
                     })
                     .pipe(
-                      Effect.mapError(
-                        () =>
+                      Effect.mapError((error) =>
+                        attachCause(
                           new InternalServerError({
                             message:
                               "Could not record the post creator email subscription.",
-                          })
+                          }),
+                          error
+                        )
                       )
                     );
                 }
@@ -666,11 +672,13 @@ const makePostWriteService = Effect.gen(function* () {
                 postId: args.id,
               })
               .pipe(
-                Effect.mapError(
-                  () =>
+                Effect.mapError((error) =>
+                  attachCause(
                     new InternalServerError({
                       message: "Could not record submission email intent.",
-                    })
+                    }),
+                    error
+                  )
                 )
               );
             yield* Option.match(notifications, {
@@ -1014,11 +1022,13 @@ const makePostWriteService = Effect.gen(function* () {
                 scheduledAt: now,
               })
               .pipe(
-                Effect.mapError(
-                  () =>
+                Effect.mapError((error) =>
+                  attachCause(
                     new InternalServerError({
                       message: "Could not record post closure email intent.",
-                    })
+                    }),
+                    error
+                  )
                 )
               );
             outboxId =
@@ -1051,11 +1061,13 @@ const makePostWriteService = Effect.gen(function* () {
                 ),
               })
               .pipe(
-                Effect.mapError(
-                  () =>
+                Effect.mapError((error) =>
+                  attachCause(
                     new InternalServerError({
                       message: "Could not record post status email intent.",
-                    })
+                    }),
+                    error
+                  )
                 )
               );
             outboxId = result._tag === "Written" ? result.intent.id : undefined;
@@ -1241,11 +1253,13 @@ const makePostWriteService = Effect.gen(function* () {
               scheduledAt: now,
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message: "Could not record post merge email intent.",
-                  })
+                  }),
+                  error
+                )
               )
             );
           return result._tag === "Inserted" ? result.intent.id : undefined;
@@ -1313,11 +1327,13 @@ const makePostWriteService = Effect.gen(function* () {
               scheduledAt: now,
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message: "Could not record post unmerge email intent.",
-                  })
+                  }),
+                  error
+                )
               )
             );
           return result._tag === "Inserted" ? result.intent.id : undefined;
