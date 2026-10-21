@@ -77,12 +77,11 @@ export async function executeRemediation(
       );
       break;
 
-    case "demote_admin":
+    case "remove_member":
       await fetchRpc((rpc) =>
-        rpc.UpdateOrganizationMemberRole({
+        rpc.RemoveOrganizationMember({
           memberId: action.resourceId,
           organizationId,
-          role: "manager",
         })
       );
       break;

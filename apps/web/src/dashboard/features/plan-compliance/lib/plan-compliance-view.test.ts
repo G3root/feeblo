@@ -94,11 +94,11 @@ describe("buildPlanComplianceView", () => {
     expect(view.sections[0]?.rows[0]?.badges).toEqual(["Private"]);
   });
 
-  it("offers no row action for an owner and only an owner may demote an admin", () => {
+  it("offers no row action for an owner and lets an owner remove any other member", () => {
     const view = buildPlanComplianceView(
       compliance([
         violation(
-          "adminRoles",
+          "members",
           [
             resource("member_owner", "member", "Owner", "Ada"),
             resource("member_admin", "member", "Admin", "Grace"),
@@ -114,18 +114,24 @@ describe("buildPlanComplianceView", () => {
       ])
     );
 
-    const [adminRoles] = view.sections;
-    const ownerRow = adminRoles?.rows.find((row) => row.label === "Ada");
-    const adminRow = adminRoles?.rows.find((row) => row.label === "Grace");
-    const invitationRow = adminRoles?.rows.find(
+    const [members] = view.sections;
+    const ownerRow = members?.rows.find((row) => row.label === "Ada");
+    const adminRow = members?.rows.find((row) => row.label === "Grace");
+    const invitationRow = members?.rows.find(
       (row) => row.label === "linus@example.com"
     );
 
+    expect(view.sections[0]?.title).toBe("Members");
+    expect(view.sections[0]?.summary).toBe(
+      "3 members. The Free plan allows 2."
+    );
+    expect(ownerRow?.badges).toEqual(["Owner"]);
     expect(ownerRow?.actions).toEqual([]);
-    expect(adminRow?.actions[0]?.type).toBe("demote_admin");
-    expect(adminRow?.actions[0]?.ownerOnly).toBe(true);
+    expect(adminRow?.badges).toEqual(["Admin"]);
+    expect(adminRow?.actions[0]?.type).toBe("remove_member");
+    expect(adminRow?.actions[0]?.destructive).toBe(true);
+    expect(invitationRow?.badges).toEqual([]);
     expect(invitationRow?.actions[0]?.type).toBe("cancel_invitation");
-    expect(invitationRow?.actions[0]?.ownerOnly).toBe(false);
   });
 
   it("labels CRM rows by kind and keeps the destructive action typed", () => {

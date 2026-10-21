@@ -51,7 +51,7 @@ export const PlanComplianceViolationKind = S.Literals([
   "privateBoards",
   "privateRoadmaps",
   "boards",
-  "adminRoles",
+  "members",
   "changelogCategories",
   "crmEntries",
 ]);

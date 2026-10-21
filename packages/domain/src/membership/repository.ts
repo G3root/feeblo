@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
-import { PRIVILEGED_ROLES, type Role } from "@feeblo/permissions";
-import { and, eq, inArray } from "drizzle-orm";
+import { type Role } from "@feeblo/permissions";
+import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -242,23 +242,24 @@ const makeMembershipRepository = Effect.gen(function* () {
             eq(schema.memberTable.role, "owner")
           )
         ),
-    countPrivilegedMembers: ({ organizationId }: TCountByOrganizationId) =>
+    /**
+     * Every member counts against the plan's member allowance, including the
+     * owner and every non-privileged role.
+     */
+    countMembers: ({ organizationId }: TCountByOrganizationId) =>
       Effect.gen(function* () {
         const members = yield* db
           .select({ id: schema.memberTable.id })
           .from(schema.memberTable)
-          .where(
-            and(
-              eq(schema.memberTable.organizationId, organizationId),
-              inArray(schema.memberTable.role, [...PRIVILEGED_ROLES])
-            )
-          );
+          .where(eq(schema.memberTable.organizationId, organizationId));
 
         return members.length;
       }),
-    countPendingPrivilegedInvitations: ({
-      organizationId,
-    }: TCountByOrganizationId) =>
+    /**
+     * A pending invitation holds a seat before anyone accepts it, so an invite
+     * cannot be used to reserve capacity the plan does not have.
+     */
+    countPendingInvitations: ({ organizationId }: TCountByOrganizationId) =>
       Effect.gen(function* () {
         const invitations = yield* db
           .select({ id: schema.invitationTable.id })
@@ -266,8 +267,7 @@ const makeMembershipRepository = Effect.gen(function* () {
           .where(
             and(
               eq(schema.invitationTable.organizationId, organizationId),
-              eq(schema.invitationTable.status, "pending"),
-              inArray(schema.invitationTable.role, [...PRIVILEGED_ROLES])
+              eq(schema.invitationTable.status, "pending")
             )
           );
 

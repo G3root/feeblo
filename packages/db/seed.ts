@@ -76,8 +76,15 @@ const OVER_PLAN_USER = {
   name: "Over Plan Demo",
 };
 
-/** The owner is the third admin role; these two complete the overage. */
-const OVER_PLAN_ADMIN_EMAILS = ["alex@feeblo.dev", "sam@feeblo.dev"] as const;
+/**
+ * Free allows 2 members and the owner is one of them, so these two complete
+ * the overage. They hold different roles on purpose: the member allowance
+ * counts people, not privileges, so a manager trips it exactly like an admin.
+ */
+const OVER_PLAN_MEMBERS = [
+  { email: "alex@feeblo.dev", role: "admin" },
+  { email: "sam@feeblo.dev", role: "manager" },
+] as const;
 
 /** Free allows 10 CRM entries; one more is enough to show the finding. */
 const OVER_PLAN_CONTACT_COUNT = 11;
@@ -1262,7 +1269,7 @@ const seedChangelogs = ({
 
 /**
  * Seeds a Free workspace that holds exactly the state the plan does not cover:
- * four boards (one private), three admin roles, four changelog categories, a
+ * four boards (one private), three members, four changelog categories, a
  * private roadmap, and eleven CRM entries.
  *
  * The rows are inserted directly on purpose. Every server policy that blocks
@@ -1311,15 +1318,15 @@ const seedOverPlanWorkspace = (auth: SeedAuth) =>
       ...(ownerMember && { creatorMemberId: ownerMember.id }),
     });
 
-    for (const email of OVER_PLAN_ADMIN_EMAILS) {
-      const admin = yield* ensureUser(
+    for (const { email, role } of OVER_PLAN_MEMBERS) {
+      const member = yield* ensureUser(
         { email, name: email, password: TEST_USER.password },
         auth
       );
       yield* ensureMember({
         organizationId: org.id,
-        userId: admin.id,
-        role: "admin",
+        userId: member.id,
+        role,
       });
     }
 
@@ -1367,7 +1374,7 @@ const seedOverPlanWorkspace = (auth: SeedAuth) =>
     console.log(
       `   Boards: ${publicBoards.length + 1} (1 private, ${posts.length} posts)`
     );
-    console.log("   Admin roles: 3 (owner + 2 admins)");
+    console.log("   Members: 3 (owner + admin + manager)");
     console.log("   Changelog categories: 4");
     console.log(`   CRM entries: ${OVER_PLAN_CONTACT_COUNT}`);
     console.log("   Private roadmap: 1");

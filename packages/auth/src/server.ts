@@ -899,24 +899,16 @@ export const initAuthHandler = (
             async beforeCreateInvitation(data) {
               await runCallbackPolicy(
                 MembershipPolicy.use((policy) =>
-                  policy.canInviteRoleWithinPlan({
+                  policy.canInviteWithinPlan({
                     organizationId: data.organization.id,
-                    role: data.invitation.role,
                   })
                 )
               );
             },
-            async beforeUpdateMemberRole(data) {
-              await runCallbackPolicy(
-                MembershipPolicy.use((policy) =>
-                  policy.canChangeRoleWithinPlan({
-                    organizationId: data.organization.id,
-                    currentRole: data.member.role,
-                    newRole: data.newRole,
-                  })
-                )
-              );
-            },
+            // No plan hook on a role change: promoting or demoting a member
+            // moves nobody in or out of the workspace, so the member allowance
+            // (which counts people) is unaffected. The rank rules in
+            // `MembershipPolicy.canUpdateMemberRole` still apply.
             // Queues the Polar subscription for revocation before the org row
             // (and its cascaded subscription/site rows) disappears, so the
             // external subscription id is still readable. The revocation runs

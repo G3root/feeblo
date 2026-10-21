@@ -6,7 +6,6 @@ import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
-import { WorkspaceRepository } from "../workspace/repository";
 import { MembershipPolicy } from "./policies";
 import { MembershipRepository } from "./repository";
 import { MembershipRpcs } from "./rpcs";
@@ -19,7 +18,6 @@ import type {
 
 export const MembershipRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* MembershipRepository;
-  const workspaceRepository = yield* WorkspaceRepository;
   const membershipPolicy = yield* MembershipPolicy;
 
   return {
@@ -55,47 +53,37 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
           ),
           withRemapDbErrors("Invitation", "select")
         ),
+    // A role change moves nobody in or out of the workspace, so it is not the
+    // plan's business: the member allowance counts people, not privileges.
+    // Only the rank rules (`canManageRole`) decide who may promote whom.
     UpdateOrganizationMemberRole: ({
       organizationId,
       memberId,
       role,
     }: TUpdateMemberRole) =>
-      transaction(
-        Effect.gen(function* () {
-          // The workspace row is locked before the plan check below so two
-          // promotions arriving near the privileged-member cap cannot both
-          // see room: the count is only meaningful while this transaction
-          // holds the lock.
-          yield* workspaceRepository.lockOrganization(organizationId);
-
-          yield* membershipPolicy.canAssignRoleWithinPlan({
-            organizationId,
-            memberId,
-            role,
-          });
-
-          yield* membershipPolicy.canManageRole({
-            organizationId,
-            memberId,
-            role,
-          });
-
-          yield* repository.updateMemberRole({
-            organizationId,
-            memberId,
-            role,
-          });
+      membershipPolicy
+        .canManageRole({
+          organizationId,
+          memberId,
+          role,
         })
-      ).pipe(
-        Policy.withPolicy(
-          membershipPolicy.canUpdateMemberRole({
-            organizationId,
-            memberId,
-            role,
-          })
+        .pipe(
+          Effect.andThen(
+            repository.updateMemberRole({
+              organizationId,
+              memberId,
+              role,
+            })
+          ),
+          Policy.withPolicy(
+            membershipPolicy.canUpdateMemberRole({
+              organizationId,
+              memberId,
+              role,
+            })
+          ),
+          withRemapDbErrors("Membership", "update")
         ),
-        withRemapDbErrors("Membership", "update")
-      ),
     RemoveOrganizationMember: ({ organizationId, memberId }: TRemoveMember) =>
       transaction(
         Effect.gen(function* () {
@@ -135,6 +123,5 @@ export const MembershipRpcHandlers = MembershipRpcs.toLayer(
 ).pipe(
   Layer.provide(MembershipPolicy.layer),
   Layer.provide(EntitlementPolicy.layer),
-  Layer.provide(MembershipRepository.layer),
-  Layer.provide(WorkspaceRepository.layer)
+  Layer.provide(MembershipRepository.layer)
 );

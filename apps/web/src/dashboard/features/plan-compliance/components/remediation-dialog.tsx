@@ -24,10 +24,10 @@ type RemediationDialogProps = {
 /**
  * The one confirmation for a remediation row.
  *
- * Reversible changes (demote, cancel an invitation, publish a roadmap) take a
- * plain confirm. Anything that destroys or publishes data requires the
- * operator to type the resource's name, so a stray double-click cannot make a
- * board public or delete a board's posts.
+ * Reversible changes (removing a member, cancelling an invitation, publishing
+ * a roadmap) take a plain confirm. Anything that destroys or publishes data
+ * requires the operator to type the resource's name, so a stray double-click
+ * cannot make a board public or delete a board's posts.
  */
 export function RemediationDialog({
   action,

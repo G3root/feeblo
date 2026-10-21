@@ -12,7 +12,7 @@ export type TPlanKey = S.Schema.Type<typeof PlanKey>;
 
 const PlanLimits = S.Struct({
   feedbackBoards: S.NullOr(S.Finite),
-  privilegedMembers: S.NullOr(S.Finite),
+  members: S.NullOr(S.Finite),
   changelogCategories: S.NullOr(S.Finite),
   crmEntries: S.NullOr(S.Finite),
   // `/api/plans` is HTTP-cached for an hour, so a client can decode a body

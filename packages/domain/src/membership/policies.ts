@@ -19,21 +19,8 @@ type TIsMember = {
   memberId: string;
 };
 
-type TCanAssignRoleWithinPlan = {
+type TCanInviteWithinPlan = {
   organizationId: string;
-  memberId: string;
-  role: Permissions.Role;
-};
-
-type TCanInviteRoleWithinPlan = {
-  organizationId: string;
-  role: string;
-};
-
-type TCanChangeRoleWithinPlan = {
-  organizationId: string;
-  currentRole: string;
-  newRole: string;
 };
 
 type TCanCancelInvitation = {
@@ -82,52 +69,25 @@ const makeMembershipPolicy = Effect.gen(function* () {
         Effect.map((members) => members.length > 0)
       );
 
-  const canAddPrivilegedRole = (organizationId: string) =>
-    entitlementPolicy.canAssignPrivilegedRole({
+  /**
+   * An invitation is a future member, so it consumes a seat before anyone
+   * accepts it. The role on the invitation is irrelevant: the plan counts
+   * people with access to the workspace, not privileged people.
+   */
+  const canAddMember = (organizationId: string) =>
+    entitlementPolicy.canAddMember({
       organizationId,
-      privilegedRoleCount: Effect.gen(function* () {
-        const privilegedMembersCount = yield* repository.countPrivilegedMembers(
-          { organizationId }
-        );
-        const pendingPrivilegedInvitationsCount =
-          yield* repository.countPendingPrivilegedInvitations({
-            organizationId,
-          });
+      memberCount: Effect.gen(function* () {
+        const memberCount = yield* repository.countMembers({ organizationId });
+        const pendingInvitationsCount =
+          yield* repository.countPendingInvitations({ organizationId });
 
-        return privilegedMembersCount + pendingPrivilegedInvitationsCount;
+        return memberCount + pendingInvitationsCount;
       }),
     });
 
-  const canInviteRoleWithinPlan = (args: TCanInviteRoleWithinPlan) =>
-    Permissions.isPrivilegedRole(args.role)
-      ? canAddPrivilegedRole(args.organizationId)
-      : Effect.void;
-
-  const canChangeRoleWithinPlan = (args: TCanChangeRoleWithinPlan) =>
-    Permissions.isPrivilegedRole(args.newRole) &&
-    !Permissions.isPrivilegedRole(args.currentRole)
-      ? canAddPrivilegedRole(args.organizationId)
-      : Effect.void;
-
-  const canAssignRoleWithinPlan = (args: TCanAssignRoleWithinPlan) =>
-    Effect.gen(function* () {
-      const member = yield* repository.findMemberById({
-        memberId: args.memberId,
-        organizationId: args.organizationId,
-      });
-
-      if (Option.isNone(member)) {
-        return yield* new Policy.PolicyDeniedError({
-          reason: "Member not found",
-        });
-      }
-
-      yield* canChangeRoleWithinPlan({
-        organizationId: args.organizationId,
-        currentRole: member.value.role,
-        newRole: args.role,
-      });
-    });
+  const canInviteWithinPlan = (args: TCanInviteWithinPlan) =>
+    canAddMember(args.organizationId);
 
   const canCancelInvitation = (args: TCanCancelInvitation) =>
     Policy.all(
@@ -197,12 +157,10 @@ const makeMembershipPolicy = Effect.gen(function* () {
     );
 
   return {
-    canInviteRoleWithinPlan,
-    canAssignRoleWithinPlan,
+    canInviteWithinPlan,
     canCancelInvitation,
     canRemoveMember,
     canUpdateMemberRole,
-    canChangeRoleWithinPlan,
     canManageTarget,
     canManageRole,
   };

@@ -15,7 +15,7 @@ export type RemediationActionType =
   | "delete_board"
   | "make_roadmap_public"
   | "delete_roadmap"
-  | "demote_admin"
+  | "remove_member"
   | "cancel_invitation"
   | "delete_changelog_category"
   | "delete_contact"
@@ -35,8 +35,6 @@ export type RemediationAction = {
   /** Destructive row actions require the operator to type the resource name. */
   readonly requiresTyping: boolean;
   readonly destructive: boolean;
-  /** Rank rules let only a workspace owner demote an admin. */
-  readonly ownerOnly: boolean;
 };
 
 export type PlanComplianceRow = {
@@ -51,7 +49,7 @@ export type PlanComplianceSection = {
   readonly key:
     | "boards"
     | "roadmaps"
-    | "adminRoles"
+    | "members"
     | "changelogCategories"
     | "crmEntries";
   readonly title: string;
@@ -116,7 +114,6 @@ const makeBoardPublic = (
   successTitle: "Board is now public",
   requiresTyping: true,
   destructive: false,
-  ownerOnly: false,
 });
 
 const deleteBoard = (resource: TPlanComplianceResource): RemediationAction => ({
@@ -132,7 +129,6 @@ const deleteBoard = (resource: TPlanComplianceResource): RemediationAction => ({
   successTitle: "Board deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 const makeRoadmapPublic = (
@@ -148,7 +144,6 @@ const makeRoadmapPublic = (
   successTitle: "Roadmap is now public",
   requiresTyping: false,
   destructive: false,
-  ownerOnly: false,
 });
 
 const deleteRoadmap = (
@@ -165,22 +160,22 @@ const deleteRoadmap = (
   successTitle: "Roadmap deleted",
   requiresTyping: false,
   destructive: true,
-  ownerOnly: false,
 });
 
-const demoteAdmin = (resource: TPlanComplianceResource): RemediationAction => ({
-  type: "demote_admin",
+const removeMember = (
+  resource: TPlanComplianceResource
+): RemediationAction => ({
+  type: "remove_member",
   resourceId: resource.id,
   confirmationValue: resource.label,
-  title: `Change ${resource.label} to manager?`,
+  title: `Remove ${resource.label} from the workspace?`,
   description:
-    "They lose admin access immediately. You can promote them again after the workspace is back inside its plan.",
-  confirmLabel: "Change role",
-  rowLabel: "Change to manager",
-  successTitle: "Admin changed to manager",
+    "They lose access to this workspace immediately. Their posts, votes, and comments stay on the board.",
+  confirmLabel: "Remove member",
+  rowLabel: "Remove",
+  successTitle: "Member removed",
   requiresTyping: false,
-  destructive: false,
-  ownerOnly: true,
+  destructive: true,
 });
 
 const cancelInvitation = (
@@ -196,7 +191,6 @@ const cancelInvitation = (
   successTitle: "Invitation cancelled",
   requiresTyping: false,
   destructive: true,
-  ownerOnly: false,
 });
 
 const deleteCategory = (
@@ -214,7 +208,6 @@ const deleteCategory = (
   successTitle: "Category deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 const deleteContact = (
@@ -231,7 +224,6 @@ const deleteContact = (
   successTitle: "Contact deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 const deleteCompany = (
@@ -248,7 +240,6 @@ const deleteCompany = (
   successTitle: "Company deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 /**
@@ -258,7 +249,7 @@ const deleteCompany = (
  * The snapshot reports findings per entitlement; a board can be in both the
  * `privateBoards` and `boards` findings, and the operator thinks about boards,
  * not entitlements. Sections are ordered by how much damage the fix does:
- * boards first, then roadmaps, admin roles, categories, and CRM entries. A
+ * boards first, then roadmaps, members, categories, and CRM entries. A
  * finding with no resource rows (the caller cannot act) produces no section.
  */
 export const buildPlanComplianceView = (
@@ -340,37 +331,38 @@ export const buildPlanComplianceView = (
     }
   }
 
-  const adminRoles = violation(compliance, "adminRoles");
+  const members = violation(compliance, "members");
 
-  if (adminRoles) {
-    const rows = adminRoles.resources.map((resource) => {
+  if (members) {
+    const rows = members.resources.map((resource) => {
       const isMember = resource.kind === "member";
-      // The snapshot writes the member's role into `detail`; an owner cannot
-      // be demoted by another owner, so that row has no action.
+      // The snapshot writes the member's role into `detail`. An owner cannot
+      // be removed from the workspace through team settings, so that row has
+      // no action; a pending invitation is cancelled instead.
       const isOwner = isMember && resource.detail === "Owner";
 
       return {
         key: resourceKey(resource),
         label: resource.label,
         detail: resource.detail,
-        badges: isMember ? (isOwner ? ["Owner"] : ["Admin"]) : [],
+        badges: isMember && resource.detail ? [resource.detail] : [],
         actions: isMember
           ? isOwner
             ? []
-            : [demoteAdmin(resource)]
+            : [removeMember(resource)]
           : [cancelInvitation(resource)],
       } satisfies PlanComplianceRow;
     });
 
     if (rows.length > 0) {
       sections.push({
-        key: "adminRoles",
-        title: "Admin roles",
+        key: "members",
+        title: "Members",
         summary: `${plural(
-          adminRoles.count,
-          "admin role"
-        )}. The ${planLabel} plan allows ${adminRoles.limit ?? "unlimited"}.`,
-        truncated: adminRoles.count > rows.length,
+          members.count,
+          "member"
+        )}. The ${planLabel} plan allows ${members.limit ?? "unlimited"}.`,
+        truncated: members.count > rows.length,
         rows,
       });
     }

@@ -20,7 +20,7 @@ type TCanHidePoweredByBranding = {
   hidePoweredBy: boolean;
 };
 
-type TCanAssignPrivilegedRole = {
+type TCanAddMember = {
   organizationId: string;
 };
 
@@ -160,9 +160,15 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
-  const canAssignPrivilegedRole = <E, R>(
-    args: TCanAssignPrivilegedRole & {
-      privilegedRoleCount: Effect.Effect<number, E, R>;
+  /**
+   * The plan's member allowance. Every member counts, whatever the role: the
+   * limit is on how many people have access to the workspace, not on how many
+   * of them are privileged. `memberCount` includes the owner and any pending
+   * invitation, so an invite consumes a seat before it is accepted.
+   */
+  const canAddMember = <E, R>(
+    args: TCanAddMember & {
+      memberCount: Effect.Effect<number, E, R>;
     }
   ) =>
     Effect.gen(function* () {
@@ -170,16 +176,13 @@ const makeEntitlementPolicy = Effect.gen(function* () {
         args.organizationId
       );
 
-      if (entitlements.limits.privilegedMembers === null) {
+      if (entitlements.limits.members === null) {
         return;
       }
 
-      if (
-        (yield* args.privilegedRoleCount) >=
-        entitlements.limits.privilegedMembers
-      ) {
+      if ((yield* args.memberCount) >= entitlements.limits.members) {
         return yield* new Policy.PolicyDeniedError({
-          reason: `The ${plan} plan allows up to ${entitlements.limits.privilegedMembers} admin roles.`,
+          reason: `The ${plan} plan allows up to ${entitlements.limits.members} members.`,
         });
       }
     });
@@ -283,7 +286,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canHidePoweredByBranding,
     canUseWidgetSso,
     canUsePublicApi,
-    canAssignPrivilegedRole,
+    canAddMember,
     canCreateRoadmap,
     canUpdateRoadmapVisibility,
     canCreateChangelogCategory,

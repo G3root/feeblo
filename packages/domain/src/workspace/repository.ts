@@ -20,7 +20,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { lockOrganizationRow, lockUserRow } from "../row-locks";
+import { lockUserRow } from "../row-locks";
 import { FailedToCreateWorkspaceError } from "./errors";
 
 interface CreateWorkspaceArgs {
@@ -37,19 +37,6 @@ const makeWorkspaceRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   return {
-    /**
-     * Locks the workspace row until the caller's transaction ends.
-     *
-     * The device the plan-limit checks lean on: a per-workspace condition
-     * (CRM entries, privileged roles) cannot be enforced by row locks on the
-     * rows it counts, because a lookup that matches nothing proves nothing.
-     * Locking the organization row serializes each count-and-write pair per
-     * workspace. `row-locks.ts` owns the lock strength and why it is that
-     * strength.
-     */
-    lockOrganization: (organizationId: string) =>
-      db.execute(lockOrganizationRow(organizationId)),
-
     /**
      * Locks the user row until the caller's transaction ends.
      *

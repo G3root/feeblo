@@ -207,27 +207,34 @@ const addCompany = (organizationId: string, name: string) =>
     return id;
   });
 
-const addAdminRole = (organizationId: string) =>
+const addMember = (
+  organizationId: string,
+  role: (typeof schema.memberTable.$inferInsert)["role"]
+) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
-    const userId = `user_admin_${organizationId}`;
+    const userId = `user_member_${organizationId}`;
     const now = yield* DateTime.nowAsDate;
 
     yield* db.insert(schema.userTable).values({
       id: userId,
       email: `${userId}@example.com`,
-      name: "Workspace Admin",
+      name: "Workspace Member",
     });
     yield* db.insert(schema.memberTable).values({
-      id: `member_admin_${organizationId}`,
+      id: `member_${userId}`,
       organizationId,
       userId,
-      role: "admin",
+      role,
       createdAt: now,
     });
   });
 
-const addAdminInvitation = (organizationId: string, inviterId: string) =>
+const addInvitation = (
+  organizationId: string,
+  inviterId: string,
+  role: (typeof schema.invitationTable.$inferInsert)["role"]
+) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
     const now = yield* DateTime.nowAsDate;
@@ -236,7 +243,7 @@ const addAdminInvitation = (organizationId: string, inviterId: string) =>
       id: `invitation_${organizationId}`,
       organizationId,
       email: `invitee_${organizationId}@example.com`,
-      role: "admin",
+      role,
       status: "pending",
       expiresAt: dateAt(now.getTime() + 86_400_000),
       inviterId,
@@ -451,25 +458,27 @@ describe("PlanCompliance", () => {
       })
     );
 
-    it.effect("counts admin roles with pending invitations", () =>
-      Effect.gen(function* () {
-        const planCompliance = yield* PlanCompliance;
-        const { organizationId, ownerId } = yield* makeOrganization();
-        yield* addAdminRole(organizationId);
-        yield* addAdminInvitation(organizationId, ownerId);
+    it.effect(
+      "counts every member with pending invitations, whatever the role",
+      () =>
+        Effect.gen(function* () {
+          const planCompliance = yield* PlanCompliance;
+          const { organizationId, ownerId } = yield* makeOrganization();
+          yield* addMember(organizationId, "manager");
+          yield* addInvitation(organizationId, ownerId, "contributor");
 
-        const snapshot = yield* planCompliance.snapshot({
-          includeResources: true,
-          organizationId,
-        });
-        const adminRoles = byKind(snapshot, "adminRoles");
+          const snapshot = yield* planCompliance.snapshot({
+            includeResources: true,
+            organizationId,
+          });
+          const members = byKind(snapshot, "members");
 
-        expect(adminRoles?.count).toBe(3);
-        expect(adminRoles?.limit).toBe(2);
-        expect(
-          adminRoles?.resources.map((resource) => resource.kind).sort()
-        ).toEqual(["invitation", "member", "member"]);
-      })
+          expect(members?.count).toBe(3);
+          expect(members?.limit).toBe(2);
+          expect(
+            members?.resources.map((resource) => resource.detail).sort()
+          ).toEqual(["Manager", "Owner", "Pending invitation · Contributor"]);
+        })
     );
 
     it.effect("counts a private roadmap on Free and leaves Starter alone", () =>

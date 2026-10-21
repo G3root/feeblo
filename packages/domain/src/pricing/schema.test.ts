@@ -35,7 +35,7 @@ describe("PlansResponse", () => {
 
   const legacyLimits = {
     feedbackBoards: 2,
-    privilegedMembers: 2,
+    members: 2,
     changelogCategories: 3,
     crmEntries: 10,
   };
