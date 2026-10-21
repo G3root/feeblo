@@ -66,7 +66,7 @@ Run `pnpm check` before claiming a change is ready. It needs no database, no bui
 What actually enforces the rules:
 
 - CI (`checks` job) runs `pnpm check` on every push and pull request.
-- CI also runs `build_app` (Playwright against built apps), `test` (unit), and `docker_smoke_test` (self-hosted compose stack).
+- CI also runs `e2e` (Playwright against built apps, sharded three ways), `test` (unit), and `docker_smoke_test` (self-hosted compose stack).
 - `autofix.yml` runs `pnpm fmt` and `pnpm lint:fix` and commits the result. It is a writer, not a gate: a violation it cannot fix does not fail it.
 - `tools/oxlint/effect-tests` reports `Effect.run*` and `ManagedRuntime.make` in test files as an **error**, so hand-running an Effect fails the gate.
 
