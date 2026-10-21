@@ -12,8 +12,8 @@ import { useEffect, useState } from "react";
 import { getLocale, setLocale } from "@/paraglide/runtime.js";
 import {
   authPageBeforeLoad,
+  authPageRedirectHref,
   isPasswordRecoveryPath,
-  signedInDestination,
 } from "~/lib/auth-redirects";
 
 /**
@@ -77,6 +77,10 @@ function AuthBoundary() {
  * A visitor whose session is still resolving sees the form for one round trip
  * before this fires. That is the trade for painting the form immediately
  * instead of the full-page loader this route used to show for several.
+ *
+ * `authPageRedirectHref` carries the host and restricted-session rules, so this
+ * cannot drift from the router guard: board hosts keep their own auth pages,
+ * and an SSO-restricted session stays where it is.
  */
 function AuthPageRedirect() {
   const [hydrated, setHydrated] = useState(false);
@@ -102,7 +106,7 @@ function SignedInRedirect() {
   // evaluation, so depending on it would re-run the redirect every render.
   const destination =
     auth.status === "authenticated" && auth.data !== null
-      ? signedInDestination(auth.data)
+      ? (authPageRedirectHref(auth.data) ?? null)
       : null;
 
   useEffect(() => {

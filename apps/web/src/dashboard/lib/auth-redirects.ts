@@ -150,10 +150,39 @@ export function isPasswordRecoveryPath(pathname: string): boolean {
 }
 
 /** Where a visitor who already has a session belongs. */
-export function signedInDestination(session: AuthClientSession): string {
+function signedInDestination(session: AuthClientSession): string {
   const defaultOrganizationId = getDefaultOrganizationId(session);
 
   return defaultOrganizationId ? `/${defaultOrganizationId}` : REGISTER_PATH;
+}
+
+/**
+ * Where a signed-in visitor should go instead of the auth page they opened, or
+ * `undefined` when they should stay.
+ *
+ * The one implementation of that decision, shared by the router guard (a
+ * client-side navigation) and `AuthPageRedirect` (a cold load, which hydration
+ * does not re-guard). Two things make "they have a session, so move them on"
+ * wrong on its own:
+ *
+ *   - Board hosts serve `/sign-in` and `/sign-up` deliberately — they are the
+ *     board's pages there — and the workspace paths this would send them to do
+ *     not exist on that host: they resolve as board routes and 404.
+ *   - An SSO-restricted session belongs to its board. `resolveRoutingSession`
+ *     already treats one as signed out for routing, so the redirect must too.
+ */
+export function authPageRedirectHref(
+  session: AuthClientSession
+): string | undefined {
+  if (!isAppSubdomainHost()) {
+    return undefined;
+  }
+
+  if (session.user.restrictedToOrganizationId != null) {
+    return undefined;
+  }
+
+  return signedInDestination(session);
 }
 
 /** Sends a visitor who already has a session away from an auth page. */
@@ -165,7 +194,13 @@ function redirectSignedInVisitorFromAuthPage(
     return;
   }
 
-  throw redirect({ href: signedInDestination(session) });
+  const href = authPageRedirectHref(session);
+
+  if (href === undefined) {
+    return;
+  }
+
+  throw redirect({ href });
 }
 
 /**
