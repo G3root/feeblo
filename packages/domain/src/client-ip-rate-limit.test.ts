@@ -208,11 +208,12 @@ it.effect(
       const context = yield* Layer.build(TestRuntime);
       const router = Context.get(context, HttpRouter.HttpRouter);
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
-      const response = yield* router
-        .asHttpEffect()
-        .pipe(
-          Effect.provideService(HttpServerRequest.HttpServerRequest, request)
-        );
+      const response = yield* router.asHttpEffect().pipe(
+        // A router failure is a defect in a test; `orDie` keeps the error
+        // channel typed instead of widening it to `unknown`.
+        Effect.orDie,
+        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+      );
 
       expect(response.status).toBe(503);
     }).pipe(Effect.scoped);
