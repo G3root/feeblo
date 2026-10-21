@@ -12,12 +12,7 @@ Role changes are therefore not gated at all. Promoting a member to `admin` or de
 
 The admin-role allowance measured the wrong thing. A workspace could hold fifty managers and contributors on Free and pay for none of them, because the only gated unit was the two `owner`/`admin` rows. The paid surface was the number of people who could _manage_ the workspace, not the number of people who could _use_ it, and the free tier gave away the second one entirely.
 
-Counting members makes the plan's unit match what a customer is buying: seats. It also removes the incentive the old rule created, which was to make everyone a `manager` and keep one admin.
-
-The two neighbouring products this catalog is priced against both work this way, and neither measures a subset:
-
-- UserJot lists "Team members 3 / Unlimited / Unlimited" and "3 admin roles / — / Unlimited" as separate rows, and its help centre defines Owner and Admin as "privileged team members" and Member as the ordinary tier.
-- Canny's paid unit is admin seats; voters and submitters are unlimited.
+Counting members makes the plan's unit match what a customer is buying: seats. It also removes the incentive the old rule created, which was to make everyone a `manager` and keep one admin. A seat limit is the unit a buyer can compare across products, unlike a limit on a subset of roles.
 
 The distinction that survives is the one that matters to the product: **end users are not members**. A person who posts, votes, or comments on the public board or through the widget is not a row in the member table and is unlimited on every plan (`unlimitedEndUsers`). The gate exists to charge the workspace for its own team, never to charge it for its customers.
 
