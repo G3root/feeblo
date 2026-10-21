@@ -3,6 +3,12 @@ packages:
   - integrations/*
   - packages/*
   - e2e
+# A version published less than a day ago is not installed. A compromised
+# release is usually yanked within hours, and the lockfile is the only place a
+# resolution may change, so the delay costs a deliberate bump nothing and keeps
+# `pnpm add` and `pnpm update` from adopting a release nobody has looked at.
+minimumReleaseAge: 1440
+
 allowBuilds:
   "@parcel/watcher": true
   "@swc/core": true
