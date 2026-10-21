@@ -64,8 +64,8 @@ function CompanyCreateForm() {
   const store = useCompanyCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
-  const { data: companies = [] } = useOrgCompanies(organizationId);
-  const { data: contacts = [] } = useOrgContacts(organizationId);
+  const { data: companies } = useOrgCompanies(organizationId);
+  const { data: contacts } = useOrgContacts(organizationId);
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = companies.length + contacts.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;

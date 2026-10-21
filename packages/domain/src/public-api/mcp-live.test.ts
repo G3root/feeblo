@@ -81,7 +81,12 @@ const executeMcp = (options: {
     // test on the production path, so the session a test continues with is the
     // one a real client would receive.
     yield* HttpEffect.toHandled(
-      Effect.flatMap(HttpRouter.HttpRouter, (router) => router.asHttpEffect()),
+      Effect.flatMap(HttpRouter.HttpRouter, (router) =>
+        // A router failure is a defect in a test; `orDie` keeps the error
+        // channel typed instead of widening it to `unknown`.
+        // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
+        router.asHttpEffect().pipe(Effect.orDie)
+      ),
       (_request, response) => Deferred.succeed(handled, response)
     ).pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, request));
 
@@ -112,9 +117,9 @@ const mcpMessage = (response: HttpServerResponse.HttpServerResponse) =>
 
 const McpJsonRpcMessage = Schema.Struct({
   error: Schema.optional(
-    Schema.Struct({ code: Schema.Number, message: Schema.String })
+    Schema.Struct({ code: Schema.Finite, message: Schema.String })
   ),
-  id: Schema.Union([Schema.String, Schema.Number]),
+  id: Schema.Union([Schema.String, Schema.Finite]),
   jsonrpc: Schema.Literal("2.0"),
   result: Schema.optional(Schema.Unknown),
 });

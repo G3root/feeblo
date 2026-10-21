@@ -82,7 +82,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const boards = boardsQuery.data ?? [];
   const boardError = boardsQuery.isError;
 
-  const { data: statusCounts = [] } = useLiveQuery({
+  const { data: statusCounts } = useLiveQuery({
     queryKey: [
       "home-status-counts",
       publicPostCollection.id,
@@ -99,7 +99,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         })),
   });
 
-  const { data: boardCounts = [] } = useLiveQuery({
+  const { data: boardCounts } = useLiveQuery({
     queryKey: [
       "home-board-counts",
       publicPostCollection.id,

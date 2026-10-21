@@ -111,7 +111,7 @@ export const RegisterWorkspaceStep = withForm({
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     placeholder="Acme Labs"
-                    value={String(field.state.value ?? "")}
+                    value={field.state.value ?? ""}
                   />
                 </InputGroup>
                 {isInvalid ? (

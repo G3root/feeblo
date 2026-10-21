@@ -29,7 +29,7 @@ export function ChangelogCategoryFilter() {
     (state) => state.context.selectedCategoryIds
   );
 
-  const { data: categories = [] } = useLiveQuery({
+  const { data: categories } = useLiveQuery({
     queryKey: [
       "portal-changelog-categories",
       publicChangelogCategoryCollection.id,

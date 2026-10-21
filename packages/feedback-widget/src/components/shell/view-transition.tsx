@@ -38,7 +38,9 @@ export function ViewTransition(props: {
       class="widget-enter flex min-h-full flex-col outline-none"
       data-enter={props.kind === "push" ? "push" : "rise"}
       data-slot="widget-view"
-      ref={element}
+      ref={(el) => {
+        element = el;
+      }}
       tabIndex={-1}
     >
       {props.children}

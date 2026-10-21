@@ -26,11 +26,11 @@ export function normalizeWidgetConfig(
 ): NormalizedWidgetConfig {
   const mode = options.mode ?? "feedback";
   if (!MODES.has(mode)) {
-    invalidConfig(`[feeblo-sdk] Invalid widget mode: ${String(mode)}.`);
+    invalidConfig(`[feeblo-sdk] Invalid widget mode: ${mode}.`);
   }
   if (options.placement && !PLACEMENTS.has(options.placement)) {
     invalidConfig(
-      `[feeblo-sdk] Invalid widget placement: ${String(options.placement)}.`
+      `[feeblo-sdk] Invalid widget placement: ${options.placement}.`
     );
   }
 

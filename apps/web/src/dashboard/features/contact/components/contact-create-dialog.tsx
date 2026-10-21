@@ -72,9 +72,8 @@ function ContactCreateForm() {
   const store = useContactCreateDialogContext();
   const upgradePlanStore = useUpgradePlanDialogContext();
   const { entitlements } = useEntitlements();
-  const { data: definitions = [] } =
-    useContactAttributeDefinitions(organizationId);
-  const { data: companiesData = [] } = useOrgCompanies(organizationId);
+  const { data: definitions } = useContactAttributeDefinitions(organizationId);
+  const { data: companiesData } = useOrgCompanies(organizationId);
   // The shared org-companies query is unordered; this picker orders by name.
   const companies = useMemo(
     () =>
@@ -83,7 +82,7 @@ function ContactCreateForm() {
       ),
     [companiesData]
   );
-  const { data: contacts = [] } = useOrgContacts(organizationId);
+  const { data: contacts } = useOrgContacts(organizationId);
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = contacts.length + companies.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;

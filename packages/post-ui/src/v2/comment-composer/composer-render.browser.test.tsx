@@ -115,7 +115,7 @@ describe("CommentComposer rerender behavior", () => {
     // Visibility feeds the submit label and the toggle state: both must
     // re-render exactly once per change. This setup has no StrictMode
     // (vitest-browser-react mounts as-is), so there is no double render.
-    await view
+    view
       .getByTestId("visibility")
       .element()
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));

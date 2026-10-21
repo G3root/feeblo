@@ -368,7 +368,7 @@ export class Embed {
       if (value === null) {
         delete this.context[key];
       } else {
-        this.context[key] = String(value);
+        this.context[key] = value;
       }
     }
     this.sendContext();

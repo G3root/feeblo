@@ -365,6 +365,7 @@ const repositoryError = (operation: string) =>
 /** The partial index that makes "one active import per workspace" a rule. */
 const ACTIVE_IMPORT_INDEX = "data_import_job_organization_active_uidx";
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const isActiveImportViolation = <T>(error: T): boolean =>
   isUniqueViolation(error) &&
   getUniqueViolationConstraint(error) === ACTIVE_IMPORT_INDEX;

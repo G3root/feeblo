@@ -147,17 +147,18 @@ const RuntimeTest = Layer.mergeAll(
 // `PostWriteService` the write path exposes, and the optional fan-outs it
 // reads with `serviceOption` are simply absent (an import backfill skips them).
 const TestLayer = Layer.mergeAll(
-  BoardRepository.layer,
-  PostWriteService.layer.pipe(
-    Layer.provideMerge(Layer.mergeAll(PostWriteDependenciesTest, RuntimeTest))
-  ),
+  PostWriteService.layer,
   DataImportService.layer,
   DataTransferRepository.layer,
   TagRepository.layer,
   PostStatusRepository.layer
 ).pipe(
-  Layer.provideMerge(Database.PgliteDatabaseLive),
-  Layer.provideMerge(NodeCrypto.layer)
+  // Provided once, at the end, so every layer in the merge sees the same
+  // dependencies. Piping them into `PostWriteService.layer` alone left the
+  // other layers with a second copy of the graph and made the dependencies
+  // invisible to `Layer.mergeAll`'s parallel construction.
+  Layer.provideMerge(PostWriteDependenciesTest),
+  Layer.provideMerge(RuntimeTest)
 );
 
 const stageAndConfirm = (

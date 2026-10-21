@@ -154,7 +154,7 @@ const seedOrganization = Effect.gen(function* () {
 
 const decodeState = (authorizeUrl: URL) => {
   const url = new URL(authorizeUrl);
-  return Schema.decodeUnknownSync(Schema.fromJsonString(DiscordOAuthState))(
+  return Schema.decodeSync(Schema.fromJsonString(DiscordOAuthState))(
     url.searchParams.get("state") ?? ""
   );
 };

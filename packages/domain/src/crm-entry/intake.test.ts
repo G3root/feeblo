@@ -131,7 +131,7 @@ layer(TestLayer)("CRM entry intake", (it) => {
 
         const found = yield* ensureCrmEntry({
           organizationId,
-          find: Effect.succeed(Option.some("existing")),
+          find: Effect.succeedSome("existing"),
           insert: Effect.die(
             new Error("the insert must not run when a row already exists")
           ),
@@ -149,7 +149,7 @@ layer(TestLayer)("CRM entry intake", (it) => {
       const created = yield* ensureCrmEntry({
         organizationId,
         find: Effect.succeed(Option.none<string>()),
-        insert: Effect.succeed(Option.some("created")),
+        insert: Effect.succeedSome("created"),
         onLostRace: Effect.die(new Error("no race was lost")),
       });
 

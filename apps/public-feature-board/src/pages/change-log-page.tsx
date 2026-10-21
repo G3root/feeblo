@@ -67,7 +67,7 @@ function ChangelogContent() {
   const normalizedSearch = search.trim();
   const hasActiveCategoryFilter = selectedCategoryIds.length > 0;
 
-  const { data: matchingLinks = [] } = useLiveQuery({
+  const { data: matchingLinks } = useLiveQuery({
     queryKey: [
       "portal-changelog-matching-links",
       publicChangelogCategoryLinkCollection.id,
@@ -125,7 +125,7 @@ function ChangelogContent() {
         .orderBy(({ changelog }) => changelog.publishedAt, "desc"),
   });
 
-  const { data: categoryLinks = [] } = useLiveQuery({
+  const { data: categoryLinks } = useLiveQuery({
     queryKey: [
       "portal-changelog-category-links",
       publicChangelogCategoryLinkCollection.id,

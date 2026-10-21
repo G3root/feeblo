@@ -94,8 +94,12 @@ it.effect("adds the request span's trace descriptors", () =>
     const context = yield* Layer.build(traced);
     const router = Context.get(context, HttpRouter.HttpRouter);
 
-    yield* HttpEffect.toHandled(router.asHttpEffect(), (_request, response) =>
-      Deferred.succeed(handled, response)
+    yield* HttpEffect.toHandled(
+      // A router failure is a defect in a test; `orDie` keeps the error
+      // channel typed instead of widening it to `unknown`.
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
+      router.asHttpEffect().pipe(Effect.orDie),
+      (_request, response) => Deferred.succeed(handled, response)
     ).pipe(
       Effect.provideService(
         HttpServerRequest.HttpServerRequest,

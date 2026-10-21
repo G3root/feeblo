@@ -160,7 +160,7 @@ const buildPublicApiMcpHandlers = () =>
         // SAFETY: the erasure above, narrowed back for the cast. The handler
         // is the operation's own, so the value the toolkit decodes with
         // `operation.input` is exactly what it accepts.
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- the erased handler is `Effect<unknown, unknown, ...>` by design (ADR 0007); the toolkit decodes a call's parameters with the operation's own schema before this runs.
         (
           operation.handler as (
             // oxlint-disable-next-line anti-slop/no-unknown-parameters -- See the record's comment: this is the erased view of the operation's own input type.

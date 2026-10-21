@@ -27,7 +27,7 @@ interface UseUpvoteParams {
   organizationId: string;
   postId: string;
   upvoteCollection: UpvoteCollection;
-  disabled: boolean;
+  disabled?: boolean;
   onAuthRequired: (() => void) | undefined;
 }
 

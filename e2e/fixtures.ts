@@ -24,7 +24,7 @@ type WorkerFixtures = {
  */
 export const test = base.extend<{ baseURL: string }, WorkerFixtures>({
   app: [
-    async ({}, use, workerInfo) => {
+    async (_unusedFixtures, use, workerInfo) => {
       const manifestFile = process.env.E2E_SERVERS_FILE;
       if (manifestFile === undefined || manifestFile === "") {
         throw new Error(

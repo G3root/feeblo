@@ -520,17 +520,16 @@ describe("EmailSubscriptionRepository", () => {
           const db = yield* currentDb;
 
           yield* createOrganization(organizationId);
-          const results = yield* Effect.all(
-            ["first-bounce@example.com", "second-bounce@example.com"].map(
-              (email) =>
-                transaction(
-                  repository.upsertSuppression({
-                    email,
-                    providerEventId: "evt_concurrent",
-                    reason: "hard_bounce",
-                  })
-                )
-            ),
+          const results = yield* Effect.forEach(
+            ["first-bounce@example.com", "second-bounce@example.com"],
+            (email) =>
+              transaction(
+                repository.upsertSuppression({
+                  email,
+                  providerEventId: "evt_concurrent",
+                  reason: "hard_bounce",
+                })
+              ),
             { concurrency: "unbounded" }
           );
 

@@ -6,6 +6,7 @@ import {
 } from "@feeblo/domain-contracts/public-api-scope";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
@@ -23,6 +24,17 @@ import {
   type TApiKeyRevoke,
   type TApiKeySummary,
 } from "./schema";
+
+/**
+ * The plugin's own failure, carrying its cause. The handler logs this and
+ * answers with `InternalServerError`, because the plugin's detail must not
+ * reach the client; a bare `catch` that returned `cause` would leave the
+ * error channel `unknown` and lose the distinction.
+ */
+class ApiKeyPluginError extends Schema.TaggedError<ApiKeyPluginError>()(
+  "ApiKeyPluginError",
+  { cause: Schema.Defect() }
+) {}
 
 /**
  * Shapes the plugin's created-key record into the dashboard's summary. Written
@@ -85,13 +97,13 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
                 permissions: toPublicApiScopeStatements(granted),
               },
             }),
-          catch: (cause) => cause,
+          catch: (cause) => new ApiKeyPluginError({ cause }),
         }).pipe(
           // The cause can carry plugin, ACL, or adapter detail. `detail` is
           // serialized into the RPC response, so keep the diagnostic in the
           // server log and answer with the fixed message.
-          Effect.tapError((cause) =>
-            Effect.logError("Failed to create API key", cause).pipe(
+          Effect.tapError((error) =>
+            Effect.logError("Failed to create API key", error.cause).pipe(
               Effect.annotateLogs({ organizationId })
             )
           ),

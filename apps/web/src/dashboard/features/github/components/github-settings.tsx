@@ -829,18 +829,15 @@ function GitHubSyncRuleSlot({
         disabled={saving || !statusesReady}
         label="Set Feeblo status"
         onValueChange={(postStatusId) => {
-          Option.match(
-            Schema.decodeOption(PostStatusId.schema)(String(postStatusId)),
-            {
-              onNone: () =>
-                toastManager.add({
-                  title: "The selected Feeblo status is no longer available",
-                  type: "error",
-                }),
-              onSome: (decodedPostStatusId) =>
-                save({ ...draft, postStatusId: decodedPostStatusId }),
-            }
-          );
+          Option.match(Schema.decodeOption(PostStatusId.schema)(postStatusId), {
+            onNone: () =>
+              toastManager.add({
+                title: "The selected Feeblo status is no longer available",
+                type: "error",
+              }),
+            onSome: (decodedPostStatusId) =>
+              save({ ...draft, postStatusId: decodedPostStatusId }),
+          });
         }}
         options={statuses.map(
           (status) =>

@@ -267,9 +267,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   lte(schema.integrationDeliveryTable.nextAttemptAt, now)
                 )
               );
-            yield* recordIntegrationDeliveryBacklog(
-              Number(backlog?.count ?? 0)
-            );
+            yield* recordIntegrationDeliveryBacklog(backlog?.count ?? 0);
             const claimableCapabilityConditions =
               providerCapabilityConditions.length === 0
                 ? sql`false`
