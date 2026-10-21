@@ -32,21 +32,14 @@ import {
   ChangelogDeleteDialogProvider,
   ChangelogMoveToDraftDialogProvider,
 } from "~/features/changelog/dialog-stores";
-import { dashboardCollections } from "~/lib/collections";
+import { preloadChangelogEditor } from "~/lib/preloads";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 )({
   beforeLoad: async () => {
-    await Promise.all([
-      dashboardCollections.changelogCollection.preload(),
-      dashboardCollections.changelogPostCollection.preload(),
-      dashboardCollections.postCollection.preload(),
-      dashboardCollections.postStatusCollection.preload(),
-      dashboardCollections.changelogCategoryCollection.preload(),
-      dashboardCollections.changelogCategoryLinkCollection.preload(),
-    ]);
+    await preloadChangelogEditor();
   },
   component: RouteComponent,
 });

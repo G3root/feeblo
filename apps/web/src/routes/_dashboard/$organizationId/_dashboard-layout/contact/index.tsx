@@ -45,19 +45,14 @@ import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definition
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrgCompanies } from "~/hooks/use-org-companies";
 import { useOrgContacts } from "~/hooks/use-org-contacts";
-import { dashboardCollections } from "~/lib/collections";
+import { preloadContacts } from "~/lib/preloads";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/contact/"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await Promise.all([
-      dashboardCollections.contactCollection.preload(),
-      dashboardCollections.contactAttributeDefinitionCollection.preload(),
-      dashboardCollections.contactAttributeValueCollection.preload(),
-      dashboardCollections.companyCollection.preload(),
-    ]);
+    await preloadContacts();
     return null;
   },
 });

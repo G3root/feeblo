@@ -941,6 +941,58 @@ describe("identity linking", () => {
     );
 
     it.effect(
+      "activates a public-board row even while its post is archived",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          const email = `global.archived.${n}@example.com`;
+          const real = `real_global_archived_${n}`;
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: null,
+          });
+          // Archiving is temporary and reversible, and restoring a post never
+          // retries activation. Eligibility is the board's visibility — the
+          // outbox re-checks it on every delivery — so the row must activate
+          // now rather than latch on the post's current state.
+          const now = yield* DateTime.nowAsDate;
+          yield* db
+            .update(schema.postTable)
+            .set({ archivedAt: now })
+            .where(eq(schema.postTable.id, `post_${n}`));
+          yield* insertContact({
+            id: `contact_${n}`,
+            organizationId,
+            email,
+            userId: null,
+          });
+          yield* insertDeferredEmailSubscription({
+            id: `${n}`,
+            organizationId,
+            email,
+            postId: `post_${n}`,
+          });
+          yield* insertRealUser({ id: real, email });
+
+          const summary = yield* activateDeferredSubscriptionsForVerifiedUser({
+            userId: real,
+          });
+
+          expect(summary.subscriptionsActivated).toBe(1);
+          expect((yield* getEmailSubscriptionById(`${n}`))?.state).toBe(
+            "active"
+          );
+        })
+    );
+
+    it.effect(
       "activates a portal user's linked contact deferred row on SSO",
       () =>
         Effect.gen(function* () {

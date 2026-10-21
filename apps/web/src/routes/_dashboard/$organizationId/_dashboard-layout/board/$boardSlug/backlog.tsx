@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { BacklogBoardPage } from "~/features/board/components/board-route-pages";
-import { preloadBoardPostsDataCollections } from "~/features/board/components/board-surface/use-board-posts-data";
+import { preloadBoardPosts } from "~/lib/preloads";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await preloadBoardPostsDataCollections();
+    await preloadBoardPosts();
     return null;
   },
 });

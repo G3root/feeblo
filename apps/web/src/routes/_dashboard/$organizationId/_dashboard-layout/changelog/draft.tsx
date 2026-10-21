@@ -1,18 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { ChangelogIndex } from "~/features/changelog/components/changelog-index";
-import { dashboardCollections } from "~/lib/collections";
+import { preloadChangelog } from "~/lib/preloads";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/changelog/draft"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await Promise.all([
-      dashboardCollections.changelogCollection.preload(),
-      dashboardCollections.changelogCategoryCollection.preload(),
-      dashboardCollections.changelogCategoryLinkCollection.preload(),
-    ]);
+    await preloadChangelog();
 
     return null;
   },
