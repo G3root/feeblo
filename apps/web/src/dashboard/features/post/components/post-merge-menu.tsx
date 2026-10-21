@@ -29,13 +29,18 @@ import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
-import { GitMergeIcon, Undo02Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+  CornerDownLeftIcon,
+  GitMergeIcon,
+  Undo02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, isNull, not, useLiveQuery } from "@tanstack/react-db";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { ArrowDownIcon, ArrowUpIcon, CornerDownLeftIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -568,17 +573,17 @@ function PostMergeCommandDialog({
               <div className="flex items-center gap-2">
                 <KbdGroup>
                   <Kbd>
-                    <ArrowUpIcon />
+                    <HugeiconsIcon icon={ArrowUp01Icon} />
                   </Kbd>
                   <Kbd>
-                    <ArrowDownIcon />
+                    <HugeiconsIcon icon={ArrowDown01Icon} />
                   </Kbd>
                 </KbdGroup>
                 <span>Navigate</span>
               </div>
               <div className="flex items-center gap-2">
                 <Kbd>
-                  <CornerDownLeftIcon />
+                  <HugeiconsIcon icon={CornerDownLeftIcon} />
                 </Kbd>
                 <span>Merge</span>
               </div>
@@ -728,17 +733,17 @@ function PostUnmergeCommandDialog({
               <div className="flex items-center gap-2">
                 <KbdGroup>
                   <Kbd>
-                    <ArrowUpIcon />
+                    <HugeiconsIcon icon={ArrowUp01Icon} />
                   </Kbd>
                   <Kbd>
-                    <ArrowDownIcon />
+                    <HugeiconsIcon icon={ArrowDown01Icon} />
                   </Kbd>
                 </KbdGroup>
                 <span>Navigate</span>
               </div>
               <div className="flex items-center gap-2">
                 <Kbd>
-                  <CornerDownLeftIcon />
+                  <HugeiconsIcon icon={CornerDownLeftIcon} />
                 </Kbd>
                 <span>Unmerge</span>
               </div>
