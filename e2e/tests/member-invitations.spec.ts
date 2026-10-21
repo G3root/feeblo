@@ -5,6 +5,7 @@ import {
   createAuthenticatedWorkspace,
   signUpProgrammatically,
 } from "../helpers/auth";
+import { setPlan } from "../helpers/set-plan";
 import {
   getTestEmails,
   invitationIdFromEmail,
@@ -19,6 +20,33 @@ const invitationEndpoint = (action: "accept" | "reject") =>
 
 function membersUrl(organizationUrl: string): string {
   return `${organizationUrl}/settings/members`;
+}
+
+/**
+ * The free plan's member allowance is two seats and the owner holds one, so a
+ * workspace that invites a second person is full and the invite form disables
+ * itself. Specs that exercise the *server's* invitation rules — a duplicate
+ * pending invite, an address that already belongs to a member — need room for
+ * the request to reach it, otherwise the form is disabled and the rule under
+ * test is never asked.
+ */
+async function giveRoomForAnotherMember(
+  page: Page,
+  organizationUrl: string
+): Promise<void> {
+  const organizationId = new URL(organizationUrl).pathname
+    .split("/")
+    .find((segment) => segment.length > 0);
+
+  expect(organizationId).toBeDefined();
+  if (organizationId === undefined) {
+    throw new Error("Workspace URL did not contain an organization id");
+  }
+
+  await setPlan(page.context().request, {
+    organizationId,
+    plan: "starter",
+  });
 }
 
 async function inviteMember(
@@ -108,6 +136,24 @@ test.describe("member invitations", () => {
     expect(email.text).toContain("admin");
   });
 
+  test("a workspace at its member limit cannot invite another", async ({
+    page,
+  }) => {
+    const owner = await createAuthenticatedWorkspace(page);
+    const invitee = createTestUser();
+
+    await page.goto(membersUrl(owner.organizationUrl));
+    await inviteMember(page, invitee.email);
+
+    // Free allows two members and the owner is one of them, so the seat the
+    // pending invitation holds is the last one. The whole form is blocked, not
+    // just the privileged role: the allowance counts people, not privileges.
+    const form = page.locator("form").filter({
+      has: page.getByRole("textbox", { name: "Invite email" }),
+    });
+    await expect(form.getByRole("button", { name: "Invite" })).toBeDisabled();
+  });
+
   test("invite form rejects an invalid email without sending mail", async ({
     page,
   }) => {
@@ -135,6 +181,7 @@ test.describe("member invitations", () => {
     const owner = await createAuthenticatedWorkspace(page);
     const invitee = createTestUser();
 
+    await giveRoomForAnotherMember(page, owner.organizationUrl);
     await page.goto(membersUrl(owner.organizationUrl));
     await inviteMember(page, invitee.email);
     await waitForTestEmail(page.context().request, invitee.email);
@@ -466,6 +513,7 @@ test.describe("member invitations", () => {
 
     try {
       await createSignedInUser(inviteeContext, invitee);
+      await giveRoomForAnotherMember(page, owner.organizationUrl);
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
       const firstEmail = await waitForTestEmail(
