@@ -1,6 +1,9 @@
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import { ChevronRight, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import {
+  ChevronRightIcon,
+  MoreHorizontalIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type * as React from "react";
 
@@ -85,7 +88,7 @@ export function BreadcrumbSeparator({
       role="presentation"
       {...props}
     >
-      {children ?? <HugeiconsIcon icon={ChevronRight} />}
+      {children ?? <HugeiconsIcon icon={ChevronRightIcon} />}
     </li>
   );
 }

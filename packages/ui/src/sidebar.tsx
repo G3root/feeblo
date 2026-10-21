@@ -301,7 +301,7 @@ export function SidebarTrigger({
       variant="ghost"
       {...props}
     >
-      <HugeiconsIcon icon={SidebarLeftIcon} />
+      <HugeiconsIcon aria-hidden="true" icon={SidebarLeftIcon} />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );
