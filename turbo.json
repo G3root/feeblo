@@ -20,7 +20,12 @@
     },
     // Reads the manifests and `pnpm-workspace.yaml`, so it hashes the whole repo
     // and needs no outputs: see `check-toolchain.ts`.
+    //
+    // Not cached on purpose: its patch check reads installed versions from
+    // `node_modules`, which are not a tracked input, so a replayed success could
+    // describe an install that no longer exists. It takes milliseconds.
     "//#toolchain": {
+      "cache": false,
       "outputs": []
     },
     "check": {

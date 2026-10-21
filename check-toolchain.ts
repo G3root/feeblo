@@ -141,6 +141,17 @@ const checkEffectTrain = (
       `  catalog.effect is ${pinned}; the train must be an exact version.`
     );
   }
+  // Every manifest says `catalog:`, so the catalog is where this train actually
+  // lives. A bump that moves `effect` and leaves `@effect/sql-pg` behind is
+  // invisible to the manifest loop below.
+  for (const [name, spec] of catalog) {
+    if (name === "effect" || !effectPackage.test(name)) continue;
+    if (spec !== pinned) {
+      failures.push(
+        `  pnpm-workspace.yaml catalog.${name} is ${spec}; the Effect train is ${pinned}.`
+      );
+    }
+  }
   for (const manifest of manifests) {
     for (const field of dependencyFields) {
       for (const [name, spec] of Object.entries(
@@ -223,18 +234,40 @@ const checkToolchain = (
   }
   if (typescript !== undefined) pins.set("typescript", typescript);
 
-  // A package that pins one of these to its own version is a second source of
-  // truth, and the next bump moves only one of them.
+  // A tool that is also catalogued would be a second source; if one is moved
+  // there, it must agree with the root pin.
+  for (const name of tools) {
+    const catalogued = catalog.get(name);
+    const pin = pins.get(name);
+    if (catalogued !== undefined && pin !== undefined && catalogued !== pin) {
+      failures.push(
+        `  pnpm-workspace.yaml catalog.${name} is ${catalogued}; the root package.json pins ${pin}.`
+      );
+    }
+  }
+
+  // Each of these has exactly one source: the catalog for `typescript`, the root
+  // manifest for the tools. A package that repeats the version — even the right
+  // one — is a second source, and the next bump moves only one of them.
   for (const manifest of manifests) {
     if (manifest.file === "package.json") continue;
     for (const field of dependencyFields) {
       for (const [name, spec] of Object.entries(
         dependencies(manifest, field)
       )) {
-        const pin = pins.get(name);
-        if (pin === undefined || spec === "catalog:" || spec === pin) continue;
+        if (!pins.has(name)) continue;
+        if (spec === "catalog:") {
+          if (catalog.get(name) === undefined) {
+            failures.push(
+              `  ${manifest.file} ${field}.${name} is "catalog:", but the catalog has no ${name} entry.`
+            );
+          }
+          continue;
+        }
         failures.push(
-          `  ${manifest.file} ${field}.${name} is ${spec}; the train pins ${pin}. Use "catalog:".`
+          catalog.has(name)
+            ? `  ${manifest.file} ${field}.${name} is ${spec}; ${name} is pinned in the catalog. Use "catalog:".`
+            : `  ${manifest.file} ${field}.${name} is ${spec}; ${name} is pinned in the root package.json and must not be declared twice.`
         );
       }
     }
@@ -313,6 +346,15 @@ const selfTest = () => {
     file: "c/package.json",
     json: { devDependencies: { typescript: "6.0.0" } },
   };
+  // A package may not repeat the pin even when it repeats it correctly.
+  const repeatedTool: Manifest = {
+    file: "d/package.json",
+    json: { devDependencies: { typescript: "7.0.2" } },
+  };
+  const driftedCatalog = new Map(catalog);
+  driftedCatalog.set("@effect/sql-pg", "4.0.1");
+  const driftedCatalogTool = new Map(catalog);
+  driftedCatalogTool.set("oxlint", "1.81.0");
 
   assert.deepEqual(
     checkEffectTrain(catalog, new Map(), [clean, rootFixture]),
@@ -323,7 +365,16 @@ const selfTest = () => {
     checkEffectTrain(catalog, new Map(), [driftedEffect]),
     []
   );
+  assert.notDeepEqual(
+    checkEffectTrain(driftedCatalog, new Map(), [clean, rootFixture]),
+    []
+  );
   assert.notDeepEqual(checkToolchain(catalog, [rootFixture, driftedTool]), []);
+  assert.notDeepEqual(checkToolchain(catalog, [rootFixture, repeatedTool]), []);
+  assert.notDeepEqual(
+    checkToolchain(driftedCatalogTool, [rootFixture, clean]),
+    []
+  );
 };
 
 selfTest();
