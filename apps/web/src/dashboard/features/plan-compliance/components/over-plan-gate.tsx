@@ -2,6 +2,7 @@ import { Badge } from "@feeblo/ui/badge";
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import { Spinner } from "@feeblo/ui/spinner";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +36,11 @@ export function OverPlanGate() {
   const { allowed: canManageBilling, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "billing.*")
   );
+  const { data: session } = useAuthState();
+  const actorRole =
+    session?.memberships.find(
+      (membership) => membership.organizationId === organizationId
+    )?.role ?? null;
   const { pendingAction, run } = useRemediation();
   const { planComplianceCollection } = useDashboardCollections();
   const [dialogAction, setDialogAction] = useState<RemediationAction | null>(
@@ -97,7 +103,7 @@ export function OverPlanGate() {
     return <PlanComplianceGateLoading />;
   }
 
-  const view = buildPlanComplianceView(compliance);
+  const view = buildPlanComplianceView(compliance, { actorRole });
 
   return (
     <main className="bg-background flex min-h-dvh flex-col">

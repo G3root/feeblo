@@ -4,6 +4,7 @@ import type {
   TWorkspacePlanCompliance,
 } from "@feeblo/domain/plan-compliance/schema";
 import { PLAN_DISPLAY_NAMES } from "@feeblo/domain/plan-entitlements";
+import { compareRoles, isRole, type Role } from "@feeblo/permissions";
 
 /**
  * The write a remediation row performs. The snake_case spelling is also the
@@ -64,6 +65,16 @@ export type PlanComplianceView = {
   readonly sections: readonly PlanComplianceSection[];
 };
 
+export type PlanComplianceViewOptions = {
+  /**
+   * The caller's role in this workspace, or null when they have none.
+   *
+   * Actions are filtered by it. The server refuses a write the actor's rank
+   * does not allow, so the gate never renders a button that can only fail.
+   */
+  readonly actorRole: string | null;
+};
+
 const plural = (
   count: number,
   singular: string,
@@ -72,6 +83,71 @@ const plural = (
 
 const resourceKey = (resource: TPlanComplianceResource): string =>
   `${resource.kind}:${resource.id}`;
+
+/**
+ * The role the snapshot wrote into a member row's `detail`. The server labels
+ * it by capitalizing the role, so the inverse is an exact lowercase. A detail
+ * that is not a role yields null, and such a row offers no action rather than
+ * one the server may refuse.
+ */
+const memberRole = (resource: TPlanComplianceResource): Role | null => {
+  const role = resource.detail?.toLowerCase();
+  return role !== undefined && isRole(role) ? role : null;
+};
+
+/**
+ * The removal on offer for one member row: the action, and the detail line that
+ * replaces the member's role when there is none.
+ */
+type MemberRemoval =
+  | { readonly action: RemediationAction; readonly detail: null }
+  | { readonly action: null; readonly detail: string | null };
+
+/**
+ * Decides whether this caller may remove this member.
+ *
+ * `RemoveOrganizationMember` requires the target to be ranked strictly below
+ * the caller (`canManageTarget` in `membership/policies.ts`), and an owner
+ * cannot be removed through team settings at all. A row the caller's rank does
+ * not cover states who has to act instead of rendering a button that always
+ * fails; a role the snapshot cannot name offers nothing, because an unknown
+ * rank cannot be shown to outrank the target.
+ */
+const memberRemoval = (
+  resource: TPlanComplianceResource,
+  actorRole: string | null
+): MemberRemoval => {
+  const role = memberRole(resource);
+
+  if (role === null) {
+    return { action: null, detail: resource.detail };
+  }
+
+  if (role === "owner") {
+    return {
+      action: null,
+      detail: "Owners cannot be removed from the workspace.",
+    };
+  }
+
+  if (actorRole === null || !isRole(actorRole)) {
+    return { action: null, detail: null };
+  }
+
+  if (compareRoles(role, actorRole) === -1) {
+    return { action: removeMember(resource), detail: null };
+  }
+
+  return {
+    action: null,
+    // Owner is the only rank above admin, so this is the one block worth
+    // naming: an admin cannot remove another admin.
+    detail:
+      role === "admin"
+        ? "Only an owner can remove an admin."
+        : "Only a member ranked above them can remove them.",
+  };
+};
 
 const violation = (
   compliance: TWorkspacePlanCompliance,
@@ -253,7 +329,8 @@ const deleteCompany = (
  * finding with no resource rows (the caller cannot act) produces no section.
  */
 export const buildPlanComplianceView = (
-  compliance: TWorkspacePlanCompliance
+  compliance: TWorkspacePlanCompliance,
+  { actorRole }: PlanComplianceViewOptions
 ): PlanComplianceView => {
   const planLabel = PLAN_DISPLAY_NAMES[compliance.plan];
   const sections: PlanComplianceSection[] = [];
@@ -335,22 +412,26 @@ export const buildPlanComplianceView = (
 
   if (members) {
     const rows = members.resources.map((resource) => {
-      const isMember = resource.kind === "member";
-      // The snapshot writes the member's role into `detail`. An owner cannot
-      // be removed from the workspace through team settings, so that row has
-      // no action; a pending invitation is cancelled instead.
-      const isOwner = isMember && resource.detail === "Owner";
+      if (resource.kind !== "member") {
+        return {
+          key: resourceKey(resource),
+          label: resource.label,
+          detail: resource.detail,
+          badges: [] as const,
+          actions: [cancelInvitation(resource)],
+        } satisfies PlanComplianceRow;
+      }
+
+      const { action, detail } = memberRemoval(resource, actorRole);
 
       return {
         key: resourceKey(resource),
         label: resource.label,
-        detail: resource.detail,
-        badges: isMember && resource.detail ? [resource.detail] : [],
-        actions: isMember
-          ? isOwner
-            ? []
-            : [removeMember(resource)]
-          : [cancelInvitation(resource)],
+        // The role is already the badge, so the detail line carries the reason
+        // a removal is not on offer.
+        detail,
+        badges: resource.detail ? [resource.detail] : [],
+        actions: action === null ? [] : [action],
       } satisfies PlanComplianceRow;
     });
 

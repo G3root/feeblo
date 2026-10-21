@@ -40,10 +40,62 @@ describe("PlansResponse", () => {
     crmEntries: 10,
   };
 
+  /** A body from before `privilegedMembers` was renamed to `members`. */
+  const preRenameLimits = {
+    feedbackBoards: 2,
+    privilegedMembers: 2,
+    changelogCategories: 3,
+    crmEntries: 10,
+    workspaces: 3,
+  };
+
   it("decodes a body that predates the workspaces key", () => {
     const decoded = decode({ plans: [plan(legacyLimits)] });
 
     expect(decoded.plans[0]?.limits.workspaces).toBeNull();
+  });
+
+  it("reads the allowance from a body that predates the members rename", () => {
+    const decoded = decode({ plans: [plan(preRenameLimits)] });
+
+    expect(decoded.plans[0]?.limits.members).toBe(2);
+  });
+
+  it("lets a present members value win over the legacy key", () => {
+    expect(
+      decode({ plans: [plan({ ...preRenameLimits, members: 5 })] }).plans[0]
+        ?.limits.members
+    ).toBe(5);
+    // An explicit `null` means "unlimited" and must not be replaced by the
+    // legacy finite value the same body carries.
+    expect(
+      decode({ plans: [plan({ ...preRenameLimits, members: null })] }).plans[0]
+        ?.limits.members
+    ).toBeNull();
+  });
+
+  it("reads a body that carries neither key as unlimited", () => {
+    const decoded = decode({
+      plans: [
+        plan({
+          feedbackBoards: 2,
+          changelogCategories: 3,
+          crmEntries: 10,
+          workspaces: 3,
+        }),
+      ],
+    });
+
+    expect(decoded.plans[0]?.limits.members).toBeNull();
+  });
+
+  it("encodes the current key and drops the legacy one", () => {
+    const encoded = S.encodeSync(PlansResponse)(
+      decode({ plans: [plan(preRenameLimits)] })
+    );
+
+    expect(encoded.plans[0]?.limits.members).toBe(2);
+    expect(encoded.plans[0]?.limits).not.toHaveProperty("privilegedMembers");
   });
 
   it("keeps present finite numbers and explicit nulls unchanged", () => {
