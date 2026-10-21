@@ -1,0 +1,25 @@
+name: Restore the Turbo cache
+description: Restores `.turbo/cache` so `turbo run` can replay tasks whose inputs are unchanged.
+inputs:
+  scope:
+    description: Namespace for this job's cache, so one job's save does not evict another's.
+    required: true
+runs:
+  using: composite
+  steps:
+    # Turbo's own key is a content hash of each task's inputs, so a key that
+    # names the wrong commit only costs a download: Turbo still decides whether
+    # a cached result is usable. That is why the Actions key can be this coarse.
+    #
+    # `scope` keeps the jobs apart. The `checks` cache is about a megabyte (the
+    # tasks have no declared outputs), while `e2e` and `test` cache build
+    # output; sharing one key would make the others download the larger one and
+    # let whichever job saves last evict it.
+    - name: Restore Turbo cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .turbo/cache
+        key: turbo-${{ runner.os }}-${{ inputs.scope }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-${{ inputs.scope }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+          turbo-${{ runner.os }}-${{ inputs.scope }}-
