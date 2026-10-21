@@ -41,6 +41,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
+import { WidgetCreateFeedbackErrors } from "./api-contract";
 import {
   type TWidgetFeedbackMetadata,
   WidgetFeedbackMetadataValue,
@@ -57,7 +58,9 @@ import { upsertContactFromParsed } from "./sso";
  * everything else in the token transaction is a contact-store failure and is
  * answered as internal.
  */
-const isFeedbackTokenFailure = <T>(error: T): boolean =>
+const isFeedbackTokenFailure = <T>(
+  error: T
+): error is T & (UnauthorizedError | DataValidationError) =>
   Schema.is(UnauthorizedError)(error) || Schema.is(DataValidationError)(error);
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
@@ -361,12 +364,15 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   // the real 401/400 instead of folding them into a 500 that
                   // says the server failed and can never be retried. Only the
                   // contact-store failures left in this effect are internal.
-                  Effect.catchIf(
-                    (error) => !isFeedbackTokenFailure(error),
-                    () =>
-                      new InternalServerError({
-                        message: "Failed to create feedback contact",
-                      })
+                  // `mapError`, not `catchIf`: the type predicate is what
+                  // removes the contact-store errors from the channel, so the
+                  // handler's declared error union stays exact.
+                  Effect.mapError((error) =>
+                    isFeedbackTokenFailure(error)
+                      ? error
+                      : new InternalServerError({
+                          message: "Failed to create feedback contact",
+                        })
                   )
                 )
               : undefined;
@@ -406,12 +412,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
             }),
             provideHandlerEnvironment,
             Effect.catchTags({
-              ConfigError: () =>
-                Effect.fail(
-                  new InternalServerError({
-                    message: "Missing APP_URL for widget integration events",
-                  })
-                ),
               PostAlreadyExistsError: () =>
                 Effect.logWarning(
                   "Exhausted post slug candidates while creating widget feedback; post was not stored",
@@ -426,7 +426,19 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   )
                 ),
             }),
-            withRemapDbErrors("Feedback", "create")
+            withRemapDbErrors("Feedback", "create"),
+            // The endpoint publishes a closed error union; every other failure
+            // the shared write path can produce — a private board's policy
+            // refusal, a subject/CRM refusal from an SSO attribution — is
+            // answered as internal, which is the same 500 an undeclared
+            // failure produced before the error channel was typed.
+            Effect.mapError((error) =>
+              Schema.is(WidgetCreateFeedbackErrors)(error)
+                ? error
+                : new InternalServerError({
+                    message: "Failed to create feedback",
+                  })
+            )
           );
         });
     })

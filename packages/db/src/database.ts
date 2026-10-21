@@ -1,3 +1,5 @@
+// oxlint-disable-next-line typescript/triple-slash-reference -- a `.d.ts` global declaration is how Drizzle's unresolved `effect/unstable/sql/SqlError` import is repaired; an import would emit a runtime module that does not exist.
+/// <reference path="./effect-sql-error-compat.d.ts" />
 import * as SQLPG from "@effect/sql-pg";
 import { PgliteClient } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
