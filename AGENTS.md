@@ -6,11 +6,11 @@ Two other documents are authoritative for their own subject and are not duplicat
 
 ## Stack contract
 
-Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and referenced as `catalog:`. Prefer that over writing a version in a package.
+Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and referenced as `catalog:`. Prefer that over writing a version in a package. `minimumReleaseAge: 1440` refuses a version published in the last day, so a bump waits a day or names the package in `minimumReleaseAgeExclude` with a reason.
 
 - pnpm workspaces + Turborepo. Node `26.4.0` (`.node-version`), pnpm `11.0.3` (`packageManager`). Do not introduce a second package manager.
 - Effect `4.0.0`, `@effect/platform-node` `4.0.0`, `@effect/vitest` `4.0.0`. These three are one release train; bump them together. Every `@effect/*` package shares the one version, so the catalog pins `effect`, `@effect/platform-node`, `@effect/vitest`, `@effect/sql-pg`, `@effect/sql-pglite`, `@effect/atom-react` and `@effect/ai-openai` in lockstep.
-- TypeScript `7.0.2`, Oxlint `1.82.0`, `oxlint-tsgolint` `7.0.2001`, `@effect/tsgo` `0.47.2`. These four are also one release train: `effect-tsgo patch` (run from `prepare` on every install) names the versions it supports and refuses to patch a mismatch. A bump is a four-line change or it is wrong. `@effect/tsgo` is not cosmetic: it embeds the module paths its rules match on, so the version has to be one that knows the Effect version in the catalog or the diagnostics go quiet — `0.45` keyed off `effect/unstable/*` and would have reported nothing once the `unstable` segment was dropped.
+- TypeScript `7.0.2`, Oxlint `1.82.0`, `oxlint-tsgolint` `7.0.2001`, `@effect/tsgo` `0.47.2`. These four are also one release train: `effect-tsgo patch` (run from `prepare` on every install) names the versions it supports and refuses to patch a mismatch. A bump is a four-line change or it is wrong. `@effect/tsgo` is not cosmetic: it embeds the module paths its rules match on, so the version has to be one that knows the Effect version in the catalog or the diagnostics go quiet — `0.45` keyed off `effect/unstable/*` and would have reported nothing once the `unstable` segment was dropped. `pnpm check` runs `check-toolchain.ts`, which fails when these two trains disagree across the catalog, the manifests and the workspace overrides, or when a `patchedDependencies` selector names a version that is not installed.
 - Drizzle `1.0.0-rc.5-169397b`, better-auth `1.7.2`, React `19`, TanStack Start for `apps/web`.
 
 `prepare` runs `effect-tsgo patch --typescript --oxlint`. That single command is what makes the Effect language service load in `tsc` and registers the `effecttsgo` Oxlint plugin; without it, Effect diagnostics silently disappear.
@@ -46,7 +46,7 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm check` | **The gate.** `turbo run check` = every package's `tsc --noEmit`, then type-aware Oxlint plus the formatter check. |
+| `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsc --noEmit`, then type-aware Oxlint plus the formatter check. |
 | `pnpm typecheck` | Types only. Cached per package. |
 | `pnpm lint` | `oxlint && oxfmt --check .` |
 | `pnpm lint:fix` | The writer: `oxlint --fix && oxfmt`. |
@@ -66,7 +66,7 @@ Run `pnpm check` before claiming a change is ready. It needs no database, no bui
 What actually enforces the rules:
 
 - CI (`checks` job) runs `pnpm check` on every push and pull request.
-- CI also runs `build_app` (Playwright against built apps), `test` (unit), and `docker_smoke_test` (self-hosted compose stack).
+- CI also runs `e2e` (Playwright against built apps, sharded three ways), `test` (unit), and `docker_smoke_test` (self-hosted compose stack).
 - `autofix.yml` runs `pnpm fmt` and `pnpm lint:fix` and commits the result. It is a writer, not a gate: a violation it cannot fix does not fail it.
 - `tools/oxlint/effect-tests` reports `Effect.run*` and `ManagedRuntime.make` in test files as an **error**, so hand-running an Effect fails the gate.
 

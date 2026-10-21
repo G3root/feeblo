@@ -35,7 +35,8 @@
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
     "typecheck": "turbo run typecheck",
-    "check": "turbo run check"
+    "check": "turbo run check",
+    "toolchain": "node check-toolchain.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
