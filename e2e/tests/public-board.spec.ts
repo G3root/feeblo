@@ -420,6 +420,42 @@ test("the board document language follows the locale cookie before hydration", a
   }
 });
 
+test(
+  "a signed-in visitor keeps the board's own sign-in page",
+  { tag: "@critical" },
+  async ({ browser, page }) => {
+    // Board hosts serve the auth pages themselves, and the dashboard's
+    // `/{organizationId}` paths do not exist on a board host: redirecting there
+    // lands on the board's not-found page. `authPageBeforeLoad` skips the
+    // redirect off the app subdomain, and the post-hydration half
+    // (`AuthPageRedirect`) has to make the same call — this holds the page open
+    // past the session resolution, which is when that half would fire.
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
+    const boardUrl = publicBoardUrl(user.workspaceName);
+
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+
+    try {
+      await visitorPage.goto(boardUrl);
+      await waitForHydration(visitorPage);
+      await signInThroughPublicBoard(visitorPage, user.email, user.password);
+
+      await visitorPage.goto(`${boardUrl}/sign-in`);
+      await waitForHydration(visitorPage);
+      await visitorPage.waitForTimeout(2000);
+
+      await expect(visitorPage).toHaveURL(`${boardUrl}/sign-in`);
+      await expect(
+        visitorPage.getByRole("textbox", { name: "Email" })
+      ).toBeVisible();
+    } finally {
+      await visitorContext.close();
+    }
+  }
+);
+
 test("a signed-in visitor never paints the sign-in button while the session resolves", async ({
   browser,
   page,

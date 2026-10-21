@@ -1,6 +1,10 @@
 import { and, createLiveQueryCollection, eq } from "@tanstack/react-db";
 
-import { dashboardCollections } from "./collections";
+import { workspaceIdFromPathname } from "./collection-scope";
+import {
+  dashboardCollections,
+  planComplianceCollectionFor,
+} from "./collections";
 
 /**
  * A page's data requirement, named once.
@@ -23,6 +27,56 @@ export async function preloadDashboardShell(): Promise<void> {
     dashboardCollections.boardCollection.preload(),
     dashboardCollections.workspacePlanCollection.preload(),
   ]);
+}
+
+/**
+ * Starts the shell's reads before the session guard resolves.
+ *
+ * `beforeLoad` runs strictly top-down and every level awaits its data, so the
+ * guard on the boundary route (`/_dashboard`, which awaits the Better Auth
+ * session) used to hold the entire chain behind it: session, then plan
+ * compliance, then the shell's collections, then the page's. On a cold load
+ * that is three round trips stacked one behind the other before the workspace
+ * renders.
+ *
+ * None of those reads need the session. They are cookie-authenticated — the
+ * session cookie rides along whether the client knows its value or not — and
+ * the workspace they read is the one in the URL, which the guard already has.
+ * Firing them here overlaps the session round trip with the shell's instead of
+ * queueing behind it; the child routes' `preload()` calls then resolve from
+ * the same in-flight promises, because TanStack Query dedupes by query key, so
+ * nothing is fetched twice.
+ *
+ * Waste in the rejected path (a stale workspace id, an anonymous visitor about
+ * to be redirected) is one request that is about to be abandoned anyway; the
+ * saving is a round trip on every load that is not rejected.
+ *
+ * `pathname` is the *router's* target path, and the guard only fires when it
+ * matches the document's: a dashboard collection resolves its scope from
+ * `window.location` when it materializes, and the browser history commits a
+ * push navigation in a microtask (`@tanstack/history` batches it), so during a
+ * client-side navigation the two can disagree. Starting the reads then would
+ * materialize the shell's collections against the route being left.
+ */
+export function startDashboardShellPreload(pathname: string): void {
+  if (window.location.pathname !== pathname) {
+    return;
+  }
+
+  const organizationId = workspaceIdFromPathname(pathname);
+
+  if (organizationId === undefined) {
+    return;
+  }
+
+  // Both are best-effort and deliberately unawaited: the guard below decides
+  // what the visitor sees, and the awaited preloads report their own failures
+  // through the collections' error state. A rejection here would surface as an
+  // unhandled one, so it terminates in this `catch`.
+  void preloadDashboardShell().catch(() => undefined);
+  void planComplianceCollectionFor(organizationId)
+    .preload()
+    .catch(() => undefined);
 }
 
 /** The workspace home: its boards, statuses, posts, and their vote counts. */

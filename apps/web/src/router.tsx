@@ -79,7 +79,14 @@ export function getRouter() {
     // makes the same call for the same architecture; see
     // apps/public-feature-board/src/app/public-board-router.tsx.
     defaultPendingMinMs: 0,
-    defaultPreloadStaleTime: 0,
+    // Intent preloading fires on hover/focus, and `0` treats the result as
+    // stale the instant it lands: the click that follows revalidates the
+    // route's `beforeLoad` and loaders even though every collection they pull
+    // is still fresh in the QueryClient (60s `staleTime`, see
+    // `integrations/tanstack-query/root-provider`). A hover that became a
+    // click therefore paid for its preload twice. Matching the query cache's
+    // freshness window makes the hover a real head start instead.
+    defaultPreloadStaleTime: 30_000,
     defaultErrorComponent: () => (
       <div className="flex h-full min-h-screen w-full items-center justify-center">
         <div>Error</div>

@@ -17,7 +17,7 @@ import { z } from "zod";
 
 import { AuthShell } from "~/features/auth/components/auth-shell";
 
-export const Route = createFileRoute("/_dashboard/sign-up")({
+export const Route = createFileRoute("/_auth/sign-up")({
   validateSearch: (search) =>
     z
       .object({
