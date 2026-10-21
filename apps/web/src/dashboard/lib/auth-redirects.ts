@@ -1,4 +1,5 @@
 import type { AuthClientSession } from "@feeblo/auth/client";
+import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { extractSubdomain } from "@feeblo/utils/url";
 import {
   getCachedAuthSession,
@@ -108,9 +109,104 @@ function getDefaultOrganizationId(session: AuthClientSession) {
 }
 
 /**
+ * The session a routing decision may act on.
+ *
+ * `null` is an authoritative signed-out (or SSO-restricted) answer; `undefined`
+ * means the session could not be resolved at all. The distinction matters: a
+ * transport failure is not evidence a visitor signed out, so guards must leave
+ * routing untouched on `undefined` instead of bouncing to sign-in.
+ */
+async function resolveRoutingSession(): Promise<
+  AuthClientSession | null | undefined
+> {
+  // A cached success is authoritative enough for routing decisions; do not
+  // stall navigation behind an in-flight revalidation. Null also covers
+  // cached failures and confirmed sign-outs, which fall through to the await
+  // below — a settled atom resolves there without a network stall.
+  let session: AuthClientSession | null = getCachedAuthSession();
+  if (session === null) {
+    try {
+      session = await getAuthSession();
+    } catch {
+      return undefined;
+    }
+  }
+
+  // SSO-restricted users are scoped to their board subdomain; on the dashboard
+  // they are treated as signed out exactly as the former middleware did.
+  return session?.user.restrictedToOrganizationId != null ? null : session;
+}
+
+/**
+ * Whether an auth page must stay reachable with a session.
+ *
+ * Password recovery is the exception to "signed-in visitors leave the auth
+ * pages": it has to work on a shared device, where the browser may still hold
+ * somebody else's session and the visitor cannot sign out to recover their own
+ * account.
+ */
+export function isPasswordRecoveryPath(pathname: string): boolean {
+  return PASSWORD_RESET_PATHS.has(normalizePathname(pathname));
+}
+
+/** Where a visitor who already has a session belongs. */
+export function signedInDestination(session: AuthClientSession): string {
+  const defaultOrganizationId = getDefaultOrganizationId(session);
+
+  return defaultOrganizationId ? `/${defaultOrganizationId}` : REGISTER_PATH;
+}
+
+/** Sends a visitor who already has a session away from an auth page. */
+function redirectSignedInVisitorFromAuthPage(
+  session: AuthClientSession,
+  pathname: string
+): void {
+  if (isPasswordRecoveryPath(pathname)) {
+    return;
+  }
+
+  throw redirect({ href: signedInDestination(session) });
+}
+
+/**
+ * The guard for the auth pages, which live outside the client-only dashboard
+ * boundary so the server can render their forms (`routes/_auth.tsx`).
+ *
+ * One rule applies there: a visitor who already has a session is moved on.
+ * Anonymous visitors render immediately — signing in needs no session, and
+ * making these pages wait for one is what put a dashboard-shaped spinner in
+ * front of the fastest possible paint.
+ */
+export async function authPageBeforeLoad({
+  location,
+}: {
+  location: BeforeLoadLocation;
+}): Promise<void> {
+  // The document is server-rendered and shared: the server has no access to
+  // the visitor's session (it would have to forward a cookie to the API), so
+  // the decision belongs to the browser. `AuthPageRedirect` makes it once the
+  // atom resolves — hydration reuses this hook's server answer rather than
+  // re-running it, which is why the component exists.
+  if (!hasWindow() || !isAppSubdomainHost()) {
+    return;
+  }
+
+  const session = await resolveRoutingSession();
+
+  if (session === null || session === undefined) {
+    return;
+  }
+
+  redirectSignedInVisitorFromAuthPage(
+    session,
+    normalizePathname(location.pathname)
+  );
+}
+
+/**
  * TanStack Router `beforeLoad` guard enforcing the dashboard auth redirects.
- * Mounted on the root route so every navigation — including the initial
- * document load — resolves the session before any route renders.
+ * Mounted on `/_dashboard`, so every navigation into the app — including the
+ * initial document load — resolves the session before any route renders.
  */
 export async function dashboardAuthBeforeLoad({
   location,
@@ -121,26 +217,16 @@ export async function dashboardAuthBeforeLoad({
     return;
   }
 
-  // A cached success is authoritative enough for routing decisions; do not
-  // stall navigation behind an in-flight revalidation. Null also covers
-  // cached failures and confirmed sign-outs, which fall through to the await
-  // below — a settled atom resolves there without a network stall.
-  let session: AuthClientSession | null = getCachedAuthSession();
-  if (session === null) {
-    try {
-      session = await getAuthSession();
-    } catch {
-      // A transport failure means the session is unknown, not signed-out.
-      // Leave routing untouched: protected routes stay behind their gates and
-      // recover once the atom revalidates.
-      return;
-    }
+  const session = await resolveRoutingSession();
+
+  // A transport failure means the session is unknown, not signed-out. Leave
+  // routing untouched: protected routes stay behind their gates and recover
+  // once the atom revalidates.
+  if (session === undefined) {
+    return;
   }
 
-  // SSO-restricted users are scoped to their board subdomain; on the dashboard
-  // they are treated as signed out exactly as the former middleware did.
-  const effectiveSession =
-    session?.user.restrictedToOrganizationId != null ? null : session;
+  const effectiveSession = session;
 
   const pathname = normalizePathname(location.pathname);
   const isAuthPath = DASHBOARD_AUTH_PATHS.has(pathname);
@@ -164,14 +250,8 @@ export async function dashboardAuthBeforeLoad({
     redirectToRegister(location);
   }
 
-  if (isAuthPath && !PASSWORD_RESET_PATHS.has(pathname)) {
-    if (!hasOrganizations) {
-      throw redirect({ href: REGISTER_PATH });
-    }
-
-    throw redirect({
-      href: defaultOrganizationId ? `/${defaultOrganizationId}` : "/",
-    });
+  if (isAuthPath) {
+    redirectSignedInVisitorFromAuthPage(effectiveSession, pathname);
   }
 
   if (

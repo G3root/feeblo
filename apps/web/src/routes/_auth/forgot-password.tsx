@@ -15,7 +15,7 @@ const SearchSchema = z.object({
   redirectTo: z.string().optional(),
 });
 
-export const Route = createFileRoute("/_dashboard/forgot-password")({
+export const Route = createFileRoute("/_auth/forgot-password")({
   validateSearch: (search) => SearchSchema.parse(search),
   component: RouteComponent,
 });
