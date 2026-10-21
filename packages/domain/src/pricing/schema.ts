@@ -1,5 +1,5 @@
-import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
+import * as SchemaTransformation from "effect/SchemaTransformation";
 
 import {
   type CapabilityFeatureKey,
@@ -10,19 +10,58 @@ export const PlanKey = S.Literals(["free", "starter", "professional"]);
 
 export type TPlanKey = S.Schema.Type<typeof PlanKey>;
 
-const PlanLimits = S.Struct({
+const PlanLimitsFields = {
   feedbackBoards: S.NullOr(S.Finite),
-  privilegedMembers: S.NullOr(S.Finite),
+  members: S.NullOr(S.Finite),
   changelogCategories: S.NullOr(S.Finite),
   crmEntries: S.NullOr(S.Finite),
-  // `/api/plans` is HTTP-cached for an hour, so a client can decode a body
-  // served before this key existed. A missing key decodes as `null`, matching
-  // "no cap"; a present finite number or explicit `null` still validates as
-  // before, and the decoded type stays `number | null`.
-  workspaces: S.NullOr(S.Finite).pipe(
-    S.withDecodingDefaultKey(Effect.succeed(null))
-  ),
-} satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> });
+  workspaces: S.NullOr(S.Finite),
+} satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> };
+
+/**
+ * The wire shape. It tolerates two things, because `/api/plans` is HTTP-cached
+ * for an hour and a client can decode a body served before a key existed or
+ * before a key was renamed:
+ *
+ * - `privilegedMembers` is the old spelling of `members`, and a body from
+ *   before the rename carries it and no `members`.
+ * - `workspaces` was added after the endpoint shipped, so older bodies omit
+ *   it entirely.
+ *
+ * Both are optional here and reconciled below; their values stay strictly
+ * typed, so a malformed limit still fails to decode.
+ */
+const PlanLimitsWire = S.Struct({
+  ...PlanLimitsFields,
+  members: S.optionalKey(PlanLimitsFields.members),
+  privilegedMembers: S.optionalKey(PlanLimitsFields.members),
+  workspaces: S.optionalKey(PlanLimitsFields.workspaces),
+});
+
+/**
+ * Decodes either spelling into one shape. A present `members` always wins,
+ * including an explicit `null` ("unlimited"): only an absent key is derived
+ * from the legacy one. A missing limit reads as `null`, matching "no cap",
+ * and the decoded type stays `number | null`. Encoding emits the current keys.
+ */
+const PlanLimits = PlanLimitsWire.pipe(
+  S.decodeTo(
+    S.Struct(PlanLimitsFields),
+    SchemaTransformation.transform({
+      decode: (wire) => ({
+        feedbackBoards: wire.feedbackBoards,
+        members:
+          wire.members !== undefined
+            ? wire.members
+            : (wire.privilegedMembers ?? null),
+        changelogCategories: wire.changelogCategories,
+        crmEntries: wire.crmEntries,
+        workspaces: wire.workspaces ?? null,
+      }),
+      encode: (limits) => limits,
+    })
+  )
+);
 
 const PlanCapabilities = S.Struct({
   roadmap: S.Boolean,

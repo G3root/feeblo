@@ -13,12 +13,18 @@ export const INTEGRATION_CAPABILITY_PROVIDER_KEYS = [
   "github",
 ] as const;
 
+/**
+ * Every plan limit counts the workspace's own team, never its end users. The
+ * people who post, vote, and comment on the public board are unlimited on
+ * every plan (`unlimitedEndUsers`) and are not rows in the member table.
+ */
 export type LimitFeatureKey =
   | "feedbackBoards"
-  | "privilegedMembers"
+  | "members"
   | "changelogCategories"
   | "crmEntries"
   | "workspaces";
+
 export type CapabilityFeatureKey =
   | "roadmap"
   | "changelog"
@@ -62,10 +68,10 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "Feedback Board",
     pluralLabel: "Feedback Boards",
   },
-  privilegedMembers: {
+  members: {
     kind: "limit",
-    singularLabel: "Admin Role",
-    pluralLabel: "Admin Roles",
+    singularLabel: "Member",
+    pluralLabel: "Members",
   },
   changelogCategories: {
     kind: "limit",
@@ -119,7 +125,7 @@ const defineFeatureOrder =
 
 const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "feedbackBoards",
-  "privilegedMembers",
+  "members",
   "changelogCategories",
   "crmEntries",
   "workspaces",
@@ -143,7 +149,7 @@ export const PLAN_ENTITLEMENTS = {
   free: {
     limits: {
       feedbackBoards: 2,
-      privilegedMembers: 2,
+      members: 2,
       changelogCategories: 3,
       crmEntries: 10,
       workspaces: 3,
@@ -165,7 +171,7 @@ export const PLAN_ENTITLEMENTS = {
   starter: {
     limits: {
       feedbackBoards: 5,
-      privilegedMembers: 5,
+      members: 5,
       changelogCategories: null,
       crmEntries: null,
       workspaces: null,
@@ -187,7 +193,7 @@ export const PLAN_ENTITLEMENTS = {
   professional: {
     limits: {
       feedbackBoards: null,
-      privilegedMembers: null,
+      members: null,
       changelogCategories: null,
       crmEntries: null,
       workspaces: null,

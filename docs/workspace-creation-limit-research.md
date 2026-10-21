@@ -14,7 +14,7 @@ Workspace creation does **not** go through better-auth's organization plugin. It
 
 `apps/web` `/register` → `WorkspaceRpcs.WorkspaceCreate` → `WorkspaceRpcHandlersEffect` → `WorkspaceRepository.createWorkspace` (`packages/domain/src/workspace/handlers.ts:24`, `packages/domain/src/workspace/repository.ts:87`). Nothing in that path counts how many workspaces the caller already owns, so today the cap is unbounded.
 
-The limit belongs in that path, following the pattern the repo already uses for every other count-based plan limit (CRM entries, changelog categories, admin roles): a count query, a `PolicyDeniedError` with a reason, and a row lock so a concurrent count cannot be trusted. Concretely:
+The limit belongs in that path, following the pattern the repo already uses for every other count-based plan limit (CRM entries, changelog categories, members): a count query, a `PolicyDeniedError` with a reason, and a row lock so a concurrent count cannot be trusted. Concretely:
 
 1. Add `workspaces` to the plan-entitlements catalog with `free: 3`, `starter/professional: null`.
 2. Add `lockUser(userId)` + an "organizations this user owns" query to `WorkspaceRepository`.
@@ -100,7 +100,7 @@ Add `workspaces` to `LimitFeatureKey`, `PLAN_FEATURE_CATALOG` (kind `limit`, `"W
 ```ts
 export type LimitFeatureKey =
   | "feedbackBoards"
-  | "privilegedMembers"
+  | "members"
   | "changelogCategories"
   | "submissionNotificationRecipients"
   | "crmEntries"
@@ -301,7 +301,7 @@ The table sits in the existing `WorkspaceCreate` describe (`:128`), which uses `
 | `packages/domain/src/workspace/repository.ts` | `createWorkspace` inserts; `findPlanByOrganizationId` plan resolution; `lockOrganization` lock discipline and rationale |
 | `packages/domain/src/workspace/rpcs.ts`, `errors.ts` | RPC contract already includes `PolicyDeniedError`; no schema change needed |
 | `packages/domain/src/plan-entitlements.ts` | `LimitFeatureKey`/`PLAN_FEATURE_CATALOG`/`PLAN_ENTITLEMENTS` and their compile-time completeness guards |
-| `packages/domain/src/entitlement/policies.ts` | Count-based limit pattern (`canCreateCrmEntry`, `canCreateChangelogCategory`, `canAssignPrivilegedRole`) |
+| `packages/domain/src/entitlement/policies.ts` | Count-based limit pattern (`canCreateCrmEntry`, `canCreateChangelogCategory`, `canAddMember`) |
 | `packages/domain/src/company/handlers.ts` (`CompanyCreate`) | Lock-first-then-count precedent and its comment |
 | `packages/domain/src/policy.ts`, `packages/domain/src/rpc-errors.ts` | `PolicyDeniedError` shape, `403`, reason plumbing |
 | `packages/web-shared/src/lib/rpc-error.ts` | `PolicyDenied` is user-facing; `parseRpcError` prefers `reason` |

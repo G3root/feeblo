@@ -39,9 +39,9 @@ import { sql } from "drizzle-orm";
 /**
  * Locks a workspace's organization row until the caller's transaction ends.
  *
- * Serializes the per-workspace limits (feedback boards, admin roles, changelog
- * categories, CRM entries, submission recipients, roadmap primaries) and the
- * post-status position sequence.
+ * Serializes the per-workspace limits (feedback boards, changelog categories,
+ * CRM entries, submission recipients, roadmap primaries) and the post-status
+ * position sequence.
  */
 export const lockOrganizationRow = (organizationId: string) =>
   sql`SELECT id FROM ${schema.organizationTable} WHERE id = ${organizationId} FOR NO KEY UPDATE`;

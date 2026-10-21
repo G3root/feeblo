@@ -49,7 +49,7 @@ describe("plan feature catalog", () => {
     expect(PLAN_ENTITLEMENTS.starter).toEqual({
       limits: {
         feedbackBoards: 5,
-        privilegedMembers: 5,
+        members: 5,
         changelogCategories: null,
         crmEntries: null,
         workspaces: null,
@@ -71,7 +71,7 @@ describe("plan feature catalog", () => {
 
     expect(getPlanFeatureRows("starter")).toEqual([
       { key: "feedbackBoards", label: "5 Feedback Boards" },
-      { key: "privilegedMembers", label: "5 Admin Roles" },
+      { key: "members", label: "5 Members" },
       { key: "changelogCategories", label: "Unlimited Changelog Categories" },
       { key: "crmEntries", label: "Unlimited CRM Entries" },
       { key: "workspaces", label: "Unlimited Workspaces" },
@@ -95,7 +95,7 @@ describe("plan feature catalog", () => {
   it("formats unlimited professional limits from the same entitlement values", () => {
     expect(getPlanFeatureRows("professional").slice(0, 2)).toEqual([
       { key: "feedbackBoards", label: "Unlimited Feedback Boards" },
-      { key: "privilegedMembers", label: "Unlimited Admin Roles" },
+      { key: "members", label: "Unlimited Members" },
     ]);
   });
 

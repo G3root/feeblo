@@ -4,6 +4,7 @@ import type {
   TWorkspacePlanCompliance,
 } from "@feeblo/domain/plan-compliance/schema";
 import { PLAN_DISPLAY_NAMES } from "@feeblo/domain/plan-entitlements";
+import { compareRoles, isRole, type Role } from "@feeblo/permissions";
 
 /**
  * The write a remediation row performs. The snake_case spelling is also the
@@ -15,7 +16,7 @@ export type RemediationActionType =
   | "delete_board"
   | "make_roadmap_public"
   | "delete_roadmap"
-  | "demote_admin"
+  | "remove_member"
   | "cancel_invitation"
   | "delete_changelog_category"
   | "delete_contact"
@@ -35,8 +36,6 @@ export type RemediationAction = {
   /** Destructive row actions require the operator to type the resource name. */
   readonly requiresTyping: boolean;
   readonly destructive: boolean;
-  /** Rank rules let only a workspace owner demote an admin. */
-  readonly ownerOnly: boolean;
 };
 
 export type PlanComplianceRow = {
@@ -51,7 +50,7 @@ export type PlanComplianceSection = {
   readonly key:
     | "boards"
     | "roadmaps"
-    | "adminRoles"
+    | "members"
     | "changelogCategories"
     | "crmEntries";
   readonly title: string;
@@ -66,6 +65,16 @@ export type PlanComplianceView = {
   readonly sections: readonly PlanComplianceSection[];
 };
 
+export type PlanComplianceViewOptions = {
+  /**
+   * The caller's role in this workspace, or null when they have none.
+   *
+   * Actions are filtered by it. The server refuses a write the actor's rank
+   * does not allow, so the gate never renders a button that can only fail.
+   */
+  readonly actorRole: string | null;
+};
+
 const plural = (
   count: number,
   singular: string,
@@ -74,6 +83,71 @@ const plural = (
 
 const resourceKey = (resource: TPlanComplianceResource): string =>
   `${resource.kind}:${resource.id}`;
+
+/**
+ * The role the snapshot wrote into a member row's `detail`. The server labels
+ * it by capitalizing the role, so the inverse is an exact lowercase. A detail
+ * that is not a role yields null, and such a row offers no action rather than
+ * one the server may refuse.
+ */
+const memberRole = (resource: TPlanComplianceResource): Role | null => {
+  const role = resource.detail?.toLowerCase();
+  return role !== undefined && isRole(role) ? role : null;
+};
+
+/**
+ * The removal on offer for one member row: the action, and the detail line that
+ * replaces the member's role when there is none.
+ */
+type MemberRemoval =
+  | { readonly action: RemediationAction; readonly detail: null }
+  | { readonly action: null; readonly detail: string | null };
+
+/**
+ * Decides whether this caller may remove this member.
+ *
+ * `RemoveOrganizationMember` requires the target to be ranked strictly below
+ * the caller (`canManageTarget` in `membership/policies.ts`), and an owner
+ * cannot be removed through team settings at all. A row the caller's rank does
+ * not cover states who has to act instead of rendering a button that always
+ * fails; a role the snapshot cannot name offers nothing, because an unknown
+ * rank cannot be shown to outrank the target.
+ */
+const memberRemoval = (
+  resource: TPlanComplianceResource,
+  actorRole: string | null
+): MemberRemoval => {
+  const role = memberRole(resource);
+
+  if (role === null) {
+    return { action: null, detail: resource.detail };
+  }
+
+  if (role === "owner") {
+    return {
+      action: null,
+      detail: "Owners cannot be removed from the workspace.",
+    };
+  }
+
+  if (actorRole === null || !isRole(actorRole)) {
+    return { action: null, detail: null };
+  }
+
+  if (compareRoles(role, actorRole) === -1) {
+    return { action: removeMember(resource), detail: null };
+  }
+
+  return {
+    action: null,
+    // Owner is the only rank above admin, so this is the one block worth
+    // naming: an admin cannot remove another admin.
+    detail:
+      role === "admin"
+        ? "Only an owner can remove an admin."
+        : "Only a member ranked above them can remove them.",
+  };
+};
 
 const violation = (
   compliance: TWorkspacePlanCompliance,
@@ -116,7 +190,6 @@ const makeBoardPublic = (
   successTitle: "Board is now public",
   requiresTyping: true,
   destructive: false,
-  ownerOnly: false,
 });
 
 const deleteBoard = (resource: TPlanComplianceResource): RemediationAction => ({
@@ -132,7 +205,6 @@ const deleteBoard = (resource: TPlanComplianceResource): RemediationAction => ({
   successTitle: "Board deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 const makeRoadmapPublic = (
@@ -148,7 +220,6 @@ const makeRoadmapPublic = (
   successTitle: "Roadmap is now public",
   requiresTyping: false,
   destructive: false,
-  ownerOnly: false,
 });
 
 const deleteRoadmap = (
@@ -165,22 +236,22 @@ const deleteRoadmap = (
   successTitle: "Roadmap deleted",
   requiresTyping: false,
   destructive: true,
-  ownerOnly: false,
 });
 
-const demoteAdmin = (resource: TPlanComplianceResource): RemediationAction => ({
-  type: "demote_admin",
+const removeMember = (
+  resource: TPlanComplianceResource
+): RemediationAction => ({
+  type: "remove_member",
   resourceId: resource.id,
   confirmationValue: resource.label,
-  title: `Change ${resource.label} to manager?`,
+  title: `Remove ${resource.label} from the workspace?`,
   description:
-    "They lose admin access immediately. You can promote them again after the workspace is back inside its plan.",
-  confirmLabel: "Change role",
-  rowLabel: "Change to manager",
-  successTitle: "Admin changed to manager",
+    "They lose access to this workspace immediately. Their posts, votes, and comments stay on the board.",
+  confirmLabel: "Remove member",
+  rowLabel: "Remove",
+  successTitle: "Member removed",
   requiresTyping: false,
-  destructive: false,
-  ownerOnly: true,
+  destructive: true,
 });
 
 const cancelInvitation = (
@@ -196,7 +267,6 @@ const cancelInvitation = (
   successTitle: "Invitation cancelled",
   requiresTyping: false,
   destructive: true,
-  ownerOnly: false,
 });
 
 const deleteCategory = (
@@ -214,7 +284,6 @@ const deleteCategory = (
   successTitle: "Category deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 const deleteContact = (
@@ -231,7 +300,6 @@ const deleteContact = (
   successTitle: "Contact deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 const deleteCompany = (
@@ -248,7 +316,6 @@ const deleteCompany = (
   successTitle: "Company deleted",
   requiresTyping: true,
   destructive: true,
-  ownerOnly: false,
 });
 
 /**
@@ -258,11 +325,12 @@ const deleteCompany = (
  * The snapshot reports findings per entitlement; a board can be in both the
  * `privateBoards` and `boards` findings, and the operator thinks about boards,
  * not entitlements. Sections are ordered by how much damage the fix does:
- * boards first, then roadmaps, admin roles, categories, and CRM entries. A
+ * boards first, then roadmaps, members, categories, and CRM entries. A
  * finding with no resource rows (the caller cannot act) produces no section.
  */
 export const buildPlanComplianceView = (
-  compliance: TWorkspacePlanCompliance
+  compliance: TWorkspacePlanCompliance,
+  { actorRole }: PlanComplianceViewOptions
 ): PlanComplianceView => {
   const planLabel = PLAN_DISPLAY_NAMES[compliance.plan];
   const sections: PlanComplianceSection[] = [];
@@ -340,37 +408,42 @@ export const buildPlanComplianceView = (
     }
   }
 
-  const adminRoles = violation(compliance, "adminRoles");
+  const members = violation(compliance, "members");
 
-  if (adminRoles) {
-    const rows = adminRoles.resources.map((resource) => {
-      const isMember = resource.kind === "member";
-      // The snapshot writes the member's role into `detail`; an owner cannot
-      // be demoted by another owner, so that row has no action.
-      const isOwner = isMember && resource.detail === "Owner";
+  if (members) {
+    const rows = members.resources.map((resource) => {
+      if (resource.kind !== "member") {
+        return {
+          key: resourceKey(resource),
+          label: resource.label,
+          detail: resource.detail,
+          badges: [] as const,
+          actions: [cancelInvitation(resource)],
+        } satisfies PlanComplianceRow;
+      }
+
+      const { action, detail } = memberRemoval(resource, actorRole);
 
       return {
         key: resourceKey(resource),
         label: resource.label,
-        detail: resource.detail,
-        badges: isMember ? (isOwner ? ["Owner"] : ["Admin"]) : [],
-        actions: isMember
-          ? isOwner
-            ? []
-            : [demoteAdmin(resource)]
-          : [cancelInvitation(resource)],
+        // The role is already the badge, so the detail line carries the reason
+        // a removal is not on offer.
+        detail,
+        badges: resource.detail ? [resource.detail] : [],
+        actions: action === null ? [] : [action],
       } satisfies PlanComplianceRow;
     });
 
     if (rows.length > 0) {
       sections.push({
-        key: "adminRoles",
-        title: "Admin roles",
+        key: "members",
+        title: "Members",
         summary: `${plural(
-          adminRoles.count,
-          "admin role"
-        )}. The ${planLabel} plan allows ${adminRoles.limit ?? "unlimited"}.`,
-        truncated: adminRoles.count > rows.length,
+          members.count,
+          "member"
+        )}. The ${planLabel} plan allows ${members.limit ?? "unlimited"}.`,
+        truncated: members.count > rows.length,
         rows,
       });
     }

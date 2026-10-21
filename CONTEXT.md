@@ -44,9 +44,11 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ### Membership
 
-**Member**: A person with access to a workspace. Membership is unlimited on every plan. _Avoid_: user, seat, account
+**Member**: A person with access to a workspace. The plan's member allowance counts every member, whatever their role, and the owner is one of them. _Avoid_: user, seat, account
 
-**Admin role**: A member holding `owner` or `admin`; the unit the plan's admin-role allowance counts. _Avoid_: privileged member, seat, admin seat
+**End user**: A person who posts, votes, or comments on the public board or through the widget. An end user is not a member and never consumes the member allowance; end users are unlimited on every plan. _Avoid_: customer, visitor, anonymous member
+
+**Admin role**: A member holding `owner` or `admin`. It grants workspace management permissions; it is no longer a plan unit, so promoting a member does not change what the plan counts. _Avoid_: privileged member, seat, admin seat
 
 ### Plans
 
@@ -54,11 +56,11 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Entitlement**: A capability or allowance a plan grants. A capability is on or off; a limit is a count. _Avoid_: feature flag, quota
 
-**Over-plan**: A workspace that holds more boards, admin roles, changelog categories, or CRM entries than its plan allows, or a private board or roadmap its plan does not include. _Avoid_: downgraded, over quota, over limit
+**Over-plan**: A workspace that holds more boards, members, changelog categories, or CRM entries than its plan allows, or a private board or roadmap its plan does not include. _Avoid_: downgraded, over quota, over limit
 
 **Remediation**: The act of bringing an over-plan workspace back inside its plan, by changing or deleting its own state, or by upgrading. _Avoid_: restore, cleanup, fix
 
-**Remediation action**: One explicit change that resolves a single over-plan finding — making a board or roadmap public, demoting an admin role, cancelling an admin invitation, or deleting a resource. _Avoid_: fix, step, task
+**Remediation action**: One explicit change that resolves a single over-plan finding — making a board or roadmap public, removing a member, cancelling an invitation, or deleting a resource. _Avoid_: fix, step, task
 
 ### Public API
 

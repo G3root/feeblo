@@ -2,11 +2,8 @@ import { Badge } from "@feeblo/ui/badge";
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import { Spinner } from "@feeblo/ui/spinner";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
-import {
-  hasPermission,
-  hasRole,
-  usePolicy,
-} from "@feeblo/web-shared/use-policy";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 
@@ -39,7 +36,11 @@ export function OverPlanGate() {
   const { allowed: canManageBilling, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "billing.*")
   );
-  const { allowed: isOwner } = usePolicy(hasRole(organizationId, "owner"));
+  const { data: session } = useAuthState();
+  const actorRole =
+    session?.memberships.find(
+      (membership) => membership.organizationId === organizationId
+    )?.role ?? null;
   const { pendingAction, run } = useRemediation();
   const { planComplianceCollection } = useDashboardCollections();
   const [dialogAction, setDialogAction] = useState<RemediationAction | null>(
@@ -102,7 +103,7 @@ export function OverPlanGate() {
     return <PlanComplianceGateLoading />;
   }
 
-  const view = buildPlanComplianceView(compliance);
+  const view = buildPlanComplianceView(compliance, { actorRole });
 
   return (
     <main className="bg-background flex min-h-dvh flex-col">
@@ -125,7 +126,6 @@ export function OverPlanGate() {
           <div className="flex flex-col gap-4">
             {view.sections.map((section) => (
               <PlanComplianceSectionCard
-                isOwner={isOwner}
                 key={section.key}
                 onAction={setDialogAction}
                 pending={pendingAction !== null}
@@ -186,12 +186,10 @@ export function OverPlanGate() {
 }
 
 function PlanComplianceSectionCard({
-  isOwner,
   onAction,
   pending,
   section,
 }: {
-  readonly isOwner: boolean;
   readonly onAction: (action: RemediationAction) => void;
   readonly pending: boolean;
   readonly section: PlanComplianceSection;
@@ -211,7 +209,6 @@ function PlanComplianceSectionCard({
       <ul className="divide-y">
         {section.rows.map((row) => (
           <PlanComplianceRowItem
-            isOwner={isOwner}
             key={row.key}
             onAction={onAction}
             pending={pending}
@@ -224,12 +221,10 @@ function PlanComplianceSectionCard({
 }
 
 function PlanComplianceRowItem({
-  isOwner,
   onAction,
   pending,
   row,
 }: {
-  readonly isOwner: boolean;
   readonly onAction: (action: RemediationAction) => void;
   readonly pending: boolean;
   readonly row: PlanComplianceRow;
@@ -250,29 +245,19 @@ function PlanComplianceRowItem({
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        {row.actions.map((action) => {
-          const requiresOwner = action.ownerOnly && !isOwner;
-
-          return (
-            <Button
-              disabled={pending || requiresOwner}
-              key={`${action.type}:${action.resourceId}`}
-              onClick={() => onAction(action)}
-              size="xs"
-              title={
-                requiresOwner
-                  ? "An owner must do this"
-                  : action.destructive
-                    ? "This cannot be undone"
-                    : undefined
-              }
-              type="button"
-              variant={action.destructive ? "destructive-outline" : "outline"}
-            >
-              {action.rowLabel}
-            </Button>
-          );
-        })}
+        {row.actions.map((action) => (
+          <Button
+            disabled={pending}
+            key={`${action.type}:${action.resourceId}`}
+            onClick={() => onAction(action)}
+            size="xs"
+            title={action.destructive ? "This cannot be undone" : undefined}
+            type="button"
+            variant={action.destructive ? "destructive-outline" : "outline"}
+          >
+            {action.rowLabel}
+          </Button>
+        ))}
       </div>
     </li>
   );

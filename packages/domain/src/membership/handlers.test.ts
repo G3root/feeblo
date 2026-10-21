@@ -72,18 +72,20 @@ describe("MembershipRpcHandlers", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const userId = `admin_${organizationId}`;
+      const memberId = yield* MemberId.generate;
       yield* db.insert(schema.userTable).values({
         id: userId,
         email: `${userId}@example.com`,
         name: "Admin User",
       });
       yield* db.insert(schema.memberTable).values({
-        id: `membership_${userId}`,
+        id: memberId,
         organizationId,
         userId,
         role: "admin",
         createdAt: yield* DateTime.nowAsDate,
       });
+      return memberId;
     });
   const Repositories = Layer.mergeAll(
     MembershipRepository.layer,
@@ -130,32 +132,50 @@ describe("MembershipRpcHandlers", () => {
         expect(error._tag).toBe("PolicyDenied");
       })
     );
-    it.effect("allows regular invitations at the privileged role limit", () =>
-      Effect.gen(function* () {
-        const policy = yield* MembershipPolicy;
-        const fixture = yield* makeFixture();
-        yield* addAdmin(fixture.organizationId);
+    it.effect(
+      "allows an invitation while the workspace is under its member limit",
+      () =>
+        Effect.gen(function* () {
+          const policy = yield* MembershipPolicy;
+          const fixture = yield* makeFixture();
 
-        yield* policy.canInviteRoleWithinPlan({
-          organizationId: fixture.organizationId,
-          role: "manager",
-        });
-      })
+          // The fixture's owner is one member of a two-member Free allowance.
+          yield* policy.canInviteWithinPlan({
+            organizationId: fixture.organizationId,
+          });
+        })
     );
-    it.effect("rejects privileged invitations at the plan limit", () =>
+    it.effect("rejects an invitation once members reach the plan limit", () =>
       Effect.gen(function* () {
         const policy = yield* MembershipPolicy;
         const fixture = yield* makeFixture();
         yield* addAdmin(fixture.organizationId);
 
         const error = yield* Effect.flip(
-          policy.canInviteRoleWithinPlan({
+          policy.canInviteWithinPlan({
             organizationId: fixture.organizationId,
-            role: "admin",
           })
         );
 
         expect(error).toMatchObject({ _tag: "PolicyDenied" });
+      })
+    );
+    it.effect("allows a role change at the member limit", () =>
+      Effect.gen(function* () {
+        // A role change moves nobody in or out of the workspace, so the member
+        // allowance does not apply to it: the owner may still demote the admin
+        // that filled the second seat.
+        const handlers = yield* MembershipRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const adminMemberId = yield* addAdmin(fixture.organizationId);
+
+        yield* handlers
+          .UpdateOrganizationMemberRole({
+            organizationId: fixture.organizationId,
+            memberId: adminMemberId,
+            role: "manager",
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
       })
     );
     it.effect("prevents an admin from promoting themselves to owner", () =>
