@@ -161,7 +161,7 @@ The DB `member.role` column is `text` (not an enum), so the rename is a data mig
 - `policy.ts` — `hasMembership`/`hasOrganizationRole`/ `hasOrganizationOwnerOrAdmin`/`isMember` now delegate to `@feeblo/permissions`; new `canPermission(organizationId, permission)` for role gates. `hasOrganizationOwnerOrAdmin` is kept as an alias of `canPermission(orgId, "workspace.update")`.
 - Module policies (`board`, `post`, `changelog`, `tag`, `site`, `contact`, `company`, `attribute-definition`, `membership`, `billing`, `roadmap`, `roadmap-column`, `post-status`) use `canPermission` with named permissions instead of role-literal checks.
 - `membership/schema.ts` builds `ROLE_LITERAL` from `ROLES`.
-- `plan-entitlements.ts` uses `PRIVILEGED_ROLES`/`isPrivilegedRole` from `@feeblo/permissions` directly (the old `PRIVILEGED_MEMBER_ROLES` / `isPrivilegedMemberRole` aliases were removed). `isPrivilegedRole` is derived from the permission table (`roleGrants(role, "workspace.update")`) rather than a hardcoded role list.
+- `plan-entitlements.ts` no longer uses `PRIVILEGED_ROLES`/`isPrivilegedRole`: the plan's member allowance counts every member, so a privileged-role list has no part in it. `isPrivilegedRole` remains in `@feeblo/permissions` (derived from the permission table via `roleGrants(role, "workspace.update")`, not a hardcoded role list) for permission gates such as `hasOwnerOrAdminRole`.
 - The `member.role` / `invitation.role` columns in `packages/db` are typed `.$type<Role>()` / `.$type<Role | null>()`, so repository results stay assignable to the Effect schemas.
 
 **Frontend (`packages/web-shared`):**

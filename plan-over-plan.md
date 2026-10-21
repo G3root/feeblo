@@ -4,7 +4,7 @@
 
 ## Objective
 
-A workspace that loses a paid plan keeps the state the paid plan paid for: private boards and roadmaps, and more boards, admin roles, changelog categories, and CRM entries than the new plan allows. Only _creation_ is gated today, so the paid surface survives the downgrade for free. This work names that state, computes it from the plan the workspace is on, and gates its own dashboard until an owner resolves it — without ever publishing or deleting customer data on its own.
+A workspace that loses a paid plan keeps the state the paid plan paid for: private boards and roadmaps, and more boards, members, changelog categories, and CRM entries than the new plan allows. Only _creation_ is gated today, so the paid surface survives the downgrade for free. This work names that state, computes it from the plan the workspace is on, and gates its own dashboard until an owner resolves it — without ever publishing or deleting customer data on its own.
 
 ## What a downgrade is, and is not
 
@@ -24,13 +24,13 @@ A workspace that loses a paid plan keeps the state the paid plan paid for: priva
 | Pre-downgrade warning | Deferred; it needs a projected plan, which is a different computation |
 | Computation | Live on every dashboard entry. No table, no migration, no recorded `over_plan_since` |
 | Enforcement | UI/route gate. The existing server policies remain the real boundary; no blanket write guard |
-| Fixable violations | Private boards, private roadmaps, boards over limit, admin roles over limit, changelog categories over limit, CRM entries over limit |
+| Fixable violations | Private boards, private roadmaps, boards over limit, members over limit, changelog categories over limit, CRM entries over limit |
 | Informational only | Paused integrations, inactive API keys, branding, widget SSO, subscriber emails |
 | Excluded | The 3-free-workspaces-per-owner cap (ADR 0013); it is owner-scoped and its only remedy is deleting a workspace |
 | Deletion | Inline in the gate, one resource per action, typed confirmation carrying the blast radius, no bulk delete |
 | Excess selection | The gate lists the resources; it never preselects which are "the excess" |
 | Upgrade path | A link to `/settings/billing`, which already hosts the plan cards and `UpgradePlanDialog` |
-| Vocabulary | Over-plan, Remediation, Remediation action, Admin role (see `CONTEXT.md`) |
+| Vocabulary | Over-plan, Remediation, Remediation action, Member, End user (see `CONTEXT.md`) |
 
 ## The gate
 
@@ -70,7 +70,7 @@ Everything else — the dashboard index, changelogs, roadmap, members, other set
 2. **Violations**, one section per resource page, ordered by cost:
    - **Boards** — every board, with `Private` and `Over limit` chips; `Make public` on private rows, `Delete` on any row.
    - **Roadmaps** — private roadmaps; `Make public`, `Delete`.
-   - **Admin roles** — members with `owner`/`admin` and pending admin invitations; `Change to manager`, `Cancel invitation`.
+   - **Members** — every member, whatever their role, plus pending invitations; `Remove`, `Cancel invitation`.
    - **Changelog categories** — `Delete`.
    - **CRM entries** — contacts and companies; `Delete`. Each section shows `N of limit` and, when the list is truncated, `showing N of M`.
 3. **What else stopped** — a collapsed section listing the degraded capabilities with links, per the allowlist.
@@ -107,7 +107,7 @@ Rank rules are respected, not bypassed: an admin cannot demote a peer admin (`co
 | `privateBoards` | boards with `visibility = PRIVATE` | `capabilities.privateBoards` is false |
 | `privateRoadmaps` | roadmaps with `visibility = private` | `capabilities.privateRoadmaps` is false |
 | `boards` | all boards | `limits.feedbackBoards !== null && count > limit` |
-| `adminRoles` | members with `owner`/`admin` **plus** pending invitations with those roles | `limits.privilegedMembers !== null && count > limit` |
+| `members` | all members **plus** all pending invitations | `limits.members !== null && count > limit` |
 | `changelogCategories` | all categories | `limits.changelogCategories !== null && count > limit` |
 | `crmEntries` | contacts **plus** companies | `limits.crmEntries !== null && count > limit` |
 
@@ -123,11 +123,11 @@ PlanComplianceResource = {
   kind: "board" | "roadmap" | "member" | "invitation"
       | "changelogCategory" | "contact" | "company";
   label: string;                 // board name, member name, contact email…
-  detail: string | null;         // "412 posts", "Owner", "pending invitation · admin"
+  detail: string | null;         // "412 posts", "Manager", "Pending invitation · Admin"
 };
 
 PlanComplianceViolation = {
-  kind: "privateBoards" | "privateRoadmaps" | "boards" | "adminRoles"
+  kind: "privateBoards" | "privateRoadmaps" | "boards" | "members"
       | "changelogCategories" | "crmEntries";
   count: number;                 // total, before truncation
   limit: number | null;
@@ -143,7 +143,7 @@ WorkspacePlanCompliance = {
 ```
 
 - **Counts first.** The service runs the count queries; it fetches resource rows only for a violation that is already over. A compliant workspace costs a handful of indexed counts and nothing else.
-- **Bounded previews.** Boards, roadmaps, and categories cap at 200 rows; CRM entries and admin roles at 100. A row beyond the cap is summarised as "and N more" and the workspace fixes the rest by reloading after the first batch. A professional downgrade with 5,000 contacts upgrades instead of clicking 4,990 times, which is the intended outcome.
+- **Bounded previews.** Boards, roadmaps, and categories cap at 200 rows; CRM entries and members at 100. A row beyond the cap is summarised as "and N more" and the workspace fixes the rest by reloading after the first batch. A professional downgrade with 5,000 contacts upgrades instead of clicking 4,990 times, which is the intended outcome.
 - **The same resource can appear twice** (a private board is also a board). The gate merges by `(kind, id)`.
 - **Detail counts** that make a confirmation honest (`412 posts`, `3 changelogs`) are computed in the same pass, grouped over the previewed ids.
 - **Authorization.** `Policy.hasMembership`. Callers without `billing.*` receive the violations with `resources: []` — kinds and counts are enough to explain the block, and invitation emails must not leak to a contributor. Callers with `billing.*` receive the previews.
@@ -154,7 +154,7 @@ WorkspacePlanCompliance = {
 - `BoardRepository.findMany` already filters by `visibility`; add `countByVisibility` if the count query is cheaper than fetching rows (it is).
 - `RoadmapRepository` has no `countByOrganizationId`; add counts for all and for `private`.
 - `ChangelogCategoryRepository.countByOrganizationId` exists.
-- `MembershipRepository.countPrivilegedMembers` and `countPendingPrivilegedInvitations` exist.
+- `MembershipRepository.countMembers` and `countPendingInvitations` exist.
 - Export `countCrmEntries` from `crm-entry/intake.ts` so the limit and the snapshot share one definition (contacts + companies). The intake transaction keeps its inner call.
 
 ## Dashboard wiring
@@ -194,5 +194,5 @@ The banner: "This workspace is over its {plan} plan — {N} {items} need attenti
 - `pnpm check` for each slice.
 - `packages/domain/src/plan-compliance/compliance.test.ts` on PGlite, `it.effect` + `layer`: free workspace with each violation kind; starter limits; professional limits; compliant workspace returns no violations and no resource fetches; non-billing caller gets empty `resources`; the `>=` boundary (exactly at limit is not a violation); private board counted in both groups.
 - `over-plan-routes.test.ts`: allowlist true/false per path and per snapshot, including the self-exempt gate and personal settings.
-- `pnpm db:seed` creates `overplan@feeblo.dev` / `TestPassword123!`: a Free workspace with four boards (one private), three admin roles, four changelog categories, eleven CRM entries, and a private roadmap. Its printed dashboard URL opens on the gate with every fixable finding represented, and its public board URL still serves while the dashboard is gated.
+- `pnpm db:seed` creates `overplan@feeblo.dev` / `TestPassword123!`: a Free workspace with four boards (one private), three members, four changelog categories, eleven CRM entries, and a private roadmap. Its printed dashboard URL opens on the gate with every fixable finding represented, and its public board URL still serves while the dashboard is gated.
 - `e2e/tests/over-plan.spec.ts`: creates a workspace, puts it on Starter through the test-only `/__e2e/set-plan` route (extended to accept `free` so the spec can perform the real downgrade), creates a private board, removes the subscription, and then asserts the redirect, the blocked and allowed pages, the public board staying live, both typed confirmations, and the gate closing after the last finding.

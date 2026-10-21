@@ -4,7 +4,7 @@
 
 Workspace creation (`WorkspaceRpcHandlersEffect.CreateWorkspace`) enforces a per-user cap: a user may own at most `PLAN_ENTITLEMENTS.free.limits.workspaces` (3) workspaces whose plan resolves to `free`. Ownership means the user's member role list contains `owner`; paid workspaces are not counted and do not raise the cap, so upgrading one of the free workspaces frees a slot.
 
-The cap lives in the plan catalog as a `LimitFeatureKey`, next to feedback boards, admin roles, changelog categories, CRM entries, and submission recipients, rather than as a private constant in the workspace module. The check runs inside the create transaction, after `WorkspaceRepository.lockUser` takes a `FOR NO KEY UPDATE` lock on the user row.
+The cap lives in the plan catalog as a `LimitFeatureKey`, next to feedback boards, members, changelog categories, CRM entries, and submission recipients, rather than as a private constant in the workspace module. The check runs inside the create transaction, after `WorkspaceRepository.lockUser` takes a `FOR NO KEY UPDATE` lock on the user row.
 
 ## Why
 
