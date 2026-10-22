@@ -121,11 +121,11 @@ catalogs:
       specifier: 1.0.0-rc.4
       version: 1.0.0-rc.4
     drizzle-orm:
-      specifier: 1.0.0-rc.5-169397b
-      version: 1.0.0-rc.5-169397b
+      specifier: 1.0.0-rc.5
+      version: 1.0.0-rc.5
     drizzle-seed:
-      specifier: 1.0.0-rc.4
-      version: 1.0.0-rc.4
+      specifier: 1.0.0-rc.5
+      version: 1.0.0-rc.5
     effect:
       specifier: 4.0.0
       version: 4.0.0
@@ -357,7 +357,7 @@ importers:
         version: link:../../packages/utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -499,7 +499,7 @@ importers:
         version: 1.0.1(react@19.2.8)(solid-js@1.9.14)
       better-auth:
         specifier: 'catalog:'
-        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
+        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -602,7 +602,7 @@ importers:
         version: link:../../packages/utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -642,7 +642,7 @@ importers:
         version: link:../../packages/utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -734,7 +734,7 @@ importers:
         version: link:../../packages/utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -783,7 +783,7 @@ importers:
         version: link:../../packages/utils
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -811,7 +811,7 @@ importers:
     dependencies:
       '@better-auth/api-key':
         specifier: 'catalog:'
-        version: 1.7.2(ef2b56ff9957808539a29d255fa0a3b8)
+        version: 1.7.2(5adccc37ce0eae901abc65cadaf6edcb)
       '@effect/platform-node':
         specifier: 'catalog:'
         version: 4.0.0(effect@4.0.0)(redis@6.2.1)
@@ -841,16 +841,16 @@ importers:
         version: link:../utils
       '@polar-sh/better-auth':
         specifier: 'catalog:'
-        version: 1.8.4(c5c9df10ef077fa0b6a49e172217a1a1)
+        version: 1.8.4(67277df03f101f7bb68e7346091463ba)
       '@polar-sh/sdk':
         specifier: 'catalog:'
         version: 0.47.1
       better-auth:
         specifier: 'catalog:'
-        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
+        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -900,7 +900,7 @@ importers:
         version: 17.4.2
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -931,13 +931,13 @@ importers:
         version: 8.21.0
       better-auth:
         specifier: 'catalog:'
-        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
+        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
       drizzle-kit:
         specifier: 'catalog:'
         version: 1.0.0-rc.4
       drizzle-seed:
         specifier: 'catalog:'
-        version: 1.0.0-rc.4(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))
+        version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))
       tsx:
         specifier: 'catalog:'
         version: 4.23.12
@@ -957,8 +957,8 @@ importers:
         specifier: ^0.0.9
         version: 0.0.9(@electric-sql/pglite@0.5.8)
       drizzle-orm:
-        specifier: 1.0.0-rc.5-169397b
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        specifier: 'catalog:'
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       postgres:
         specifier: ^3.4.7
         version: 3.4.9
@@ -1016,13 +1016,13 @@ importers:
         version: 0.47.1
       better-auth:
         specifier: 'catalog:'
-        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
+        version: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
       cookie-es:
         specifier: ^3.1.1
         version: 3.1.1
       drizzle-orm:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+        version: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       effect:
         specifier: 'catalog:'
         version: 4.0.0
@@ -2126,8 +2126,8 @@ packages:
   '@dotenvx/primitives@0.8.0':
     resolution: {integrity: sha512-VYJy0uhFm9zTJ1TxBaW/pA8bjbOM/OttaNMwZ1RHG4JKyRG7DhSdiqD1ipQoAyoD22olUtxbP78W9xY3Wd11bg==}
 
-  '@drizzle-team/brocli@0.12.0':
-    resolution: {integrity: sha512-mlUE+rZ8CatQekLhnaiN91Iemdd+e2gFKooGlnRB3oPTL3VghLfX24dx7HrzMNeC1JrIB/0kpsfyty3f5HNfxQ==}
+  '@drizzle-team/brocli@0.12.1':
+    resolution: {integrity: sha512-yHwomvolVafvUXhy5TdiJVkuNCxXn+bKOs2aWiWEQh/5YaV97Oa/abJz3dmx7lxgIUsUlS1Jl4mEfvJPo3YsVw==}
 
   '@effect-aws/client-s3@2.0.0-beta.6':
     resolution: {integrity: sha512-eT74hhA7G7ydzmJcjNdIcw7Bq/8oGPf8YR6W8orwylFkUUriFwp1yHB++y6s8P6EIFI22TioQFQymaT7V+xaaA==}
@@ -6165,21 +6165,23 @@ packages:
       sqlite3:
         optional: true
 
-  drizzle-orm@1.0.0-rc.5-169397b:
-    resolution: {integrity: sha512-xf5TudQhFplMMzjwgmMY5f64Sqbv4iwXxdTHBHqvLMt+SHyY8rAYhzNLQchEkDxiqMclTS/txPEOg5pdQy0Tcw==}
+  drizzle-orm@1.0.0-rc.5:
+    resolution: {integrity: sha512-7BMYTsAZbQ9DcQCtLG4G202Hq6nc/e8o1EBKN6nBweRI8EGPFe/VdyvWQCsU9fuZSiRjNpELolUSi//JFBq+lw==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
+      '@aws/aurora-dsql-node-postgres-connector': '>=0.1.9'
+      '@aws/aurora-dsql-postgresjs-connector': '>=0.3.0'
       '@cloudflare/workers-types': '>=4'
-      '@drizzle-team/minipg': '>=0.3.2'
-      '@effect/sql-d1': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-libsql': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-mysql2': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-pg': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-pglite': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-sqlite-bun': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-sqlite-do': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-sqlite-node': '>=4.0.0-beta.105 || >=4.0.0'
-      '@effect/sql-sqlite-wasm': '>=4.0.0-beta.105 || >=4.0.0'
+      '@drizzle-team/minipg': '>=0.4.2'
+      '@effect/sql-d1': '>=4.0.0'
+      '@effect/sql-libsql': '>=4.0.0'
+      '@effect/sql-mysql2': '>=4.0.0'
+      '@effect/sql-pg': '>=4.0.0'
+      '@effect/sql-pglite': '>=4.0.0'
+      '@effect/sql-sqlite-bun': '>=4.0.0'
+      '@effect/sql-sqlite-do': '>=4.0.0'
+      '@effect/sql-sqlite-node': '>=4.0.0'
+      '@effect/sql-sqlite-wasm': '>=4.0.0'
       '@electric-sql/pglite': '>=0.2.0'
       '@libsql/client': '>=0.10.0'
       '@libsql/client-wasm': '>=0.10.0'
@@ -6205,7 +6207,7 @@ packages:
       arktype: '>=2.0.0'
       better-sqlite3: '>=9.3.0'
       bun-types: '*'
-      effect: '>=4.0.0-beta.105 || >=4.0.0'
+      effect: '>=4.0.0'
       expo-sqlite: '>=14.0.0'
       mssql: ^11.0.1
       mysql2: '>=2'
@@ -6218,6 +6220,10 @@ packages:
       zod: ^3.25.0 || ^4.0.0
     peerDependenciesMeta:
       '@aws-sdk/client-rds-data':
+        optional: true
+      '@aws/aurora-dsql-node-postgres-connector':
+        optional: true
+      '@aws/aurora-dsql-postgresjs-connector':
         optional: true
       '@cloudflare/workers-types':
         optional: true
@@ -6314,10 +6320,13 @@ packages:
       zod:
         optional: true
 
-  drizzle-seed@1.0.0-rc.4:
-    resolution: {integrity: sha512-WztS8tuuWV9Wqx5rMIhFlFuIfE0DPf7Zher3WtCumhSRgsAo5dASRmzS/w+6h22hEfOF/YJk6f3vKIqltKhUEg==}
+  drizzle-seed@1.0.0-rc.5:
+    resolution: {integrity: sha512-WCQXQ6JbABsMhK+8FDJAkjdObzK4sj96MZQHXCG034vjIY+K0AijdF6Dl8SpQA4i1yxT0SGg/dxsfzMu1IcnmQ==}
     peerDependencies:
-      drizzle-orm: '>=1.0.0-beta.2'
+      drizzle-orm: '>=1.0.0-rc.5'
+    peerDependenciesMeta:
+      drizzle-orm:
+        optional: true
 
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
@@ -6711,8 +6720,8 @@ packages:
     resolution: {integrity: sha512-kVCxPF3vQM/N0B1PmoqVUqgHP+EeVjmZSQn+1oCRPxd2P21P2F19lIgbR3HBosbB1PUhOAoctJnfEn2GbN2eZA==}
     engines: {node: '>=18'}
 
-  get-tsconfig@4.14.2:
-    resolution: {integrity: sha512-XpwZALwwl/BaKTAyC6+c5T8y6kCg2jk+XGqOVrKIQmW49pNypYLMRjCUXqa28tQgJlhS2RlzP7sc+Rx7W6qsfw==}
+  get-tsconfig@4.14.3:
+    resolution: {integrity: sha512-++QEw4DIY7WGoukz+/+A/8dGYPT9l9yIadnmSgZ8Rjr3YVSVDipQSO9CdnJo9ePqFqUUqh+wk9uIaoiAwsiPkA==}
 
   glob-parent@5.1.2:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
@@ -9870,11 +9879,11 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.18
 
-  '@better-auth/api-key@1.7.2(ef2b56ff9957808539a29d255fa0a3b8)':
+  '@better-auth/api-key@1.7.2(5adccc37ce0eae901abc65cadaf6edcb)':
     dependencies:
       '@better-auth/core': 1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2)
       '@better-auth/utils': 0.4.2
-      better-auth: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
+      better-auth: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
       better-call: 1.4.0(zod@4.6.5)
       zod: 4.6.5
 
@@ -9892,12 +9901,12 @@ snapshots:
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260702.1
 
-  '@better-auth/drizzle-adapter@1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))':
+  '@better-auth/drizzle-adapter@1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))':
     dependencies:
       '@better-auth/core': 1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2)
       '@better-auth/utils': 0.4.2
     optionalDependencies:
-      drizzle-orm: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+      drizzle-orm: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
 
   '@better-auth/kysely-adapter@1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)(kysely@0.29.5)':
     dependencies:
@@ -10081,7 +10090,7 @@ snapshots:
 
   '@dotenvx/primitives@0.8.0': {}
 
-  '@drizzle-team/brocli@0.12.0': {}
+  '@drizzle-team/brocli@0.12.1': {}
 
   '@effect-aws/client-s3@2.0.0-beta.6(effect@4.0.0)':
     dependencies:
@@ -11347,11 +11356,11 @@ snapshots:
     dependencies:
       playwright: 1.62.1
 
-  '@polar-sh/better-auth@1.8.4(c5c9df10ef077fa0b6a49e172217a1a1)':
+  '@polar-sh/better-auth@1.8.4(67277df03f101f7bb68e7346091463ba)':
     dependencies:
       '@polar-sh/checkout': 0.2.1(@stripe/react-stripe-js@4.0.2(@stripe/stripe-js@7.9.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@stripe/stripe-js@7.9.0)(react@19.2.8)
       '@polar-sh/sdk': 0.47.1
-      better-auth: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
+      better-auth: 1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2)
       zod: 4.6.5
     transitivePeerDependencies:
       - '@stripe/react-stripe-js'
@@ -13101,10 +13110,10 @@ snapshots:
 
   before-after-hook@3.0.2: {}
 
-  better-auth@1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2):
+  better-auth@1.7.2(@cloudflare/workers-types@4.20260702.1)(@tanstack/react-start@1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))(next@16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.14)(vitest@5.0.2):
     dependencies:
       '@better-auth/core': 1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2)
-      '@better-auth/drizzle-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))
+      '@better-auth/drizzle-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5))
       '@better-auth/kysely-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)(kysely@0.29.5)
       '@better-auth/memory-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)
       '@better-auth/mongo-adapter': 1.7.2(@better-auth/core@1.7.2(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@cloudflare/workers-types@4.20260702.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.8)(kysely@0.29.5)(nanostores@1.4.2))(@better-auth/utils@0.4.2)
@@ -13123,7 +13132,7 @@ snapshots:
     optionalDependencies:
       '@tanstack/react-start': 1.168.57(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.4)(rollup@4.62.4)(vite-plugin-solid@2.11.14(solid-js@1.9.14)(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0)))(vite@8.2.1(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))
       drizzle-kit: 1.0.0-rc.4
-      drizzle-orm: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
+      drizzle-orm: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       next: 16.3.0(@babel/core@7.29.7)(@playwright/test@1.62.1)(@types/node@26.2.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -13510,10 +13519,10 @@ snapshots:
 
   drizzle-kit@1.0.0-rc.4:
     dependencies:
-      '@drizzle-team/brocli': 0.12.0
+      '@drizzle-team/brocli': 0.12.1
       '@js-temporal/polyfill': 0.5.1
       esbuild: 0.25.12
-      get-tsconfig: 4.14.2
+      get-tsconfig: 4.14.3
       jiti: 2.7.0
 
   drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260702.1)(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(kysely@0.29.5)(postgres@3.4.9):
@@ -13524,7 +13533,7 @@ snapshots:
       kysely: 0.29.5
       postgres: 3.4.9
 
-  drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5):
+  drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20260702.1
       '@effect/sql-pg': 4.0.0(effect@4.0.0)
@@ -13535,10 +13544,11 @@ snapshots:
       postgres: 3.4.9
       zod: 4.6.5
 
-  drizzle-seed@1.0.0-rc.4(drizzle-orm@1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)):
+  drizzle-seed@1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)):
     dependencies:
-      drizzle-orm: 1.0.0-rc.5-169397b(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
       pure-rand: 6.1.0
+    optionalDependencies:
+      drizzle-orm: 1.0.0-rc.5(@cloudflare/workers-types@4.20260702.1)(@effect/sql-pg@4.0.0(effect@4.0.0))(@effect/sql-pglite@4.0.0(effect@4.0.0))(@electric-sql/pglite@0.5.8)(@types/pg@8.21.0)(effect@4.0.0)(postgres@3.4.9)(zod@4.6.5)
 
   dunder-proto@1.0.1:
     dependencies:
@@ -14033,7 +14043,7 @@ snapshots:
       '@sec-ant/readable-stream': 0.4.1
       is-stream: 4.0.1
 
-  get-tsconfig@4.14.2:
+  get-tsconfig@4.14.3:
     dependencies:
       resolve-pkg-maps: 1.0.0
 
