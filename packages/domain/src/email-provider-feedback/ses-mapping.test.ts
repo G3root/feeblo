@@ -74,7 +74,7 @@ describe("toProviderLifecycleEvent", () => {
     });
     expect(
       toProviderLifecycleEvent("sns-delivery-3", notification)?.messageId
-    ).toBe("01000178a3125d21-000000");
+    ).toBe("<01000178a3125d21-000000>");
   });
 
   it("treats a whitespace-only Message-ID header as absent", () => {
@@ -101,7 +101,7 @@ describe("toProviderLifecycleEvent", () => {
     expect(
       toProviderLifecycleEvent("sns-delivery-5", withoutCommonHeaders)
         ?.messageId
-    ).toBe("01000178a3125d21-000000");
+    ).toBe("<01000178a3125d21-000000>");
   });
 
   it("treats a whitespace-only commonHeaders messageId as absent", () => {
@@ -114,7 +114,7 @@ describe("toProviderLifecycleEvent", () => {
     });
     expect(
       toProviderLifecycleEvent("sns-delivery-7", notification)?.messageId
-    ).toBe("01000178a3125d21-000000");
+    ).toBe("<01000178a3125d21-000000>");
   });
 
   it("maps a permanent bounce to a hard bounce lifecycle event", () => {
@@ -161,6 +161,16 @@ describe("toProviderLifecycleEvent", () => {
     expect(
       toProviderLifecycleEvent("sns-bounce-2", notification)
     ).toMatchObject({ type: "bounced", bounceType: "soft" });
+  });
+
+  it("treats a bounce event with no bounce block as undetermined", () => {
+    const notification: SesEventNotification = {
+      eventType: "Bounce",
+      mail: deliveryNotification().mail,
+    };
+    expect(
+      toProviderLifecycleEvent("sns-bounce-missing", notification)
+    ).toMatchObject({ type: "bounced", bounceType: "undetermined" });
   });
 
   it("maps a delivery delay to a deferred lifecycle event", () => {
@@ -230,7 +240,7 @@ describe("toProviderLifecycleEvent", () => {
     expect(occurredAtDate.getTime()).toBeLessThanOrEqual(Date.now() + 100);
   });
 
-  it("maps an undetermined bounce to a hard bounce lifecycle event", () => {
+  it("maps an undetermined bounce to an undetermined lifecycle event", () => {
     const notification: SesEventNotification = {
       eventType: "Bounce",
       mail: deliveryNotification().mail,
@@ -242,7 +252,57 @@ describe("toProviderLifecycleEvent", () => {
     };
     expect(
       toProviderLifecycleEvent("sns-bounce-3", notification)
-    ).toMatchObject({ type: "bounced", bounceType: "hard" });
+    ).toMatchObject({ type: "bounced", bounceType: "undetermined" });
+  });
+
+  it("normalizes reportable recipients and falls back to the envelope destination", () => {
+    const bounced = toProviderLifecycleEvent("sns-recipients-1", {
+      eventType: "Bounce",
+      mail: {
+        ...deliveryNotification().mail,
+        destination: ["Envelope@Example.com"],
+      },
+      bounce: {
+        bounceType: "Permanent",
+        timestamp: "2026-08-18T00:00:01.000Z",
+        // AWS omits the address when it is on the account suppression list.
+        bouncedRecipients: [{ action: "failed" }],
+      },
+    });
+    expect(bounced?.recipients).toEqual(["envelope@example.com"]);
+
+    const reported = toProviderLifecycleEvent("sns-recipients-2", {
+      eventType: "Bounce",
+      mail: {
+        ...deliveryNotification().mail,
+        destination: ["envelope@example.com"],
+      },
+      bounce: {
+        bounceType: "Permanent",
+        timestamp: "2026-08-18T00:00:01.000Z",
+        bouncedRecipients: [
+          { emailAddress: "Bounced@Example.com" },
+          { emailAddress: "bounced@example.com" },
+        ],
+      },
+    });
+    expect(reported?.recipients).toEqual(["bounced@example.com"]);
+  });
+
+  it("reads the delivery correlation header regardless of casing", () => {
+    const notification = deliveryNotification({
+      mail: {
+        ...deliveryNotification().mail,
+        headers: [
+          ...(deliveryNotification().mail.headers ?? []),
+          { name: "x-feeblo-delivery-id", value: "edl_123" },
+        ],
+      },
+    });
+    expect(
+      toProviderLifecycleEvent("sns-delivery-correlation", notification)
+        ?.deliveryId
+    ).toBe("edl_123");
   });
 
   it("maps a complaint to a complained lifecycle event", () => {

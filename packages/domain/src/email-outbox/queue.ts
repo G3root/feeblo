@@ -9,7 +9,7 @@ import {
 import { createChangelogEmail } from "@feeblo/transactional/templates/changelog";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, eq, gte, inArray, isNull, sql, sum } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, or, sql, sum } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -24,6 +24,8 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
+import { EmailSuppressionRepository } from "../email-suppression/repository";
+import { recordEmailSuppression } from "../email-suppression/telemetry";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { NotificationPreferenceRepository } from "../notification-preference/repository";
 import { NotificationPreferenceTokenService } from "../notification-preference/tokens";
@@ -38,6 +40,10 @@ import {
   makeSubmissionNotificationPayload,
   resolveSubscriptionNotificationContent,
 } from "./content";
+import {
+  maximumDeliveryAttempts,
+  maximumInfrastructureFailures,
+} from "./limits";
 import { EmailOutboxRepository, type ResumedEmailDelivery } from "./repository";
 import {
   ChangelogTemplatePayload,
@@ -77,9 +83,6 @@ type DeliveryAttemptOutcome = Schema.Schema.Type<
  * by another worker, slid into the future, or lost all of its posts.
  */
 const noDeliveryIds: readonly string[] = [];
-
-const maximumDeliveryAttempts = 5;
-const maximumInfrastructureFailures = 10;
 
 /** The preference category an email intent's recipients are governed by. */
 const notificationCategoryForIntentKind = (
@@ -167,9 +170,20 @@ const resolveMemberNotificationRecipients = ({
         .filter((row) => row.category === category)
         .map((row) => row.userId)
     );
-    return candidates.filter(
+    const enabled = candidates.filter(
       (candidate) =>
         !paused.has(candidate.userId) && !categoryDisabled.has(candidate.userId)
+    );
+    // Suppressed addresses are dropped before a delivery row exists. The send
+    // path checks again, so this only saves rows and a claim; the second check
+    // is what keeps a suppression written after materialization effective.
+    const suppressions = yield* EmailSuppressionRepository;
+    const suppressed = yield* suppressions.findSuppressedEmails({
+      emails: enabled.map((candidate) => candidate.email),
+      organizationId,
+    });
+    return enabled.filter(
+      (candidate) => !suppressed.has(candidate.email.trim().toLowerCase())
     );
   });
 const materializationBatchSize = 100;
@@ -585,9 +599,20 @@ export const materializeEmailIntent = (outboxId: string) =>
               )
               .leftJoin(
                 schema.emailSuppressionTable,
-                eq(
-                  schema.emailSuppressionTable.email,
-                  schema.emailContactTable.email
+                and(
+                  eq(
+                    schema.emailSuppressionTable.email,
+                    schema.emailContactTable.email
+                  ),
+                  // Complaints and manual blocks belong to one workspace; a
+                  // platform row applies to every sender.
+                  or(
+                    isNull(schema.emailSuppressionTable.organizationId),
+                    eq(
+                      schema.emailSuppressionTable.organizationId,
+                      intent.organizationId
+                    )
+                  )
                 )
               )
               .leftJoin(
@@ -772,6 +797,21 @@ const sendDeliveryAttempt = (
       });
       return { _tag: "terminal" as const };
     }
+    // The cheapest decisive gate first: a suppressed address never reaches the
+    // provider, so it must not spend an attempt or the volume queries below.
+    const suppressions = yield* EmailSuppressionRepository;
+    if (
+      yield* suppressions.isSuppressed({
+        email: delivery.recipientEmail,
+        organizationId: intent.organizationId,
+      })
+    ) {
+      yield* repository.markDeliveryOutcome({
+        id: delivery.id,
+        state: "suppressed",
+      });
+      return { _tag: "terminal" as const };
+    }
     if (
       config.globalDeliveryPaused ||
       config.pausedWorkspaceIds.has(intent.organizationId)
@@ -924,18 +964,6 @@ const sendDeliveryAttempt = (
         });
         return { _tag: "terminal" as const };
       }
-    }
-    const [suppressed] = yield* db
-      .select({ email: schema.emailSuppressionTable.email })
-      .from(schema.emailSuppressionTable)
-      .where(eq(schema.emailSuppressionTable.email, delivery.recipientEmail))
-      .limit(1);
-    if (suppressed) {
-      yield* repository.markDeliveryOutcome({
-        id: delivery.id,
-        state: "suppressed",
-      });
-      return { _tag: "terminal" as const };
     }
     // Organization-access gate for post-attributed notifications
     // (plan-on-behalf.md, "Notification eligibility"). Runs after consent so
@@ -1303,9 +1331,22 @@ const sendDeliveryAttempt = (
       });
       return { _tag: "terminal" as const };
     }
+    // The verification template is the one variant without a `headers` field;
+    // the delivery id must ride on every message regardless.
+    const existingHeaders =
+      "headers" in resolvedMailMessage.value
+        ? resolvedMailMessage.value.headers
+        : undefined;
     const sent = yield* mailer
       .send({
         ...resolvedMailMessage.value,
+        // The provider echoes headers back in its events; SES truncates the
+        // list and some relays rewrite Message-ID, so the delivery id is the
+        // second correlation key for bounce attribution.
+        headers: {
+          ...existingHeaders,
+          "X-Feeblo-Delivery-Id": delivery.id,
+        },
         messageId: delivery.messageId,
         to: delivery.recipientEmail,
       })
@@ -1317,13 +1358,44 @@ const sendDeliveryAttempt = (
         })),
         Effect.catchTags({
           MailPermanentDeliveryError: (error) =>
-            repository
-              .markDeliveryOutcome({
+            Effect.gen(function* () {
+              // A recipient-level 5xx ("user unknown", "mailbox disabled") is
+              // the address fact a webhook would have reported later. Waiting
+              // for the provider's feedback loop means sending to a known-bad
+              // address again, so the rejection suppresses here.
+              if (error.failureClass === "recipient") {
+                // Best-effort: the rejection is already terminal, and failing
+                // here would defer the delivery and send to the known-bad
+                // address again on the retry. The address is suppressed on the
+                // next legitimate send if this write is lost.
+                yield* suppressions
+                  .upsert({
+                    email: delivery.recipientEmail,
+                    note: null,
+                    now: DateTime.toDateUtc(now),
+                    organizationId: intent.organizationId,
+                    providerEventId: null,
+                    reason: "hard_bounce",
+                  })
+                  .pipe(
+                    Effect.tap(() =>
+                      recordEmailSuppression("hard_bounce", "smtp")
+                    ),
+                    Effect.catch((suppressionError) =>
+                      Effect.logError(
+                        "Could not record the SMTP recipient rejection as a suppression",
+                        suppressionError
+                      )
+                    )
+                  );
+              }
+              yield* repository.markDeliveryOutcome({
                 id: delivery.id,
                 state: "failed",
                 lastError: { tag: error._tag },
-              })
-              .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" })),
+              });
+              return { _tag: "terminal" as const };
+            }),
           MailTemplateRenderError: (error) =>
             repository
               .markDeliveryOutcome({
@@ -1738,6 +1810,7 @@ export const reconcileEmailOutbox = ({
   | DatabaseService
   | EmailOutboxConfig
   | EmailOutboxRepository
+  | EmailSuppressionRepository
   | EmailSubscriptionRepository
   | EntitlementPolicy
   | EmailOutboxQueues

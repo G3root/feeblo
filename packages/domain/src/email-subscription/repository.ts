@@ -16,7 +16,6 @@ import {
   type EmailSubscriptionTokenRequest,
   parseEmailAddress,
   type EmailSubscriptionRecord as Subscription,
-  type EmailSuppressionRecord as Suppression,
 } from "./schema";
 import {
   type EmailSubscriptionToken,
@@ -64,11 +63,6 @@ export interface UnsubscribeEmailSubscriptionInput {
   readonly now: Subscription["updatedAt"];
   readonly unsubscribeToken: EmailSubscriptionTokenRequest["token"];
 }
-
-export type UpsertEmailSuppressionInput = Pick<
-  Suppression,
-  "email" | "providerEventId" | "reason"
->;
 
 const dataError = (
   operation: string,
@@ -825,47 +819,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     return rows.map((row) => row.organizationId);
   });
 
-  const upsertSuppression = Effect.fn(
-    "EmailSubscriptionRepository.upsertSuppression"
-  )(function* (input: UpsertEmailSuppressionInput) {
-    const email = yield* parseEmailAddress(input.email, "upsertSuppression");
-    if (input.providerEventId !== null) {
-      const [inserted] = yield* db
-        .insert(schema.emailSuppressionTable)
-        .values({
-          email,
-          reason: input.reason,
-          providerEventId: input.providerEventId,
-        })
-        .onConflictDoNothing({
-          target: schema.emailSuppressionTable.providerEventId,
-        })
-        .returning({ email: schema.emailSuppressionTable.email });
-      return inserted === undefined
-        ? { _tag: "DuplicateEvent" as const }
-        : { _tag: "Upserted" as const };
-    }
-
-    const [upserted] = yield* db
-      .insert(schema.emailSuppressionTable)
-      .values({
-        email,
-        reason: input.reason,
-        providerEventId: null,
-      })
-      .onConflictDoUpdate({
-        target: schema.emailSuppressionTable.email,
-        set: { reason: input.reason },
-      })
-      .returning({ email: schema.emailSuppressionTable.email });
-    return upserted !== undefined
-      ? { _tag: "Upserted" as const }
-      : yield* dataError(
-          "upsertSuppression",
-          "Suppression conflict did not resolve to a stored row"
-        );
-  });
-
   const deriveLinkToken = Effect.fn(
     "EmailSubscriptionRepository.deriveLinkToken"
   )(
@@ -937,7 +890,6 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     unsubscribePreviousAuthorTopic,
     reconcileSubscriptionPlanStates,
     findPlanStateOrganizationIds,
-    upsertSuppression,
     verifySubscription,
   };
 });

@@ -44,6 +44,8 @@ For monitors, start from the same queries:
 
 - due integration delivery backlog above zero for 10 minutes;
 - oldest queued email age above five minutes;
+- 24-hour hard bounce rate (outbox hard bounces / outbox submissions) above 5%, critical above 10%;
+- 24-hour complaint rate (outbox complaints / outbox submissions) above 0.1%, critical above 0.5%;
 - any `exhausted` integration delivery;
 - HTTP 5xx burn rate above 14.4 for one hour, or above 6 for six hours, against a 1% objective;
 - any `feeblo_telemetry_export_failures_total` increase over 5 minutes, because telemetry is being lost;

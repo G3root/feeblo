@@ -72,7 +72,7 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Roadmaps | Prioritize the roadmap | No | Yes | Yes |
 | Changelog | Manage the changelog | No | Yes | Yes |
 | Changelog | Manage changelog privacy | No | No | Yes |
-| Developer | Manage API/SSO keys or webhooks | No | No | Yes |
+| Developer | Manage API/SSO keys, webhooks, or the email suppression list | No | No | Yes |
 | Settings | Manage post statuses | No | Yes | Yes |
 | Settings | Manage authentication, billing, company profile, custom domains, email, or integrations | No | No | Yes |
 | Settings | Manage teammates | No | No | Yes |
@@ -80,7 +80,7 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 
 The matrix is the authorization contract, including capabilities planned for future product surfaces. Board import and CSV export shipped as the distinct permissions `boards.importPosts` and `boards.exportData` (manager and above), enforced in `packages/domain/src/data-transfer/policies` and mirrored in Settings → Data → Imports & exports. Create-post-form customization is not currently shipped; it must receive a distinct named permission and a matching backend/frontend gate when implemented, and no existing generic permission should be reused for it.
 
-The Developer row is implemented in pieces: outbound webhook management uses the named `webhooks.manage`, the Public API's keys use the named `apiKeys.manage`, and widget SSO keys still gate on the generic `workspace.update` (see the migration checklist below).
+The Developer row is implemented in pieces: outbound webhook management uses the named `webhooks.manage`, the Public API's keys use the named `apiKeys.manage`, the deliverability suppression surface uses the named `emailSuppressions.manage`, and widget SSO keys still gate on the generic `workspace.update` (see the migration checklist below).
 
 ### Layer 2 — Named permissions
 
@@ -92,7 +92,7 @@ comments.*           members.invite      members.remove
 members.assign       site.*              roadmap.*
 statuses.*           billing.*           contacts.*
 companies.*          webhooks.manage     integrations.manage
-apiKeys.manage
+apiKeys.manage       emailSuppressions.manage
 ```
 
 `packages/permissions/src/permissions.ts` is the catalog (id + label + description, anchored to the backend policy it maps to). Its `createPermissions(resource, actions)` utility creates the action permissions and the matching `{resource}.*` wildcard. `roleGrants` resolves a wildcard grant for action checks. `src/role-permissions.ts` is the role → permission table. Roles inherit permissions from lower ranks automatically (`permissionsForRole`).

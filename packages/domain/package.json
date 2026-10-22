@@ -163,6 +163,15 @@
     "./email-subscription/repository": {
       "default": "./src/email-subscription/repository.ts"
     },
+    "./email-suppression/guard": {
+      "default": "./src/email-suppression/guard.ts"
+    },
+    "./email-suppression/repository": {
+      "default": "./src/email-suppression/repository.ts"
+    },
+    "./email-suppression/schema": {
+      "default": "./src/email-suppression/schema.ts"
+    },
     "./entitlement/policies": {
       "default": "./src/entitlement/policies.ts"
     },

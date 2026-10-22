@@ -1,3 +1,5 @@
+import { normalizeEmailAddress } from "@feeblo/domain-contracts/email";
+
 import type { ProviderLifecycleEvent } from "./schema";
 import type { SesEventNotification } from "./ses-schema";
 
@@ -36,6 +38,64 @@ const findMessageId = (notification: SesEventNotification): string => {
   );
 };
 
+const findHeader = (
+  notification: SesEventNotification,
+  name: string
+): string | undefined =>
+  notification.mail.headers
+    ?.find((header) => header.name.toLowerCase() === name)
+    ?.value.trim();
+
+/**
+ * The addresses a provider event is about.
+ *
+ * A bounce names the recipients that failed and a complaint names the ones who
+ * reported, which is the set suppression needs. Delivery, delay, reject and
+ * open/click events carry no per-address detail, so the envelope destination
+ * is the honest fallback. Values are normalized because the suppression and
+ * delivery lookups compare addresses exactly.
+ */
+const findRecipients = (
+  notification: SesEventNotification
+): readonly string[] => {
+  const reported =
+    notification.eventType === "Bounce"
+      ? (notification.bounce?.bouncedRecipients ?? []).flatMap((recipient) =>
+          recipient.emailAddress === undefined ? [] : [recipient.emailAddress]
+        )
+      : notification.eventType === "Complaint"
+        ? (notification.complaint?.complainedRecipients ?? []).flatMap(
+            (recipient) =>
+              recipient.emailAddress === undefined
+                ? []
+                : [recipient.emailAddress]
+          )
+        : notification.eventType === "Delivery"
+          ? (notification.delivery?.recipients ?? [])
+          : [];
+  const fallback = notification.mail.destination ?? [];
+  return [
+    ...new Set(
+      (reported.length > 0 ? reported : fallback).map((email) =>
+        normalizeEmailAddress(email)
+      )
+    ),
+  ];
+};
+
+/**
+ * Normalizes a provider Message-ID for comparison with the stored header.
+ *
+ * The outbox persists the header exactly as it sends it, angle brackets
+ * included. SES repeats the header verbatim in `mail.headers`, but
+ * `commonHeaders.messageId` and third-party relays may drop the brackets, so
+ * both sides of the lookup are compared in bracket form.
+ */
+const normalizeProviderMessageId = (value: string): string => {
+  const trimmed = value.trim();
+  return trimmed.startsWith("<") ? trimmed : `<${trimmed}>`;
+};
+
 /**
  * Normalizes one Amazon SES event notification into Feeblo's provider-neutral
  * lifecycle event. Events that carry no mailing feedback (Send, Open, Click)
@@ -45,8 +105,14 @@ export const toProviderLifecycleEvent = (
   eventId: string,
   notification: SesEventNotification
 ): ProviderLifecycleEvent | undefined => {
-  const messageId = findMessageId(notification);
+  const messageId = normalizeProviderMessageId(findMessageId(notification));
   const mailTimestamp = notification.mail.timestamp;
+  const recipients = findRecipients(notification);
+  const headerDeliveryId = findHeader(notification, "x-feeblo-delivery-id");
+  const deliveryId =
+    headerDeliveryId === undefined || headerDeliveryId === ""
+      ? undefined
+      : headerDeliveryId;
 
   switch (notification.eventType) {
     case "Delivery": {
@@ -58,7 +124,9 @@ export const toProviderLifecycleEvent = (
           notification.delivery?.timestamp,
           mailTimestamp
         ),
+        recipients,
         type: "delivered" as const,
+        ...(deliveryId !== undefined && { deliveryId }),
       };
       return smtpResponse !== undefined && smtpResponse !== ""
         ? {
@@ -72,9 +140,16 @@ export const toProviderLifecycleEvent = (
     }
     case "Bounce": {
       const bounce = notification.bounce;
-      // AWS cannot classify Undetermined bounces; treat them like hard bounces
-      // so a failed delivery never silently stays in flight.
-      const bounceType = bounce?.bounceType === "Transient" ? "soft" : "hard";
+      // Only `Permanent` is an address fact. `Transient` is retried. Anything
+      // else — `Undetermined`, or an event with no bounce block at all — is
+      // also retried: treating an unknown classification as hard would
+      // suppress an address that may still be deliverable.
+      const bounceType =
+        bounce?.bounceType === "Permanent"
+          ? "hard"
+          : bounce?.bounceType === "Transient"
+            ? "soft"
+            : "undetermined";
       const diagnosticCode =
         bounce?.bouncedRecipients?.[0]?.diagnosticCode?.trim();
       const category =
@@ -83,9 +158,11 @@ export const toProviderLifecycleEvent = (
         eventId,
         messageId,
         occurredAt: parseOccurredAt(bounce?.timestamp, mailTimestamp),
+        recipients,
         type: "bounced",
         bounceType,
         metadata: { category: truncate(category, 64) },
+        ...(deliveryId !== undefined && { deliveryId }),
       };
       return diagnosticCode !== undefined && diagnosticCode !== ""
         ? {
@@ -104,8 +181,10 @@ export const toProviderLifecycleEvent = (
         eventId,
         messageId,
         occurredAt: parseOccurredAt(complaint?.timestamp, mailTimestamp),
+        recipients,
         type: "complained",
         metadata: { category: truncate(category, 64) },
+        ...(deliveryId !== undefined && { deliveryId }),
       };
     }
     case "DeliveryDelay": {
@@ -115,7 +194,9 @@ export const toProviderLifecycleEvent = (
         eventId,
         messageId,
         occurredAt: parseOccurredAt(deliveryDelay?.timestamp, mailTimestamp),
+        recipients,
         type: "deferred" as const,
+        ...(deliveryId !== undefined && { deliveryId }),
       };
       return delayType !== undefined && delayType !== ""
         ? {
@@ -130,7 +211,9 @@ export const toProviderLifecycleEvent = (
         eventId,
         messageId,
         occurredAt: parseOccurredAt(undefined, mailTimestamp),
+        recipients,
         type: "failed" as const,
+        ...(deliveryId !== undefined && { deliveryId }),
       };
       return reason !== undefined && reason !== ""
         ? {
