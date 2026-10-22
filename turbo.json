@@ -1,15 +1,19 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  // `typecheck` is cached and reads `node_modules` through every package's
-  // imports, so the resolved dependency versions have to be part of its hash.
-  // They are not by default: appending a line to `pnpm-lock.yaml` leaves every
-  // typecheck task reporting `cache hit, replaying logs`, and a package whose
-  // types no longer compile replays a green result from before the bump. That
-  // is the same hazard the `//#toolchain` and `//#knip` comments below describe
-  // and solve by not caching at all; typecheck is worth caching, so the
-  // lockfile is named as a global dependency instead. A source-only change
-  // still hits the cache; a dependency bump now misses once, which is the point.
+  // Every cached task here resolves its imports through `node_modules`: the
+  // typecheck pass, the type-aware //#lint pass, and the three build tasks,
+  // which bundle dependencies rather than just the package's own sources. None
+  // of that is a tracked input, so by default the resolved dependency versions
+  // are not part of a task's hash. Appending a line to `pnpm-lock.yaml` left
+  // both `typecheck` and `//#lint` replaying `cache hit`, and a package whose
+  // types no longer compiled replayed a green result from before the install —
+  // which is the same hazard the `//#toolchain` and `//#knip` comments below
+  // describe and solve by not caching at all. Those two are cheap; these are
+  // not, so the lockfile is named as a global dependency instead. It applies to
+  // tasks that declare their own `inputs` too, which is what makes it cover the
+  // build tasks. A source-only change still hits the cache; a dependency bump
+  // misses once, which is the point.
   "globalDependencies": ["pnpm-lock.yaml"],
   "tasks": {
     "typecheck": {
