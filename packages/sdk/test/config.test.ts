@@ -50,4 +50,18 @@ describe("normalizeWidgetConfig", () => {
       normalizeWidgetConfig({ placement: "unsupported" as never })
     ).toThrow(EmbedError);
   });
+
+  it.each([{ mode: Symbol("mode") }, { placement: Symbol("placement") }])(
+    "reports INVALID_CONFIG instead of a coercion error for Symbol-valued options %#",
+    (options) => {
+      let caught: unknown;
+      try {
+        normalizeWidgetConfig(options);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(EmbedError);
+      expect(caught).toMatchObject({ code: "INVALID_CONFIG" });
+    }
+  );
 });
