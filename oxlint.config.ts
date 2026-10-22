@@ -202,6 +202,36 @@ export default defineConfig({
     // APIs move.
     "effecttsgo/unstable-api-usage": "off",
 
+    // The three `prefer-effect-*` rules arrived with `@effect/tsgo@0.56` and
+    // report 2,514 findings between them, all of one kind: `effect/Array`,
+    // `effect/String` and `effect/Record` re-export functions that behave
+    // exactly like the native method they replace. Nothing is defective at any
+    // of those sites, and around a thousand of them are in browser bundles,
+    // Playwright specs, the published `@feeblo/sdk` and the embeddable widget,
+    // where importing `effect/*` to call `.trim()` is bundle weight for no
+    // behavioural change — the same reason ADR 0005 keeps `effect/Schema` out
+    // of that bundle. One of them is not even a drop-in: `Array.find` returns
+    // `undefined` while `Array.findFirst` returns `Option`, so "prefer" there
+    // is a rewrite with a different return type at every one of its sites.
+    // Leaving 2,514 warnings would train reviewers to skim the report, which
+    // is the argument this file already makes for `unstable-api-usage`.
+    "effecttsgo/prefer-effect-array": "off",
+    "effecttsgo/prefer-effect-record": "off",
+    "effecttsgo/prefer-effect-string": "off",
+
+    // The 127 findings are all `Schema.TaggedError`, and the brand the rule asks
+    // for would be a symbol nothing matches on. The rule's concern is that
+    // "TypeScript may accept structurally compatible values where this class
+    // instance type is expected" — but a tagged error already carries `_tag` as
+    // a required unique literal, so two errors with identical fields are not
+    // assignable to each other. Checked with a pair of one-field errors: tsc
+    // rejects both directions on `_tag` alone. `_tag` is the brand. The 127 are
+    // the per-module error vocabularies (`post/errors.ts`,
+    // `data-transfer/errors.ts`, `public-api/errors.ts`) plus the integration
+    // adapters, and ADR 0005's pattern is to brand a type that needs
+    // discriminating — these are already discriminated.
+    "effecttsgo/schema-class-missing-brand": "off",
+
     // The first rung of ADR 0005's ratchet, and now clear everywhere except
     // `packages/db/seed.ts`. `new Date()` inside Effect bypasses `Clock`, so
     // the rule is an error for every new way to write it; the seed script's
@@ -237,6 +267,13 @@ export default defineConfig({
     // that carries `_tag` with no prototype, so the branch silently takes its
     // fallback and `Schema.is` is the only correct match. `leaking-requirements`
     // keeps a service's implementation type out of its method signatures.
+    // `any-unknown-in-error-context` was the third rung, and it is clear: zero
+    // findings after Effect `4.0.5` turned `Crypto.randomUUIDv4`/
+    // `randomUUIDv7` into methods, so every `crypto.randomUUIDv4.pipe(...)`
+    // site required `never` instead of `unknown` and the `unknown` stopped
+    // flowing outward. `error` costs nothing today and keeps an `unknown` from
+    // re-entering a failure or requirement channel unnoticed.
+    "effecttsgo/any-unknown-in-error-context": "error",
     "effecttsgo/leaking-requirements": "error",
     "effecttsgo/abort-controller-in-effect": "error",
     "effecttsgo/crypto-random-uuid-in-effect": "error",
@@ -254,6 +291,14 @@ export default defineConfig({
     // the tree already used at 27 other sites), returns it, or awaits it; from
     // here a new float fails the gate instead of warning.
     "typescript/no-floating-promises": "error",
+
+    // Arrived with the `@effect/tsgo@0.56` / `oxlint-tsgolint@7.0.2004` train and
+    // reports two findings, both deliberate: a `Schema.Struct({})` whose
+    // `Schema.Type` is `{}` because the thing it describes genuinely has no
+    // configuration. Those two files are `off` in the override below, and the
+    // rule is `error` here so a *new* empty struct — which usually means a
+    // schema that silently lost its fields — fails the gate.
+    "typescript/no-generated-empty-object-type": "error",
 
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
@@ -324,6 +369,22 @@ export default defineConfig({
       ],
       rules: {
         "effecttsgo/extends-native-error": "off",
+      },
+    },
+    {
+      // `DiscordConnectionConfiguration` and `SlackConnectionConfiguration` are
+      // deliberately `Schema.Struct({})`: a connection carries no settings of
+      // its own and the destination channel is chosen per route, so the schema
+      // exists to state "nothing to configure here" rather than to hold fields.
+      // Its `Schema.Type` is therefore `{}`, which is exactly what the rule
+      // reports. Individually named files rather than a glob, so the exception
+      // cannot spread to the next empty struct someone adds.
+      files: [
+        "integrations/discord/src/discord-manifest.ts",
+        "integrations/slack/src/slack-manifest.ts",
+      ],
+      rules: {
+        "typescript/no-generated-empty-object-type": "off",
       },
     },
     {

@@ -284,7 +284,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
       // emails separate. Caller-supplied headers take precedence in any casing.
       headers: {
         ...(findEntityRefIdHeaderName(message.headers) === undefined && {
-          "X-Entity-Ref-ID": yield* crypto.randomUUIDv7.pipe(Effect.orDie),
+          "X-Entity-Ref-ID": yield* crypto.randomUUIDv7().pipe(Effect.orDie),
         }),
         ...message.headers,
       },

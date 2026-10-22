@@ -121,7 +121,7 @@ const makeS3UploadService = Effect.gen(function* () {
       Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const now = yield* DateTime.now;
-        const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
+        const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
         return resolvePublicUrl(fileKey);
       }),
@@ -139,7 +139,7 @@ const makeS3UploadService = Effect.gen(function* () {
       Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const now = yield* DateTime.now;
-        const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
+        const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
         return resolvePublicUrl(fileKey);
       }),
@@ -159,7 +159,7 @@ const makeS3UploadService = Effect.gen(function* () {
       Effect.gen(function* () {
         const crypto = yield* Crypto.Crypto;
         const now = yield* DateTime.now;
-        const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4}.${extension}`;
+        const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
         return resolvePublicUrl(fileKey);
       }),

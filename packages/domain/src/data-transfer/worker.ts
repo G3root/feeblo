@@ -631,7 +631,7 @@ export const runDataImportWorker = ({
   Effect.gen(function* () {
     const repository = yield* DataTransferRepository;
     const crypto = yield* Crypto.Crypto;
-    const leaseOwner = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
+    const leaseOwner = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
 
     const poll = Effect.gen(function* () {
       const claim = yield* repository.claimNextJob({
