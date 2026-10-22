@@ -21,7 +21,7 @@ The audit that preceded this decision is in [`docs/audit-email-suppression.md`](
 | `organization_id` | meaning | matches |
 | --- | --- | --- |
 | a workspace id | the workspace that observed the event, or a manual block by its admin | that workspace's mail, plus platform mail |
-| `null` | a platform row: the event concerned mail that belongs to no workspace (verification, password reset, onboarding) | platform mail; also every workspace's mail, because a hard bounce is an address fact |
+| `null` | a platform row: the event concerned mail that belongs to no workspace (verification, password reset, onboarding) or could not be attributed to one | platform mail; also every workspace's mail, because a hard bounce is an address fact |
 
 The send path reads a workspace row and platform rows; a workspace never reads another workspace's row. Two partial unique indexes keep the scopes separate:
 
@@ -39,6 +39,8 @@ The send path reads a workspace row and platform rows; a workspace never reads a
 ### Account mail
 
 Authentication mail has no workspace. It is checked against platform rows only, and a hard bounce observed for it writes a platform row. A workspace's complaint therefore never blocks a password reset; a bounced address is not retried by the auth path.
+
+An invitation is not account mail: it belongs to the inviting workspace, so the guard checks that workspace's rows as well as the platform rows. A synchronous rejection of the invitation is recorded against that workspace, which is what a later invitation from the same workspace sees. Asynchronous feedback for a direct send still has no delivery row to correlate to, so it lands in the platform scope.
 
 ## Consequences
 

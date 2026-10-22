@@ -1,7 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -363,7 +363,7 @@ describe("EmailSuppressionRepository", () => {
           .where(
             and(
               eq(schema.emailSuppressionTable.email, "erased@example.com"),
-              isNull(schema.emailSuppressionTable.organizationId)
+              eq(schema.emailSuppressionTable.organizationId, organizationId)
             )
           );
         expect(remaining).toHaveLength(0);

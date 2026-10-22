@@ -22,6 +22,7 @@ import {
   type EmailSuppressionStatsRequest,
   type EmailSuppressionSummary,
 } from "./schema";
+import { recordEmailSuppression } from "./telemetry";
 
 /** The role gate: admin and owner, inherited through the permission table. */
 const canManage = (organizationId: string) =>
@@ -118,6 +119,7 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
           providerEventId: null,
           reason: "administrative_block",
         });
+        yield* recordEmailSuppression("administrative_block", "manual");
         const record = yield* repository
           .find({ email, organizationId })
           .pipe(Effect.flatMap(failIfMissing));

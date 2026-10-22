@@ -30,8 +30,8 @@ export type EmailSuppressionReason = TEmailSuppressionReason;
  * The workspace a suppression belongs to, or `null` for a platform row.
  *
  * A platform row is written when the bounced mail belongs to no workspace —
- * account verification, password reset, invitations. It matches every sender,
- * because the address itself is the fact.
+ * account verification, password reset — or could not be attributed to one. It
+ * matches every sender, because the address itself is the fact.
  */
 export type EmailSuppressionScope = {
   readonly organizationId: string | null;

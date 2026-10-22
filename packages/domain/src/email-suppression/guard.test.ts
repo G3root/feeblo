@@ -1,6 +1,8 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { MailPermanentDeliveryError } from "@feeblo/transactional/mailer";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -74,6 +76,72 @@ describe("sendUnlessSuppressed", () => {
         });
 
         expect(yield* Ref.get(sent)).toBe(1);
+      })
+    );
+
+    it.effect(
+      "records a synchronous recipient rejection before re-raising it",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const organizationId = yield* createOrganization();
+          const error = yield* Effect.flip(
+            sendUnlessSuppressed({
+              email: "Rejected@Example.com",
+              organizationId,
+              send: Effect.fail(
+                new MailPermanentDeliveryError({
+                  failureClass: "recipient",
+                  message: "Test rejection",
+                  operation: "guard.test",
+                  provider: "smtp",
+                  smtpStatusCode: 550,
+                })
+              ),
+            })
+          );
+
+          expect(error).toBeInstanceOf(MailPermanentDeliveryError);
+          const [row] = yield* db
+            .select({
+              organizationId: schema.emailSuppressionTable.organizationId,
+              reason: schema.emailSuppressionTable.reason,
+            })
+            .from(schema.emailSuppressionTable)
+            .where(
+              eq(schema.emailSuppressionTable.email, "rejected@example.com")
+            );
+          expect(row).toMatchObject({
+            organizationId,
+            reason: "hard_bounce",
+          });
+        })
+    );
+
+    it.effect("does not suppress a message-level rejection", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        yield* Effect.flip(
+          sendUnlessSuppressed({
+            email: "policy@example.com",
+            organizationId: null,
+            send: Effect.fail(
+              new MailPermanentDeliveryError({
+                failureClass: "message",
+                message: "Test rejection",
+                operation: "guard.test",
+                provider: "smtp",
+                smtpStatusCode: 554,
+              })
+            ),
+          })
+        );
+
+        const rows = yield* db
+          .select({ email: schema.emailSuppressionTable.email })
+          .from(schema.emailSuppressionTable)
+          .where(eq(schema.emailSuppressionTable.email, "policy@example.com"));
+        expect(rows).toHaveLength(0);
       })
     );
 

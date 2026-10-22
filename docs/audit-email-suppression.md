@@ -63,6 +63,7 @@ The send path consults the list before the circuit breaker, the monthly volume q
 - **Provider complaint without a correlated delivery** → logged, not suppressed: a complaint is about a sender, and there is no sender to scope.
 - **SMTP recipient rejection** at submission → workspace row. The transport classifies `5.1.x`, `5.2.1`, `551`, and `553` as recipient facts. It does _not_ suppress `5.7.x` (policy), `5.6.x`/`5.2.3` (content), `5.3.x`, or `552` (size), and it treats `5.2.2` (mailbox full) as a temporary failure.
 - **Manual block** through `AddEmailSuppression`.
+- **Synchronous recipient rejection of a direct send** (password reset, OTP, invitation, onboarding) → the guard records the rejection before re-raising it, in the sender's scope. These messages have no delivery row, so this is the only chance to learn the address is dead.
 
 ### What does not suppress
 
@@ -93,7 +94,7 @@ Added or updated:
 - `email-provider-feedback/ses-mapping.test.ts` — recipient extraction with the account-suppression-list fallback, delivery-id header, undetermined mapping, Message-ID normalization.
 - `email-suppression/repository.test.ts` — scope isolation, precedence, idempotency, search/list/stats, removal, cascade on workspace deletion.
 - `email-suppression/handlers.test.ts` — admin gate, manager denial, tenant isolation, removal of a foreign row.
-- `email-suppression/guard.test.ts` — platform-only auth-mail gate.
+- `email-suppression/guard.test.ts` — platform-only auth-mail gate, and a synchronous recipient rejection recorded in the sender's scope while a message-level rejection is not.
 - `email-outbox/queue.test.ts` — SMTP recipient rejection suppression, delivery header, suppressed member not materialized.
 - `email-subscription/handlers.test.ts` — a suppressed address is not promised a verification email.
 - `transactional/src/mailer.test.ts` — 5xx classification, generated Message-ID.

@@ -1510,9 +1510,15 @@ export const emailProviderEventTable = pgTable(
   "email_provider_event",
   {
     providerEventId: text("provider_event_id").primaryKey(),
-    deliveryId: text("delivery_id")
-      .notNull()
-      .references(() => emailDeliveryTable.id, { onDelete: "cascade" }),
+    /**
+     * The delivery this event was correlated to, or null when the feedback
+     * could not be attributed (for example a bounce of account mail, which has
+     * no delivery row). The ledger still records the event so a redelivered
+     * SNS message is recognized as a duplicate.
+     */
+    deliveryId: text("delivery_id").references(() => emailDeliveryTable.id, {
+      onDelete: "cascade",
+    }),
     type: text("type").$type<TEmailProviderEventType>().notNull(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true })

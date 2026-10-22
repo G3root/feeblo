@@ -248,6 +248,38 @@ describe("EmailProviderFeedbackService", () => {
         })
     );
 
+    it.effect("records an uncorrelated event once when SNS redelivers it", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* EmailProviderFeedbackService;
+        const event = {
+          bounceType: "hard" as const,
+          eventId: "provider-uncorrelated-duplicate-1",
+          messageId: "<unknown-duplicate@notifications.feeblo>",
+          occurredAt: "2026-08-09T12:00:00.000Z",
+          recipients: ["duplicate-bounce@example.com"],
+          type: "bounced" as const,
+        };
+
+        expect(yield* service.ingest(event)).toEqual({
+          _tag: "UnknownDelivery",
+          suppressed: true,
+        });
+        expect(yield* service.ingest(event)).toEqual({ _tag: "Duplicate" });
+
+        const rows = yield* db
+          .select({ email: schema.emailSuppressionTable.email })
+          .from(schema.emailSuppressionTable)
+          .where(
+            eq(
+              schema.emailSuppressionTable.email,
+              "duplicate-bounce@example.com"
+            )
+          );
+        expect(rows).toHaveLength(1);
+      })
+    );
+
     it.effect(
       "does not let an uncorrelated complaint silence every workspace",
       () =>

@@ -140,15 +140,16 @@ export const toProviderLifecycleEvent = (
     }
     case "Bounce": {
       const bounce = notification.bounce;
-      // Only `Permanent` is an address fact. `Undetermined` means SES could not
-      // classify the bounce, so it is retried; treating it as hard would
+      // Only `Permanent` is an address fact. `Transient` is retried. Anything
+      // else — `Undetermined`, or an event with no bounce block at all — is
+      // also retried: treating an unknown classification as hard would
       // suppress an address that may still be deliverable.
       const bounceType =
-        bounce?.bounceType === "Transient"
-          ? "soft"
-          : bounce?.bounceType === "Undetermined"
-            ? "undetermined"
-            : "hard";
+        bounce?.bounceType === "Permanent"
+          ? "hard"
+          : bounce?.bounceType === "Transient"
+            ? "soft"
+            : "undetermined";
       const diagnosticCode =
         bounce?.bouncedRecipients?.[0]?.diagnosticCode?.trim();
       const category =

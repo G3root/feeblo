@@ -163,6 +163,16 @@ describe("toProviderLifecycleEvent", () => {
     ).toMatchObject({ type: "bounced", bounceType: "soft" });
   });
 
+  it("treats a bounce event with no bounce block as undetermined", () => {
+    const notification: SesEventNotification = {
+      eventType: "Bounce",
+      mail: deliveryNotification().mail,
+    };
+    expect(
+      toProviderLifecycleEvent("sns-bounce-missing", notification)
+    ).toMatchObject({ type: "bounced", bounceType: "undetermined" });
+  });
+
   it("maps a delivery delay to a deferred lifecycle event", () => {
     const notification: SesEventNotification = {
       eventType: "DeliveryDelay",

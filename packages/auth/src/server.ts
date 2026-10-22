@@ -943,7 +943,9 @@ export const initAuthHandler = (
             await callbackRuntime.runPromise(
               sendUnlessSuppressed({
                 email: data.email,
-                organizationId: null,
+                // An invitation is the inviting workspace's mail, so a
+                // workspace-scoped complaint or manual block applies to it.
+                organizationId: data.organization.id,
                 send: Mailer.use((mailer) =>
                   mailer.send({
                     to: data.email,

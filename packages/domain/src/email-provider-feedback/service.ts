@@ -191,46 +191,15 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
         Effect.gen(function* () {
           const delivery = yield* findDelivery(event);
 
-          if (delivery === undefined) {
-            // The delivery cannot be found, but a hard bounce still names an
-            // address that does not exist. Suppressing it is the whole point of
-            // the feedback loop, and doing it without a delivery row is what
-            // closes the gap for mail outside the outbox (verification,
-            // password reset, invitations). The row is platform-scoped because
-            // there is no workspace to attribute it to.
-            //
-            // A complaint is deliberately not suppressed here: a complaint is
-            // about one sender's mail, and without a delivery there is no
-            // sender to scope the row to. Writing a platform row would silence
-            // every workspace because one unknown sender's recipient pressed
-            // "spam".
-            if (event.type !== "bounced" || event.bounceType !== "hard") {
-              return { _tag: "UnknownDelivery" as const, suppressed: false };
-            }
-            yield* suppress({
-              event,
-              organizationId: null,
-              reason: "hard_bounce",
-            });
-            yield* Effect.logWarning(
-              "Provider feedback could not be correlated to a delivery; suppressed the reported recipients"
-            ).pipe(
-              Effect.annotateLogs({
-                eventType: event.type,
-                providerEventId: event.eventId,
-              })
-            );
-            return {
-              _tag: "UnknownDelivery" as const,
-              suppressed: event.recipients.length > 0,
-            };
-          }
-
+          // The ledger comes first, whether or not the event correlates to a
+          // delivery: an uncorrelated event has no delivery to attach to, and
+          // recording it here is what stops a redelivered SNS message from
+          // being counted twice. `delivery_id` is nullable for exactly this.
           const [insertedEvent] = yield* db
             .insert(schema.emailProviderEventTable)
             .values({
               providerEventId: event.eventId,
-              deliveryId: delivery.id,
+              deliveryId: delivery?.id ?? null,
               type: event.type,
               occurredAt: event.occurredAt,
               metadata: event.metadata ?? {},
@@ -244,6 +213,55 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
 
           if (insertedEvent === undefined) {
             return { _tag: "Duplicate" as const };
+          }
+
+          if (delivery === undefined) {
+            // The delivery cannot be found, but a hard bounce still names an
+            // address that does not exist. Suppressing it is the whole point of
+            // the feedback loop, and doing it without a delivery row is what
+            // closes the gap for mail outside the outbox (verification,
+            // password reset, invitations). The row is platform-scoped because
+            // there is no workspace to attribute it to.
+            //
+            if (event.type === "bounced") {
+              if (event.bounceType !== "hard") {
+                // A soft or undetermined bounce of unattributed mail is
+                // observable only; there is no delivery to reschedule.
+                yield* recordEmailProviderBounce(event.bounceType, false);
+                return { _tag: "UnknownDelivery" as const, suppressed: false };
+              }
+              yield* suppress({
+                event,
+                organizationId: null,
+                reason: "hard_bounce",
+              });
+              yield* recordEmailProviderBounce(
+                "hard",
+                event.recipients.length > 0
+              );
+              yield* Effect.logWarning(
+                "Provider feedback could not be correlated to a delivery; suppressed the reported recipients"
+              ).pipe(
+                Effect.annotateLogs({
+                  eventType: event.type,
+                  providerEventId: event.eventId,
+                })
+              );
+              return {
+                _tag: "UnknownDelivery" as const,
+                suppressed: event.recipients.length > 0,
+              };
+            }
+            // A complaint is deliberately not suppressed here: a complaint is
+            // about one sender's mail, and without a delivery there is no
+            // sender to scope the row to. Writing a platform row would silence
+            // every workspace because one unknown sender's recipient pressed
+            // "spam". It is still counted: the complaint rate is a property of
+            // the sending account, not of the correlation.
+            if (event.type === "complained") {
+              yield* recordEmailProviderComplaint;
+            }
+            return { _tag: "UnknownDelivery" as const, suppressed: false };
           }
 
           const transitionDelivery = (
