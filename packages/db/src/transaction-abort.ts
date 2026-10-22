@@ -135,7 +135,7 @@ const abortCodeOf = (
  * @param cause - The failure it replaces, kept for the retry and for diagnosis.
  * @returns `error`, with `cause` attached.
  */
-export const attachCause = <E extends Error, C>(error: E, cause: C): E =>
+export const attachCause = <E extends Error>(error: E, cause: unknown): E =>
   Object.assign(error, { cause });
 
 /**

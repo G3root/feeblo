@@ -258,7 +258,7 @@ const suppressInternalFailures = <A, E, R>(
   effect: Effect.Effect<A, E | InternalServerError, R>
 ): Effect.Effect<Option.Option<A>, E, R> =>
   effect.pipe(
-    Effect.map(Option.some),
+    Effect.asSome,
     Effect.catchTag("InternalServerError", () =>
       Effect.succeed(Option.none<A>())
     )

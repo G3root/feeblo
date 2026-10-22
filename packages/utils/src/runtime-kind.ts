@@ -7,6 +7,7 @@
  * type system (including primitives and cross-realm objects).
  */
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const boxedPrototypeName = <T>(value: T): string | null => {
   if (value === null || value === undefined) return null;
   // SAFETY: Object.getPrototypeOf always returns an object or null; every

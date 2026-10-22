@@ -115,9 +115,7 @@ const semanticEmbeddings = (
 ): Option.Option<PostEmbeddingService["Service"]> =>
   Option.some({
     embed: () =>
-      Effect.succeed(
-        Option.some({ model: DEFAULT_POST_EMBEDDING_MODEL, vector })
-      ),
+      Effect.succeedSome({ model: DEFAULT_POST_EMBEDDING_MODEL, vector }),
   });
 
 it.effect(

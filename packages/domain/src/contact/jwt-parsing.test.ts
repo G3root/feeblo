@@ -19,7 +19,7 @@ const SECRET = new TextEncoder().encode("test-secret");
 const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
 const fixtureNowSeconds = Math.floor(fixtureNow.getTime() / 1000);
 
-async function signAndVerify<T extends jose.JWTPayload>(payload: T) {
+async function signAndVerify(payload: jose.JWTPayload) {
   const token = await new jose.SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .sign(SECRET);

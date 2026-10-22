@@ -219,6 +219,7 @@ export function BoardGridView({
         }
       );
     },
+    // oxlint-disable-next-line typescript/unbound-method -- the reference is a `useCallback` dependency, not a call; wrapping it would create a new function every render and defeat the dependency.
     [postCollection.update]
   );
 

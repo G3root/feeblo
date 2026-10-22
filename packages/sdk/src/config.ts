@@ -1,15 +1,20 @@
 import { EmbedError } from "./errors";
-import type {
-  EmbedOptions,
-  WidgetMode,
-  WidgetModule,
-  WidgetPlacement,
-} from "./types";
+import type { WidgetMode, WidgetModule, WidgetPlacement } from "./types";
 
 const DEFAULT_MODULES: WidgetModule[] = ["feedback", "updates"];
-const MODES = new Set<WidgetMode>(["feedback", "updates", "hub"]);
+// The lookup sets accept `PropertyKey` because `normalizeWidgetConfig`
+// validates values from plain-JavaScript callers: a Symbol must reach
+// `invalidConfig` as `INVALID_CONFIG` instead of throwing a coercion TypeError.
+const MODES: ReadonlySet<PropertyKey> = new Set<WidgetMode>([
+  "feedback",
+  "updates",
+  "hub",
+]);
 const MODULES = new Set<WidgetModule>(DEFAULT_MODULES);
-const PLACEMENTS = new Set<WidgetPlacement>(["bottom-left", "bottom-right"]);
+const PLACEMENTS: ReadonlySet<PropertyKey> = new Set<WidgetPlacement>([
+  "bottom-left",
+  "bottom-right",
+]);
 
 export interface NormalizedWidgetConfig {
   mode: WidgetMode;
@@ -21,18 +26,37 @@ function invalidConfig(message: string): never {
   throw new EmbedError({ code: "INVALID_CONFIG", message });
 }
 
-export function normalizeWidgetConfig(
-  options: Pick<EmbedOptions, "mode" | "modules" | "placement">
-): NormalizedWidgetConfig {
-  const mode = options.mode ?? "feedback";
-  if (!MODES.has(mode)) {
-    invalidConfig(`[feeblo-sdk] Invalid widget mode: ${String(mode)}.`);
+function isWidgetMode(value: PropertyKey): value is WidgetMode {
+  return MODES.has(value);
+}
+
+function isWidgetPlacement(value: PropertyKey): value is WidgetPlacement {
+  return PLACEMENTS.has(value);
+}
+
+function parseMode(value: PropertyKey): WidgetMode {
+  if (!isWidgetMode(value)) {
+    invalidConfig(`[feeblo-sdk] Invalid widget mode: ${String(value)}.`);
   }
-  if (options.placement && !PLACEMENTS.has(options.placement)) {
-    invalidConfig(
-      `[feeblo-sdk] Invalid widget placement: ${String(options.placement)}.`
-    );
+  return value;
+}
+
+function parsePlacement(value: PropertyKey): WidgetPlacement {
+  if (!isWidgetPlacement(value)) {
+    invalidConfig(`[feeblo-sdk] Invalid widget placement: ${String(value)}.`);
   }
+  return value;
+}
+
+export function normalizeWidgetConfig(options: {
+  mode?: PropertyKey | undefined;
+  modules?: WidgetModule[] | undefined;
+  placement?: PropertyKey | undefined;
+}): NormalizedWidgetConfig {
+  const mode = parseMode(options.mode ?? "feedback");
+  const placement = options.placement
+    ? parsePlacement(options.placement)
+    : undefined;
 
   if (mode !== "hub" && options.modules !== undefined) {
     invalidConfig("[feeblo-sdk] `modules` can only be used with mode `hub`.");
@@ -53,7 +77,7 @@ export function normalizeWidgetConfig(
   return {
     mode,
     modules: [...modules],
-    ...(options.placement && { placement: options.placement }),
+    ...(placement !== undefined && { placement }),
   };
 }
 

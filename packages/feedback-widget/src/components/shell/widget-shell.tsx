@@ -30,7 +30,7 @@ export function WidgetShell(props: {
     )
   );
 
-  let scroller: HTMLDivElement | undefined;
+  let scroller: HTMLElement | undefined;
 
   createEffect(
     on(
@@ -75,7 +75,9 @@ export function WidgetShell(props: {
       <main
         class="hide-scrollbar relative z-10 min-h-0 flex-1 overflow-y-auto"
         data-slot="widget-scroll"
-        ref={scroller}
+        ref={(el) => {
+          scroller = el;
+        }}
       >
         {props.children}
       </main>

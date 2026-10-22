@@ -246,15 +246,15 @@ export const createCompanyOperation = defineOperation(
         // The shared intake module refuses for want of plan room with the
         // policy's own tag; the Public API publishes that as
         // `PLAN_REQUIRES_UPGRADE`, like every other plan gate on this API.
-        Effect.catchTag("PolicyDenied", () =>
-          Effect.fail(planRequiresUpgradeError(crmLimitMessage))
-        ),
         // The domain reports a name collision as a typed failure; the index
-        // race that beats the pre-check is a driver error. Both answer on
+        // race that beats the pre-check is a driver error, and both answer on
         // the published `CONFLICT`.
-        Effect.catchTag("CompanyAlreadyExistsError", () =>
-          Effect.fail(conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE))
-        ),
+        Effect.catchTags({
+          PolicyDenied: () =>
+            Effect.fail(planRequiresUpgradeError(crmLimitMessage)),
+          CompanyAlreadyExistsError: () =>
+            Effect.fail(conflictError(COMPANY_UNIQUE_VIOLATION_MESSAGE)),
+        }),
         withRemapDbErrors({
           action: "create",
           entity: "PublicApiCompany",

@@ -626,7 +626,7 @@ const makeContactRepository = Effect.gen(function* () {
         .select({ count: count() })
         .from(schema.contactTable)
         .where(eq(schema.contactTable.organizationId, organizationId))
-        .pipe(Effect.map((rows) => Number(rows[0]?.count ?? 0))),
+        .pipe(Effect.map((rows) => rows[0]?.count ?? 0)),
   };
 });
 

@@ -504,6 +504,7 @@ describe("GitHub issue-create handler", () => {
         .deliver({
           ...deliveryInput,
           event: {
+            // oxlint-disable-next-line typescript/no-misused-spread -- the fixture is a plain object literal typed as a Schema class; the spread copies its own enumerable fields and the receiver only reads them
             ...deliveryInput.event,
             type: "post.status_changed",
           },
@@ -530,6 +531,7 @@ describe("GitHub issue-create handler", () => {
         const result = yield* handler.deliver({
           ...deliveryInput,
           route: {
+            // oxlint-disable-next-line typescript/no-misused-spread -- the fixture is a plain object literal typed as a Schema class; the spread copies its own enumerable fields and the receiver only reads them
             ...deliveryInput.route,
             providerConfig: {
               version: 1,

@@ -21,7 +21,7 @@ describe("GitHub App API response schemas", () => {
     () =>
       Effect.gen(function* () {
         const [issue, token, repositories] = yield* Effect.all([
-          Schema.decodeUnknownEffect(GitHubIssue)({
+          Schema.decodeEffect(GitHubIssue)({
             html_url: "https://github.com/acme/feedback/issues/7",
             id: 7,
             node_id: "I_7",
@@ -29,11 +29,11 @@ describe("GitHub App API response schemas", () => {
             state: "open",
             title: "Dark mode",
           }),
-          Schema.decodeUnknownEffect(GitHubInstallationAccessToken)({
+          Schema.decodeEffect(GitHubInstallationAccessToken)({
             expires_at: "2030-01-01T00:00:00Z",
             token: "ghs_installation_token",
           }),
-          Schema.decodeUnknownEffect(GitHubInstallationRepositories)({
+          Schema.decodeEffect(GitHubInstallationRepositories)({
             repositories: [
               {
                 full_name: "acme/feedback",

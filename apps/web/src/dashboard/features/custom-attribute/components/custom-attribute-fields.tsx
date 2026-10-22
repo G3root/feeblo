@@ -2,7 +2,6 @@ import type {
   TCompanyAttributeValue,
   TCompanyAttributeValueUpsert,
   TContactAttributeValue,
-  TContactAttributeValueUpsert,
 } from "@feeblo/domain/attribute-definition/schema";
 import type { TCompany } from "@feeblo/domain/company/schema";
 import type { TContact } from "@feeblo/domain/contact/schema";

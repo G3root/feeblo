@@ -220,7 +220,7 @@ export function PostCreateForm() {
         .where(({ board }) => eq(board.organizationId, organizationId));
     },
   });
-  const { data: postStatuses = [] } = usePostStatuses();
+  const { data: postStatuses } = usePostStatuses();
 
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const explicitStatusId = store.get().context.data.statusId as

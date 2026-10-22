@@ -178,7 +178,7 @@ const seedOrganization = Effect.gen(function* () {
 
 const decodeState = (authorizeUrl: URL) => {
   const url = new URL(authorizeUrl);
-  return Schema.decodeUnknownSync(Schema.fromJsonString(SlackOAuthState))(
+  return Schema.decodeSync(Schema.fromJsonString(SlackOAuthState))(
     url.searchParams.get("state") ?? ""
   );
 };

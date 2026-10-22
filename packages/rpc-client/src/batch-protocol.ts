@@ -147,7 +147,12 @@ interface PendingFrame {
 }
 
 const fromEntry = (entry: Request.Entry<BatchedFrame>): PendingFrame => ({
-  ...entry.request,
+  // Named rather than spread: `BatchedFrame` is a class, and the spread would
+  // copy only its own fields while suggesting the prototype came along.
+  byteLength: entry.request.byteLength,
+  clientId: entry.request.clientId,
+  encoded: entry.request.encoded,
+  requestId: entry.request.requestId,
   complete: (exit) => Effect.sync(() => entry.completeUnsafe(exit)),
 });
 

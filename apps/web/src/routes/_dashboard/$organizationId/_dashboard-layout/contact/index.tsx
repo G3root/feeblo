@@ -97,9 +97,8 @@ function ContactPage() {
       ),
     [contactsQuery.data]
   );
-  const { data: definitions = [] } =
-    useContactAttributeDefinitions(organizationId);
-  const { data: companies = [] } = useOrgCompanies(organizationId);
+  const { data: definitions } = useContactAttributeDefinitions(organizationId);
+  const { data: companies } = useOrgCompanies(organizationId);
   const companiesById = new Map(companies.map((c) => [c.id, c]));
 
   const { entitlements } = useEntitlements();

@@ -33,6 +33,17 @@ export type NotificationPreferenceUnsubscribeToken = Redacted.Redacted<string>;
 
 const tokenPrefix = "notification-preference:unsubscribe";
 
+/**
+ * The claims codec as JSON text: the token's payload is a signed JSON string,
+ * so the codec is declared once here instead of a `JSON.stringify`/`parse`
+ * pair that could drift from the schema.
+ */
+const ClaimsJson = Schema.fromJsonString(
+  NotificationPreferenceUnsubscribeClaims
+);
+const encodeClaims = Schema.encodeSync(ClaimsJson);
+const decodeClaims = Schema.decodeUnknownOption(ClaimsJson);
+
 const sign = (signingSecret: string, payload: string): string =>
   createHmac("sha256", signingSecret)
     .update(`${tokenPrefix}:${payload}`)
@@ -62,7 +73,7 @@ const makeTokenService = (signingSecret: string) => ({
     Effect.try({
       try: () => {
         const payload = Buffer.from(
-          JSON.stringify({ category, organizationId, userId }),
+          encodeClaims({ category, organizationId, userId }),
           "utf8"
         ).toString("base64url");
         return Redacted.make(`${payload}.${sign(signingSecret, payload)}`);
@@ -96,12 +107,8 @@ const makeTokenService = (signingSecret: string) => ({
         ) {
           return Option.none();
         }
-        const decoded = JSON.parse(
-          Buffer.from(payload, "base64url").toString("utf8")
-        );
-        return Schema.decodeUnknownOption(
-          NotificationPreferenceUnsubscribeClaims
-        )(decoded);
+        const decoded = Buffer.from(payload, "base64url").toString("utf8");
+        return decodeClaims(decoded);
       },
       catch: (cause) =>
         new NotificationPreferenceTokenError({

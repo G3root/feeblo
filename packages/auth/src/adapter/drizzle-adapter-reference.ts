@@ -417,7 +417,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                 ),
               ];
             }
-            return [like(schemaModel[field], `%${w.value}%`)];
+            return [like(schemaModel[field], `%${String(w.value)}%`)];
           }
           if (w.operator === "starts_with") {
             if (isInsensitive && typeof w.value === "string") {
@@ -429,7 +429,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                 ),
               ];
             }
-            return [like(schemaModel[field], `${w.value}%`)];
+            return [like(schemaModel[field], `${String(w.value)}%`)];
           }
           if (w.operator === "ends_with") {
             if (isInsensitive && typeof w.value === "string") {
@@ -441,7 +441,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                 ),
               ];
             }
-            return [like(schemaModel[field], `%${w.value}`)];
+            return [like(schemaModel[field], `%${String(w.value)}`)];
           }
 
           if (w.operator === "lt") {
@@ -531,7 +531,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                   config.provider
                 );
               }
-              return like(schemaModel[field], `%${w.value}%`);
+              return like(schemaModel[field], `%${String(w.value)}%`);
             }
             if (w.operator === "starts_with") {
               if (isInsensitive && typeof w.value === "string") {
@@ -541,7 +541,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                   config.provider
                 );
               }
-              return like(schemaModel[field], `${w.value}%`);
+              return like(schemaModel[field], `${String(w.value)}%`);
             }
             if (w.operator === "ends_with") {
               if (isInsensitive && typeof w.value === "string") {
@@ -551,7 +551,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                   config.provider
                 );
               }
-              return like(schemaModel[field], `%${w.value}`);
+              return like(schemaModel[field], `%${String(w.value)}`);
             }
             if (w.operator === "lt") {
               return lt(schemaModel[field], w.value);
@@ -639,7 +639,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                   config.provider
                 );
               }
-              return like(schemaModel[field], `%${w.value}%`);
+              return like(schemaModel[field], `%${String(w.value)}%`);
             }
             if (w.operator === "starts_with") {
               if (isInsensitive && typeof w.value === "string") {
@@ -649,7 +649,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                   config.provider
                 );
               }
-              return like(schemaModel[field], `${w.value}%`);
+              return like(schemaModel[field], `${String(w.value)}%`);
             }
             if (w.operator === "ends_with") {
               if (isInsensitive && typeof w.value === "string") {
@@ -659,7 +659,7 @@ export const drizzleAdapter = (db: DB, config: DrizzleAdapterConfig) => {
                   config.provider
                 );
               }
-              return like(schemaModel[field], `%${w.value}`);
+              return like(schemaModel[field], `%${String(w.value)}`);
             }
             if (w.operator === "lt") {
               return lt(schemaModel[field], w.value);

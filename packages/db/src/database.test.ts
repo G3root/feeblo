@@ -42,7 +42,7 @@ layer(TestDatabaseLive)("database transactions", (it) => {
               .insert(transactionTestTable)
               .values({ id: 0 })
               .pipe(Effect.andThen(Effect.fail("rollback")))
-          ).pipe(Effect.catch(() => Effect.void));
+          ).pipe(Effect.ignore);
 
           yield* transaction(
             Effect.gen(function* () {
@@ -52,7 +52,7 @@ layer(TestDatabaseLive)("database transactions", (it) => {
                   .insert(transactionTestTable)
                   .values({ id: 2 })
                   .pipe(Effect.andThen(Effect.fail("rollback savepoint")))
-              ).pipe(Effect.catch(() => Effect.void));
+              ).pipe(Effect.ignore);
               yield* capturedDb.insert(transactionTestTable).values({ id: 3 });
             })
           );

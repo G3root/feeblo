@@ -34,9 +34,7 @@ describe("signWebhookDelivery", () => {
       expect(
         new Webhook(Redacted.value(secret)).verify(rawBody, headers)
       ).toEqual(
-        yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Json))(
-          rawBody
-        )
+        yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Json))(rawBody)
       );
     })
   );
@@ -70,9 +68,9 @@ describe("signWebhookDelivery", () => {
           expect(
             new Webhook(Redacted.value(oldSecret)).verify(rawBody, duringGrace)
           ).toEqual(
-            yield* Schema.decodeUnknownEffect(
-              Schema.fromJsonString(Schema.Json)
-            )(rawBody)
+            yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Json))(
+              rawBody
+            )
           );
           expect(afterGrace["webhook-signature"].split(" ")).toHaveLength(1);
         })

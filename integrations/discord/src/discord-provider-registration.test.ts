@@ -221,6 +221,7 @@ describe("discord provider registration", () => {
         handler.deliver(
           deliveryInput({
             event: {
+              // oxlint-disable-next-line typescript/no-misused-spread -- the fixture is a plain object literal typed as a Schema class; the spread copies its own enumerable fields and the receiver only reads them
               ...deliveryInput().event,
               type: "post.status_changed",
             },

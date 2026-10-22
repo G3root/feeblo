@@ -11,7 +11,7 @@ describe("CreateContact", () => {
       const organizationId = yield* WorkspaceId.generate;
       const attributeId = yield* ContactAttributeDefinitionId.generate;
       const error = yield* Effect.flip(
-        Schema.decodeUnknownEffect(ContactCreate)({
+        Schema.decodeEffect(ContactCreate)({
           organizationId,
           attributeValues: [
             { attributeId, value: "first" },

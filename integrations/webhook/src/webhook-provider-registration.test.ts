@@ -206,7 +206,7 @@ describe("webhook provider registration", () => {
         const result = yield* handler.deliver(input);
         expect(result).toEqual({ httpStatus: 204 });
         const request = yield* Effect.tryPromise(() => received);
-        const decodedRequest = yield* Schema.decodeUnknownEffect(
+        const decodedRequest = yield* Schema.decodeEffect(
           Schema.fromJsonString(WebhookExternalPayload)
         )(request.body);
         expect(request.headers["content-type"]).toBe("application/json");

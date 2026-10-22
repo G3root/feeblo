@@ -39,6 +39,7 @@ function isWidgetPlacement(value: string | null): value is WidgetPlacement {
   return value === "bottom-left" || value === "bottom-right";
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is the helper's contract: the caller names the element type once instead of every call site repeating `as HTMLInputElement`.
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) {

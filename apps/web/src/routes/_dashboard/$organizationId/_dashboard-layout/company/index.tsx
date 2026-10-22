@@ -91,7 +91,7 @@ function CompanyPage() {
       ),
     [companiesQuery.data]
   );
-  const { data: contacts = [] } = useOrgContacts(organizationId);
+  const { data: contacts } = useOrgContacts(organizationId);
   const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
   const definitions = definitionsQuery.data ?? [];
 
