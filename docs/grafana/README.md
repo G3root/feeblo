@@ -5,7 +5,7 @@ Three importable Grafana dashboards for the telemetry the server exports over OT
 | File | Covers |
 | --- | --- |
 | `feeblo-server-apm.json` | Exact HTTP request rate, error rate, and latency, from the server's own metrics |
-| `feeblo-server-dashboard.json` | Integration delivery and email outbox queues, from the server's own metrics |
+| `feeblo-server-dashboard.json` | Integration delivery, email outbox queues, and email deliverability, from the server's own metrics |
 | `feeblo-server-runtime.json` | Telemetry export health and process CPU, memory, and event-loop metrics |
 
 Traces, trace-derived RED metrics, and logs are covered by Application Observability, Traces Drilldown, and Logs Drilldown instead.
@@ -51,6 +51,23 @@ RPC methods are not visible here: every call shares `POST /rpc`, and the method 
 | --- | --- |
 | Integrations | Due and claimed backlog, retry/exhausted outcomes, oldest recovered lease, delivery rate by outcome, p95 latency, lease recoveries and pauses |
 | Email outbox | Oldest queued age, delivery retries, throttles, estimated cost, intent/delivery transitions, retries by error tag, access skips, provider submissions, reconciliation recoveries |
+| Email deliverability | Bounce and complaint rates, bounces by SES classification, suppression writes by reason and source |
+
+## Email deliverability
+
+The last row of `feeblo-server-dashboard.json` turns three counters into the signals a sending reputation depends on:
+
+| Metric | Labels |
+| --- | --- |
+| `feeblo_email_provider_bounces_total` | `bounceType` (`hard`, `soft`, `undetermined`), `suppressed` (`true`, `false`) |
+| `feeblo_email_provider_complaints_total` | — |
+| `feeblo_email_suppressions_written_total` | `reason` (`hard_bounce`, `complaint`, `administrative_block`), `source` (`provider`, `smtp`, `manual`) |
+
+The rates divide the 24-hour increase in bounces or complaints by the 24-hour increase in `feeblo_email_provider_submissions_total` (provider-accepted submissions), so they answer "of the mail we sent, how much came back bad". The panels use the AWS reputation thresholds as guides: **5% bounce** and **10% suspension** for bounce rate, **0.1% warning** and **0.5% suspension** for complaint rate. The rolling one-hour panels show the same ratio so a spike is visible before the 24-hour window absorbs it.
+
+`suppressed=true` means the event also wrote a suppression row, so the address will not be tried again. `undetermined` bounces are retried and never suppress; a `soft` bounce is deferred within the delivery's attempt budget. `source=smtp` is a synchronous recipient rejection, `source=provider` is webhook feedback, and `source=manual` is an administrator adding a block. `reason` and `source` are independent labels, so a complaint written by a provider event is counted under `complaint` / `provider`.
+
+The suppression panel counts writes, not the current list size: re-adding an address that is already suppressed increments both `provider` and `manual` totals for the rows the dashboard writes.
 
 ## Runtime and telemetry health
 
@@ -76,6 +93,10 @@ The runtime and SLO signals are worth alerting on. Create Grafana-managed alert 
 | Fast 5xx burn | `100 * sum(increase(feeblo_http_server_requests_total{job="feeblo/feeblo-server",status=~"5.."}[1h])) / clamp_min(sum(increase(feeblo_http_server_requests_total{job="feeblo/feeblo-server"}[1h])), 1)` | `> 14.4` for 5m |
 | Slow 5xx burn | the fast query with `[6h]` in both places | `> 6` for 30m |
 | p95 latency over objective | `histogram_quantile(0.95, sum by (le) (rate(feeblo_http_server_request_duration_milliseconds_bucket{job="feeblo/feeblo-server"}[5m])))` | `> 500` for 10m |
+| Bounce rate over warning | `100 * sum(increase(feeblo_email_provider_bounces_total{job="feeblo/feeblo-server"}[24h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{job="feeblo/feeblo-server"}[24h])), 1)` | `> 5` for 30m |
+| Bounce rate over suspension | the same query | `> 10` for 10m |
+| Complaint rate over warning | `100 * sum(increase(feeblo_email_provider_complaints_total{job="feeblo/feeblo-server"}[24h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{job="feeblo/feeblo-server"}[24h])), 1)` | `> 0.1` for 30m |
+| Complaint rate over suspension | the same query | `> 0.5` for 10m |
 
 ## Metric name suffixes
 
