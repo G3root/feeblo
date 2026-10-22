@@ -1,8 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { entitledSubscriptionCondition } from "@feeblo/db/schema/billing";
 import { SubscriptionId, WorkspaceId } from "@feeblo/id";
-import type { WebhookProductCreatedPayload } from "@polar-sh/sdk/models/components/webhookproductcreatedpayload";
-import type { WebhookSubscriptionCreatedPayload } from "@polar-sh/sdk/models/components/webhooksubscriptioncreatedpayload";
+import type { webhooks } from "@polar-sh/sdk/2026-10";
 import {
   and,
   asc,
@@ -26,8 +25,8 @@ import * as SchemaTransformation from "effect/SchemaTransformation";
 import { PAID_PLAN_KEYS } from "../plan-entitlements";
 import { PolarService } from "./service";
 
-type SubscriptionPayload = WebhookSubscriptionCreatedPayload["data"];
-type ProductPayload = WebhookProductCreatedPayload["data"];
+type SubscriptionPayload = webhooks.WebhookSubscriptionCreatedPayload["data"];
+type ProductPayload = webhooks.WebhookProductCreatedPayload["data"];
 
 type SubscriptionInsert = typeof schema.subscriptionTable.$inferInsert;
 type ProductInsert = typeof schema.productTable.$inferInsert;
@@ -122,9 +121,15 @@ const SubscriptionOrganizationIdFromPolar = Schema.Unknown.pipe(
 // decode failure there means the SDK sent garbage and dying the fiber (defect)
 // is deliberate over silently coercing it. The workspace key is different and
 // is decoded as an Option above, because a subscription without it is merely
-// one Feeblo does not own.
+// one Feeblo does not own. Polar timestamps arrive as ISO-8601 strings and are
+// stored as `Date`, which is the same all-or-nothing read: a timestamp the
+// database column cannot hold is garbage, not a value to coerce.
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeString = Schema.decodeUnknownSync(Schema.String);
+const decodeTimestamp = Schema.decodeUnknownSync(Schema.DateFromString);
+const decodeOptionalTimestamp = Schema.decodeUnknownSync(
+  Schema.NullOr(Schema.DateFromString)
+);
 // Never fails: SubscriptionOrganizationIdFromPolar is total and returns an
 // Option. Reported only because the rule cannot see that.
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
@@ -159,23 +164,23 @@ const toSubscriptionValues = (
   lastEventAt: eventTimestamp,
   polarServer,
   amount: payload.amount,
-  cancelAtPeriodEnd: payload.cancelAtPeriodEnd,
+  cancelAtPeriodEnd: payload.cancel_at_period_end,
   currency: payload.currency,
-  recurringInterval: payload.recurringInterval,
-  recurringIntervalCount: payload.recurringIntervalCount,
+  recurringInterval: payload.recurring_interval,
+  recurringIntervalCount: payload.recurring_interval_count,
   status: decodeSubscriptionStatus(payload.status),
-  currentPeriodStart: payload.currentPeriodStart,
-  currentPeriodEnd: payload.currentPeriodEnd,
-  trialStart: payload.trialStart,
-  trialEnd: payload.trialEnd,
-  canceledAt: payload.canceledAt,
-  startedAt: payload.startedAt,
-  endsAt: payload.endsAt,
-  endedAt: payload.endedAt,
-  customerId: payload.customerId,
-  productId: decodeString(payload.productId),
-  discountId: payload.discountId,
-  checkoutId: payload.checkoutId,
+  currentPeriodStart: decodeTimestamp(payload.current_period_start),
+  currentPeriodEnd: decodeTimestamp(payload.current_period_end),
+  trialStart: decodeOptionalTimestamp(payload.trial_start),
+  trialEnd: decodeOptionalTimestamp(payload.trial_end),
+  canceledAt: decodeOptionalTimestamp(payload.canceled_at),
+  startedAt: decodeOptionalTimestamp(payload.started_at),
+  endsAt: decodeOptionalTimestamp(payload.ends_at),
+  endedAt: decodeOptionalTimestamp(payload.ended_at),
+  customerId: payload.customer_id,
+  productId: decodeString(payload.product_id),
+  discountId: payload.discount_id,
+  checkoutId: payload.checkout_id,
   seats: payload.seats,
 });
 
@@ -186,16 +191,16 @@ const toProductValues = (
   id: payload.id,
   name: payload.name,
   description: payload.description,
-  trialInterval: payload.trialInterval,
-  trialIntervalCount: payload.trialIntervalCount,
-  recurringInterval: decodeProductRecurringInterval(payload.recurringInterval),
-  recurringIntervalCount: payload.recurringIntervalCount,
-  isRecurring: payload.isRecurring,
-  isArchived: payload.isArchived,
-  externalOrganizationId: payload.organizationId,
+  trialInterval: payload.trial_interval,
+  trialIntervalCount: payload.trial_interval_count,
+  recurringInterval: decodeProductRecurringInterval(payload.recurring_interval),
+  recurringIntervalCount: payload.recurring_interval_count,
+  isRecurring: payload.is_recurring,
+  isArchived: payload.is_archived,
+  externalOrganizationId: payload.organization_id,
   visibility: payload.visibility,
-  createdAt: payload.createdAt,
-  updatedAt: payload.modifiedAt ?? now,
+  createdAt: decodeTimestamp(payload.created_at),
+  updatedAt: decodeOptionalTimestamp(payload.modified_at) ?? now,
   metadata: decodeProductMetadata(payload.metadata),
   prices: payload.prices,
 });
@@ -335,7 +340,7 @@ const makeBillingRepository = Effect.gen(function* () {
             target: schema.productTable.id,
             set: {
               ...toProductValues(payload, now),
-              updatedAt: payload.modifiedAt ?? now,
+              updatedAt: decodeOptionalTimestamp(payload.modified_at) ?? now,
             },
           })
           .pipe(Effect.asVoid);

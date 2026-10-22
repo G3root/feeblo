@@ -72,6 +72,7 @@ describe("BillingRpcHandlers", () => {
     });
   const PolarServiceTest = Layer.succeed(PolarService, {
     client: undefined,
+    coreClient: undefined,
     target: "sandbox",
     webhookSecret: Option.none(),
     getOrganizationSettings: () => Effect.succeedNone,
