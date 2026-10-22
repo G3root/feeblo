@@ -18,7 +18,9 @@
  *    release, and no package pins any of them to something else.
  * 3. Every `patchedDependencies` selector names a version that is installed. A
  *    selector that names no installed version is a no-op, and the package then
- *    runs unpatched with the install still succeeding.
+ *    runs unpatched with the install still succeeding. The block itself may be
+ *    absent: a patch is removable, and an empty set is expressed by not having
+ *    the block rather than by leaving a selector that names nothing.
  *
  * The pairing between `@effect/tsgo` and TypeScript/Oxlint is not checked here:
  * `effect-tsgo patch` (run from `prepare` on every install) refuses a mismatch,
@@ -77,11 +79,17 @@ const source = (file: string) => readFileSync(join(root, file), "utf8");
  * The file's shape is ours, so a line this reader cannot parse is an error: a
  * silently skipped entry would turn the check into one that always passes.
  */
-const readMapping = (yaml: string, key: string): Mapping => {
+/**
+ * Reads a top-level mapping. `optional` is for a block pnpm accepts as absent;
+ * `patchedDependencies` is empty whenever no dependency needs a patch.
+ */
+const readMapping = (yaml: string, key: string, optional = false): Mapping => {
   const lines = yaml.split("\n");
   const start = lines.findIndex((line) => line === `${key}:`);
-  if (start === -1)
+  if (start === -1) {
+    if (optional) return new Map();
     fail(`pnpm-workspace.yaml has no top-level \`${key}:\` block.`);
+  }
 
   const entries = new Map<string, string>();
   for (const line of lines.slice(start + 1)) {
@@ -382,7 +390,7 @@ selfTest();
 const workspace = source("pnpm-workspace.yaml");
 const catalog = readMapping(workspace, "catalog");
 const overrides = readMapping(workspace, "overrides");
-const patches = readMapping(workspace, "patchedDependencies");
+const patches = readMapping(workspace, "patchedDependencies", true);
 const manifests = readManifests();
 
 const failures = [

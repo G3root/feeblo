@@ -24,5 +24,3 @@ export const JWT_AUTO_LOGIN_ERROR_CODES = defineErrorCodes({
   SSO_RATE_LIMIT_UNAVAILABLE:
     "SSO sign-in is temporarily unavailable. Please try again later.",
 });
-
-export type JwtAutoLoginErrorCode = keyof typeof JWT_AUTO_LOGIN_ERROR_CODES;

@@ -83,10 +83,6 @@ export const gitHubBoardsAtom = Atom.family((organizationId: string) =>
   ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
-export type GitHubBoard = Atom.Success<
-  ReturnType<typeof gitHubBoardsAtom>
->[number];
-
 /** Feeblo statuses available as synchronization-rule targets. */
 export const gitHubPostStatusesAtom = Atom.family((organizationId: string) =>
   DashboardClient.query(

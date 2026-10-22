@@ -589,6 +589,3 @@ export const makeDiscordConnectionServiceLive = (
       });
     })
   );
-
-/** Live layer with the default fetch-backed Discord API client. */
-export const DiscordConnectionServiceLive = makeDiscordConnectionServiceLive();

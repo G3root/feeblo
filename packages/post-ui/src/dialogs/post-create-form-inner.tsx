@@ -1,0 +1,504 @@
+import type { TPost } from "@feeblo/domain/post/schema";
+import type {
+  TPostCreateAuthor,
+  TPostListItem,
+} from "@feeblo/domain/post/schema";
+import { PostId } from "@feeblo/id";
+import { Button } from "@feeblo/ui/button";
+import { DialogFooter, DialogPanel } from "@feeblo/ui/dialog";
+import { useAppForm } from "@feeblo/ui/hooks/form";
+import { toastManager } from "@feeblo/ui/toast";
+import { htmlToExcerpt } from "@feeblo/utils/html";
+import { slugify } from "@feeblo/utils/url";
+import { trackEvent } from "@feeblo/web-shared/analytics-provider";
+import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  and,
+  createOptimisticAction,
+  eq,
+  useLiveQuery,
+} from "@tanstack/react-db";
+import {
+  type FormEvent,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useState,
+} from "react";
+
+import { AuthorPicker } from "../author-picker/author-picker";
+import {
+  emptyOnBehalfAuthor,
+  hasOnBehalfAuthorValue,
+  toOnBehalfAuthor,
+} from "../contact-combobox/contact-combobox";
+import { usePostCreateDialogContext } from "../dialog-stores/post";
+import {
+  PostBoardField,
+  PostContentField,
+  PostCreateMoreField,
+  PostStatusField,
+  PostTitleField,
+  postCreateFormOpts,
+} from "../forms/post-create-form-shared";
+import { m } from "../paraglide/messages.js";
+import { usePostCollections } from "../providers/post-collections-provider";
+import { usePostStatuses } from "../use-post-statuses";
+
+const SUGGESTIONS_DEBOUNCE_MS = 450;
+
+function SimilarPosts({
+  boardId,
+  content,
+  title,
+}: {
+  boardId: string;
+  content: string;
+  title: string;
+}) {
+  const { getPostHref, suggestPosts } = usePostCollections();
+  const [posts, setPosts] = useState<readonly TPost[]>([]);
+  const [loading, setLoading] = useState(false);
+  // Defer the expensive inputs off the urgent typing path: the editor stays
+  // responsive while suggestions settle a beat behind.
+  const deferredTitle = useDeferredValue(title);
+  const deferredContent = useDeferredValue(content);
+
+  useEffect(() => {
+    const normalizedTitle = deferredTitle.trim();
+    if (!suggestPosts || normalizedTitle.length < 3) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
+    // Preserve matching posts while the next query settles. Resetting them on
+    // each keystroke unmounted the panel and caused it to flash.
+    const controller = new AbortController();
+    let isCurrent = true;
+    setLoading(true);
+    const timer = window.setTimeout(() => {
+      suggestPosts({
+        ...(boardId && { boardId }),
+        content: deferredContent,
+        signal: controller.signal,
+        title: normalizedTitle,
+      })
+        .then((nextPosts) => {
+          if (isCurrent) {
+            setPosts(nextPosts);
+          }
+        })
+        .catch(() => {
+          if (isCurrent && !controller.signal.aborted) {
+            setPosts([]);
+          }
+        })
+        .finally(() => {
+          if (isCurrent) {
+            setLoading(false);
+          }
+        });
+    }, SUGGESTIONS_DEBOUNCE_MS);
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [boardId, deferredContent, suggestPosts, deferredTitle]);
+
+  // Do not render an empty/loading panel. If the request returns no matches,
+  // the suggestions area should stay absent instead of flashing briefly.
+  if (posts.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      aria-busy={loading}
+      aria-label={m.fun_game_goose()}
+      aria-live="polite"
+      className="bg-muted/30 overflow-hidden rounded-lg border"
+    >
+      <div className="border-b px-3 py-2">
+        <p className="text-sm font-medium">{m.fun_game_goose()}</p>
+        <p className="text-muted-foreground text-xs">{m.bad_empty_polecat()}</p>
+      </div>
+      <div className="divide-y">
+        {posts.map((post) => {
+          const href = getPostHref?.(post);
+          const body = (
+            <>
+              <span className="text-sm font-medium">{post.title}</span>
+              {post.excerpt ? (
+                <span className="text-muted-foreground line-clamp-1 text-xs">
+                  {post.excerpt}
+                </span>
+              ) : null}
+            </>
+          );
+          return href ? (
+            <a
+              className="hover:bg-muted flex flex-col gap-0.5 px-3 py-2.5 transition-colors"
+              href={href}
+              key={post.id}
+            >
+              {body}
+            </a>
+          ) : (
+            <div className="flex flex-col gap-0.5 px-3 py-2.5" key={post.id}>
+              {body}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export interface PostCreateActionInput {
+  readonly author?: TPostCreateAuthor;
+  readonly content: string;
+  readonly row: TPostListItem;
+}
+
+export function PostCreateForm() {
+  const store = usePostCreateDialogContext();
+  const { collections, onAuthRequired, organizationId, persistPost } =
+    usePostCollections();
+  const {
+    boardCollection,
+    deleteEligibilityCollection,
+    membersCollection,
+    postCollection,
+  } = collections;
+  const { data: session } = useAuthState();
+
+  // Mirrors the backend's PostPolicy gate for PostCreate.author; hidden
+  // entirely from roles below manager.
+  const createOnBehalfPolicy = usePolicy(
+    hasPermission(organizationId, "posts.createOnBehalf")
+  );
+
+  const { data: member } = useLiveQuery({
+    // The feedback dialog mounts on hot portal pages; the explicit keys list
+    // every captured input plus the collection each query reads.
+    queryKey: [
+      "post-create-member",
+      membersCollection?.id ?? null,
+      organizationId,
+      session?.user?.id ?? null,
+    ],
+    query: (q) => {
+      if (!(membersCollection && organizationId && session?.user?.id)) {
+        return undefined;
+      }
+      return q
+        .from({ member: membersCollection })
+        .where(({ member }) =>
+          and(
+            eq(member.organizationId, organizationId),
+            eq(member.userId, session?.user?.id)
+          )
+        )
+        .findOne();
+    },
+  });
+
+  const { data: boards = [] } = useLiveQuery({
+    queryKey: ["post-create-boards", boardCollection.id, organizationId],
+    query: (q) => {
+      if (!organizationId) {
+        return undefined;
+      }
+      return q
+        .from({ board: boardCollection })
+        .where(({ board }) => eq(board.organizationId, organizationId));
+    },
+  });
+  const { data: postStatuses } = usePostStatuses();
+
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  const explicitStatusId = store.get().context.data.statusId as
+    | string
+    | undefined;
+  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  const explicitStatus = store.get().context.data.status as
+    | BoardPostStatus
+    | undefined;
+  // The workspace's own default, not the first row and not a hardcoded type: a
+  // quick-create from the board files into whichever status the workspace
+  // marked as its default, which is where the widget and the Slack and Discord
+  // integrations file too.
+  //
+  // Resolved from the row data rather than through `pickDefaultPostStatus` in
+  // `@feeblo/domain`: this package is browser code and imports
+  // `@feeblo/domain/*` for types only, because a value import pulls the server
+  // domain graph into the bundle. The rule is the same one that helper states —
+  // the marked default, then the PENDING status, then the first row.
+  const initialPostStatus =
+    postStatuses.find((postStatus) => postStatus.id === explicitStatusId) ??
+    (explicitStatus === undefined
+      ? undefined
+      : postStatuses.find(
+          (postStatus) => postStatus.type === explicitStatus
+        )) ??
+    postStatuses.find((postStatus) => postStatus.isDefault) ??
+    postStatuses.find((postStatus) => postStatus.type === "PENDING") ??
+    postStatuses[0];
+
+  const initialBoardId = store.get().context.data.boardId ?? "";
+  const [contentEditorKey, setContentEditorKey] = useState(0);
+  const [editorScope] = useState(() => crypto.randomUUID());
+
+  // Creation persists through the surface's `persistPost` RPC while the
+  // slim list row (no `content`) inserts optimistically in the same
+  // transaction. The body travels as action input — never through the
+  // list row or a side channel — and a failed RPC rolls the row back.
+  const createPost = createOptimisticAction<PostCreateActionInput>({
+    onMutate: ({ row }) => {
+      postCollection.insert(row);
+    },
+    mutationFn: async ({ author, content, row }) => {
+      const canonicalSlug = await persistPost({
+        assetIds: [...(row.assetIds ?? [])],
+        boardId: row.boardId,
+        content,
+        id: row.id,
+        organizationId: row.organizationId,
+        statusId: row.statusId,
+        title: row.title,
+        ...(author ? { author } : undefined),
+      });
+      // The RPC returns the collision-resolved slug actually persisted.
+      // Reconcile the optimistic row before isPersisted settles so links
+      // and detail queries target the stored post.
+      if (canonicalSlug !== row.slug) {
+        postCollection.update(row.id, (draft) => {
+          draft.slug = canonicalSlug;
+        });
+      }
+      // Sync server writes before returning: the optimistic state is
+      // dropped when the mutation settles, so refetch failures propagate
+      // to the submit handler instead of being suppressed.
+      await postCollection.utils.refetch();
+      // A new own post is immediately deletable: refresh the hint set in the
+      // background so submit doesn't wait on a second round trip for it.
+      if (deleteEligibilityCollection) {
+        refetchInBackground(deleteEligibilityCollection.utils.refetch());
+      }
+      return canonicalSlug;
+    },
+  });
+
+  const form = useAppForm({
+    ...postCreateFormOpts,
+    defaultValues: {
+      author: emptyOnBehalfAuthor,
+      boardId: initialBoardId,
+      content: "",
+      createMore: false,
+      statusId: initialPostStatus?.id ?? "",
+      title: "",
+    },
+
+    onSubmit: async ({ value }) => {
+      if (!session) {
+        onAuthRequired?.();
+        return;
+      }
+
+      const source = store.get().context.data.source;
+
+      try {
+        const postId = await PostId.unsafeGenerate();
+        const title = value.title.trim();
+        const assetOrganizationId = member ? organizationId : undefined;
+        // Imported on submit rather than with the dialog chunk: asset
+        // finalization rides the editor chunk, already warm from the open
+        // editor, so submit pays no extra load.
+        const { finalizeEditorContent } = await import("@feeblo/ui/editor");
+        const finalized = await finalizeEditorContent(
+          value.content,
+          assetOrganizationId,
+          { scope: editorScope }
+        );
+        const { assetIds, content } = finalized;
+        const selectedPostStatus = postStatuses.find(
+          (postStatus) => postStatus.id === value.statusId
+        );
+
+        if (!selectedPostStatus) {
+          throw new Error(m.knotty_actual_bumblebee());
+        }
+        // Attribution only rides along when a subject is actually picked;
+        // otherwise the session user authors.
+        const authorSelection = createOnBehalfPolicy.allowed
+          ? value.author
+          : undefined;
+        // Mirrors the server's `authorIsMember`: an on-behalf subject carries
+        // the picker's hint, a self-authored post follows the session's
+        // membership.
+        const authorIsMember = hasOnBehalfAuthorValue(authorSelection)
+          ? (authorSelection.isMember ?? false)
+          : member !== undefined;
+
+        // The list row carries no body; it travels as action input to the
+        // surface's `persistPost` RPC instead. On-behalf attribution rides
+        // the same action input so `persistPost` can forward it to CreatePost.
+        const tx = createPost({
+          content,
+          row: {
+            id: postId,
+            assetIds,
+            archivedAt: null,
+            boardId: value.boardId,
+            title,
+            slug: slugify(title) || "untitled",
+            excerpt: htmlToExcerpt(content),
+            lockedAt: null,
+            mergedAt: null,
+            mergedIntoPostId: null,
+            etaQuarter: null,
+            statusId: selectedPostStatus.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            organizationId,
+            creatorId: session?.user?.id ?? null,
+            creatorMemberId: member?.id ?? null,
+            authorIsMember,
+            user: {
+              name: session?.user?.name ?? null,
+              image: session?.user?.image ?? null,
+            },
+          },
+          ...(hasOnBehalfAuthorValue(authorSelection)
+            ? { author: toOnBehalfAuthor(authorSelection) }
+            : undefined),
+        });
+
+        await tx.isPersisted.promise;
+        finalized.commit();
+        trackEvent("post_created", { source, success: true });
+        toastManager.add({
+          title: m.trite_lower_moose(),
+          type: "success",
+        });
+
+        if (value.createMore) {
+          form.resetField("title");
+          form.resetField("content");
+          form.resetField("author");
+          setContentEditorKey((current) => current + 1);
+          return;
+        }
+
+        form.reset();
+        setContentEditorKey((current) => current + 1);
+        store.send({ type: "toggle" });
+      } catch (error) {
+        trackEvent("post_created", { source, success: false });
+
+        const parsed = parseRpcError(error);
+
+        toastManager.add({
+          title: parsed.message,
+          type: "error",
+        });
+      }
+    },
+  });
+
+  const handleSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      void form.handleSubmit();
+    },
+    [form]
+  );
+
+  if (postStatuses.length === 0) {
+    return null;
+  }
+
+  return (
+    <form className="contents" id="post-create-form" onSubmit={handleSubmit}>
+      <DialogPanel>
+        <div className="space-y-4">
+          <PostTitleField form={form} />
+          <PostContentField
+            assetOwner={member ? "organization" : "user"}
+            editorScope={editorScope}
+            form={form}
+            key={contentEditorKey}
+          />
+          <form.Subscribe
+            selector={(state) =>
+              [
+                state.values.boardId,
+                state.values.content,
+                state.values.title,
+              ] as const
+            }
+          >
+            {([boardId, content, title]) => (
+              <SimilarPosts boardId={boardId} content={content} title={title} />
+            )}
+          </form.Subscribe>
+        </div>
+      </DialogPanel>
+
+      <DialogFooter className="grid grid-cols-2 items-center">
+        <div className="flex justify-start">
+          <div className="flex items-center gap-2">
+            <PostBoardField boards={boards} form={form} />
+            <PostStatusField form={form} statuses={postStatuses} />
+            {createOnBehalfPolicy.allowed ? (
+              <form.AppField name="author">
+                {(field) => {
+                  const selection = hasOnBehalfAuthorValue(field.state.value)
+                    ? field.state.value
+                    : null;
+                  return (
+                    <AuthorPicker
+                      display={
+                        selection ?? {
+                          name: session?.user?.name ?? m.noble_merry_owl(),
+                          avatarUrl: session?.user?.image ?? null,
+                        }
+                      }
+                      label={m.inner_glad_leopard()}
+                      onSelect={(next) =>
+                        field.handleChange(next ?? emptyOnBehalfAuthor)
+                      }
+                      organizationId={organizationId}
+                      placeholder={m.free_quiet_llama()}
+                      searchPlaceholder={m.lime_jumpy_mouse()}
+                      submitLabel={m.stout_cozy_finch()}
+                      value={selection}
+                    />
+                  );
+                }}
+              </form.AppField>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3">
+          <PostCreateMoreField form={form} />
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
+              <Button loading={isSubmitting} type="submit" variant="brand">
+                {m.lucky_game_cowfish()}
+              </Button>
+            )}
+          </form.Subscribe>
+        </div>
+      </DialogFooter>
+    </form>
+  );
+}

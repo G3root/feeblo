@@ -22,6 +22,7 @@ export const ChangelogPostCreate = S.Struct({
 
 export type TChangelogPostCreate = S.Schema.Type<typeof ChangelogPostCreate>;
 
+/** @alias */
 export const ChangelogPostDelete = ChangelogPostCreate;
 
 export type TChangelogPostDelete = S.Schema.Type<typeof ChangelogPostDelete>;

@@ -116,11 +116,6 @@ export const makeSlackIntegrationConfig = (config: ServerConfigValue) => {
   });
 };
 
-export const makeSlackConfigLayer = (
-  config: ServerConfigValue
-): Layer.Layer<SlackIntegrationConfig> =>
-  Layer.succeed(SlackIntegrationConfig, makeSlackIntegrationConfig(config));
-
 /** Builds the Discord integration configuration values from the server environment. */
 export const makeDiscordIntegrationConfig = (config: ServerConfigValue) => {
   const trailingSlashPattern = /\/$/;

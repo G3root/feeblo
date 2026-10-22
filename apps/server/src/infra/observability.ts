@@ -18,11 +18,9 @@ import * as Option from "effect/Option";
 import * as References from "effect/References";
 
 import type { ServerConfigValue } from "../config";
-import {
-  startProcessMetrics,
-  telemetryConfig,
-  telemetryLayer,
-} from "./telemetry";
+import { telemetryConfig } from "./telemetry/config";
+import { telemetryLayer } from "./telemetry/layer";
+import { startProcessMetrics } from "./telemetry/process";
 
 /** Longest failure summary written to the startup log. */
 const failureSummaryLimit = 500;

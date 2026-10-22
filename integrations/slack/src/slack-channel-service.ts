@@ -254,6 +254,3 @@ export const makeSlackChannelServiceLive = (
       });
     })
   );
-
-/** Live layer with the default fetch-backed Slack API client. */
-export const SlackChannelServiceLive = makeSlackChannelServiceLive();

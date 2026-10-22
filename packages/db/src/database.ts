@@ -219,13 +219,21 @@ export const SqlClientContextLive = Layer.unwrap(
   )
 );
 
-// Backwards-compatible alias for the Postgres-only database layer.
+/**
+ * Backwards-compatible alias for the Postgres-only database layer.
+ *
+ * @alias
+ */
 export const DatabaseLive = PgDatabaseLive;
 
-// Effect SQL keeps the active transaction connection in fiber-local context,
-// so queries made through this database automatically join the current
-// transaction (including queries from repositories that captured the database
-// when their layer was built).
+/**
+ * Effect SQL keeps the active transaction connection in fiber-local context,
+ * so queries made through this database automatically join the current
+ * transaction (including queries from repositories that captured the database
+ * when their layer was built).
+ *
+ * @alias
+ */
 export const currentDb: Effect.Effect<
   PgDrizzle.EffectPgDatabase,
   never,

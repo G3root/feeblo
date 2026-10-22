@@ -13,12 +13,10 @@ minimumReleaseAge: 1440
 # instead of the removed `effect/unstable/sql`, and that is a correctness fix,
 # not a preference: the stale path resolved to `any` under `skipLibCheck`, so
 # the error half of `db.transaction`'s type was `any` and every transaction in
-# the tree silently lost the errors it was supposed to handle. `drizzle-seed`
-# moves with it because the two ship in one release and both peer on the ORM.
-# Drop these entries once rc.5 is a day old.
+# the tree silently lost the errors it was supposed to handle. Drop this entry
+# once rc.5 is a day old.
 minimumReleaseAgeExclude:
   - drizzle-orm
-  - drizzle-seed
 
 allowBuilds:
   "@parcel/watcher": true
@@ -32,12 +30,10 @@ allowBuilds:
 catalog:
   "@base-ui/react": ^1.7.0
   "@better-auth/api-key": 1.7.2
-  "@better-auth/utils": ^0.4.0
   "@bufbuild/protobuf": 2.16.0
   "@cloudflare/workers-types": ^4.20260702.1
   "@dotenvx/dotenvx": ^1.75.1
   "@effect-aws/client-s3": 2.0.0-beta.6
-  "@effect-aws/s3": 1.0.0-beta.5
   "@effect/ai-openai": 4.0.0
   "@effect/atom-react": 4.0.0
   "@effect/platform-node": 4.0.0
@@ -49,7 +45,6 @@ catalog:
   "@polar-sh/better-auth": ^1.8.3
   "@polar-sh/sdk": ^0.47.1
   "@solidjs/router": ^0.16.1
-  "@tailwindcss/cli": ^4.1.18
   "@tailwindcss/vite": ^4.3.3
   "@tanstack/query-db-collection": 1.2.15
   "@tanstack/react-db": ^0.4.1
@@ -63,7 +58,6 @@ catalog:
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.4
   "@vitejs/plugin-react": ^6.1.1
-  alchemy: ^0.82.1
   better-auth: 1.7.2
   class-variance-authority: ^0.7.1
   cn: ^0.2.4
@@ -77,9 +71,9 @@ catalog:
   # rewrite, never on its own.
   drizzle-kit: 1.0.0-rc.4
   drizzle-orm: 1.0.0-rc.5
-  drizzle-seed: 1.0.0-rc.5
   effect: 4.0.0
   jose: ^6.2.3
+  knip: ^6.42.1
   postgres: ^3.4.7
   rangi: ^2.2.0
   react: ^19.2.8
@@ -103,5 +97,3 @@ nodeLinker: hoisted
 overrides:
   "@effect/platform-node-shared": 4.0.0
   prosemirror-model: ^1.25.9
-patchedDependencies:
-  "@effect-aws/s3@1.0.0-beta.5": patches/@effect-aws__s3@1.0.0-beta.5.patch

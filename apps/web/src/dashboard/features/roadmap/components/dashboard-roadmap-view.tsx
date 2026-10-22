@@ -340,19 +340,3 @@ export function DashboardRoadmapDetailView({
     </DashboardRoadmapDetailProvider>
   );
 }
-
-// Back-compat — delegates to explicit variants
-export function DashboardRoadmapView({
-  organizationId,
-  slug,
-}: {
-  organizationId: string;
-  slug?: string;
-}) {
-  if (slug === undefined) {
-    return <DashboardRoadmapIndexView organizationId={organizationId} />;
-  }
-  return (
-    <DashboardRoadmapDetailView organizationId={organizationId} slug={slug} />
-  );
-}

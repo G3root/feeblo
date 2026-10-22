@@ -4,7 +4,7 @@
 
 - Catalog: `project.inlang/` + `messages/{en,de,zh,es,fr,pt,ru,ar}.json` at the repo root.
 - Generated (git-ignored): `packages/post-ui/src/paraglide/`.
-- Import messages relatively (`../paraglide/messages.js` from `src/v2/*`, `../../paraglide/messages.js` from `src/v2/*/*`).
+- Import messages relatively (`./paraglide/messages.js` from `src/*`, `../paraglide/messages.js` from `src/*/*`).
 
 ## Host injection
 
