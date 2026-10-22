@@ -53,7 +53,6 @@
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@feeblo/config": "workspace:*",
-    "@feeblo/id": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

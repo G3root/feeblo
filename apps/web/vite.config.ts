@@ -348,7 +348,6 @@ export default defineConfig({
           if (
             id.includes("/prosemirror-") ||
             id.includes("/prosekit/") ||
-            id.includes("/katex/") ||
             id.includes("/mdast-util-to-markdown/") ||
             id.includes("/unist-util-visit-parents/") ||
             id.includes("/unified/") ||

@@ -6,7 +6,7 @@ import { FeedbackFormSkeleton } from "../components/feedback-form/skeleton";
 import { ViewTransition } from "../components/shell/view-transition";
 import { fetchBoards } from "../lib/api";
 
-export function BoardDetailComponent() {
+function BoardDetailComponent() {
   return (
     <ViewTransition kind="push">
       <Suspense fallback={<FeedbackFormSkeleton />}>

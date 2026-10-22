@@ -3,8 +3,6 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
-export { Provider } from "@feeblo/web-shared/integrations/tanstack-query/root-provider";
-
 /**
  * Per-request clients, keyed by the request they belong to.
  *

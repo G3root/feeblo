@@ -4,11 +4,10 @@ import { requestBoards, requestUpdates, submitFeedback } from "./requests";
 
 export type {
   FeedbackResult,
-  WidgetBoard,
   WidgetSuggestion,
   WidgetUpdate,
 } from "./requests";
-export { fetchSuggestions, getOrganizationId } from "./requests";
+export { fetchSuggestions } from "./requests";
 
 /**
  * The router-facing half of the widget's HTTP boundary.

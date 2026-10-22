@@ -46,21 +46,6 @@
     "./auth-handler": {
       "default": "./src/auth-handler.ts"
     },
-    "./auth/verification-otp": {
-      "default": "./src/auth/verification-otp/index.ts"
-    },
-    "./auth/verification-otp/api": {
-      "default": "./src/auth/verification-otp/api.ts"
-    },
-    "./auth/verification-otp/live": {
-      "default": "./src/auth/verification-otp/live.ts"
-    },
-    "./auth/verification-otp/schema": {
-      "default": "./src/auth/verification-otp/schema.ts"
-    },
-    "./auth/verification-otp/utils": {
-      "default": "./src/auth/verification-otp/utils.ts"
-    },
     "./billing/repository": {
       "default": "./src/billing/repository.ts"
     },
@@ -199,9 +184,6 @@
     "./identity/service": {
       "default": "./src/identity/service.ts"
     },
-    "./import-export/schema": {
-      "default": "./src/import-export/schema.ts"
-    },
     "./integration/chat": {
       "default": "./src/integration/chat/index.ts"
     },
@@ -271,23 +253,11 @@
     "./integration/github/errors": {
       "default": "./src/integration/github/errors.ts"
     },
-    "./integration/github/github-provider": {
-      "default": "./src/integration/github/github-provider.ts"
-    },
-    "./integration/github/inbound-live": {
-      "default": "./src/integration/github/inbound-live.ts"
-    },
     "./integration/github/inbound-service": {
       "default": "./src/integration/github/inbound-service.ts"
     },
-    "./integration/github/management-live": {
-      "default": "./src/integration/github/management-live.ts"
-    },
     "./integration/github/management-service": {
       "default": "./src/integration/github/management-service.ts"
-    },
-    "./integration/github/oauth-callback": {
-      "default": "./src/integration/github/oauth-callback.ts"
     },
     "./integration/github/rpcs": {
       "default": "./src/integration/github/rpcs.ts"
@@ -369,12 +339,6 @@
     },
     "./notification/service": {
       "default": "./src/notification/service.ts"
-    },
-    "./notifications/batches": {
-      "default": "./src/notifications/batches.ts"
-    },
-    "./notifications/runtime": {
-      "default": "./src/notifications/runtime.ts"
     },
     "./og-image/errors": {
       "default": "./src/og-image/errors.ts"
@@ -526,17 +490,8 @@
     "./upvote/schema": {
       "default": "./src/upvote/schema.ts"
     },
-    "./user/handlers": {
-      "default": "./src/user/handlers.ts"
-    },
     "./user/repository": {
       "default": "./src/user/repository.ts"
-    },
-    "./user/rpcs": {
-      "default": "./src/user/rpcs.ts"
-    },
-    "./user/schema": {
-      "default": "./src/user/schema.ts"
     },
     "./user/workflows": {
       "default": "./src/user/workflows.ts"
@@ -567,7 +522,6 @@
   },
   "dependencies": {
     "@effect-aws/client-s3": "catalog:",
-    "@effect-aws/s3": "catalog:",
     "@effect/ai-openai": "catalog:",
     "@feeblo/db": "workspace:*",
     "@feeblo/domain-contracts": "workspace:*",
@@ -578,7 +532,6 @@
     "@feeblo/utils": "workspace:*",
     "@isaacs/ttlcache": "catalog:",
     "@polar-sh/sdk": "catalog:",
-    "better-auth": "catalog:",
     "cookie-es": "^3.1.1",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",

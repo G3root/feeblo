@@ -35,9 +35,7 @@
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@tailwindcss/vite": "catalog:",
-    "shadcn": "catalog:",
     "tailwindcss": "catalog:",
-    "tw-animate-css": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-icons-spritesheet": "catalog:",

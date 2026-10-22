@@ -23,15 +23,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@better-auth/utils": "catalog:",
     "@isaacs/ttlcache": "catalog:",
     "@noble/ciphers": "^2.0.1",
     "@noble/hashes": "^2.0.1",
     "dayjs": "^1.11.21",
     "effect": "catalog:",
-    "legid": "^0.1.4",
     "mdast-util-to-markdown": "^2.1.2",
-    "nanoid": "^5.1.6",
     "rangi": "catalog:",
     "rehype-parse": "^9.0.1",
     "rehype-remark": "^10.0.1",

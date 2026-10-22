@@ -10,16 +10,14 @@ import { createSignal } from "solid-js";
  * about the fields. The iframe's previous copy narrowed `customFields` to
  * scalars, which silently dropped the nested values the SDK permits.
  */
-export type WidgetUserIdentity = TWidgetIdentity;
-
 export type WidgetIdentity = TWidgetIdentity;
 
 const [identity, setIdentity] = createSignal<WidgetIdentity | null>(null);
 
-export function getWidgetIdentity(): WidgetIdentity | null {
-  return identity();
-}
-
+/**
+ * The identity is written by the embedder and read only for its token; the
+ * token is what the widget's API calls authenticate with.
+ */
 export function getWidgetToken(): string | null {
   const current = identity();
   return current?.token ?? null;
@@ -27,8 +25,4 @@ export function getWidgetToken(): string | null {
 
 export function setWidgetIdentity(data: WidgetIdentity): void {
   setIdentity(data);
-}
-
-export function clearWidgetIdentity(): void {
-  setIdentity(null);
 }

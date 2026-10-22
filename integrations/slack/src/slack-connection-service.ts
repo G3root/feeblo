@@ -505,6 +505,3 @@ export const makeSlackConnectionServiceLive = (
       });
     })
   );
-
-/** Live layer with the default fetch-backed Slack API client. */
-export const SlackConnectionServiceLive = makeSlackConnectionServiceLive();

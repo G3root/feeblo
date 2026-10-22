@@ -13,68 +13,68 @@
       "default": "./src/post-status.ts"
     },
     "./post-properties": {
-      "types": "./src/v2/post-field.tsx",
-      "default": "./src/v2/post-field.tsx"
+      "types": "./src/post-field.tsx",
+      "default": "./src/post-field.tsx"
     },
     "./post-create-dialog": {
-      "types": "./src/v2/dialogs/post-create-dialog.tsx",
-      "default": "./src/v2/dialogs/post-create-dialog.tsx"
+      "types": "./src/dialogs/post-create-dialog.tsx",
+      "default": "./src/dialogs/post-create-dialog.tsx"
     },
     "./post-delete-dialog": {
-      "types": "./src/v2/dialogs/post-delete-dialog.tsx",
-      "default": "./src/v2/dialogs/post-delete-dialog.tsx"
+      "types": "./src/dialogs/post-delete-dialog.tsx",
+      "default": "./src/dialogs/post-delete-dialog.tsx"
     },
     "./comment-delete-dialog": {
-      "types": "./src/v2/dialogs/comment-delete-dialog.tsx",
-      "default": "./src/v2/dialogs/comment-delete-dialog.tsx"
+      "types": "./src/dialogs/comment-delete-dialog.tsx",
+      "default": "./src/dialogs/comment-delete-dialog.tsx"
     },
     "./post-collections-provider": {
-      "types": "./src/v2/providers/post-collections-provider.tsx",
-      "default": "./src/v2/providers/post-collections-provider.tsx"
+      "types": "./src/providers/post-collections-provider.tsx",
+      "default": "./src/providers/post-collections-provider.tsx"
     },
     "./comment-display": {
-      "types": "./src/v2/comment-display/index.tsx",
-      "default": "./src/v2/comment-display/index.tsx"
+      "types": "./src/comment-display/index.tsx",
+      "default": "./src/comment-display/index.tsx"
     },
     "./contact-combobox": {
-      "types": "./src/v2/contact-combobox/contact-combobox.tsx",
-      "default": "./src/v2/contact-combobox/contact-combobox.tsx"
+      "types": "./src/contact-combobox/contact-combobox.tsx",
+      "default": "./src/contact-combobox/contact-combobox.tsx"
     },
     "./contact-combobox/new-user-dialog": {
-      "types": "./src/v2/contact-combobox/new-user-dialog.tsx",
-      "default": "./src/v2/contact-combobox/new-user-dialog.tsx"
+      "types": "./src/contact-combobox/new-user-dialog.tsx",
+      "default": "./src/contact-combobox/new-user-dialog.tsx"
     },
     "./author-picker": {
-      "types": "./src/v2/author-picker/author-picker.tsx",
-      "default": "./src/v2/author-picker/author-picker.tsx"
+      "types": "./src/author-picker/author-picker.tsx",
+      "default": "./src/author-picker/author-picker.tsx"
     },
     "./dialogs": {
-      "types": "./src/v2/dialogs/index.ts",
-      "default": "./src/v2/dialogs/index.ts"
+      "types": "./src/dialogs/index.ts",
+      "default": "./src/dialogs/index.ts"
     },
     "./dialog-stores": {
-      "types": "./src/v2/dialog-stores/index.ts",
-      "default": "./src/v2/dialog-stores/index.ts"
+      "types": "./src/dialog-stores/index.ts",
+      "default": "./src/dialog-stores/index.ts"
     },
     "./post-collection": {
-      "types": "./src/v2/post-collection.tsx",
-      "default": "./src/v2/post-collection.tsx"
+      "types": "./src/post-collection.tsx",
+      "default": "./src/post-collection.tsx"
     },
     "./post-page": {
-      "types": "./src/v2/post-page.tsx",
-      "default": "./src/v2/post-page.tsx"
+      "types": "./src/post-page.tsx",
+      "default": "./src/post-page.tsx"
     },
     "./post-page-context": {
-      "types": "./src/v2/post-page-context.tsx",
-      "default": "./src/v2/post-page-context.tsx"
+      "types": "./src/post-page-context.tsx",
+      "default": "./src/post-page-context.tsx"
     },
     "./post-dialog-stores": {
-      "types": "./src/v2/dialog-stores/post.ts",
-      "default": "./src/v2/dialog-stores/post.ts"
+      "types": "./src/dialog-stores/post.ts",
+      "default": "./src/dialog-stores/post.ts"
     },
     "./post-editor": {
-      "types": "./src/v2/post-editor.tsx",
-      "default": "./src/v2/post-editor.tsx"
+      "types": "./src/post-editor.tsx",
+      "default": "./src/post-editor.tsx"
     },
     "./post-comment-composer": {
       "types": "./src/post/post-comment-composer.tsx",
@@ -85,36 +85,32 @@
       "default": "./src/post/post-content.tsx"
     },
     "./reaction-picker": {
-      "types": "./src/v2/reaction-picker.tsx",
-      "default": "./src/v2/reaction-picker.tsx"
+      "types": "./src/reaction-picker.tsx",
+      "default": "./src/reaction-picker.tsx"
     },
     "./upvote-toggle": {
-      "types": "./src/v2/upvote-toggle.tsx",
-      "default": "./src/v2/upvote-toggle.tsx"
+      "types": "./src/upvote-toggle.tsx",
+      "default": "./src/upvote-toggle.tsx"
     },
     "./use-post-upvotes": {
-      "types": "./src/v2/use-post-upvotes.ts",
-      "default": "./src/v2/use-post-upvotes.ts"
+      "types": "./src/use-post-upvotes.ts",
+      "default": "./src/use-post-upvotes.ts"
     },
     "./voter-panel": {
-      "types": "./src/v2/voter-panel.tsx",
-      "default": "./src/v2/voter-panel.tsx"
+      "types": "./src/voter-panel.tsx",
+      "default": "./src/voter-panel.tsx"
     },
     "./subscribe-toggle": {
-      "types": "./src/v2/subscribe-toggle.tsx",
-      "default": "./src/v2/subscribe-toggle.tsx"
+      "types": "./src/subscribe-toggle.tsx",
+      "default": "./src/subscribe-toggle.tsx"
     },
     "./notifications-menu": {
-      "types": "./src/v2/notifications-menu.tsx",
-      "default": "./src/v2/notifications-menu.tsx"
+      "types": "./src/notifications-menu.tsx",
+      "default": "./src/notifications-menu.tsx"
     },
     "./post-title-input": {
-      "types": "./src/v2/post-title-input.tsx",
-      "default": "./src/v2/post-title-input.tsx"
-    },
-    "./comment-reaction-section": {
-      "types": "./src/post/comment-reaction-section.tsx",
-      "default": "./src/post/comment-reaction-section.tsx"
+      "types": "./src/post-title-input.tsx",
+      "default": "./src/post-title-input.tsx"
     },
     "./social-auth-buttons": {
       "types": "./src/auth/social-auth-buttons.tsx",
@@ -141,8 +137,8 @@
       "default": "./src/auth/turnstile.tsx"
     },
     "./auth-dialog": {
-      "types": "./src/v2/dialogs/auth-dialog.tsx",
-      "default": "./src/v2/dialogs/auth-dialog.tsx"
+      "types": "./src/dialogs/auth-dialog.tsx",
+      "default": "./src/dialogs/auth-dialog.tsx"
     },
     "./roadmap/roadmap-grid": {
       "types": "./src/roadmap/roadmap-grid.tsx",
@@ -188,8 +184,6 @@
   "scripts": {
     "build:paraglide": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations",
     "dev": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations --watch",
-    "ladle": "ladle serve",
-    "ladle:build": "ladle build",
     "machine-translate": "inlang machine translate --project ../../project.inlang",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
@@ -203,6 +197,7 @@
     "@feeblo/web-shared": "workspace:*",
     "@hugeicons/core-free-icons": "^4.1.1",
     "@hugeicons/react": "^1.1.6",
+    "@marsidev/react-turnstile": "^1.5.4",
     "@number-flow/react": "^0.6.1",
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-form": "catalog:",
@@ -214,12 +209,12 @@
     "@feeblo/config": "workspace:*",
     "@inlang/cli": "^3.3.0",
     "@inlang/paraglide-js": "^2.23.1",
-    "@ladle/react": "^5.1.1",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "^5.0.2",
+    "shadcn": "catalog:",
     "tailwindcss": "catalog:",
     "tw-animate-css": "catalog:",
     "typescript": "catalog:",
