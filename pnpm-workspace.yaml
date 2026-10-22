@@ -13,9 +13,11 @@ minimumReleaseAge: 1440
 # instead of the removed `effect/unstable/sql`, and that is a correctness fix,
 # not a preference: the stale path resolved to `any` under `skipLibCheck`, so
 # the error half of `db.transaction`'s type was `any` and every transaction in
-# the tree silently lost the errors it was supposed to handle. Drop this entry
-# once rc.5 is a day old.
+# the tree silently lost the errors it was supposed to handle. The kit moves
+# with it because rc.5's kit peers on the rc.5 ORM and reads snapshot format 9.
+# Drop these entries once rc.5 is a day old.
 minimumReleaseAgeExclude:
+  - drizzle-kit
   - drizzle-orm
 
 allowBuilds:
@@ -62,14 +64,11 @@ catalog:
   class-variance-authority: ^0.7.1
   cn: ^0.2.4
   dotenv: ^17.2.2
-  # `drizzle-kit` stays on rc.4 on purpose. rc.5's kit reads snapshot format 9,
-  # and all 45 committed snapshots in `packages/db/src/migrations` are format 8,
-  # so rc.5's `generate` refuses to run until `drizzle-kit up` rewrites every
-  # one of them. That rewrite touches the migrations directory, so it is its own
-  # change; rc.4's kit reads the rc.5 ORM schema and generates a clean, empty
-  # diff today, which is verified. Bump this to rc.5 only together with that
-  # rewrite, never on its own.
-  drizzle-kit: 1.0.0-rc.4
+  # The ORM and the kit are one version or neither runs: rc.5's kit peers on
+  # `drizzle-orm >= 1.0.0-rc.5`, and it reads snapshot format 9 while every
+  # earlier kit reads format 8. `drizzle-kit up` rewrote the 45 committed
+  # snapshots to 9, so a downgrade would have to regenerate them.
+  drizzle-kit: 1.0.0-rc.5
   drizzle-orm: 1.0.0-rc.5
   effect: 4.0.5
   jose: ^6.2.3
