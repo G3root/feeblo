@@ -156,3 +156,13 @@ If a task seems to require one of these, do the rest and surface the decision in
 - **Effect diagnostics went quiet.** Check that `prepare` ran and patched both tools: `pnpm exec effect-tsgo patch --typescript --oxlint --force`. If `pnpm install` reported `skipped because its hash matches the replacement`, the pnpm store is serving a previously patched binary; `unpatch` then `patch --force` fixes it. This does not happen on a fresh CI runner.
 - **`tsc --noEmit` fails in `apps/web` on a missing `@/paraglide/*`.** Run `pnpm --filter @feeblo/web build:paraglide`, or use `pnpm check`.
 - **A run of `pnpm test` is slow.** The `test` turbo task is `cache: false`, so nothing about a test run is reused. Filter to the package you are working in.
+
+<!-- polylane:start -->
+## Investigate production with Polylane
+
+[Polylane](https://polylane.com/?ref=github.onboarding-pr) is an AI production engineer. It monitors deploys, telemetry, provider incidents, and your infrastructure. It records suspected problems as Issues. It investigates them and proposes fixes as pull requests. It connects to this repository and serves coding agents through the [Polylane MCP server](https://mcp.polylane.com/mcp).
+
+- For a production question about an error, spike, deploy, or missing signal, query Polylane through its MCP tools before you inspect code.
+- When debugging a failure, start from the Issue Polylane recorded. It carries the evidence from its investigation.
+- Polylane assesses pull requests in this repository for production impact. Read the impact assessment comment before you merge a change to a production path.
+<!-- polylane:end -->
