@@ -52,7 +52,6 @@
     "@types/pg": "^8.16.0",
     "better-auth": "catalog:",
     "drizzle-kit": "catalog:",
-    "drizzle-seed": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

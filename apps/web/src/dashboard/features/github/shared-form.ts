@@ -37,10 +37,6 @@ export const githubPostIssueFormSchema = z
     }
   });
 
-export type GitHubPostIssueFormValues = z.infer<
-  typeof githubPostIssueFormSchema
->;
-
 export const githubPostIssueFormOpts = formOptions({
   defaultValues: {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.

@@ -1,0 +1,43 @@
+import {
+  Dialog,
+  DialogDescription,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@feeblo/ui/dialog";
+import { useSelector } from "@xstate/store-react";
+import { lazy, Suspense } from "react";
+
+import { usePostCreateDialogContext } from "../dialog-stores/post";
+import { m } from "../paraglide/messages.js";
+
+const PostCreateForm = lazy(() =>
+  import("./post-create-form-inner").then((mod) => ({
+    default: mod.PostCreateForm,
+  }))
+);
+
+function PostCreateFormFallback() {
+  return <DialogPanel>{m.sleek_left_ray()}</DialogPanel>;
+}
+
+export function PostCreateDialog() {
+  const store = usePostCreateDialogContext();
+  const open = useSelector(store, (state) => state.context.open);
+  return (
+    <Dialog onOpenChange={() => store.send({ type: "toggle" })} open={open}>
+      <DialogPopup className="w-full max-w-187.5 md:min-h-150">
+        <DialogHeader>
+          <DialogTitle>{m.lucky_game_cowfish()}</DialogTitle>
+          <DialogDescription>{m.wide_inner_jurgen()}</DialogDescription>
+        </DialogHeader>
+        {open ? (
+          <Suspense fallback={<PostCreateFormFallback />}>
+            <PostCreateForm />
+          </Suspense>
+        ) : null}
+      </DialogPopup>
+    </Dialog>
+  );
+}

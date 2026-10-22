@@ -1,0 +1,287 @@
+import type { TPostCreateAuthor } from "@feeblo/domain/post/schema";
+import type { TUpvote } from "@feeblo/domain/upvote/schema";
+import { AvatarGroup, AvatarGroupCount } from "@feeblo/ui/avatar";
+import { Button } from "@feeblo/ui/button";
+import {
+  Dialog,
+  DialogHeader,
+  DialogPopup,
+  DialogTitle,
+} from "@feeblo/ui/dialog";
+import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { toastManager } from "@feeblo/ui/toast";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
+import { cn } from "@feeblo/ui/utils";
+import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { useAuthState } from "@feeblo/web-shared/use-auth-state";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  Cancel01Icon,
+  ThumbsUpIcon,
+  UserAdd01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react";
+
+import {
+  ContactCombobox,
+  type ContactComboboxSelection,
+  toOnBehalfAuthor,
+} from "./contact-combobox/contact-combobox";
+import {
+  NewUserDialog,
+  NewUserFooter,
+} from "./contact-combobox/new-user-dialog";
+import { m } from "./paraglide/messages.js";
+import { usePostCollectionData } from "./post-page-context";
+import { usePostCollections } from "./providers/post-collections-provider";
+import { usePostUpvotes } from "./use-post-upvotes";
+
+function VoterAvatar({
+  className,
+  upvote,
+}: {
+  className?: string;
+  upvote: TUpvote;
+}) {
+  return (
+    <UserAvatar
+      className={cn("shrink-0", className)}
+      image={upvote.user.image}
+      name={upvote.user.name}
+      size="sm"
+    />
+  );
+}
+
+/**
+ * Dashboard voter management for a post: lists the current voters and lets
+ * members with `votes.onBehalf` add voters through the contact picker
+ * (`AddUpvoteOnBehalf`) or remove an individual voter
+ * (`RemoveUpvoteOnBehalf`). Removal is deliberately confirm-free — the action
+ * is activity-logged and re-addable.
+ */
+export function VoterPanel() {
+  const { isMerged, post, organizationId } = usePostCollectionData();
+  const {
+    collections: { upvoteCollection },
+  } = usePostCollections();
+  const { data: session } = useAuthState();
+  const votesOnBehalfPolicy = usePolicy(
+    hasPermission(organizationId, "votes.onBehalf")
+  );
+  // Votes carry over to the survivor on merge, so on-behalf management is
+  // disabled on a merged post until it is unmerged.
+  const canManageVoters = Boolean(
+    session && votesOnBehalfPolicy.allowed && !isMerged
+  );
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  const upvotesQuery = usePostUpvotes({
+    organizationId,
+    postId: post.id,
+    upvoteCollection,
+  });
+
+  const upvotes = upvotesQuery.data ?? [];
+  // Hydration lands the voter list before the first client render; a skeleton
+  // gated on `isLoading` would replace it (see `isLiveQueryPending`).
+  const isLoading = isLiveQueryPending(upvotesQuery);
+
+  // Plain async functions, deliberately NOT createOptimisticAction: that API
+  // skips mutationFn entirely when onMutate stages zero collection
+  // operations (commit early-returns on an empty mutation list), which made
+  // add/remove silently no-op. Every vote count in the UI derives from the
+  // upvote collection client-side (post rows carry no vote count), so
+  // refetching it alone is the full invalidation.
+  const addVoter = async ({ author }: { author: TPostCreateAuthor }) => {
+    await fetchRpc((rpc) =>
+      rpc.AddUpvoteOnBehalf({
+        author,
+        organizationId,
+        postId: post.id,
+      })
+    );
+    await upvoteCollection.utils.refetch();
+  };
+
+  const removeVoter = async ({ userId }: { userId: string }) => {
+    await fetchRpc((rpc) =>
+      rpc.RemoveUpvoteOnBehalf({
+        organizationId,
+        postId: post.id,
+        userId,
+      })
+    );
+    await upvoteCollection.utils.refetch();
+  };
+
+  const handleAdd = async (selection: ContactComboboxSelection | null) => {
+    if (!selection) {
+      return;
+    }
+    try {
+      await addVoter({ author: toOnBehalfAuthor(selection) });
+      setIsAddOpen(false);
+    } catch (error) {
+      toastManager.add({
+        title: parseRpcError(error).message,
+        type: "error",
+      });
+    }
+  };
+
+  // The shared dialog collects the name/email; an address that turns out
+  // to belong to an existing contact or member resolves to them instead
+  // of duplicating — the RPC is idempotent either way.
+  const handleCreateAndVote = async ({
+    email,
+    name,
+  }: {
+    email: string;
+    name: string;
+  }) => {
+    await addVoter({ author: { email, name } });
+    setIsAddOpen(false);
+  };
+
+  const handleRemove = async (userId: string) => {
+    try {
+      await removeVoter({ userId });
+    } catch (error) {
+      toastManager.add({
+        title: parseRpcError(error).message,
+        type: "error",
+      });
+    }
+  };
+
+  return (
+    <section aria-label={m.dizzy_livid_warbler()} className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
+          <HugeiconsIcon
+            className="size-3.5"
+            icon={ThumbsUpIcon}
+            strokeWidth={2}
+          />
+          {m.safe_shy_firefox({ count: upvotes.length })}
+        </h2>
+        {canManageVoters ? (
+          <Popover onOpenChange={setIsAddOpen} open={isAddOpen}>
+            <PopoverTrigger
+              render={
+                <Button size="sm" type="button" variant="ghost">
+                  <HugeiconsIcon icon={UserAdd01Icon} strokeWidth={2} />
+                  {m.deft_strong_fox()}
+                </Button>
+              }
+            />
+            <PopoverPopup align="end" className="w-64 p-1" initialFocus={false}>
+              <ContactCombobox
+                label={m.deft_strong_fox()}
+                onSelect={handleAdd}
+                organizationId={organizationId}
+                placeholder={m.basic_main_tuna()}
+                postId={post.id}
+                value={null}
+              />
+              <NewUserFooter onNewUser={() => setIsCreateOpen(true)}>
+                {m.known_weird_platypus()}
+              </NewUserFooter>
+            </PopoverPopup>
+          </Popover>
+        ) : null}
+      </div>
+
+      <NewUserDialog
+        onOpenChange={setIsCreateOpen}
+        onSubmit={handleCreateAndVote}
+        open={isCreateOpen}
+        submitLabel={m.great_tangy_butterfly()}
+      />
+
+      {isLoading ? (
+        <Skeleton className="h-8 w-full" />
+      ) : upvotes.length === 0 ? (
+        <p className="text-muted-foreground text-xs">
+          {m.pretty_misty_stingray()}
+        </p>
+      ) : (
+        <Dialog onOpenChange={setIsDialogOpen} open={isDialogOpen}>
+          <button
+            aria-label={m.home_late_grebe({ count: upvotes.length })}
+            className="flex items-center transition-opacity hover:opacity-80"
+            onClick={() => setIsDialogOpen(true)}
+            type="button"
+          >
+            <AvatarGroup>
+              {upvotes.slice(0, 5).map((upvote) => (
+                <VoterAvatar
+                  className="ring-background ring-2"
+                  key={upvote.id}
+                  upvote={upvote}
+                />
+              ))}
+              {upvotes.length > 5 ? (
+                <AvatarGroupCount>+{upvotes.length - 5}</AvatarGroupCount>
+              ) : null}
+            </AvatarGroup>
+          </button>
+          <DialogPopup>
+            <DialogHeader>
+              <DialogTitle>
+                {m.safe_shy_firefox({ count: upvotes.length })}
+              </DialogTitle>
+            </DialogHeader>
+            <ul className="max-h-80 space-y-1 overflow-y-auto px-6 pb-6">
+              {upvotes.map((upvote) => {
+                const canRemove = Boolean(canManageVoters && upvote.userId);
+                return (
+                  <li
+                    className="group flex items-center gap-2 rounded-md px-1 py-1"
+                    key={upvote.id}
+                  >
+                    <VoterAvatar upvote={upvote} />
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-sm",
+                        !upvote.user.name && "text-muted-foreground"
+                      )}
+                    >
+                      {upvote.user.name ?? m.teal_merry_bee()}
+                    </span>
+                    {canRemove ? (
+                      <Button
+                        aria-label={m.calm_nice_marmot({
+                          name: upvote.user.name ?? m.teal_merry_bee(),
+                        })}
+                        className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                        onClick={() => {
+                          if (!upvote.userId) {
+                            return;
+                          }
+                          void handleRemove(upvote.userId);
+                        }}
+                        size="icon-xs"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} />
+                      </Button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </DialogPopup>
+        </Dialog>
+      )}
+    </section>
+  );
+}

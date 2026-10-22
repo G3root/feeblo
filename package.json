@@ -36,6 +36,7 @@
     "fmt:check": "oxfmt --check",
     "typecheck": "turbo run typecheck",
     "check": "turbo run check",
+    "knip": "knip",
     "toolchain": "node check-toolchain.ts"
   },
   "devDependencies": {
@@ -45,14 +46,13 @@
     "@feeblo/config": "workspace:*",
     "@oxlint/plugins": "1.82.0",
     "@types/node": "catalog:",
-    "dotenv": "catalog:",
+    "knip": "catalog:",
     "oxfmt": "^0.63.0",
     "oxlint": "1.82.0",
     "oxlint-plugin-react-doctor": "^0.9.12",
     "oxlint-tsgolint": "7.0.2001",
     "turbo": "^2.10.8",
-    "typescript": "catalog:",
-    "zod": "catalog:"
+    "typescript": "catalog:"
   },
   "engines": {
     "node": "^26.4.0",

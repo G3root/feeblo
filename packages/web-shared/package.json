@@ -18,18 +18,6 @@
       "types": "./src/lib/xstate.tsx",
       "default": "./src/lib/xstate.tsx"
     },
-    "./runtime-provider": {
-      "types": "./src/lib/runtime/runtime-provider.tsx",
-      "default": "./src/lib/runtime/runtime-provider.tsx"
-    },
-    "./runtime-context": {
-      "types": "./src/lib/runtime/runtime-context.tsx",
-      "default": "./src/lib/runtime/runtime-context.tsx"
-    },
-    "./use-runtime": {
-      "types": "./src/lib/runtime/use-runtime.tsx",
-      "default": "./src/lib/runtime/use-runtime.tsx"
-    },
     "./runtime-public-env": {
       "types": "./src/lib/runtime-public-env.ts",
       "default": "./src/lib/runtime-public-env.ts"

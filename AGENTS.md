@@ -46,7 +46,8 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsc --noEmit`, then type-aware Oxlint plus the formatter check. |
+| `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsc --noEmit`, type-aware Oxlint plus the formatter check, and Knip. |
+| `pnpm knip` | Unused files, dependencies and exports. Also runs inside `pnpm check`; see "Knip" below for what fails and what only prints. |
 | `pnpm typecheck` | Types only. Cached per package. |
 | `pnpm lint` | `oxlint && oxfmt --check .` |
 | `pnpm lint:fix` | The writer: `oxlint --fix && oxfmt`. |
@@ -73,6 +74,18 @@ What actually enforces the rules:
 **There is no commit hook.** Nothing stops a commit that fails the gate; CI catches it about twenty minutes later. Never pass `--no-verify` to git, and do not add a commit hook without deciding how it is protected from bypass.
 
 If a check fails, fix the failure. Do not loosen the rule to get green. If a rule is genuinely wrong for this codebase, turn it off in `oxlint.config.ts` with a written reason directly above it — the `effecttsgo/*` and `typescript/*` overrides in that file are the pattern to copy. A rule turned off without a reason is indistinguishable from a rule nobody could be bothered to satisfy.
+
+## Knip
+
+`knip.config.ts` finds unused files, dependencies and exports, and `pnpm check` runs it (`turbo` task `//#knip`, uncached, ~12s).
+
+- Every issue type is `error` except two. A finding in an `error` type fails the run.
+- `unlisted` is `warn`: 51 imports of packages no workspace declares. Under the hoisted node linker they resolve through a sibling's dependency, so they work by accident. The fix is to declare each package where it is imported, which is a dependency addition and therefore an owner decision, not a cleanup. `binaries` is `warn` for the same reason (`vite` in `apps/web`'s scripts).
+- Clean a type, then move its rule to `error` in the same change. Adding to the `warn` list to get a run green is the one thing that file is not for; when a type reaches zero, promote it.
+
+Two things in that file are configuration, not suppression, and both carry the reason inline: `ignoreExportsUsedInFile` (an export the same file also uses is a file-local helper, not a dead surface) and the Paraglide exception, which is conditional because the generated `src/paraglide` directory is gitignored — Knip skips it when it exists, and the relative imports into it cannot resolve when it does not. That conditional exists so the report is identical on a fresh clone, after a local build, and in CI.
+
+One `ignoreDependencies` is worth knowing about: `apps/server` declares `@feeblo/db-migrator` although nothing imports it, because the Dockerfile copies its build output into the image and the dependency is what puts it in the build graph. The others are tsconfig-only references (`@effect/language-service`, `react` as `jsxImportSource`) and the root Playwright config's `@playwright/test`, whose runner lives in `e2e`.
 
 ## Effect code
 

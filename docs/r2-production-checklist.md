@@ -67,4 +67,4 @@ Run these against the deployed environment; every misconfiguration above shows u
 
 - [ ] **Temporary uploads share the public bucket.** A separate private bucket for `tmp/` would keep an abandoned draft unreadable until it is promoted; it needs a second bucket, a second set of credentials, and a copy across buckets in `promoteEditorMedia`.
 - [ ] **Promoted media inherits the one-hour temporary TTL.** Giving it the one-day TTL needs `MetadataDirective: REPLACE` on the copy, which this deployment cannot verify against R2 from here.
-- [ ] **`@effect-aws/s3` is no longer imported by anything.** `packages/domain/src/services/s3.ts` now writes through `S3.putObject` directly. Removing the dependency is a catalog change and needs an owner decision.
+- [x] **`@effect-aws/s3` is no longer imported by anything.** `packages/domain/src/services/s3.ts` writes through `S3.putObject` directly, and the dependency, its catalog entry and its patch were removed.

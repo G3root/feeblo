@@ -168,8 +168,6 @@ export const apiKeyFormSchema = z.object({
   capabilities: z.array(z.enum(API_KEY_CAPABILITY_GROUPS)),
 });
 
-export type ApiKeyFormValues = z.infer<typeof apiKeyFormSchema>;
-
 /**
  * No capability chosen, typed as the vocabulary rather than as an empty array.
  *

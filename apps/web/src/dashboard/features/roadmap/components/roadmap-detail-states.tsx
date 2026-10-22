@@ -115,21 +115,3 @@ export function RoadmapDetailActions({
     </PolicyGuard>
   );
 }
-export function RoadmapLoadingState() {
-  return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden p-4 md:p-6">
-      <div className="grid min-w-max auto-cols-max grid-flow-col gap-4 overflow-x-auto p-3">
-        {["planned", "in-progress", "completed"].map((key) => (
-          <div className="bg-muted/30 h-96 w-80 rounded-lg" key={key} />
-        ))}
-      </div>
-    </div>
-  );
-}
-export function RoadmapEmptyState({ message }: { message: string }) {
-  return (
-    <div className="border-border/70 bg-muted/20 text-muted-foreground flex min-h-64 flex-1 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
-      {message}
-    </div>
-  );
-}
