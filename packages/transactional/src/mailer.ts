@@ -413,7 +413,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
     // id; direct sends (verification, password reset, onboarding) get this one.
     const messageId =
       message.messageId ??
-      `<${yield* crypto.randomUUIDv7.pipe(Effect.orDie)}@${MESSAGE_ID_DOMAIN}>`;
+      `<${yield* crypto.randomUUIDv7().pipe(Effect.orDie)}@${MESSAGE_ID_DOMAIN}>`;
 
     // The transport contract returns an already-validated MailTransportReceipt
     // (the concrete transport decodes provider output at its own boundary), so
