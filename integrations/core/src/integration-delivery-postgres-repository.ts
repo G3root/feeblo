@@ -259,7 +259,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
               )
             );
             const [backlog] = yield* db
-              .select({ count: sql<number>`count(*)` })
+              .select({ count: sql<number | bigint>`count(*)` })
               .from(schema.integrationDeliveryTable)
               .where(
                 and(
@@ -267,7 +267,11 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   lte(schema.integrationDeliveryTable.nextAttemptAt, now)
                 )
               );
-            yield* recordIntegrationDeliveryBacklog(backlog?.count ?? 0);
+            // PGlite decodes the count as a number and the Postgres driver as
+            // a bigint; the backlog gauge is number-valued.
+            yield* recordIntegrationDeliveryBacklog(
+              Number(backlog?.count ?? 0)
+            );
             const claimableCapabilityConditions =
               providerCapabilityConditions.length === 0
                 ? sql`false`
