@@ -4,6 +4,8 @@ import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { revokePendingSubscriptionRevocations } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
+import { sendUnlessSuppressed } from "@feeblo/domain/email-suppression/guard";
+import { EmailSuppressionRepository } from "@feeblo/domain/email-suppression/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import {
   healShadowsForVerifiedUser,
@@ -171,6 +173,10 @@ export const initAuthHandler = (
         MembershipRepository.layer,
         makeMailerLayer(),
         WorkspaceRepository.layer,
+        // Authentication mail is not part of the outbox, so its suppression
+        // check happens at the send site; the service has to be in this
+        // runtime for that check to run.
+        EmailSuppressionRepository.layer,
         Layer.succeed(RateLimitService, yield* RateLimitService),
         SsoRepositoriesLive,
         NodeCrypto.layer
@@ -766,15 +772,19 @@ export const initAuthHandler = (
         async sendResetPassword(data) {
           const { createPasswordResetEmail } = await loadPasswordResetEmail();
           await callbackRuntime.runPromise(
-            Mailer.use((mailer) =>
-              mailer.send({
-                to: data.user.email,
-                ...createPasswordResetEmail({
-                  resetUrl: data.url,
-                  recipientName: data.user.name,
-                }),
-              })
-            )
+            sendUnlessSuppressed({
+              email: data.user.email,
+              organizationId: null,
+              send: Mailer.use((mailer) =>
+                mailer.send({
+                  to: data.user.email,
+                  ...createPasswordResetEmail({
+                    resetUrl: data.url,
+                    recipientName: data.user.name,
+                  }),
+                })
+              ),
+            })
           );
         },
       },
@@ -931,17 +941,21 @@ export const initAuthHandler = (
             const { createOrganizationInvitationEmail } =
               await loadOrganizationInvitationEmail();
             await callbackRuntime.runPromise(
-              Mailer.use((mailer) =>
-                mailer.send({
-                  to: data.email,
-                  ...createOrganizationInvitationEmail({
-                    inviteUrl: inviteLink,
-                    organizationName: data.organization.name,
-                    inviterName: data.inviter.user.name,
-                    role: data.role,
-                  }),
-                })
-              )
+              sendUnlessSuppressed({
+                email: data.email,
+                organizationId: null,
+                send: Mailer.use((mailer) =>
+                  mailer.send({
+                    to: data.email,
+                    ...createOrganizationInvitationEmail({
+                      inviteUrl: inviteLink,
+                      organizationName: data.organization.name,
+                      inviterName: data.inviter.user.name,
+                      role: data.role,
+                    }),
+                  })
+                ),
+              })
             );
           },
         }),
@@ -995,15 +1009,19 @@ export const initAuthHandler = (
               await loadVerificationOtpEmail();
 
             await callbackRuntime.runPromise(
-              Mailer.use((mailer) =>
-                mailer.send({
-                  to: email,
-                  ...createVerificationOtpEmail({
-                    otp,
-                    flowLabel,
-                  }),
-                })
-              )
+              sendUnlessSuppressed({
+                email,
+                organizationId: null,
+                send: Mailer.use((mailer) =>
+                  mailer.send({
+                    to: email,
+                    ...createVerificationOtpEmail({
+                      otp,
+                      flowLabel,
+                    }),
+                  })
+                ),
+              })
             );
           },
         }),

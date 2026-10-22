@@ -16,6 +16,7 @@ import { CompanyRpcHandlers } from "./company/handlers";
 import { ContactRpcHandlers } from "./contact/handlers";
 import { DataTransferRpcHandlers } from "./data-transfer/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
+import { EmailSuppressionRpcHandlers } from "./email-suppression/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
@@ -91,6 +92,7 @@ export const RpcHandlerRegistrations = {
   Workspace: WorkspaceRpcHandlers,
   Contact: ContactRpcHandlers,
   EmailSubscription: EmailSubscriptionRpcHandlers,
+  EmailSuppression: EmailSuppressionRpcHandlers,
   ExternalResource: ExternalResourceRpcHandlers,
   WebhookManagement: "provider",
   SlackManagement: "provider",

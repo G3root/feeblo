@@ -57,7 +57,15 @@ export type SesWebhookOutcome =
             readonly deliveryUpdated: boolean;
             readonly suppressed: boolean;
           }
-        | { readonly _tag: "UnknownDelivery" };
+        | {
+            /**
+             * The event named no delivery we know. A hard bounce still names
+             * its recipients, so `suppressed` reports whether an address was
+             * added even without the delivery row.
+             */
+            readonly _tag: "UnknownDelivery";
+            readonly suppressed: boolean;
+          };
     };
 
 const decodeSnsEnvelope = (

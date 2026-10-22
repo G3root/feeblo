@@ -12,6 +12,7 @@ import { CompanyRpcs } from "./company/rpcs";
 import { ContactRpcs } from "./contact/rpcs";
 import { DataTransferRpcs } from "./data-transfer/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
+import { EmailSuppressionRpcs } from "./email-suppression/rpcs";
 import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { ExternalResourceRpcs } from "./integration/external-resource/rpcs";
 import { GitHubManagementRpcs } from "./integration/github/rpcs";
@@ -86,6 +87,7 @@ export const RpcGroups = [
   ["Workspace", WorkspaceRpcs],
   ["Contact", ContactRpcs],
   ["EmailSubscription", EmailSubscriptionRpcs],
+  ["EmailSuppression", EmailSuppressionRpcs],
   ["ExternalResource", ExternalResourceRpcs],
   ["WebhookManagement", WebhookManagementRpcs],
   ["SlackManagement", SlackManagementRpcs],

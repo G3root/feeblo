@@ -28,6 +28,7 @@ import { TestClock } from "effect/testing";
 
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
+import { EmailSuppressionRepository } from "../email-suppression/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { NotificationPreferenceRepository } from "../notification-preference/repository";
 import { NotificationPreferenceTokenService } from "../notification-preference/tokens";
@@ -65,6 +66,7 @@ const makeTestLayer = (
     ),
     Layer.provideMerge(MailerTestLayer),
     Layer.provideMerge(EmailOutboxRepository.layer),
+    Layer.provideMerge(EmailSuppressionRepository.layer),
     Layer.provideMerge(
       EmailSubscriptionRepository.layerWithoutDependencies.pipe(
         Layer.provide(
@@ -291,7 +293,9 @@ const addSubscriptionContact = (args: {
         id: contactId,
         organizationId: args.organizationId,
         userId: args.userId ?? null,
-        email: args.email,
+        // Production normalizes before insert; the fixture must too, or the
+        // suppression join (which is case-sensitive by schema) misses.
+        email: args.email.trim().toLowerCase(),
         verificationState:
           args.state === "pending_verification" ? "pending" : "verified",
         verifiedAt: args.state === "pending_verification" ? null : now,
@@ -316,7 +320,7 @@ const addSubscriptionContact = (args: {
       .where(
         and(
           eq(schema.emailContactTable.organizationId, args.organizationId),
-          eq(schema.emailContactTable.email, args.email)
+          eq(schema.emailContactTable.email, args.email.trim().toLowerCase())
         )
       )
       .limit(1);
@@ -522,6 +526,159 @@ describe("EmailOutbox workflows", () => {
             .where(eq(schema.emailDeliveryTable.outboxId, intentId));
           expect(deliveries).toHaveLength(1);
           expect(deliveries[0]?.state).toBe("accepted");
+        })
+    );
+
+    it.effect(
+      "stamps each message with the delivery id so provider feedback can correlate it",
+      () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId } = yield* fixture;
+          yield* reconcileEmailOutbox();
+          yield* waitForDelivery(
+            intentId,
+            (delivery) => delivery.state === "accepted"
+          );
+          const db = yield* Database.Database;
+          const [delivery] = yield* db
+            .select({ id: schema.emailDeliveryTable.id })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+          const state = yield* testMailerState;
+          expect(state.sentMessages[0]?.headers?.["X-Feeblo-Delivery-Id"]).toBe(
+            delivery?.id
+          );
+        })
+    );
+
+    it.effect("does not materialize a delivery for a suppressed member", () =>
+      Effect.gen(function* () {
+        yield* resetTestMailer();
+        const { intentId, organizationId, ownerEmail } = yield* fixture;
+        const db = yield* Database.Database;
+        yield* db.insert(schema.emailSuppressionTable).values({
+          email: ownerEmail.toLowerCase(),
+          firstReason: "complaint",
+          organizationId,
+          reason: "complaint",
+          updatedAt: fixtureNow,
+        });
+
+        yield* reconcileEmailOutbox();
+        yield* waitForIntentState(intentId, "materialized");
+        const deliveries = yield* db
+          .select({ id: schema.emailDeliveryTable.id })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.outboxId, intentId));
+        expect(deliveries).toHaveLength(0);
+        expect((yield* testMailerState).sentMessages).toHaveLength(0);
+      })
+    );
+
+    it.effect(
+      "suppresses the address when the provider rejects the recipient permanently",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* Database.Database;
+          const { organizationId } = yield* fixture;
+          // Drop the fixture's owner so the subscriber is the only delivery
+          // this test can consume the outcome with.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
+          yield* enableSubscriberEmails(organizationId);
+          const subscriptionRepository = yield* EmailSubscriptionRepository;
+          const subscriberEmail = `rejected-${organizationId}@example.test`;
+          const subscription =
+            yield* subscriptionRepository.requestSubscription({
+              email: subscriberEmail,
+              now: fixtureNow,
+              organizationId,
+              source: "explicit",
+              topic: { topicId: null, topicType: "changelog" },
+              verificationExpiresAt: shiftDate(fixtureNow, Duration.days(1)),
+            });
+          if (Option.isNone(subscription.verificationToken)) {
+            return yield* Effect.die("Expected a verification token");
+          }
+          yield* subscriptionRepository.verifySubscription({
+            now: fixtureNow,
+            verificationToken: Redacted.value(
+              subscription.verificationToken.value
+            ),
+          });
+          const changelogId = `changelog_${organizationId}`;
+          yield* db.insert(schema.changelogTable).values({
+            id: changelogId,
+            organizationId,
+            title: "Rejected release",
+            slug: "rejected-release",
+            content: "Release notes",
+            excerpt: "Release notes",
+            status: "published",
+            publishedAt: fixtureNow,
+            creatorId: null,
+            creatorMemberId: null,
+            createdAt: fixtureNow,
+            updatedAt: fixtureNow,
+          });
+          const intent = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: changelogId,
+            aggregateType: "changelog",
+            deduplicationKey: `changelog.published:${organizationId}:${changelogId}`,
+            expiresAt: null,
+            kind: "changelog.published",
+            organizationId,
+            payload: { kind: "changelog.published", changelogId },
+            scheduledAt: fixtureNow,
+          });
+          if (intent._tag !== "Inserted") {
+            return yield* Effect.die("Expected a changelog intent");
+          }
+          const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
+          const deliveryId = deliveryIds[0];
+          if (deliveryId === undefined || deliveryIds.length !== 1) {
+            return yield* Effect.die("Expected exactly one queued delivery");
+          }
+          yield* resetTestMailer({
+            outcomes: [
+              {
+                _tag: "permanentFailure",
+                failureClass: "recipient",
+                smtpStatusCode: 550,
+              },
+            ],
+          });
+          yield* deliverEmailDelivery({ deliveryId });
+
+          const [delivery] = yield* db
+            .select({
+              lastError: schema.emailDeliveryTable.lastError,
+              state: schema.emailDeliveryTable.state,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.id, deliveryId));
+          expect(delivery?.state).toBe("failed");
+          expect(delivery?.lastError).toMatchObject({
+            tag: "MailPermanentDeliveryError",
+          });
+          const [suppression] = yield* db
+            .select({
+              organizationId: schema.emailSuppressionTable.organizationId,
+              reason: schema.emailSuppressionTable.reason,
+            })
+            .from(schema.emailSuppressionTable)
+            .where(
+              eq(
+                schema.emailSuppressionTable.email,
+                subscriberEmail.toLowerCase()
+              )
+            );
+          expect(suppression).toMatchObject({
+            organizationId,
+            reason: "hard_bounce",
+          });
         })
     );
 
@@ -1415,9 +1572,12 @@ describe("EmailOutbox workflows", () => {
             topicType: "post",
           });
           yield* db.insert(schema.emailSuppressionTable).values({
-            email: `suppressed-${organizationId}@example.test`,
+            email: `suppressed-${organizationId}@example.test`.toLowerCase(),
+            firstReason: "hard_bounce",
+            organizationId,
             reason: "hard_bounce",
             providerEventId: null,
+            updatedAt: yield* DateTime.nowAsDate,
           });
           const intent =
             yield* (yield* EmailOutboxRepository).upsertPendingStatusChange({
@@ -2485,6 +2645,7 @@ describe("EmailOutbox queues with plain-HTTP API_URL", () => {
       ),
       Layer.provideMerge(MailerTestLayer),
       Layer.provideMerge(EmailOutboxRepository.layer),
+      Layer.provideMerge(EmailSuppressionRepository.layer),
       Layer.provideMerge(
         EmailSubscriptionRepository.layerWithoutDependencies.pipe(
           Layer.provide(

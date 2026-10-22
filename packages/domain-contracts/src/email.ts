@@ -1,6 +1,27 @@
 import * as S from "effect/Schema";
 
 /**
+ * A normalized email address suitable for persistence and equality checks.
+ *
+ * Every email path stores the value this codec accepts, which is why the
+ * suppression lookup can compare addresses with plain equality. Normalization
+ * (`trim` + lowercase) is deliberately separate from validation: only the
+ * owner of an address may decide whether a mixed-case input is a new address
+ * or the same one, and every writer here says it is the same one.
+ */
+export const EmailAddress = S.String.pipe(
+  S.check(S.isMinLength(3)),
+  S.check(S.isMaxLength(320)),
+  S.check(S.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/))
+);
+
+export type EmailAddress = S.Schema.Type<typeof EmailAddress>;
+
+/** Trims and lowercases an address before it is validated or compared. */
+export const normalizeEmailAddress = (input: string): string =>
+  input.trim().toLowerCase();
+
+/**
  * Canonical email-outbox and email-subscription vocabularies.
  *
  * The `email_outbox`, `email_delivery`, `email_contact`,
@@ -107,7 +128,12 @@ export type TEmailSubscriptionState = S.Schema.Type<
   typeof EmailSubscriptionState
 >;
 
-/** Canonical `email_suppression.reason` vocabulary. */
+/**
+ * Canonical `email_suppression.reason` vocabulary, ordered by precedence:
+ * a complaint outranks a manual block, which outranks a hard bounce. The
+ * precedence is what keeps `reason` from flapping when a second provider event
+ * arrives for an address that is already suppressed.
+ */
 export const EmailSuppressionReason = S.Literals([
   "hard_bounce",
   "complaint",

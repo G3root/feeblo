@@ -9,7 +9,7 @@ import { createTransport, type SendMailOptions } from "nodemailer";
 import type { ReactElement } from "react";
 import { render, toPlainText } from "react-email";
 
-import { MailerConfig } from "./config";
+import { MailerConfig, MESSAGE_ID_DOMAIN } from "./config";
 
 /** An application-owned request to send one rendered transactional email. */
 export type MailMessage = {
@@ -118,11 +118,36 @@ export class MailTemplateRenderError extends Schema.TaggedError<MailTemplateRend
   }
 ) {}
 
+/**
+ * What a permanent SMTP rejection actually rejects.
+ *
+ * `recipient` means the address is the problem ("user unknown", "mailbox
+ * disabled") and the caller may suppress it. `message` means the content,
+ * size, or sender policy was refused, which says nothing about the address.
+ * `unknown` is a 5xx without a parseable enhanced status code; the caller must
+ * not treat it as an address fact.
+ */
+export const MailPermanentFailureClass = Schema.Literals([
+  "recipient",
+  "message",
+  "unknown",
+]);
+
+export type MailPermanentFailureClass = Schema.Schema.Type<
+  typeof MailPermanentFailureClass
+>;
+
 /** The provider rejected the message permanently; retrying will not help. */
 export class MailPermanentDeliveryError extends Schema.TaggedError<MailPermanentDeliveryError>()(
   "MailPermanentDeliveryError",
   {
     cause: Schema.optionalKey(Schema.Defect()),
+    /**
+     * A classification of the 5xx, derived from the enhanced status code.
+     * Optional so a hand-built error from a custom transport stays valid; the
+     * send path only suppresses when this is explicitly `recipient`.
+     */
+    failureClass: Schema.optionalKey(MailPermanentFailureClass),
     message: Schema.String,
     operation: Schema.String,
     provider: Schema.Literal("smtp"),
@@ -167,8 +192,69 @@ const NodemailerErrorDetails = Schema.Struct({
   code: Schema.optionalKey(
     Schema.String.pipe(Schema.check(Schema.isMaxLength(64)))
   ),
+  /**
+   * The provider's reply text. It may name the recipient, so it is only
+   * inspected here for the enhanced status code and never persisted.
+   */
+  response: Schema.optionalKey(
+    Schema.String.pipe(Schema.check(Schema.isMaxLength(2048)))
+  ),
   responseCode: Schema.optionalKey(SmtpResponseCode),
 });
+
+/**
+ * RFC 3463 enhanced status code, e.g. the `5.1.1` in
+ * `550 5.1.1 <x@example.com>: Recipient address rejected`.
+ */
+const enhancedStatusCodePattern = /\b([245])\.(\d{1,3})\.(\d{1,3})\b/;
+
+/**
+ * Classifies a permanent rejection by what it rejects.
+ *
+ * Only an address-level refusal may suppress the recipient: a policy or
+ * content rejection (5.7.x, 5.6.x) and a system failure (5.3.x) would suppress
+ * a deliverable address if they were treated as an address fact. Codes
+ * without an enhanced status fall back to the three unambiguous SMTP replies.
+ */
+export const classifyPermanentFailure = (args: {
+  readonly response?: string | undefined;
+  readonly responseCode?: number | undefined;
+}): MailPermanentFailureClass => {
+  const enhanced =
+    args.response === undefined
+      ? undefined
+      : enhancedStatusCodePattern.exec(args.response);
+  const subject = enhanced?.[2] === undefined ? undefined : Number(enhanced[2]);
+  const detail = enhanced?.[3] === undefined ? undefined : Number(enhanced[3]);
+
+  if (subject !== undefined) {
+    // 5.1.x = addressing; 5.2.1 = mailbox disabled; 5.2.2 = mailbox full.
+    if (subject === 1 || (subject === 2 && (detail === 1 || detail === 2))) {
+      return "recipient";
+    }
+    // 5.2.3, 5.3.x, 5.6.x, 5.7.x all describe the message or the sending host.
+    return "message";
+  }
+
+  switch (args.responseCode) {
+    case 551:
+    case 553:
+      return "recipient";
+    case 552:
+      return "message";
+    default:
+      return "unknown";
+  }
+};
+
+/** True when the 5xx is a temporary mailbox condition, not a final rejection. */
+const isMailboxFullResponse = (response: string | undefined): boolean => {
+  if (response === undefined) {
+    return false;
+  }
+  const enhanced = enhancedStatusCodePattern.exec(response);
+  return enhanced?.[2] === "2" && enhanced[3] === "2";
+};
 
 const temporaryNodemailerCodes = new Set([
   "ECONNRESET",
@@ -213,8 +299,20 @@ const classifyNodemailerFailure = (
     if (smtpStatusCode >= 400 && smtpStatusCode < 500) {
       return new MailTemporaryDeliveryError({ ...diagnostics, smtpStatusCode });
     }
+    if (smtpStatusCode >= 500 && isMailboxFullResponse(details?.response)) {
+      // A full mailbox is a 5xx in SMTP semantics but a temporary condition in
+      // practice; suppressing it would permanently drop a deliverable address.
+      return new MailTemporaryDeliveryError({ ...diagnostics, smtpStatusCode });
+    }
     if (smtpStatusCode >= 500) {
-      return new MailPermanentDeliveryError({ ...diagnostics, smtpStatusCode });
+      return new MailPermanentDeliveryError({
+        ...diagnostics,
+        failureClass: classifyPermanentFailure({
+          response: details?.response,
+          responseCode: smtpStatusCode,
+        }),
+        smtpStatusCode,
+      });
     }
   }
 
@@ -273,12 +371,21 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
           operation: "Mailer.send.renderText",
         }),
     });
+    // Every message leaves with a Message-ID on a domain the deployment
+    // controls. Without one, nodemailer falls back to a timestamp observed on
+    // the sending host, which is both an unpredictable identifier and a
+    // deliverability signal. Outbox deliveries supply their own deterministic
+    // id; direct sends (verification, password reset, onboarding) get this one.
+    const messageId =
+      message.messageId ??
+      `<${yield* crypto.randomUUIDv7.pipe(Effect.orDie)}@${MESSAGE_ID_DOMAIN}>`;
 
     // The transport contract returns an already-validated MailTransportReceipt
     // (the concrete transport decodes provider output at its own boundary), so
     // no second decode happens per send.
     const receipt = yield* transport.send({
       ...message,
+      messageId,
       // Outlook groups emails with the same subject into one conversation
       // thread; a unique per-send X-Entity-Ref-ID keeps unrelated transactional
       // emails separate. Caller-supplied headers take precedence in any casing.
@@ -291,7 +398,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
       html,
       text,
     });
-    return toMailSendResult(receipt, message.messageId);
+    return toMailSendResult(receipt, messageId);
   }),
 });
 

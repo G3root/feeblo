@@ -15,6 +15,7 @@ import { EmailProviderFeedbackConfig } from "@feeblo/domain/email-provider-feedb
 import { EmailProviderFeedbackService } from "@feeblo/domain/email-provider-feedback/service";
 import { SesEmailFeedbackWebhook } from "@feeblo/domain/email-provider-feedback/ses-webhook";
 import { EmailSubscriptionRepository } from "@feeblo/domain/email-subscription/repository";
+import { EmailSuppressionRepository } from "@feeblo/domain/email-suppression/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import { ResolvePrincipalService } from "@feeblo/domain/identity/service";
 import { ChatFeedbackServiceLive } from "@feeblo/domain/integration/chat/feedback-service";
@@ -286,6 +287,9 @@ export const makeServiceLayers = ({
     // repository; provided once here rather than rebuilt inside each handler.
     AssetRepository.layer,
     EmailOutboxRepository.layer,
+    // One suppression list for the send path, provider feedback, the
+    // dashboard RPCs, and the direct-send guard in the auth runtime.
+    EmailSuppressionRepository.layer,
     // The Public API's post writes record integration events, and the recorder
     // snapshots the post's URL into the event. Required rather than provided
     // per-layer, so the one value is built from the server's own `APP_URL` and

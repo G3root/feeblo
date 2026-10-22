@@ -8,6 +8,7 @@ import {
   type EmailOutboxDataError,
   EmailOutboxRepository,
 } from "../email-outbox/repository";
+import { EmailSuppressionRepository } from "../email-suppression/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import {
@@ -40,6 +41,7 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
   const entitlementPolicy = yield* EntitlementPolicy;
   const repository = yield* EmailSubscriptionRepository;
   const emailOutbox = yield* EmailOutboxRepository;
+  const suppressions = yield* EmailSuppressionRepository;
 
   const consumeVerificationRequest = (args: {
     readonly email: string;
@@ -87,6 +89,16 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
       "requestChangelogSubscription"
     );
     yield* consumeVerificationRequest({ email, organizationId });
+    // A suppressed address can never complete double opt-in, so no verification
+    // mail is recorded for it. The request still answers with the same generic
+    // shape an already-active subscriber receives: the endpoint must not become
+    // an oracle that confirms whether an address is suppressed. The subscription
+    // row is kept so a later removal of the suppression can re-issue a token
+    // when the person asks again.
+    const suppressed = yield* suppressions.isSuppressed({
+      email,
+      organizationId,
+    });
     const now = yield* DateTime.nowAsDate;
     const verificationExpiresAt = verificationExpiration(now);
     const { outboxId, subscription } = yield* transaction(
@@ -99,7 +111,7 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
           topic: { topicId: null, topicType: "changelog" },
           verificationExpiresAt,
         });
-        if (Option.isNone(requested.verificationToken)) {
+        if (suppressed || Option.isNone(requested.verificationToken)) {
           return { outboxId: undefined, subscription: requested };
         }
         const recorded = yield* emailOutbox.recordIntent({
@@ -125,7 +137,8 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
     yield* wakeEmailOutboxBestEffort(outboxId, organizationId);
     return {
       ...subscription,
-      verificationRequired: Option.isSome(subscription.verificationToken),
+      verificationRequired:
+        !suppressed && Option.isSome(subscription.verificationToken),
     };
   });
 
@@ -219,6 +232,7 @@ export const EmailSubscriptionRpcHandlers = EmailSubscriptionRpcs.toLayer(
   EmailSubscriptionRpcHandlersEffect
 ).pipe(
   Layer.provide(EmailSubscriptionRepository.layer),
+  Layer.provide(EmailSuppressionRepository.layer),
   Layer.provide(EmailOutboxRepository.layer),
   Layer.provide(SitePolicy.layer),
   Layer.provide(SiteRepository.layer),

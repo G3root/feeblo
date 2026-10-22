@@ -1,8 +1,10 @@
 import {
+  EmailAddress,
   EmailContactVerificationState,
   EmailSubscriptionSource,
   EmailSubscriptionState,
   EmailSuppressionReason,
+  normalizeEmailAddress,
 } from "@feeblo/db/validation-schema/email";
 import {
   EmailContactId,
@@ -21,16 +23,13 @@ import * as Schema from "effect/Schema";
 
 const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
-const EmailAddressValue = Schema.String.pipe(
-  Schema.check(Schema.isMinLength(3)),
-  Schema.check(Schema.isMaxLength(320)),
-  Schema.check(Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/))
-);
-
-/** A normalized email address suitable for persistence and equality checks. */
-export const EmailAddress = EmailAddressValue;
-
-export type EmailAddress = Schema.Schema.Type<typeof EmailAddress>;
+/**
+ * A normalized email address suitable for persistence and equality checks.
+ *
+ * Canonical in `@feeblo/domain-contracts/email` so the suppression module can
+ * share it without importing a subscription concept.
+ */
+export { EmailAddress };
 
 export class EmailSubscriptionInputError extends Schema.TaggedError<EmailSubscriptionInputError>()(
   "EmailSubscriptionInputError",
@@ -52,7 +51,7 @@ export const parseEmailAddress = (
   input: string,
   operation: string
 ): Effect.Effect<EmailAddress, EmailSubscriptionInputError> =>
-  Schema.decodeEffect(EmailAddress)(input.trim().toLowerCase()).pipe(
+  Schema.decodeEffect(EmailAddress)(normalizeEmailAddress(input)).pipe(
     Effect.mapError(
       () =>
         new EmailSubscriptionInputError({

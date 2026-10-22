@@ -10,6 +10,9 @@ import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 import * as W from "effect/workflow";
 
+import { sendUnlessSuppressed } from "../email-suppression/guard";
+import { EmailSuppressionDataError } from "../email-suppression/schema";
+
 export const WelcomeUserWorkflow = W.Workflow.make("WelcomeUserWorkflow", {
   payload: {
     userId: S.String,
@@ -17,7 +20,11 @@ export const WelcomeUserWorkflow = W.Workflow.make("WelcomeUserWorkflow", {
     name: S.String,
     dashboardUrl: S.String,
   },
-  error: S.Union([MailTemplateRenderError, MailProviderDeliveryError]),
+  error: S.Union([
+    MailTemplateRenderError,
+    MailProviderDeliveryError,
+    EmailSuppressionDataError,
+  ]),
   idempotencyKey: ({ userId }) => userId,
 });
 
@@ -36,21 +43,30 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
 
     yield* W.Activity.make({
       name: "SendWelcomeEmail",
-      error: S.Union([MailTemplateRenderError, MailProviderDeliveryError]),
+      error: S.Union([
+        MailTemplateRenderError,
+        MailProviderDeliveryError,
+        EmailSuppressionDataError,
+      ]),
 
       execute: Effect.gen(function* () {
         const mailer = yield* Mailer;
         const { personalFrom } = yield* MailerConfig;
 
-        //TODO take a look later
-        yield* mailer.send({
-          ...createUserOnboardingEmail({
-            dashboardUrl: payload.dashboardUrl,
-            name: payload.name,
-          }),
-          ...(personalFrom._tag === "Some" && { from: personalFrom.value }),
-          messageId: `<welcome.${payload.userId}@${MESSAGE_ID_DOMAIN}>`,
-          to: payload.email,
+        yield* sendUnlessSuppressed({
+          email: payload.email,
+          organizationId: null,
+          send: mailer
+            .send({
+              ...createUserOnboardingEmail({
+                dashboardUrl: payload.dashboardUrl,
+                name: payload.name,
+              }),
+              ...(personalFrom._tag === "Some" && { from: personalFrom.value }),
+              messageId: `<welcome.${payload.userId}@${MESSAGE_ID_DOMAIN}>`,
+              to: payload.email,
+            })
+            .pipe(Effect.asVoid),
         });
       }),
     }).pipe(
@@ -71,20 +87,32 @@ export const WelcomeUserWorkflowLayer = WelcomeUserWorkflow.toLayer(
 
     yield* W.Activity.make({
       name: "SendUserFeedbackEmail",
-      error: S.Union([MailTemplateRenderError, MailProviderDeliveryError]),
+      error: S.Union([
+        MailTemplateRenderError,
+        MailProviderDeliveryError,
+        EmailSuppressionDataError,
+      ]),
 
       execute: Effect.gen(function* () {
         const mailer = yield* Mailer;
         const { personalFrom } = yield* MailerConfig;
 
-        yield* mailer.send({
-          ...createUserFeedbackEmail({
-            feedbackUrl: "https://feedback.feeblo.com",
-            name: payload.name,
-          }),
-          ...(personalFrom._tag === "Some" && { from: personalFrom.value }),
-          messageId: `<feedback-request.${payload.userId}@${MESSAGE_ID_DOMAIN}>`,
-          to: payload.email,
+        yield* sendUnlessSuppressed({
+          email: payload.email,
+          organizationId: null,
+          send: mailer
+            .send({
+              ...createUserFeedbackEmail({
+                feedbackUrl: "https://feedback.feeblo.com",
+                name: payload.name,
+              }),
+              ...(personalFrom._tag === "Some" && {
+                from: personalFrom.value,
+              }),
+              messageId: `<feedback-request.${payload.userId}@${MESSAGE_ID_DOMAIN}>`,
+              to: payload.email,
+            })
+            .pipe(Effect.asVoid),
         });
       }),
     }).pipe(
