@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "migrate": "node ./src/migrator.mjs",
+    "migrate": "pnpm build && MIGRATIONS_DIR=../db/src/migrations node ./dist/index.js",
     "build": "rolldown -c",
     "typecheck": "tsc --noEmit"
   },

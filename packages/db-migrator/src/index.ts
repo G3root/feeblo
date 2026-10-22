@@ -237,8 +237,17 @@ const runMigrate = async () => {
     process.exit(0);
   }
 
+  // `../migrations` is the layout the server image builds: `dist` is copied to
+  // `/app/migrate` and `packages/db/src/migrations` to `/app/migrations`, so the
+  // migrations sit beside the bundle. Nothing inside this package ever held a
+  // `migrations` folder, so a run from a checkout has to name one — that is what
+  // `MIGRATIONS_DIR` is for. It is resolved against the working directory, which
+  // is this package under `pnpm --filter`.
   const migratorConfig = {
-    migrationsFolder: resolve(__dirname, "../migrations"),
+    migrationsFolder:
+      process.env.MIGRATIONS_DIR === undefined
+        ? resolve(__dirname, "../migrations")
+        : resolve(process.env.MIGRATIONS_DIR),
   };
 
   if (DB_URL.startsWith("memory://")) {
