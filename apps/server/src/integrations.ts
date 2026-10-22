@@ -281,7 +281,7 @@ export const makeIntegrationLayers: Effect.Effect<
   );
   const lifecycleRepository = yield* makeIntegrationManagementRepository;
   const crypto = yield* Crypto.Crypto;
-  const leaseOwner = yield* crypto.randomUUIDv4.pipe(
+  const leaseOwner = yield* crypto.randomUUIDv4().pipe(
     Effect.map((uuid) => `server-${uuid}`),
     Effect.mapError(
       () =>

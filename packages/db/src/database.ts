@@ -1,5 +1,3 @@
-// oxlint-disable-next-line typescript/triple-slash-reference -- a `.d.ts` global declaration is how Drizzle's unresolved `effect/unstable/sql/SqlError` import is repaired; an import would emit a runtime module that does not exist.
-/// <reference path="./effect-sql-error-compat.d.ts" />
 import * as SQLPG from "@effect/sql-pg";
 import { PgliteClient } from "@effect/sql-pglite";
 import { PGlite } from "@electric-sql/pglite";
@@ -162,18 +160,26 @@ const pgDbEffect = PgDrizzle.make({ relations }).pipe(
 );
 
 // Create the DB effect for an embedded PGlite instance.
-// PGlite & drizzle-orm/effect-pglite expose the same public API as the
-// server-backed Postgres variants (Execute, execute, transaction, etc.), so
-// the runtime object is compatible with `EffectPgDatabase`. Casting through
-// `unknown` is safe as long as those two drizzle packages stay API-compatible;
-// if they diverge (e.g. different `execute` return types), this will fail at
-// runtime with no compile-time guard.
 const pgliteDbEffect = PgDrizzlePglite.make({ relations }).pipe(
-  Effect.tap(testConnection),
-  // SAFETY: PgDrizzlePglite.make returns a fully-initialized EffectPgDatabase;
-  // the cast bridges the driver-specific return type to the pg dialect type
-  // used by the rest of the codebase.
-  Effect.map((db) => db as PgDrizzle.EffectPgDatabase<typeof relations>)
+  // SAFETY: `PgDrizzlePglite.make` returns a fully-initialized database whose
+  // runtime surface is the Postgres driver's — the same `select`, `insert`,
+  // `transaction` and `execute`, over the same Effect SQL client. Only the
+  // *declared* result of a statement differs: Postgres', through
+  // `@effect/sql-pg`, reports `oid` plus a mandatory `command` and `rowCount`,
+  // while PGlite's `Results` makes those optional and has no `oid` to report
+  // because an embedded database has no server catalog to name. That difference
+  // is unavoidable at the type level — it is inside the builder generics, so a
+  // `Pick`/`Omit` of the divergent members would not make the two databases
+  // comparable — and it is invisible at runtime, where nothing in the tree
+  // reads `oid`, `command` or `rowCount` off an `execute` result: `execute` is
+  // used for statements whose effect is the point, such as a row lock.
+  // The intermediate `unknown` is what lets the assertion pass the compiler's
+  // overlap check (TS2352 rejects the single-step cast).
+  Effect.map(
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- See the SAFETY comment: the drivers' database types are irreconcilable at TS2352 and identical at runtime, so this boundary is the one place the difference is erased.
+    (db) => db as unknown as PgDrizzle.EffectPgDatabase<typeof relations>
+  ),
+  Effect.tap(testConnection)
 );
 
 // Define a DB service tag for dependency injection
