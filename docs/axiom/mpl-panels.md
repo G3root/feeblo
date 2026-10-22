@@ -209,12 +209,14 @@ Bounces by classification and whether the event suppressed the address:
 | group by `bounceType`, `suppressed` using sum
 ```
 
-Bounce rate over a 24-hour window (multiply by 100 for percent). The numerator fills unset buckets with zero: `compute` only emits timestamps present on both sides, so without it a window with no bounces would show no data instead of 0%:
+Hard bounce rate over a 24-hour window (multiply by 100 for percent). The numerator is restricted to hard bounces correlated to an outbox delivery: AWS's bounce rate counts hard bounces only, and `feeblo_email_provider_submissions_total` counts outbox submissions only. Direct-send feedback stays in the raw counters but not in this rate. The numerator fills unset buckets with zero: `compute` only emits timestamps present on both sides, so without it a window with no bounces would show no data instead of 0%:
 
 ```
 (
   `<metrics-dataset>`:`feeblo_email_provider_bounces_total`
   | where `service.name` == "feeblo-server"
+  | where `bounceType` == "hard"
+  | where `correlated` == "true"
   | map increase
   | align to 24h using sum
   | group using sum
@@ -229,7 +231,7 @@ Bounce rate over a 24-hour window (multiply by 100 for percent). The numerator f
 | map * 100
 ```
 
-Complaint rate is the same pair with `feeblo_email_provider_complaints_total` in the numerator. The 5% and 10% bounce guides and the 0.1% and 0.5% complaint guides are the AWS reputation thresholds, not product targets.
+Complaint rate is the same pair with `feeblo_email_provider_complaints_total` in the numerator and the same `correlated == "true"` filter. The 5% and 10% bounce guides and the 0.1% and 0.5% complaint guides are the AWS reputation thresholds, not product targets.
 
 ## Telemetry health
 

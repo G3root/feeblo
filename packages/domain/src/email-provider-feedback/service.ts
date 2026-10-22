@@ -227,7 +227,11 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               if (event.bounceType !== "hard") {
                 // A soft or undetermined bounce of unattributed mail is
                 // observable only; there is no delivery to reschedule.
-                yield* recordEmailProviderBounce(event.bounceType, false);
+                yield* recordEmailProviderBounce(
+                  event.bounceType,
+                  false,
+                  false
+                );
                 return { _tag: "UnknownDelivery" as const, suppressed: false };
               }
               yield* suppress({
@@ -237,7 +241,8 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               });
               yield* recordEmailProviderBounce(
                 "hard",
-                event.recipients.length > 0
+                event.recipients.length > 0,
+                false
               );
               yield* Effect.logWarning(
                 "Provider feedback could not be correlated to a delivery; suppressed the reported recipients"
@@ -259,7 +264,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             // "spam". It is still counted: the complaint rate is a property of
             // the sending account, not of the correlation.
             if (event.type === "complained") {
-              yield* recordEmailProviderComplaint;
+              yield* recordEmailProviderComplaint(false);
             }
             return { _tag: "UnknownDelivery" as const, suppressed: false };
           }
@@ -357,7 +362,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                 const deliveryUpdated = yield* retryAfterSoftBounce(
                   event.bounceType
                 );
-                yield* recordEmailProviderBounce(event.bounceType, false);
+                yield* recordEmailProviderBounce(event.bounceType, false, true);
                 return {
                   _tag: "Processed" as const,
                   deliveryUpdated,
@@ -376,7 +381,8 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               });
               yield* recordEmailProviderBounce(
                 "hard",
-                event.recipients.length > 0
+                event.recipients.length > 0,
+                true
               );
               yield* Effect.logWarning(
                 "Email provider hard-bounce alert signal"
@@ -415,7 +421,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                 organizationId: delivery.organizationId,
                 reason: "complaint",
               });
-              yield* recordEmailProviderComplaint;
+              yield* recordEmailProviderComplaint(true);
               yield* Effect.logWarning(
                 "Email provider complaint alert signal"
               ).pipe(

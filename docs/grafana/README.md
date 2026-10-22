@@ -59,13 +59,13 @@ The last row of `feeblo-server-dashboard.json` turns three counters into the sig
 
 | Metric | Labels |
 | --- | --- |
-| `feeblo_email_provider_bounces_total` | `bounceType` (`hard`, `soft`, `undetermined`), `suppressed` (`true`, `false`) |
-| `feeblo_email_provider_complaints_total` | — |
+| `feeblo_email_provider_bounces_total` | `bounceType` (`hard`, `soft`, `undetermined`), `suppressed` (`true`, `false`), `correlated` (`true`, `false`) |
+| `feeblo_email_provider_complaints_total` | `correlated` (`true`, `false`) |
 | `feeblo_email_suppressions_written_total` | `reason` (`hard_bounce`, `complaint`, `administrative_block`), `source` (`provider`, `smtp`, `manual`) |
 
-The rates divide the 24-hour increase in bounces or complaints by the 24-hour increase in `feeblo_email_provider_submissions_total` (provider-accepted submissions), so they answer "of the mail we sent, how much came back bad". The panels use the AWS reputation thresholds as guides: **5% bounce** and **10% suspension** for bounce rate, **0.1% warning** and **0.5% suspension** for complaint rate. The rolling one-hour panels show the same ratio so a spike is visible before the 24-hour window absorbs it.
+The rates divide the 24-hour increase in **hard bounces** — or complaints — by the 24-hour increase in `feeblo_email_provider_submissions_total`, which counts provider-accepted **outbox** submissions. AWS defines its bounce rate as hard bounces only, so soft and undetermined bounces are retried and never enter the numerator. Both rates filter `correlated="true"`: direct-send mail (password reset, OTP, invitations, onboarding) has no delivery row, so its feedback appears in the raw counters and the classification panel but not in these rates. The panels use the AWS reputation thresholds as guides: **5% hard bounce** and **10% suspension** for bounce rate, **0.1% warning** and **0.5% suspension** for complaint rate. The rolling one-hour panels show the same ratio so a spike is visible before the 24-hour window absorbs it.
 
-`suppressed=true` means the event also wrote a suppression row, so the address will not be tried again. `undetermined` bounces are retried and never suppress; a `soft` bounce is deferred within the delivery's attempt budget. `source=smtp` is a synchronous recipient rejection, `source=provider` is webhook feedback, and `source=manual` is an administrator adding a block. `reason` and `source` are independent labels, so a complaint written by a provider event is counted under `complaint` / `provider`.
+`suppressed=true` means the event also wrote a suppression row, so the address will not be tried again. `undetermined` bounces are retried and never suppress; a `soft` bounce is deferred within the delivery's attempt budget. `correlated=false` marks feedback with no delivery row — direct sends and the rare correlation failure. `source=smtp` is a synchronous recipient rejection, `source=provider` is webhook feedback, and `source=manual` is an administrator adding a block. `reason` and `source` are independent labels, so a complaint written by a provider event is counted under `complaint` / `provider`.
 
 The suppression panel counts writes, not the current list size: re-adding an address that is already suppressed increments both `provider` and `manual` totals for the rows the dashboard writes.
 
@@ -93,9 +93,9 @@ The runtime and SLO signals are worth alerting on. Create Grafana-managed alert 
 | Fast 5xx burn | `100 * sum(increase(feeblo_http_server_requests_total{job="feeblo/feeblo-server",status=~"5.."}[1h])) / clamp_min(sum(increase(feeblo_http_server_requests_total{job="feeblo/feeblo-server"}[1h])), 1)` | `> 14.4` for 5m |
 | Slow 5xx burn | the fast query with `[6h]` in both places | `> 6` for 30m |
 | p95 latency over objective | `histogram_quantile(0.95, sum by (le) (rate(feeblo_http_server_request_duration_milliseconds_bucket{job="feeblo/feeblo-server"}[5m])))` | `> 500` for 10m |
-| Bounce rate over warning | `100 * sum(increase(feeblo_email_provider_bounces_total{job="feeblo/feeblo-server"}[24h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{job="feeblo/feeblo-server"}[24h])), 1)` | `> 5` for 30m |
-| Bounce rate over suspension | the same query | `> 10` for 10m |
-| Complaint rate over warning | `100 * sum(increase(feeblo_email_provider_complaints_total{job="feeblo/feeblo-server"}[24h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{job="feeblo/feeblo-server"}[24h])), 1)` | `> 0.1` for 30m |
+| Hard bounce rate over warning | `100 * (sum(increase(feeblo_email_provider_bounces_total{job="feeblo/feeblo-server",bounceType="hard",correlated="true"}[24h])) or vector(0)) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{job="feeblo/feeblo-server"}[24h])), 1)` | `> 5` for 30m |
+| Hard bounce rate over suspension | the same query | `> 10` for 10m |
+| Complaint rate over warning | `100 * (sum(increase(feeblo_email_provider_complaints_total{job="feeblo/feeblo-server",correlated="true"}[24h])) or vector(0)) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{job="feeblo/feeblo-server"}[24h])), 1)` | `> 0.1` for 30m |
 | Complaint rate over suspension | the same query | `> 0.5` for 10m |
 
 ## Metric name suffixes

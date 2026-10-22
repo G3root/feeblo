@@ -20,7 +20,7 @@ The audit that preceded this decision is in [`docs/audit-email-suppression.md`](
 
 | `organization_id` | meaning | matches |
 | --- | --- | --- |
-| a workspace id | the workspace that observed the event, or a manual block by its admin | that workspace's mail, plus platform mail |
+| a workspace id | the workspace that observed the event, or a manual block by its admin | only that workspace's mail |
 | `null` | a platform row: the event concerned mail that belongs to no workspace (verification, password reset, onboarding) or could not be attributed to one | platform mail; also every workspace's mail, because a hard bounce is an address fact |
 
 The send path reads a workspace row and platform rows; a workspace never reads another workspace's row. Two partial unique indexes keep the scopes separate:

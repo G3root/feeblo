@@ -1747,7 +1747,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Provider bounces over the last 24 hours as a share of accepted submissions. AWS warns at 5% and can pause sending at 10%.",
+      "description": "Hard bounces (SES Permanent) over the last 24 hours as a share of outbox submissions. AWS warns at 5% and can pause sending at 10%. Direct-send mail is counted in the totals but excluded from the rate.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1803,13 +1803,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "100 * sum(increase(feeblo_email_provider_bounces_total{${service_label}=~\"$service\"}[24h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[24h])), 1)",
+          "expr": "100 * (sum(increase(feeblo_email_provider_bounces_total{${service_label}=~\"$service\",bounceType=\"hard\",correlated=\"true\"}[24h])) or vector(0)) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[24h])), 1)",
           "legendFormat": "",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Bounce rate (24h)",
+      "title": "Hard bounce rate (24h)",
       "type": "stat"
     },
     {
@@ -1817,7 +1817,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Provider complaints over the last 24 hours as a share of accepted submissions. AWS warns at 0.1% and can suspend sending at 0.5%.",
+      "description": "Provider complaints over the last 24 hours as a share of outbox submissions. AWS warns at 0.1% and can suspend sending at 0.5%. Direct-send mail is counted in the totals but excluded from the rate.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1873,7 +1873,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "100 * sum(increase(feeblo_email_provider_complaints_total{${service_label}=~\"$service\"}[24h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[24h])), 1)",
+          "expr": "100 * (sum(increase(feeblo_email_provider_complaints_total{${service_label}=~\"$service\",correlated=\"true\"}[24h])) or vector(0)) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[24h])), 1)",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -1949,7 +1949,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Provider-reported complaints in the last 24 hours, correlated or not. The rate panel above is the threshold that matters; this is the raw count.",
+      "description": "Provider-reported complaints in the last 24 hours across all mail, correlated or not. The rate panel above is the threshold that matters; this is the raw count.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2096,15 +2096,15 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "100 * sum(increase(feeblo_email_provider_bounces_total{${service_label}=~\"$service\"}[1h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[1h])), 1)",
+          "expr": "100 * (sum(increase(feeblo_email_provider_bounces_total{${service_label}=~\"$service\",bounceType=\"hard\",correlated=\"true\"}[1h])) or vector(0)) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[1h])), 1)",
           "legendFormat": "bounce rate",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Bounce rate (1h window)",
+      "title": "Hard bounce rate (1h window)",
       "type": "timeseries",
-      "description": "Rolling one-hour bounce rate. The 5% and 10% guides are the AWS reputation thresholds."
+      "description": "Rolling one-hour hard bounce rate over outbox submissions. The 5% and 10% guides are the AWS reputation thresholds."
     },
     {
       "datasource": {
@@ -2196,7 +2196,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "100 * sum(increase(feeblo_email_provider_complaints_total{${service_label}=~\"$service\"}[1h])) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[1h])), 1)",
+          "expr": "100 * (sum(increase(feeblo_email_provider_complaints_total{${service_label}=~\"$service\",correlated=\"true\"}[1h])) or vector(0)) / clamp_min(sum(increase(feeblo_email_provider_submissions_total{${service_label}=~\"$service\"}[1h])), 1)",
           "legendFormat": "complaint rate",
           "range": true,
           "refId": "A"
@@ -2204,7 +2204,7 @@
       ],
       "title": "Complaint rate (1h window)",
       "type": "timeseries",
-      "description": "Rolling one-hour complaint rate. The 0.1% and 0.5% guides are the AWS reputation thresholds."
+      "description": "Rolling one-hour complaint rate over outbox submissions. The 0.1% and 0.5% guides are the AWS reputation thresholds."
     },
     {
       "datasource": {
@@ -2454,7 +2454,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Feeblo Server — Queues & Email",
+  "title": "Feeblo Server \u2014 Queues & Email",
   "uid": "feeblo-server-queues",
   "version": 1,
   "weekStart": ""
