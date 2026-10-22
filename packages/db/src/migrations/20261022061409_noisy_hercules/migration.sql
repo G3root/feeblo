@@ -1,12 +1,18 @@
 -- Suppression is scoped now: a row belongs to the workspace that observed the
 -- bounce or complaint, or to the platform when the bounced mail belongs to no
--- workspace (verification, password reset). Existing rows are platform rows,
--- which preserves today's behaviour exactly: they matched every sender.
+-- workspace (verification, password reset, onboarding) or could not be
+-- attributed. Existing rows become platform rows, which preserves today's
+-- behaviour exactly: they matched every sender.
 ALTER TABLE "email_suppression" DROP CONSTRAINT "email_suppression_pkey";--> statement-breakpoint
 ALTER TABLE "email_suppression" ADD COLUMN "organization_id" text;--> statement-breakpoint
 ALTER TABLE "email_suppression" ADD COLUMN "first_reason" text;--> statement-breakpoint
 ALTER TABLE "email_suppression" ADD COLUMN "note" text;--> statement-breakpoint
 ALTER TABLE "email_suppression" ADD COLUMN "updated_at" timestamp with time zone DEFAULT now() NOT NULL;--> statement-breakpoint
+
+-- Uncorrelated provider feedback has no delivery to point at, but it still
+-- joins the event ledger so a redelivered SNS message is a duplicate instead
+-- of a second suppression or a double-counted metric.
+ALTER TABLE "email_provider_event" ALTER COLUMN "delivery_id" DROP NOT NULL;--> statement-breakpoint
 
 -- `email` was the primary key, so the table allowed any casing. Normalize it
 -- before the check constraint and the case-sensitive unique indexes land.

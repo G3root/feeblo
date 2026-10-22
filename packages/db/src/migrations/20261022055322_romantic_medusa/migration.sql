@@ -1,1 +1,0 @@
-ALTER TABLE "email_provider_event" ALTER COLUMN "delivery_id" DROP NOT NULL;
