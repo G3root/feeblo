@@ -11,8 +11,11 @@ ALTER TABLE "email_suppression" ADD COLUMN "updated_at" timestamp with time zone
 
 -- Uncorrelated provider feedback has no delivery to point at, but it still
 -- joins the event ledger so a redelivered SNS message is a duplicate instead
--- of a second suppression or a double-counted metric.
+-- of a second suppression or a double-counted metric. Deleting a delivery
+-- nulls the reference rather than deleting the ledger row, because the event
+-- id is the idempotency key.
 ALTER TABLE "email_provider_event" ALTER COLUMN "delivery_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "email_provider_event" DROP CONSTRAINT "email_provider_event_delivery_id_email_delivery_id_fkey", ADD CONSTRAINT "email_provider_event_delivery_id_email_delivery_id_fkey" FOREIGN KEY ("delivery_id") REFERENCES "email_delivery"("id") ON DELETE SET NULL;--> statement-breakpoint
 
 -- `email` was the primary key, so the table allowed any casing. Normalize it
 -- before the check constraint and the case-sensitive unique indexes land.

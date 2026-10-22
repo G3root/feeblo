@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "8ef3379d-6365-41e3-9808-d7300cc26cc3",
+  "id": "1a647892-f805-43bf-8b0d-3042d0101cee",
   "prevIds": [
     "605001ba-36a3-4494-b4ba-515cb0df2d56"
   ],
@@ -14401,7 +14401,7 @@
         "id"
       ],
       "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
+      "onDelete": "SET NULL",
       "name": "email_provider_event_delivery_id_email_delivery_id_fkey",
       "entityType": "fks",
       "schema": "public",

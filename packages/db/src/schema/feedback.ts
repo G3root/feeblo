@@ -1515,9 +1515,13 @@ export const emailProviderEventTable = pgTable(
      * could not be attributed (for example a bounce of account mail, which has
      * no delivery row). The ledger still records the event so a redelivered
      * SNS message is recognized as a duplicate.
+     *
+     * Deleting the delivery nulls this reference instead of deleting the row:
+     * the event id is the idempotency key, and a redelivered SNS message after
+     * a delivery cleanup must still be recognized as a duplicate.
      */
     deliveryId: text("delivery_id").references(() => emailDeliveryTable.id, {
-      onDelete: "cascade",
+      onDelete: "set null",
     }),
     type: text("type").$type<TEmailProviderEventType>().notNull(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
