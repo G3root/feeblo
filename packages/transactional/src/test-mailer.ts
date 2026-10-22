@@ -33,7 +33,15 @@ export type TestMailerOutcome =
       readonly providerMessageId?: string;
       readonly responseCode?: number;
     }
-  | { readonly _tag: "permanentFailure"; readonly smtpStatusCode?: number }
+  | {
+      readonly _tag: "permanentFailure";
+      /**
+       * Mirrors the classification the real transport derives from the SMTP
+       * response, so the send path's suppression branch is testable.
+       */
+      readonly failureClass?: "recipient" | "message" | "unknown";
+      readonly smtpStatusCode?: number;
+    }
   | { readonly _tag: "temporaryFailure"; readonly smtpStatusCode?: number }
   | { readonly _tag: "uncertainFailure" };
 
@@ -155,6 +163,9 @@ const mailerLayer = Layer.effect(
         switch (attempt.outcome._tag) {
           case "permanentFailure":
             return yield* new MailPermanentDeliveryError({
+              ...(attempt.outcome.failureClass !== undefined && {
+                failureClass: attempt.outcome.failureClass,
+              }),
               message: "Test SMTP provider rejected the message",
               operation: "TestMailer.send",
               provider: "smtp",

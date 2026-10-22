@@ -12,6 +12,8 @@ import {
   MailPermanentDeliveryError,
   MailTemporaryDeliveryError,
   MailUncertainDeliveryError,
+  classifyNodemailerFailure,
+  classifyPermanentFailure,
   makeMailerLayer,
   makeNodemailerSendOptions,
 } from "./mailer";
@@ -73,6 +75,30 @@ describe("Mailer", () => {
             responseCode: 250,
           },
         });
+      })
+  );
+
+  it.effect(
+    "gives a message without a Message-ID one on the deployment's domain",
+    () =>
+      Effect.gen(function* () {
+        let sentMessageId: string | undefined;
+        const { messageId: _omitted, ...withoutMessageId } = message;
+        const sent = yield* sendWith(
+          {
+            send: (rendered) =>
+              Effect.sync(() => {
+                sentMessageId = rendered.messageId;
+                return transportReceipt;
+              }),
+          },
+          withoutMessageId
+        );
+
+        expect(sentMessageId).toMatch(
+          /^<[0-9a-f-]+@notifications\.feeblo\.com>$/
+        );
+        expect(sent.messageId).toBe(sentMessageId);
       })
   );
 
@@ -250,6 +276,107 @@ const renderedMessage = {
 } as const;
 
 const defaultFrom = "Feeblo <noreply@example.test>";
+
+describe("classifyPermanentFailure", () => {
+  it("treats an addressing or mailbox refusal as a recipient fact", () => {
+    expect(
+      classifyPermanentFailure({
+        response: "550 5.1.1 <x@example.com>: Recipient address rejected",
+        responseCode: 550,
+      })
+    ).toBe("recipient");
+    expect(
+      classifyPermanentFailure({
+        response: "550 5.2.1 Mailbox disabled",
+        responseCode: 550,
+      })
+    ).toBe("recipient");
+  });
+
+  it("never treats a policy or content refusal as an address fact", () => {
+    expect(
+      classifyPermanentFailure({
+        response: "554 5.7.1 Message rejected as spam",
+        responseCode: 554,
+      })
+    ).toBe("message");
+    expect(
+      classifyPermanentFailure({
+        response: "552 message too large",
+        responseCode: 552,
+      })
+    ).toBe("message");
+  });
+
+  it("never treats a sender-address failure as a recipient fact", () => {
+    expect(
+      classifyPermanentFailure({
+        response: "550 5.1.7 Bad sender address syntax",
+        responseCode: 550,
+      })
+    ).toBe("sender");
+    expect(
+      classifyPermanentFailure({
+        response: "553 5.1.8 Sender address rejected",
+        responseCode: 553,
+      })
+    ).toBe("sender");
+    // The failed command outranks the enhanced code: a refusal during
+    // MAIL FROM never named the recipient.
+    expect(
+      classifyPermanentFailure({
+        command: "MAIL FROM",
+        response: "550 5.1.1 Recipient address rejected",
+        responseCode: 550,
+      })
+    ).toBe("sender");
+    expect(
+      classifyPermanentFailure({
+        command: "RCPT TO",
+        response: "550 5.1.1 Recipient address rejected",
+        responseCode: 550,
+      })
+    ).toBe("recipient");
+  });
+
+  it("only reads an enhanced code that starts a reply line", () => {
+    expect(
+      classifyPermanentFailure({
+        response: "Recipient 5.1.1 is quoted in the diagnostic text",
+        responseCode: 550,
+      })
+    ).toBe("unknown");
+  });
+
+  it("leaves a 5xx without a parseable detail unknown", () => {
+    expect(classifyPermanentFailure({ responseCode: 550 })).toBe("unknown");
+    expect(
+      classifyPermanentFailure({ response: "rejected", responseCode: 554 })
+    ).toBe("unknown");
+  });
+
+  it("classifies a long provider reply by its status code", () => {
+    // A reply over the old decode limit used to fail the whole struct,
+    // discarding `responseCode` and turning a temporary failure into an
+    // uncertain one.
+    const temporary = classifyNodemailerFailure({
+      response: "x".repeat(3000),
+      responseCode: 450,
+    });
+    expect(temporary).toBeInstanceOf(MailTemporaryDeliveryError);
+    expect(temporary).toMatchObject({ smtpStatusCode: 450 });
+
+    const permanent = classifyNodemailerFailure({
+      response: `550 5.1.1 ${"x".repeat(3000)}`,
+      responseCode: 550,
+    });
+    expect(permanent).toBeInstanceOf(MailPermanentDeliveryError);
+    expect(permanent).toMatchObject({
+      failureClass: "recipient",
+      smtpStatusCode: 550,
+    });
+  });
+});
 
 describe("makeNodemailerSendOptions", () => {
   it("defaults the sender and lets a message override it", () => {

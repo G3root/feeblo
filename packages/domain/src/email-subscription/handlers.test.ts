@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -9,6 +10,7 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 
 import { EmailOutboxRepository } from "../email-outbox/repository";
+import { EmailSuppressionRepository } from "../email-suppression/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { RateLimitService } from "../rate-limit/service";
 import { SitePolicy } from "../site/policies";
@@ -35,14 +37,16 @@ describe("EmailSubscriptionConsentHandlers", () => {
         )
       )
     ),
-    WorkspaceRepository.layer
+    WorkspaceRepository.layer,
+    EmailSuppressionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
   const SiteRepositories = Layer.mergeAll(
     SiteRepository.layer,
-    WorkspaceRepository.layer
+    WorkspaceRepository.layer,
+    EmailSuppressionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = Layer.mergeAll(
     Repositories,
@@ -160,6 +164,39 @@ describe("EmailSubscriptionConsentHandlers", () => {
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             state: "pending_verification",
           });
+        })
+    );
+
+    it.effect(
+      "does not promise a verification email to a suppressed address",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* EmailSubscriptionConsentHandlersEffect;
+          const organizationId = yield* createWorkspace({ paid: true });
+          const db = yield* currentDb;
+          const now = dateAt("2026-08-09T00:00:00.000Z");
+          yield* db.insert(schema.emailSuppressionTable).values({
+            email: "suppressed@example.com",
+            firstReason: "complaint",
+            organizationId,
+            reason: "complaint",
+            updatedAt: now,
+          });
+
+          const accepted = yield* handlers.requestChangelogSubscription({
+            email: "Suppressed@Example.com",
+            organizationId,
+          });
+
+          // The shape matches an already-active subscriber: suppression is
+          // never disclosed, and no verification mail is recorded because it
+          // could never activate anything.
+          expect(accepted.verificationRequired).toBe(false);
+          const intents = yield* db
+            .select({ id: schema.emailOutboxTable.id })
+            .from(schema.emailOutboxTable)
+            .where(eq(schema.emailOutboxTable.organizationId, organizationId));
+          expect(intents).toHaveLength(0);
         })
     );
 

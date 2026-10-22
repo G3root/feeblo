@@ -18,6 +18,7 @@ import {
 } from "./email-outbox/queue";
 import { EmailOutboxRepository } from "./email-outbox/repository";
 import { EmailSubscriptionRepository } from "./email-subscription/repository";
+import { EmailSuppressionRepository } from "./email-suppression/repository";
 import { EntitlementPolicy } from "./entitlement/policies";
 import { NotificationPreferenceRepository } from "./notification-preference/repository";
 import { NotificationPreferenceTokenService } from "./notification-preference/tokens";
@@ -72,6 +73,7 @@ const makeEmailOutboxLayer = (makeMailerLayer: MakeMailerLayer) => {
     Layer.provide(mailerLayer),
     Layer.provide(EmailOutboxConfig.layer),
     Layer.provide(EmailOutboxRepository.layer),
+    Layer.provide(EmailSuppressionRepository.layer),
     Layer.provide(EmailSubscriptionRepository.layer),
     Layer.provide(NotificationPreferenceRepository.layer),
     Layer.provide(NotificationPreferenceTokenService.layer),
@@ -85,7 +87,9 @@ const makeWorkflowLayers = (makeMailerLayer: MakeMailerLayer) =>
   Layer.mergeAll(
     WelcomeUserWorkflowLayer.pipe(
       Layer.provide(makeMailerLayer()),
-      Layer.provide(MailerConfig.layer)
+      Layer.provide(MailerConfig.layer),
+      // The onboarding activities check the suppression list before sending.
+      Layer.provide(EmailSuppressionRepository.layer)
     ),
     makeEmailOutboxLayer(makeMailerLayer)
   );

@@ -22,6 +22,14 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Row report**: one import job's per-row outcomes, keyed by the file's line number. _Avoid_: error log, results
 
+### Deliverability
+
+**Suppression**: A durable instruction not to mail one address for one sender. A workspace suppression silences that workspace; a platform suppression covers mail that belongs to no workspace — account verification, password reset — and applies to every sender. A suppression is not an unsubscribe: an unsubscribe is the recipient's own consent decision about a topic, and it lives on the subscription. _Avoid_: blocklist, blacklist, unsubscribe
+
+**Provider feedback**: A bounce, complaint, delivery delay, or rejection reported by the outbound provider for one delivery. _Avoid_: webhook event
+
+**Hard bounce**: A provider's permanent rejection of an address — it does not exist or cannot receive. The only bounce classification that suppresses. **Soft bounce** is a temporary condition (full mailbox, greylist) and is retried; **undetermined bounce** is one the provider could not classify and is retried rather than suppressed.
+
 ### Integrations
 
 **Provider**: an external integration family. V1 implements the `webhook`, `slack`, and `discord` providers.
