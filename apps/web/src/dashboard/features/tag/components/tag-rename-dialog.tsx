@@ -52,11 +52,10 @@ function TagRenameForm() {
         .where((tag) =>
           and(eq(tag.tag.id, tagId), eq(tag.tag.organizationId, organizationId))
         )
-        .orderBy((tag) => tag.tag.createdAt, "desc")
-        .limit(1),
+        .findOne(),
   });
 
-  const tag = data[0];
+  const tag = data;
 
   if (!tag) {
     return null;

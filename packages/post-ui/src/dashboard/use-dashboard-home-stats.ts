@@ -1,4 +1,3 @@
-import type { Collection, UtilsRecord } from "@tanstack/db";
 import {
   and,
   count,
@@ -6,6 +5,8 @@ import {
   inArray,
   isNull,
   useLiveQuery,
+  type Collection,
+  type UtilsRecord,
 } from "@tanstack/react-db";
 
 type BoardRowLike = {

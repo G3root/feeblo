@@ -1,5 +1,8 @@
-import type { SyncConfig } from "@tanstack/db";
-import { BasicIndex, createCollection } from "@tanstack/react-db";
+import {
+  BasicIndex,
+  createCollection,
+  type SyncConfig,
+} from "@tanstack/react-db";
 
 type WriteOp<T extends object> = Parameters<
   SyncConfig<T, string>["sync"]

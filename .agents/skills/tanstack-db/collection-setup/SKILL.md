@@ -14,7 +14,7 @@ description: >
   sync with onLoad/onLoadSubset hooks.
 type: sub-skill
 library: db
-library_version: '0.9.2'
+library_version: '0.15.2'
 sources:
   - 'TanStack/db:docs/overview.md'
   - 'TanStack/db:docs/guides/schemas.md'

@@ -58,11 +58,10 @@ function RenameBoardForm() {
             eq(board.board.organizationId, organizationId)
           )
         )
-        .orderBy((board) => board.board.createdAt, "desc")
-        .limit(1),
+        .findOne(),
   });
 
-  const board = data[0];
+  const board = data;
 
   if (!board) {
     return null;

@@ -9,7 +9,7 @@ description: >
   preloading with Promise.all. Framework-specific loader APIs.
 type: composition
 library: db
-library_version: '0.9.2'
+library_version: '0.15.2'
 requires:
   - tanstack-db
   - tanstack-db/collection-setup

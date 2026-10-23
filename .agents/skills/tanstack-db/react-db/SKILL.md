@@ -14,7 +14,7 @@ description: >
 type: framework
 library: db
 framework: react
-library_version: '0.9.2'
+library_version: '0.15.2'
 requires:
   - tanstack-db
 sources:
@@ -410,7 +410,7 @@ If multiple versions appear, fix with one of:
 {
   "pnpm": {
     "overrides": {
-      "@tanstack/db": "^0.9.2"
+      "@tanstack/db": "^0.15.2"
     }
   }
 }

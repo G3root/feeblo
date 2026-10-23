@@ -78,10 +78,9 @@ function CompanyEditFormLoader({ mode }: { mode: "display" | "edit" }) {
             eq(company.organizationId, organizationId)
           )
         )
-        .orderBy(({ company }) => company.updatedAt, "desc")
-        .limit(1),
+        .findOne(),
   });
-  const company = data?.[0];
+  const company = data;
   const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
   const valuesQuery = useCompanyAttributeValues(companyId);
 

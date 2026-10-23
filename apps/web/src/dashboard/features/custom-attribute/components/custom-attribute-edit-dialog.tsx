@@ -97,11 +97,10 @@ function CustomAttributeEditForm() {
             eq(a.attribute.organizationId, organizationId)
           )
         )
-        .orderBy((a) => a.attribute.createdAt, "desc")
-        .limit(1),
+        .findOne(),
   });
 
-  const attribute = data[0];
+  const attribute = data;
 
   if (!attribute) {
     return null;
