@@ -23,7 +23,7 @@ The API origin publishes the documents an agent reads before it has a credential
 
 Every discovery response carries a `Link` header with the same relations (`api-catalog`, `service-desc`, `service-doc`, `describedby`). Discovery never reads the database: an outage that fails `/api/v1` still answers these documents.
 
-Each public board also serves `/llms.txt`, a Markdown index of the board's public posts, roadmap, and changelog generated from the same public data as its sitemap. A board the owner marked noindex answers `404` for both.
+Each public board also serves `/llms.txt`, a Markdown index of the board's public posts, roadmap, and changelog generated from the same public data as its sitemap. A board the owner marked noindex answers `404` for `/llms.txt` and a `200` with an empty `<urlset>` for `/sitemap.xml`; the robots.txt blocks the crawler either way.
 
 ## Authentication
 

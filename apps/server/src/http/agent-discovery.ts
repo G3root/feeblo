@@ -47,15 +47,19 @@ const API_CATALOG_LINK_TYPE = "application/linkset+json";
  * from the proxy headers when they are present and from `Host` otherwise. A
  * self-hosted deployment and a preview host therefore advertise themselves
  * rather than feeblo.com. `x-forwarded-host` wins because a proxy that rewrites
- * the internal host is the case where `Host` is already the upstream name. The
- * fallback is the hosted API origin, not a placeholder: a document that
- * advertises `http://localhost` in production is worse than one that advertises
- * the canonical host.
+ * the internal host is the case where `Host` is already the upstream name.
+ *
+ * When no proxy supplies a scheme, the scheme comes from the configured API
+ * URL. A plain-HTTP deployment on a LAN address must not advertise HTTPS URLs
+ * that cannot connect, and the configured origin is the one the operator told
+ * the server to publish.
  */
 export const discoveryOrigin = (
-  request: HttpServerRequest.HttpServerRequest
+  request: HttpServerRequest.HttpServerRequest,
+  fallbackOrigin: string
 ) => {
-  const url = new URL(request.url, "https://api.feeblo.com");
+  const fallback = new URL(fallbackOrigin);
+  const url = new URL(request.url, fallback.origin);
 
   if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(request.url)) {
     return url.origin;
@@ -64,21 +68,17 @@ export const discoveryOrigin = (
   const host = request.headers["x-forwarded-host"] ?? request.headers.host;
 
   if (host === undefined || host === "") {
-    return url.origin;
+    return fallback.origin;
   }
 
   const forwardedProto = request.headers["x-forwarded-proto"]
     ?.split(",")[0]
     ?.trim()
     .toLowerCase();
-  const localHost =
-    host.startsWith("localhost") || host.startsWith("127.0.0.1");
   const protocol =
     forwardedProto === "http" || forwardedProto === "https"
       ? forwardedProto
-      : localHost
-        ? "http"
-        : "https";
+      : fallback.protocol.slice(0, -1);
 
   return `${protocol}://${host}`;
 };
@@ -378,41 +378,43 @@ const route = (
  *
  * `RootRouter` used to answer `/` with `Hello world`; this replaces it, because
  * the API origin's root is the first page an agent can reach and it should name
- * the contract instead of greeting nobody in particular.
+ * the contract instead of greeting nobody in particular. `apiUrl` is the origin
+ * the deployment publishes, used when no proxy supplies a scheme.
  */
-export const AgentDiscoveryRouter = HttpRouter.use((router) =>
-  Effect.gen(function* () {
-    yield* route(router, "/", (request) =>
-      discoveryResponse(
-        apiMarkdown(discoveryOrigin(request)),
-        MARKDOWN_CONTENT_TYPE
-      )
-    );
-    yield* route(router, AGENT_LLMS_PATH, (request) =>
-      discoveryResponse(
-        apiMarkdown(discoveryOrigin(request)),
-        TEXT_CONTENT_TYPE
-      )
-    );
-    yield* route(router, AGENT_AUTH_PATH, (request) =>
-      discoveryResponse(
-        authMarkdown(discoveryOrigin(request)),
-        MARKDOWN_CONTENT_TYPE
-      )
-    );
-    yield* route(router, API_CATALOG_PATH, (request) =>
-      discoveryResponse(
-        JSON.stringify(apiCatalog(discoveryOrigin(request)), null, 2),
-        API_CATALOG_CONTENT_TYPE,
-        `</${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`
-      )
-    );
-    yield* route(router, MCP_SERVER_CARD_PATH, (request) =>
-      discoveryResponse(
-        JSON.stringify(mcpServerCard(discoveryOrigin(request)), null, 2),
-        JSON_CONTENT_TYPE,
-        `</${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`
-      )
-    );
-  })
-);
+export const makeAgentDiscoveryRouter = (apiUrl: string) => {
+  const fallbackOrigin = new URL(apiUrl).origin;
+
+  return HttpRouter.use((router) =>
+    Effect.gen(function* () {
+      const originOf = (request: HttpServerRequest.HttpServerRequest) =>
+        discoveryOrigin(request, fallbackOrigin);
+
+      yield* route(router, "/", (request) =>
+        discoveryResponse(apiMarkdown(originOf(request)), MARKDOWN_CONTENT_TYPE)
+      );
+      yield* route(router, AGENT_LLMS_PATH, (request) =>
+        discoveryResponse(apiMarkdown(originOf(request)), TEXT_CONTENT_TYPE)
+      );
+      yield* route(router, AGENT_AUTH_PATH, (request) =>
+        discoveryResponse(
+          authMarkdown(originOf(request)),
+          MARKDOWN_CONTENT_TYPE
+        )
+      );
+      yield* route(router, API_CATALOG_PATH, (request) =>
+        discoveryResponse(
+          JSON.stringify(apiCatalog(originOf(request)), null, 2),
+          API_CATALOG_CONTENT_TYPE,
+          `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`
+        )
+      );
+      yield* route(router, MCP_SERVER_CARD_PATH, (request) =>
+        discoveryResponse(
+          JSON.stringify(mcpServerCard(originOf(request)), null, 2),
+          JSON_CONTENT_TYPE,
+          `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`
+        )
+      );
+    })
+  );
+};

@@ -38,7 +38,10 @@ const clampLine = (value: string, limit: number) => {
 
 /** Escape a value that sits inside a Markdown link label or list item. */
 const escapeMarkdownText = (value: string) =>
-  value.replaceAll(/([\\[\]])/gu, "\\$1");
+  value
+    .replaceAll(/\s+/gu, " ")
+    .trim()
+    .replaceAll(/([\\[\]])/gu, "\\$1");
 
 const markdownLine = (label: string, url: string, detail?: string) => {
   const text = escapeMarkdownText(label);

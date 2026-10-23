@@ -183,6 +183,21 @@ describe("renderBoardLlmsTxt", () => {
     );
   });
 
+  it("collapses a multiline title into one link line", () => {
+    const output = renderBoardLlmsTxt(
+      site(),
+      "https://acme.example.test",
+      content({
+        posts: [post({ title: "First\n\nSecond", slug: "multiline" })],
+      })
+    );
+
+    expect(output).toContain(
+      "- [First Second](https://acme.example.test/p/multiline)"
+    );
+    expect(output).not.toContain("First\n\nSecond");
+  });
+
   it("caps the recent posts and collapses a long excerpt", () => {
     const posts = Array.from({ length: 60 }, (_, index) =>
       post({

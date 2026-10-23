@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as HttpRouter from "effect/http/HttpRouter";
 
-import { AgentDiscoveryRouter } from "./agent-discovery";
+import { makeAgentDiscoveryRouter } from "./agent-discovery";
 
 /**
  * The discovery documents are the only part of the API that a robot reads
@@ -15,11 +15,14 @@ const withApp = <A, E, R>(
   run: (app: {
     readonly handler: (request: Request) => Promise<globalThis.Response>;
     readonly dispose: () => Promise<void>;
-  }) => Effect.Effect<A, E, R>
+  }) => Effect.Effect<A, E, R>,
+  apiUrl = "https://api.feeblo.com"
 ): Effect.Effect<A, E, R> =>
   Effect.acquireUseRelease(
     Effect.sync(() =>
-      HttpRouter.toWebHandler(AgentDiscoveryRouter, { disableLogger: true })
+      HttpRouter.toWebHandler(makeAgentDiscoveryRouter(apiUrl), {
+        disableLogger: true,
+      })
     ),
     run,
     (app) => Effect.promise(() => app.dispose())
@@ -30,15 +33,12 @@ const get = (
     readonly handler: (request: Request) => Promise<globalThis.Response>;
   },
   path: string,
-  origin = "https://api.feeblo.com"
+  headers: Record<string, string> = {}
 ) =>
   Effect.promise(() =>
     app.handler(
-      new Request(`${origin}${path}`, {
-        headers: {
-          "x-forwarded-host": new URL(origin).host,
-          "x-forwarded-proto": new URL(origin).protocol.slice(0, -1),
-        },
+      new Request(`https://api.feeblo.com${path}`, {
+        headers,
       })
     )
   );
@@ -168,16 +168,31 @@ it.live("serves an MCP server card that states the key requirement", () =>
 it.live("advertises the origin the request arrived on", () =>
   withApp((app) =>
     Effect.gen(function* () {
-      const response = yield* get(
-        app,
-        "/auth.md",
-        "https://feedback.example.test"
-      );
+      const response = yield* get(app, "/auth.md", {
+        "x-forwarded-host": "feedback.example.test",
+        "x-forwarded-proto": "https",
+      });
       const body = yield* Effect.promise(() => response.text());
 
       expect(body).toContain("https://feedback.example.test/api/v1");
       expect(body).toContain("https://feedback.example.test/mcp");
       expect(body).not.toContain("https://api.feeblo.com/mcp");
     })
+  )
+);
+
+it.live("uses the configured API URL's scheme when no proxy supplies one", () =>
+  withApp(
+    (app) =>
+      Effect.gen(function* () {
+        const response = yield* get(app, "/auth.md", {
+          "x-forwarded-host": "192.168.1.20:8080",
+        });
+        const body = yield* Effect.promise(() => response.text());
+
+        expect(body).toContain("http://192.168.1.20:8080/api/v1");
+        expect(body).not.toContain("https://192.168.1.20:8080");
+      }),
+    "http://192.168.1.20:8080"
   )
 );
