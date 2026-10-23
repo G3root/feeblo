@@ -151,7 +151,7 @@ function SlackSettingsContent({
           </FrameDescription>
         </FrameHeader>
         <FramePanel>
-          <h2 className="text-sm font-semibold">Connect your workspace</h2>
+          <h2 className="text-sm font-medium">Connect your workspace</h2>
           <p className="text-muted-foreground text-sm">
             Let your team send feedback with /feeblo, forward messages with
             “Send to Feeblo”, and post new requests to your channels.
@@ -229,7 +229,7 @@ function SlackConnectionFrame({
       <FramePanel>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold">Workspace</h2>
+            <h2 className="text-sm font-medium">Workspace</h2>
             <p className="text-muted-foreground text-sm">
               {connection.teamId ?? "Connecting…"}
             </p>
@@ -273,7 +273,7 @@ function SlackConnectionFrame({
       </FramePanel>
       {connection.lifecycle === "active" ? (
         <FramePanel>
-          <h2 className="text-sm font-semibold">New post notifications</h2>
+          <h2 className="text-sm font-medium">New post notifications</h2>
           <p className="text-muted-foreground text-sm">
             Post new requests to one or more channels. Add the Feeblo bot to a
             channel to make it selectable.

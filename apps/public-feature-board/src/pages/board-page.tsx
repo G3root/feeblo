@@ -41,7 +41,9 @@ function MainContent({ children }: { children: ReactNode }) {
 function ListHeader({ count, title }: { count?: number; title: string }) {
   return (
     <div className="flex items-baseline justify-between px-1 pb-3">
-      <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+      <h2 className="text-xl leading-tight font-semibold tracking-tight">
+        {title}
+      </h2>
       {count !== undefined && (
         <span className="text-muted-foreground text-xs tabular-nums">
           {count === 1

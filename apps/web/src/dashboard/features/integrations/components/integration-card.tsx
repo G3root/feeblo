@@ -1,6 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { Button } from "@feeblo/ui/button";
-import { Card, CardPanel } from "@feeblo/ui/card";
+import { Card, CardPanel, CardTitle } from "@feeblo/ui/card";
 import { toastManager } from "@feeblo/ui/toast";
 import { LockedIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type HugeiconsIconProps } from "@hugeicons/react";
@@ -162,7 +162,7 @@ export function IntegrationCard<C extends IntegrationConnection>({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="font-medium">{config.name}</p>
+                <CardTitle>{config.name}</CardTitle>
                 <ConnectionStatusBadge
                   connected={connected}
                   isLoading={isLoading}

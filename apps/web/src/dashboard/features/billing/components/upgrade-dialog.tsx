@@ -261,7 +261,7 @@ function UpgradePlanDialogContent({
             <ul className="mt-3 space-y-2">
               {visibleFeatures.map((feature) => (
                 <li
-                  className="flex items-start gap-2.5 text-[13px] leading-5"
+                  className="flex items-start gap-2.5 text-sm leading-5"
                   key={feature.key}
                 >
                   <span className="bg-primary/10 text-primary mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
@@ -277,7 +277,7 @@ function UpgradePlanDialogContent({
             </ul>
             {hiddenCount > 0 ? (
               <button
-                className="text-muted-foreground hover:text-foreground mt-3 text-left text-[13px] font-medium underline-offset-4 hover:underline"
+                className="text-muted-foreground hover:text-foreground mt-3 text-left text-sm font-medium underline-offset-4 hover:underline"
                 onClick={() => setShowAllFeatures(true)}
                 type="button"
               >
@@ -285,7 +285,7 @@ function UpgradePlanDialogContent({
               </button>
             ) : selectedPlan.features.length > 6 ? (
               <button
-                className="text-muted-foreground hover:text-foreground mt-3 text-left text-[13px] font-medium underline-offset-4 hover:underline"
+                className="text-muted-foreground hover:text-foreground mt-3 text-left text-sm font-medium underline-offset-4 hover:underline"
                 onClick={() => setShowAllFeatures(false)}
                 type="button"
               >

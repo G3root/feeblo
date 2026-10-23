@@ -10,7 +10,7 @@ export function CurrentPlanStat({
 }) {
   return (
     <div className="space-y-1">
-      <div className="text-muted-foreground text-xs tracking-wide uppercase">
+      <div className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
         {label}
       </div>
       <div className="text-sm font-medium">{value}</div>

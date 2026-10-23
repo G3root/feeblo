@@ -96,7 +96,7 @@ export function BoardPostRowItem({
 
         <div className="hidden shrink-0 items-center gap-3 sm:flex">
           {post.boardName ? (
-            <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
+            <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
               {post.boardName}
             </span>
           ) : null}

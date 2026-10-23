@@ -58,7 +58,7 @@ function RouteComponent() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-wrap-balance text-2xl font-semibold">
+        <h1 className="text-2xl leading-tight font-semibold tracking-tight text-balance">
           Hello, {userName}
         </h1>
         <div className="hidden gap-2 md:flex">

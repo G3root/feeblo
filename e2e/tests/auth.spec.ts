@@ -193,6 +193,25 @@ test.describe("dashboard auth redirects", () => {
     ).toBeVisible();
   });
 
+  test("a missing post renders the post not-found state, not the route error", async ({
+    page,
+  }) => {
+    const user = createTestUser();
+    const { organizationUrl } = await createAuthenticatedWorkspace(page, user);
+
+    await page.goto(`${organizationUrl}/post/feedback/does-not-exist`);
+
+    // `beforeLoad` preloads the slug-scoped detail collection, so a missing
+    // slug used to reject the navigation into the route's error boundary. It
+    // is an empty result, and the page's own not-found state must render.
+    await expect(
+      page.getByText("Post not found", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Go back to dashboard" })
+    ).toBeVisible();
+  });
+
   test("a wrong workspace prefix is canonicalized to the member workspace", async ({
     page,
   }) => {

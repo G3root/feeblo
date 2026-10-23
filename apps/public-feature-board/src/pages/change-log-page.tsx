@@ -170,7 +170,7 @@ function ChangelogContent() {
     <ChangelogPageLayout>
       <div className="flex flex-wrap items-center justify-between gap-4 sm:items-end">
         <div className="flex w-full items-center justify-between gap-3 sm:block sm:w-auto sm:space-y-3">
-          <h2 className="text-base font-semibold tracking-tight">
+          <h2 className="text-xl leading-tight font-semibold tracking-tight">
             {m.yummy_silly_hedgehog()}
           </h2>
           <div className="flex items-center gap-2">

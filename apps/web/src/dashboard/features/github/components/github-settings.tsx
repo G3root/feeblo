@@ -166,7 +166,7 @@ function GitHubSettingsContent({
           </FrameDescription>
         </FrameHeader>
         <FramePanel>
-          <h2 className="text-sm font-semibold">Install the GitHub App</h2>
+          <h2 className="text-sm font-medium">Install the GitHub App</h2>
           <p className="text-muted-foreground text-sm">
             Choose the GitHub organization and repositories where the Feeblo bot
             can publish issues, add linked-feedback comments, and synchronize
@@ -288,7 +288,7 @@ function GitHubConnectionFrame({
         </FramePanel>
       )}
       <FramePanel>
-        <h2 className="text-sm font-semibold">Remove integration</h2>
+        <h2 className="text-sm font-medium">Remove integration</h2>
         <p className="text-muted-foreground text-sm">
           Stop GitHub publishing and synchronization for this Feeblo
           organization.
@@ -409,7 +409,7 @@ function GitHubPublishingSettings({
       : "";
   return (
     <FramePanel>
-      <h2 className="text-sm font-semibold">Automatic issue publishing</h2>
+      <h2 className="text-sm font-medium">Automatic issue publishing</h2>
       <p className="text-muted-foreground text-sm">
         Create a GitHub issue automatically when a new post matches this scope.
       </p>
@@ -619,7 +619,7 @@ function GitHubSyncRules({
   return (
     <FramePanel>
       <div>
-        <h2 className="text-sm font-semibold">Issue status rules</h2>
+        <h2 className="text-sm font-medium">Issue status rules</h2>
         <p className="text-muted-foreground text-sm">
           Update a post's Feeblo status as its linked GitHub issues change.
         </p>

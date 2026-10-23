@@ -476,7 +476,7 @@ function PostMetaSidebarSection({
   return (
     <section className="border-border/70 space-y-2 border-b pb-3 last:border-b-0 last:pb-0">
       <div className="flex items-center justify-between">
-        <p className="text-muted-foreground/80 text-xs font-medium tracking-wider">
+        <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
           {title}
         </p>
         {actions}

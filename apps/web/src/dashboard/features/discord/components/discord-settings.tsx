@@ -167,7 +167,7 @@ function DiscordSettingsContent({
           </FrameDescription>
         </FrameHeader>
         <FramePanel>
-          <h2 className="text-sm font-semibold">Connect your server</h2>
+          <h2 className="text-sm font-medium">Connect your server</h2>
           <p className="text-muted-foreground text-sm">
             Let your team send feedback with /feeblo, forward messages with
             “Send to Feeblo”, and post new requests to your channels.
@@ -243,7 +243,7 @@ function DiscordConnectionFrame({
       <FramePanel>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold">Server</h2>
+            <h2 className="text-sm font-medium">Server</h2>
             <p className="text-muted-foreground text-sm">
               {connection.guildId ?? "Connecting…"}
             </p>
@@ -287,7 +287,7 @@ function DiscordConnectionFrame({
       </FramePanel>
       {connection.lifecycle === "active" ? (
         <FramePanel>
-          <h2 className="text-sm font-semibold">New post notifications</h2>
+          <h2 className="text-sm font-medium">New post notifications</h2>
           <p className="text-muted-foreground text-sm">
             Post new requests to one or more text channels.
           </p>

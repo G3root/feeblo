@@ -51,7 +51,7 @@ function HomeTitle() {
   const { state } = useHome();
 
   return (
-    <CardTitle className="hidden px-1 sm:block">
+    <CardTitle className="hidden px-1 text-xl leading-tight sm:block">
       {state.selectedBoard === "all"
         ? m.muddy_bad_midge()
         : state.activeBoardLabel}
