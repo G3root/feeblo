@@ -19,6 +19,15 @@ WORKDIR /app
 
 # First install dependencies (as they change less often)
 COPY --from=prepare /app/out/json/ .
+# The image build does not use the Effect language service: `prepare` patches
+# `tsc` and Oxlint for the editor and the `check` gate, and `turbo build`
+# runs neither. `@effect/tsgo-<arch>` is an optional dependency, so a tarball
+# download that fails leaves `pnpm install` successful and then fails
+# `prepare`, which fails the build even though the image does not need the
+# patch (publish-images run 39667056588, arm64). Drop the script from the
+# pruned manifest before installing; the dependency build scripts named in
+# `allowBuilds` still run.
+RUN node -e 'const fs=require("node:fs");const p=JSON.parse(fs.readFileSync("package.json","utf8"));delete p.scripts.prepare;fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")'
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Build the project and its dependencies
