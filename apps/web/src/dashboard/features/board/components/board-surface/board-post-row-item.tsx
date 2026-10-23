@@ -32,10 +32,14 @@ export function BoardPostRowItem({
     // endpoint once real sizes resolve. (Reverted after causing exactly
     // that open/close jump.)
     <div className="group hover:bg-muted/50 mt-1 flex items-center gap-2 rounded-xl px-4 py-3 transition-colors">
+      {/* Hover only exists on fine pointers, so a `group-hover` reveal leaves
+          the checkbox permanently invisible on phones. Coarse pointers get it
+          always, with a 44px tap target; desktop keeps the clean row until
+          hover, focus or selection. */}
       <Checkbox
         aria-label={`Select ${post.title}`}
         checked={checked}
-        className="pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 data-checked:pointer-events-auto data-checked:opacity-100"
+        className="pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 data-checked:pointer-events-auto data-checked:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11"
         onCheckedChange={(nextChecked) => {
           store.send({
             boardId: post.boardId,
@@ -92,6 +96,13 @@ export function BoardPostRowItem({
               <span className="truncate">{post.boardName}</span>
             </>
           ) : null}
+          {/* The date only existed in the desktop meta column, so phones lost
+              it entirely. It rides on the author line instead, and does not
+              shrink so a long name or board truncates first. */}
+          <span aria-hidden="true" className="text-border">
+            ·
+          </span>
+          <span className="shrink-0">{formatPostDate(post.updatedAt)}</span>
         </div>
 
         <div className="hidden shrink-0 items-center gap-3 sm:flex">
