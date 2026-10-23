@@ -20,6 +20,7 @@ import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
 
 import type { ServerConfigValue } from "../config";
+import { AgentDiscoveryRouter } from "../http/agent-discovery";
 import { bodySizeLimitMiddleware } from "../http/body-limit";
 import { makeIsAllowedOrigin } from "../http/cors";
 import {
@@ -35,7 +36,6 @@ import {
   HealthRouter,
   OgImageRouterLive,
   PublicApiDocsRoute,
-  RootRouter,
 } from "../http/routers";
 import { serverTimingMiddleware } from "../http/server-timing";
 import { SesEmailFeedbackRouter } from "../http/ses";
@@ -119,9 +119,9 @@ export const makePublicRouters = ({
     : undefined;
   const RootRouterLive =
     mailbox === undefined
-      ? RootRouter
+      ? AgentDiscoveryRouter
       : Layer.mergeAll(
-          RootRouter,
+          AgentDiscoveryRouter,
           testMailboxRouter(mailbox),
           e2eRoadmapSeedRouter,
           e2eSetPlanRouter
