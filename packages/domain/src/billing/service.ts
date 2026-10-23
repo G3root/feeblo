@@ -1,4 +1,4 @@
-import { Polar } from "@polar-sh/sdk";
+import { createPolar, createPolarCore } from "@polar-sh/sdk/2026-10";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -18,13 +18,18 @@ import {
 const URLRegex = /\/$/;
 
 /**
- * The shape of a Polar SDK error response. `PolarError` carries `statusCode`;
- * the typed `AlreadyCanceledSubscription` adds the `error` discriminant.
+ * The parts of a rejected Polar revoke call this module reads. `PolarError`
+ * carries `statusCode`; a typed client error additionally carries the answer
+ * body, whose `error` discriminant names the refusal. The body is decoded on
+ * its own so a shape it does not recognize can never hide the status code.
  */
 const PolarRevokeFailure = Schema.Struct({
   statusCode: Schema.optional(Schema.Finite),
-  error: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.Unknown),
 });
+
+/** The discriminant of a typed Polar client error's answer body. */
+const PolarErrorBody = Schema.Struct({ error: Schema.String });
 
 /** What a rejected revoke tells us about the subscription's fate. */
 export interface ClassifiedRevokeFailure {
@@ -62,7 +67,13 @@ export const classifyPolarRevokeFailure = (
   if (Option.isNone(decoded)) {
     return { alreadyRevoked: false };
   }
-  const { statusCode, error } = decoded.value;
+  const { statusCode } = decoded.value;
+  const error = Option.getOrUndefined(
+    Option.map(
+      Schema.decodeUnknownOption(PolarErrorBody)(decoded.value.error),
+      (body) => body.error
+    )
+  );
   return {
     alreadyRevoked:
       error === "AlreadyCanceledSubscription" || error === "ResourceNotFound",
@@ -100,11 +111,11 @@ export interface PolarOrganizationSubscriptionSettings {
 
 /** The slice of an organizations list response the settings read needs. */
 type OrganizationsWithSettings = {
-  readonly result: {
-    readonly items: ReadonlyArray<{
-      readonly subscriptionSettings: PolarOrganizationSubscriptionSettings;
-    }>;
-  };
+  readonly items: ReadonlyArray<{
+    readonly subscription_settings: {
+      readonly allow_multiple_subscriptions: boolean;
+    };
+  }>;
 };
 
 /**
@@ -137,7 +148,12 @@ export const readOrganizationSubscriptionSettings = (
   }).pipe(
     Effect.timeout(Duration.seconds(5)),
     Effect.map((page) =>
-      Option.fromNullishOr(page.result.items[0]?.subscriptionSettings)
+      Option.map(
+        Option.fromNullishOr(page.items[0]?.subscription_settings),
+        (settings) => ({
+          allowMultipleSubscriptions: settings.allow_multiple_subscriptions,
+        })
+      )
     ),
     Effect.tapError((error) =>
       Effect.logWarning(
@@ -153,19 +169,29 @@ export const readOrganizationSubscriptionSettings = (
 const makePolarService = Effect.gen(function* () {
   const { accessToken, appUrl, server, webhookSecret } = yield* PolarConfig;
 
-  const client =
+  const clientOptions =
     accessToken._tag === "Some"
-      ? new Polar({
+      ? {
           accessToken: accessToken.value.pipe(Redacted.value),
-          server,
-        })
+          environment: server,
+        }
       : undefined;
+
+  // Two views of one configuration. The service calls below use the service
+  // client (`createPolar`), whose methods are namespaced per resource. The
+  // better-auth plugin takes a core client instead (`createPolarCore`): it
+  // resolves its endpoints from the SDK's standalone functions, which are
+  // bound to the core request builder. Both read the same `clientOptions`, so
+  // the token and the target cannot drift apart.
+  const client = clientOptions ? createPolar(clientOptions) : undefined;
+  const coreClient = clientOptions ? createPolarCore(clientOptions) : undefined;
 
   const billingBaseUrl = (organizationId: string) =>
     `${appUrl.replace(URLRegex, "")}/${organizationId}/settings/billing`;
 
   return {
     client,
+    coreClient,
     webhookSecret,
     // The Polar target this deployment talks to. Webhook sync stamps it as
     // the origin on subscription rows, the revocation queue copies it, and a
@@ -223,11 +249,11 @@ const makePolarService = Effect.gen(function* () {
             // Polar constraint, not an isolation guarantee — which is why
             // account deletion must never delete a Polar customer (see the
             // `createCustomerOnSignUp` note in packages/auth).
-            externalCustomerId: organizationId,
-            customerEmail: user.email ?? undefined,
-            customerName: user.name ?? undefined,
-            successUrl: `${billingBaseUrl(organizationId)}?checkout_id={CHECKOUT_ID}`,
-            returnUrl: billingBaseUrl(organizationId),
+            external_customer_id: organizationId,
+            customer_email: user.email ?? null,
+            customer_name: user.name ?? null,
+            success_url: `${billingBaseUrl(organizationId)}?checkout_id={CHECKOUT_ID}`,
+            return_url: billingBaseUrl(organizationId),
           }),
         catch: () =>
           new FailedToCreateCheckoutError({
@@ -253,7 +279,7 @@ const makePolarService = Effect.gen(function* () {
       const portalSession = yield* Effect.tryPromise({
         try: () =>
           client.customerSessions.create({
-            customerId,
+            customer_id: customerId,
           }),
         catch: () =>
           new FailedToCreatePortalError({
@@ -262,7 +288,7 @@ const makePolarService = Effect.gen(function* () {
       });
 
       return {
-        url: portalSession.customerPortalUrl,
+        url: portalSession.customer_portal_url,
       };
     }),
     /**
@@ -283,7 +309,7 @@ const makePolarService = Effect.gen(function* () {
         }
 
         yield* Effect.tryPromise({
-          try: () => client.subscriptions.revoke({ id }),
+          try: () => client.subscriptions.revoke(id),
           catch: (cause) => {
             const classified = classifyPolarRevokeFailure(cause);
             return new FailedToRevokeSubscriptionError({

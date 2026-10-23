@@ -47,9 +47,21 @@ type PricingProduct = {
   prices: unknown;
 };
 
+/**
+ * A price entry as stored in the product row's `prices` JSONB.
+ *
+ * Polar's v1 SDK hands the wire shape through unchanged, so entries synced by
+ * it are snake_case. Rows written by the previous SDK carry the camelCase its
+ * codec produced. Both are read: a product only picks up the new shape when
+ * its next `product.updated` webhook lands, so the old shape has to keep
+ * working until then. Every field is optional because a malformed entry is
+ * skipped, not fatal.
+ */
 const PolarProductPrice = Schema.Struct({
-  priceAmount: Schema.Finite,
-  priceCurrency: Schema.String,
+  priceAmount: Schema.optional(Schema.Finite),
+  priceCurrency: Schema.optional(Schema.String),
+  price_amount: Schema.optional(Schema.Finite),
+  price_currency: Schema.optional(Schema.String),
 });
 
 /**
@@ -65,11 +77,17 @@ const firstPositivePrice = (product: PricingProduct): TPlanPrice | null => {
 
   for (const entry of product.prices) {
     const decoded = Schema.decodeUnknownOption(PolarProductPrice)(entry);
-    if (decoded._tag === "Some" && decoded.value.priceAmount > 0) {
+    if (decoded._tag !== "Some") {
+      continue;
+    }
+    const { value } = decoded;
+    const amount = value.priceAmount ?? value.price_amount;
+    const currency = value.priceCurrency ?? value.price_currency;
+    if (amount !== undefined && amount > 0 && currency !== undefined) {
       return {
         productId: product.id,
-        amount: decoded.value.priceAmount,
-        currency: decoded.value.priceCurrency,
+        amount,
+        currency,
       };
     }
   }

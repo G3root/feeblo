@@ -793,14 +793,24 @@ export const initAuthHandler = (
         ...(emulatorProviders.length > 0
           ? [genericOAuth({ config: emulatorProviders })]
           : []),
-        ...(polarService.client && Option.isSome(polarService.webhookSecret)
+        ...(polarService.coreClient && Option.isSome(polarService.webhookSecret)
           ? [
+              // SAFETY: the plugin implements the BetterAuthPlugin contract,
+              // and widening the result to it keeps the plugin's
+              // `PolarBetterAuthPlugin` type out of this module's exported
+              // handler type — that type is not exported from
+              // `@polar-sh/better-auth`, so an inferred declaration cannot
+              // name it. Nothing here consumes the plugin's augmented
+              // endpoints (`polarClient`/`polarWebhooks`), only the route.
               polar({
-                client: polarService.client,
+                // The plugin resolves its endpoints through the SDK's core
+                // client, which is not the same value as the service client
+                // the billing calls use; see `PolarService`.
+                client: polarService.coreClient,
                 // Off on purpose. The plugin creates a customer per user with
                 // `externalId = user.id` and, on account deletion, deletes a
                 // customer matched only by email — which is the customer a
-                // workspace checkout's `externalCustomerId = organizationId`
+                // workspace checkout's `external_customer_id = organizationId`
                 // resolves to, because Polar looks a checkout customer up by
                 // email before external id. That combination cancels a
                 // surviving workspace's subscription when the person who paid
@@ -841,7 +851,9 @@ export const initAuthHandler = (
                               BillingRepository.use((billingRepository) =>
                                 billingRepository.upsertSubscription(
                                   payload.data,
-                                  payload.timestamp
+                                  DateTime.toDateUtc(
+                                    DateTime.makeUnsafe(payload.timestamp)
+                                  )
                                 )
                               )
                             )
@@ -855,7 +867,7 @@ export const initAuthHandler = (
                     },
                   }),
                 ],
-              }),
+              }) as BetterAuthPlugin,
             ]
           : []),
 

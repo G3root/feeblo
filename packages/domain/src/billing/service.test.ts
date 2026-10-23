@@ -1,8 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { AlreadyCanceledSubscription } from "@polar-sh/sdk/models/errors/alreadycanceledsubscription";
-import { PolarError } from "@polar-sh/sdk/models/errors/polarerror";
-import { ResourceNotFound } from "@polar-sh/sdk/models/errors/resourcenotfound";
-import { SubscriptionLocked } from "@polar-sh/sdk/models/errors/subscriptionlocked";
+import { PolarClientError, PolarServerError } from "@polar-sh/sdk";
+import { errors } from "@polar-sh/sdk/2026-10";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
@@ -12,32 +10,23 @@ import {
   readOrganizationSubscriptionSettings,
 } from "./service";
 
-const httpMeta = (status: number) => ({
-  body: "{}",
-  request: new Request("https://api.polar.sh/v1/subscriptions/sub_test/revoke"),
-  response: new Response(null, { status }),
-});
-
 describe("classifyPolarRevokeFailure", () => {
   it("treats Polar's already-canceled and missing-subscription answers as achieved", () => {
     const canceled = classifyPolarRevokeFailure(
-      new AlreadyCanceledSubscription(
-        {
-          detail: "Subscription is already canceled",
-          error: "AlreadyCanceledSubscription",
-        },
-        httpMeta(403)
-      )
+      new errors.AlreadyCanceledSubscription(403, {
+        detail: "Subscription is already canceled",
+        error: "AlreadyCanceledSubscription",
+      })
     );
     expect(canceled.alreadyRevoked).toBe(true);
     expect(canceled.statusCode).toBe(403);
     expect(canceled.errorTag).toBe("AlreadyCanceledSubscription");
 
     const missing = classifyPolarRevokeFailure(
-      new ResourceNotFound(
-        { detail: "Subscription not found", error: "ResourceNotFound" },
-        httpMeta(404)
-      )
+      new errors.ResourceNotFound(404, {
+        detail: "Subscription not found",
+        error: "ResourceNotFound",
+      })
     );
     expect(missing.alreadyRevoked).toBe(true);
     expect(missing.statusCode).toBe(404);
@@ -47,13 +36,10 @@ describe("classifyPolarRevokeFailure", () => {
   it("keeps other refusals and transport errors as failures", () => {
     expect(
       classifyPolarRevokeFailure(
-        new SubscriptionLocked(
-          {
-            detail: "Subscription has a pending update",
-            error: "SubscriptionLocked",
-          },
-          httpMeta(409)
-        )
+        new errors.SubscriptionLocked(409, {
+          detail: "Subscription has a pending update",
+          error: "SubscriptionLocked",
+        })
       )
     ).toEqual({
       alreadyRevoked: false,
@@ -62,14 +48,15 @@ describe("classifyPolarRevokeFailure", () => {
     });
 
     expect(
-      classifyPolarRevokeFailure(new PolarError("Server error", httpMeta(500)))
+      classifyPolarRevokeFailure(new PolarServerError(500, "Boom"))
     ).toEqual({ alreadyRevoked: false, statusCode: 500 });
 
     // A 404 whose body is not the typed ResourceNotFound response must not
     // close a queue row: only the discriminant proves the subscription is
-    // gone, and closing on a live one leaves it billing.
+    // gone, and closing on a live one leaves it billing. An unmapped status
+    // arrives as a client error carrying the raw body text.
     expect(
-      classifyPolarRevokeFailure(new PolarError("Not found", httpMeta(404)))
+      classifyPolarRevokeFailure(new PolarClientError(404, "Not found"))
     ).toEqual({ alreadyRevoked: false, statusCode: 404 });
 
     expect(classifyPolarRevokeFailure(new Error("socket hang up"))).toEqual({
@@ -110,11 +97,9 @@ describe("readOrganizationSubscriptionSettings", () => {
     Effect.gen(function* () {
       const settings = yield* readOrganizationSubscriptionSettings(() =>
         Promise.resolve({
-          result: {
-            items: [
-              { subscriptionSettings: { allowMultipleSubscriptions: false } },
-            ],
-          },
+          items: [
+            { subscription_settings: { allow_multiple_subscriptions: false } },
+          ],
         })
       );
 
@@ -128,7 +113,7 @@ describe("readOrganizationSubscriptionSettings", () => {
   it.effect("reads an empty organization list as no settings", () =>
     Effect.gen(function* () {
       const settings = yield* readOrganizationSubscriptionSettings(() =>
-        Promise.resolve({ result: { items: [] } })
+        Promise.resolve({ items: [] })
       );
 
       expect(Option.isNone(settings)).toBe(true);
