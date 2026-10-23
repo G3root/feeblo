@@ -177,6 +177,22 @@ test.describe("dashboard auth redirects", () => {
     await expect(page).toHaveURL(/\/org_[^/]+$/);
   });
 
+  test("an unknown path inside a workspace renders the 404 page", async ({
+    page,
+  }) => {
+    const user = createTestUser();
+    const { organizationUrl } = await createAuthenticatedWorkspace(page, user);
+
+    await page.goto(`${organizationUrl}/does-not-exist`);
+
+    await expect(
+      page.getByText("Page not found", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Go to dashboard" })
+    ).toBeVisible();
+  });
+
   test("a wrong workspace prefix is canonicalized to the member workspace", async ({
     page,
   }) => {

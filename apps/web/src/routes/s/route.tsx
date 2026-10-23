@@ -10,6 +10,7 @@ import {
 } from "@feeblo/public-feature-board";
 import { PublicBoardPending } from "@feeblo/public-feature-board/components/pending";
 import { PublicBoardShell } from "@feeblo/public-feature-board/components/shell";
+import { BoardNotFoundPage } from "@feeblo/public-feature-board/pages/not-found";
 import { SiteProvider } from "@feeblo/public-feature-board/providers/site-provider";
 import {
   getSsoTokenFromHash,
@@ -36,12 +37,18 @@ import {
   notFound,
   Outlet,
   redirect,
+  type NotFoundRouteProps,
 } from "@tanstack/react-router";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import * as S from "effect/Schema";
 import { useEffect, useRef, useState } from "react";
 
-import { getPublicBoardPage } from "@/lib/public-board-data";
+import {
+  getPublicBoardPage,
+  type PublicBoardPage,
+} from "@/lib/public-board-data";
+import { m } from "@/paraglide/messages.js";
 import { getLocale, setLocale } from "@/paraglide/runtime.js";
 
 const LOCALE_COOKIE_NAME = "PARAGLIDE_LOCALE";
@@ -115,10 +122,11 @@ export const Route = createFileRoute("/s")({
     }
 
     if (page.kind === "not-found") {
-      // Missing or hidden detail content: a hard 404 keeps crawlers (and
-      // visitors) off URLs that would otherwise render a not-found state
-      // behind a 200.
-      throw notFound();
+      // Missing or hidden detail content, or a subdomain no board owns: a hard
+      // 404 keeps crawlers (and visitors) off URLs that would otherwise render
+      // a not-found state behind a 200. The page is the data the boundary
+      // below renders, so it can say which of the two happened.
+      throw notFound({ data: page });
     }
 
     if (page.kind === "rpc-unavailable") {
@@ -148,16 +156,30 @@ export const Route = createFileRoute("/s")({
       return undefined;
     }
 
+    const boardPage = findBoardPage(match.context);
+
     return {
       "Cache-Control":
-        match.context.boardPage.kind === "found" &&
+        boardPage?.kind === "found" &&
         !isBoardPreloadDegraded(match.context.dbClient)
           ? cacheControl
           : "no-store",
     };
   },
   head: ({ match }) => {
-    const { boardPage } = match.context;
+    const boardPage = findBoardPage(match.context);
+
+    if (boardPage === undefined) {
+      // `beforeLoad` threw the not-found before it could return a page: this
+      // is the 404 document, and its title should say so rather than borrow
+      // the unavailable-content one.
+      return {
+        meta: [
+          { title: m.salty_empty_shrike() },
+          { name: "robots", content: "noindex, nofollow" },
+        ],
+      };
+    }
 
     if (boardPage.kind !== "found") {
       return {
@@ -250,7 +272,23 @@ export const Route = createFileRoute("/s")({
   },
   pendingComponent: PublicBoardPending,
   component: BoardLayout,
+  notFoundComponent: BoardNotFound,
 });
+
+/**
+ * The board page from a match context, when `beforeLoad` got far enough to put
+ * one there.
+ *
+ * A not-found or redirect throws out of `beforeLoad`, so the router can still
+ * run `head` and `headers` for a match whose context has no `boardPage`. The
+ * route's context type describes the success path, which is what the layout
+ * and child routes read; these two options read it through this optional view.
+ */
+function findBoardPage(context: {
+  readonly boardPage?: PublicBoardPage;
+}): PublicBoardPage | undefined {
+  return context.boardPage;
+}
 
 /**
  * The board's locale runtime.
@@ -269,6 +307,43 @@ function initBoardI18n() {
   if (!isPublicBoardI18nInitialized()) {
     initPublicBoardI18n({ getLocale, setLocale });
   }
+}
+
+/**
+ * The shape `beforeLoad` puts in the not-found error.
+ *
+ * The value crosses the server/client boundary, so the boundary decodes it
+ * instead of trusting the shape it expects.
+ */
+const BoardNotFoundData = S.Struct({
+  dashboardUrl: S.String,
+  host: S.String,
+  kind: S.Literal("not-found"),
+  siteName: S.NullOr(S.String),
+  subdomain: S.NullOr(S.String),
+});
+
+/**
+ * The 404 document for a board host.
+ *
+ * Both an unknown subdomain and a missing page abort this layout's
+ * `beforeLoad`, so the layout (and its providers) never render. The page comes
+ * from the board package, which can render without a `SiteProvider`; the
+ * locale runtime it would otherwise get from the layout is installed here.
+ */
+function BoardNotFound({ data }: NotFoundRouteProps) {
+  const page = S.decodeUnknownSync(BoardNotFoundData)(data);
+
+  initBoardI18n();
+
+  return (
+    <BoardNotFoundPage
+      dashboardUrl={page.dashboardUrl}
+      host={page.host}
+      siteName={page.siteName}
+      subdomain={page.subdomain}
+    />
+  );
 }
 
 /**
