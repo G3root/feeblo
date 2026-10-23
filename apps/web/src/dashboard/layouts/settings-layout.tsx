@@ -5,6 +5,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@feeblo/ui/sidebar";
+import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 
 import { SettingsSidebar } from "~/components/common/settings-sidebar";
@@ -32,14 +34,15 @@ export function SettingsLayout({ children }: { children: React.ReactNode }) {
         <SidebarInset className="h-full min-h-0 overflow-hidden">
           <header className="flex h-(--header-height) shrink-0 items-center border-b px-4 md:hidden">
             <div className="flex w-full items-center justify-between gap-2">
-              <SidebarTrigger className="-ml-1" />
               <Link
-                className={buttonVariants({ size: "sm", variant: "ghost" })}
+                aria-label="Back to dashboard"
+                className={buttonVariants({ size: "icon", variant: "ghost" })}
                 params={{ organizationId }}
                 to="/$organizationId"
               >
-                Back to Dashboard
+                <HugeiconsIcon icon={ArrowLeft01Icon} />
               </Link>
+              <SidebarTrigger className="-mr-1" />
             </div>
           </header>
           <OverPlanBanner />

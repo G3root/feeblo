@@ -211,7 +211,20 @@ export function Sidebar({
     return (
       <Sheet onOpenChange={setOpenMobile} open={openMobile} {...props}>
         <SheetPopup
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+          className={cn(
+            "bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden",
+            // `ease-(--ease-drawer)`, not `ease-drawer`: tailwind-merge does not
+            // know theme utilities, so the base popup's `ease-in-out` would
+            // survive the merge and Tailwind emits custom theme easings before
+            // the built-in ones, so `ease-in-out` would win the cascade.
+            "transition-[opacity,translate] duration-300 ease-(--ease-drawer)",
+            // The panel travels its own width. Reduced motion drops the
+            // transition instead of easing a long slide across the viewport.
+            "motion-reduce:transition-none",
+            side === "right"
+              ? "data-ending-style:translate-x-full data-starting-style:translate-x-full"
+              : "data-ending-style:-translate-x-full data-starting-style:-translate-x-full"
+          )}
           data-mobile="true"
           data-sidebar="sidebar"
           data-slot="sidebar"

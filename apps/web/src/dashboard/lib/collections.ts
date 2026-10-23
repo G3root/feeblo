@@ -36,6 +36,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
 import * as Duration from "effect/Duration";
+import * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
 
 import { getDbClient } from "@/lib/db-client";
@@ -256,10 +257,20 @@ export function postDetailCollection(scope: DashboardCollectionScope) {
         }
 
         const post = await fetchRpc(
-          (rpc) => rpc.GetPost({ organizationId, slug }),
+          (rpc) =>
+            rpc
+              .GetPost({ organizationId, slug })
+              // A missing slug is an empty lookup, not a failed one: the live
+              // query resolves to no row and the route renders its "Post not
+              // found" state. Without this the not-found error rejects the
+              // preload, and a stale or mistyped post URL lands on the route's
+              // error boundary instead of that state.
+              .pipe(
+                Effect.catchTag("PostNotFoundError", () => Effect.succeed(null))
+              ),
           { signal: ctx.signal }
         );
-        return [post];
+        return post === null ? [] : [post];
       },
       getKey: (item) => item.id,
     })

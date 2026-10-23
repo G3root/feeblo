@@ -27,7 +27,26 @@ export type PublicBoardPage =
       readonly ogImageUrl: string;
       readonly noIndex: boolean;
     }
-  | { readonly kind: "not-found" }
+  | {
+      readonly kind: "not-found";
+      /**
+       * The host the visitor asked for. The 404 names it so a mistyped
+       * subdomain is recognizable against the address bar.
+       */
+      readonly host: string;
+      /**
+       * The requested subdomain, or null when the URL was not served from a
+       * board host at all (the dashboard host's internal `/s` path).
+       */
+      readonly subdomain: string | null;
+      /**
+       * The board that exists at the requested host when only the page is
+       * missing. Null when the board itself does not exist.
+       */
+      readonly siteName: string | null;
+      /** The dashboard origin, for the 404's "Go to dashboard" action. */
+      readonly dashboardUrl: string;
+    }
   | { readonly kind: "redirect"; readonly to: string }
   | { readonly kind: "rpc-unavailable" };
 
@@ -122,6 +141,20 @@ async function resolvePageContent(
 }
 
 /**
+ * The dashboard origin to send a lost visitor to.
+ *
+ * `APP_URL` is the deployment's canonical app host. The request's own origin is
+ * only a fallback for a misconfigured deployment; when the URL did not
+ * classify as a board host, that origin already is the dashboard.
+ */
+function dashboardOrigin(url: URL) {
+  const configured = process.env.APP_URL;
+  return configured !== undefined && URL.canParse(configured)
+    ? new URL(configured).origin
+    : url.origin;
+}
+
+/**
  * Resolve the board page for a public URL.
  *
  * The loader is isomorphic, so the current location travels as data: the
@@ -138,8 +171,22 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
       rootDomain: process.env.APP_ROOT_DOMAIN ?? "",
     });
 
+    // The 404 document is rendered for an unknown board and for a missing
+    // page on a known board, so every not-found carries what it needs to say
+    // which one happened.
+    const notFound = (
+      siteName: string | null,
+      requestedSubdomain: string | null
+    ): PublicBoardPage => ({
+      kind: "not-found",
+      host: url.host,
+      subdomain: requestedSubdomain,
+      siteName,
+      dashboardUrl: dashboardOrigin(url),
+    });
+
     if (!subdomain) {
-      return { kind: "not-found" };
+      return notFound(null, null);
     }
 
     let site: TSite | null;
@@ -150,13 +197,15 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
     }
 
     if (!site) {
-      return { kind: "not-found" };
+      return notFound(null, subdomain);
     }
 
     const detail = await resolvePageContent(url.pathname, site);
 
     if (detail.kind !== "found") {
-      return detail;
+      return detail.kind === "not-found"
+        ? notFound(site.name, subdomain)
+        : detail;
     }
 
     const ogImageUrl = new URL("/og-image", process.env.API_URL);

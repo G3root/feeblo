@@ -1,5 +1,6 @@
 import { Button } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import {
   InputGroup,
   InputGroupAddon,
@@ -77,9 +78,21 @@ export function ChangelogToolbar() {
             </InputGroup>
           </div>
           {canCreate ? (
-            <Button onClick={createChangeLog} variant="brand">
+            <Button
+              className="max-md:hidden"
+              onClick={createChangeLog}
+              variant="brand"
+            >
               <HugeiconsIcon icon={Plus} /> New Entry
             </Button>
+          ) : null}
+          {canCreate ? (
+            <FloatingActionButton
+              icon={<HugeiconsIcon icon={Plus} />}
+              onClick={createChangeLog}
+            >
+              New Entry
+            </FloatingActionButton>
           ) : null}
         </div>
       </div>

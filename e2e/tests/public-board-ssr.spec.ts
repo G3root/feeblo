@@ -6,7 +6,7 @@ import { waitForHydration } from "../helpers/hydration";
 import { assertNoPageErrors, trackPageErrors } from "../helpers/page-errors";
 import { createPost, openPost } from "../helpers/posts";
 import { createTestUser } from "../helpers/test-users";
-import { publicBoardUrl } from "../helpers/urls";
+import { publicBoardUrl, unknownPublicBoardUrl } from "../helpers/urls";
 
 /**
  * The public board is server-rendered: crawlers and no-JS visitors must see the
@@ -48,6 +48,82 @@ test.describe("public board server rendering", () => {
     // Crawler metadata still resolves server-side.
     expect(html).toContain(`<link rel="canonical" href="${boardUrl}/"`);
     expect(html).toContain('"@type":"WebSite"');
+  });
+
+  test("an unknown subdomain renders the 404 page with a real 404 status", async ({
+    request,
+  }) => {
+    const unknownUrl = new URL(unknownPublicBoardUrl());
+
+    const response = await request.get(unknownUrl.toString());
+
+    // The status is what keeps crawlers off the host; the body is what a
+    // visitor sees instead of the router's bare "Not Found" paragraph.
+    expect(response.status()).toBe(404);
+    const html = await response.text();
+    expect(html).toContain("Page not found");
+    expect(html).toContain(`There is no workspace at ${unknownUrl.host}`);
+    expect(html).toContain("Go to dashboard");
+    expect(html).toContain("<title>Page not found</title>");
+    expect(html).not.toContain("<p>Not Found</p>");
+  });
+
+  test("the unknown-subdomain 404 hydrates with its data intact", async ({
+    page,
+  }) => {
+    trackPageErrors(page);
+
+    await page.goto(unknownPublicBoardUrl());
+    await waitForHydration(page);
+
+    // The not-found data crosses the server/client boundary; a decode that
+    // does not survive that trip would leave the error boundary on screen.
+    await expect(
+      page.getByText("Page not found", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Go to dashboard" })
+    ).toBeVisible();
+
+    await assertNoPageErrors(page, [
+      // The document is deliberately a 404, and Chromium reports that status
+      // as a failed resource for the navigation itself.
+      /Failed to load resource: the server responded with a status of 404/,
+    ]);
+  });
+
+  test("a missing post renders the 404 page and points back at the board", async ({
+    page,
+    request,
+  }) => {
+    const user = createTestUser();
+    await createAuthenticatedWorkspace(page, user);
+
+    const missingPostUrl = `${publicBoardUrl(user.workspaceName)}/p/does-not-exist-${randomUUID()}`;
+    const response = await request.get(missingPostUrl);
+
+    // The board resolves, so the page can name it and link back to it, while
+    // the response still tells crawlers the URL is gone.
+    expect(response.status()).toBe(404);
+    const html = await response.text();
+    expect(html).toContain("Page not found");
+    expect(html).toContain(
+      `This page does not exist on ${user.workspaceName}.`
+    );
+    expect(html).toContain("Back to feedback");
+    expect(html).not.toContain("<p>Not Found</p>");
+
+    // The same document must hydrate: the link is written through the board
+    // rewrite, so the visitor stays on the board's public spelling.
+    await page.goto(missingPostUrl);
+    await waitForHydration(page);
+
+    await expect(
+      page.getByText("Page not found", { exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Back to feedback" })
+    ).toHaveAttribute("href", "/");
   });
 
   test("a client-rendered route still renders the board shell, never the host shell", async ({

@@ -91,7 +91,7 @@ export function StatusField({
         )
       }
     >
-      <ComboboxTrigger render={<SelectButton size="sm" />}>
+      <ComboboxTrigger render={<SelectButton className="w-full" size="sm" />}>
         <ComboboxValue placeholder={placeholder}>
           {(value) => (
             <span className="flex items-center gap-2">

@@ -25,7 +25,7 @@ export function BoardListCard() {
 
   return (
     <div>
-      <h3 className="text-muted-foreground mb-2 px-2 text-[11px] font-medium tracking-wider uppercase">
+      <h3 className="text-muted-foreground mb-2 px-2 text-xs font-medium tracking-wider uppercase">
         {m.happy_upper_firefox()}
       </h3>
       <nav className="flex flex-col gap-0.5">

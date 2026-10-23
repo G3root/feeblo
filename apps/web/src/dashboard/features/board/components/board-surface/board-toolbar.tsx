@@ -6,10 +6,19 @@ import {
   InputGroupText,
 } from "@feeblo/ui/input-group";
 import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "@feeblo/ui/select";
 import { toggleVariants } from "@feeblo/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
 import { cn } from "@feeblo/ui/utils";
 import {
+  ArrowUpNarrowWideIcon,
+  Sorting01Icon,
   GridViewIcon,
   ListViewIcon,
   Search01Icon,
@@ -19,7 +28,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
-import { useBoardStore } from "../../state/board-store-context";
+import {
+  type BoardOrderField,
+  useBoardOrdering,
+  useBoardStore,
+} from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";
 
 const links = [
@@ -50,6 +63,16 @@ const feedbackLinks = [
     name: "Backlog",
     to: "/$organizationId/feedback/backlog" as const,
   },
+];
+
+const orderFieldOptions: ReadonlyArray<{
+  label: string;
+  value: BoardOrderField;
+}> = [
+  { label: "Created", value: "createdAt" },
+  { label: "Updated", value: "updatedAt" },
+  { label: "Upvotes", value: "upvoteCount" },
+  { label: "Title", value: "title" },
 ];
 
 export function BoardToolbar({
@@ -110,8 +133,8 @@ export function BoardToolbar({
                   </Link>
                 ))}
           </div>
-          <div className="ml-auto flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap">
-            <div className="w-full sm:w-72">
+          <div className="ml-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto">
+            <div className="min-w-0 flex-1 sm:w-72 sm:flex-none">
               <BoardSearchInput />
             </div>
             <BoardFilter.Trigger />
@@ -162,11 +185,85 @@ function DisplayPopOver() {
       />
       {/* `w-100` is 400px; clamp it so the popover cannot spill off a phone. */}
       <PopoverPopup className="w-[min(25rem,calc(100vw-2rem))]">
-        <div className="p-4">
-          <ViewSelect />
+        <div className="flex flex-col gap-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-1">
+            <span className="text-muted-foreground text-sm">View</span>
+            <ViewSelect />
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-1">
+            <span className="text-muted-foreground text-sm">Order by</span>
+            <OrderingControls />
+          </div>
         </div>
       </PopoverPopup>
     </Popover>
+  );
+}
+
+function OrderingControls() {
+  const store = useBoardStore();
+  const ordering = useBoardOrdering();
+  const isAscending = ordering.direction === "asc";
+  // The trigger has no label element, so its accessible name would otherwise be
+  // its content — just the selected value ("Created"). Prefixing the purpose
+  // and keeping the value gives a screen reader both, because the trigger
+  // exposes no separate closed-state value.
+  const activeLabel =
+    orderFieldOptions.find((option) => option.value === ordering.field)
+      ?.label ?? "Created";
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <Button
+        aria-label={
+          isAscending
+            ? "Change to descending order"
+            : "Change to ascending order"
+        }
+        className="rounded-full"
+        onClick={() => store.send({ type: "toggleOrderDirection" })}
+        size="icon-sm"
+        title={isAscending ? "Ascending" : "Descending"}
+        variant="outline"
+      >
+        <HugeiconsIcon
+          icon={isAscending ? ArrowUpNarrowWideIcon : Sorting01Icon}
+        />
+      </Button>
+      <Select
+        onValueChange={(value) => {
+          if (!value) {
+            return;
+          }
+          store.send({
+            type: "setOrderField",
+            // SAFETY: The select is populated only with BoardOrderField values.
+            field: value as BoardOrderField,
+          });
+        }}
+        value={ordering.field}
+      >
+        <SelectTrigger
+          aria-label={`Order by: ${activeLabel}`}
+          className="w-30"
+          size="sm"
+        >
+          <SelectValue>
+            {(value: string) =>
+              orderFieldOptions.find((option) => option.value === value)
+                ?.label ?? "Created"
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectPopup align="end">
+          {orderFieldOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectPopup>
+      </Select>
+    </div>
   );
 }
 
@@ -186,18 +283,10 @@ function ViewSelect() {
       value={[mode]}
       variant="outline"
     >
-      <ToggleGroupItem
-        aria-label="Toggle List view"
-        className="w-full"
-        value="list"
-      >
+      <ToggleGroupItem aria-label="Toggle List view" value="list">
         <HugeiconsIcon icon={ListViewIcon} /> List
       </ToggleGroupItem>
-      <ToggleGroupItem
-        aria-label="Toggle Board view"
-        className="w-full"
-        value="grid"
-      >
+      <ToggleGroupItem aria-label="Toggle Board view" value="grid">
         <HugeiconsIcon icon={GridViewIcon} /> Board
       </ToggleGroupItem>
     </ToggleGroup>

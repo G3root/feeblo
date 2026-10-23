@@ -105,7 +105,9 @@ function RouteComponent() {
                   </span>
                   <span className="sr-only">Acme Inc.</span>
                 </Link>
-                <h1 className="text-xl font-bold">Enter verification code</h1>
+                <h1 className="text-xl font-semibold">
+                  Enter verification code
+                </h1>
                 <FieldDescription>
                   We sent a 6-digit code to your email address
                 </FieldDescription>

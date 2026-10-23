@@ -16,6 +16,7 @@ import {
   themeScript,
 } from "@/lib/pre-hydration-scripts";
 import { getLocale, getTextDirection } from "@/paraglide/runtime.js";
+import { RouteNotFoundPage } from "~/components/route-not-found-page";
 import {
   apiPreconnectOrigins,
   getBrowserPublicEnv,
@@ -98,6 +99,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       })),
     ],
   }),
+  notFoundComponent: RouteNotFoundPage,
   shellComponent: RootDocument,
 });
 

@@ -1,8 +1,20 @@
 import { useDashboardHomeStats } from "@feeblo/post-ui/dashboard/use-dashboard-home-stats";
 import { Button } from "@feeblo/ui/button";
 import { Separator } from "@feeblo/ui/separator";
+import {
+  SpeedDial,
+  SpeedDialAction,
+  SpeedDialContent,
+  SpeedDialItem,
+  SpeedDialLabel,
+  SpeedDialTrigger,
+} from "@feeblo/ui/speed-dial";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
-import { Plus } from "@hugeicons/core-free-icons";
+import {
+  DashboardSquareAddIcon,
+  MessageAdd01Icon,
+  Plus,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -46,10 +58,10 @@ function RouteComponent() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-wrap-balance text-2xl font-semibold">
+        <h1 className="text-2xl leading-tight font-semibold tracking-tight text-balance">
           Hello, {userName}
         </h1>
-        <div className="flex gap-2">
+        <div className="hidden gap-2 md:flex">
           <Button
             className="flex-1 sm:flex-none"
             onClick={() =>
@@ -75,6 +87,43 @@ function RouteComponent() {
           </Button>
         </div>
       </div>
+
+      <SpeedDial
+        className="fixed right-4 bottom-[max(calc(var(--spacing)*4),env(safe-area-inset-bottom))] z-40 md:hidden"
+        side="top"
+      >
+        <SpeedDialTrigger aria-label="Create">
+          <HugeiconsIcon
+            className="transition-transform duration-500 ease-[cubic-bezier(0.68,-0.6,0.32,1.6)] in-[[aria-expanded=true]]:rotate-[135deg] motion-reduce:transition-none"
+            icon={Plus}
+          />
+        </SpeedDialTrigger>
+        <SpeedDialContent>
+          <SpeedDialItem>
+            <SpeedDialLabel>New post</SpeedDialLabel>
+            <SpeedDialAction
+              aria-label="New post"
+              onClick={() =>
+                createPostStore.send({
+                  type: "toggle",
+                  data: { source: "dashboard", status: "PENDING" },
+                })
+              }
+            >
+              <HugeiconsIcon icon={MessageAdd01Icon} />
+            </SpeedDialAction>
+          </SpeedDialItem>
+          <SpeedDialItem>
+            <SpeedDialLabel>New board</SpeedDialLabel>
+            <SpeedDialAction
+              aria-label="New board"
+              onClick={() => createBoardStore.send({ type: "toggle" })}
+            >
+              <HugeiconsIcon icon={DashboardSquareAddIcon} />
+            </SpeedDialAction>
+          </SpeedDialItem>
+        </SpeedDialContent>
+      </SpeedDial>
 
       {/* Recent posts */}
       <RecentPostsSection

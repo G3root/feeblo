@@ -8,8 +8,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
-import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import {
+  SkeletonLoader,
+  SkeletonWrapper,
+  useIsSkeleton,
+} from "@feeblo/ui/skeleton-loader";
 import {
   Table,
   TableBody,
@@ -256,14 +261,28 @@ function AttributeList({
 }
 
 function AttributeActions({ onCreate }: { onCreate: () => void }) {
+  const isSkeleton = useIsSkeleton();
   return (
     <div className="flex justify-end">
       <SkeletonWrapper>
-        <Button onClick={onCreate} type="button" variant="brand">
+        <Button
+          className="max-md:hidden"
+          onClick={onCreate}
+          type="button"
+          variant="brand"
+        >
           <HugeiconsIcon icon={Plus} />
           New attribute
         </Button>
       </SkeletonWrapper>
+      {isSkeleton ? null : (
+        <FloatingActionButton
+          icon={<HugeiconsIcon icon={Plus} />}
+          onClick={onCreate}
+        >
+          New attribute
+        </FloatingActionButton>
+      )}
     </div>
   );
 }

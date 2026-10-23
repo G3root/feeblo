@@ -1,4 +1,5 @@
 import { Button } from "@feeblo/ui/button";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import {
   Table,
@@ -175,28 +176,38 @@ function CompanyPage() {
         </div>
         <PolicyGuard policy={hasPermission(organizationId, "companies.create")}>
           {({ allowed }) => (
-            <Tooltip>
-              <TooltipTrigger
-                render={(props) => (
-                  <Button
-                    {...props}
-                    disabled={!allowed}
-                    onClick={openCreateDialog}
-                    type="button"
-                    variant="brand"
-                  >
-                    <HugeiconsIcon icon={Building02Icon} />
-                    Create company
-                  </Button>
-                )}
-              />
-              {hasReachedCrmLimit ? (
-                <TooltipPopup>
-                  CRM entry limit reached ({totalCrmEntries} of {crmLimit}
-                  used) — upgrade to add more companies.
-                </TooltipPopup>
-              ) : null}
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger
+                  render={(props) => (
+                    <Button
+                      {...props}
+                      className="max-md:hidden"
+                      disabled={!allowed}
+                      onClick={openCreateDialog}
+                      type="button"
+                      variant="brand"
+                    >
+                      <HugeiconsIcon icon={Building02Icon} />
+                      Create company
+                    </Button>
+                  )}
+                />
+                {hasReachedCrmLimit ? (
+                  <TooltipPopup>
+                    CRM entry limit reached ({totalCrmEntries} of {crmLimit}
+                    used) — upgrade to add more companies.
+                  </TooltipPopup>
+                ) : null}
+              </Tooltip>
+              <FloatingActionButton
+                disabled={!allowed}
+                icon={<HugeiconsIcon icon={Building02Icon} />}
+                onClick={openCreateDialog}
+              >
+                Create company
+              </FloatingActionButton>
+            </>
           )}
         </PolicyGuard>
       </div>

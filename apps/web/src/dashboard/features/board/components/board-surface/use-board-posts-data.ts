@@ -19,6 +19,7 @@ import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import type {
+  BoardOrdering,
   BoardPostStatusFilter,
   BoardStatusOperator,
   BoardTagOperator,
@@ -47,6 +48,7 @@ function filterPostStatusesByPreset(
 
 type UseBoardPostsDataOptions = {
   boardId?: string;
+  ordering: BoardOrdering;
   organizationId: string;
   postStatusFilter: BoardPostStatusFilter;
   search: string;
@@ -58,6 +60,7 @@ type UseBoardPostsDataOptions = {
 
 export function useBoardPostsData({
   boardId,
+  ordering,
   organizationId,
   postStatusFilter,
   search,
@@ -112,6 +115,8 @@ export function useBoardPostsData({
       statuses,
       tagOperator,
       tagIds,
+      ordering.field,
+      ordering.direction,
     ],
     query: (q) => {
       if (!organizationId) {
@@ -153,7 +158,7 @@ export function useBoardPostsData({
             : gte($selected.matchedCount, 1)
         );
 
-      return q
+      const filteredQuery = q
         .from({ post: postCollection })
         .join(
           { postStatus: postStatusCollection },
@@ -239,9 +244,28 @@ export function useBoardPostsData({
           }
 
           return condition;
-        })
-        .orderBy(({ post }) => post.createdAt, "desc")
-        .select(({ board, post, postStatus, upvoteCounts }) => ({
+        });
+
+      const orderedQuery =
+        ordering.field === "title"
+          ? filteredQuery.orderBy(({ post }) => post.title, ordering.direction)
+          : ordering.field === "updatedAt"
+            ? filteredQuery.orderBy(
+                ({ post }) => post.updatedAt,
+                ordering.direction
+              )
+            : ordering.field === "upvoteCount"
+              ? filteredQuery.orderBy(
+                  ({ upvoteCounts }) => coalesce(upvoteCounts.upvoteCount, 0),
+                  ordering.direction
+                )
+              : filteredQuery.orderBy(
+                  ({ post }) => post.createdAt,
+                  ordering.direction
+                );
+
+      return orderedQuery.select(
+        ({ board, post, postStatus, upvoteCounts }) => ({
           archivedAt: post.archivedAt,
           authorIsMember: post.authorIsMember,
           boardId: post.boardId,
@@ -257,7 +281,8 @@ export function useBoardPostsData({
           updatedAt: post.updatedAt,
           upvoteCount: coalesce(upvoteCounts.upvoteCount, 0),
           user: post.user,
-        }));
+        })
+      );
     },
   });
 

@@ -7,8 +7,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
-import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import {
+  SkeletonLoader,
+  SkeletonWrapper,
+  useIsSkeleton,
+} from "@feeblo/ui/skeleton-loader";
 import {
   Table,
   TableBody,
@@ -166,18 +171,37 @@ function TagTableActions({
   onCreate: () => void;
   organizationId: string;
 }) {
+  const isSkeleton = useIsSkeleton();
   return (
     <div className="flex items-center justify-end">
       <SkeletonWrapper>
         <PolicyGuard policy={hasPermission(organizationId, "tags.create")}>
           {({ allowed }) => (
-            <Button disabled={!allowed} onClick={onCreate} type="button">
+            <Button
+              className="max-md:hidden"
+              disabled={!allowed}
+              onClick={onCreate}
+              type="button"
+            >
               <HugeiconsIcon icon={Plus} />
               <span>New tag</span>
             </Button>
           )}
         </PolicyGuard>
       </SkeletonWrapper>
+      {isSkeleton ? null : (
+        <PolicyGuard policy={hasPermission(organizationId, "tags.create")}>
+          {({ allowed }) => (
+            <FloatingActionButton
+              disabled={!allowed}
+              icon={<HugeiconsIcon icon={Plus} />}
+              onClick={onCreate}
+            >
+              New tag
+            </FloatingActionButton>
+          )}
+        </PolicyGuard>
+      )}
     </div>
   );
 }

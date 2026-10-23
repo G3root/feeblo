@@ -15,6 +15,7 @@ import {
 import { and, eq, inArray, queryOnce, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
+import { useOccupyMobileBottomSlot } from "~/components/common/mobile-bottom-slot";
 import {
   useBoardStore,
   useSelectedPostIds,
@@ -84,24 +85,59 @@ function useCanBulkDeleteSelectedPosts(): boolean {
   return selectedPostIds.every((postId) => eligibleIds.has(postId));
 }
 
+// The bar replaces the bottom nav in the same slot, so a tap should feel the
+// same in both: 150ms press feedback at the nav's 0.97 scale.
+const actionPressFeedback =
+  "ease-out-strong transition-[scale,box-shadow] duration-150 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100";
+
 export function BoardPostBulkActions() {
   const selectedPostIds = useSelectedPostIds();
   const store = useBoardStore();
   const selectedCount = selectedPostIds.length;
   const canBulkDelete = useCanBulkDeleteSelectedPosts();
 
+  // Phones have no room for two floating bars, and a Delete button parked
+  // directly above the bottom nav is a mis-tap waiting to happen. The bar
+  // takes the nav's slot instead: the nav fades out while a selection exists
+  // and returns when the selection is cleared (including on unmount).
+  useOccupyMobileBottomSlot(selectedCount > 0);
+
   return (
     <div
       className={cn(
-        "pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-3 transition-all duration-200 sm:px-6",
+        "pointer-events-none fixed inset-x-0 z-50 flex justify-center px-3 sm:px-6",
+        // The nav only exists below `md`, so the bar shares that breakpoint:
+        // it sits at the nav's exact height (safe-area aware) on phones and
+        // keeps the desktop floating position from `md` up.
+        "bottom-[max(calc(var(--spacing)*4),env(safe-area-inset-bottom))] md:bottom-6",
+        // Explicit properties only: `transition-all` also animates the
+        // border/background under a theme switch. `filter` is the 2px blur
+        // mask that softens the crossfade with the nav — both pills occupy
+        // this slot, and a raw crossfade double-exposes their icons and text.
+        // Rest state is `[filter:none]`, not `blur-0`: any filter value makes
+        // this container a backdrop root, which would cut the inner pill off
+        // from the page behind its `backdrop-blur-sm`.
+        "ease-out-strong transition-[opacity,translate,filter] motion-reduce:transition-opacity",
+        // Asymmetric by state: CSS reads the duration off the destination
+        // style, so the bar takes 200ms to come in and snaps away in 150ms —
+        // the system answers fast, the entrance stays legible.
         selectedCount > 0
-          ? "translate-y-0 opacity-100"
-          : "translate-y-5 opacity-0"
+          ? "translate-y-0 opacity-100 [filter:none] duration-200"
+          : "translate-y-5 opacity-0 blur-[2px] duration-150"
       )}
+      // Hidden means hidden: without `inert` the transparent bar still sat in
+      // the tab order and swallowed taps meant for the nav underneath it.
+      inert={selectedCount === 0}
     >
-      <div className="border-border bg-background/95 pointer-events-auto flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm">
+      <div
+        className={cn(
+          "border-border bg-background/95 flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur-sm",
+          selectedCount > 0 && "pointer-events-auto"
+        )}
+      >
         <p className="text-sm font-medium">{selectedCount} selected</p>
         <Button
+          className={actionPressFeedback}
           onClick={() => store.send({ type: "clearSelection" })}
           size="sm"
           type="button"
@@ -112,6 +148,7 @@ export function BoardPostBulkActions() {
         {/* Disabled instead of hidden: contributors keep the affordance and
             learn it applies only to their own untouched posts. */}
         <Button
+          className={actionPressFeedback}
           disabled={!canBulkDelete}
           onClick={() => store.send({ type: "setBulkDeleteOpen", open: true })}
           size="sm"

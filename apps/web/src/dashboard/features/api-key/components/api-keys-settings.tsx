@@ -11,6 +11,7 @@ import {
   CardPanel,
 } from "@feeblo/ui/card";
 import { CopyButton } from "@feeblo/ui/copy-button";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import * as dayjs from "@feeblo/utils/dayjs";
 import { MoreVerticalIcon, Plus } from "@hugeicons/core-free-icons";
@@ -74,7 +75,7 @@ function ApiKeysSettingsContent({
                 ? null
                 : " The Public API requires the Starter plan or higher."}
             </CardFrameDescription>
-            <CardFrameAction>
+            <CardFrameAction className="max-md:hidden">
               <Button
                 disabled={!publicApiAvailable}
                 onClick={() => createDialogStore.send({ type: "toggle" })}
@@ -85,6 +86,13 @@ function ApiKeysSettingsContent({
                 New key
               </Button>
             </CardFrameAction>
+            <FloatingActionButton
+              disabled={!publicApiAvailable}
+              icon={<HugeiconsIcon icon={Plus} />}
+              onClick={() => createDialogStore.send({ type: "toggle" })}
+            >
+              New key
+            </FloatingActionButton>
           </CardFrameHeader>
 
           {isLoading ? (

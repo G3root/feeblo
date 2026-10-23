@@ -112,7 +112,7 @@ export function OverPlanGate() {
           <Badge className="self-start" size="lg" variant="warning">
             Over plan
           </Badge>
-          <h1 className="text-2xl font-semibold tracking-tight text-balance">
+          <h1 className="text-2xl leading-tight font-semibold tracking-tight text-balance">
             This workspace is over its {view.planLabel} plan
           </h1>
           <p className="text-muted-foreground max-w-2xl text-sm text-pretty">

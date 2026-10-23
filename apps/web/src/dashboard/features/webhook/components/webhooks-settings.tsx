@@ -17,6 +17,7 @@ import {
   CardPanel,
   CardTitle,
 } from "@feeblo/ui/card";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import { toastManager } from "@feeblo/ui/toast";
 import { Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -129,7 +130,7 @@ function WebhooksSettingsContent({
             <CardFrameDescription>
               Deliver signed feedback events to your HTTPS endpoint.
             </CardFrameDescription>
-            <CardFrameAction>
+            <CardFrameAction className="max-md:hidden">
               <Button
                 onClick={() => createDialogStore.send({ type: "toggle" })}
                 type="button"
@@ -139,6 +140,12 @@ function WebhooksSettingsContent({
                 New endpoint
               </Button>
             </CardFrameAction>
+            <FloatingActionButton
+              icon={<HugeiconsIcon icon={Plus} />}
+              onClick={() => createDialogStore.send({ type: "toggle" })}
+            >
+              New endpoint
+            </FloatingActionButton>
           </CardFrameHeader>
           {isLoading ? (
             <Card>
@@ -203,7 +210,7 @@ function WebhookEndpointCard({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="grid min-w-0 gap-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle className="text-base">{endpoint.name}</CardTitle>
+              <CardTitle>{endpoint.name}</CardTitle>
               <Badge>{endpoint.lifecycle}</Badge>
               <Badge
                 variant={
