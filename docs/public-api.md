@@ -10,6 +10,21 @@ It is **not** the public portal — the feedback board and widget that anyone ca
 - **Reference:** `{API_URL}/api/v1/docs` — a Scalar page rendered from the same document. It carries the API key security scheme, so the Authorize button stores the key and sends it as `x-api-key` in the Try-it requests.
 - **MCP:** `POST {API_URL}/mcp` — the same operations as [Model Context Protocol (MCP)](#model-context-protocol-mcp) tools, for a client that speaks the protocol instead of HTTP.
 
+## Agent discovery
+
+The API origin publishes the documents an agent reads before it has a credential. They are static, need no key, and name the origin the request arrived on, so a self-hosted deployment advertises itself rather than `api.feeblo.com`.
+
+| Document | Path | Purpose |
+| --- | --- | --- |
+| Markdown landing | `GET /` and `GET /llms.txt` | What the origin is, the base URL, the key header, and the docs links. |
+| Auth guide | `GET /auth.md` | Create a key, call the API, connect an MCP client, and read the error vocabulary. |
+| API catalog | `GET /.well-known/api-catalog` | RFC 9727 linkset: the OpenAPI document, the reference, and the MCP server card. |
+| MCP server card | `GET /.well-known/mcp.json` | The MCP endpoint, its transport, and its `x-api-key` requirement. |
+
+Every discovery response carries a `Link` header with the same relations (`api-catalog`, `service-desc`, `service-doc`, `describedby`). Discovery never reads the database: an outage that fails `/api/v1` still answers these documents.
+
+Each public board also serves `/llms.txt`, a Markdown index of the board's public posts, roadmap, and changelog generated from the same public data as its sitemap. A board the owner marked noindex answers `404` for `/llms.txt` and a `200` with an empty `<urlset>` for `/sitemap.xml`; the robots.txt blocks the crawler either way.
+
 ## Authentication
 
 Every request carries an API key:

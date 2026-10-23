@@ -306,7 +306,7 @@ export const subscriptionTable = pgTable(
     lastEventAt: timestamp("last_event_at", { withTimezone: true }),
 
     //
-    // Polar target (the SDK `server`, i.e. sandbox or production) whose
+    // Polar target (the SDK `environment`, i.e. sandbox or production) whose
     // webhooks synced this row. The revocation queue copies it so a deployment
     // that changed targets cannot close a row on a 404 from a server that
     // never held the subscription. Nullable because rows synced before this
@@ -341,7 +341,7 @@ export const subscriptionRevocationTable = pgTable(
     externalSubscriptionId: text("external_subscription_id").primaryKey(),
     organizationId: text("organization_id").notNull(),
     /**
-     * Polar target (the SDK `server`, i.e. sandbox or production) the
+     * Polar target (the SDK `environment`, i.e. sandbox or production) the
      * subscription was synced from. A queued revocation is only conclusive
      * against this target: a 404 from a different target means "unknown
      * here", not "already gone", so the row stays pending for reconciliation

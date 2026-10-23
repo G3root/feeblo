@@ -127,6 +127,7 @@ export const makeServerApp = Effect.gen(function* () {
   });
 
   const PublicRouters = makePublicRouters({
+    apiUrl: config.apiUrl,
     e2eRoutesEnabled: config.e2eRoutesEnabled,
     mailbox,
     nodeEnv: config.nodeEnv,
