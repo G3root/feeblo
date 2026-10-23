@@ -20,6 +20,7 @@ import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
 
 import type { ServerConfigValue } from "../config";
+import { makeAgentDiscoveryRouter } from "../http/agent-discovery";
 import { bodySizeLimitMiddleware } from "../http/body-limit";
 import { makeIsAllowedOrigin } from "../http/cors";
 import {
@@ -35,7 +36,6 @@ import {
   HealthRouter,
   OgImageRouterLive,
   PublicApiDocsRoute,
-  RootRouter,
 } from "../http/routers";
 import { serverTimingMiddleware } from "../http/server-timing";
 import { SesEmailFeedbackRouter } from "../http/ses";
@@ -93,10 +93,16 @@ export const shouldMountE2eRoutes = ({
 }): boolean => e2eRoutesEnabled && hasMailbox && nodeEnv !== "production";
 
 export const makePublicRouters = ({
+  apiUrl,
   e2eRoutesEnabled,
   mailbox: inputMailbox,
   nodeEnv,
 }: {
+  /**
+   * The public origin this deployment serves the API from. Discovery documents
+   * use its scheme when no proxy supplies one.
+   */
+  readonly apiUrl: string;
   /**
    * Explicit opt-in for the test-only routes. Separate from
    * `E2E_TEST_MAILER` on purpose: a deployment that only wanted the in-memory
@@ -117,11 +123,12 @@ export const makePublicRouters = ({
   })
     ? inputMailbox
     : undefined;
+  const DiscoveryRouter = makeAgentDiscoveryRouter(apiUrl);
   const RootRouterLive =
     mailbox === undefined
-      ? RootRouter
+      ? DiscoveryRouter
       : Layer.mergeAll(
-          RootRouter,
+          DiscoveryRouter,
           testMailboxRouter(mailbox),
           e2eRoadmapSeedRouter,
           e2eSetPlanRouter

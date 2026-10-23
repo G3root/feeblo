@@ -7,12 +7,13 @@ import {
   type SitemapUrl,
 } from "@feeblo/web-shared/sitemap";
 
+import { renderBoardLlmsTxt, type BoardContent } from "@/lib/board-llms";
 import { fetchRpcServer } from "~/lib/runtime-server";
 import { resolveSite } from "~/lib/site";
 
 /**
- * The public board's crawler endpoints (robots.txt, sitemap.xml, changelog
- * RSS), ported from the Astro endpoints.
+ * The public board's crawler and agent endpoints (robots.txt, sitemap.xml,
+ * llms.txt, changelog RSS), ported from the Astro endpoints.
  *
  * They stay raw HTTP responses rather than router data: crawlers and feed
  * readers are the contract. Each resolves the site from the request host with
@@ -177,12 +178,7 @@ export async function handleBoardSitemap(request: Request) {
   return xmlResponse(xml);
 }
 
-async function collectUrls(
-  site: TSite,
-  origin: string
-): Promise<ReadonlyArray<SitemapUrl>> {
-  const urls: SitemapUrl[] = [{ loc: `${origin}/` }];
-
+async function collectBoardContent(site: TSite): Promise<BoardContent> {
   // The four list fetches are independent, so fire them together and pay
   // one RPC round-trip instead of four sequential ones. Visibility-gated
   // lists resolve to empty without a request.
@@ -207,6 +203,16 @@ async function collectUrls(
       })
     ),
   ]);
+
+  return { boards, entries, posts, roadmaps };
+}
+
+async function collectUrls(
+  site: TSite,
+  origin: string
+): Promise<ReadonlyArray<SitemapUrl>> {
+  const urls: SitemapUrl[] = [{ loc: `${origin}/` }];
+  const { boards, entries, posts, roadmaps } = await collectBoardContent(site);
 
   if (site.roadmapVisibility === "PUBLIC") {
     urls.push({ loc: `${origin}/roadmap` });
@@ -247,6 +253,46 @@ async function collectUrls(
   }
 
   return urls;
+}
+
+/**
+ * `llms.txt` for the public board, served at
+ * `https://<subdomain>.<root-domain>/llms.txt`.
+ *
+ * A host without a site and a site flagged `noIndex` both answer 404: the
+ * robots.txt already keeps crawlers out, and an agent that fetched this file
+ * must not receive content the site owner asked search engines not to index.
+ */
+export async function handleBoardLlmsTxt(request: Request) {
+  let site: TSite | null;
+  try {
+    site = await resolveBoardSite(request);
+  } catch {
+    return new Response("Index unavailable", { status: 502 });
+  }
+
+  if (site === null || site.noIndex || Boolean(process.env.NO_INDEX)) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  let content: BoardContent;
+  try {
+    content = await collectBoardContent(site);
+  } catch {
+    return new Response("Index unavailable", { status: 502 });
+  }
+
+  const origin = new URL(request.url).origin;
+
+  return new Response(renderBoardLlmsTxt(site, origin, content), {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      // Same frame as the sitemap: no mutation-triggered cache purge exists yet,
+      // so a visibility change has to surface within the cache lifetime.
+      "Cache-Control": XML_CACHE_CONTROL,
+      Vary: "Host",
+    },
+  });
 }
 
 // Single pass: the chained `replaceAll` version re-scanned the whole

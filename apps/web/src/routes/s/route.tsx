@@ -47,6 +47,17 @@ import { getLocale, setLocale } from "@/paraglide/runtime.js";
 const LOCALE_COOKIE_NAME = "PARAGLIDE_LOCALE";
 
 /**
+ * The headers a board document sets.
+ *
+ * Named rather than anonymous so the conditional `Link` below keeps its type
+ * evidence; the router accepts any response header value as a string.
+ */
+type BoardDocumentHeaders = {
+  "Cache-Control": string;
+  Link?: string;
+};
+
+/**
  * The document's cache policy.
  *
  * A public board document is visitor-independent only while the visitor has
@@ -148,13 +159,24 @@ export const Route = createFileRoute("/s")({
       return undefined;
     }
 
-    return {
-      "Cache-Control":
-        match.context.boardPage.kind === "found" &&
-        !isBoardPreloadDegraded(match.context.dbClient)
-          ? cacheControl
-          : "no-store",
+    const indexable =
+      match.context.boardPage.kind === "found" &&
+      !match.context.boardPage.noIndex &&
+      !isBoardPreloadDegraded(match.context.dbClient);
+
+    const headers: BoardDocumentHeaders = {
+      "Cache-Control": indexable ? cacheControl : "no-store",
     };
+
+    // Point an agent that landed on the HTML at the text index and the full
+    // URL list. Both are withheld from a site the owner marked noindex, so
+    // the document does not advertise a 404.
+    if (indexable) {
+      headers.Link =
+        '</llms.txt>; rel="describedby"; type="text/plain", </sitemap.xml>; rel="alternate"; type="application/xml"';
+    }
+
+    return headers;
   },
   head: ({ match }) => {
     const { boardPage } = match.context;

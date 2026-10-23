@@ -24,6 +24,7 @@ import { Route as DashboardResetPasswordRouteImport } from "./routes/_dashboard/
 import { Route as FeedbackWidgetOrganizationIdRouteImport } from "./routes/feedback-widget/$organizationId"
 import { Route as SIndexRouteImport } from "./routes/s/index"
 import { Route as SSplatRouteImport } from "./routes/s/$"
+import { Route as SLlmsDottxtRouteImport } from "./routes/s/llms[.]txt"
 import { Route as SRobotsDottxtRouteImport } from "./routes/s/robots[.]txt"
 import { Route as SSitemapDotxmlRouteImport } from "./routes/s/sitemap[.]xml"
 import { Route as DashboardOrganizationIdDashboardLayoutRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout"
@@ -151,6 +152,11 @@ const SIndexRoute = SIndexRouteImport.update({
 const SSplatRoute = SSplatRouteImport.update({
   id: "/$",
   path: "/$",
+  getParentRoute: () => SRouteRoute,
+} as any)
+const SLlmsDottxtRoute = SLlmsDottxtRouteImport.update({
+  id: "/llms.txt",
+  path: "/llms.txt",
   getParentRoute: () => SRouteRoute,
 } as any)
 const SRobotsDottxtRoute = SRobotsDottxtRouteImport.update({
@@ -488,6 +494,7 @@ export interface FileRoutesByFullPath {
   "/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
   "/s/$": typeof SSplatRoute
+  "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s/": typeof SIndexRoute
@@ -556,6 +563,7 @@ export interface FileRoutesByTo {
   "/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
   "/s/$": typeof SSplatRoute
+  "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s": typeof SIndexRoute
@@ -625,6 +633,7 @@ export interface FileRoutesById {
   "/_dashboard/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
   "/s/$": typeof SSplatRoute
+  "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/s/": typeof SIndexRoute
@@ -697,6 +706,7 @@ export interface FileRouteTypes {
     | "/reset-password"
     | "/feedback-widget/$organizationId"
     | "/s/$"
+    | "/s/llms.txt"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/s/"
@@ -765,6 +775,7 @@ export interface FileRouteTypes {
     | "/reset-password"
     | "/feedback-widget/$organizationId"
     | "/s/$"
+    | "/s/llms.txt"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/s"
@@ -833,6 +844,7 @@ export interface FileRouteTypes {
     | "/_dashboard/reset-password"
     | "/feedback-widget/$organizationId"
     | "/s/$"
+    | "/s/llms.txt"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/s/"
@@ -1003,6 +1015,13 @@ declare module "@tanstack/react-router" {
       path: "/$"
       fullPath: "/s/$"
       preLoaderRoute: typeof SSplatRouteImport
+      parentRoute: typeof SRouteRoute
+    }
+    "/s/llms.txt": {
+      id: "/s/llms.txt"
+      path: "/llms.txt"
+      fullPath: "/s/llms.txt"
+      preLoaderRoute: typeof SLlmsDottxtRouteImport
       parentRoute: typeof SRouteRoute
     }
     "/s/robots.txt": {
@@ -1388,6 +1407,7 @@ declare module "@tanstack/react-router" {
 
 interface SRouteRouteChildren {
   SSplatRoute: typeof SSplatRoute
+  SLlmsDottxtRoute: typeof SLlmsDottxtRoute
   SRobotsDottxtRoute: typeof SRobotsDottxtRoute
   SSitemapDotxmlRoute: typeof SSitemapDotxmlRoute
   SIndexRoute: typeof SIndexRoute
@@ -1402,6 +1422,7 @@ interface SRouteRouteChildren {
 
 const SRouteRouteChildren: SRouteRouteChildren = {
   SSplatRoute: SSplatRoute,
+  SLlmsDottxtRoute: SLlmsDottxtRoute,
   SRobotsDottxtRoute: SRobotsDottxtRoute,
   SSitemapDotxmlRoute: SSitemapDotxmlRoute,
   SIndexRoute: SIndexRoute,

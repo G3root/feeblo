@@ -86,10 +86,26 @@ test.describe("public board SEO", () => {
       )?.[1];
     expect(postUrl).toBeTruthy();
 
+    // llms.txt indexes the same public content for agents: the board, the
+    // recent posts, the published changelog entry, and the sitemap.
+    const llms = await page.request.get(`${boardUrl}/llms.txt`);
+    expect(llms.status()).toBe(200);
+    expect(llms.headers()["content-type"]).toContain("text/plain");
+    const llmsBody = await llms.text();
+    expect(llmsBody).toContain(`# ${user.workspaceName}`);
+    expect(llmsBody).toContain(`(${postUrl})`);
+    expect(llmsBody).toContain(title);
+    expect(llmsBody).toContain(`(${boardUrl}/changelog/${changelogSlug})`);
+    expect(llmsBody).toContain(`${boardUrl}/sitemap.xml`);
+
     // The post detail page carries per-page metadata and structured data in
     // the raw server response — exactly what a crawler receives.
     const postResponse = await page.request.get(postUrl!);
     expect(postResponse.status()).toBe(200);
+    // The HTML document points an agent at the text index and the full URL
+    // list; both are withheld from a noindex site.
+    expect(postResponse.headers().link).toContain("</llms.txt>");
+    expect(postResponse.headers().link).toContain("</sitemap.xml>");
     const postScripts = jsonLdScripts(await postResponse.text());
     // Every node must remain parseable JSON: the HTML-delimiter escaping
     // keeps the embedded serialization intact inside the script element.
@@ -181,11 +197,21 @@ test.describe("public board SEO", () => {
     expect(sitemapBody).toContain("<urlset");
     expect(sitemapBody).not.toContain("<loc>");
 
+    // The agent index is not served for a site the owner asked search engines
+    // to ignore; the robots.txt already answers the same question.
+    const llms = await page.request.get(`${boardUrl}/llms.txt`);
+    expect(llms.status()).toBe(404);
+
     // A host without a site keeps crawlers out entirely.
     const unknownRobots = await page.request.get(
       `${unknownPublicBoardUrl()}/robots.txt`
     );
     expect(unknownRobots.status()).toBe(200);
     expect(await unknownRobots.text()).toContain("Disallow: /");
+
+    const unknownLlms = await page.request.get(
+      `${unknownPublicBoardUrl()}/llms.txt`
+    );
+    expect(unknownLlms.status()).toBe(404);
   });
 });

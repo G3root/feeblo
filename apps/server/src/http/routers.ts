@@ -92,7 +92,3 @@ export const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
       );
     })
   );
-
-export const RootRouter = HttpRouter.use((router) =>
-  router.add("GET", "/", HttpServerResponse.text("Hello world"))
-);
