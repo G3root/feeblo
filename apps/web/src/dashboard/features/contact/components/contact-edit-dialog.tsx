@@ -84,10 +84,9 @@ function ContactEditForm() {
             eq(contact.organizationId, organizationId)
           )
         )
-        .orderBy(({ contact }) => contact.updatedAt, "desc")
-        .limit(1),
+        .findOne(),
   });
-  const contact = data[0];
+  const contact = data;
   const definitionsQuery = useContactAttributeDefinitions(organizationId);
   const attributeValuesQuery = useContactAttributeValues(contactId);
   const companiesQuery = useOrgCompanies(organizationId);

@@ -66,7 +66,7 @@ export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
   const initialName = site?.name;
 
   async function handleBlur() {
-    if (!canEdit) {
+    if (!(canEdit && site)) {
       return;
     }
 
@@ -86,7 +86,7 @@ export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
 
     try {
       const tx = dashboardCollections.siteCollection.update(
-        site?.id,
+        site.id,
         (draft) => {
           draft.name = siteName;
         }

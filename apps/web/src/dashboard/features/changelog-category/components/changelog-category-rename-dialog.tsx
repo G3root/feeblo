@@ -70,11 +70,10 @@ function ChangelogCategoryRenameForm() {
             eq(category.organizationId, organizationId)
           )
         )
-        .orderBy(({ category }) => category.createdAt, "desc")
-        .limit(1),
+        .findOne(),
   });
 
-  const category = data[0];
+  const category = data;
 
   if (!category) {
     return null;

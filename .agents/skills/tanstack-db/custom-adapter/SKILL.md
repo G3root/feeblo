@@ -14,7 +14,7 @@ description: >
   for storing per-row and per-collection adapter state.
 type: sub-skill
 library: db
-library_version: '0.9.2'
+library_version: '0.15.2'
 sources:
   - 'TanStack/db:docs/guides/collection-options-creator.md'
   - 'TanStack/db:packages/db/src/collection/sync.ts'

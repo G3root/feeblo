@@ -16,7 +16,7 @@ description: >
   (onEnter, onUpdate, onExit, onBatch).
 type: sub-skill
 library: db
-library_version: '0.9.2'
+library_version: '0.15.2'
 sources:
   - 'TanStack/db:docs/guides/live-queries.md'
   - 'TanStack/db:packages/db/src/query/builder/index.ts'

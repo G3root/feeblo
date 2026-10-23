@@ -9,7 +9,7 @@ description: >
   Entry point for the tanstack-db sub-skills.
 type: core
 library: db
-library_version: '0.9.2'
+library_version: '0.15.2'
 ---
 
 # TanStack DB — Core Concepts
@@ -30,8 +30,8 @@ Use the current TanStack DB source, not memory or older examples.
 1. If `~/.local/share/opencode/repos/github.com/TanStack/db` is missing, clone
    `https://github.com/TanStack/db` there. Do that, not in the skill folder.
 2. Check the installed package versions before answering:
-   `@tanstack/db` **0.9.2**, `@tanstack/react-db` **0.4.1**,
-   `@tanstack/query-db-collection` **1.2.15**, `@tanstack/db-ivm` **0.1.22**.
+   `@tanstack/db` **0.15.2**, `@tanstack/react-db` **0.5.12**,
+   `@tanstack/query-db-collection` **1.4.8**, `@tanstack/db-ivm` **0.2.0**.
    The package sources under `node_modules/@tanstack/*` are authoritative for
    the installed version; the clone tracks upstream `main`, which can be ahead
    of this catalog. When they disagree, the installed sources win.
@@ -82,12 +82,18 @@ none of them are installed in this repo.
 - **The update API is Immer-style** — `collection.update(id, (draft) => { ... })`.
 - **Every collection has an explicit `id`** — Workers forbid random values in
   global scope, and the SSR bundle imports these modules at startup.
-- **Index join and filter fields** — joins warn in dev when the loaded side has
-  no index. Follow the existing `createIndex(..., { indexType: BasicIndex })`
-  style in both collection files.
+- **Index every join and ordered window** — dev builds warn for each one that
+  would scan instead. Which side needs the index depends on the join kind:
+  inner and right joins need it on the from-side collection's join field;
+  left joins need it on the joined collection's join field. A `groupBy`
+  subquery's join key resolves to the source collection's grouped field.
+  `orderBy(...).limit(n)` needs an index on the ordered field, so read a row
+  by id with `.findOne()` rather than ordering by a timestamp just to take
+  one. Follow the existing `createIndex(..., { indexType: BasicIndex })` style
+  in both collection files.
 - **SSR is not supported for collections** — routes using collections set
   `ssr: false`; preload in client-side route loaders.
 
 ## Version
 
-Targets `@tanstack/db` v0.9.2.
+Targets `@tanstack/db` v0.15.2.

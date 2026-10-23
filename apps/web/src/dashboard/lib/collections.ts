@@ -2266,8 +2266,17 @@ export const dashboardCollections = {
     return getBrowserDbClient().collection(roadmapCollection(currentScope()));
   },
   get roadmapColumnCollection() {
-    return getBrowserDbClient().collection(
-      roadmapColumnCollection(currentScope())
+    return withIndexes(
+      getBrowserDbClient().collection(roadmapColumnCollection(currentScope())),
+      (collection) => {
+        // Roadmap columns join statuses and roadmaps by their foreign keys.
+        collection.createIndex((row) => row.statusId, {
+          indexType: BasicIndex,
+        });
+        collection.createIndex((row) => row.roadmapId, {
+          indexType: BasicIndex,
+        });
+      }
     );
   },
   get postTagCollection() {
