@@ -204,6 +204,13 @@ function OrderingControls() {
   const store = useBoardStore();
   const ordering = useBoardOrdering();
   const isAscending = ordering.direction === "asc";
+  // The trigger has no label element, so its accessible name would otherwise be
+  // its content — just the selected value ("Created"). Prefixing the purpose
+  // and keeping the value gives a screen reader both, because the trigger
+  // exposes no separate closed-state value.
+  const activeLabel =
+    orderFieldOptions.find((option) => option.value === ordering.field)
+      ?.label ?? "Created";
 
   return (
     <div className="flex items-center gap-1.5">
@@ -236,7 +243,11 @@ function OrderingControls() {
         }}
         value={ordering.field}
       >
-        <SelectTrigger className="w-30" size="sm">
+        <SelectTrigger
+          aria-label={`Order by: ${activeLabel}`}
+          className="w-30"
+          size="sm"
+        >
           <SelectValue>
             {(value: string) =>
               orderFieldOptions.find((option) => option.value === value)

@@ -218,6 +218,9 @@ export function Sidebar({
             // survive the merge and Tailwind emits custom theme easings before
             // the built-in ones, so `ease-in-out` would win the cascade.
             "transition-[opacity,translate] duration-300 ease-(--ease-drawer)",
+            // The panel travels its own width. Reduced motion drops the
+            // transition instead of easing a long slide across the viewport.
+            "motion-reduce:transition-none",
             side === "right"
               ? "data-ending-style:translate-x-full data-starting-style:translate-x-full"
               : "data-ending-style:-translate-x-full data-starting-style:-translate-x-full"

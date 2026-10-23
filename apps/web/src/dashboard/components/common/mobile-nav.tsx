@@ -46,7 +46,7 @@ export function MobileNav() {
   const hasActiveItem = activeIndex >= 0;
 
   return (
-    <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex items-center justify-center pb-4 md:hidden">
+    <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex items-center justify-center pb-[max(calc(var(--spacing)*4),env(safe-area-inset-bottom))] md:hidden">
       <nav
         aria-label="Mobile navigation"
         className="bg-popover pointer-events-auto relative flex w-fit items-center justify-around gap-1 rounded-full border p-1 shadow-lg shadow-black/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-full before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]"
