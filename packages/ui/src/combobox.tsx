@@ -1,6 +1,7 @@
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { isNumber, isString } from "@feeblo/utils/runtime-kind";
-import { ChevronsUpDownIcon, XIcon } from "lucide-react";
+import { Cancel01Icon, UnfoldMoreIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
 
 import { Input } from "./input";
@@ -118,7 +119,7 @@ export function ComboboxInput({
           {...triggerProps}
         >
           <ComboboxPrimitive.Icon data-slot="combobox-icon">
-            <ChevronsUpDownIcon />
+            <HugeiconsIcon icon={UnfoldMoreIcon} />
           </ComboboxPrimitive.Icon>
         </ComboboxTrigger>
       )}
@@ -130,7 +131,7 @@ export function ComboboxInput({
           )}
           {...clearProps}
         >
-          <XIcon />
+          <HugeiconsIcon icon={Cancel01Icon} />
         </ComboboxClear>
       )}
     </ComboboxPrimitive.InputGroup>
@@ -428,7 +429,7 @@ export function ComboboxChipRemove(
       data-slot="combobox-chip-remove"
       {...props}
     >
-      <XIcon />
+      <HugeiconsIcon icon={Cancel01Icon} />
     </ComboboxPrimitive.ChipRemove>
   );
 }

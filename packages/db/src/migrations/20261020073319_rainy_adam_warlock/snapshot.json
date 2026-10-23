@@ -1,0 +1,717 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "605001ba-36a3-4494-b4ba-515cb0df2d56",
+  "prevIds": [
+    "937ff6a2-30f6-4d8e-bd33-e383c92e1807"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "invitation",
+        "invitation_inviterId_idx"
+      ],
+      "writes": [
+        "s|idx|public.invitation_inviterId_idx",
+        "n|idx|public.invitation_inviterId_idx",
+        "e|idx|public.invitation_inviterId_idx",
+        "n|rel|public.invitation_inviterId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.invitation",
+        "n|sch|public",
+        "n|col|public.invitation.inviter_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "changelog_category_link",
+        "changelog_category_link_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.changelog_category_link_organizationId_idx",
+        "n|idx|public.changelog_category_link_organizationId_idx",
+        "e|idx|public.changelog_category_link_organizationId_idx",
+        "n|rel|public.changelog_category_link_organizationId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.changelog_category_link",
+        "n|sch|public",
+        "n|col|public.changelog_category_link.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "changelog_subscription",
+        "changelog_subscription_memberId_idx"
+      ],
+      "writes": [
+        "s|idx|public.changelog_subscription_memberId_idx",
+        "n|idx|public.changelog_subscription_memberId_idx",
+        "e|idx|public.changelog_subscription_memberId_idx",
+        "n|rel|public.changelog_subscription_memberId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.changelog_subscription",
+        "n|sch|public",
+        "n|col|public.changelog_subscription.member_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "comment_reaction",
+        "commentReaction_memberId_idx"
+      ],
+      "writes": [
+        "s|idx|public.commentReaction_memberId_idx",
+        "n|idx|public.commentReaction_memberId_idx",
+        "e|idx|public.commentReaction_memberId_idx",
+        "n|rel|public.commentReaction_memberId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.comment_reaction",
+        "n|sch|public",
+        "n|col|public.comment_reaction.member_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "comment",
+        "comment_parentCommentId_idx"
+      ],
+      "writes": [
+        "s|idx|public.comment_parentCommentId_idx",
+        "n|idx|public.comment_parentCommentId_idx",
+        "e|idx|public.comment_parentCommentId_idx",
+        "n|rel|public.comment_parentCommentId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|col|public.comment.parent_comment_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "comment",
+        "comment_userId_idx"
+      ],
+      "writes": [
+        "s|idx|public.comment_userId_idx",
+        "n|idx|public.comment_userId_idx",
+        "e|idx|public.comment_userId_idx",
+        "n|rel|public.comment_userId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|col|public.comment.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "comment",
+        "comment_memberId_idx"
+      ],
+      "writes": [
+        "s|idx|public.comment_memberId_idx",
+        "n|idx|public.comment_memberId_idx",
+        "e|idx|public.comment_memberId_idx",
+        "n|rel|public.comment_memberId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.comment",
+        "n|sch|public",
+        "n|col|public.comment.member_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "notification_preference",
+        "notification_preference_userId_idx"
+      ],
+      "writes": [
+        "s|idx|public.notification_preference_userId_idx",
+        "n|idx|public.notification_preference_userId_idx",
+        "e|idx|public.notification_preference_userId_idx",
+        "n|rel|public.notification_preference_userId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.notification_preference",
+        "n|sch|public",
+        "n|col|public.notification_preference.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post_reaction",
+        "postReaction_memberId_idx"
+      ],
+      "writes": [
+        "s|idx|public.postReaction_memberId_idx",
+        "n|idx|public.postReaction_memberId_idx",
+        "e|idx|public.postReaction_memberId_idx",
+        "n|rel|public.postReaction_memberId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post_reaction",
+        "n|sch|public",
+        "n|col|public.post_reaction.member_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post_subscription",
+        "post_subscription_memberId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_subscription_memberId_idx",
+        "n|idx|public.post_subscription_memberId_idx",
+        "e|idx|public.post_subscription_memberId_idx",
+        "n|rel|public.post_subscription_memberId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post_subscription",
+        "n|sch|public",
+        "n|col|public.post_subscription.member_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post_subscription",
+        "post_subscription_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_subscription_organizationId_idx",
+        "n|idx|public.post_subscription_organizationId_idx",
+        "e|idx|public.post_subscription_organizationId_idx",
+        "n|rel|public.post_subscription_organizationId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post_subscription",
+        "n|sch|public",
+        "n|col|public.post_subscription.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post",
+        "post_boardId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_boardId_idx",
+        "n|idx|public.post_boardId_idx",
+        "e|idx|public.post_boardId_idx",
+        "n|rel|public.post_boardId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post",
+        "n|sch|public",
+        "n|col|public.post.board_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post",
+        "post_creatorId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_creatorId_idx",
+        "n|idx|public.post_creatorId_idx",
+        "e|idx|public.post_creatorId_idx",
+        "n|rel|public.post_creatorId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post",
+        "n|sch|public",
+        "n|col|public.post.creator_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post",
+        "post_creatorMemberId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_creatorMemberId_idx",
+        "n|idx|public.post_creatorMemberId_idx",
+        "e|idx|public.post_creatorMemberId_idx",
+        "n|rel|public.post_creatorMemberId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post",
+        "n|sch|public",
+        "n|col|public.post.creator_member_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post_tag",
+        "post_tag_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_tag_organizationId_idx",
+        "n|idx|public.post_tag_organizationId_idx",
+        "e|idx|public.post_tag_organizationId_idx",
+        "n|rel|public.post_tag_organizationId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post_tag",
+        "n|sch|public",
+        "n|col|public.post_tag.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "upvote",
+        "upvote_memberId_idx"
+      ],
+      "writes": [
+        "s|idx|public.upvote_memberId_idx",
+        "n|idx|public.upvote_memberId_idx",
+        "e|idx|public.upvote_memberId_idx",
+        "n|rel|public.upvote_memberId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.upvote",
+        "n|sch|public",
+        "n|col|public.upvote.member_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "invitation",
+        "name": "invitation_inviterId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "inviter_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "changelog_category_link",
+        "name": "changelog_category_link_organizationId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "changelog_subscription",
+        "name": "changelog_subscription_memberId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "member_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment_reaction",
+        "name": "commentReaction_memberId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "member_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_parentCommentId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "parent_comment_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_userId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "comment",
+        "name": "comment_memberId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "member_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "notification_preference",
+        "name": "notification_preference_userId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post_reaction",
+        "name": "postReaction_memberId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "member_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post_subscription",
+        "name": "post_subscription_memberId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "member_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post_subscription",
+        "name": "post_subscription_organizationId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post",
+        "name": "post_boardId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "board_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post",
+        "name": "post_creatorId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "creator_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post",
+        "name": "post_creatorMemberId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "creator_member_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post_tag",
+        "name": "post_tag_organizationId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "upvote",
+        "name": "upvote_memberId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "member_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

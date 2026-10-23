@@ -101,6 +101,7 @@ describe("makeIntegrationProviderRegistry", () => {
                 },
               ],
               manifest: {
+                // oxlint-disable-next-line typescript/no-misused-spread -- the fixture is a plain object literal typed as a Schema class; the spread copies its own enumerable fields and the receiver only reads them
                 ...registration.manifest,
                 capabilities: [],
               },
@@ -166,6 +167,7 @@ describe("makeIntegrationProviderRegistry", () => {
             {
               ...registration,
               manifest: {
+                // oxlint-disable-next-line typescript/no-misused-spread -- the fixture is a plain object literal typed as a Schema class; the spread copies its own enumerable fields and the receiver only reads them
                 ...registration.manifest,
                 capabilities: [
                   {

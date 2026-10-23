@@ -48,10 +48,10 @@ import { z } from "zod";
 
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { MembersSettingsLayout } from "~/features/settings/components/settings-members-layout";
+import { useMemberLimit } from "~/hooks/use-member-limit";
 import { useOrgInvitations } from "~/hooks/use-org-invitations";
 import { useOrgMembers } from "~/hooks/use-org-members";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { usePrivilegedMemberLimit } from "~/hooks/use-privileged-member-limit";
 import { dashboardCollections } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -82,7 +82,6 @@ interface OrganizationInvitationRow {
 export function MembersSection() {
   const organizationId = useOrganizationId();
   const { data: session } = useAuthState();
-  const { atLimit: atPrivilegedLimit } = usePrivilegedMemberLimit();
   const [search, setSearch] = React.useState("");
 
   const membersQuery = useOrgMembers(organizationId);
@@ -210,7 +209,6 @@ export function MembersSection() {
 
             return (
               <MemberListItem
-                atPrivilegedLimit={atPrivilegedLimit}
                 email={member.user?.email || "No email"}
                 id={member.id}
                 isCurrentUser={isCurrentUser}
@@ -408,7 +406,6 @@ function MembersSectionErrorState({
 }
 
 function MemberListItem({
-  atPrivilegedLimit,
   email,
   id,
   isCurrentUser,
@@ -417,7 +414,6 @@ function MemberListItem({
   organizationId,
   role,
 }: {
-  atPrivilegedLimit: boolean;
   email: string;
   id: string;
   isCurrentUser: boolean;
@@ -499,12 +495,7 @@ function MemberListItem({
                 {isOwner ? <SelectItem value="owner">Owner</SelectItem> : null}
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="contributor">Contributor</SelectItem>
-                <SelectItem
-                  disabled={atPrivilegedLimit && role !== "admin"}
-                  value="admin"
-                >
-                  Admin
-                </SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
               </SelectPopup>
             </Select>
           )}
@@ -680,7 +671,7 @@ const InviteMemberFormSchema = z.object({
 
 function InviteMemberForm() {
   const organizationId = useOrganizationId();
-  const { atLimit, limit } = usePrivilegedMemberLimit();
+  const { atLimit, limit } = useMemberLimit();
 
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const form = useAppForm({
@@ -768,22 +759,20 @@ function InviteMemberForm() {
               <SelectPopup>
                 <SelectItem value="manager">Manager</SelectItem>
                 <SelectItem value="contributor">Contributor</SelectItem>
-                <SelectItem disabled={atLimit} value="admin">
-                  Admin
-                </SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
               </SelectPopup>
             </Select>
           )}
         </form.AppField>
         {atLimit ? (
           <SettingsItem.PaidPlanIndicator
-            content={`Admin roles are limited to ${limit} on this plan. Upgrade to add more.`}
+            content={`This plan includes ${limit} members. Upgrade to invite more.`}
           />
         ) : null}
       </div>
       <form.AppForm>
         <SkeletonWrapper>
-          <form.SubscribeButton type="submit">
+          <form.SubscribeButton disabled={atLimit} type="submit">
             <HugeiconsIcon icon={Plus} />
             Invite
           </form.SubscribeButton>

@@ -189,11 +189,10 @@ const defaultBrandName = (name: string): string =>
  */
 export const makeId = <
   const Name extends string,
-  const Prefix extends string,
   const BrandName extends string = DefaultBrandName<Name>,
 >(
   name: Name,
-  prefix: Prefix,
+  prefix: string,
   options?: LegidConfig & { readonly brand?: BrandName }
 ): PrefixableLegidFactory<BrandName> => {
   const validPrefix = Effect.runSync(validatePrefix(prefix));

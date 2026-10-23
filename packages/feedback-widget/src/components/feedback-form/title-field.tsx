@@ -22,7 +22,9 @@ export function FeedbackFormTitleField() {
       name="title"
       onInput={(event) => actions.setTitle(event.currentTarget.value)}
       placeholder="Share your product feedback!"
-      ref={input}
+      ref={(el) => {
+        input = el;
+      }}
       required
       type="text"
     />

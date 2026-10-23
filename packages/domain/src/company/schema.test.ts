@@ -11,7 +11,7 @@ describe("CreateCompany", () => {
       const organizationId = yield* WorkspaceId.generate;
       const attributeId = yield* CompanyAttributeDefinitionId.generate;
       const error = yield* Effect.flip(
-        Schema.decodeUnknownEffect(CompanyCreate)({
+        Schema.decodeEffect(CompanyCreate)({
           organizationId,
           name: "Acme",
           attributeValues: [

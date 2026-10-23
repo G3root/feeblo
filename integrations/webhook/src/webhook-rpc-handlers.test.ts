@@ -148,7 +148,7 @@ describe("WebhookManagementRpcHandlers", () => {
     expect(endpoint).not.toHaveProperty("endpointUrl");
     expect(endpoint).not.toHaveProperty("signingSecret");
     expect(
-      Schema.decodeUnknownSync(WebhookDeliveryHistoryPage)({
+      Schema.decodeSync(WebhookDeliveryHistoryPage)({
         items: [],
         nextCursor: null,
       })
@@ -156,7 +156,7 @@ describe("WebhookManagementRpcHandlers", () => {
   });
 
   it("decodes in-progress attempts with a null retry decision", () => {
-    const page = Schema.decodeUnknownSync(WebhookDeliveryHistoryPage)({
+    const page = Schema.decodeSync(WebhookDeliveryHistoryPage)({
       items: [
         {
           attempts: [

@@ -1,5 +1,6 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type React from "react";
 
 import { cn } from "./utils";
@@ -39,7 +40,8 @@ export function AccordionTrigger({
         {...props}
       >
         {children}
-        <ChevronDownIcon
+        <HugeiconsIcon
+          icon={ChevronDownIcon}
           className="pointer-events-none size-4 shrink-0 translate-y-0.5 opacity-80 transition-transform duration-200 ease-in-out"
           data-slot="accordion-indicator"
         />

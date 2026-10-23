@@ -1,5 +1,4 @@
 import type { LegidFrom, WorkspaceId } from "@feeblo/id";
-import { isPrivilegedRole } from "@feeblo/permissions";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -31,7 +30,7 @@ import type {
  * tool nobody asked for.
  */
 const RESOURCE_PREVIEW_LIMIT = 200;
-const ADMIN_ROLE_PREVIEW_LIMIT = 100;
+const MEMBER_PREVIEW_LIMIT = 100;
 const CRM_RESOURCE_PREVIEW_LIMIT = 100;
 
 /**
@@ -52,8 +51,11 @@ const postCountLabel = (total: number): string =>
 const changelogCountLabel = (total: number): string =>
   `${total} ${total === 1 ? "changelog" : "changelogs"}`;
 
+/** The snapshot's `detail` is display copy, so every role is labelled here. */
 const roleLabel = (role: string): string =>
-  role === "owner" ? "Owner" : "Admin";
+  role.length === 0
+    ? role
+    : `${role.slice(0, 1).toUpperCase()}${role.slice(1)}`;
 
 const toBoardResources = (
   boards: ReadonlyArray<{ readonly id: string; readonly name: string }>,
@@ -104,8 +106,8 @@ const makePlanCompliance = Effect.gen(function* () {
       privateBoardCount,
       privateRoadmapCount,
       changelogCategoryCount,
-      privilegedMemberCount,
-      pendingPrivilegedInvitationCount,
+      memberCount,
+      pendingInvitationCount,
       crmEntryCount,
     ] = yield* Effect.all([
       boardRepository.countByOrganizationId({ organizationId }),
@@ -118,8 +120,8 @@ const makePlanCompliance = Effect.gen(function* () {
         visibility: "private",
       }),
       changelogCategoryRepository.countByOrganizationId({ organizationId }),
-      membershipRepository.countPrivilegedMembers({ organizationId }),
-      membershipRepository.countPendingPrivilegedInvitations({
+      membershipRepository.countMembers({ organizationId }),
+      membershipRepository.countPendingInvitations({
         organizationId,
       }),
       countCrmEntries(organizationId),
@@ -208,13 +210,9 @@ const makePlanCompliance = Effect.gen(function* () {
       });
     }
 
-    const adminRoleCount =
-      privilegedMemberCount + pendingPrivilegedInvitationCount;
+    const totalMembers = memberCount + pendingInvitationCount;
 
-    if (
-      limits.privilegedMembers !== null &&
-      adminRoleCount > limits.privilegedMembers
-    ) {
+    if (limits.members !== null && totalMembers > limits.members) {
       const [members, invitations] = args.includeResources
         ? yield* Effect.all([
             membershipRepository.findOrganizationMembers({ organizationId }),
@@ -225,30 +223,26 @@ const makePlanCompliance = Effect.gen(function* () {
         : [[], []];
 
       const resources: TPlanComplianceResource[] = [
-        ...members
-          .filter((member) => isPrivilegedRole(member.role))
-          .map((member) => ({
-            id: member.id,
-            kind: "member" as const,
-            label: member.user.name.trim() || member.user.email,
-            detail: roleLabel(member.role),
-          })),
-        ...invitations
-          .filter((invitation) => isPrivilegedRole(invitation.role ?? ""))
-          .map((invitation) => ({
-            id: invitation.id,
-            kind: "invitation" as const,
-            label: invitation.email,
-            detail: `Pending invitation · ${roleLabel(invitation.role ?? "")}`,
-          })),
+        ...members.map((member) => ({
+          id: member.id,
+          kind: "member" as const,
+          label: member.user.name.trim() || member.user.email,
+          detail: roleLabel(member.role),
+        })),
+        ...invitations.map((invitation) => ({
+          id: invitation.id,
+          kind: "invitation" as const,
+          label: invitation.email,
+          detail: `Pending invitation · ${roleLabel(invitation.role ?? "")}`,
+        })),
       ]
         .sort((left, right) => left.label.localeCompare(right.label))
-        .slice(0, ADMIN_ROLE_PREVIEW_LIMIT);
+        .slice(0, MEMBER_PREVIEW_LIMIT);
 
       violations.push({
-        kind: "adminRoles",
-        count: adminRoleCount,
-        limit: limits.privilegedMembers,
+        kind: "members",
+        count: totalMembers,
+        limit: limits.members,
         resources: args.includeResources ? resources : [],
       });
     }

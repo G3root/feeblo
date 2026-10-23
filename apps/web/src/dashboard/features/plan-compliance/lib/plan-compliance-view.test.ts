@@ -7,6 +7,7 @@ import type {
 import { describe, expect, it } from "vitest";
 
 import { buildPlanComplianceView } from "./plan-compliance-view";
+import type { PlanComplianceRow } from "./plan-compliance-view";
 
 const resource = (
   id: string,
@@ -52,7 +53,8 @@ describe("buildPlanComplianceView", () => {
         violation("privateBoards", [
           resource("board_1", "board", "412 posts", "Feedback"),
         ]),
-      ])
+      ]),
+      { actorRole: "owner" }
     );
 
     expect(view.planLabel).toBe("Free");
@@ -85,7 +87,8 @@ describe("buildPlanComplianceView", () => {
         violation("privateBoards", [
           resource("board_1", "board", "12 posts", "Secret"),
         ]),
-      ])
+      ]),
+      { actorRole: "owner" }
     );
 
     expect(view.sections[0]?.summary).toBe(
@@ -94,38 +97,82 @@ describe("buildPlanComplianceView", () => {
     expect(view.sections[0]?.rows[0]?.badges).toEqual(["Private"]);
   });
 
-  it("offers no row action for an owner and only an owner may demote an admin", () => {
-    const view = buildPlanComplianceView(
-      compliance([
-        violation(
-          "adminRoles",
-          [
-            resource("member_owner", "member", "Owner", "Ada"),
-            resource("member_admin", "member", "Admin", "Grace"),
-            resource(
-              "invitation_admin",
-              "invitation",
-              "Pending invitation · Admin",
-              "linus@example.com"
-            ),
-          ],
-          { count: 3, limit: 2 }
+  const membersViolation = () =>
+    violation(
+      "members",
+      [
+        resource("member_owner", "member", "Owner", "Ada"),
+        resource("member_admin", "member", "Admin", "Grace"),
+        resource("member_manager", "member", "Manager", "Katherine"),
+        resource(
+          "invitation_admin",
+          "invitation",
+          "Pending invitation · Admin",
+          "linus@example.com"
         ),
-      ])
+      ],
+      { count: 4, limit: 2 }
     );
 
-    const [adminRoles] = view.sections;
-    const ownerRow = adminRoles?.rows.find((row) => row.label === "Ada");
-    const adminRow = adminRoles?.rows.find((row) => row.label === "Grace");
-    const invitationRow = adminRoles?.rows.find(
+  const membersRow = (
+    actorRole: string | null,
+    label: string
+  ): PlanComplianceRow | undefined => {
+    const view = buildPlanComplianceView(compliance([membersViolation()]), {
+      actorRole,
+    });
+
+    return view.sections[0]?.rows.find((row) => row.label === label);
+  };
+
+  it("offers removal to an owner for every member the server would accept", () => {
+    const view = buildPlanComplianceView(compliance([membersViolation()]), {
+      actorRole: "owner",
+    });
+
+    const [members] = view.sections;
+    const ownerRow = members?.rows.find((row) => row.label === "Ada");
+    const adminRow = members?.rows.find((row) => row.label === "Grace");
+    const invitationRow = members?.rows.find(
       (row) => row.label === "linus@example.com"
     );
 
+    expect(members?.title).toBe("Members");
+    expect(members?.summary).toBe("4 members. The Free plan allows 2.");
+    // An owner cannot be removed through team settings, so that row explains
+    // itself instead of offering a button the server refuses.
+    expect(ownerRow?.badges).toEqual(["Owner"]);
     expect(ownerRow?.actions).toEqual([]);
-    expect(adminRow?.actions[0]?.type).toBe("demote_admin");
-    expect(adminRow?.actions[0]?.ownerOnly).toBe(true);
+    expect(ownerRow?.detail).toBe(
+      "Owners cannot be removed from the workspace."
+    );
+    expect(adminRow?.badges).toEqual(["Admin"]);
+    expect(adminRow?.detail).toBeNull();
+    expect(adminRow?.actions[0]?.type).toBe("remove_member");
+    expect(adminRow?.actions[0]?.destructive).toBe(true);
+    expect(invitationRow?.badges).toEqual([]);
     expect(invitationRow?.actions[0]?.type).toBe("cancel_invitation");
-    expect(invitationRow?.actions[0]?.ownerOnly).toBe(false);
+  });
+
+  it("withholds removals an admin's rank does not allow", () => {
+    // `canManageTarget` requires a strictly lower rank, so an admin cannot
+    // remove another admin; only an owner can, and the row says so.
+    expect(membersRow("admin", "Grace")?.actions).toEqual([]);
+    expect(membersRow("admin", "Grace")?.detail).toBe(
+      "Only an owner can remove an admin."
+    );
+    // The rank below the caller is unaffected.
+    expect(membersRow("admin", "Katherine")?.actions[0]?.type).toBe(
+      "remove_member"
+    );
+    // An invitation is not a member, so cancelling one is not rank-gated.
+    expect(membersRow("admin", "linus@example.com")?.actions[0]?.type).toBe(
+      "cancel_invitation"
+    );
+  });
+
+  it("offers no removal when the caller's role is unknown", () => {
+    expect(membersRow(null, "Katherine")?.actions).toEqual([]);
   });
 
   it("labels CRM rows by kind and keeps the destructive action typed", () => {
@@ -139,7 +186,8 @@ describe("buildPlanComplianceView", () => {
           ],
           { count: 12, limit: 10 }
         ),
-      ])
+      ]),
+      { actorRole: "owner" }
     );
 
     const [crmEntries] = view.sections;
@@ -155,13 +203,16 @@ describe("buildPlanComplianceView", () => {
       compliance([
         violation("boards", [], { count: 7, limit: 2 }),
         violation("crmEntries", [], { count: 11, limit: 10 }),
-      ])
+      ]),
+      { actorRole: "owner" }
     );
 
     expect(view.sections).toEqual([]);
   });
 
   it("renders nothing for a compliant workspace", () => {
-    expect(buildPlanComplianceView(compliance([])).sections).toEqual([]);
+    const view = buildPlanComplianceView(compliance([]), { actorRole: null });
+
+    expect(view.sections).toEqual([]);
   });
 });

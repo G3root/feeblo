@@ -13,7 +13,7 @@ import { getWidgetConfig } from "../lib/config";
  * surface's root; an updates-only config renders the updates list here so a
  * bare `#/` never dead-ends (the SDK lands such configs on `#/updates`).
  */
-export function IndexComponent() {
+function IndexComponent() {
   const config = getWidgetConfig();
 
   return (

@@ -370,7 +370,9 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         const crypto = yield* Crypto.Crypto;
-        const statusChangedUuid = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
+        const statusChangedUuid = yield* crypto
+          .randomUUIDv4()
+          .pipe(Effect.orDie);
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
@@ -531,7 +533,7 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         const crypto = yield* Crypto.Crypto;
-        const eventId = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
+        const eventId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
@@ -604,7 +606,7 @@ const makeNotificationService = Effect.gen(function* () {
             )
           );
         const crypto = yield* Crypto.Crypto;
-        const eventId = yield* crypto.randomUUIDv4.pipe(Effect.orDie);
+        const eventId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,

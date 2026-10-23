@@ -20,6 +20,20 @@ import {
   WidgetUpdate,
 } from "./schema";
 
+/**
+ * The closed failure surface of `createFeedback`. The handler folds every
+ * other write-path failure into `InternalServerError`, so this is the single
+ * source of truth for what the endpoint publishes (and the predicate the fold
+ * narrows with).
+ */
+export const WidgetCreateFeedbackErrors = Schema.Union([
+  DataValidationError,
+  NotFoundError,
+  InternalServerError,
+  UnauthorizedError,
+  RateLimitErrors,
+]);
+
 export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
   .add(
     HttpApiEndpoint.post("suggestPosts", "/suggestions", {
@@ -38,13 +52,7 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
     HttpApiEndpoint.post("createFeedback", "/feedback", {
       payload: WidgetFeedbackCreate,
       success: WidgetFeedbackResponse,
-      error: Schema.Union([
-        DataValidationError,
-        NotFoundError,
-        InternalServerError,
-        UnauthorizedError,
-        RateLimitErrors,
-      ]),
+      error: WidgetCreateFeedbackErrors,
     })
       .annotate(OpenApi.Title, "Create Feedback")
       .annotate(OpenApi.Summary, "Create a feedback post")

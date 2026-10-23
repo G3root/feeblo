@@ -49,7 +49,6 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      SERVER_PORT: ${SERVER_PORT:-8080}
       APP_RELEASE: ${APP_RELEASE:-dev}
       APP_URL: ${APP_URL:-http://localhost:3001}
       API_URL: ${API_URL:-http://localhost:3000}
@@ -68,6 +67,24 @@ services:
       # Optional SES feedback webhook: leave unset to keep the route inert (404).
       EMAIL_PROVIDER_WEBHOOK_TOKEN: ${EMAIL_PROVIDER_WEBHOOK_TOKEN:-}
       EMAIL_PROVIDER_SNS_TOPIC_ARN: ${EMAIL_PROVIDER_SNS_TOPIC_ARN:-}
+      # Transactional email (password reset, verification, invitations,
+      # notifications). The compose project reads .env for interpolation,
+      # so an operator who fills .env still configures nothing unless the
+      # values are forwarded here. Unset, the server defaults SMTP_HOST to
+      # the container loopback (127.0.0.1:2500), where no SMTP server
+      # listens, and every send fails. See .env.example for the full set.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_UNSAFE_IGNORE_TLS: ${SMTP_UNSAFE_IGNORE_TLS:-}
+      SMTP_SERVICE: ${SMTP_SERVICE:-}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
+      SMTP_PERSONAL_FROM_ADDRESS: ${SMTP_PERSONAL_FROM_ADDRESS:-}
+      SMTP_PERSONAL_FROM_NAME: ${SMTP_PERSONAL_FROM_NAME:-}
+      SMTP_REPLY_TO_ADDRESS: ${SMTP_REPLY_TO_ADDRESS:-}
       # REQUIRED: S3-compatible object storage. The production stack runs no
       # MinIO, so these must point at real storage and compose fails fast
       # instead of defaulting to the dev stack's credentials or region. See
@@ -89,6 +106,9 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-}
       FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE: ${FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE:-1}
     ports:
+      # Only the host side varies. The image pins the container listen
+      # port (SERVER_PORT=8080), and the healthcheck and this mapping
+      # target that same port, so the target must stay 8080.
       - "${SERVER_PORT:-8080}:8080"
 
   web:
@@ -108,11 +128,12 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: ${WEB_PORT:-4321}
       API_URL: ${API_URL:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3001}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
     ports:
+      # Only the host side varies. The image pins the container listen
+      # port (PORT=4321), so the mapping target must stay 4321.
       - "${WEB_PORT:-4321}:4321"
 
 volumes:

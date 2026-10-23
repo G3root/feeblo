@@ -209,7 +209,7 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
       // SAFETY: `unhandled` is statically `never`; this cast only preserves the
       // discriminant for the defensive runtime error below.
       throw new Error(
-        `Unhandled post activity kind: ${String((unhandled as PostActivityInput).kind)}`
+        `Unhandled post activity kind: ${(unhandled as PostActivityInput).kind}`
       );
     }
   }

@@ -57,6 +57,7 @@ const getDatabaseErrorField = (
 // `Schema.is`, not `instanceof`: these errors cross the RPC and serialization
 // boundaries, where a decoded error is a plain object carrying `_tag` and no
 // prototype, and `instanceof` would answer `false` for a real one.
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 export const isUniqueViolation = <T>(error: T): boolean =>
   Schema.is(EffectDrizzleQueryError)(error) &&
   getDatabaseErrorField(error.cause, "code") === "23505";
@@ -67,6 +68,7 @@ export const isUniqueViolation = <T>(error: T): boolean =>
  * distinguish which unique index rejected an insert instead of treating every
  * 23505 as the same collision.
  */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 export const getUniqueViolationConstraint = <T>(
   error: T
 ): string | undefined =>

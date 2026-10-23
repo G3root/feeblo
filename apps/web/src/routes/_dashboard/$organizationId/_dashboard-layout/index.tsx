@@ -23,18 +23,14 @@ import { RecentPostsSection } from "~/features/dashboard-home/components/recent-
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { dashboardCollections } from "~/lib/collections";
+import { preloadDashboardHome } from "~/lib/preloads";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await Promise.all([
-      dashboardCollections.boardCollection.preload(),
-      dashboardCollections.postCollection.preload(),
-      dashboardCollections.postStatusCollection.preload(),
-      dashboardCollections.upvoteCollection.preload(),
-    ]);
+    await preloadDashboardHome();
 
     return null;
   },

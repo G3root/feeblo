@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import type { Json } from "effect/Schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -93,7 +94,7 @@ describe("widget api boundary", () => {
 
     // The rename must fail here, in the iframe, rather than reaching a
     // component that renders `undefined`.
-    await expect(requestBoards()).rejects.toThrow();
+    await expect(requestBoards()).rejects.toThrow("updatedAt");
   });
 
   it("decodes updates and suggestions", async () => {
@@ -119,7 +120,7 @@ describe("widget api boundary", () => {
   it("fails at boot when the shell loses the organization id", () => {
     vi.stubGlobal("global", { __ENV: { API_URL: apiUrl } });
 
-    expect(() => getOrganizationId()).toThrow();
+    expect(() => getOrganizationId()).toThrow("organizationId");
   });
 
   it("decodes a refusal body instead of casting it", async () => {
@@ -142,7 +143,8 @@ describe("widget api boundary", () => {
     stubBootEnv();
     let sentBody: Json | undefined;
     const fetchSpy = vi.fn((_url: string, init?: RequestInit) => {
-      sentBody = JSON.parse(String(init?.body));
+      const body = init?.body;
+      sentBody = isString(body) ? JSON.parse(body) : undefined;
       return Promise.resolve(
         new Response(JSON.stringify({ message: "ok" }), { status: 200 })
       );

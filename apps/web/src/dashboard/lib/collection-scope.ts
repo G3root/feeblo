@@ -25,6 +25,21 @@ export interface DashboardCollectionScope {
 }
 
 /**
+ * The workspace a path starts with, when it starts with one.
+ *
+ * `WorkspaceId` ids are minted with the `org` prefix (`@feeblo/id`), so this is
+ * what tells `/org_abc/settings` apart from `/register`, `/invitation/...`, and
+ * the auth pages that share the dashboard's parent route. Rules that want to
+ * act on the workspace before the route has matched (starting its preloads,
+ * say) read it from here rather than re-deriving the prefix test.
+ */
+export function workspaceIdFromPathname(pathname: string): string | undefined {
+  const [segment] = pathname.replace(/^\/+/, "").split("/");
+
+  return segment?.startsWith("org_") ? segment : undefined;
+}
+
+/**
  * Mirrors `organizationScopedKey`: an unscoped collection falls back to a bare
  * id rather than one keyed by `undefined`.
  */

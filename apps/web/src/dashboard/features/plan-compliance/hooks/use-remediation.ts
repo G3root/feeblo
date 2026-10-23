@@ -42,7 +42,7 @@ export const useRemediation = () => {
           collections.roadmapCollection.utils.refetch(),
         ],
         delete_roadmap: () => [collections.roadmapCollection.utils.refetch()],
-        demote_admin: () => [
+        remove_member: () => [
           collections.membersCollection.utils.refetch(),
           collections.invitationsCollection.utils.refetch(),
         ],

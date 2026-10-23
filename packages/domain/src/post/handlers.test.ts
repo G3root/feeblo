@@ -2162,12 +2162,10 @@ describe("PostRpcHandlers", () => {
           const semanticHandlers = yield* PostRpcHandlersEffect.pipe(
             Effect.provideService(PostEmbeddingService, {
               embed: () =>
-                Effect.succeed(
-                  Option.some({
-                    model: DEFAULT_POST_EMBEDDING_MODEL,
-                    vector: queryVector,
-                  })
-                ),
+                Effect.succeedSome({
+                  model: DEFAULT_POST_EMBEDDING_MODEL,
+                  vector: queryVector,
+                }),
             })
           );
           const suggestions = yield* semanticHandlers
@@ -2234,12 +2232,10 @@ describe("PostRpcHandlers", () => {
           const semanticHandlers = yield* PostRpcHandlersEffect.pipe(
             Effect.provideService(PostEmbeddingService, {
               embed: () =>
-                Effect.succeed(
-                  Option.some({
-                    model: DEFAULT_POST_EMBEDDING_MODEL,
-                    vector: queryVector,
-                  })
-                ),
+                Effect.succeedSome({
+                  model: DEFAULT_POST_EMBEDDING_MODEL,
+                  vector: queryVector,
+                }),
             })
           );
           const suggestions = yield* semanticHandlers

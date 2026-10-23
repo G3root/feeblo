@@ -24,6 +24,11 @@ type WorkerFixtures = {
  */
 export const test = base.extend<{ baseURL: string }, WorkerFixtures>({
   app: [
+    // Playwright reads this parameter's destructuring pattern to discover the
+    // fixture's dependencies; a named parameter makes registration fail with
+    // "First argument must use the object destructuring pattern", so the empty
+    // pattern is required rather than a lint oversight.
+    // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright requires the empty destructuring pattern here; naming the parameter breaks registration.
     async ({}, use, workerInfo) => {
       const manifestFile = process.env.E2E_SERVERS_FILE;
       if (manifestFile === undefined || manifestFile === "") {

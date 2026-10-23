@@ -4,6 +4,8 @@ import * as schema from "@feeblo/db/schema";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { revokePendingSubscriptionRevocations } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
+import { sendUnlessSuppressed } from "@feeblo/domain/email-suppression/guard";
+import { EmailSuppressionRepository } from "@feeblo/domain/email-suppression/repository";
 import { EntitlementPolicy } from "@feeblo/domain/entitlement/policies";
 import {
   healShadowsForVerifiedUser,
@@ -43,7 +45,7 @@ import {
   type GenericOAuthUserInfo,
   genericOAuth,
 } from "better-auth/plugins/generic-oauth";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -66,6 +68,7 @@ import {
 } from "./organization-roles";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
+import { memberManagementGuard } from "./plugins/member-management-guard";
 import { mapPolicyDeniedToApiError } from "./policy-api-error";
 import { AUTH_SESSION_DURATION_SECONDS } from "./session";
 import { getTrustedOrigins, isEmailBlocked, isTemporaryEmail } from "./utils";
@@ -170,6 +173,10 @@ export const initAuthHandler = (
         MembershipRepository.layer,
         makeMailerLayer(),
         WorkspaceRepository.layer,
+        // Authentication mail is not part of the outbox, so its suppression
+        // check happens at the send site; the service has to be in this
+        // runtime for that check to run.
+        EmailSuppressionRepository.layer,
         Layer.succeed(RateLimitService, yield* RateLimitService),
         SsoRepositoriesLive,
         NodeCrypto.layer
@@ -373,18 +380,12 @@ export const initAuthHandler = (
           message: `${workspaceNames.join(", ")} still has other members. Remove them in Members settings, or delete the workspace, before deleting your account.`,
         });
 
-      const countMembers = (organizationId: string, lock: boolean) =>
-        Effect.gen(function* () {
-          const members = db
-            .select({ id: schema.memberTable.id })
-            .from(schema.memberTable)
-            .where(eq(schema.memberTable.organizationId, organizationId));
-          if (!lock) {
-            return (yield* members).length;
-          }
-          // `FOR UPDATE` only means anything inside the deletion transaction.
-          return (yield* members.for("update")).length;
-        });
+      const countMembers = (organizationId: string) =>
+        db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.organizationId, organizationId))
+          .pipe(Effect.map((members) => members.length));
 
       const ownedWorkspaces = await callbackRuntime.runPromise(
         Effect.gen(function* () {
@@ -399,7 +400,12 @@ export const initAuthHandler = (
               schema.organizationTable,
               eq(schema.organizationTable.id, schema.memberTable.organizationId)
             )
-            .where(eq(schema.memberTable.userId, userId));
+            .where(eq(schema.memberTable.userId, userId))
+            // Ordered so the locks below are taken in one order. A workspace can
+            // have several owners, so two owners deleting their accounts can own
+            // the same pair of workspaces; without a fixed order each could hold
+            // the first one the other is waiting for.
+            .orderBy(asc(schema.organizationTable.id));
           return memberships.filter((membership) =>
             membership.role.split(",").includes("owner")
           );
@@ -415,7 +421,7 @@ export const initAuthHandler = (
         Effect.gen(function* () {
           const blocking: string[] = [];
           for (const workspace of ownedWorkspaces) {
-            if ((yield* countMembers(workspace.id, false)) > 1) {
+            if ((yield* countMembers(workspace.id)) > 1) {
               blocking.push(workspace.name);
             }
           }
@@ -427,12 +433,27 @@ export const initAuthHandler = (
       }
 
       // Every deletion commits or none does, and the membership count is
-      // re-checked under a lock: an invitation accepted between the check above
-      // and here must fail the whole deletion rather than take a workspace away
-      // from the member who just joined. The revocation rows are written in
-      // this transaction, before the organization row (and its cascaded
-      // subscriptions) disappears, so a rollback leaves no queue work and no
-      // revoked subscription for a workspace that survives.
+      // re-checked after the workspace's own row is locked: an invitation
+      // accepted between the check above and here must fail the whole deletion
+      // rather than take a workspace away from the member who just joined.
+      //
+      // The organization-row lock is what makes that re-check authoritative, and
+      // it is enough on its own: accepting an invitation inserts a `member` row,
+      // whose foreign-key check needs a key-share on this same organization row,
+      // and a key-share conflicts with `FOR UPDATE`. A member insert still
+      // uncommitted therefore blocks the lock acquisition, and by the time it is
+      // granted the insert has committed and the count below sees it. Locking the
+      // member rows as well was redundant and made this transaction deadlock-prone:
+      // `post_subscription`, `upvote`, `post_reaction` and `changelog_subscription`
+      // declare their user and member foreign keys before their organization one,
+      // so an insert into them takes the member key-share first and then waits for
+      // the organization key-share held here, while this transaction waits for
+      // `FOR UPDATE` on that same member row.
+      //
+      // The revocation rows are written in this transaction, before the
+      // organization row (and its cascaded subscriptions) disappears, so a
+      // rollback leaves no queue work and no revoked subscription for a
+      // workspace that survives.
       const deletedWorkspaceIds = await callbackRuntime.runPromise(
         transaction(
           Effect.gen(function* () {
@@ -447,7 +468,7 @@ export const initAuthHandler = (
               if (locked === undefined) {
                 continue;
               }
-              if ((yield* countMembers(workspace.id, true)) > 1) {
+              if ((yield* countMembers(workspace.id)) > 1) {
                 nowBlocking.push(workspace.name);
               } else {
                 deletable.push(workspace.id);
@@ -751,15 +772,19 @@ export const initAuthHandler = (
         async sendResetPassword(data) {
           const { createPasswordResetEmail } = await loadPasswordResetEmail();
           await callbackRuntime.runPromise(
-            Mailer.use((mailer) =>
-              mailer.send({
-                to: data.user.email,
-                ...createPasswordResetEmail({
-                  resetUrl: data.url,
-                  recipientName: data.user.name,
-                }),
-              })
-            )
+            sendUnlessSuppressed({
+              email: data.user.email,
+              organizationId: null,
+              send: Mailer.use((mailer) =>
+                mailer.send({
+                  to: data.user.email,
+                  ...createPasswordResetEmail({
+                    resetUrl: data.url,
+                    recipientName: data.user.name,
+                  }),
+                })
+              ),
+            })
           );
         },
       },
@@ -884,24 +909,16 @@ export const initAuthHandler = (
             async beforeCreateInvitation(data) {
               await runCallbackPolicy(
                 MembershipPolicy.use((policy) =>
-                  policy.canInviteRoleWithinPlan({
+                  policy.canInviteWithinPlan({
                     organizationId: data.organization.id,
-                    role: data.invitation.role,
                   })
                 )
               );
             },
-            async beforeUpdateMemberRole(data) {
-              await runCallbackPolicy(
-                MembershipPolicy.use((policy) =>
-                  policy.canChangeRoleWithinPlan({
-                    organizationId: data.organization.id,
-                    currentRole: data.member.role,
-                    newRole: data.newRole,
-                  })
-                )
-              );
-            },
+            // No plan hook on a role change: promoting or demoting a member
+            // moves nobody in or out of the workspace, so the member allowance
+            // (which counts people) is unaffected. The rank rules in
+            // `MembershipPolicy.canUpdateMemberRole` still apply.
             // Queues the Polar subscription for revocation before the org row
             // (and its cascaded subscription/site rows) disappears, so the
             // external subscription id is still readable. The revocation runs
@@ -924,20 +941,33 @@ export const initAuthHandler = (
             const { createOrganizationInvitationEmail } =
               await loadOrganizationInvitationEmail();
             await callbackRuntime.runPromise(
-              Mailer.use((mailer) =>
-                mailer.send({
-                  to: data.email,
-                  ...createOrganizationInvitationEmail({
-                    inviteUrl: inviteLink,
-                    organizationName: data.organization.name,
-                    inviterName: data.inviter.user.name,
-                    role: data.role,
-                  }),
-                })
-              )
+              sendUnlessSuppressed({
+                email: data.email,
+                // An invitation is the inviting workspace's mail, so a
+                // workspace-scoped complaint or manual block applies to it.
+                organizationId: data.organization.id,
+                send: Mailer.use((mailer) =>
+                  mailer.send({
+                    to: data.email,
+                    ...createOrganizationInvitationEmail({
+                      inviteUrl: inviteLink,
+                      organizationName: data.organization.name,
+                      inviterName: data.inviter.user.name,
+                      role: data.role,
+                    }),
+                  })
+                ),
+              })
             );
           },
         }),
+
+        // The plugin's member-mutation routes authorize on the coarse
+        // organization ACL, which lets an admin manage a peer admin; the
+        // dashboard's RPCs additionally enforce the rank rule. Close the
+        // duplicate write path instead of reimplementing the policy here (see
+        // the module's comment).
+        memberManagementGuard(),
 
         // Organization-owned machine credentials for the Public API. The
         // plugin owns credential material; every authorization decision stays
@@ -981,15 +1011,19 @@ export const initAuthHandler = (
               await loadVerificationOtpEmail();
 
             await callbackRuntime.runPromise(
-              Mailer.use((mailer) =>
-                mailer.send({
-                  to: email,
-                  ...createVerificationOtpEmail({
-                    otp,
-                    flowLabel,
-                  }),
-                })
-              )
+              sendUnlessSuppressed({
+                email,
+                organizationId: null,
+                send: Mailer.use((mailer) =>
+                  mailer.send({
+                    to: email,
+                    ...createVerificationOtpEmail({
+                      otp,
+                      flowLabel,
+                    }),
+                  })
+                ),
+              })
             );
           },
         }),

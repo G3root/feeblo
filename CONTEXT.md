@@ -22,6 +22,14 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Row report**: one import job's per-row outcomes, keyed by the file's line number. _Avoid_: error log, results
 
+### Deliverability
+
+**Suppression**: A durable instruction not to mail one address for one sender. A workspace suppression silences that workspace; a platform suppression covers mail that belongs to no workspace — account verification, password reset — and applies to every sender. A suppression is not an unsubscribe: an unsubscribe is the recipient's own consent decision about a topic, and it lives on the subscription. _Avoid_: blocklist, blacklist, unsubscribe
+
+**Provider feedback**: A bounce, complaint, delivery delay, or rejection reported by the outbound provider for one delivery. _Avoid_: webhook event
+
+**Hard bounce**: A provider's permanent rejection of an address — it does not exist or cannot receive. The only bounce classification that suppresses. **Soft bounce** is a temporary condition (full mailbox, greylist) and is retried; **undetermined bounce** is one the provider could not classify and is retried rather than suppressed.
+
 ### Integrations
 
 **Provider**: an external integration family. V1 implements the `webhook`, `slack`, and `discord` providers.
@@ -44,9 +52,11 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ### Membership
 
-**Member**: A person with access to a workspace. Membership is unlimited on every plan. _Avoid_: user, seat, account
+**Member**: A person with access to a workspace. The plan's member allowance counts every member, whatever their role, and the owner is one of them. _Avoid_: user, seat, account
 
-**Admin role**: A member holding `owner` or `admin`; the unit the plan's admin-role allowance counts. _Avoid_: privileged member, seat, admin seat
+**End user**: A person who posts, votes, or comments on the public board or through the widget. An end user is not a member and never consumes the member allowance; end users are unlimited on every plan. _Avoid_: customer, visitor, anonymous member
+
+**Admin role**: A member holding `owner` or `admin`. It grants workspace management permissions; it is no longer a plan unit, so promoting a member does not change what the plan counts. _Avoid_: privileged member, seat, admin seat
 
 ### Plans
 
@@ -54,11 +64,11 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Entitlement**: A capability or allowance a plan grants. A capability is on or off; a limit is a count. _Avoid_: feature flag, quota
 
-**Over-plan**: A workspace that holds more boards, admin roles, changelog categories, or CRM entries than its plan allows, or a private board or roadmap its plan does not include. _Avoid_: downgraded, over quota, over limit
+**Over-plan**: A workspace that holds more boards, members, changelog categories, or CRM entries than its plan allows, or a private board or roadmap its plan does not include. _Avoid_: downgraded, over quota, over limit
 
 **Remediation**: The act of bringing an over-plan workspace back inside its plan, by changing or deleting its own state, or by upgrading. _Avoid_: restore, cleanup, fix
 
-**Remediation action**: One explicit change that resolves a single over-plan finding — making a board or roadmap public, demoting an admin role, cancelling an admin invitation, or deleting a resource. _Avoid_: fix, step, task
+**Remediation action**: One explicit change that resolves a single over-plan finding — making a board or roadmap public, removing a member, cancelling an invitation, or deleting a resource. _Avoid_: fix, step, task
 
 ### Public API
 

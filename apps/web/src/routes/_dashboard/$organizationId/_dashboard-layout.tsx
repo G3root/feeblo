@@ -2,7 +2,7 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { DashboardPendingShell } from "~/components/dashboard-pending-shell";
 import { DashboardLayout } from "~/layouts/dashboard-layout";
-import { dashboardCollections } from "~/lib/collections";
+import { preloadDashboardShell } from "~/lib/preloads";
 
 export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout"
@@ -12,11 +12,7 @@ export const Route = createFileRoute(
     // on every page. Page-specific collections (posts, tags, changelogs,
     // …) preload in their own routes so settings/members/billing never pay
     // for board data and vice versa.
-    await Promise.all([
-      dashboardCollections.organizationCollection.preload(),
-      dashboardCollections.boardCollection.preload(),
-      dashboardCollections.workspacePlanCollection.preload(),
-    ]);
+    await preloadDashboardShell();
     return null;
   },
   component: DashboardLayoutComponent,

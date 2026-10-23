@@ -1,4 +1,5 @@
 import { getClientHintCheckScript } from "@feeblo/web-shared/client-hints";
+import interLatinFontUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import {
   createRootRouteWithContext,
   HeadContent,
@@ -52,6 +53,15 @@ import "../styles/global.css";
  * The dashboard is client-only (`/_dashboard` is `ssr: false`), so its routes
  * render after hydration behind `DashboardPendingShell`. The public board
  * renders its metadata on the server and hands the SPA over to the client.
+ *
+ * Inter's Latin subset is preloaded rather than discovered: the `@font-face`
+ * that names it lives in the render-blocking stylesheet, so without the hint
+ * the browser cannot start the font request until the CSS has parsed, and the
+ * first paint swaps a fallback for it. Only the Latin pair is hinted — it is
+ * the one subset a Latin-script page fetches, and preloading the other six
+ * would put ~200 kB of never-used woff2 on the critical path. Geist Mono is
+ * deliberately not preloaded: it is the code face and never paints above the
+ * fold, so its swap costs nothing worth a blocking request.
  */
 const getRootDocumentData = createServerFn({ method: "GET" }).handler(() => ({
   env: getBrowserPublicEnv(),
@@ -72,6 +82,16 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      // `crossOrigin` is required to match the CORS-mode request the
+      // `@font-face` load makes; without it the preload warms a different
+      // cache entry and the browser fetches the file twice.
+      {
+        rel: "preload",
+        href: interLatinFontUrl,
+        as: "font",
+        type: "font/woff2",
+        crossOrigin: "anonymous",
+      },
       ...(loaderData?.preconnectOrigins ?? []).map((origin) => ({
         rel: "preconnect",
         href: origin,

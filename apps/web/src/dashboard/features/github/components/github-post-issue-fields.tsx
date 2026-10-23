@@ -36,7 +36,7 @@ export const GitHubConnectionField = withForm({
           <FieldLabel>GitHub App installation</FieldLabel>
           <Select
             onValueChange={(value) => {
-              field.handleChange(String(value ?? ""));
+              field.handleChange(value ?? "");
               // Repositories are scoped to the installation, so clear the
               // previous selection when the installation changes.
               form.setFieldValue("repositoryFullName", "");
@@ -88,7 +88,7 @@ export const GitHubRepositoryField = withForm({
           <FieldLabel>Repository</FieldLabel>
           <Select
             disabled={disabled}
-            onValueChange={(value) => field.handleChange(String(value ?? ""))}
+            onValueChange={(value) => field.handleChange(value ?? "")}
             value={field.state.value}
           >
             <SelectTrigger className="w-full">

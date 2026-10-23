@@ -194,8 +194,12 @@ const execute = (
   const request = HttpServerRequest.fromWeb(
     new Request(`http://localhost${path}`, init)
   );
+  // `asHttpEffect` types its failure as `unknown`, and a router failure in a
+  // test is a defect: `orDie` makes it fail the test instead of widening the
+  // error channel of every request helper below.
   return Effect.flatMap(HttpRouter.HttpRouter, (router) =>
-    router.asHttpEffect()
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
+    router.asHttpEffect().pipe(Effect.orDie)
   ).pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, request));
 };
 

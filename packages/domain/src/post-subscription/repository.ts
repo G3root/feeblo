@@ -7,6 +7,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { publicPostVisibility } from "../post/public-visibility";
+
 interface TSubscribe {
   memberId?: string | null;
   organizationId: string;
@@ -120,7 +122,7 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
             ...(userId
               ? [eq(schema.postSubscriptionTable.userId, userId)]
               : []),
-            ...(publicOnly ? [eq(schema.boardTable.visibility, "PUBLIC")] : [])
+            ...(publicOnly ? [publicPostVisibility] : [])
           )
         ),
   };

@@ -17,7 +17,7 @@ const useDebounce = ({
 }: {
   onChange: DebouncedInputProps["onChange"];
   value: string;
-  wait: number;
+  wait?: number;
 }) => {
   const [localValue, setLocalValue] = useState(value);
   const [prevValue, setPrevValue] = useState(value);

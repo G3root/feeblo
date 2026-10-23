@@ -1,13 +1,11 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import { pipe } from "effect/Function";
 import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
 
 import * as Policy from "../policy";
 import type { Surface } from "../surface";
 import { PostRepository } from "./repository";
-import { PostIds } from "./schema";
 
 type TIsCreator = {
   organizationId: string;
@@ -61,28 +59,50 @@ type TIsUnlocked = {
 const makePostPolicy = Effect.gen(function* () {
   const repository = yield* PostRepository;
 
+  /**
+   * A batch id is the non-string branch of `string | readonly string[]`.
+   *
+   * `Array.isArray` cannot be used for the false branch: it narrows a
+   * `readonly string[]` to `never` on the positive side and leaves it in the
+   * union on the negative side, so the single-id branch would still see an
+   * array. `isString` splits the union cleanly and follows the repo's
+   * runtime-kind convention.
+   */
+  const isIdBatch = (
+    value: string | readonly string[]
+  ): value is readonly string[] => !isString(value);
+
   const isCreator = (args: TIsCreator) =>
-    Policy.policy((user) =>
-      pipe(args.postId, (postId) =>
-        Schema.is(PostIds)(postId)
-          ? repository
-              .findByCreatorIds({
-                ids: postId,
-                organizationId: args.organizationId,
-                userId: user.session.userId,
-                boardId: args.boardId,
-              })
-              .pipe(Effect.map((posts) => posts.length === postId.length))
-          : repository
-              .findByCreatorId({
-                id: postId,
-                organizationId: args.organizationId,
-                userId: user.session.userId,
-                boardId: args.boardId,
-              })
-              .pipe(Effect.map((post) => post._tag === "Some"))
-      )
-    );
+    Policy.policy((user) => {
+      const { postId } = args;
+      // An empty array stays in the batch branch and is denied by the length
+      // check below.
+      return isIdBatch(postId)
+        ? repository
+            .findByCreatorIds({
+              ids: postId,
+              organizationId: args.organizationId,
+              userId: user.session.userId,
+              boardId: args.boardId,
+            })
+            // The non-empty check is not redundant with the schema: this
+            // predicate also receives ids from internal callers, and
+            // `posts.length === 0` for an empty request would read as
+            // "owns everything".
+            .pipe(
+              Effect.map(
+                (posts) => postId.length > 0 && posts.length === postId.length
+              )
+            )
+        : repository
+            .findByCreatorId({
+              id: postId,
+              organizationId: args.organizationId,
+              userId: user.session.userId,
+              boardId: args.boardId,
+            })
+            .pipe(Effect.map((post) => post._tag === "Some"));
+    });
 
   const isOwner = (args: TIsCreator) =>
     Policy.any(
@@ -91,27 +111,30 @@ const makePostPolicy = Effect.gen(function* () {
     );
 
   const isNewPostOwner = (args: TIsCreator) =>
-    Policy.policy((user) =>
-      pipe(args.postId, (postId) =>
-        Schema.is(PostIds)(postId)
-          ? repository
-              .findNewByCreatorIds({
-                ids: postId,
-                organizationId: args.organizationId,
-                userId: user.session.userId,
-                boardId: args.boardId,
-              })
-              .pipe(Effect.map((posts) => posts.length === postId.length))
-          : repository
-              .findNewByCreatorId({
-                id: postId,
-                organizationId: args.organizationId,
-                userId: user.session.userId,
-                boardId: args.boardId,
-              })
-              .pipe(Effect.map((post) => post._tag === "Some"))
-      )
-    );
+    Policy.policy((user) => {
+      const { postId } = args;
+      return isIdBatch(postId)
+        ? repository
+            .findNewByCreatorIds({
+              ids: postId,
+              organizationId: args.organizationId,
+              userId: user.session.userId,
+              boardId: args.boardId,
+            })
+            .pipe(
+              Effect.map(
+                (posts) => postId.length > 0 && posts.length === postId.length
+              )
+            )
+        : repository
+            .findNewByCreatorId({
+              id: postId,
+              organizationId: args.organizationId,
+              userId: user.session.userId,
+              boardId: args.boardId,
+            })
+            .pipe(Effect.map((post) => post._tag === "Some"));
+    });
 
   const isNewPostOwnerOrPrivileged = (args: TIsCreator) =>
     Policy.any(
@@ -139,7 +162,7 @@ const makePostPolicy = Effect.gen(function* () {
     Policy.policy(() =>
       repository
         .findMergedIds({
-          ids: Schema.is(PostIds)(args.postId) ? args.postId : [args.postId],
+          ids: isIdBatch(args.postId) ? args.postId : [args.postId],
           organizationId: args.organizationId,
         })
         .pipe(Effect.map((posts) => posts.length === 0))

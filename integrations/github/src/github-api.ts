@@ -226,18 +226,21 @@ export interface GitHubApiClient {
 }
 
 /** Extracts the stable `_tag` of a tagged SDK error, if present. */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const sdkErrorTag = <T>(error: T): string | undefined =>
   Predicate.isObject(error) && "_tag" in error && isString(error._tag)
     ? error._tag
     : undefined;
 
 /** Extracts a human-readable message from an SDK error, if present. */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const sdkErrorMessage = <T>(error: T): string | undefined =>
   Predicate.isObject(error) && "message" in error && isString(error.message)
     ? error.message
     : undefined;
 
 /** Extracts a server-provided retry hint from an SDK error, if present. */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const sdkRetryAfterMs = <T>(error: T): number | undefined =>
   Predicate.isObject(error) &&
   "retryAfter" in error &&
@@ -248,6 +251,7 @@ const sdkRetryAfterMs = <T>(error: T): number | undefined =>
 /** Maps the Effect-native SDK's typed errors onto the integration kernel failure algebra. */
 const mapSdkError =
   (context: string) =>
+  // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
   <T>(error: T): GitHubApiFailure => {
     if (HttpClientError.isHttpClientError(error)) {
       return new IntegrationProviderTemporaryFailure({
@@ -407,6 +411,10 @@ const withSdk = <A, E>(
   );
 
 /** Decodes an SDK response back through one of the repository's stricter schemas. */
+// The SDK's response types are looser than the schema's Encoded type (its
+// `state` is `string` where the schema wants `"open" | "closed"`), so the
+// decoder must accept any value: that is what the type parameter is for.
+/* oxlint-disable typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans; the SDK types are deliberately looser than the schema's Encoded type */
 const decodeSdkResponse =
   <S extends Schema.Constraint, V>(schema: S, context: string) =>
   (
@@ -421,6 +429,7 @@ const decodeSdkResponse =
           })
       )
     );
+/* oxlint-enable typescript/no-unnecessary-type-parameters */
 
 /** Validates a GitHub App installation id before it is converted for the SDK. */
 const installationIdToNumber = (

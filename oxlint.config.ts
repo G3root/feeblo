@@ -116,6 +116,23 @@ export default defineConfig({
     // plugin reports as standalone expects even though they run within a test.
     "vitest/no-standalone-expect": "off",
     "vitest/require-mock-type-parameters": "off",
+    // Vitest's `expect(actual, message?)` accepts an optional message (unlike
+    // Jest's), and these suites pass the loop's `METHOD path` or query as that
+    // message so a failure says which case failed. The rule's Jest-era default
+    // of one argument reports those messages as invalid.
+    "vitest/valid-expect": ["warn", { maxArgs: 2 }],
+
+    // All 127 findings are the same false positive on the repo's dominant
+    // idiom. `return yield* new TaggedError(...)` fails without producing a
+    // value, and `return yield* Effect.void` produces none, but the rule reads
+    // the `yield*` expression as a value and the generator's fall-through as
+    // `undefined`, so it reports every void-returning `Effect.gen` that guards
+    // with a typed error. It is equally wrong on React effect callbacks, whose
+    // `void | Destructor` return is the platform's contract. Satisfying it
+    // would mean adding a trailing `return yield* Effect.void` to 127 bodies
+    // and an explicit `return undefined` to every early React exit; ADR 0005's
+    // rule is not to churn code to satisfy a rule whose advice does not apply.
+    "typescript/consistent-return": "off",
 
     // ---------------------------------------------------------------------
     // Effect diagnostics that do not describe a defect in this codebase.
@@ -140,6 +157,37 @@ export default defineConfig({
     // The widget, the SDK, and CLI entry points log to the console on purpose;
     // they have no logger to route through.
     "effecttsgo/global-console": "off",
+
+    // ---------------------------------------------------------------------
+    // The rest of the boundary pattern above, extended to the plain halves
+    // whose `-in-effect` siblings are `error` below. Each one fires only on
+    // code this repo deliberately keeps outside Effect: browser components,
+    // Playwright specs, test setup and fixtures, the standalone widget/SDK,
+    // Node scripts and build configs. The defect is doing the thing inside a
+    // fiber tree, where it bypasses the service the runtime substitutes in
+    // tests, and that half stays `error`. ADR 0005 records why these sites are
+    // not churned to satisfy a rule whose advice does not apply.
+    // ---------------------------------------------------------------------
+    // `crypto.randomUUID()`, `fetch`, `Math.random` and `setTimeout` are the
+    // browser's own APIs in React components and the embeddable widget, and
+    // Playwright/setup code has no Effect runtime to read them through.
+    "effecttsgo/crypto-random-uuid": "off",
+    "effecttsgo/global-fetch": "off",
+    "effecttsgo/global-random": "off",
+    "effecttsgo/global-timers": "off",
+    // 54 findings, all `Schema.decodeUnknownSync` in tests (where a throw is
+    // the assertion) or in the widget's Effect-free decode helpers. The
+    // `schema-sync-in-effect` sibling stays `error`.
+    "effecttsgo/schema-sync": "off",
+    // Storybook mocks, Playwright specs, test servers, browser code, and the
+    // one deliberate wall-clock race in `packages/db`'s PGlite close. There is
+    // no `-in-effect` sibling; the Effect-native Promise rules
+    // (`promise-in-effect-success`, `lazy-promise-in-effect-sync`) stay on.
+    "effecttsgo/new-promise": "off",
+    // Node builtins at the boundaries: `node:crypto` HMAC/RSA/timing-safe
+    // comparisons that Effect's `Crypto` service does not cover, `node:http`
+    // for the server's own `createServer`, and test/script/config files.
+    "effecttsgo/node-builtin-import": "off",
     // 928 findings, and every one of them is the same non-defect. Effect 4.0
     // moved `http`, `http-api`, `rpc`, `sql`, `persistence`, `reactivity` and
     // `workflow` out of `effect/unstable/*` into `effect/*` while keeping them
@@ -153,6 +201,36 @@ export default defineConfig({
     // upgrade itself is the control: the catalog pin is what decides when these
     // APIs move.
     "effecttsgo/unstable-api-usage": "off",
+
+    // The three `prefer-effect-*` rules arrived with `@effect/tsgo@0.56` and
+    // report 2,514 findings between them, all of one kind: `effect/Array`,
+    // `effect/String` and `effect/Record` re-export functions that behave
+    // exactly like the native method they replace. Nothing is defective at any
+    // of those sites, and around a thousand of them are in browser bundles,
+    // Playwright specs, the published `@feeblo/sdk` and the embeddable widget,
+    // where importing `effect/*` to call `.trim()` is bundle weight for no
+    // behavioural change — the same reason ADR 0005 keeps `effect/Schema` out
+    // of that bundle. One of them is not even a drop-in: `Array.find` returns
+    // `undefined` while `Array.findFirst` returns `Option`, so "prefer" there
+    // is a rewrite with a different return type at every one of its sites.
+    // Leaving 2,514 warnings would train reviewers to skim the report, which
+    // is the argument this file already makes for `unstable-api-usage`.
+    "effecttsgo/prefer-effect-array": "off",
+    "effecttsgo/prefer-effect-record": "off",
+    "effecttsgo/prefer-effect-string": "off",
+
+    // The 127 findings are all `Schema.TaggedError`, and the brand the rule asks
+    // for would be a symbol nothing matches on. The rule's concern is that
+    // "TypeScript may accept structurally compatible values where this class
+    // instance type is expected" — but a tagged error already carries `_tag` as
+    // a required unique literal, so two errors with identical fields are not
+    // assignable to each other. Checked with a pair of one-field errors: tsc
+    // rejects both directions on `_tag` alone. `_tag` is the brand. The 127 are
+    // the per-module error vocabularies (`post/errors.ts`,
+    // `data-transfer/errors.ts`, `public-api/errors.ts`) plus the integration
+    // adapters, and ADR 0005's pattern is to brand a type that needs
+    // discriminating — these are already discriminated.
+    "effecttsgo/schema-class-missing-brand": "off",
 
     // The first rung of ADR 0005's ratchet, and now clear everywhere except
     // `packages/db/seed.ts`. `new Date()` inside Effect bypasses `Clock`, so
@@ -189,6 +267,13 @@ export default defineConfig({
     // that carries `_tag` with no prototype, so the branch silently takes its
     // fallback and `Schema.is` is the only correct match. `leaking-requirements`
     // keeps a service's implementation type out of its method signatures.
+    // `any-unknown-in-error-context` was the third rung, and it is clear: zero
+    // findings after Effect `4.0.5` turned `Crypto.randomUUIDv4`/
+    // `randomUUIDv7` into methods, so every `crypto.randomUUIDv4.pipe(...)`
+    // site required `never` instead of `unknown` and the `unknown` stopped
+    // flowing outward. `error` costs nothing today and keeps an `unknown` from
+    // re-entering a failure or requirement channel unnoticed.
+    "effecttsgo/any-unknown-in-error-context": "error",
     "effecttsgo/leaking-requirements": "error",
     "effecttsgo/abort-controller-in-effect": "error",
     "effecttsgo/crypto-random-uuid-in-effect": "error",
@@ -206,6 +291,14 @@ export default defineConfig({
     // the tree already used at 27 other sites), returns it, or awaits it; from
     // here a new float fails the gate instead of warning.
     "typescript/no-floating-promises": "error",
+
+    // Arrived with the `@effect/tsgo@0.56` / `oxlint-tsgolint@7.0.2004` train and
+    // reports two findings, both deliberate: a `Schema.Struct({})` whose
+    // `Schema.Type` is `{}` because the thing it describes genuinely has no
+    // configuration. Those two files are `off` in the override below, and the
+    // rule is `error` here so a *new* empty struct — which usually means a
+    // schema that silently lost its fields — fails the gate.
+    "typescript/no-generated-empty-object-type": "error",
 
     // anti-slop
     "anti-slop/no-chained-type-assertions": "error",
@@ -235,21 +328,63 @@ export default defineConfig({
     {
       // Human-facing CLIs, not services: `seed.ts` prints its progress as it
       // goes, and `nuke.ts` prints what it removes. `Effect.log` would add
-      // fiber ids and timestamps to output a person reads directly, so the
-      // console rule stays `warn` for both and is `error` everywhere else.
+      // fiber ids and timestamps to output a person reads directly. ADR 0005
+      // says to leave the code as it is, so the rule is off for exactly these
+      // two files and stays `error` everywhere else.
       files: ["packages/db/seed.ts", "packages/db/nuke.ts"],
       rules: {
-        "effecttsgo/global-console-in-effect": "warn",
+        "effecttsgo/global-console-in-effect": "off",
       },
     },
     {
       // ADR 0005's date rung excepts only `seed.ts`, whose fixture timestamps
-      // for the rows it inserts are the 22 remaining findings. `nuke.ts`
-      // constructs no dates, so it stays under the global `error`: a new
-      // `new Date()` there fails the gate instead of warning.
+      // for the rows it inserts are the remaining findings and are deliberately
+      // left. `nuke.ts` constructs no dates, so it stays under the global
+      // `error`: a new `new Date()` there fails the gate instead of warning.
       files: ["packages/db/seed.ts"],
       rules: {
-        "effecttsgo/global-date-in-effect": "warn",
+        "effecttsgo/global-date-in-effect": "off",
+      },
+    },
+    {
+      // Tests build the exact wire bytes a provider's signature covers
+      // (`JSON.stringify` of the body) and assert what a serialized error
+      // contains. That is the input under test, not a decode boundary that
+      // should go through a Schema codec; production code is covered by the
+      // rule, and the two production findings it had were fixed.
+      files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      rules: {
+        "effecttsgo/prefer-schema-over-json": "off",
+      },
+    },
+    {
+      // `RpcError` and `EmbedError` are deliberately plain `Error` subclasses
+      // that never enter an Effect failure channel, and the SDK one must not
+      // pull `effect/Schema` into the embeddable bundle (ADR 0005). The rule
+      // stays `error` everywhere else, so a new untagged error in a service
+      // fails the gate.
+      files: [
+        "packages/sdk/src/errors.ts",
+        "packages/web-shared/src/lib/rpc-error.ts",
+      ],
+      rules: {
+        "effecttsgo/extends-native-error": "off",
+      },
+    },
+    {
+      // `DiscordConnectionConfiguration` and `SlackConnectionConfiguration` are
+      // deliberately `Schema.Struct({})`: a connection carries no settings of
+      // its own and the destination channel is chosen per route, so the schema
+      // exists to state "nothing to configure here" rather than to hold fields.
+      // Its `Schema.Type` is therefore `{}`, which is exactly what the rule
+      // reports. Individually named files rather than a glob, so the exception
+      // cannot spread to the next empty struct someone adds.
+      files: [
+        "integrations/discord/src/discord-manifest.ts",
+        "integrations/slack/src/slack-manifest.ts",
+      ],
+      rules: {
+        "typescript/no-generated-empty-object-type": "off",
       },
     },
     {

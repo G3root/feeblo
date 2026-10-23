@@ -57,7 +57,7 @@ export function WorkspaceDetailsSection() {
               <SettingsItem.FieldLabel>Workspace logo</SettingsItem.FieldLabel>
             </SettingsItem.FieldContent>
             <WorkspaceLogoButton
-              canEdit={Boolean(canManageOrganization)}
+              canEdit={canManageOrganization}
               imageUrl={organization.logo}
               name={organization.name}
               organizationId={organization.id}
@@ -69,7 +69,7 @@ export function WorkspaceDetailsSection() {
       <SettingsItem.ItemContent>
         <SettingsItem.FieldGroup>
           <WorkspaceNameField
-            canEdit={Boolean(canManageOrganization)}
+            canEdit={canManageOrganization}
             initialName={organization.name}
             organizationId={organization.id}
           />

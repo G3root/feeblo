@@ -101,11 +101,13 @@ it.effect(
           headers: { "x-forwarded-for": clientIp },
         })
       ).modify({ remoteAddress: Option.some("10.0.0.4") });
-      return router
-        .asHttpEffect()
-        .pipe(
-          Effect.provideService(HttpServerRequest.HttpServerRequest, request)
-        );
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
+      return router.asHttpEffect().pipe(
+        // A router failure is a defect in a test; `orDie` keeps the error
+        // channel typed instead of widening it to `unknown`.
+        Effect.orDie,
+        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+      );
     };
 
     return Effect.gen(function* () {
@@ -205,11 +207,13 @@ it.effect(
     return Effect.gen(function* () {
       const context = yield* Layer.build(TestRuntime);
       const router = Context.get(context, HttpRouter.HttpRouter);
-      const response = yield* router
-        .asHttpEffect()
-        .pipe(
-          Effect.provideService(HttpServerRequest.HttpServerRequest, request)
-        );
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
+      const response = yield* router.asHttpEffect().pipe(
+        // A router failure is a defect in a test; `orDie` keeps the error
+        // channel typed instead of widening it to `unknown`.
+        Effect.orDie,
+        Effect.provideService(HttpServerRequest.HttpServerRequest, request)
+      );
 
       expect(response.status).toBe(503);
     }).pipe(Effect.scoped);

@@ -1,0 +1,15 @@
+-- The sixteen foreign-key indexes this release adds are created by
+-- `packages/db-migrator/src/index.ts`, not here.
+--
+-- `CREATE INDEX` inside a migration takes a SHARE lock on the table for the
+-- whole build, and drizzle's migrator runs every pending migration in one
+-- transaction, so a plain `CREATE INDEX` on `post` or `comment` would block
+-- writes to it until the last migration in the batch committed. The migrator
+-- builds these with `CREATE INDEX CONCURRENTLY` after the transactional pass,
+-- the same way it already builds `post_embedding_hnsw_idx`.
+--
+-- The snapshot beside this file records the indexes, which is what keeps
+-- `drizzle-kit generate` from emitting them again. The statement below exists
+-- only so this migration is a valid, explicitly no-op query. See
+-- `docs/adr/0020-lock-deadlines-and-transaction-retries.md`.
+SELECT 1;

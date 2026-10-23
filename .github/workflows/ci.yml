@@ -51,16 +51,33 @@ jobs:
 
       - uses: ./.github/actions/setup-node
 
-      # `turbo run check` runs each package's `tsc --noEmit`, then the
-      # type-aware Oxlint pass (which owns the Effect diagnostics), then the
-      # formatter check. It needs no database, no build output, and no env.
+      # A full `check` leaves ~1.2 MB in the cache (the tasks declare no
+      # outputs), so restoring it turns the job into an install plus whatever
+      # the changed files actually invalidated.
+      - uses: ./.github/actions/turbo-cache
+        with:
+          scope: checks
+
+      # `turbo run check` runs the toolchain guard, each package's
+      # `tsc --noEmit`, then the type-aware Oxlint pass (which owns the Effect
+      # diagnostics), then the formatter check. It needs no database, no build
+      # output, and no env.
       - name: Check and test
         run: pnpm check
 
-  build_app:
-    name: Build App
+  e2e:
+    name: End-to-End Tests (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # One Playwright worker owns an API server, a web server, a PGlite database
+    # and a browser, so a single runner cannot carry more workers than
+    # `e2e/playwright.config.ts` already uses (`workers: 2`). The suite was one
+    # 13m43s job; three runners keep that worker budget each and pay one ~30s
+    # build apiece.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -77,6 +94,10 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
+
+      - uses: ./.github/actions/turbo-cache
+        with:
+          scope: e2e
 
       - name: Copy env
         run: cp .env.example .env
@@ -106,16 +127,19 @@ jobs:
         run: pnpm --filter @feeblo/e2e exec playwright install --with-deps chromium
 
       # Saved right after the install instead of in a post step so the browsers
-      # are cached even when a later step fails or the job is cancelled.
+      # are cached even when a later step fails or the job is cancelled. The
+      # shards start together and all miss, so all three try to save the key;
+      # one winner is enough.
       - name: Save Playwright browsers
         if: ${{ steps.playwright-cache.outputs.cache-hit != 'true' }}
+        continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Run end-to-end tests using built apps
-        run: pnpm --filter @feeblo/e2e test:ci
+        run: pnpm --filter @feeblo/e2e exec playwright test --shard=${{ matrix.shard }}/3
         env:
           # Print web-server startup, health-check, and process-exit details when
           # Playwright fails before a spec can begin.
@@ -125,7 +149,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report-${{ github.run_attempt }}
+          name: playwright-report-${{ github.run_attempt }}-${{ matrix.shard }}
           path: |
             e2e/playwright-report
             e2e/test-results
@@ -152,6 +176,12 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node
+
+      # `turbo run test` does not cache, but it still builds each package's
+      # Paraglide output, and that is cached.
+      - uses: ./.github/actions/turbo-cache
+        with:
+          scope: test
 
       - name: Copy env
         run: cp .env.example .env

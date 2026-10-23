@@ -74,6 +74,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
         new InternalServerError({ message: `GitHub App ${operation} failed.` });
       const issueFailure =
         (operation: string) =>
+        // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
         <T>(failure: T) => {
           if (Schema.is(NotFoundError)(failure)) {
             return new NotFoundError({
@@ -149,11 +150,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             // Through the `Crypto` service, not the global: the OAuth state
             // must be reproducible under `TestCrypto` in tests, and Workers
             // forbid random value generation in global scope.
-            const nonce = yield* crypto.randomUUIDv4.pipe(
-              Effect.mapError(() =>
-                providerFailure("installation state generation")
-              )
-            );
+            const nonce = yield* crypto
+              .randomUUIDv4()
+              .pipe(
+                Effect.mapError(() =>
+                  providerFailure("installation state generation")
+                )
+              );
             const state = yield* Schema.encodeEffect(
               Schema.fromJsonString(IntegrationOAuthState)
             )({ connectionId: id, organizationId, nonce }).pipe(

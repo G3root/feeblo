@@ -9,17 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from "./routes/__root"
+import { Route as AuthRouteImport } from "./routes/_auth"
 import { Route as DashboardRouteImport } from "./routes/_dashboard"
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt"
 import { Route as SRouteRouteImport } from "./routes/s/route"
+import { Route as AuthForgotPasswordRouteImport } from "./routes/_auth/forgot-password"
+import { Route as AuthSignInRouteImport } from "./routes/_auth/sign-in"
+import { Route as AuthSignUpRouteImport } from "./routes/_auth/sign-up"
 import { Route as DashboardSplatRouteImport } from "./routes/_dashboard/$"
 import { Route as DashboardOrganizationIdRouteImport } from "./routes/_dashboard/$organizationId"
 import { Route as DashboardEmailVerifyRouteImport } from "./routes/_dashboard/email-verify"
-import { Route as DashboardForgotPasswordRouteImport } from "./routes/_dashboard/forgot-password"
 import { Route as DashboardRegisterRouteImport } from "./routes/_dashboard/register"
 import { Route as DashboardResetPasswordRouteImport } from "./routes/_dashboard/reset-password"
-import { Route as DashboardSignInRouteImport } from "./routes/_dashboard/sign-in"
-import { Route as DashboardSignUpRouteImport } from "./routes/_dashboard/sign-up"
 import { Route as FeedbackWidgetOrganizationIdRouteImport } from "./routes/feedback-widget/$organizationId"
 import { Route as SIndexRouteImport } from "./routes/s/index"
 import { Route as SSplatRouteImport } from "./routes/s/$"
@@ -78,6 +79,10 @@ import { Route as DashboardOrganizationIdSettingsIntegrationsDiscordIndexRouteIm
 import { Route as DashboardOrganizationIdSettingsIntegrationsGithubIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/github/index"
 import { Route as DashboardOrganizationIdSettingsIntegrationsSlackIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/slack/index"
 
+const AuthRoute = AuthRouteImport.update({
+  id: "/_auth",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: "/_dashboard",
   getParentRoute: () => rootRouteImport,
@@ -91,6 +96,21 @@ const SRouteRoute = SRouteRouteImport.update({
   id: "/s",
   path: "/s",
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
+  id: "/forgot-password",
+  path: "/forgot-password",
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthSignInRoute = AuthSignInRouteImport.update({
+  id: "/sign-in",
+  path: "/sign-in",
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthSignUpRoute = AuthSignUpRouteImport.update({
+  id: "/sign-up",
+  path: "/sign-up",
+  getParentRoute: () => AuthRoute,
 } as any)
 const DashboardSplatRoute = DashboardSplatRouteImport.update({
   id: "/$",
@@ -107,11 +127,6 @@ const DashboardEmailVerifyRoute = DashboardEmailVerifyRouteImport.update({
   path: "/email-verify",
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardForgotPasswordRoute = DashboardForgotPasswordRouteImport.update({
-  id: "/forgot-password",
-  path: "/forgot-password",
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardRegisterRoute = DashboardRegisterRouteImport.update({
   id: "/register",
   path: "/register",
@@ -120,16 +135,6 @@ const DashboardRegisterRoute = DashboardRegisterRouteImport.update({
 const DashboardResetPasswordRoute = DashboardResetPasswordRouteImport.update({
   id: "/reset-password",
   path: "/reset-password",
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardSignInRoute = DashboardSignInRouteImport.update({
-  id: "/sign-in",
-  path: "/sign-in",
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardSignUpRoute = DashboardSignUpRouteImport.update({
-  id: "/sign-up",
-  path: "/sign-up",
   getParentRoute: () => DashboardRoute,
 } as any)
 const FeedbackWidgetOrganizationIdRoute =
@@ -473,14 +478,14 @@ export interface FileRoutesByFullPath {
   "/s": typeof SRouteRouteWithChildren
   "/": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
+  "/forgot-password": typeof AuthForgotPasswordRoute
+  "/sign-in": typeof AuthSignInRoute
+  "/sign-up": typeof AuthSignUpRoute
   "/$": typeof DashboardSplatRoute
   "/$organizationId": typeof DashboardOrganizationIdRouteWithChildren
   "/email-verify": typeof DashboardEmailVerifyRoute
-  "/forgot-password": typeof DashboardForgotPasswordRoute
   "/register": typeof DashboardRegisterRoute
   "/reset-password": typeof DashboardResetPasswordRoute
-  "/sign-in": typeof DashboardSignInRoute
-  "/sign-up": typeof DashboardSignUpRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
   "/s/$": typeof SSplatRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -541,14 +546,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
+  "/forgot-password": typeof AuthForgotPasswordRoute
+  "/sign-in": typeof AuthSignInRoute
+  "/sign-up": typeof AuthSignUpRoute
   "/$": typeof DashboardSplatRoute
   "/$organizationId": typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   "/email-verify": typeof DashboardEmailVerifyRoute
-  "/forgot-password": typeof DashboardForgotPasswordRoute
   "/register": typeof DashboardRegisterRoute
   "/reset-password": typeof DashboardResetPasswordRoute
-  "/sign-in": typeof DashboardSignInRoute
-  "/sign-up": typeof DashboardSignUpRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
   "/s/$": typeof SSplatRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -607,16 +612,17 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   "/s": typeof SRouteRouteWithChildren
+  "/_auth": typeof AuthRouteWithChildren
   "/_dashboard": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
+  "/_auth/forgot-password": typeof AuthForgotPasswordRoute
+  "/_auth/sign-in": typeof AuthSignInRoute
+  "/_auth/sign-up": typeof AuthSignUpRoute
   "/_dashboard/$": typeof DashboardSplatRoute
   "/_dashboard/$organizationId": typeof DashboardOrganizationIdRouteWithChildren
   "/_dashboard/email-verify": typeof DashboardEmailVerifyRoute
-  "/_dashboard/forgot-password": typeof DashboardForgotPasswordRoute
   "/_dashboard/register": typeof DashboardRegisterRoute
   "/_dashboard/reset-password": typeof DashboardResetPasswordRoute
-  "/_dashboard/sign-in": typeof DashboardSignInRoute
-  "/_dashboard/sign-up": typeof DashboardSignUpRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
   "/s/$": typeof SSplatRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -681,14 +687,14 @@ export interface FileRouteTypes {
     | "/s"
     | "/"
     | "/robots.txt"
+    | "/forgot-password"
+    | "/sign-in"
+    | "/sign-up"
     | "/$"
     | "/$organizationId"
     | "/email-verify"
-    | "/forgot-password"
     | "/register"
     | "/reset-password"
-    | "/sign-in"
-    | "/sign-up"
     | "/feedback-widget/$organizationId"
     | "/s/$"
     | "/s/robots.txt"
@@ -749,14 +755,14 @@ export interface FileRouteTypes {
   to:
     | "/"
     | "/robots.txt"
+    | "/forgot-password"
+    | "/sign-in"
+    | "/sign-up"
     | "/$"
     | "/$organizationId"
     | "/email-verify"
-    | "/forgot-password"
     | "/register"
     | "/reset-password"
-    | "/sign-in"
-    | "/sign-up"
     | "/feedback-widget/$organizationId"
     | "/s/$"
     | "/s/robots.txt"
@@ -814,16 +820,17 @@ export interface FileRouteTypes {
   id:
     | "__root__"
     | "/s"
+    | "/_auth"
     | "/_dashboard"
     | "/robots.txt"
+    | "/_auth/forgot-password"
+    | "/_auth/sign-in"
+    | "/_auth/sign-up"
     | "/_dashboard/$"
     | "/_dashboard/$organizationId"
     | "/_dashboard/email-verify"
-    | "/_dashboard/forgot-password"
     | "/_dashboard/register"
     | "/_dashboard/reset-password"
-    | "/_dashboard/sign-in"
-    | "/_dashboard/sign-up"
     | "/feedback-widget/$organizationId"
     | "/s/$"
     | "/s/robots.txt"
@@ -885,6 +892,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   SRouteRoute: typeof SRouteRouteWithChildren
+  AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   FeedbackWidgetOrganizationIdRoute: typeof FeedbackWidgetOrganizationIdRoute
@@ -892,6 +900,13 @@ export interface RootRouteChildren {
 
 declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
+    "/_auth": {
+      id: "/_auth"
+      path: ""
+      fullPath: "/"
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     "/_dashboard": {
       id: "/_dashboard"
       path: ""
@@ -912,6 +927,27 @@ declare module "@tanstack/react-router" {
       fullPath: "/s"
       preLoaderRoute: typeof SRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    "/_auth/forgot-password": {
+      id: "/_auth/forgot-password"
+      path: "/forgot-password"
+      fullPath: "/forgot-password"
+      preLoaderRoute: typeof AuthForgotPasswordRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    "/_auth/sign-in": {
+      id: "/_auth/sign-in"
+      path: "/sign-in"
+      fullPath: "/sign-in"
+      preLoaderRoute: typeof AuthSignInRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    "/_auth/sign-up": {
+      id: "/_auth/sign-up"
+      path: "/sign-up"
+      fullPath: "/sign-up"
+      preLoaderRoute: typeof AuthSignUpRouteImport
+      parentRoute: typeof AuthRoute
     }
     "/_dashboard/$": {
       id: "/_dashboard/$"
@@ -934,13 +970,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardEmailVerifyRouteImport
       parentRoute: typeof DashboardRoute
     }
-    "/_dashboard/forgot-password": {
-      id: "/_dashboard/forgot-password"
-      path: "/forgot-password"
-      fullPath: "/forgot-password"
-      preLoaderRoute: typeof DashboardForgotPasswordRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     "/_dashboard/register": {
       id: "/_dashboard/register"
       path: "/register"
@@ -953,20 +982,6 @@ declare module "@tanstack/react-router" {
       path: "/reset-password"
       fullPath: "/reset-password"
       preLoaderRoute: typeof DashboardResetPasswordRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    "/_dashboard/sign-in": {
-      id: "/_dashboard/sign-in"
-      path: "/sign-in"
-      fullPath: "/sign-in"
-      preLoaderRoute: typeof DashboardSignInRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    "/_dashboard/sign-up": {
-      id: "/_dashboard/sign-up"
-      path: "/sign-up"
-      fullPath: "/sign-up"
-      preLoaderRoute: typeof DashboardSignUpRouteImport
       parentRoute: typeof DashboardRoute
     }
     "/feedback-widget/$organizationId": {
@@ -1402,6 +1417,20 @@ const SRouteRouteChildren: SRouteRouteChildren = {
 const SRouteRouteWithChildren =
   SRouteRoute._addFileChildren(SRouteRouteChildren)
 
+interface AuthRouteChildren {
+  AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
+  AuthSignInRoute: typeof AuthSignInRoute
+  AuthSignUpRoute: typeof AuthSignUpRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthForgotPasswordRoute: AuthForgotPasswordRoute,
+  AuthSignInRoute: AuthSignInRoute,
+  AuthSignUpRoute: AuthSignUpRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 interface DashboardOrganizationIdDashboardLayoutRouteChildren {
   DashboardOrganizationIdDashboardLayoutIndexRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   DashboardOrganizationIdDashboardLayoutChangelogDraftRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogDraftRoute
@@ -1573,11 +1602,8 @@ interface DashboardRouteChildren {
   DashboardSplatRoute: typeof DashboardSplatRoute
   DashboardOrganizationIdRoute: typeof DashboardOrganizationIdRouteWithChildren
   DashboardEmailVerifyRoute: typeof DashboardEmailVerifyRoute
-  DashboardForgotPasswordRoute: typeof DashboardForgotPasswordRoute
   DashboardRegisterRoute: typeof DashboardRegisterRoute
   DashboardResetPasswordRoute: typeof DashboardResetPasswordRoute
-  DashboardSignInRoute: typeof DashboardSignInRoute
-  DashboardSignUpRoute: typeof DashboardSignUpRoute
   DashboardInvitationInvitationIdRoute: typeof DashboardInvitationInvitationIdRoute
 }
 
@@ -1585,11 +1611,8 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSplatRoute: DashboardSplatRoute,
   DashboardOrganizationIdRoute: DashboardOrganizationIdRouteWithChildren,
   DashboardEmailVerifyRoute: DashboardEmailVerifyRoute,
-  DashboardForgotPasswordRoute: DashboardForgotPasswordRoute,
   DashboardRegisterRoute: DashboardRegisterRoute,
   DashboardResetPasswordRoute: DashboardResetPasswordRoute,
-  DashboardSignInRoute: DashboardSignInRoute,
-  DashboardSignUpRoute: DashboardSignUpRoute,
   DashboardInvitationInvitationIdRoute: DashboardInvitationInvitationIdRoute,
 }
 
@@ -1599,6 +1622,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   SRouteRoute: SRouteRouteWithChildren,
+  AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   FeedbackWidgetOrganizationIdRoute: FeedbackWidgetOrganizationIdRoute,

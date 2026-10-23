@@ -602,6 +602,87 @@ describe("TagRpcHandlers", () => {
             ).toHaveLength(1);
           })
       );
+
+      it.effect(
+        "hides tags linked only to archived or merged posts from the public list",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* TagRpcHandlersEffect;
+            const f = yield* fixture();
+            const tagId = yield* TagId.generate;
+            const survivorPostId = yield* PostId.generate;
+
+            yield* handlers
+              .CreateTag({
+                id: tagId,
+                name: "Feature",
+                organizationId: f.organizationId,
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+            yield* handlers
+              .SetPostTags({
+                organizationId: f.organizationId,
+                postId: f.postId,
+                tagIds: [tagId],
+              })
+              .pipe(Effect.provideService(CurrentSession, session(f)));
+
+            const [fixturePost] = yield* db
+              .select({ boardId: schema.postTable.boardId })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, f.postId));
+            if (fixturePost === undefined) {
+              return yield* Effect.die("fixture post was not inserted");
+            }
+            yield* db.insert(schema.postTable).values({
+              id: survivorPostId,
+              title: "Survivor post",
+              content: "Content",
+              slug: survivorPostId,
+              excerpt: "Content",
+              boardId: fixturePost.boardId,
+              organizationId: f.organizationId,
+              statusId: f.statusId,
+              creatorId: f.userId,
+              creatorMemberId: f.membershipId,
+              createdAt: yield* DateTime.nowAsDate,
+              updatedAt: yield* DateTime.nowAsDate,
+            });
+
+            const now = yield* DateTime.nowAsDate;
+            yield* db
+              .update(schema.postTable)
+              .set({ archivedAt: now })
+              .where(eq(schema.postTable.id, f.postId));
+            expect(
+              yield* handlers.ListTagsPublic({
+                organizationId: f.organizationId,
+              })
+            ).toHaveLength(0);
+
+            yield* db
+              .update(schema.postTable)
+              .set({
+                archivedAt: now,
+                mergedAt: now,
+                mergedIntoPostId: survivorPostId,
+              })
+              .where(eq(schema.postTable.id, f.postId));
+            expect(
+              yield* handlers.ListTagsPublic({
+                organizationId: f.organizationId,
+              })
+            ).toHaveLength(0);
+
+            // The dashboard still lists it for the archived post's page.
+            expect(
+              yield* handlers
+                .ListTags({ organizationId: f.organizationId })
+                .pipe(Effect.provideService(CurrentSession, session(f)))
+            ).toHaveLength(1);
+          })
+      );
     }
   );
 });

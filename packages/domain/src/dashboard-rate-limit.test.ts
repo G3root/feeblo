@@ -9,13 +9,11 @@ import { RateLimitService } from "./rate-limit/service";
 
 describe("consumeDashboardRateLimit", () => {
   it.effect("skips when the rate-limit layer is absent", () =>
-    Effect.gen(function* () {
-      // Handler unit tests run without RateLimitService; the helper must
-      // succeed without enforcing rather than die on a missing service.
-      yield* consumeDashboardRateLimit({
-        key: "dashboard-rate-limit-test:o:u",
-        name: "contact-search",
-      });
+    // Handler unit tests run without RateLimitService; the helper must
+    // succeed without enforcing rather than die on a missing service.
+    consumeDashboardRateLimit({
+      key: "dashboard-rate-limit-test:o:u",
+      name: "contact-search",
     })
   );
 

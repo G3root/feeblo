@@ -5,9 +5,9 @@ import { MessageLock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type FormEvent, type ReactNode, useCallback, useState } from "react";
 
+import { CommentComposerField, useCommentForm } from "../forms/comment-form";
 import { m } from "../paraglide/messages.js";
-import { CommentComposerField, useCommentForm } from "../v2/forms/comment-form";
-import { usePostCollectionData } from "../v2/post-page-context";
+import { usePostCollectionData } from "../post-page-context";
 
 type TCommentVisibility = "PUBLIC" | "INTERNAL";
 

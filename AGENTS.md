@@ -6,12 +6,12 @@ Two other documents are authoritative for their own subject and are not duplicat
 
 ## Stack contract
 
-Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and referenced as `catalog:`. Prefer that over writing a version in a package.
+Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and referenced as `catalog:`. Prefer that over writing a version in a package. `minimumReleaseAge: 1440` refuses a version published in the last day, so a bump waits a day or names the package in `minimumReleaseAgeExclude` with a reason.
 
 - pnpm workspaces + Turborepo. Node `26.4.0` (`.node-version`), pnpm `11.0.3` (`packageManager`). Do not introduce a second package manager.
-- Effect `4.0.0`, `@effect/platform-node` `4.0.0`, `@effect/vitest` `4.0.0`. These three are one release train; bump them together. Every `@effect/*` package shares the one version, so the catalog pins `effect`, `@effect/platform-node`, `@effect/vitest`, `@effect/sql-pg`, `@effect/sql-pglite`, `@effect/atom-react` and `@effect/ai-openai` in lockstep.
-- TypeScript `7.0.2`, Oxlint `1.82.0`, `oxlint-tsgolint` `7.0.2001`, `@effect/tsgo` `0.47.2`. These four are also one release train: `effect-tsgo patch` (run from `prepare` on every install) names the versions it supports and refuses to patch a mismatch. A bump is a four-line change or it is wrong. `@effect/tsgo` is not cosmetic: it embeds the module paths its rules match on, so the version has to be one that knows the Effect version in the catalog or the diagnostics go quiet — `0.45` keyed off `effect/unstable/*` and would have reported nothing once the `unstable` segment was dropped.
-- Drizzle `1.0.0-rc.5-169397b`, better-auth `1.7.2`, React `19`, TanStack Start for `apps/web`.
+- Effect `4.0.5`, `@effect/platform-node` `4.0.5`, `@effect/vitest` `4.0.5`. These three are one release train; bump them together. Every `@effect/*` package shares the one version, so the catalog pins `effect`, `@effect/platform-node`, `@effect/vitest`, `@effect/sql-pg`, `@effect/sql-pglite`, `@effect/atom-react` and `@effect/ai-openai` in lockstep.
+- TypeScript `7.0.2`, Oxlint `1.89.0`, `oxlint-tsgolint` `7.0.2004`, `@effect/tsgo` `0.56.0`. These four are also one release train: `effect-tsgo patch` (run from `prepare` on every install) names the versions it supports and refuses to patch a mismatch. A bump is a four-line change or it is wrong. `@effect/tsgo` is not cosmetic: it embeds the module paths its rules match on, so the version has to be one that knows the Effect version in the catalog or the diagnostics go quiet — `0.45` keyed off `effect/unstable/*` and would have reported nothing once the `unstable` segment was dropped. `pnpm check` runs `check-toolchain.ts`, which fails when these two trains disagree across the catalog, the manifests and the workspace overrides, or when a `patchedDependencies` selector names a version that is not installed. Each `@effect/tsgo` release publishes a table of the TypeScript, Oxlint and `oxlint-tsgolint` versions it supports; `0.56.0` accepts Oxlint `1.87`–`1.89` and `oxlint-tsgolint` `7.0.2003`/`7.0.2004`, which is what pins those two.
+- Drizzle `1.0.0-rc.5` — `drizzle-orm` and `drizzle-kit` are one version — better-auth `1.7.2`, React `19`, TanStack Start for `apps/web`. rc.5's kit peers on the rc.5 ORM and reads snapshot format 9, so the two move together or neither runs. The committed snapshots in `packages/db/src/migrations` are format 9, which is a **diff chain**: each snapshot holds only its delta from its parent rather than the whole schema, so a snapshot is no longer self-contained and the chain has to stay intact and ordered. `drizzle-kit up` produced that rewrite; it is one-way, and going back means regenerating. The ORM's own migrator — what deployments run through `packages/db-migrator` — never reads a snapshot, so this is a tooling constraint and not a production one.
 
 `prepare` runs `effect-tsgo patch --typescript --oxlint`. That single command is what makes the Effect language service load in `tsc` and registers the `effecttsgo` Oxlint plugin; without it, Effect diagnostics silently disappear.
 
@@ -46,7 +46,8 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm check` | **The gate.** `turbo run check` = every package's `tsc --noEmit`, then type-aware Oxlint plus the formatter check. |
+| `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsc --noEmit`, type-aware Oxlint plus the formatter check, and Knip. |
+| `pnpm knip` | Unused files, dependencies and exports. Also runs inside `pnpm check`; see "Knip" below for what fails and what only prints. |
 | `pnpm typecheck` | Types only. Cached per package. |
 | `pnpm lint` | `oxlint && oxfmt --check .` |
 | `pnpm lint:fix` | The writer: `oxlint --fix && oxfmt`. |
@@ -66,7 +67,7 @@ Run `pnpm check` before claiming a change is ready. It needs no database, no bui
 What actually enforces the rules:
 
 - CI (`checks` job) runs `pnpm check` on every push and pull request.
-- CI also runs `build_app` (Playwright against built apps), `test` (unit), and `docker_smoke_test` (self-hosted compose stack).
+- CI also runs `e2e` (Playwright against built apps, sharded three ways), `test` (unit), and `docker_smoke_test` (self-hosted compose stack).
 - `autofix.yml` runs `pnpm fmt` and `pnpm lint:fix` and commits the result. It is a writer, not a gate: a violation it cannot fix does not fail it.
 - `tools/oxlint/effect-tests` reports `Effect.run*` and `ManagedRuntime.make` in test files as an **error**, so hand-running an Effect fails the gate.
 
@@ -74,13 +75,25 @@ What actually enforces the rules:
 
 If a check fails, fix the failure. Do not loosen the rule to get green. If a rule is genuinely wrong for this codebase, turn it off in `oxlint.config.ts` with a written reason directly above it — the `effecttsgo/*` and `typescript/*` overrides in that file are the pattern to copy. A rule turned off without a reason is indistinguishable from a rule nobody could be bothered to satisfy.
 
+## Knip
+
+`knip.config.ts` finds unused files, dependencies and exports, and `pnpm check` runs it (`turbo` task `//#knip`, uncached, ~12s).
+
+- Every issue type is `error` except two. A finding in an `error` type fails the run.
+- `unlisted` is `warn`: 51 imports of packages no workspace declares. Under the hoisted node linker they resolve through a sibling's dependency, so they work by accident. The fix is to declare each package where it is imported, which is a dependency addition and therefore an owner decision, not a cleanup. `binaries` is `warn` for the same reason (`vite` in `apps/web`'s scripts).
+- Clean a type, then move its rule to `error` in the same change. Adding to the `warn` list to get a run green is the one thing that file is not for; when a type reaches zero, promote it.
+
+Two things in that file are configuration, not suppression, and both carry the reason inline: `ignoreExportsUsedInFile` (an export the same file also uses is a file-local helper, not a dead surface) and the Paraglide exception, which is conditional because the generated `src/paraglide` directory is gitignored — Knip skips it when it exists, and the relative imports into it cannot resolve when it does not. That conditional exists so the report is identical on a fresh clone, after a local build, and in CI.
+
+One `ignoreDependencies` is worth knowing about: `apps/server` declares `@feeblo/db-migrator` although nothing imports it, because the Dockerfile copies its build output into the image and the dependency is what puts it in the build graph. The others are tsconfig-only references (`@effect/language-service`, `react` as `jsxImportSource`) and the root Playwright config's `@playwright/test`, whose runner lives in `e2e`.
+
 ## Effect code
 
 Effect diagnostics live in Oxlint (`effecttsgo/*`), not in `tsc`. `packages/config/tsconfig.base.json` sets `diagnostics: false` on the language service so a finding is reported once, by the tool that can act on it. Put severity changes in `oxlint.config.ts`.
 
 `oxlint.config.ts` extends two `@effect/tsgo` presets, `recommended` **and** `effect-native`, and both are load-bearing. `@effect/tsgo@0.46` moved twenty `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and `instance-of-schema` rules out of `recommended` into the opt-in `effect-native` preset, so extending only `recommended` drops `global-date-in-effect` — the defect this file's `off` entries are written against — with nothing failing to say so. The two presets together are exactly the rule set `0.45.0`'s `recommended` carried. See `docs/adr/0005`.
 
-Five `effecttsgo/*` rules are `off` with reasons in that file. Four — `async-function`, `global-date`, `process-env`, `global-console` — name the code that legitimately does the thing outside Effect; their `-in-effect` siblings are on, and those are the ones that describe a defect, because `new Date()` inside Effect bypasses `Clock`, which is why services that do it cannot be tested against `TestClock`. The fifth, `unstable-api-usage` (928 findings), is off for a different reason: Effect 4.0 moved `http`, `http-api`, `rpc`, `persistence` and `reactivity` to `effect/*` while keeping them `@stability unstable`, so the rule fires on the imports this repo is built out of and there is no stable alternative to move to. `typescript/no-unnecessary-type-arguments` is off for the same kind of reason: 131 findings that are all the same non-defect.
+Nine `effecttsgo/*` rules are `off` with reasons in that file. Four — `async-function`, `global-date`, `process-env`, `global-console` — name the code that legitimately does the thing outside Effect; their `-in-effect` siblings are on, and those are the ones that describe a defect, because `new Date()` inside Effect bypasses `Clock`, which is why services that do it cannot be tested against `TestClock`. Three more, `prefer-effect-array`/`string`/`record` (2,514 findings between them), name a stylistic swap to an Effect module whose functions behave identically to the native method; roughly a thousand of those sites are in browser bundles, Playwright specs and the published SDK, where the import is bundle weight and the behaviour is unchanged, and `Array.find` → `Array.findFirst` is not even a drop-in. `schema-class-missing-brand` (127) is off because all 127 are `Schema.TaggedError`, whose required unique `_tag` already makes two such errors mutually unassignable — the brand would be a symbol nothing matches on. The ninth, `unstable-api-usage` (928 findings), is off for a different reason: Effect 4.0 moved `http`, `http-api`, `rpc`, `persistence` and `reactivity` to `effect/*` while keeping them `@stability unstable`, so the rule fires on the imports this repo is built out of and there is no stable alternative to move to. `typescript/no-unnecessary-type-arguments` is off for the same kind of reason: 131 findings that are all the same non-defect.
 
 `docs/adr/0005` records the ratchet order for what is still a warning.
 
@@ -93,6 +106,8 @@ Tests use `@effect/vitest`:
 - One documented exception, `packages/auth/src/api-key.test.ts`, which shares one PGlite database across the file and hands it to the better-auth adapter as a plain value. Its `oxlint-disable` carries the reason inline.
 
 Match errors by tag, not by prototype: `Schema.is(SomeError)(error)` or `Predicate.isTagged(error, "SomeError")`. A decoded error is a plain object carrying `_tag` with no prototype, so `instanceof` answers `false` for a real one and the branch silently takes its fallback. Read randomness, time, and environment through Effect services (`Crypto`, `Clock`, `Config`), not the globals; `packages/domain/src/jwt-secret/repository.ts` is a good example.
+
+A database transaction is retried. `transaction()` in `@feeblo/db` re-runs the whole transaction on `40P01` (deadlock), `40001` (serialization failure) and `55P03` (lock timeout), so a transaction body must be database work only: no HTTP call, no provider client, no filesystem write, because a retry replays it. Every connection carries a 5-second `lock_timeout` and a 30-second idle-in-transaction timeout, so a lock wait fails a request instead of holding a pooled connection forever. A mapping inside a transaction keeps the failure it replaced (`attachCause` from `@feeblo/db`): the retry reads the `cause` chain, so a message-only replacement turns a retryable abort into a 500. A lock that only serializes a count-and-write pair on one workspace is `FOR NO KEY UPDATE`; `FOR UPDATE` is for the case where blocking child inserts is the point, which today is only the account-deletion membership re-check. See `docs/adr/0020`.
 
 ## Architecture
 

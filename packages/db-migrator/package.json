@@ -4,20 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "migrate": "node ./src/migrator.mjs",
+    "migrate": "pnpm build && MIGRATIONS_DIR=../db/src/migrations node ./dist/index.js",
     "build": "rolldown -c",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@electric-sql/pglite-pgvector": "^0.0.9",
-    "drizzle-orm": "1.0.0-rc.5-169397b",
+    "drizzle-orm": "catalog:",
     "postgres": "^3.4.7"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "rolldown": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }

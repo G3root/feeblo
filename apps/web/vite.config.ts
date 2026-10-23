@@ -5,7 +5,7 @@ import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 const paraglideProjectDir = fileURLToPath(
   new URL("../../project.inlang", import.meta.url)
@@ -28,6 +28,127 @@ const tanstackPackageRegex = /\/@tanstack\/([^/]+)/;
  * hosting plugin (the Node path is served by `server.mjs`, which pairs srvx
  * with the `dist/server` fetch handler).
  */
+/**
+ * Hints the entry chunk's whole static module graph, not just its first level.
+ *
+ * TanStack Start records a route's chunks one level deep — the route's chunk
+ * plus that chunk's direct imports (`start-manifest-plugin/manifestBuilder`,
+ * `getChunkPreloads`) — and the document renders exactly those as
+ * `<link rel="modulepreload">`. The entry chunk imports the shared chunk, which
+ * imports the vendor chunks the entry never names, so the browser only
+ * discovers them after downloading and parsing the shared chunk: ~180 kB of
+ * brotli in a second round trip ahead of hydration on every first visit.
+ *
+ * This walks the client build's chunk graph and appends the entry's closure to
+ * `__root__`'s preloads, which every document emits. Nothing extra ships — the
+ * browser fetches that graph before the route can render anyway — it just
+ * starts fetching it in parallel with the entry.
+ *
+ * Deliberately scoped to `__root__`. Expanding *every* route to its own closure
+ * put the same files in a parent's and its children's lists — the generated
+ * manifest has already deduplicated them once by then — and the resulting
+ * duplicate `<link>` elements made React discard hydration for the whole
+ * document (`Minified React error #418`, reproduced by the public board's
+ * "guest's comments" e2e). The leftover second-level chunks are small leaf
+ * modules (a few kB per route), so the root scope is where the win is.
+ *
+ * The transform fails the build when the generated manifest no longer has the
+ * shape it edits: a silent no-op here would bring the extra round trip back
+ * with nothing to say so.
+ */
+function eagerPreloadHints(): Plugin {
+  let importsByHref: ReadonlyMap<string, ReadonlyArray<string>> = new Map();
+
+  return {
+    name: "eager-preload-hints",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      if (this.environment.name !== "client") {
+        return;
+      }
+
+      const base = this.environment.config.base;
+      const graph = new Map<string, ReadonlyArray<string>>();
+
+      for (const [fileName, output] of Object.entries(bundle)) {
+        if (output.type !== "chunk") {
+          continue;
+        }
+
+        graph.set(
+          `${base}${fileName}`,
+          output.imports.map((imported) => `${base}${imported}`)
+        );
+      }
+
+      importsByHref = graph;
+    },
+    transform(code, id) {
+      if (this.environment.name !== "ssr") {
+        return null;
+      }
+
+      if (!id.includes("tanstack-start-manifest")) {
+        return null;
+      }
+
+      if (importsByHref.size === 0) {
+        this.error(
+          "eager-preload-hints: the server build started before the client build published its chunk graph"
+        );
+      }
+
+      const rootPreloads =
+        /(__root__:\s*\{[\s\S]*?preloads:\s*\[)([\s\S]*?)(\])/;
+
+      if (!rootPreloads.test(code)) {
+        this.error(
+          "eager-preload-hints: the generated route manifest has no `__root__` preloads array any more; update this plugin for its new shape"
+        );
+      }
+
+      const graph = importsByHref;
+      const next = code.replace(
+        rootPreloads,
+        (_whole, head: string, body: string, tail: string) => {
+          const declared = [...body.matchAll(/"([^"]+)"/g)].map(
+            // SAFETY: the pattern captures one group, so index 1 exists.
+            (match) => match[1] as string
+          );
+          const closure = new Set(declared);
+          const queue = [...declared];
+
+          for (let href = queue.pop(); href !== undefined; href = queue.pop()) {
+            for (const imported of graph.get(href) ?? []) {
+              if (!closure.has(imported)) {
+                closure.add(imported);
+                queue.push(imported);
+              }
+            }
+          }
+
+          const added = [...closure]
+            .filter((href) => !declared.includes(href))
+            .sort()
+            .map((href) => `\n\t\t\t${JSON.stringify(href)},`)
+            .join("");
+
+          // The generated array has no trailing comma, so the first addition
+          // needs its own separator.
+          const trimmed = body.trimEnd();
+          const separator =
+            trimmed.length === 0 || trimmed.endsWith(",") ? "" : ",";
+
+          return `${head}${trimmed}${separator}${added}\n\t\t${tail}`;
+        }
+      );
+
+      return { code: next, map: null };
+    },
+  };
+}
+
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
@@ -119,6 +240,7 @@ export default defineConfig({
     }),
     viteReact(),
     tailwindcss(),
+    eagerPreloadHints(),
   ],
   ssr: {
     noExternal: [/^@feeblo\//],
@@ -226,7 +348,6 @@ export default defineConfig({
           if (
             id.includes("/prosemirror-") ||
             id.includes("/prosekit/") ||
-            id.includes("/katex/") ||
             id.includes("/mdast-util-to-markdown/") ||
             id.includes("/unist-util-visit-parents/") ||
             id.includes("/unified/") ||

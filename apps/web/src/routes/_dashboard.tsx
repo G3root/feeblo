@@ -7,6 +7,7 @@ import { AuthProvider } from "@feeblo/web-shared/auth-context";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
+import { getClientOnlyDocumentCacheControl } from "@/lib/document-cache-control";
 import { getLocale, setLocale } from "@/paraglide/runtime.js";
 import { DashboardPendingShell } from "~/components/dashboard-pending-shell";
 import {
@@ -16,6 +17,7 @@ import {
 } from "~/components/posthog-provider";
 import { getContext } from "~/integrations/tanstack-query/root-provider";
 import { dashboardAuthBeforeLoad } from "~/lib/auth-redirects";
+import { startDashboardShellPreload } from "~/lib/preloads";
 
 /**
  * The dashboard boundary: every route under `/_dashboard` is client-only and
@@ -33,10 +35,29 @@ import { dashboardAuthBeforeLoad } from "~/lib/auth-redirects";
  * the DOM) and the auth/analytics providers (which read the browser session)
  * never run on the server. The public board has its own stack in the board's
  * layout route (`routes/s/route.tsx`), which does server-render.
+ *
+ * The document this route renders is visitor-independent (the session is
+ * resolved in the browser), so it carries a shared cache policy — see
+ * `@/lib/document-cache-control`. Its `beforeLoad` also starts the shell's
+ * reads before the guard's session request resolves; see
+ * `startDashboardShellPreload`.
  */
 export const Route = createFileRoute("/_dashboard")({
   ssr: false,
-  beforeLoad: dashboardAuthBeforeLoad,
+  beforeLoad: async ({ location }) => {
+    // Not awaited: the shell's reads do not depend on the session, so they run
+    // alongside the guard's session request rather than behind it. See
+    // `startDashboardShellPreload`.
+    startDashboardShellPreload(location.pathname);
+    await dashboardAuthBeforeLoad({ location });
+  },
+  headers: () => {
+    const cacheControl = getClientOnlyDocumentCacheControl();
+
+    return cacheControl === undefined
+      ? undefined
+      : { "Cache-Control": cacheControl };
+  },
   head: () => ({ meta: [{ title: "Dashboard" }] }),
   component: DashboardBoundary,
   // The boundary owns the full-page loader: it runs before the layout (and its

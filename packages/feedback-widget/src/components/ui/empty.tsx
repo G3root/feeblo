@@ -1,4 +1,3 @@
-import { cva, type VariantProps } from "class-variance-authority";
 import { type ComponentProps, splitProps } from "solid-js";
 
 import { cn } from "../../lib/utils";
@@ -28,37 +27,6 @@ export function EmptyHeader(props: ComponentProps<"div">) {
   );
 }
 
-const emptyMediaVariants = cva(
-  "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        default: "bg-transparent",
-        icon: "bg-muted text-foreground flex size-10 shrink-0 items-center justify-center rounded-xl [&_svg:not([class*='size-'])]:size-5",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  }
-);
-
-export function EmptyMedia(
-  props: ComponentProps<"div"> & VariantProps<typeof emptyMediaVariants>
-) {
-  const [local, others] = splitProps(props, ["class", "variant"]);
-  return (
-    <div
-      class={cn(
-        emptyMediaVariants({ variant: local.variant, className: local.class })
-      )}
-      data-slot="empty-icon"
-      data-variant={local.variant ?? "default"}
-      {...others}
-    />
-  );
-}
-
 export function EmptyTitle(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
   return (
@@ -79,20 +47,6 @@ export function EmptyDescription(props: ComponentProps<"div">) {
         local.class
       )}
       data-slot="empty-description"
-      {...others}
-    />
-  );
-}
-
-export function EmptyContent(props: ComponentProps<"div">) {
-  const [local, others] = splitProps(props, ["class"]);
-  return (
-    <div
-      class={cn(
-        "flex w-full max-w-sm min-w-0 flex-col items-center gap-4 text-sm text-balance",
-        local.class
-      )}
-      data-slot="empty-content"
       {...others}
     />
   );

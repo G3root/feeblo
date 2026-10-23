@@ -436,6 +436,7 @@ export const postTagTable = pgTable(
   (table) => [
     index("post_tag_postId_idx").on(table.postId),
     index("post_tag_tagId_idx").on(table.tagId),
+    index("post_tag_organizationId_idx").on(table.organizationId),
     index("post_tag_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("post_tag_postId_tagId_uidx").on(table.postId, table.tagId),
   ]
@@ -575,6 +576,9 @@ export const postTable = pgTable(
       table.boardId,
       table.createdAt
     ),
+    index("post_boardId_idx").on(table.boardId),
+    index("post_creatorId_idx").on(table.creatorId),
+    index("post_creatorMemberId_idx").on(table.creatorMemberId),
     index("post_statusId_idx").on(table.statusId),
     index("post_archivedAt_idx").on(table.archivedAt),
     index("post_mergedIntoPostId_idx").on(table.mergedIntoPostId),
@@ -656,6 +660,7 @@ export const upvoteTable = pgTable(
       table.postId
     ),
     index("upvote_postId_idx").on(table.postId),
+    index("upvote_memberId_idx").on(table.memberId),
     index("upvote_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("upvote_userId_postId_uidx").on(table.userId, table.postId),
   ]
@@ -694,6 +699,7 @@ export const postReactionTable = pgTable(
   },
   (table) => [
     index("postReaction_postId_idx").on(table.postId),
+    index("postReaction_memberId_idx").on(table.memberId),
     index("postReaction_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("postReaction_userId_postId_emoji_uidx").on(
       table.userId,
@@ -739,6 +745,8 @@ export const postSubscriptionTable = pgTable(
   (table) => [
     index("post_subscription_postId_idx").on(table.postId),
     index("post_subscription_userId_idx").on(table.userId),
+    index("post_subscription_memberId_idx").on(table.memberId),
+    index("post_subscription_organizationId_idx").on(table.organizationId),
     index("post_subscription_mergedFromPostId_idx").on(table.mergedFromPostId),
     uniqueIndex("post_subscription_postId_userId_uidx").on(
       table.postId,
@@ -771,6 +779,7 @@ export const changelogSubscriptionTable = pgTable(
   (table) => [
     index("changelog_subscription_organizationId_idx").on(table.organizationId),
     index("changelog_subscription_userId_idx").on(table.userId),
+    index("changelog_subscription_memberId_idx").on(table.memberId),
     uniqueIndex("changelog_subscription_organizationId_userId_uidx").on(
       table.organizationId,
       table.userId
@@ -834,6 +843,9 @@ export const commentTable = pgTable(
     ),
     index("comment_postId_pinnedAt_idx").on(table.postId, table.pinnedAt),
     index("comment_mergedFromPostId_idx").on(table.mergedFromPostId),
+    index("comment_parentCommentId_idx").on(table.parentCommentId),
+    index("comment_userId_idx").on(table.userId),
+    index("comment_memberId_idx").on(table.memberId),
     uniqueIndex("comment_post_pinned_uidx")
       .on(table.postId)
       .where(sql`${table.pinnedAt} IS NOT NULL`),
@@ -864,6 +876,7 @@ export const commentReactionTable = pgTable(
   },
   (table) => [
     index("commentReaction_commentId_idx").on(table.commentId),
+    index("commentReaction_memberId_idx").on(table.memberId),
     uniqueIndex("commentReaction_userId_commentId_emoji_uidx").on(
       table.userId,
       table.commentId,
@@ -1034,6 +1047,9 @@ export const changelogCategoryLinkTable = pgTable(
   (table) => [
     index("changelog_category_link_changelogId_idx").on(table.changelogId),
     index("changelog_category_link_categoryId_idx").on(table.categoryId),
+    index("changelog_category_link_organizationId_idx").on(
+      table.organizationId
+    ),
     uniqueIndex("changelog_category_link_changelogId_categoryId_uidx").on(
       table.changelogId,
       table.categoryId
@@ -1421,19 +1437,67 @@ export const emailSubscriptionTable = pgTable(
   ]
 );
 
+/**
+ * One address a sender must not mail again.
+ *
+ * `organizationId` names the workspace that observed the suppression, or null
+ * for a platform-level row. A complaint is about one workspace's mail, so it
+ * must never silence another workspace's notifications; a hard bounce is an
+ * address fact, but the row still belongs to the tenant that observed it, which
+ * is what keeps listing and removal tenant-safe. Platform rows exist for mail
+ * that belongs to no workspace (verification, password reset) and match every
+ * sender.
+ *
+ * The unique keys are partial on purpose: there is one platform row per
+ * address and one row per (workspace, address), so the two scopes coexist.
+ * `firstReason` preserves the cause that created the row when a stronger
+ * reason later overwrites `reason`; `note` is only ever set by an operator
+ * adding a manual block.
+ */
 export const emailSuppressionTable = pgTable(
   "email_suppression",
   {
-    email: text("email").primaryKey(),
+    email: text("email").notNull(),
+    organizationId: text("organization_id").references(
+      () => organizationTable.id,
+      { onDelete: "cascade" }
+    ),
     reason: text("reason").$type<TEmailSuppressionReason>().notNull(),
+    firstReason: text("first_reason")
+      .$type<TEmailSuppressionReason>()
+      .notNull(),
+    /** Operator-supplied context for a manual block; never provider detail. */
+    note: text("note"),
     providerEventId: text("provider_event_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
   },
   (table) => [
+    uniqueIndex("email_suppression_email_platform_uidx")
+      .on(table.email)
+      .where(sql`${table.organizationId} is null`),
+    uniqueIndex("email_suppression_organizationId_email_uidx")
+      .on(table.organizationId, table.email)
+      .where(sql`${table.organizationId} is not null`),
     uniqueIndex("email_suppression_providerEventId_uidx").on(
       table.providerEventId
+    ),
+    index("email_suppression_organizationId_createdAt_idx").on(
+      table.organizationId,
+      table.createdAt
+    ),
+    check(
+      "email_suppression_email_normalized_chk",
+      sql`${table.email} = lower(btrim(${table.email}))`
+    ),
+    check(
+      "email_suppression_note_chk",
+      sql`${table.note} is null or (length(${table.note}) between 1 and 500)`
     ),
   ]
 );
@@ -1446,9 +1510,19 @@ export const emailProviderEventTable = pgTable(
   "email_provider_event",
   {
     providerEventId: text("provider_event_id").primaryKey(),
-    deliveryId: text("delivery_id")
-      .notNull()
-      .references(() => emailDeliveryTable.id, { onDelete: "cascade" }),
+    /**
+     * The delivery this event was correlated to, or null when the feedback
+     * could not be attributed (for example a bounce of account mail, which has
+     * no delivery row). The ledger still records the event so a redelivered
+     * SNS message is recognized as a duplicate.
+     *
+     * Deleting the delivery nulls this reference instead of deleting the row:
+     * the event id is the idempotency key, and a redelivered SNS message after
+     * a delivery cleanup must still be recognized as a duplicate.
+     */
+    deliveryId: text("delivery_id").references(() => emailDeliveryTable.id, {
+      onDelete: "set null",
+    }),
     type: text("type").$type<TEmailProviderEventType>().notNull(),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true })
@@ -1535,6 +1609,7 @@ export const notificationPreferenceTable = pgTable(
       .notNull(),
   },
   (table) => [
+    index("notification_preference_userId_idx").on(table.userId),
     uniqueIndex("notification_preference_org_user_channel_category_uidx").on(
       table.organizationId,
       table.userId,

@@ -1,7 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest";
-import { currentDb, Database, schema, transaction } from "@feeblo/db";
+import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
-import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -474,81 +473,6 @@ describe("EmailSubscriptionRepository", () => {
           expect(Option.getOrUndefined(pending)).toMatchObject({
             state: "pending_verification",
           });
-        })
-    );
-
-    it.effect(
-      "suppresses normalized addresses idempotently by provider event",
-      () =>
-        Effect.gen(function* () {
-          const organizationId = yield* WorkspaceId.generate;
-          const repository = yield* EmailSubscriptionRepository;
-
-          yield* createOrganization(organizationId);
-          expect(
-            yield* repository.upsertSuppression({
-              email: " Subscriber@Example.com ",
-              providerEventId: "evt_1",
-              reason: "hard_bounce",
-            })
-          ).toEqual({ _tag: "Upserted" });
-          expect(
-            yield* repository.upsertSuppression({
-              email: "subscriber@example.com",
-              providerEventId: "evt_1",
-              reason: "hard_bounce",
-            })
-          ).toEqual({ _tag: "DuplicateEvent" });
-          const db = yield* currentDb;
-          const [suppressed] = yield* db
-            .select({ email: schema.emailSuppressionTable.email })
-            .from(schema.emailSuppressionTable)
-            .where(
-              eq(schema.emailSuppressionTable.email, "subscriber@example.com")
-            )
-            .limit(1);
-          expect(suppressed?.email).toBe("subscriber@example.com");
-        })
-    );
-
-    it.effect(
-      "deduplicates concurrent suppression writes by provider event",
-      () =>
-        Effect.gen(function* () {
-          const organizationId = yield* WorkspaceId.generate;
-          const repository = yield* EmailSubscriptionRepository;
-          const db = yield* currentDb;
-
-          yield* createOrganization(organizationId);
-          const results = yield* Effect.all(
-            ["first-bounce@example.com", "second-bounce@example.com"].map(
-              (email) =>
-                transaction(
-                  repository.upsertSuppression({
-                    email,
-                    providerEventId: "evt_concurrent",
-                    reason: "hard_bounce",
-                  })
-                )
-            ),
-            { concurrency: "unbounded" }
-          );
-
-          expect(results.map((result) => result._tag).sort()).toEqual([
-            "DuplicateEvent",
-            "Upserted",
-          ]);
-          expect(
-            yield* db
-              .select({ email: schema.emailSuppressionTable.email })
-              .from(schema.emailSuppressionTable)
-              .where(
-                eq(
-                  schema.emailSuppressionTable.providerEventId,
-                  "evt_concurrent"
-                )
-              )
-          ).toHaveLength(1);
         })
     );
   });

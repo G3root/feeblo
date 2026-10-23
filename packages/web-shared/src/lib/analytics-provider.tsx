@@ -88,7 +88,7 @@ export interface AnalyticsEvents {
       | "delete_board"
       | "make_roadmap_public"
       | "delete_roadmap"
-      | "demote_admin"
+      | "remove_member"
       | "cancel_invitation"
       | "delete_changelog_category"
       | "delete_contact"

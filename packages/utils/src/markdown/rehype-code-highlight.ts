@@ -54,7 +54,9 @@ export function rehypeCodeHighlight(): (tree: Root) => void {
       }
 
       const className = code.properties?.className;
-      const classNameList = Array.isArray(className) ? className : [];
+      const classNameList: unknown[] = Array.isArray(className)
+        ? className
+        : [];
       let languageClass: string | null = null;
       for (const value of classNameList) {
         // hast className values can be primitives; only strings carry a

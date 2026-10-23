@@ -93,7 +93,7 @@ export const makeSlackConnectionServiceLive = (
           // Through the `Crypto` service, not the global: the OAuth state must
           // be reproducible under `TestCrypto` in tests, and Workers forbid
           // random value generation in global scope.
-          const nonce = yield* crypto.randomUUIDv4.pipe(
+          const nonce = yield* crypto.randomUUIDv4().pipe(
             Effect.mapError(
               () =>
                 new InternalServerError({
@@ -505,6 +505,3 @@ export const makeSlackConnectionServiceLive = (
       });
     })
   );
-
-/** Live layer with the default fetch-backed Slack API client. */
-export const SlackConnectionServiceLive = makeSlackConnectionServiceLive();

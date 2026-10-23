@@ -15,6 +15,7 @@ import type {
 import { isBrowser } from "./utils";
 
 /** Boxed-prototype classification for untrusted runtime values (no `typeof`). */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const boxedKind = <T>(value: T): string | null => {
   if (value === null || value === undefined) return null;
   // SAFETY: Object.getPrototypeOf always returns an object or null; every
@@ -28,6 +29,7 @@ const boxedKind = <T>(value: T): string | null => {
 const isStringValue = <T>(value: T): value is T & string =>
   boxedKind(value) === "String";
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const isObjectValue = <T>(value: T): boolean => {
   const kind = boxedKind(value);
   return (

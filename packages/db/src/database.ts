@@ -14,6 +14,7 @@ import * as Schedule from "effect/Schedule";
 import type { SqlError } from "effect/sql/SqlError";
 
 import { relations } from "./relations";
+import { withTransactionAbortRetry } from "./transaction-abort";
 
 // Detect whether the configured DATABASE_URL points at an embedded PGlite
 // instance (`pglite:/path/...`) instead of a real PostgreSQL server.
@@ -87,14 +88,49 @@ export const PgliteClientLive = PgliteClient.layerFrom(
   )
 );
 
+/**
+ * How long a statement may wait for a row lock before Postgres aborts it.
+ *
+ * Without a deadline a waiter holds its pooled connection indefinitely. The
+ * pool is ten connections per process, and the write paths serialize per
+ * workspace on the organization row, so ten blocked requests would starve
+ * every other tenant of the same process — a lock wait on one workspace
+ * becoming an outage on all of them. The value is longer than any healthy
+ * write transaction (the longest is a post create with notification fan-out)
+ * and short enough that a request fails instead of hanging.
+ */
+const lockTimeout = "5s";
+
+/**
+ * How long a transaction may sit idle — open, holding its locks, running no
+ * statement — before Postgres terminates it.
+ *
+ * A leaked transaction is the one leak a pooling client cannot recover from on
+ * its own: the connection stays checked out and its row locks stay held, so
+ * every other writer queues behind a fiber that may never resume.
+ */
+const idleInTransactionTimeout = "30s";
+
 // Configure the Postgres client layer.
 //
 // `PgClient` owns the wire protocol as of rc.117 and no longer accepts `pg`
 // type parsers, so the former `types` shim is gone. Timestamp columns now
 // decode to `Date` rather than the raw strings that shim forced; the domain
 // schemas read them through `Schema.Union([Schema.Date, Schema.DateFromString])`.
+//
+// The two timeouts travel in the startup packet, so every pooled connection
+// carries them and no caller has to remember to set them per transaction.
+// `lock_timeout` surfaces as SQLSTATE `55P03`, which `withTransactionAbortRetry`
+// retries and `withRemapDbErrors` turns into a 500 once the retries run out —
+// far better than a request that never returns.
 export const PgClientLive = SQLPG.PgClient.layerConfig({
   url: Config.Redacted("DATABASE_URL"),
+  startupParameters: {
+    idle_in_transaction_session_timeout: Config.succeed(
+      idleInTransactionTimeout
+    ),
+    lock_timeout: Config.succeed(lockTimeout),
+  },
 });
 
 /** Connection health-check that retries with jittered backoff on startup. */
@@ -124,18 +160,26 @@ const pgDbEffect = PgDrizzle.make({ relations }).pipe(
 );
 
 // Create the DB effect for an embedded PGlite instance.
-// PGlite & drizzle-orm/effect-pglite expose the same public API as the
-// server-backed Postgres variants (Execute, execute, transaction, etc.), so
-// the runtime object is compatible with `EffectPgDatabase`. Casting through
-// `unknown` is safe as long as those two drizzle packages stay API-compatible;
-// if they diverge (e.g. different `execute` return types), this will fail at
-// runtime with no compile-time guard.
 const pgliteDbEffect = PgDrizzlePglite.make({ relations }).pipe(
-  Effect.tap(testConnection),
-  // SAFETY: PgDrizzlePglite.make returns a fully-initialized EffectPgDatabase;
-  // the cast bridges the driver-specific return type to the pg dialect type
-  // used by the rest of the codebase.
-  Effect.map((db) => db as PgDrizzle.EffectPgDatabase<typeof relations>)
+  // SAFETY: `PgDrizzlePglite.make` returns a fully-initialized database whose
+  // runtime surface is the Postgres driver's — the same `select`, `insert`,
+  // `transaction` and `execute`, over the same Effect SQL client. Only the
+  // *declared* result of a statement differs: Postgres', through
+  // `@effect/sql-pg`, reports `oid` plus a mandatory `command` and `rowCount`,
+  // while PGlite's `Results` makes those optional and has no `oid` to report
+  // because an embedded database has no server catalog to name. That difference
+  // is unavoidable at the type level — it is inside the builder generics, so a
+  // `Pick`/`Omit` of the divergent members would not make the two databases
+  // comparable — and it is invisible at runtime, where nothing in the tree
+  // reads `oid`, `command` or `rowCount` off an `execute` result: `execute` is
+  // used for statements whose effect is the point, such as a row lock.
+  // The intermediate `unknown` is what lets the assertion pass the compiler's
+  // overlap check (TS2352 rejects the single-step cast).
+  Effect.map(
+    // oxlint-disable-next-line anti-slop/no-chained-type-assertions -- See the SAFETY comment: the drivers' database types are irreconcilable at TS2352 and identical at runtime, so this boundary is the one place the difference is erased.
+    (db) => db as unknown as PgDrizzle.EffectPgDatabase<typeof relations>
+  ),
+  Effect.tap(testConnection)
 );
 
 // Define a DB service tag for dependency injection
@@ -175,13 +219,21 @@ export const SqlClientContextLive = Layer.unwrap(
   )
 );
 
-// Backwards-compatible alias for the Postgres-only database layer.
+/**
+ * Backwards-compatible alias for the Postgres-only database layer.
+ *
+ * @alias
+ */
 export const DatabaseLive = PgDatabaseLive;
 
-// Effect SQL keeps the active transaction connection in fiber-local context,
-// so queries made through this database automatically join the current
-// transaction (including queries from repositories that captured the database
-// when their layer was built).
+/**
+ * Effect SQL keeps the active transaction connection in fiber-local context,
+ * so queries made through this database automatically join the current
+ * transaction (including queries from repositories that captured the database
+ * when their layer was built).
+ *
+ * @alias
+ */
 export const currentDb: Effect.Effect<
   PgDrizzle.EffectPgDatabase,
   never,
@@ -191,11 +243,17 @@ export const currentDb: Effect.Effect<
 // Run an effect inside a database transaction. Effect SQL routes every query
 // using this client's fiber-local transaction connection and turns nested
 // calls into savepoints.
+//
+// The retry re-runs the whole transaction, which is the only recovery for a
+// deadlock or a lock timeout: Postgres has already rolled it back, so nothing
+// from the first attempt is visible to the second. Repositories that call
+// `db.transaction` directly instead of this helper should wrap the call in
+// `withTransactionAbortRetry` for the same reason.
 export function transaction<A, E, R>(
   effect: Effect.Effect<A, E, R>
 ): Effect.Effect<A, E | SqlError, R | Database> {
   return Effect.gen(function* () {
     const db = yield* Database;
     return yield* db.transaction(() => effect);
-  });
+  }).pipe(withTransactionAbortRetry);
 }

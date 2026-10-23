@@ -8,6 +8,7 @@ import {
   scopePostSlug,
   slugScopedCollectionId,
   slugScopedQueryKey,
+  workspaceIdFromPathname,
 } from "./collection-scope";
 
 const orgA = { organizationId: "org-a", postSlug: "post-1" };
@@ -191,5 +192,29 @@ describe("collections module invariants", () => {
   it("gives every descriptor a unique id", () => {
     const ids = blocks.map((b) => b.name);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("workspaceIdFromPathname", () => {
+  it("returns the first segment when it is a workspace id", () => {
+    expect(workspaceIdFromPathname("/org_abc123/settings/members")).toBe(
+      "org_abc123"
+    );
+    expect(workspaceIdFromPathname("/org_abc123")).toBe("org_abc123");
+    expect(workspaceIdFromPathname("org_abc123/")).toBe("org_abc123");
+  });
+
+  it("returns undefined for the paths that share the dashboard's parent route", () => {
+    for (const pathname of [
+      "/",
+      "/sign-in",
+      "/sign-up",
+      "/forgot-password",
+      "/register",
+      "/invitation/inv_abc123",
+      "/email-verify",
+    ]) {
+      expect(workspaceIdFromPathname(pathname)).toBeUndefined();
+    }
   });
 });

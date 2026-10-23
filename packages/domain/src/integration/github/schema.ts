@@ -155,6 +155,7 @@ export const GitHubSettingsUpdate = Schema.Struct({
 export type GitHubSettingsUpdate = Schema.Schema.Type<
   typeof GitHubSettingsUpdate
 >;
+/** @alias */
 export const GitHubRuleList = GitHubSettingsGet;
 export type GitHubRuleList = Schema.Schema.Type<typeof GitHubRuleList>;
 export const GitHubRuleCreate = Schema.Struct({

@@ -70,7 +70,7 @@ export function ContactTableRow({
   onUnsubscribe: () => void;
   updatePolicy: ClientPolicy;
 }) {
-  const { data: values = [] } = useContactAttributeValues(contact.id);
+  const { data: values } = useContactAttributeValues(contact.id);
   const valuesByAttributeId = new Map(
     values.map((value) => [value.attributeId, value])
   );

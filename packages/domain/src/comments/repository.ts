@@ -8,6 +8,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { publicPostVisibility } from "../post/public-visibility";
+
 interface DeleteCommentArgs {
   id: string;
   organizationId: string;
@@ -180,7 +182,10 @@ const makeCommentRepository = Effect.gen(function* () {
           and(
             eq(schema.commentTable.organizationId, organizationId),
             eq(schema.postTable.slug, slug),
-            eq(schema.boardTable.visibility, "PUBLIC")
+            // A superseded post has no public page, so the comments anchored
+            // to it are not publicly readable either. `GetPostPublic` already
+            // 404s for it; this read has to agree.
+            publicPostVisibility
           )
         )
         .orderBy(

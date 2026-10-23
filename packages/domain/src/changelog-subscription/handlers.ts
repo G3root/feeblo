@@ -1,4 +1,4 @@
-import { transaction } from "@feeblo/db";
+import { attachCause, transaction } from "@feeblo/db";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -67,12 +67,14 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
               ),
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message:
                       "Could not record the changelog email subscription.",
-                  })
+                  }),
+                  error
+                )
               )
             );
         })
@@ -100,12 +102,14 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
               userId: session.session.userId,
             })
             .pipe(
-              Effect.mapError(
-                () =>
+              Effect.mapError((error) =>
+                attachCause(
                   new InternalServerError({
                     message:
                       "Could not unsubscribe the changelog email subscription.",
-                  })
+                  }),
+                  error
+                )
               )
             );
         })

@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { boardPaths } from "../lib/board-links";
 
 export type HomePageSortOption = "upvotes" | "newest" | "oldest";
-type FilterValue = "all" | string;
+type FilterValue = "all" | (string & {});
 
 const SORT_OPTIONS: Set<HomePageSortOption> = new Set([
   "upvotes",

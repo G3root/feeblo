@@ -1,9 +1,11 @@
 import { currentDb, schema } from "@feeblo/db";
-import { and, count, eq, sql } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+
+import { publicPostVisibility } from "../post/public-visibility";
 
 const makeOgImageRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -41,16 +43,10 @@ const makeOgImageRepository = Effect.gen(function* () {
             eq(schema.postTable.organizationId, organizationId),
             eq(schema.postTable.slug, postSlug),
             // The route is unauthenticated and slugs are slugified titles, so
-            // never render metadata for posts on PRIVATE boards — only PUBLIC
-            // boards are reachable through the public site anyway.
-            eq(schema.boardTable.visibility, "PUBLIC"),
-            // Same rule the public post reads apply (`findManyPublic`,
-            // `findPublicBySlug`, `isUnlockedPublic`): superseded content stays
-            // queryable internally but must not render for the public. Without
-            // these two an archived or merged post's title, board, status and
-            // upvote count were readable as a PNG by anyone with its slug.
-            sql`${schema.postTable.archivedAt} is null`,
-            sql`${schema.postTable.mergedIntoPostId} is null`
+            // never render metadata for a post that has no public page: a
+            // private board, an archived post, or a merged-away source. The
+            // shared predicate is the same one the public reads apply.
+            publicPostVisibility
           )
         )
         .groupBy(

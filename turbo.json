@@ -1,6 +1,20 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  // Every cached task here resolves its imports through `node_modules`: the
+  // typecheck pass, the type-aware //#lint pass, and the three build tasks,
+  // which bundle dependencies rather than just the package's own sources. None
+  // of that is a tracked input, so by default the resolved dependency versions
+  // are not part of a task's hash. Appending a line to `pnpm-lock.yaml` left
+  // both `typecheck` and `//#lint` replaying `cache hit`, and a package whose
+  // types no longer compiled replayed a green result from before the install —
+  // which is the same hazard the `//#toolchain` and `//#knip` comments below
+  // describe and solve by not caching at all. Those two are cheap; these are
+  // not, so the lockfile is named as a global dependency instead. It applies to
+  // tasks that declare their own `inputs` too, which is what makes it cover the
+  // build tasks. A source-only change still hits the cache; a dependency bump
+  // misses once, which is the point.
+  "globalDependencies": ["pnpm-lock.yaml"],
   "tasks": {
     "typecheck": {
       "dependsOn": ["^typecheck", "build:paraglide"],
@@ -18,8 +32,44 @@
     "//#lint": {
       "outputs": []
     },
+    // Reads the manifests and `pnpm-workspace.yaml`, so it hashes the whole repo
+    // and needs no outputs: see `check-toolchain.ts`.
+    //
+    // Not cached on purpose: its patch check reads installed versions from
+    // `node_modules`, which are not a tracked input, so a replayed success could
+    // describe an install that no longer exists. It takes milliseconds.
+    "//#toolchain": {
+      "cache": false,
+      "outputs": []
+    },
+    // Finds unused files, dependencies and exports. It resolves every import
+    // through `node_modules` and reads the manifests and the workspace file, so
+    // it hashes the whole repository and produces no output.
+    //
+    // The three `build:paraglide` dependencies are ordering, not work: the
+    // generated `src/paraglide` directories ignore themselves through a
+    // `.gitignore` Paraglide writes into them, so Knip must not start reading
+    // one before that file exists. Running them concurrently (they are already
+    // in the graph for `typecheck`) let Knip enumerate half-written generated
+    // files as project files and report every unused runtime export on CI.
+    //
+    // Not cached: the report depends on installed packages and on generated
+    // files that are not tracked inputs, so a replayed success could describe
+    // a tree that no longer exists. It takes ~12s.
+    //
+    // The issue types pinned to `warn` in `knip.config.ts` are printed but do
+    // not fail the run; the `error` ones are the types that are clean today.
+    "//#knip": {
+      "dependsOn": [
+        "@feeblo/web#build:paraglide",
+        "@feeblo/post-ui#build:paraglide",
+        "@feeblo/public-feature-board#build:paraglide"
+      ],
+      "cache": false,
+      "outputs": []
+    },
     "check": {
-      "dependsOn": ["typecheck", "//#lint"],
+      "dependsOn": ["typecheck", "//#lint", "//#toolchain", "//#knip"],
       "outputs": []
     },
     "build": {

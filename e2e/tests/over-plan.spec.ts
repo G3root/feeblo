@@ -32,7 +32,7 @@ test.describe("over-plan gate", () => {
     const owner = await createAuthenticatedWorkspace(page);
     const organizationId = new URL(owner.organizationUrl).pathname
       .split("/")
-      .filter(Boolean)[0];
+      .find(Boolean);
 
     if (organizationId === undefined) {
       throw new Error(
