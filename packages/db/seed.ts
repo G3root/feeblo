@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import { faker } from "@faker-js/faker";
 import {
@@ -10,6 +10,7 @@ import {
   CommentReactionId,
   ContactId,
   MemberId,
+  PostActivityId,
   PostId,
   PostReactionId,
   PostStatusId,
@@ -18,6 +19,7 @@ import {
   SiteId,
   SubscriptionId,
   UpvoteId,
+  UserId,
   WorkspaceId,
 } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
@@ -47,6 +49,7 @@ import {
   DEFAULT_POST_STATUSES,
   memberTable,
   organizationTable,
+  postActivityTable,
   postReactionTable,
   postStatusTable,
   postTable,
@@ -403,6 +406,14 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+
+/**
+ * The address digest `provisionShadowUser` and `upsertSsoUser` store. The seed
+ * cannot import the domain's helper (dependency direction), so it mirrors the
+ * sha256-of-the-normalised-address contract here.
+ */
+const seedEmailHash = (email: string) =>
+  createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
 
 const addDays = (date: Date, days: number) => {
   const result = new Date(date);
@@ -1276,6 +1287,513 @@ const seedChangelogs = ({
  * these shapes on Free still applies to the dashboard; the fixture only needs
  * to reproduce the state a downgrade would leave behind.
  */
+/**
+ * The account facts an on-behalf timeline entry snapshots (ADR 0023). A field
+ * is omitted when the action would not have known it.
+ */
+type SeedOnBehalfSubject = {
+  contactId?: string;
+  userId?: string;
+  name?: string;
+  email?: string;
+  kind: "member" | "customer";
+};
+
+/**
+ * The CRM and on-behalf cases the dashboard is built to render.
+ *
+ * One contact per account class the Customers table badges — no account, a
+ * `behalf-*` shadow, an unverified account, a verified account, a legacy
+ * contact for a member, and an SSO portal identity — plus the two "the record
+ * is gone" states the provenance snapshot exists for: a deleted customer whose
+ * shadow kept their history, and a member who was removed after attributing a
+ * post. Seeded against the main org so the plan's generous CRM allowance is not
+ * in the way.
+ */
+const seedCrmOnBehalf = ({
+  organizationId,
+  actorId,
+  actorMemberId,
+}: {
+  organizationId: string;
+  actorId: string;
+  actorMemberId: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+    const now = new Date();
+
+    const [status] = yield* db
+      .select({ id: postStatusTable.id })
+      .from(postStatusTable)
+      .where(eq(postStatusTable.organizationId, organizationId))
+      .limit(1);
+    const [board] = yield* db
+      .select({ id: boardTable.id })
+      .from(boardTable)
+      .where(eq(boardTable.organizationId, organizationId))
+      .limit(1);
+
+    if (!status || !board) {
+      return yield* new SeedDataError({
+        message: "No post status or board to seed the on-behalf cases against",
+      });
+    }
+
+    const findMemberByEmail = (email: string) =>
+      db
+        .select({
+          email: userTable.email,
+          memberId: memberTable.id,
+          name: userTable.name,
+          userId: userTable.id,
+        })
+        .from(memberTable)
+        .innerJoin(userTable, eq(userTable.id, memberTable.userId))
+        .where(
+          and(
+            eq(memberTable.organizationId, organizationId),
+            eq(userTable.email, email)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0]));
+
+    const contactMember = yield* findMemberByEmail("sam@feeblo.dev");
+    const attributingMember = yield* findMemberByEmail("alex@feeblo.dev");
+    if (!contactMember || !attributingMember) {
+      return yield* new SeedDataError({
+        message: "The CRM cases need the seeded team members",
+      });
+    }
+
+    // -- Linked accounts -------------------------------------------------
+    const shadowAccountId = yield* UserId.generate;
+    const unverifiedAccountId = yield* UserId.generate;
+    const verifiedAccountId = yield* UserId.generate;
+    const portalAccountId = yield* UserId.generate;
+
+    yield* db.insert(userTable).values([
+      {
+        id: shadowAccountId,
+        name: "Sally Shadow",
+        email: `behalf-${randomBytes(8).toString("hex")}@feeblo.com`,
+        emailHash: seedEmailHash("sally@acme.test"),
+        emailVerified: false,
+        restrictedToOrganizationId: organizationId,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: unverifiedAccountId,
+        name: "Uma Unverified",
+        email: "uma@acme.test",
+        emailHash: seedEmailHash("uma@acme.test"),
+        emailVerified: false,
+        // Every row carries the key so the multi-row insert has one shape.
+        restrictedToOrganizationId: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: verifiedAccountId,
+        name: "Vera Verified",
+        email: "vera@acme.test",
+        emailHash: seedEmailHash("vera@acme.test"),
+        emailVerified: true,
+        restrictedToOrganizationId: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: portalAccountId,
+        name: "Pat Portal",
+        email: `sso-${randomBytes(8).toString("hex")}@feeblo.com`,
+        emailHash: seedEmailHash("pat@acme.test"),
+        emailVerified: true,
+        restrictedToOrganizationId: organizationId,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+
+    // -- Contacts, one per account class ---------------------------------
+    const nedContactId = yield* ContactId.generate;
+    const sallyContactId = yield* ContactId.generate;
+    const umaContactId = yield* ContactId.generate;
+    const veraContactId = yield* ContactId.generate;
+    const patContactId = yield* ContactId.generate;
+    const moContactId = yield* ContactId.generate;
+
+    yield* db.insert(contactTable).values([
+      {
+        id: nedContactId,
+        organizationId,
+        name: "Ned No Account",
+        email: "ned@acme.test",
+        userId: null,
+        source: "ON_BEHALF",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: sallyContactId,
+        organizationId,
+        name: "Sally Shadow",
+        email: "sally@acme.test",
+        userId: shadowAccountId,
+        source: "ON_BEHALF",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: umaContactId,
+        organizationId,
+        name: "Uma Unverified",
+        email: "uma@acme.test",
+        userId: unverifiedAccountId,
+        source: "ON_BEHALF",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: veraContactId,
+        organizationId,
+        name: "Vera Verified",
+        email: "vera@acme.test",
+        userId: verifiedAccountId,
+        source: "ON_BEHALF",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: patContactId,
+        organizationId,
+        name: "Pat Portal",
+        email: "pat@acme.test",
+        userId: portalAccountId,
+        source: "WIDGET",
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        // A customer record that predates the person joining the team: the
+        // resolver keeps it as the attribution anchor (ADR 0017).
+        id: moContactId,
+        organizationId,
+        name: "Mo Member",
+        email: contactMember.email,
+        userId: contactMember.userId,
+        source: "DASHBOARD",
+        createdAt: now,
+        updatedAt: now,
+      },
+    ]);
+
+    let postIndex = 0;
+    const createPost = ({
+      title,
+      authorName,
+      contactId,
+      creatorId,
+      creatorMemberId,
+    }: {
+      title: string;
+      /** What the write path stores on `post.author_name`. */
+      authorName: string | null;
+      contactId: string | null;
+      creatorId: string | null;
+      creatorMemberId: string | null;
+    }) =>
+      Effect.gen(function* () {
+        postIndex += 1;
+        const id = yield* PostId.generate;
+        const content = faker.lorem.paragraphs({ min: 1, max: 2 });
+        yield* db.insert(postTable).values({
+          id,
+          title,
+          slug: slugify(`${title}-${postIndex}`),
+          content,
+          excerpt: htmlToExcerpt(content),
+          boardId: board.id,
+          statusId: status.id,
+          organizationId,
+          creatorId,
+          creatorMemberId,
+          contactId,
+          authorName,
+          source: "DASHBOARD",
+          metadata: {},
+          createdAt: now,
+          updatedAt: now,
+        });
+        return id;
+      });
+
+    const recordOnBehalf = ({
+      postId,
+      kind,
+      subject,
+    }: {
+      postId: string;
+      kind: "AUTHOR_CHANGED" | "POST_CREATED" | "VOTE_ADDED";
+      subject: SeedOnBehalfSubject;
+    }) =>
+      Effect.gen(function* () {
+        const id = yield* PostActivityId.generate;
+        yield* db.insert(postActivityTable).values({
+          id,
+          organizationId,
+          postId,
+          actorId,
+          actorMemberId,
+          kind,
+          metadata: { onBehalfOf: subject },
+          createdAt: now,
+        });
+      });
+
+    // 1. Contact with no account: the post carries only `contact_id`, so the
+    //    delete dialog's "loses their author" branch is the true one.
+    const nedPostId = yield* createPost({
+      title: "Bulk import of 400 rows times out",
+      authorName: "Ned No Account",
+      contactId: nedContactId,
+      creatorId: null,
+      creatorMemberId: null,
+    });
+    yield* recordOnBehalf({
+      postId: nedPostId,
+      kind: "POST_CREATED",
+      subject: {
+        contactId: nedContactId,
+        name: "Ned No Account",
+        email: "ned@acme.test",
+        kind: "customer",
+      },
+    });
+
+    // 2. Attribution-only shadow: its vote and comment are what keep the
+    //    account alive after the contact goes.
+    const sallyPostId = yield* createPost({
+      title: "Weekly digest arrives twice",
+      authorName: "Sally Shadow",
+      contactId: sallyContactId,
+      creatorId: shadowAccountId,
+      creatorMemberId: null,
+    });
+    yield* recordOnBehalf({
+      postId: sallyPostId,
+      kind: "POST_CREATED",
+      subject: {
+        contactId: sallyContactId,
+        userId: shadowAccountId,
+        name: "Sally Shadow",
+        email: "sally@acme.test",
+        kind: "customer",
+      },
+    });
+    yield* db.insert(upvoteTable).values({
+      id: yield* UpvoteId.generate,
+      userId: shadowAccountId,
+      memberId: null,
+      postId: sallyPostId,
+      organizationId,
+    });
+    yield* recordOnBehalf({
+      postId: sallyPostId,
+      kind: "VOTE_ADDED",
+      subject: {
+        contactId: sallyContactId,
+        userId: shadowAccountId,
+        name: "Sally Shadow",
+        email: "sally@acme.test",
+        kind: "customer",
+      },
+    });
+    yield* db.insert(commentTable).values({
+      id: yield* CommentId.generate,
+      content: "Happens every Tuesday for me too.",
+      organizationId,
+      postId: sallyPostId,
+      userId: shadowAccountId,
+      memberId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // 3. Unverified account: badged as an account, refused by the gate.
+    const umaPostId = yield* createPost({
+      title: "Rename saved views",
+      authorName: "Uma Unverified",
+      contactId: umaContactId,
+      creatorId: unverifiedAccountId,
+      creatorMemberId: null,
+    });
+    yield* recordOnBehalf({
+      postId: umaPostId,
+      kind: "POST_CREATED",
+      subject: {
+        contactId: umaContactId,
+        userId: unverifiedAccountId,
+        name: "Uma Unverified",
+        email: "uma@acme.test",
+        kind: "customer",
+      },
+    });
+
+    // 4. Verified global account: reaches public boards only.
+    const veraPostId = yield* createPost({
+      title: "Export board history to CSV",
+      authorName: "Vera Verified",
+      contactId: veraContactId,
+      creatorId: verifiedAccountId,
+      creatorMemberId: null,
+    });
+    yield* recordOnBehalf({
+      postId: veraPostId,
+      kind: "POST_CREATED",
+      subject: {
+        contactId: veraContactId,
+        userId: verifiedAccountId,
+        name: "Vera Verified",
+        email: "vera@acme.test",
+        kind: "customer",
+      },
+    });
+
+    // 5. Portal identity: verified and bound to this workspace.
+    const patPostId = yield* createPost({
+      title: "SSO session expires too early",
+      authorName: "Pat Portal",
+      contactId: patContactId,
+      creatorId: portalAccountId,
+      creatorMemberId: null,
+    });
+    yield* recordOnBehalf({
+      postId: patPostId,
+      kind: "POST_CREATED",
+      subject: {
+        contactId: patContactId,
+        userId: portalAccountId,
+        name: "Pat Portal",
+        email: "pat@acme.test",
+        kind: "customer",
+      },
+    });
+
+    // 6. Legacy contact for a member: the record wins as the anchor, so the
+    //    post is attributed to the contact and no member tick is drawn.
+    const moPostId = yield* createPost({
+      title: "Slack notifications for status changes",
+      authorName: "Mo Member",
+      contactId: moContactId,
+      creatorId: contactMember.userId,
+      creatorMemberId: null,
+    });
+    yield* recordOnBehalf({
+      postId: moPostId,
+      kind: "POST_CREATED",
+      subject: {
+        contactId: moContactId,
+        userId: contactMember.userId,
+        // The contact is the anchor, so its name is the snapshot the resolver
+        // would have written — not the account's own name.
+        name: "Mo Member",
+        email: contactMember.email,
+        kind: "customer",
+      },
+    });
+
+    // 7. Removed teammate: the account keeps the post's author name and the
+    //    snapshot keeps the timeline saying "workspace member".
+    const formerMemberUserId = yield* UserId.generate;
+    const formerMemberId = yield* MemberId.generate;
+    yield* db.insert(userTable).values({
+      id: formerMemberUserId,
+      name: "Former Member",
+      email: "former@feeblo.dev",
+      emailHash: seedEmailHash("former@feeblo.dev"),
+      emailVerified: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    yield* db.insert(memberTable).values({
+      id: formerMemberId,
+      organizationId,
+      userId: formerMemberUserId,
+      role: "contributor",
+      createdAt: now,
+    });
+    const formerPostId = yield* createPost({
+      title: "Recorded from a customer call",
+      authorName: "Former Member",
+      contactId: null,
+      creatorId: formerMemberUserId,
+      creatorMemberId: formerMemberId,
+    });
+    yield* recordOnBehalf({
+      postId: formerPostId,
+      kind: "POST_CREATED",
+      subject: {
+        userId: formerMemberUserId,
+        name: "Former Member",
+        email: "former@feeblo.dev",
+        kind: "member",
+      },
+    });
+    yield* db.delete(memberTable).where(eq(memberTable.id, formerMemberId));
+
+    // 8. Deleted customer whose shadow survived: the contact id in the entry
+    //    no longer resolves, so the timeline can only read the snapshot.
+    const orphanAccountId = yield* UserId.generate;
+    yield* db.insert(userTable).values({
+      id: orphanAccountId,
+      name: "Dana Deleted",
+      email: `behalf-${randomBytes(8).toString("hex")}@feeblo.com`,
+      emailHash: seedEmailHash("dana@acme.test"),
+      emailVerified: false,
+      restrictedToOrganizationId: organizationId,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const orphanPostId = yield* createPost({
+      title: "Custom fields on the roadmap card",
+      authorName: "Dana Deleted",
+      contactId: null,
+      creatorId: orphanAccountId,
+      creatorMemberId: null,
+    });
+    yield* recordOnBehalf({
+      postId: orphanPostId,
+      kind: "POST_CREATED",
+      subject: {
+        // Deliberately dangling: this is what `ON DELETE SET NULL` leaves in
+        // the JSON provenance when the CRM record is removed.
+        contactId: "cnt_deleted_dana",
+        userId: orphanAccountId,
+        name: "Dana Deleted",
+        email: "dana@acme.test",
+        kind: "customer",
+      },
+    });
+    yield* db.insert(upvoteTable).values({
+      id: yield* UpvoteId.generate,
+      userId: orphanAccountId,
+      memberId: null,
+      postId: orphanPostId,
+      organizationId,
+    });
+
+    console.log("\n6) Seeding CRM account states and on-behalf history");
+    console.log(
+      "   Contacts: 6 (no account, shadow, unverified, verified, member, portal)"
+    );
+    console.log(
+      `   On-behalf posts: ${postIndex} (including a deleted customer and a removed member)`
+    );
+  });
+
 const seedOverPlanWorkspace = (auth: SeedAuth) =>
   Effect.gen(function* () {
     const db = yield* Database.Database;
@@ -1366,7 +1884,7 @@ const seedOverPlanWorkspace = (auth: SeedAuth) =>
       });
     }
 
-    console.log("\n6) Seeding the over-plan workspace");
+    console.log("\n7) Seeding the over-plan workspace");
     console.log(
       `   User: ${OVER_PLAN_USER.email} / ${OVER_PLAN_USER.password}`
     );
@@ -1577,6 +2095,12 @@ const seed = (auth: SeedAuth) =>
       creatorId: primaryUser.id,
       creatorMemberId: primaryMember.id,
       posts: mainPosts,
+    });
+
+    yield* seedCrmOnBehalf({
+      actorId: primaryUser.id,
+      actorMemberId: primaryMember.id,
+      organizationId: primaryOrg.id,
     });
 
     yield* seedOverPlanWorkspace(auth);

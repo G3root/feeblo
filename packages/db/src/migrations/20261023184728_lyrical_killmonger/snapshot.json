@@ -1,0 +1,91 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "3bfd96b3-b8a6-4c7b-ade9-da650a93f25e",
+  "prevIds": [
+    "1a647892-f805-43bf-8b0d-3042d0101cee"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "post",
+        "author_name"
+      ],
+      "writes": [
+        "s|col|public.post.author_name",
+        "n|col|public.post.author_name",
+        "e|col|public.post.author_name"
+      ],
+      "reads": [
+        "n|tbl|public.post",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post",
+        "post_contactId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_contactId_idx",
+        "n|idx|public.post_contactId_idx",
+        "e|idx|public.post_contactId_idx",
+        "n|rel|public.post_contactId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.post",
+        "n|sch|public",
+        "n|col|public.post.contact_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post",
+        "name": "author_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "post",
+        "name": "post_contactId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "contact_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

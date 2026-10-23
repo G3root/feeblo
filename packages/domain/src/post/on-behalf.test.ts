@@ -483,6 +483,89 @@ describe("PostRpcHandlers on-behalf", () => {
         })
       );
 
+      it.effect(
+        "keeps the author's identity on the timeline after the contact is deleted",
+        () =>
+          Effect.gen(function* () {
+            recordedIntegrationEvents.length = 0;
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture("manager");
+            const postId = yield* PostId.generate;
+
+            yield* handlers
+              .CreatePost({
+                ...postCreateInput(fixture, postId, "Snapshot author"),
+                author: { email: "dana@example.com", name: "Dana Dee" },
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+
+            const createdPost = yield* getPost(postId);
+            const readCreated = () =>
+              db
+                .select({ metadata: schema.postActivityTable.metadata })
+                .from(schema.postActivityTable)
+                .where(
+                  and(
+                    eq(schema.postActivityTable.postId, postId),
+                    eq(schema.postActivityTable.kind, "POST_CREATED")
+                  )
+                )
+                .limit(1);
+
+            // The timeline entry snapshots the subject it was written for, so
+            // `on-behalf` history never depends on a live contact row.
+            const [created] = yield* readCreated();
+            expect(created?.metadata).toEqual({
+              onBehalfOf: {
+                contactId: createdPost?.contactId,
+                name: "Dana Dee",
+                email: "dana@example.com",
+                kind: "customer",
+              },
+            });
+
+            // Deleting the contact nulls the post's only author pointer
+            // (`post.contact_id`); the entry must keep naming the person.
+            yield* db
+              .delete(schema.contactTable)
+              .where(
+                eq(schema.contactTable.organizationId, fixture.organizationId)
+              );
+            const deletedPost = yield* getPost(postId);
+            expect(deletedPost?.contactId).toBeNull();
+            expect(deletedPost?.creatorId).toBeNull();
+            expect(deletedPost?.authorName).toBe("Dana Dee");
+
+            const [surviving] = yield* readCreated();
+            expect(surviving?.metadata).toEqual(created?.metadata);
+
+            // The dashboard post row reads the same author, from its own
+            // display snapshot, now that neither the contact nor an account
+            // can name them.
+            const posts = yield* handlers
+              .ListPosts({
+                boardId: fixture.boardId,
+                organizationId: fixture.organizationId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              );
+            expect(posts.find((row) => row.id === postId)?.user).toEqual({
+              name: "Dana Dee",
+              image: null,
+            });
+          })
+      );
+
       it.effect("denies contributors", () =>
         Effect.gen(function* () {
           recordedIntegrationEvents.length = 0;
@@ -660,7 +743,12 @@ describe("PostRpcHandlers on-behalf", () => {
               )
               .limit(1);
             expect(activity?.metadata).toEqual({
-              onBehalfOf: { userId: teammate.userId },
+              onBehalfOf: {
+                userId: teammate.userId,
+                name: "Teammate",
+                email: `teammate_${fixture.organizationId}@example.com`,
+                kind: "member",
+              },
             });
           })
       );

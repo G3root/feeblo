@@ -1,4 +1,8 @@
-import type { TContact } from "@feeblo/domain/contact/schema";
+import type {
+  TContact,
+  TContactAccountKind,
+  TContactNotifyAccess,
+} from "@feeblo/domain/contact/schema";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { TableCell, TableRow } from "@feeblo/ui/table";
@@ -40,6 +44,48 @@ function formatSource(source: TContact["source"]) {
   }[source];
 }
 
+const accountKindLabel = {
+  ACCOUNT: "Account",
+  MEMBER: "Workspace member",
+  PORTAL: "Portal account",
+  SHADOW: "On-behalf only",
+} satisfies Record<TContactAccountKind, string>;
+
+/**
+ * The account state column: what the person is in Feeblo, and whether post
+ * updates can reach them. Both come from the server, which derives them from
+ * the same eligibility rule the delivery gate uses, so the CRM cannot claim
+ * someone "will be notified" when the gate would skip them.
+ */
+function AccountStatus({
+  accountKind,
+  notifyAccess,
+}: {
+  accountKind?: TContactAccountKind | null;
+  notifyAccess?: TContactNotifyAccess;
+}) {
+  const label = accountKind ? accountKindLabel[accountKind] : "No account";
+  const hint =
+    accountKind === "SHADOW"
+      ? "Cannot sign in"
+      : notifyAccess === "NO"
+        ? // No account, or an account whose email is unverified: attribution
+          // without delivery is exactly what the reader needs to know.
+          "Won't be notified"
+        : notifyAccess === "PUBLIC_ONLY"
+          ? "Notified on public boards only"
+          : null;
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span>{label}</span>
+      {hint ? (
+        <span className="text-muted-foreground text-xs">{hint}</span>
+      ) : null}
+    </div>
+  );
+}
+
 export function ContactTableRow({
   company,
   contact,
@@ -53,11 +99,13 @@ export function ContactTableRow({
 }: {
   company?: { id: string; name: string };
   contact: {
+    accountKind?: TContactAccountKind | null;
     companyId: string | null;
     email: string | null;
     externalId: string | null;
     id: string;
     name: string | null;
+    notifyAccess?: TContactNotifyAccess;
     phone: string | null;
     source: TContact["source"];
     updatedAt: Date;
@@ -81,6 +129,12 @@ export function ContactTableRow({
         {contact.name ?? "Unnamed contact"}
       </TableCell>
       <TableCell>{contact.email ?? "—"}</TableCell>
+      <TableCell>
+        <AccountStatus
+          accountKind={contact.accountKind}
+          notifyAccess={contact.notifyAccess}
+        />
+      </TableCell>
       <TableCell>{contact.phone ?? "—"}</TableCell>
       <TableCell>{contact.externalId ?? "—"}</TableCell>
       <TableCell>{formatSource(contact.source)}</TableCell>

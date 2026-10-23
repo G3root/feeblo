@@ -26,13 +26,21 @@ export const PostActivity = S.Struct({
   previousValue: S.NullOr(S.String),
   nextValue: S.NullOr(S.String),
   commentId: S.NullOr(S.String),
-  /** On-behalf provenance; see docs/on-behalf.md. */
+  /**
+   * On-behalf provenance; see `docs/on-behalf.md`. `name` / `email` / `kind`
+   * are a snapshot taken at attribution time so the timeline still names the
+   * subject after the contact or account is deleted (rows written before the
+   * snapshot fields existed carry only the identifiers).
+   */
   metadata: S.optional(
     S.NullOr(
       S.Struct({
         onBehalfOf: S.Struct({
           contactId: S.optional(S.NullOr(S.String)),
           userId: S.optional(S.NullOr(S.String)),
+          name: S.optional(S.NullOr(S.String)),
+          email: S.optional(S.NullOr(S.String)),
+          kind: S.optional(S.NullOr(S.Literals(["member", "customer"]))),
         }),
       })
     )

@@ -68,8 +68,15 @@ export const resolveOnBehalfSubject = (args: {
   });
 
 /**
- * Builds the `{ onBehalfOf: { contactId, userId? } }` provenance stored on
- * `post_activity.metadata`. Absent subject means self-service: no metadata.
+ * Builds the `{ onBehalfOf: { contactId?, userId?, name?, email?, kind } }`
+ * provenance stored on `post_activity.metadata`. Absent subject means
+ * self-service: no metadata.
+ *
+ * `name` and `email` are a snapshot, not a lookup: the contact or account can
+ * be deleted later, and a timeline entry that resolves its subject from a live
+ * collection would then read "on behalf of a customer". `kind` records which
+ * of the two the subject was, so a removed staff member still renders as staff
+ * rather than as a customer.
  */
 export const toOnBehalfMetadata = (
   subject: ResolvedPrincipal | undefined
@@ -80,6 +87,9 @@ export const toOnBehalfMetadata = (
       // provenance, and the timeline resolves the member from it.
       ...(subject.contactId !== null && { contactId: subject.contactId }),
       ...(subject.userId !== null && { userId: subject.userId }),
+      ...(subject.name !== null && { name: subject.name }),
+      ...(subject.email !== null && { email: subject.email }),
+      kind: subject.memberId !== null ? "member" : "customer",
     },
   };
 

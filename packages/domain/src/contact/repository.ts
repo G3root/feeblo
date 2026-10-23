@@ -8,19 +8,37 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import {
+  type EmailRecipientAccessClass,
+  evaluateOrganizationAccess,
+} from "../email-outbox/access";
 import { isSyntheticEmail } from "../identity/emails";
 import {
   ContactAlreadyExistsError,
   FailedToUpdateContactError,
 } from "./errors";
 import type {
+  TContactAccountKind,
   TContactCreate,
   TContactDelete,
   TContactUpdate,
   TContactUpsert,
+  TContactWithAccount,
 } from "./schema";
 
 export type Contact = typeof schema.contactTable.$inferSelect;
+
+/**
+ * Account class → the Customers-table vocabulary. Exhaustive, so a new class in
+ * `evaluateOrganizationAccess` is a compile error here rather than a silently
+ * unlabelled row.
+ */
+const ACCOUNT_KIND_BY_CLASS = {
+  global: "ACCOUNT",
+  member: "MEMBER",
+  shadow: "SHADOW",
+  sso: "PORTAL",
+} as const satisfies Record<EmailRecipientAccessClass, TContactAccountKind>;
 
 /**
  * Keeps a synthetic account's display name in step with the customer record
@@ -151,6 +169,21 @@ const makeContactRepository = Effect.gen(function* () {
               now,
               userId: contact.value.userId,
             });
+          }
+          // The post-level display snapshot follows the CRM too. It is only
+          // read once the live contact is gone, so leaving it stale would bring
+          // the old name back at exactly the wrong moment.
+          if (Option.isSome(contact) && args.name !== undefined) {
+            yield* tx
+              .update(schema.postTable)
+              .set({
+                authorName: contact.value.name ?? contact.value.email,
+                // Metadata about someone else's post must not reorder
+                // "recently updated" lists; `$onUpdate` only fills the column
+                // when the set clause omits it.
+                updatedAt: sql`${schema.postTable.updatedAt}`,
+              })
+              .where(eq(schema.postTable.contactId, contact.value.id));
           }
           return contact;
         })
@@ -393,16 +426,81 @@ const makeContactRepository = Effect.gen(function* () {
         return Option.fromNullishOr(created);
       }),
 
+    /**
+     * The Customers-table read: every contact in the workspace plus the state
+     * of its linked account.
+     *
+     * `accountKind` / `notifyAccess` are derived here, from the same
+     * `evaluateOrganizationAccess` the delivery gate uses, so the CRM and the
+     * on-behalf picker cannot disagree about who has an account and who will be
+     * emailed. The picker evaluates with a concrete post; this page has none,
+     * so an unrestricted account reads as `PUBLIC_ONLY` instead of guessing.
+     */
     findManyContacts: (
       organizationId: string,
       options?: { limit?: number }
     ) => {
       const query = db
-        .select()
+        .select({
+          accountEmail: schema.userTable.email,
+          accountEmailVerified: schema.userTable.emailVerified,
+          accountRestrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+          contact: schema.contactTable,
+          memberId: schema.memberTable.id,
+        })
         .from(schema.contactTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.contactTable.userId)
+        )
+        .leftJoin(
+          schema.memberTable,
+          and(
+            eq(schema.memberTable.organizationId, organizationId),
+            eq(schema.memberTable.userId, schema.contactTable.userId)
+          )
+        )
         .where(eq(schema.contactTable.organizationId, organizationId));
 
-      return options?.limit === undefined ? query : query.limit(options.limit);
+      const rows =
+        options?.limit === undefined ? query : query.limit(options.limit);
+
+      return Effect.map(rows, (found) =>
+        found.map(({ contact, ...link }): TContactWithAccount => {
+          const account =
+            link.accountEmail === null
+              ? null
+              : {
+                  email: link.accountEmail,
+                  emailVerified: link.accountEmailVerified === true,
+                  restrictedToOrganizationId:
+                    link.accountRestrictedToOrganizationId ?? null,
+                };
+          // `PUBLIC` only affects the unrestricted-global branch: the CRM page
+          // has no post, so this is the most that account can be promised.
+          const verdict = evaluateOrganizationAccess({
+            account,
+            boardVisibility: "PUBLIC",
+            hasMembership: link.memberId !== null,
+            organizationId,
+          });
+
+          return {
+            ...contact,
+            accountKind:
+              account === null
+                ? null
+                : ACCOUNT_KIND_BY_CLASS[verdict.recipientClass],
+            notifyAccess:
+              account === null || !verdict.eligible
+                ? "NO"
+                : verdict.recipientClass === "global"
+                  ? "PUBLIC_ONLY"
+                  : "YES",
+          };
+        })
+      );
     },
 
     /**

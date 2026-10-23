@@ -1142,6 +1142,40 @@ describe("identity linking", () => {
     );
 
     it.effect(
+      "heals a shadow whose contact was deleted while its posts survive",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          const real = `real_orphan_${n}`;
+          const email = `orphan.${n}@example.com`;
+          const shadow = `shadow_orphan_${n}`;
+          yield* insertRealUser({ id: real, email });
+          yield* insertShadowUser({ id: shadow, email, organizationId });
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_orphan_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: shadow,
+          });
+
+          // No contact row: deleting the CRM record leaves exactly this, and
+          // the contact scan above can never discover the surviving shadow.
+          const summary = yield* healShadowsForVerifiedUser({ userId: real });
+
+          expect(summary.organizationIds).toEqual([organizationId]);
+          expect(summary.totals.posts).toBe(1);
+          expect(yield* getUserById(shadow)).toBeUndefined();
+          expect((yield* getPostById(`post_orphan_${n}`))?.creatorId).toBe(
+            real
+          );
+        })
+    );
+
+    it.effect(
       "heals a non-member customer signup discovered by contact email alone",
       () =>
         Effect.gen(function* () {

@@ -3,6 +3,7 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
+import { hashEmail } from "../user/repository";
 import { isShadowUserEmail, isSyntheticEmail } from "./emails";
 import { SubjectNotFoundError } from "./errors";
 
@@ -429,6 +430,9 @@ const activateDeferredSubscriptionsForContact = (args: {
  *   email, so a different address can never claim another identity.
  * - Only shadow links are consumed; contacts pointing at SSO portal users or
  *   real accounts are left untouched.
+ * - Shadows with no contact left (their CRM record was deleted while
+ *   attributed content kept them alive) are found by email hash, so removing a
+ *   customer cannot strand an identity that signs up later.
  */
 export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
   Effect.gen(function* () {
@@ -500,6 +504,45 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
         organizationIds.push(organizationId);
         totals = addCounts(totals, counts);
       }
+    }
+
+    // The contact scan cannot see a shadow whose contact was deleted while
+    // attributed content kept the account alive (deleting a contact only nulls
+    // `post.contact_id`). Without this pass, signing up after a CRM cleanup
+    // would leave the person's own posts and votes owned by an account they can
+    // never sign in to. The email hash is the same proof the scan uses.
+    const currentEmailHash = yield* hashEmail(user.email);
+    const survivingShadows = yield* db
+      .select({
+        email: schema.userTable.email,
+        id: schema.userTable.id,
+        organizationId: schema.userTable.restrictedToOrganizationId,
+      })
+      .from(schema.userTable)
+      .where(
+        and(
+          eq(schema.userTable.emailHash, currentEmailHash),
+          isNotNull(schema.userTable.restrictedToOrganizationId)
+        )
+      );
+
+    for (const shadow of survivingShadows) {
+      // A portal (`sso-*`) account is a proven identity, not an attribution
+      // shim; only shadows are consumed here.
+      if (!isShadowUserEmail(shadow.email)) {
+        continue;
+      }
+      const organizationId = shadow.organizationId;
+      if (organizationId === null) {
+        continue;
+      }
+      const counts = yield* linkShadowUser({
+        shadowUserId: shadow.id,
+        realUserId: userId,
+        deleteShadowUser: true,
+      });
+      organizationIds.push(organizationId);
+      totals = addCounts(totals, counts);
     }
 
     return { organizationIds, totals } satisfies ShadowHealSummary;

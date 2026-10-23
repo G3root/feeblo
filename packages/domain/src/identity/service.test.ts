@@ -357,12 +357,69 @@ describe("ResolvePrincipalService", () => {
           });
 
           // Attribution must match `findAdoptableByIdentityHash` precedence
-          // (org-scoped wins) so it stays consistent with the SSO session
-          // identity and the `sso` notification-access class.
+          // (a verified org-scoped identity wins) so it stays consistent with
+          // the SSO session identity and the `sso` notification-access class.
           expect(resolved.userId).toBe("user_both_org_resolve");
           const contact = yield* getContactById(resolved.contactId);
           expect(contact?.userId).toBe("user_both_org_resolve");
         })
+    );
+
+    it.effect("adopts a real account over an attribution-only shadow", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        const email = "orphan-shadow@example.com";
+        yield* insertGlobalUser({ id: "user_real_over_shadow", email });
+        // What deleting a contact leaves behind: the shadow survives on the
+        // content it authored, with no contact to anchor it. Binding new
+        // attribution to it would strand the real account.
+        yield* db.insert(schema.userTable).values({
+          id: "user_orphan_shadow",
+          name: "Customer",
+          email: "behalf-0123456789abcdef@feeblo.com",
+          emailHash: hashEmail(email),
+          emailVerified: false,
+          restrictedToOrganizationId: organizationId,
+        });
+
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: true,
+          subject: { email, name: "Jane" },
+        });
+
+        expect(resolved.userId).toBe("user_real_over_shadow");
+        const contact = yield* getContactById(resolved.contactId);
+        expect(contact?.userId).toBe("user_real_over_shadow");
+      })
+    );
+
+    it.effect("adopts a global account that carries no email hash", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        const email = "no-hash-signup@example.com";
+        // What better-auth actually creates: verified, no `email_hash`.
+        yield* db.insert(schema.userTable).values({
+          id: "user_no_hash",
+          name: "No Hash",
+          email,
+          emailVerified: true,
+        });
+
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: true,
+          subject: { email, name: "No Hash" },
+        });
+
+        expect(resolved.userId).toBe("user_no_hash");
+        const contact = yield* getContactById(resolved.contactId);
+        expect(contact?.userId).toBe("user_no_hash");
+      })
     );
 
     it.effect(
@@ -440,10 +497,12 @@ describe("ResolvePrincipalService", () => {
 
           // Staff are not customers: the member row carries the attribution
           // and the CRM stays untouched, so a full CRM must not even be
-          // consulted.
+          // consulted. The snapshot names the account so history survives it.
           expect(resolved).toEqual({
             contactId: null,
+            email: "staff@example.com",
             memberId: "member_staff",
+            name: "Staff Member",
             userId: "user_staff",
           });
           expect(yield* getContactCount(organizationId)).toBe(0);
