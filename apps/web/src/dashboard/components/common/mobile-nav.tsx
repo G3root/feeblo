@@ -40,12 +40,39 @@ export function MobileNav() {
   });
   const { toggleSidebar } = useSidebar();
 
+  const activeIndex = mobileNavItems.findIndex((item) =>
+    pathname.startsWith(`/${organizationId}/${item.segment}`)
+  );
+  const hasActiveItem = activeIndex >= 0;
+
   return (
     <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex items-center justify-center pb-4 md:hidden">
       <nav
         aria-label="Mobile navigation"
-        className="bg-popover pointer-events-auto relative flex w-fit items-center justify-around gap-1 rounded-full border p-1 shadow-lg shadow-black/5 backdrop-blur-sm before:pointer-events-none before:absolute before:inset-0 before:rounded-full before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]"
+        className="bg-popover pointer-events-auto relative flex w-fit items-center justify-around gap-1 rounded-full border p-1 shadow-lg shadow-black/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-full before:shadow-[0_1px_--theme(--color-black/4%)] dark:before:shadow-[0_-1px_--theme(--color-white/6%)]"
+        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+        style={
+          {
+            "--active-item": String(Math.max(activeIndex, 0)),
+          } as React.CSSProperties
+        }
       >
+        {/*
+         * The pill is a sibling of the links and slides between them, so a tab
+         * change reads as one control rather than two background swaps. The
+         * items are equal width (`size-11`), so the offset is arithmetic: the
+         * pill's own width plus the `gap-1` between items.
+         */}
+        <span
+          aria-hidden="true"
+          className="bg-sidebar-accent ease-in-out-strong pointer-events-none absolute inset-y-1 left-1 w-11 rounded-full transition-[transform,opacity] duration-200 motion-reduce:transition-none"
+          data-slot="mobile-nav-indicator"
+          style={{
+            opacity: hasActiveItem ? 1 : 0,
+            transform:
+              "translateX(calc(var(--active-item) * (100% + 0.25rem)))",
+          }}
+        />
         {mobileNavItems.map((item) => {
           const isActive = pathname.startsWith(
             `/${organizationId}/${item.segment}`
@@ -57,7 +84,9 @@ export function MobileNav() {
               aria-label={item.label}
               className={cn(
                 buttonVariants({ size: "icon", variant: "ghost" }),
-                "text-sidebar-foreground/80 aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-accent-foreground size-11! rounded-full"
+                "text-sidebar-foreground/80 aria-[current=page]:text-sidebar-accent-foreground size-11! rounded-full",
+                "ease-out-strong transition-[scale,color] duration-150 active:scale-[0.97]",
+                "motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:active:opacity-64"
               )}
               key={item.segment}
               params={{ organizationId }}
@@ -69,7 +98,7 @@ export function MobileNav() {
         })}
         <Button
           aria-label="Open navigation"
-          className="size-11! rounded-full"
+          className="ease-out-strong size-11! rounded-full transition-[scale,color] duration-150 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 motion-reduce:active:opacity-64"
           onClick={toggleSidebar}
           size="icon"
           variant="ghost"

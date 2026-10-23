@@ -12,6 +12,18 @@
   --animate-toast-error-odd: toast-error-odd 0.28s cubic-bezier(0.5, 1, 0.89, 1);
   --animate-toast-error-even: toast-error-even 0.28s
     cubic-bezier(0.5, 1, 0.89, 1);
+
+  /*
+   * Motion tokens. The built-in CSS easings are too weak to read as
+   * intentional. `--ease-out-strong` is for anything entering or responding
+   * (it starts fast, so the response is immediate); `--ease-in-out-strong` is
+   * for things moving or morphing on screen; `--ease-drawer` is the iOS-like
+   * curve for panels that travel a long distance. Same values as the feedback
+   * widget's local `--ease-widget-*` pair.
+   */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --font-heading: var(--font-inter, sans-serif);
   --font-mono: var(--font-geist-mono, monospace);
   --font-sans: var(--font-inter, sans-serif);

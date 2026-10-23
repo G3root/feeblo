@@ -59,7 +59,13 @@ export function MenuPopup({
       >
         <MenuPrimitive.Popup
           className={cn(
-            "bg-popover relative flex origin-(--transform-origin) rounded-lg border shadow-lg/5 outline-none not-dark:bg-clip-padding not-[class*='w-']:min-w-32 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] focus:outline-none dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
+            // `max-w-(--available-width)` is the only thing keeping a fixed-width
+            // popup (e.g. the `w-96` notifications panel) inside the viewport on
+            // a phone narrower than that width. An overflowing popup makes the
+            // document horizontally scrollable, and a mobile browser answers
+            // that by growing the layout viewport — which drops any
+            // `fixed bottom-0` bar below the visible area until the menu closes.
+            "bg-popover relative flex max-w-(--available-width) origin-(--transform-origin) rounded-lg border shadow-lg/5 outline-none not-dark:bg-clip-padding not-[class*='w-']:min-w-32 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] focus:outline-none dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
             className
           )}
           data-slot="menu-popup"
