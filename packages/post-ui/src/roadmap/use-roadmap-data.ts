@@ -4,8 +4,14 @@ import type { TPost } from "@feeblo/domain/post/schema";
 import type { TStatusRoadmapColumn } from "@feeblo/domain/roadmap-column/schema";
 import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
 import { isLiveQueryPending } from "@feeblo/web-shared/collections";
-import type { Collection, UtilsRecord } from "@tanstack/db";
-import { and, eq, isNull, useLiveQuery } from "@tanstack/react-db";
+import {
+  and,
+  eq,
+  isNull,
+  useLiveQuery,
+  type Collection,
+  type UtilsRecord,
+} from "@tanstack/react-db";
 import { useCallback, useMemo } from "react";
 
 import type {
