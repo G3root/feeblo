@@ -49,12 +49,13 @@ export const userTable = pgTable(
     restrictedToOrganizationId: text("restricted_to_organization_id"),
   },
   (table) => [
-    index("user_emailHash_idx").on(table.emailHash),
     index("user_restricted_to_organization_id_idx").on(
       table.restrictedToOrganizationId
     ),
-    // Enforces at most one org-scoped identity per (email hash, organization).
-    // NULLs stay distinct (Postgres default), so globally-registered accounts
+    // Enforces at most one org-scoped identity per (email hash, organization),
+    // and its leading column also serves the plain email-hash lookup the legacy
+    // single-column index used to cover. NULLs stay distinct (Postgres default),
+    // so globally-registered accounts
     // (NULL restrictedToOrganizationId) and hash-less rows never conflict;
     // only non-null pairs are deduplicated, closing the
     // provisionShadowUser/upsertSsoUser select-then-insert race.
@@ -173,8 +174,9 @@ export const organizationTable = pgTable(
     metadata: text("metadata"),
     /** Per-workspace cap on identity-token lifetime, in minutes. NULL means the 24h default. */
     jwtMaxTokenLifetimeMinutes: integer("jwt_max_token_lifetime_minutes"),
-  },
-  (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)]
+  }
+  // `slug` carries its own `.unique()` constraint; a second unique index on
+  // the same column was pure write amplification.
 );
 
 export const memberTable = pgTable(
@@ -191,7 +193,6 @@ export const memberTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (table) => [
-    index("member_organizationId_idx").on(table.organizationId),
     index("member_userId_idx").on(table.userId),
     uniqueIndex("member_organizationId_userId_uidx").on(
       table.organizationId,
@@ -404,7 +405,6 @@ export const jwtSecretTable = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (table) => [
-    index("jwt_secret_organizationId_idx").on(table.organizationId),
     unique("jwt_secret_organizationId_secret_revokedAt_uidx")
       .on(table.organizationId, table.secret, table.revokedAt)
       .nullsNotDistinct(),
