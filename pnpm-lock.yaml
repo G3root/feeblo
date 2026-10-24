@@ -633,8 +633,8 @@ importers:
   integrations/github:
     dependencies:
       '@distilled.cloud/github':
-        specifier: 1.0.0-rc.16
-        version: 1.0.0-rc.16(effect@4.0.5)
+        specifier: 1.0.0-rc.13
+        version: 1.0.0-rc.13(effect@4.0.5)
       '@feeblo/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -2053,15 +2053,15 @@ packages:
   '@date-fns/tz@1.5.0':
     resolution: {integrity: sha512-lwYN/vDPeNRULcepoE/LO2Pgx+7/RV+S9ARfbc9lr2DtGkOD7pAiruHvbR1RX3Qyf6ja47EWJDMsNK5vK08DJg==}
 
-  '@distilled.cloud/core@1.0.0-rc.16':
-    resolution: {integrity: sha512-+baAuJZxwsrenfM74+nsPs+57al8LIjhkvILyUFl4Q7bPZi0imtmpby/H4UUNlYHP9Iccd3MLfbh77CY2Pt3TA==}
+  '@distilled.cloud/core@1.0.0-rc.13':
+    resolution: {integrity: sha512-RYyrxW+F5zrTuu1UWV/JoycholBCIkXIusYJdDniDwCdmbjdKGl07KlkkeeY774uBawNGf+pt1ESNGeLVnNHsg==}
     peerDependencies:
-      effect: ^4.0.5
+      effect: ^4.0.0
 
-  '@distilled.cloud/github@1.0.0-rc.16':
-    resolution: {integrity: sha512-F4G9HgVp2iehWjrAP7alsAjoWyrtbVfhBI20q4K0bcCCggx6TBI53a0o7hiETDLUr2GtrW1f3nMNKFEy0dImaA==}
+  '@distilled.cloud/github@1.0.0-rc.13':
+    resolution: {integrity: sha512-4c+Oiq8a//GTOJp0xThQcQbIHSI8zokevhz2FFTvBQBiKjDeAQKHXP/XOwdo1EVnZ9ox/Y7OHK/YoLrjmxiq1A==}
     peerDependencies:
-      effect: ^4.0.5
+      effect: ^4.0.0
 
   '@dnd-kit/abstract@0.5.1':
     resolution: {integrity: sha512-XI13sUYRvRgggMocjHlQhLRgENm/2GF94KF7mk+c0uxse7sbn75r0BgxoNPDlzLTDPWx6PkS0YHoeXN9JWhnOA==}
@@ -5747,6 +5747,10 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
+  graphql@16.11.0:
+    resolution: {integrity: sha512-mS1lbMsxgQj6hge1XZ6p7GPhbrtFwUFYi3wRzXAC/FmYnyXMTvvI3td3rjmQ2u8ewXueaSvRPWaEcgVVOT9Jnw==}
+    engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
+
   graphql@16.14.2:
     resolution: {integrity: sha512-Chq1s4CY7jmh8gO2qvLIJyfCDIN+EHLFW/9iShnp1z8FjBQMoodWP1kDC36VAMXXIvAjj4ARa7ntfAV2BrjsbA==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
@@ -8575,13 +8579,14 @@ snapshots:
 
   '@date-fns/tz@1.5.0': {}
 
-  '@distilled.cloud/core@1.0.0-rc.16(effect@4.0.5)':
+  '@distilled.cloud/core@1.0.0-rc.13(effect@4.0.5)':
     dependencies:
       effect: 4.0.5
+      graphql: 16.11.0
 
-  '@distilled.cloud/github@1.0.0-rc.16(effect@4.0.5)':
+  '@distilled.cloud/github@1.0.0-rc.13(effect@4.0.5)':
     dependencies:
-      '@distilled.cloud/core': 1.0.0-rc.16(effect@4.0.5)
+      '@distilled.cloud/core': 1.0.0-rc.13(effect@4.0.5)
       effect: 4.0.5
 
   '@dnd-kit/abstract@0.5.1':
@@ -11739,6 +11744,8 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
+
+  graphql@16.11.0: {}
 
   graphql@16.14.2: {}
 
