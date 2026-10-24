@@ -83,8 +83,13 @@ catalog:
   knip: ^6.42.1
   postgres: ^3.4.7
   rangi: ^2.2.0
-  react: ^19.2.8
-  react-dom: ^19.2.8
+  # React 19.3 breaks two comment flows the e2e suite pins: the
+  # Comments/Activity tab click stops switching panels and a replied-to thread
+  # stays collapsed (`--grep "comment as status update|comment replies"` fails
+  # on 19.3.1, passes on 19.2.8). Stay on the 19.2 line until that is
+  # diagnosed; 19.3 carries no advisory.
+  react: ~19.2.8
+  react-dom: ~19.2.8
   rolldown: ^1.2.15
   shadcn: ^4.22.1
   solid-js: ^1.9.17
