@@ -1,5 +1,4 @@
 import type { TContact } from "@feeblo/domain/contact/schema";
-import type { TOrganizationMember } from "@feeblo/domain/membership/schema";
 import type { TPostActivityKind } from "@feeblo/domain/post-activity/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
@@ -54,71 +53,12 @@ import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useOrgTags } from "~/hooks/use-org-tags";
 import { dashboardCollections } from "~/lib/collections";
 
+import {
+  getOnBehalfMetadata,
+  resolveOnBehalfSubject,
+} from "../lib/on-behalf-subject";
+
 type NameLookup = ReadonlyMap<string, string>;
-
-/**
- * Provenance payload recorded by on-behalf actions
- * (`packages/domain/src/post-activity/repository.ts#PostActivityMetadata`).
- * `ListPostActivities` returns `metadata` (nullable; null for every
- * pre-on-behalf row), so on-behalf rows render "on behalf of {subject}"
- * once the subject's contact is in the local collection.
- */
-type OnBehalfMetadata = {
-  onBehalfOf?: {
-    contactId?: string | null;
-    userId?: string | null;
-  } | null;
-};
-
-function getOnBehalfMetadata(activity: TPostActivity): OnBehalfMetadata | null {
-  // Metadata is decoded by the PostActivity RPC schema; absent for every
-  // pre-on-behalf activity row.
-  const onBehalfOf = activity.metadata?.onBehalfOf ?? null;
-  if (!onBehalfOf) {
-    return null;
-  }
-  return { onBehalfOf };
-}
-
-/**
- * The label rendered after "on behalf of": the subject's display name and
- * whether it came from the member list rather than the customer list.
- */
-type OnBehalfSubjectLabel = {
-  readonly isMember: boolean;
-  readonly name: string;
-};
-
-/**
- * The subject of an on-behalf activity, resolved from the provenance
- * metadata: a customer contact, or a workspace member when the subject is
- * staff (staff attribution records no contact id).
- */
-function resolveOnBehalfSubject(
-  metadata: OnBehalfMetadata,
-  contactsById: ReadonlyMap<string, TContact>,
-  contactsByUserId: ReadonlyMap<string, TContact>,
-  membersByUserId: ReadonlyMap<string, TOrganizationMember>
-): OnBehalfSubjectLabel {
-  const contactId = metadata.onBehalfOf?.contactId;
-  const userId = metadata.onBehalfOf?.userId;
-  const contact =
-    (contactId ? contactsById.get(contactId) : undefined) ??
-    (userId ? contactsByUserId.get(userId) : undefined);
-  if (contact) {
-    return {
-      name: contact.name ?? contact.email ?? "a customer",
-      isMember: false,
-    };
-  }
-
-  const member = userId ? membersByUserId.get(userId) : undefined;
-  if (member) {
-    return { name: member.user.name, isMember: true };
-  }
-
-  return { name: "a customer", isMember: false };
-}
 
 const activityIconMap = {
   POST_CREATED: FileAddIcon,

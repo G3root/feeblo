@@ -64,6 +64,17 @@ export interface ResolvedPrincipal {
    * no consumer reads `undefined` as "customer".
    */
   memberId: string | null;
+  /**
+   * The subject's display name at attribution time. Written onto the timeline
+   * entry so history keeps naming the person after the contact or account is
+   * deleted; null when nothing named them.
+   */
+  name: string | null;
+  /**
+   * The subject's real address at attribution time, never a synthetic inbox.
+   * The same snapshot purpose as `name`.
+   */
+  email: string | null;
 }
 
 type Contact = typeof schema.contactTable.$inferSelect;
@@ -199,6 +210,22 @@ const makeResolvePrincipalService = Effect.gen(function* () {
         })
         .where(eq(schema.contactTable.id, contact.id))
         .returning();
+
+      // A name the subject just enriched onto a nameless contact also names
+      // the posts anchored to it: their author-name fallback was the bare
+      // address, and once the contact is deleted the fallback is what renders.
+      // `updatedAt` is pinned so enrichment does not reorder "recently
+      // updated" lists.
+      if (nextName !== null && nextName !== contact.name) {
+        yield* db
+          .update(schema.postTable)
+          .set({
+            authorName: nextName,
+            updatedAt: sql`${schema.postTable.updatedAt}`,
+          })
+          .where(eq(schema.postTable.contactId, contact.id));
+      }
+
       return updated ?? contact;
     });
 
@@ -326,9 +353,38 @@ const makeResolvePrincipalService = Effect.gen(function* () {
    * because it carries a null contact with a member id.
    */
   const customerPrincipal = (
-    contactId: string,
-    userId: string | null
-  ): ResolvedPrincipal => ({ contactId, memberId: null, userId });
+    contact: Contact,
+    userId: string | null,
+    fallbackEmail: string | undefined
+  ): ResolvedPrincipal => ({
+    contactId: contact.id,
+    memberId: null,
+    userId,
+    name: contact.name,
+    // A contact may have no address of its own (an external-id or
+    // contact-id-only subject); the caller's input is the best fallback.
+    email: contact.email ?? fallbackEmail ?? null,
+  });
+
+  /**
+   * A staff resolution: the account is the attribution anchor and no contact
+   * is minted. The email is dropped for a synthetic inbox so a shadow address
+   * never reaches the timeline as if it were reachable.
+   */
+  const staffPrincipal = (
+    user: {
+      readonly email: string;
+      readonly id: string;
+      readonly name: string | null;
+    },
+    memberId: string
+  ): ResolvedPrincipal => ({
+    contactId: null,
+    memberId,
+    userId: user.id,
+    name: user.name,
+    email: isSyntheticEmail(user.email) ? null : user.email,
+  });
 
   return {
     resolve: ({ organizationId, needsUser, subject }: ResolvePrincipalInput) =>
@@ -368,11 +424,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               user.value.id
             );
             if (memberId !== null) {
-              return {
-                contactId: null,
-                memberId,
-                userId: user.value.id,
-              };
+              return staffPrincipal(user.value, memberId);
             }
 
             // Avoid tripping the `(organization_id, email)` unique index by
@@ -420,8 +472,9 @@ const makeResolvePrincipalService = Effect.gen(function* () {
 
           const enriched = yield* enrichContact(contact, subject);
           return customerPrincipal(
-            enriched.id,
-            enriched.userId ?? user.value.id
+            enriched,
+            enriched.userId ?? user.value.id,
+            email
           );
         }
 
@@ -437,7 +490,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             needsUser,
             email,
           });
-          return customerPrincipal(contact.id, userId);
+          return customerPrincipal(contact, userId, email);
         }
 
         // -- Priority 3: external id from the customer's system ------------
@@ -454,7 +507,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               needsUser,
               email,
             });
-            return customerPrincipal(contact.id, userId);
+            return customerPrincipal(contact, userId, email);
           }
 
           // No external-id match: fall through to an email match before
@@ -490,7 +543,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               needsUser,
               email,
             });
-            return customerPrincipal(contact.id, userId);
+            return customerPrincipal(contact, userId, email);
           }
 
           const created = yield* ensureContactInRoom(
@@ -512,7 +565,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             needsUser,
             email,
           });
-          return customerPrincipal(created.id, userId);
+          return customerPrincipal(created, userId, email);
         }
 
         // -- Priority 4: email as the find-or-create key -------------------
@@ -525,7 +578,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               needsUser,
               email,
             });
-            return customerPrincipal(contact.id, userId);
+            return customerPrincipal(contact, userId, email);
           }
 
           // The email may belong to a real account that simply has no contact
@@ -545,12 +598,16 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             if (!linked) {
               const memberId = yield* findMembership(organizationId, user.id);
               if (memberId !== null) {
-                return { contactId: null, memberId, userId: user.id };
+                return staffPrincipal(user, memberId);
               }
             }
             if (linked) {
               const contact = yield* enrichContact(linked, subject);
-              return customerPrincipal(contact.id, contact.userId ?? user.id);
+              return customerPrincipal(
+                contact,
+                contact.userId ?? user.id,
+                email
+              );
             }
             const created = yield* ensureContactInRoom(
               {
@@ -562,7 +619,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               },
               () => findContactByUser(organizationId, user.id)
             );
-            return customerPrincipal(created.id, user.id);
+            return customerPrincipal(created, user.id, email);
           }
 
           // Nothing anywhere: create the customer, plus a shadow user when
@@ -581,7 +638,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             needsUser,
             email,
           });
-          return customerPrincipal(created.id, userId);
+          return customerPrincipal(created, userId, email);
         }
 
         return yield* new InvalidSubjectError({

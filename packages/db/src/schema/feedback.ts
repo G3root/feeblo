@@ -553,6 +553,18 @@ export const postTable = pgTable(
     contactId: text("contact_id").references(() => contactTable.id, {
       onDelete: "set null",
     }),
+    /**
+     * The attributed author's display name as it was when the post was written
+     * or last reassigned.
+     *
+     * A read-only fallback for the dashboard, never for public surfaces. A
+     * contact-only author has no `creator_id` to name them, so deleting the
+     * contact would otherwise leave the post with no author at all; this keeps
+     * the name while the link itself is legitimately gone. The live contact or
+     * account still wins in the read (see `selectPostFields`), so a rename
+     * shows through while the record exists.
+     */
+    authorName: text("author_name"),
     source: text("source").$type<TPostSource>().default("DASHBOARD").notNull(),
     metadata: jsonb("metadata")
       .$type<Record<string, string>>()
@@ -579,6 +591,9 @@ export const postTable = pgTable(
     index("post_boardId_idx").on(table.boardId),
     index("post_creatorId_idx").on(table.creatorId),
     index("post_creatorMemberId_idx").on(table.creatorMemberId),
+    // `ON DELETE SET NULL` from `contact` and the rename propagation both
+    // look posts up by contact, and neither can use a partial index.
+    index("post_contactId_idx").on(table.contactId),
     index("post_statusId_idx").on(table.statusId),
     index("post_archivedAt_idx").on(table.archivedAt),
     index("post_mergedIntoPostId_idx").on(table.mergedIntoPostId),

@@ -130,6 +130,34 @@ export type TContactDelete = S.Schema.Type<typeof ContactDelete>;
 export type TContactSearch = S.Schema.Type<typeof ContactSearch>;
 export type TContactSearchResult = S.Schema.Type<typeof ContactSearchResult>;
 
+/**
+ * What kind of account a contact is linked to, when one is linked at all.
+ *
+ * - `MEMBER`: the account is a member of this workspace (staff, not a
+ *   customer; an old contact row for them still counts against the plan).
+ * - `PORTAL`: an SSO portal account bound to this workspace.
+ * - `ACCOUNT`: a real, unrestricted Feeblo account.
+ * - `SHADOW`: an attribution-only `behalf-*` account that cannot sign in.
+ */
+export const ContactAccountKind = S.Literals([
+  "MEMBER",
+  "PORTAL",
+  "ACCOUNT",
+  "SHADOW",
+]);
+
+/**
+ * Whether the linked account can be emailed post updates today.
+ *
+ * `PUBLIC_ONLY` is the honest answer for an unrestricted account on the CRM
+ * page, where no post (and so no board visibility) is in hand: the delivery
+ * gate passes them only for posts on public boards.
+ */
+export const ContactNotifyAccess = S.Literals(["YES", "PUBLIC_ONLY", "NO"]);
+
+export type TContactAccountKind = S.Schema.Type<typeof ContactAccountKind>;
+export type TContactNotifyAccess = S.Schema.Type<typeof ContactNotifyAccess>;
+
 export const Contact = S.Struct({
   id: S.String,
   organizationId: S.String,
@@ -147,6 +175,26 @@ export const Contact = S.Struct({
 });
 
 export type TContact = S.Schema.Type<typeof Contact>;
+
+/**
+ * The `ListContacts` row: the contact plus the state of its linked account.
+ * Write responses (`CreateContact` / `UpdateContact`) are the stored `Contact`
+ * row and do not carry the two derived fields; the account state is classified
+ * per read in `contact/repository.ts#findManyContacts`, from the same
+ * `evaluateOrganizationAccess` the delivery gate uses.
+ */
+export const ContactWithAccount = S.Struct({
+  ...Contact.fields,
+  /**
+   * What the linked account is, for the Customers table and the delete
+   * confirmation. `null` when no account is linked.
+   */
+  accountKind: S.NullOr(ContactAccountKind),
+  /** Whether the linked account can receive post updates. See the literal. */
+  notifyAccess: ContactNotifyAccess,
+});
+
+export type TContactWithAccount = S.Schema.Type<typeof ContactWithAccount>;
 
 export const ContactList = S.Struct({
   organizationId: WorkspaceId.schema,

@@ -1,8 +1,12 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
+  BoardId,
   ContactAttributeDefinitionId,
   ContactId,
+  PostId,
+  PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
 import { eq } from "drizzle-orm";
@@ -109,10 +113,281 @@ describe("ContactRpcHandlers", () => {
     ),
     Repositories,
     Entitlements,
-    Database.PgliteDatabaseLive
+    Database.PgliteDatabaseLive,
+    NodeCrypto.layer
   );
 
   layer(TestLayer)("handlers", (it) => {
+    it.effect("reports the linked account class and notification access", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const now = yield* DateTime.nowAsDate;
+
+        // The fixture's owner is a member, but unverified by default; the
+        // member row alone is not enough to be emailed.
+        yield* db
+          .update(schema.userTable)
+          .set({ emailVerified: true })
+          .where(eq(schema.userTable.id, fixture.userId));
+
+        yield* db.insert(schema.userTable).values([
+          {
+            id: "user_state_shadow",
+            name: "Shadow Customer",
+            email: "behalf-0123456789abcdef@feeblo.com",
+            emailVerified: false,
+            restrictedToOrganizationId: fixture.organizationId,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "user_state_verified",
+            name: "Verified Customer",
+            email: "verified-state@example.com",
+            emailVerified: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "user_state_unverified",
+            name: "Unverified Customer",
+            email: "unverified-state@example.com",
+            emailVerified: false,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]);
+
+        yield* db.insert(schema.contactTable).values([
+          {
+            id: "contact_state_none",
+            organizationId: fixture.organizationId,
+            email: "no-account@example.com",
+            userId: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "contact_state_member",
+            organizationId: fixture.organizationId,
+            email: "member-state@example.com",
+            userId: fixture.userId,
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "contact_state_shadow",
+            organizationId: fixture.organizationId,
+            email: "shadow-state@example.com",
+            userId: "user_state_shadow",
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "contact_state_verified",
+            organizationId: fixture.organizationId,
+            email: "verified-state@example.com",
+            userId: "user_state_verified",
+            createdAt: now,
+            updatedAt: now,
+          },
+          {
+            id: "contact_state_unverified",
+            organizationId: fixture.organizationId,
+            email: "unverified-state@example.com",
+            userId: "user_state_unverified",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ]);
+
+        const contacts = yield* handlers
+          .ListContacts({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+        const byId = new Map(contacts.map((contact) => [contact.id, contact]));
+
+        // No account: attribution only, nothing to email.
+        expect(byId.get("contact_state_none")).toMatchObject({
+          accountKind: null,
+          notifyAccess: "NO",
+        });
+        // Staff: the member row is what the delivery gate reads.
+        expect(byId.get("contact_state_member")).toMatchObject({
+          accountKind: "MEMBER",
+          notifyAccess: "YES",
+        });
+        // An attribution-only shadow can never sign in.
+        expect(byId.get("contact_state_shadow")).toMatchObject({
+          accountKind: "SHADOW",
+          notifyAccess: "NO",
+        });
+        // A verified global account reaches public boards only, and this page
+        // has no post to prove otherwise.
+        expect(byId.get("contact_state_verified")).toMatchObject({
+          accountKind: "ACCOUNT",
+          notifyAccess: "PUBLIC_ONLY",
+        });
+        // Unverified: the gate skips them however they are linked.
+        expect(byId.get("contact_state_unverified")).toMatchObject({
+          accountKind: "ACCOUNT",
+          notifyAccess: "NO",
+        });
+      })
+    );
+
+    it.effect(
+      "keeps a post's author display in step with a contact rename",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* ContactRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const now = yield* DateTime.nowAsDate;
+          const boardId = yield* BoardId.generate;
+          const statusId = yield* PostStatusId.generate;
+          const contactId = yield* ContactId.generate;
+          const postId = yield* PostId.generate;
+
+          yield* db.insert(schema.boardTable).values({
+            id: boardId,
+            name: "Board",
+            slug: boardId,
+            visibility: "PUBLIC",
+            organizationId: fixture.organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postStatusTable).values({
+            id: statusId,
+            type: "PENDING",
+            orderIndex: 0,
+            organizationId: fixture.organizationId,
+          });
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId: fixture.organizationId,
+            name: "Before Rename",
+            email: "rename@example.com",
+            createdAt: now,
+            updatedAt: now,
+          });
+          // A contact-only author: the display snapshot is the only name the
+          // post will have once the contact is deleted.
+          yield* db.insert(schema.postTable).values({
+            id: postId,
+            title: "Contact-anchored",
+            slug: `contact-anchored-${postId}`,
+            content: "Body",
+            excerpt: "Body",
+            boardId,
+            statusId,
+            organizationId: fixture.organizationId,
+            contactId,
+            authorName: "Before Rename",
+            source: "DASHBOARD",
+            metadata: {},
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          yield* handlers
+            .UpdateContact({
+              id: contactId,
+              name: "After Rename",
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [post] = yield* db
+            .select({
+              authorName: schema.postTable.authorName,
+              updatedAt: schema.postTable.updatedAt,
+            })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(post?.authorName).toBe("After Rename");
+          // A CRM rename is metadata about the post, not a change to it.
+          expect(post?.updatedAt).toEqual(now);
+        })
+    );
+
+    it.effect(
+      "refreshes the author-name fallback when an email-only update changes the address",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* ContactRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const now = yield* DateTime.nowAsDate;
+          const boardId = yield* BoardId.generate;
+          const statusId = yield* PostStatusId.generate;
+          const contactId = yield* ContactId.generate;
+          const postId = yield* PostId.generate;
+
+          // A nameless, contact-only author: the post's only identity is the
+          // contact, and the fallback carries the address the post was
+          // written with.
+          yield* db.insert(schema.boardTable).values({
+            id: boardId,
+            name: "Board",
+            slug: boardId,
+            visibility: "PUBLIC",
+            organizationId: fixture.organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postStatusTable).values({
+            id: statusId,
+            type: "PENDING",
+            orderIndex: 0,
+            organizationId: fixture.organizationId,
+          });
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId: fixture.organizationId,
+            name: null,
+            email: "nameless@example.com",
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postTable).values({
+            id: postId,
+            title: "Contact-anchored",
+            slug: `contact-anchored-${postId}`,
+            content: "Body",
+            excerpt: "Body",
+            boardId,
+            statusId,
+            organizationId: fixture.organizationId,
+            contactId,
+            authorName: "nameless@example.com",
+            source: "DASHBOARD",
+            metadata: {},
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          // Email-only correction: no `name` in the payload. The fallback
+          // must follow, or deleting the contact later would resurface the
+          // superseded address as the post's author.
+          yield* handlers
+            .UpdateContact({
+              id: contactId,
+              email: "renamed-address@example.com",
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [post] = yield* db
+            .select({ authorName: schema.postTable.authorName })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(post?.authorName).toBe("renamed-address@example.com");
+        })
+    );
+
     it.effect("lists contacts for organization members", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;

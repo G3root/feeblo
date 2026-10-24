@@ -9,14 +9,21 @@ import * as Layer from "effect/Layer";
 /**
  * Structured provenance stored beside an activity. On-behalf actions record
  * the customer subject distinct from the staff actor, e.g.
- * `{ onBehalfOf: { contactId, userId? } }`. A field is omitted when the
- * action cannot know it — e.g. removing a voter by userId may have no
- * contact for them.
+ * `{ onBehalfOf: { contactId, userId?, name?, email?, kind } }`. A field is
+ * omitted when the action cannot know it — e.g. removing a voter by userId may
+ * have no contact for them.
+ *
+ * `name` and `email` are the subject's identity at attribution time, stored so
+ * the timeline survives the contact or account being deleted; `kind` keeps a
+ * removed staff member from being relabelled a customer.
  */
 export interface PostActivityMetadata {
   readonly onBehalfOf: {
     readonly contactId?: string | undefined;
     readonly userId?: string | undefined;
+    readonly name?: string | undefined;
+    readonly email?: string | undefined;
+    readonly kind?: "member" | "customer" | undefined;
   };
 }
 

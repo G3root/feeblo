@@ -683,10 +683,14 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             actorMemberId: fixture.membershipId,
           });
           // Remove-by-userId resolves the contact when one exists, so
-          // provenance keeps its documented `{ contactId, userId }` shape.
+          // provenance keeps its documented `{ contactId, userId }` shape and
+          // snapshots the identity the contact carried at removal time.
           const db = yield* currentDb;
           const [voterContact] = yield* db
-            .select({ contactId: schema.contactTable.id })
+            .select({
+              contactId: schema.contactTable.id,
+              email: schema.contactTable.email,
+            })
             .from(schema.contactTable)
             .where(
               and(
@@ -699,6 +703,11 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             onBehalfOf: {
               contactId: voterContact?.contactId,
               userId: shadowUserId,
+              // The contact has no name, so the snapshot falls back to the
+              // account's display name — the same name votes render.
+              name: "Customer",
+              email: voterContact?.email,
+              kind: "customer",
             },
           });
         })
@@ -731,7 +740,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
       );
 
       it.effect(
-        "records userId-only provenance when the voter has no contact",
+        "records the staff snapshot when the voter has no contact",
         () =>
           Effect.gen(function* () {
             const handlers = yield* UpvoteRpcHandlersEffect;
@@ -764,7 +773,12 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             const activities = yield* getActivities(postId, "VOTE_REMOVED");
             expect(activities).toHaveLength(1);
             expect(activities[0]?.metadata).toEqual({
-              onBehalfOf: { userId: fixture.userId },
+              onBehalfOf: {
+                userId: fixture.userId,
+                name: "Staff Actor",
+                email: fixture.userEmail,
+                kind: "member",
+              },
             });
           })
       );

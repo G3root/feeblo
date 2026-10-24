@@ -247,6 +247,8 @@ describe("identity linking", () => {
     organizationId: string;
     email: string;
     postId: string;
+    /** Links the email row to the subject's account, as subscription time does. */
+    userId?: string;
   }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -256,6 +258,7 @@ describe("identity linking", () => {
         id: emailContactId,
         organizationId: args.organizationId,
         email: args.email,
+        userId: args.userId ?? null,
         verificationState: "pending",
         createdAt: now,
         updatedAt: now,
@@ -1138,6 +1141,147 @@ describe("identity linking", () => {
           expect(yield* getUserById(`shadow_${n}_1`)).toBeUndefined();
           expect((yield* getPostById(`post_${n}_0`))?.creatorId).toBe(real);
           expect((yield* getPostById(`post_${n}_1`))?.creatorId).toBe(real);
+        })
+    );
+
+    it.effect(
+      "heals a shadow whose contact was deleted while its posts survive",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          const real = `real_orphan_${n}`;
+          const email = `orphan.${n}@example.com`;
+          const shadow = `shadow_orphan_${n}`;
+          yield* insertRealUser({ id: real, email });
+          yield* insertShadowUser({ id: shadow, email, organizationId });
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_orphan_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: shadow,
+          });
+
+          // No contact row: deleting the CRM record leaves exactly this, and
+          // the contact scan above can never discover the surviving shadow.
+          const summary = yield* healShadowsForVerifiedUser({ userId: real });
+
+          expect(summary.organizationIds).toEqual([organizationId]);
+          expect(summary.totals.posts).toBe(1);
+          expect(yield* getUserById(shadow)).toBeUndefined();
+          expect((yield* getPostById(`post_orphan_${n}`))?.creatorId).toBe(
+            real
+          );
+        })
+    );
+
+    it.effect(
+      "leaves a shadow whose contact still points at it under a corrected address",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          // Staff corrected the contact's address from the stale one to the
+          // current one after the shadow recorded the stale hash. Whoever
+          // verifies the stale address must not claim the shadow's content or
+          // its contact link: the contact scan owns contact-attached shadows
+          // and matches the contact's current address.
+          const real = `real_corrected_${n}`;
+          yield* insertRealUser({
+            id: real,
+            email: `stale.${n}@example.com`,
+          });
+          const shadow = `shadow_corrected_${n}`;
+          yield* insertShadowUser({
+            id: shadow,
+            email: `stale.${n}@example.com`,
+            organizationId,
+          });
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_corrected_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: shadow,
+          });
+          yield* insertContact({
+            id: `contact_corrected_${n}`,
+            organizationId,
+            email: `current.${n}@example.com`,
+            userId: shadow,
+          });
+
+          const summary = yield* healShadowsForVerifiedUser({ userId: real });
+
+          expect(summary.organizationIds).toEqual([]);
+          expect(summary.totals.posts).toBe(0);
+          expect(yield* getUserById(shadow)).toBeDefined();
+          expect((yield* getPostById(`post_corrected_${n}`))?.creatorId).toBe(
+            shadow
+          );
+        })
+    );
+
+    it.effect(
+      "activates the deferred subscriptions an orphaned shadow's address holds",
+      () =>
+        Effect.gen(function* () {
+          const n = nextTestRun();
+          const organizationId = yield* makeOrganization();
+          // The customer joins the workspace: eligibility holds without a
+          // board read, so activation is direct.
+          const real = `real_deferred_${n}`;
+          yield* insertRealUser({
+            id: real,
+            email: `orphan.sub.${n}@example.com`,
+          });
+          yield* insertMembership({
+            id: `member_deferred_${n}`,
+            organizationId,
+            userId: real,
+          });
+          const shadow = `shadow_deferred_${n}`;
+          yield* insertShadowUser({
+            id: shadow,
+            email: `orphan.sub.${n}@example.com`,
+            organizationId,
+          });
+          const { boardId, statusId } =
+            yield* makeBoardAndStatus(organizationId);
+          yield* insertPost({
+            id: `post_deferred_${n}`,
+            organizationId,
+            boardId,
+            statusId,
+            creatorId: shadow,
+          });
+          // The subscription the subject held while their contact existed:
+          // the email row is linked to the shadow, the CRM record is gone.
+          yield* insertDeferredEmailSubscription({
+            id: `orphan_sub_${n}`,
+            organizationId,
+            email: `orphan.sub.${n}@example.com`,
+            postId: `post_deferred_${n}`,
+            userId: shadow,
+          });
+
+          const summary = yield* healShadowsForVerifiedUser({ userId: real });
+
+          expect(summary.totals.subscriptionsActivated).toBe(1);
+          expect(
+            yield* getEmailSubscriptionById(`orphan_sub_${n}`)
+          ).toMatchObject({
+            state: "active",
+          });
+          expect(yield* getEmailContactById(`orphan_sub_${n}`)).toMatchObject({
+            userId: real,
+            verificationState: "verified",
+          });
         })
     );
 
