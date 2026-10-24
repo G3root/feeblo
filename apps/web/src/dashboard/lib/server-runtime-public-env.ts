@@ -15,10 +15,20 @@ const serverEnvSchema = z.object({
   APP_URL: z.string().min(1),
   APP_ROOT_DOMAIN: z.string().min(1),
   APP_RELEASE: z.string().optional(),
+  // The deployment environment name (`APP_ENV`, defaulting to `NODE_ENV` on
+  // the server). The browser uses it for Sentry and PostHog when
+  // `SENTRY_ENVIRONMENT` is unset, so an event's environment matches the
+  // server's instead of Vite's build mode.
+  APP_ENV: z.string().optional(),
   TURNSTILE_SITE_KEY: z.string().optional(),
   NO_INDEX: z.string().optional(),
   POSTHOG_KEY: z.string().optional(),
   POSTHOG_HOST: z.string().optional(),
+  // Public by design: a Sentry DSN identifies a project, it does not
+  // authorize ingestion of another. The server-side `SENTRY_ENVIRONMENT`
+  // keeps test and production events apart.
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
 });
 
 export type ServerPublicEnv = z.infer<typeof serverEnvSchema>;
@@ -29,10 +39,13 @@ export function getPublicEnvServer(): ServerPublicEnv {
     APP_URL: process.env.APP_URL,
     APP_ROOT_DOMAIN: process.env.APP_ROOT_DOMAIN,
     APP_RELEASE: process.env.APP_RELEASE,
+    APP_ENV: process.env.APP_ENV,
     TURNSTILE_SITE_KEY: process.env.TURNSTILE_SITE_KEY,
     NO_INDEX: process.env.NO_INDEX,
     POSTHOG_KEY: process.env.POSTHOG_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
+    SENTRY_DSN: process.env.SENTRY_DSN,
+    SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT,
   });
 }
 
@@ -44,9 +57,12 @@ export function getServerRuntimePublicEnv() {
     appUrl: env.APP_URL,
     appRootDomain: env.APP_ROOT_DOMAIN,
     appRelease: env.APP_RELEASE,
+    appEnv: env.APP_ENV,
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
     posthogKey: env.POSTHOG_KEY,
     posthogHost: env.POSTHOG_HOST,
+    sentryDsn: env.SENTRY_DSN,
+    sentryEnvironment: env.SENTRY_ENVIRONMENT,
   };
 }
 
@@ -66,9 +82,12 @@ export function getBrowserPublicEnv() {
     APP_URL: env.APP_URL,
     APP_ROOT_DOMAIN: env.APP_ROOT_DOMAIN,
     APP_RELEASE: env.APP_RELEASE,
+    APP_ENV: env.APP_ENV,
     TURNSTILE_SITE_KEY: env.TURNSTILE_SITE_KEY,
     POSTHOG_KEY: env.POSTHOG_KEY,
     POSTHOG_HOST: env.POSTHOG_HOST,
+    SENTRY_DSN: env.SENTRY_DSN,
+    SENTRY_ENVIRONMENT: env.SENTRY_ENVIRONMENT,
   };
 }
 

@@ -65,6 +65,18 @@ describe("toInternalPath", () => {
     ).toBe("/feedback-widget/org_1");
   });
 
+  it("keeps the observability relays on the path the browser posted to", () => {
+    expect(
+      toInternalPath("/sentry-tunnel", "acme.example.com", ROOT_DOMAIN)
+    ).toBe("/sentry-tunnel");
+    expect(
+      toInternalPath("/telemetry/traces", "acme.example.com", ROOT_DOMAIN)
+    ).toBe("/telemetry/traces");
+    expect(
+      toInternalPath("/telemetry/logs", "acme.example.com", ROOT_DOMAIN)
+    ).toBe("/telemetry/logs");
+  });
+
   it("keeps dashboard auth pages reachable from board hosts", () => {
     for (const path of DASHBOARD_AUTH_PATHS) {
       expect(toInternalPath(path, "acme.example.com", ROOT_DOMAIN)).toBe(path);

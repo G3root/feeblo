@@ -25,6 +25,7 @@
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@sentry/node": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:"
   },

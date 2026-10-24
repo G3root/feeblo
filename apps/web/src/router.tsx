@@ -1,3 +1,4 @@
+import { isObject, isString } from "@feeblo/utils/runtime-kind";
 import { DbClient } from "@tanstack/react-db";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
@@ -11,8 +12,20 @@ import {
   createPublicBoardRewrite,
   type PublicBoardRewrite,
 } from "./lib/public-board-rewrite";
+import {
+  reportRouteError,
+  startNavigationTelemetry,
+  startWebErrorReporting,
+  startWebTelemetry,
+} from "./observability";
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
+
+// Both surfaces report the same way: error tracking and OTLP tracing start
+// before hydration, so a failed first render is captured and the first route
+// change is traced. On the server these are no-ops.
+startWebErrorReporting();
+startWebTelemetry();
 
 /**
  * The root domain, request-scoped on the server (Workers inject env per
@@ -92,7 +105,17 @@ export function getRouter() {
         <div>Error</div>
       </div>
     ),
+    // Render and loader failures caught by the router's error boundary. React
+    // 19's uncaught render errors reach the SDK's global handler as well.
+    defaultOnCatch: (error) =>
+      reportRouteError(
+        isObject(error) || isString(error) ? error : "UnknownError"
+      ),
   });
+
+  // One subscription per document opens a `ui.navigation` span for every
+  // client-side route change, on the dashboard and the public board alike.
+  startNavigationTelemetry(router);
 
   // Hydrates the client from the server render's dehydrated DB state and, on
   // the server, dehydrates the queries the render preloaded.
