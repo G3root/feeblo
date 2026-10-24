@@ -31,7 +31,15 @@
     "paths": {
       "~/*": ["./src/dashboard/*"],
       "@/*": ["./src/*"],
-      "@/paraglide/*": ["./src/paraglide/*"]
+      "@/paraglide/*": ["./src/paraglide/*"],
+      // The two published packages resolve to `dist/` through their `types`
+      // field, which no checkout has until `pnpm build` runs. Mapping them to
+      // source here is what lets `pnpm check` typecheck the dashboard on a
+      // fresh clone, and Vite resolves the same paths (`resolve.tsconfigPaths`).
+      // It is the same arrangement `packages/sdk-react/tsconfig.json` uses for
+      // the core SDK. The published tarballs still point at `dist/`.
+      "@feeblo/sdk": ["../../packages/sdk/src/index.ts"],
+      "@feeblo/sdk-react": ["../../packages/sdk-react/src/index.ts"]
     },
     "plugins": [
       {

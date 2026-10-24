@@ -7,6 +7,8 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
+import sdkPackage from "../../packages/sdk/package.json" with { type: "json" };
+
 const paraglideProjectDir = fileURLToPath(
   new URL("../../project.inlang", import.meta.url)
 );
@@ -180,6 +182,14 @@ function eagerPreloadHints(): Plugin {
 }
 
 export default defineConfig({
+  // The dashboard consumes `@feeblo/sdk-react` (and, through it, `@feeblo/sdk`)
+  // from source — see the path mapping in `tsconfig.json` — so the SDK's
+  // version module would otherwise read a global only its own build defines.
+  // Mirrors `packages/sdk/vite.config.ts`; the value comes from the same
+  // manifest, so the two cannot drift.
+  define: {
+    __FEEBLO_VERSION__: JSON.stringify(sdkPackage.version),
+  },
   resolve: {
     tsconfigPaths: true,
   },

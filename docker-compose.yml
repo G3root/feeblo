@@ -131,6 +131,10 @@ services:
       API_URL: ${API_URL:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3001}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
+      # Optional in-app feedback button: the workspace that receives what it
+      # submits. Empty keeps the button out, which is the default for a stack
+      # with no such workspace. See .env.example.
+      FEEDBACK_WIDGET_ORGANIZATION_ID: ${FEEDBACK_WIDGET_ORGANIZATION_ID:-}
     ports:
       # Only the host side varies. The image pins the container listen
       # port (PORT=4321), so the mapping target must stay 4321.
