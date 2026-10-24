@@ -511,6 +511,9 @@
     "./widget/api-live": {
       "default": "./src/widget/api-live.ts"
     },
+    "./widget/config": {
+      "default": "./src/widget/config.ts"
+    },
     "./widget/schema": {
       "default": "./src/widget/schema.ts"
     },

@@ -1,7 +1,12 @@
-import { FeebloProvider, useFeeblo } from "@feeblo/sdk-react";
+import {
+  FeebloProvider,
+  useFeeblo,
+  type UserIdentity,
+} from "@feeblo/sdk-react";
 import { useTheme } from "@feeblo/ui/theme-provider";
 import { hasWindow } from "@feeblo/utils/runtime-kind";
-import { useEffect, useRef } from "react";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
+import { useEffect, useRef, useState } from "react";
 
 interface FeedbackWidgetEmbedProps {
   /** Increments on every click of the sidebar trigger; opens the widget. */
@@ -35,6 +40,7 @@ export default function FeedbackWidgetEmbed({
   organizationId,
 }: FeedbackWidgetEmbedProps) {
   const { resolvedTheme } = useTheme();
+  const user = useWidgetIdentity(openRequests);
   // The dashboard and the widget's iframe are the same deployment, so the
   // page's own origin is the host to embed from. This only ever runs in the
   // browser; the guard covers a module evaluated during a build.
@@ -46,10 +52,52 @@ export default function FeedbackWidgetEmbed({
       containerStyles={CONTAINER_STYLES}
       organizationId={organizationId}
       theme={resolvedTheme}
+      user={user}
     >
       <OpenWidget openRequests={openRequests} />
     </FeebloProvider>
   );
+}
+
+/**
+ * The signed-in user, identified with a freshly minted SSO token.
+ *
+ * Without it the widget accepts the feedback anonymously: the token only says
+ * who to file it under, so a deployment with no widget workspace configured,
+ * or a workspace whose signing secret was never generated, keeps a usable
+ * widget instead of a broken button. Minted per open because the token is
+ * short-lived; `FeebloProvider` re-identifies the live widget on a new `user`
+ * without recreating it (and keeps the last identity when this resolves to
+ * `undefined`).
+ */
+function useWidgetIdentity(openRequests: number): UserIdentity | undefined {
+  const [user, setUser] = useState<UserIdentity | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchRpc((rpc) => rpc.GetFeedbackWidgetIdentity())
+      .then((identity) => {
+        if (cancelled) {
+          return;
+        }
+        setUser({
+          email: identity.user.email,
+          id: identity.user.id,
+          name: identity.user.name,
+          token: identity.token,
+        });
+      })
+      .catch(() => {
+        // Anonymous feedback is still feedback; see this hook's doc comment.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [openRequests]);
+
+  return user;
 }
 
 /**

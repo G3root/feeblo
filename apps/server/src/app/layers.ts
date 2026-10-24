@@ -42,6 +42,7 @@ import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
 import { SiteRepository } from "@feeblo/domain/site/repository";
 import { UserRepository } from "@feeblo/domain/user/repository";
+import { FeedbackWidgetConfig } from "@feeblo/domain/widget/config";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
 import { WorkspaceRepository } from "@feeblo/domain/workspace/repository";
 import { IntegrationEventRecorderLive } from "@feeblo/integration-core";
@@ -374,7 +375,11 @@ export const makeServiceLayers = ({
     // where the operations declare it in `PublicApiDependencies`. Dropping
     // this line fails the server's type rather than one request that asks for
     // a paging link.
-    PublicApiConfig.layer
+    PublicApiConfig.layer,
+    // Read by the dashboard's widget-identity RPC: the widget workspace is an
+    // operator setting, never a request parameter, so the layer that reads it
+    // is assembled here with the rest of the server's configuration.
+    FeedbackWidgetConfig.layer
   ).pipe(Layer.provideMerge(Database.DatabaseContextLive));
 
   // The import worker and its retention sweep run for the layer's lifetime,

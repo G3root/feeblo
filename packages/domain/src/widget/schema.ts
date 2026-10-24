@@ -236,3 +236,22 @@ export const decodeWidgetBootEnv = S.decodeUnknownSync(WidgetBootEnv);
  */
 export const decodeWidgetOrganizationIdOption =
   S.decodeUnknownOption(WidgetOrganizationId);
+
+/**
+ * What the dashboard's "Send Feedback" button needs to attribute a submission
+ * to the signed-in user: a short-lived identity token, and the identity it
+ * names so the host page identifies the widget with exactly the claims the
+ * token carries.
+ */
+export const FeedbackWidgetIdentity = S.Struct({
+  token: S.String,
+  user: S.Struct({
+    email: S.String,
+    id: S.String,
+    name: S.String,
+  }),
+});
+
+export type TFeedbackWidgetIdentity = S.Schema.Type<
+  typeof FeedbackWidgetIdentity
+>;

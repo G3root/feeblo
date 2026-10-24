@@ -34,6 +34,7 @@ import { RoadmapRpcs } from "./roadmap/rpcs";
 import { SiteRpcs } from "./site/rpcs";
 import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
+import { WidgetRpcs } from "./widget/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
 /**
@@ -84,6 +85,7 @@ export const RpcGroups = [
   ["PostSubscription", PostSubscriptionRpcs],
   ["Roadmap", RoadmapRpcs],
   ["RoadmapColumn", RoadmapColumnRpcs],
+  ["Widget", WidgetRpcs],
   ["Workspace", WorkspaceRpcs],
   ["Contact", ContactRpcs],
   ["EmailSubscription", EmailSubscriptionRpcs],

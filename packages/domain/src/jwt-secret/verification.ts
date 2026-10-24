@@ -81,7 +81,7 @@ export const maxTokenLifetimeFromMinutes = (
  *
  * Secrets are stored as 64-char hex (32 bytes). Decode hex to raw bytes.
  */
-const secretToKey = (secret: string): Uint8Array =>
+export const secretToKey = (secret: string): Uint8Array =>
   new Uint8Array(Buffer.from(secret, "hex"));
 
 export const verifyJwt = (

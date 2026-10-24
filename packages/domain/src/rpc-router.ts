@@ -42,6 +42,7 @@ import {
 import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
+import { WidgetRpcHandlers } from "./widget/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
 /**
@@ -89,6 +90,7 @@ export const RpcHandlerRegistrations = {
   PostSubscription: PostSubscriptionRpcHandlers,
   Roadmap: RoadmapRpcHandlers,
   RoadmapColumn: RoadmapColumnRpcHandlers,
+  Widget: WidgetRpcHandlers,
   Workspace: WorkspaceRpcHandlers,
   Contact: ContactRpcHandlers,
   EmailSubscription: EmailSubscriptionRpcHandlers,
