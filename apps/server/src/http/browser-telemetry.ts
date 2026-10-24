@@ -151,7 +151,10 @@ const forward = (
   body: string
 ) =>
   target === undefined
-    ? Effect.succeed(empty(404))
+    ? // Telemetry is disabled on this deployment. Accept and discard: the
+      // browser is not an operator, and a 4xx here becomes a console error on
+      // every page without telling anyone why.
+      Effect.succeed(empty(202))
     : Effect.gen(function* () {
         const request = HttpClientRequest.post(target.url, {
           body: HttpBody.text(body, "application/json"),
@@ -182,10 +185,18 @@ const forward = (
       );
 
 const relay =
-  (client: HttpClient.HttpClient, target: TelemetryTarget | undefined) =>
+  (
+    client: HttpClient.HttpClient,
+    signal: "traces" | "logs",
+    target: TelemetryTarget | undefined,
+    identity: BrowserTelemetryIdentity
+  ) =>
   (
     request: HttpServerRequest.HttpServerRequest
   ): Effect.Effect<HttpServerResponse.HttpServerResponse> => {
+    // Telemetry is off for this deployment. Discard quietly: a 4xx here only
+    // becomes a console error on every page load.
+    if (target === undefined) return Effect.succeed(empty(202));
     const contentType = request.headers["content-type"];
     if (
       contentType === undefined ||
@@ -201,7 +212,12 @@ const relay =
       // middleware already caps the request at 1 MB.
       if (new TextEncoder().encode(body).byteLength > maxBodyBytes)
         return empty(413);
-      return yield* forward(client, target, body);
+      // The caller controls every field it sent. Rebuild the batch under the
+      // server's identity before it reaches the collector with the server's
+      // credentials; a malformed or mismatched batch is a client error.
+      const batch = browserBatch(signal, body, identity);
+      if (batch === undefined) return empty(400);
+      return yield* forward(client, target, batch);
     }).pipe(
       // `MaxBodySize` fails the read with a `Cause`-wide error; the only
       // caller-visible distinction is "did the body fit".
@@ -212,8 +228,10 @@ const relay =
 /**
  * Mount the browser relay.
  *
- * A deployment without OTLP configured exposes the route as a 404 so a
- * misconfigured frontend fails visibly instead of silently discarding traces.
+ * A deployment without OTLP configured accepts and discards a batch with 202.
+ * The browser is not an operator: failing the request only adds a console
+ * error to every page load, and the server has already said in its startup
+ * configuration that no exporter is configured.
  */
 export const makeBrowserTelemetryRouter = (
   options: {
@@ -236,20 +254,34 @@ export const makeBrowserTelemetryRouter = (
         service: `${options.service}-web`,
         environment: options.environment,
       }).pipe(Effect.option);
-      if (Option.isNone(config))
-        return yield* router.add(
-          "POST",
-          "/api/telemetry/*",
-          relay(client, undefined)
-        );
-      const traces = relay(client, config.value.traces);
-      const logs = relay(client, config.value.logs);
-      const disabled = relay(client, undefined);
+      // The service name is fixed here rather than read from `config`: an
+      // operator-set `OTEL_SERVICE_NAME` must not let browser records claim
+      // the server's identity.
+      const identity: BrowserTelemetryIdentity = {
+        service: `${options.service}-web`,
+        version: Option.isNone(config) ? "dev" : config.value.version,
+        environment: Option.isNone(config)
+          ? options.environment
+          : config.value.environment,
+      };
+      const traces = relay(
+        client,
+        "traces",
+        Option.isNone(config) ? undefined : config.value.traces,
+        identity
+      );
+      const logs = relay(
+        client,
+        "logs",
+        Option.isNone(config) ? undefined : config.value.logs,
+        identity
+      );
+      const unknown = () => Effect.succeed(empty(404));
       return yield* router
         .add("POST", "/api/telemetry/traces", traces)
         .pipe(
           Effect.andThen(router.add("POST", "/api/telemetry/logs", logs)),
-          Effect.andThen(router.add("POST", "/api/telemetry/*", disabled))
+          Effect.andThen(router.add("POST", "/api/telemetry/*", unknown))
         );
     })
   ).pipe(Layer.provide(clientLayer));

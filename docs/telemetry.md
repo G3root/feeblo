@@ -65,7 +65,7 @@ Two policies run in the tracer wrappers the OTLP layer installs (`span-attribute
 
 ## Browser telemetry
 
-Every page starts Effect's OTLP exporters in the browser, on the dashboard and the public board alike. Batches post as OTLP/JSON to the web app's same-origin `/telemetry/traces` and `/telemetry/logs`, which forward server-to-server to the API's `/api/telemetry/*`, which in turn owns the destination configured for the server. The collector credential never reaches the page, and a public board on a customer's custom domain works: its browser never posts cross-origin to the API. Both relays cap a batch at 256 KiB; the API relay answers 404 when OTLP is not configured for the deployment.
+Every page starts Effect's OTLP exporters in the browser, on the dashboard and the public board alike. Batches post as OTLP/JSON to the web app's same-origin `/telemetry/traces` and `/telemetry/logs`, which forward server-to-server to the API's `/api/telemetry/*`, which in turn owns the destination configured for the server. The collector credential never reaches the page, and a public board on a customer's custom domain works: its browser never posts cross-origin to the API. Both relays cap a batch at 256 KiB. When OTLP is not configured for the deployment, the API relay accepts the batch with 202 and discards it, rather than turning every page load into a console error.
 
 Browser spans use the `feeblo-web` service name: `ui.navigation` measures a client-side route transition, `ui.error` and `ui.unhandled-rejection` capture uncaught failures, and the page sends a final flush on `pagehide`. Both surfaces share the composition root in `apps/web/src/observability.ts`.
 
