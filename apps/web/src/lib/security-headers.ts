@@ -94,15 +94,46 @@ export const parseImageOrigins = (
 export interface PageSecurityInput {
   readonly pathname: string;
   /**
-   * Whether the hop the app answered on was HTTPS. HSTS is only meaningful
-   * over a secure transport, and a development server on `http://localhost`
-   * must not pin the host — so this is derived from the request rather than
-   * from `NODE_ENV`, which a Worker does not receive by default.
+   * Whether this deployment answers its public origin over HTTPS.
+   *
+   * HSTS only means anything over a secure transport, so the decision comes
+   * from `APP_URL`, the operator's declaration of the public dashboard origin.
+   * The request URL is not consulted: the Node container answers plain HTTP
+   * behind the TLS-terminating proxy, so its request scheme would always say
+   * `http:`. `NODE_ENV` is not consulted either — the server bundle is built by
+   * Vite, which replaces `process.env.NODE_ENV` with the build mode, so it is a
+   * constant (`"production"`) at runtime and would send HSTS everywhere.
    */
-  readonly secureRequest: boolean;
+  readonly includeHsts: boolean;
   /** Absolute origins images may load from, beyond the built-in defaults. */
   readonly imageOrigins?: readonly string[];
 }
+
+/** Whether a configured URL uses HTTPS. A malformed value is not HTTPS. */
+const isHttpsUrl = (value: string | undefined): boolean => {
+  if (value === undefined) {
+    return false;
+  }
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Whether this deployment answers its public origin over HTTPS.
+ *
+ * `APP_URL` is the operator's declaration of the public dashboard origin, and
+ * the only signal consulted: it is a genuine runtime read, and it is not
+ * client input, so a spoofed `X-Forwarded-Proto` can neither add nor remove
+ * the header.
+ */
+export const deploymentServesHttps = ({
+  appUrl,
+}: {
+  readonly appUrl: string | undefined;
+}): boolean => isHttpsUrl(appUrl);
 
 const contentSecurityPolicy = ({
   imageOrigins = [],
@@ -128,8 +159,8 @@ const contentSecurityPolicy = ({
 
 export const pageSecurityHeaders = ({
   imageOrigins,
+  includeHsts,
   pathname,
-  secureRequest,
 }: PageSecurityInput) => ({
   "content-security-policy": contentSecurityPolicy({
     imageOrigins,
@@ -145,7 +176,7 @@ export const pageSecurityHeaders = ({
   ...(isEmbeddedWidgetPath(pathname)
     ? undefined
     : { "x-frame-options": "DENY" }),
-  ...(secureRequest
+  ...(includeHsts
     ? { "strict-transport-security": "max-age=63072000; includeSubDomains" }
     : undefined),
 });

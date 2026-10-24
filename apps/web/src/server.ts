@@ -2,6 +2,7 @@ import handler from "@tanstack/react-start/server-entry";
 
 import {
   applyPageSecurityHeaders,
+  deploymentServesHttps,
   parseImageOrigins,
 } from "./lib/security-headers";
 import { paraglideMiddleware } from "./paraglide/server.js";
@@ -45,8 +46,13 @@ export default {
         process.env.MEDIA_PUBLIC_BASE_URL,
         process.env.CONTENT_IMAGE_ORIGINS,
       ]),
+      // Read from the deployment's own configuration, not the request URL: the
+      // Node container answers plain HTTP behind the TLS-terminating proxy, and
+      // the bundle inlines `NODE_ENV` to the build mode.
+      includeHsts: deploymentServesHttps({
+        appUrl: process.env.APP_URL,
+      }),
       pathname: url.pathname,
-      secureRequest: url.protocol === "https:",
     });
   },
 };

@@ -47,30 +47,45 @@ export const apiSecurityHeaders = ({
     : undefined),
 });
 
+/** Whether a configured URL uses HTTPS. A malformed value is not HTTPS. */
+const isHttpsUrl = (value: string): boolean => {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Whether this deployment answers its public origin over HTTPS.
+ *
+ * HSTS only means anything over a secure transport, so the decision comes from
+ * configuration the operator declared — the public API origin and the
+ * environment — and not from the request. The request URL is not a transport
+ * signal: a Node adapter behind a TLS-terminating proxy sees a plain-HTTP
+ * internal hop, and an adapter that honours forwarded headers would let the
+ * caller decide. Reading it would either drop HSTS where it is needed or let
+ * client input add a header.
+ */
+export const deploymentServesHttps = (
+  config: Pick<ServerConfigValue, "apiUrl" | "nodeEnv">
+): boolean => config.nodeEnv === "production" || isHttpsUrl(config.apiUrl);
+
 /**
  * Adds {@link apiSecurityHeaders} to every response, including the ones the
  * router answers itself (404, a failed handler, a schema rejection).
  *
- * HSTS is sent when the deployment says it is production or when the request
- * arrived over HTTPS. The second half matters behind a TLS-terminating proxy
- * whose internal hop is plain HTTP: the browser only honours the header over
- * HTTPS, so sending it on that hop is how the externally-secure deployment
- * still pins the host.
+ * The header set is built once at composition: `includeHsts` is a deployment
+ * fact, so it cannot change between requests.
  */
-export const makeSecurityHeadersMiddleware = (
-  config: Pick<ServerConfigValue, "nodeEnv">
-) =>
-  HttpMiddleware.make((httpApp) =>
-    HttpEffect.withPreResponseHandler(httpApp, (request, response) =>
-      Effect.succeed(
-        HttpServerResponse.setHeaders(
-          response,
-          apiSecurityHeaders({
-            includeHsts:
-              config.nodeEnv === "production" ||
-              request.url.startsWith("https:"),
-          })
-        )
-      )
+export const makeSecurityHeadersMiddleware = (options: {
+  readonly includeHsts: boolean;
+}) => {
+  const headers = apiSecurityHeaders({ includeHsts: options.includeHsts });
+
+  return HttpMiddleware.make((httpApp) =>
+    HttpEffect.withPreResponseHandler(httpApp, (_request, response) =>
+      Effect.succeed(HttpServerResponse.setHeaders(response, headers))
     )
   );
+};

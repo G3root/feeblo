@@ -3,14 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_IMAGE_ORIGINS,
   applyPageSecurityHeaders,
+  deploymentServesHttps,
   isEmbeddedWidgetPath,
   pageSecurityHeaders,
   parseImageOrigins,
 } from "./security-headers";
 
 const dashboard = {
+  includeHsts: true,
   pathname: "/org_1/boards",
-  secureRequest: true,
 } as const;
 
 const imgSrcOf = (policy: string): string => {
@@ -85,8 +86,8 @@ describe("pageSecurityHeaders", () => {
 
   it("allows the widget shell to be framed and omits DENY", () => {
     const headers = pageSecurityHeaders({
+      includeHsts: true,
       pathname: "/feedback-widget/org_1",
-      secureRequest: true,
     });
     expect(headers["content-security-policy"]).toContain("frame-ancestors *");
     expect(headers["x-frame-options"]).toBeUndefined();
@@ -121,15 +122,34 @@ describe("pageSecurityHeaders", () => {
     expect(sources).not.toContain("http:");
   });
 
-  it("sends HSTS only on a secure request", () => {
+  it("sends HSTS only when the deployment declares HTTPS", () => {
+    expect(pageSecurityHeaders(dashboard)["strict-transport-security"]).toBe(
+      "max-age=63072000; includeSubDomains"
+    );
     expect(
-      pageSecurityHeaders(dashboard)["strict-transport-security"]
-    ).toBeDefined();
-    expect(
-      pageSecurityHeaders({ ...dashboard, secureRequest: false })[
+      pageSecurityHeaders({ ...dashboard, includeHsts: false })[
         "strict-transport-security"
       ]
     ).toBeUndefined();
+  });
+});
+
+describe("deploymentServesHttps", () => {
+  it("treats an HTTPS APP_URL as HTTPS", () => {
+    expect(deploymentServesHttps({ appUrl: "https://app.example.com" })).toBe(
+      true
+    );
+  });
+
+  it("does not treat a plain-HTTP APP_URL as HTTPS", () => {
+    expect(deploymentServesHttps({ appUrl: "http://localhost:3001" })).toBe(
+      false
+    );
+  });
+
+  it("does not trust an absent or unparseable APP_URL", () => {
+    expect(deploymentServesHttps({ appUrl: undefined })).toBe(false);
+    expect(deploymentServesHttps({ appUrl: "not a url" })).toBe(false);
   });
 });
 

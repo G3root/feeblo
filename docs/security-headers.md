@@ -32,7 +32,14 @@ The app inlines the runtime env script, ships Tailwind's generated CSS, loads th
 
 ## HSTS
 
-`Strict-Transport-Security` is sent only when the deployment is production or the request itself arrived over HTTPS. The second half is what covers a TLS-terminating proxy whose internal hop is plain HTTP: the browser only honours the header over HTTPS, so the externally-secure deployment still pins the host. Development over `http://localhost` never sends it.
+`Strict-Transport-Security` is sent when the deployment declares that its public origin is HTTPS:
+
+- **Web:** `APP_URL` is `https:`.
+- **API:** `NODE_ENV=production` or `API_URL` is `https:`.
+
+The request URL is deliberately not consulted. The Node containers answer plain HTTP behind the operator's TLS-terminating proxy, so the request scheme would always say `http:` and the header would never be sent where it is needed; an adapter that honours forwarded headers would instead let the caller decide. Both signals above are operator configuration, so a spoofed `X-Forwarded-Proto` can only ever lose the header, never add one.
+
+`NODE_ENV` is not consulted on the web side either: the server bundle is built by Vite, which replaces `process.env.NODE_ENV` with the build mode, so it is the constant `"production"` at runtime and would send HSTS from every deployment. `APP_URL` is read at runtime and covers the same case. Development over `http://localhost` sends none.
 
 ## Verified
 

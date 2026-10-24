@@ -37,7 +37,10 @@ import {
   OgImageRouterLive,
   PublicApiDocsRoute,
 } from "../http/routers";
-import { makeSecurityHeadersMiddleware } from "../http/security-headers";
+import {
+  deploymentServesHttps,
+  makeSecurityHeadersMiddleware,
+} from "../http/security-headers";
 import { serverTimingMiddleware } from "../http/server-timing";
 import { SesEmailFeedbackRouter } from "../http/ses";
 import type { IntegrationRuntime } from "../integrations";
@@ -207,9 +210,12 @@ export const withGlobalMiddleware = <A, E, R>(
     // policy has no `default-src` and why the session cookie makes framing the
     // load-bearing directive.
     Layer.provide(
-      HttpRouter.middleware(makeSecurityHeadersMiddleware(config), {
-        global: true,
-      })
+      HttpRouter.middleware(
+        makeSecurityHeadersMiddleware({
+          includeHsts: deploymentServesHttps(config),
+        }),
+        { global: true }
+      )
     ),
     Layer.provide(
       HttpRouter.middleware(serverTimingMiddleware, { global: true })
