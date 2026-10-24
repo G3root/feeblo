@@ -13,6 +13,7 @@ import {
   evaluateOrganizationAccess,
 } from "../email-outbox/access";
 import { isShadowUserEmail, isSyntheticEmail } from "../identity/emails";
+import { linkShadowUser } from "../identity/linking";
 import { hashEmail } from "../user/repository";
 import {
   ContactAlreadyExistsError,
@@ -108,7 +109,16 @@ const refreshPostAuthorFallback = (args: {
  * identity and are left alone; only an attribution-only `behalf-*` shadow is
  * refreshed.
  *
- * Takes the transaction handle so the hash commits with the contact write.
+ * A deleted customer can leave its shadow alive when attributed content still
+ * refers to it, so the target address may already have an org-scoped identity.
+ * Writing the hash over that one would violate the unique
+ * `(emailHash, restrictedToOrganizationId)` index and roll back the contact
+ * edit. The existing identity is the person the contact is being corrected to:
+ * heal this shadow into it instead, moving the content rather than duplicating
+ * the identity.
+ *
+ * Takes the transaction handle so the hash (or merge) commits with the contact
+ * write.
  */
 const refreshShadowEmailHash = (args: {
   db: PgDrizzle.EffectPgDatabase;
@@ -119,17 +129,52 @@ const refreshShadowEmailHash = (args: {
 }) =>
   Effect.gen(function* () {
     const [user] = yield* args.db
-      .select({ email: schema.userTable.email })
+      .select({
+        email: schema.userTable.email,
+        restrictedToOrganizationId: schema.userTable.restrictedToOrganizationId,
+      })
       .from(schema.userTable)
       .where(eq(schema.userTable.id, args.userId))
       .limit(1);
-    if (!user || !isShadowUserEmail(user.email)) {
+    if (
+      !user ||
+      !isShadowUserEmail(user.email) ||
+      user.restrictedToOrganizationId === null
+    ) {
       return false;
+    }
+
+    const emailHash = yield* hashEmail(args.email);
+    const [existing] = yield* args.db
+      .select({ id: schema.userTable.id })
+      .from(schema.userTable)
+      .where(
+        and(
+          eq(schema.userTable.emailHash, emailHash),
+          eq(
+            schema.userTable.restrictedToOrganizationId,
+            user.restrictedToOrganizationId
+          )
+        )
+      )
+      .limit(1);
+
+    if (existing !== undefined && existing.id !== args.userId) {
+      yield* linkShadowUser({
+        shadowUserId: args.userId,
+        realUserId: existing.id,
+        deleteShadowUser: true,
+      }).pipe(
+        Effect.catchTag("SubjectNotFoundError", () =>
+          Effect.fail(new FailedToUpdateContactError())
+        )
+      );
+      return true;
     }
 
     yield* args.db
       .update(schema.userTable)
-      .set({ emailHash: yield* hashEmail(args.email), updatedAt: args.now })
+      .set({ emailHash, updatedAt: args.now })
       .where(eq(schema.userTable.id, args.userId));
     return true;
   });

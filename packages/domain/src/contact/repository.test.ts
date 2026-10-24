@@ -30,6 +30,9 @@ describe("ContactRepository", () => {
   const hashEmail = (email: string): string =>
     createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
 
+  const shadowInbox = (seed: string): string =>
+    `behalf-${createHash("sha256").update(seed).digest("hex").slice(0, 16)}@feeblo.com`;
+
   const createOrganization = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -45,6 +48,7 @@ describe("ContactRepository", () => {
     authorName: string;
     boardId: string;
     contactId: string;
+    creatorId?: string;
     organizationId: string;
     postId: string;
     statusId: string;
@@ -76,6 +80,7 @@ describe("ContactRepository", () => {
         statusId: args.statusId,
         organizationId: args.organizationId,
         contactId: args.contactId,
+        ...(args.creatorId !== undefined && { creatorId: args.creatorId }),
         authorName: args.authorName,
         source: "DASHBOARD",
         metadata: {},
@@ -295,10 +300,7 @@ describe("ContactRepository", () => {
           const oldEmail = "old@example.com";
           const newEmail = "new@example.com";
           const shadowUserId = `shadow_${contactId}`;
-          const shadowEmail = `behalf-${createHash("sha256")
-            .update(contactId)
-            .digest("hex")
-            .slice(0, 16)}@feeblo.com`;
+          const shadowEmail = shadowInbox(contactId);
           const oldUpdatedAt = dateAt("2020-01-01T00:00:00.000Z");
 
           yield* createOrganization(organizationId);
@@ -355,6 +357,98 @@ describe("ContactRepository", () => {
             .where(eq(schema.postTable.id, postId));
           expect(post?.authorName).toBe(newEmail);
           expect(post?.updatedAt).toEqual(dateAt("2020-01-01T00:00:00.000Z"));
+        })
+    );
+
+    it.effect(
+      "heals into an existing identity instead of colliding with its hash",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const repository = yield* ContactRepository;
+          const organizationId = yield* WorkspaceId.generate;
+          const now = yield* DateTime.nowAsDate;
+          const contactId = yield* ContactId.generate;
+          const postId = yield* PostId.generate;
+          const boardId = yield* BoardId.generate;
+          const statusId = yield* PostStatusId.generate;
+          const oldEmail = "before-correction@example.com";
+          const targetEmail = "existing-identity@example.com";
+          const shadowUserId = `shadow_${contactId}`;
+          const existingShadowUserId = `shadow_existing_${contactId}`;
+
+          yield* createOrganization(organizationId);
+          // The address being corrected to still has an org-scoped identity:
+          // its customer was deleted, but a vote kept the shadow alive.
+          yield* db.insert(schema.userTable).values([
+            {
+              id: shadowUserId,
+              name: "Ada",
+              email: shadowInbox(shadowUserId),
+              emailHash: hashEmail(oldEmail),
+              emailVerified: false,
+              restrictedToOrganizationId: organizationId,
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: existingShadowUserId,
+              name: "Ada",
+              email: shadowInbox(existingShadowUserId),
+              emailHash: hashEmail(targetEmail),
+              emailVerified: false,
+              restrictedToOrganizationId: organizationId,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId,
+            email: oldEmail,
+            userId: shadowUserId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* createPostForContact({
+            authorName: "Ada",
+            boardId,
+            contactId,
+            creatorId: shadowUserId,
+            organizationId,
+            postId,
+            statusId,
+          });
+
+          const updated = yield* repository.update({
+            id: contactId,
+            organizationId,
+            email: targetEmail,
+          });
+          expect(Option.isSome(updated)).toBe(true);
+
+          // The correction commits by adopting the existing identity, not by
+          // writing a duplicate hash the unique index would reject.
+          const [contact] = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.id, contactId));
+          expect(contact?.email).toBe(targetEmail);
+          expect(contact?.userId).toBe(existingShadowUserId);
+
+          const users = yield* db
+            .select({ id: schema.userTable.id })
+            .from(schema.userTable)
+            .where(
+              eq(schema.userTable.restrictedToOrganizationId, organizationId)
+            );
+          expect(users.map((user) => user.id)).toEqual([existingShadowUserId]);
+
+          const [post] = yield* db
+            .select({ creatorId: schema.postTable.creatorId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(post?.creatorId).toBe(existingShadowUserId);
         })
     );
 
