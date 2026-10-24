@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
@@ -241,6 +242,19 @@ export default defineConfig({
     viteReact(),
     tailwindcss(),
     eagerPreloadHints(),
+    // Upload the exact chunks this build served, matched to the release the
+    // browser reports. A build without a token (local, CI checks) skips it:
+    // the plugin disables itself instead of failing the build.
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      url: process.env.SENTRY_URL,
+      release: { name: process.env.APP_RELEASE },
+      telemetry: false,
+      silent: true,
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+    }),
   ],
   ssr: {
     noExternal: [/^@feeblo\//],

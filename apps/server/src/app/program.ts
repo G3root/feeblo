@@ -25,6 +25,7 @@ import {
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as ErrorReporter from "effect/ErrorReporter";
 import * as Etag from "effect/http/Etag";
 import * as HttpPlatform from "effect/http/HttpPlatform";
 import * as HttpRouter from "effect/http/HttpRouter";
@@ -32,6 +33,7 @@ import type * as HttpServer from "effect/http/HttpServer";
 import * as Layer from "effect/Layer";
 
 import { ServerConfig } from "../config";
+import { makeBrowserTelemetryRouter } from "../http/browser-telemetry";
 import { makeObservabilityLayer } from "../infra/observability";
 import { makeIntegrationLayers } from "../integrations";
 import {
@@ -134,6 +136,10 @@ export const makeServerApp = Effect.gen(function* () {
   });
   const MergedRoutes = makeMergedRoutes({
     appUrl: config.appUrl,
+    browserTelemetry: makeBrowserTelemetryRouter({
+      service: "feeblo-server",
+      environment: config.environment,
+    }),
     integrationRuntime,
     publicRouters: PublicRouters,
   });
@@ -209,6 +215,9 @@ const ObservabilityLayer = Layer.unwrap(
 
 export const main = program.pipe(
   Effect.scoped,
+  // A failure that escapes the server (a layer that cannot build, a fiber
+  // that dies) is an incident too; the reporter filters client rejections.
+  Effect.tapCause(ErrorReporter.report),
   // This is the application's entry point: everything the server needs is
   // composed here, exactly as the rule asks.
   // eslint-disable-next-line effecttsgo/strict-effect-provide -- application entry point

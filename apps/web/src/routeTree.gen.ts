@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from "./routes/_auth"
 import { Route as DashboardRouteImport } from "./routes/_dashboard"
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt"
 import { Route as SRouteRouteImport } from "./routes/s/route"
+import { Route as SentryTunnelRouteImport } from "./routes/sentry-tunnel"
 import { Route as AuthForgotPasswordRouteImport } from "./routes/_auth/forgot-password"
 import { Route as AuthSignInRouteImport } from "./routes/_auth/sign-in"
 import { Route as AuthSignUpRouteImport } from "./routes/_auth/sign-up"
@@ -27,6 +28,7 @@ import { Route as SSplatRouteImport } from "./routes/s/$"
 import { Route as SLlmsDottxtRouteImport } from "./routes/s/llms[.]txt"
 import { Route as SRobotsDottxtRouteImport } from "./routes/s/robots[.]txt"
 import { Route as SSitemapDotxmlRouteImport } from "./routes/s/sitemap[.]xml"
+import { Route as TelemetrySignalRouteImport } from "./routes/telemetry/$signal"
 import { Route as DashboardOrganizationIdDashboardLayoutRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout"
 import { Route as DashboardOrganizationIdOverPlanRouteImport } from "./routes/_dashboard/$organizationId/over-plan"
 import { Route as DashboardOrganizationIdSettingsRouteImport } from "./routes/_dashboard/$organizationId/settings"
@@ -96,6 +98,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const SRouteRoute = SRouteRouteImport.update({
   id: "/s",
   path: "/s",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SentryTunnelRoute = SentryTunnelRouteImport.update({
+  id: "/sentry-tunnel",
+  path: "/sentry-tunnel",
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
@@ -168,6 +175,11 @@ const SSitemapDotxmlRoute = SSitemapDotxmlRouteImport.update({
   id: "/sitemap.xml",
   path: "/sitemap.xml",
   getParentRoute: () => SRouteRoute,
+} as any)
+const TelemetrySignalRoute = TelemetrySignalRouteImport.update({
+  id: "/telemetry/$signal",
+  path: "/telemetry/$signal",
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardOrganizationIdDashboardLayoutRoute =
   DashboardOrganizationIdDashboardLayoutRouteImport.update({
@@ -484,6 +496,7 @@ export interface FileRoutesByFullPath {
   "/s": typeof SRouteRouteWithChildren
   "/": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
+  "/sentry-tunnel": typeof SentryTunnelRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
   "/sign-in": typeof AuthSignInRoute
   "/sign-up": typeof AuthSignUpRoute
@@ -497,6 +510,7 @@ export interface FileRoutesByFullPath {
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
+  "/telemetry/$signal": typeof TelemetrySignalRoute
   "/s/": typeof SIndexRoute
   "/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
   "/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
@@ -553,6 +567,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
+  "/sentry-tunnel": typeof SentryTunnelRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
   "/sign-in": typeof AuthSignInRoute
   "/sign-up": typeof AuthSignUpRoute
@@ -566,6 +581,7 @@ export interface FileRoutesByTo {
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
+  "/telemetry/$signal": typeof TelemetrySignalRoute
   "/s": typeof SIndexRoute
   "/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
   "/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
@@ -623,6 +639,7 @@ export interface FileRoutesById {
   "/_auth": typeof AuthRouteWithChildren
   "/_dashboard": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
+  "/sentry-tunnel": typeof SentryTunnelRoute
   "/_auth/forgot-password": typeof AuthForgotPasswordRoute
   "/_auth/sign-in": typeof AuthSignInRoute
   "/_auth/sign-up": typeof AuthSignUpRoute
@@ -636,6 +653,7 @@ export interface FileRoutesById {
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
+  "/telemetry/$signal": typeof TelemetrySignalRoute
   "/s/": typeof SIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout": typeof DashboardOrganizationIdDashboardLayoutRouteWithChildren
   "/_dashboard/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
@@ -696,6 +714,7 @@ export interface FileRouteTypes {
     | "/s"
     | "/"
     | "/robots.txt"
+    | "/sentry-tunnel"
     | "/forgot-password"
     | "/sign-in"
     | "/sign-up"
@@ -709,6 +728,7 @@ export interface FileRouteTypes {
     | "/s/llms.txt"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
+    | "/telemetry/$signal"
     | "/s/"
     | "/$organizationId/over-plan"
     | "/$organizationId/settings"
@@ -765,6 +785,7 @@ export interface FileRouteTypes {
   to:
     | "/"
     | "/robots.txt"
+    | "/sentry-tunnel"
     | "/forgot-password"
     | "/sign-in"
     | "/sign-up"
@@ -778,6 +799,7 @@ export interface FileRouteTypes {
     | "/s/llms.txt"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
+    | "/telemetry/$signal"
     | "/s"
     | "/$organizationId/over-plan"
     | "/invitation/$invitationId"
@@ -834,6 +856,7 @@ export interface FileRouteTypes {
     | "/_auth"
     | "/_dashboard"
     | "/robots.txt"
+    | "/sentry-tunnel"
     | "/_auth/forgot-password"
     | "/_auth/sign-in"
     | "/_auth/sign-up"
@@ -847,6 +870,7 @@ export interface FileRouteTypes {
     | "/s/llms.txt"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
+    | "/telemetry/$signal"
     | "/s/"
     | "/_dashboard/$organizationId/_dashboard-layout"
     | "/_dashboard/$organizationId/over-plan"
@@ -907,7 +931,9 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
+  SentryTunnelRoute: typeof SentryTunnelRoute
   FeedbackWidgetOrganizationIdRoute: typeof FeedbackWidgetOrganizationIdRoute
+  TelemetrySignalRoute: typeof TelemetrySignalRoute
 }
 
 declare module "@tanstack/react-router" {
@@ -938,6 +964,13 @@ declare module "@tanstack/react-router" {
       path: "/s"
       fullPath: "/s"
       preLoaderRoute: typeof SRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/sentry-tunnel": {
+      id: "/sentry-tunnel"
+      path: "/sentry-tunnel"
+      fullPath: "/sentry-tunnel"
+      preLoaderRoute: typeof SentryTunnelRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/_auth/forgot-password": {
@@ -1037,6 +1070,13 @@ declare module "@tanstack/react-router" {
       fullPath: "/s/sitemap.xml"
       preLoaderRoute: typeof SSitemapDotxmlRouteImport
       parentRoute: typeof SRouteRoute
+    }
+    "/telemetry/$signal": {
+      id: "/telemetry/$signal"
+      path: "/telemetry/$signal"
+      fullPath: "/telemetry/$signal"
+      preLoaderRoute: typeof TelemetrySignalRouteImport
+      parentRoute: typeof rootRouteImport
     }
     "/_dashboard/$organizationId/_dashboard-layout": {
       id: "/_dashboard/$organizationId/_dashboard-layout"
@@ -1646,7 +1686,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
+  SentryTunnelRoute: SentryTunnelRoute,
   FeedbackWidgetOrganizationIdRoute: FeedbackWidgetOrganizationIdRoute,
+  TelemetrySignalRoute: TelemetrySignalRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -28,6 +28,10 @@ minimumReleaseAgeExclude:
 
 allowBuilds:
   "@parcel/watcher": true
+  # `@sentry/vite-plugin` uploads source maps with the Sentry CLI binary this
+  # package's postinstall downloads. A build without SENTRY_AUTH_TOKEN disables
+  # the plugin, so the binary is never invoked locally.
+  "@sentry/cli": true
   "@swc/core": true
   core-js: true
   esbuild: true
@@ -52,6 +56,12 @@ catalog:
   "@isaacs/ttlcache": ^2.1.5
   "@polar-sh/better-auth": ^2.1.0
   "@polar-sh/sdk": ^1.0.2
+  # Error reporting only. Tracing stays on the Effect OTLP exporters
+  # (`docs/telemetry.md`); Sentry is initialized with `tracesSampleRate: 0`,
+  # matching `UsefulSoftwareCo/executor`'s split between the two systems.
+  "@sentry/node": 10.75.0
+  "@sentry/react": 10.75.0
+  "@sentry/vite-plugin": 5.4.0
   "@solidjs/router": ^0.16.1
   "@tailwindcss/vite": ^4.3.3
   "@tanstack/query-db-collection": 1.4.8
@@ -82,6 +92,7 @@ catalog:
   jose: ^6.2.3
   knip: ^6.42.1
   postgres: ^3.4.7
+  posthog-js: ^1.416.0
   rangi: ^2.2.0
   react: ^19.2.8
   react-dom: ^19.2.8

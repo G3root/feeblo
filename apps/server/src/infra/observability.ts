@@ -18,6 +18,7 @@ import * as Option from "effect/Option";
 import * as References from "effect/References";
 
 import type { ServerConfigValue } from "../config";
+import { makeSentryObservability } from "./sentry";
 import { telemetryConfig } from "./telemetry/config";
 import { telemetryLayer } from "./telemetry/layer";
 import { startProcessMetrics } from "./telemetry/process";
@@ -65,49 +66,56 @@ export const failureSummary = (cause: Cause.Cause<unknown>): string =>
   );
 
 export const makeObservabilityLayer = (config: ServerConfigValue) =>
-  Layer.unwrap(
-    Effect.gen(function* () {
-      const telemetry = yield* telemetryConfig({
-        service: "feeblo-server",
-        environment: config.environment,
-      }).pipe(
-        Effect.tapError((error) =>
-          Effect.logError(
-            "OTLP configuration is invalid; continuing without OTLP exporters",
-            { error: failureSummary(Cause.fail(error)) }
-          )
-        ),
-        Effect.option
-      );
-
-      // The invalid-configuration path has no decoded log level; the fallbacks
-      // below do, so keep `FEEBLO_TELEMETRY_LOG_LEVEL` in effect even when no
-      // exporter starts.
-      if (Option.isNone(telemetry)) {
-        return Layer.empty;
-      }
-      const { logLevel, logs, metrics, traces } = telemetry.value;
-      const otlpEnabled =
-        traces !== undefined || logs !== undefined || metrics !== undefined;
-      if (!otlpEnabled) {
-        return Layer.succeed(References.MinimumLogLevel, logLevel);
-      }
-
-      // `provideMerge` gives the sampler the telemetry layer's fresh metric
-      // registry, so its gauges reach the same exporter, and keeps the
-      // telemetry output in the result.
-      return Layer.effectDiscard(startProcessMetrics("feeblo-server")).pipe(
-        Layer.provideMerge(telemetryLayer(telemetry.value, { rpcSpanPrefix })),
-        Layer.catchCause((cause) =>
-          Layer.unwrap(
+  Layer.merge(
+    // Error reporting is independent of OTLP: a deployment can run OTLP
+    // without Sentry, Sentry without OTLP, or neither.
+    makeSentryObservability({ environment: config.environment }),
+    Layer.unwrap(
+      Effect.gen(function* () {
+        const telemetry = yield* telemetryConfig({
+          service: "feeblo-server",
+          environment: config.environment,
+        }).pipe(
+          Effect.tapError((error) =>
             Effect.logError(
-              "OTLP exporters failed to start; continuing without OTLP exporters",
-              { cause: failureSummary(cause) }
-            ).pipe(
-              Effect.as(Layer.succeed(References.MinimumLogLevel, logLevel))
+              "OTLP configuration is invalid; continuing without OTLP exporters",
+              { error: failureSummary(Cause.fail(error)) }
+            )
+          ),
+          Effect.option
+        );
+
+        // The invalid-configuration path has no decoded log level; the fallbacks
+        // below do, so keep `FEEBLO_TELEMETRY_LOG_LEVEL` in effect even when no
+        // exporter starts.
+        if (Option.isNone(telemetry)) {
+          return Layer.empty;
+        }
+        const { logLevel, logs, metrics, traces } = telemetry.value;
+        const otlpEnabled =
+          traces !== undefined || logs !== undefined || metrics !== undefined;
+        if (!otlpEnabled) {
+          return Layer.succeed(References.MinimumLogLevel, logLevel);
+        }
+
+        // `provideMerge` gives the sampler the telemetry layer's fresh metric
+        // registry, so its gauges reach the same exporter, and keeps the
+        // telemetry output in the result.
+        return Layer.effectDiscard(startProcessMetrics("feeblo-server")).pipe(
+          Layer.provideMerge(
+            telemetryLayer(telemetry.value, { rpcSpanPrefix })
+          ),
+          Layer.catchCause((cause) =>
+            Layer.unwrap(
+              Effect.logError(
+                "OTLP exporters failed to start; continuing without OTLP exporters",
+                { cause: failureSummary(cause) }
+              ).pipe(
+                Effect.as(Layer.succeed(References.MinimumLogLevel, logLevel))
+              )
             )
           )
-        )
-      );
-    })
+        );
+      })
+    )
   );
