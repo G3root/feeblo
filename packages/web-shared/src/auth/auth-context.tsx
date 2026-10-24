@@ -110,14 +110,24 @@ function AuthProviderClient({
   const [initialHint, setInitialHint] = useState<AuthUser | null>(() =>
     hydrationSafe ? null : readAuthHintFromCookie()
   );
+  // The atom can resolve before hydration (a route loader may have awaited it),
+  // so the first client render would otherwise see `unauthenticated` while the
+  // server rendered `loading`. Hold the server's state until after mount, then
+  // let the resolved session and hint take over.
+  const [isHydrated, setIsHydrated] = useState(!hydrationSafe);
 
   useEffect(() => {
     if (hydrationSafe) {
       setInitialHint(readAuthHintFromCookie());
+      setIsHydrated(true);
     }
   }, [hydrationSafe]);
 
   const state = useMemo<AuthState>(() => {
+    if (hydrationSafe && !isHydrated) {
+      return loadingAuthState;
+    }
+
     // A transition (an SSO token exchange, say) is an authentication event
     // the atom cannot know about yet: its current answer predates it, and a
     // signed-out result would paint the wrong UI for the round trips the
@@ -130,7 +140,7 @@ function AuthProviderClient({
     return resolved.status === "loading"
       ? (hintState(initialHint) ?? resolved)
       : resolved;
-  }, [initialHint, resolved, transitionPending]);
+  }, [hydrationSafe, initialHint, isHydrated, resolved, transitionPending]);
 
   return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>;
 }
