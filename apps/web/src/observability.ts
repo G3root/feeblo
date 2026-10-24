@@ -54,6 +54,7 @@ export const startWebTelemetry = (): void => {
     environment: environment(),
     tracesUrl: telemetryUrl("traces"),
     logsUrl: telemetryUrl("logs"),
+    scripts: scriptDirectory(import.meta.url),
   });
   recordBrowserNavigation({ type: "load", path: window.location.pathname });
 };

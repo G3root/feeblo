@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { readBoundedText } from "~/lib/bounded-body";
 import { getPublicEnvServer } from "~/lib/server-runtime-public-env";
 
 /**
@@ -25,12 +26,15 @@ const relay = async (signal: string, request: Request): Promise<Response> => {
   if (!isSignal(signal)) return empty(404);
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     return empty(415);
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (!Number.isFinite(declaredLength) || declaredLength > maxBodyBytes)
+  // `Number(null)` is 0, so the header must be checked before it is
+  // converted. A body without a length is refused rather than buffered.
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength === null) return empty(411);
+  const length = Number(declaredLength);
+  if (!Number.isInteger(length) || length < 0 || length > maxBodyBytes)
     return empty(413);
-  const body = await request.text();
-  if (new TextEncoder().encode(body).byteLength > maxBodyBytes)
-    return empty(413);
+  const body = await readBoundedText(request, maxBodyBytes);
+  if (body === undefined) return empty(413);
   const apiUrl = getPublicEnvServer().API_URL.replace(/\/+$/, "");
   try {
     const upstream = await fetch(`${apiUrl}/api/telemetry/${signal}`, {

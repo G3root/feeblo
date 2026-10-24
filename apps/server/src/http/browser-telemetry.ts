@@ -28,6 +28,7 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 
 import type { TelemetryTarget } from "../infra/telemetry/config";
 import {
@@ -38,8 +39,111 @@ import {
 /** Browser batches are one buffered second of spans or logs. */
 const maxBodyBytes = 256 * 1024;
 const maxBodySize = ByteSize.bytes(maxBodyBytes);
+/** One buffered second cannot legitimately carry more than this. */
+const maxRecords = 1_000;
 
 const empty = (status: number) => HttpServerResponse.empty({ status });
+
+/**
+ * The identity every forwarded browser record carries, decided by the server.
+ *
+ * The browser controls its payload, so the resource it sent — including
+ * `service.name` — is discarded. Without this, an anonymous caller could post
+ * spans or logs claiming to be `feeblo-server` and mislead backend alerts.
+ * Fabricated records under the browser's own identity remain possible; this
+ * boundary only guarantees which service they can claim to be.
+ */
+export interface BrowserTelemetryIdentity {
+  readonly service: string;
+  readonly version: string;
+  readonly environment: string;
+}
+
+const SpanRecord = Schema.Record(Schema.String, Schema.Json);
+const LogRecord = Schema.Record(Schema.String, Schema.Json);
+const TracePayload = Schema.fromJsonString(
+  Schema.Struct({
+    resourceSpans: Schema.Array(
+      Schema.Struct({
+        scopeSpans: Schema.Array(
+          Schema.Struct({
+            spans: Schema.Array(SpanRecord).check(
+              Schema.isMaxLength(maxRecords)
+            ),
+          })
+        ),
+      })
+    ),
+  })
+);
+const LogPayload = Schema.fromJsonString(
+  Schema.Struct({
+    resourceLogs: Schema.Array(
+      Schema.Struct({
+        scopeLogs: Schema.Array(
+          Schema.Struct({
+            logRecords: Schema.Array(LogRecord).check(
+              Schema.isMaxLength(maxRecords)
+            ),
+          })
+        ),
+      })
+    ),
+  })
+);
+
+const resource = (identity: BrowserTelemetryIdentity) => ({
+  attributes: [
+    { key: "service.name", value: { stringValue: identity.service } },
+    { key: "service.version", value: { stringValue: identity.version } },
+    {
+      key: "deployment.environment.name",
+      value: { stringValue: identity.environment },
+    },
+  ],
+});
+
+/**
+ * Decode a browser batch and rebuild it under the server's identity.
+ *
+ * Only the records survive; the caller's resource, scope names and any extra
+ * top-level fields are dropped. `undefined` means the body was not a valid
+ * OTLP batch for this signal.
+ */
+export const browserBatch = (
+  signal: "traces" | "logs",
+  body: string,
+  identity: BrowserTelemetryIdentity
+): string | undefined => {
+  if (signal === "traces") {
+    const payload = Schema.decodeOption(TracePayload)(body);
+    if (Option.isNone(payload)) return undefined;
+    const spans = payload.value.resourceSpans.flatMap((entry) =>
+      entry.scopeSpans.flatMap((scope) => scope.spans)
+    );
+    return JSON.stringify({
+      resourceSpans: [
+        {
+          resource: resource(identity),
+          scopeSpans: [{ scope: { name: identity.service }, spans }],
+        },
+      ],
+    });
+  }
+  const payload = Schema.decodeOption(LogPayload)(body);
+  if (Option.isNone(payload)) return undefined;
+  const logRecords = payload.value.resourceLogs.flatMap((entry) =>
+    entry.scopeLogs.flatMap((scope) => scope.logRecords)
+  );
+  return JSON.stringify({
+    resourceLogs: [
+      {
+        resource: resource(identity),
+        scopeLogs: [{ scope: { name: identity.service }, logRecords }],
+      },
+    ],
+  });
+};
 
 const forward = (
   client: HttpClient.HttpClient,

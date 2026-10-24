@@ -30,6 +30,8 @@ import {
   OtlpTracer,
 } from "effect/observability";
 
+import { firstPartyFailure } from "./browser-errors";
+
 /** Public, browser-safe telemetry identity and same-origin relay URLs. */
 export interface BrowserTelemetrySettings {
   readonly service: string;
@@ -37,6 +39,8 @@ export interface BrowserTelemetrySettings {
   readonly environment: string;
   readonly tracesUrl: string;
   readonly logsUrl: string;
+  /** Directory holding this surface's built chunks, from the app entry's `import.meta.url`. */
+  readonly scripts: string;
 }
 
 /** Page events use the same tracer and export scope as browser API operations. */
@@ -94,7 +98,7 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
         Effect.timeoutOption(flushTimeout),
         Effect.asVoid
       );
-      const error = (name: string, value: Error | string) =>
+      const error = (name: string, value: Error) =>
         run(
           Effect.logError(Cause.die(value)).pipe(
             Effect.andThen(Effect.fail(value)),
@@ -102,16 +106,23 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
             Effect.ignore
           )
         );
-      const onError = (event: ErrorEvent) =>
-        error(
-          "ui.error",
-          event.error instanceof Error ? event.error : new Error(event.message)
-        );
-      const onRejection = (event: PromiseRejectionEvent) =>
-        error(
-          "ui.unhandled-rejection",
-          event.reason instanceof Error ? event.reason : String(event.reason)
-        );
+      // A page-level handler also sees extension and injected-script failures.
+      // The same first-party filter Sentry uses decides what belongs to the
+      // app, so both reporting paths agree.
+      const onError = (event: ErrorEvent) => {
+        if (
+          event.error instanceof Error &&
+          firstPartyFailure(event.error, settings.scripts)
+        )
+          error("ui.error", event.error);
+      };
+      const onRejection = (event: PromiseRejectionEvent) => {
+        if (
+          event.reason instanceof Error &&
+          firstPartyFailure(event.reason, settings.scripts)
+        )
+          error("ui.unhandled-rejection", event.reason);
+      };
       const onHidden = () => {
         if (navigation !== undefined && document.visibilityState === "hidden")
           navigation.hidden = true;

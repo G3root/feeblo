@@ -6,7 +6,7 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as Layer from "effect/Layer";
 
-import { makeBrowserTelemetryRouter } from "./browser-telemetry";
+import { browserBatch, makeBrowserTelemetryRouter } from "./browser-telemetry";
 
 const collect = (urls: Array<string>): Layer.Layer<HttpClient.HttpClient> =>
   Layer.succeed(
@@ -117,5 +117,74 @@ describe("browser telemetry relay", () => {
       expect(response.status).toBe(413);
       expect(urls).toEqual([]);
     });
+  });
+});
+
+/**
+ * The relay is public, so the resource identity is the server's, not the
+ * caller's. These cases pin that a forged `service.name` is replaced while the
+ * records the caller actually sent survive.
+ */
+describe("browserBatch", () => {
+  const identity = {
+    service: "feeblo-server-web",
+    version: "abc123",
+    environment: "production",
+  };
+
+  it("replaces a forged service identity on spans", () => {
+    const body = JSON.stringify({
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "feeblo-server" } },
+              { key: "attacker.attribute", value: { stringValue: "yes" } },
+            ],
+          },
+          scopeSpans: [
+            { scope: { name: "forged" }, spans: [{ name: "post.delete" }] },
+          ],
+        },
+      ],
+    });
+    const rewritten = browserBatch("traces", body, identity);
+    expect(rewritten).toBeDefined();
+    expect(rewritten).toContain('"stringValue":"feeblo-server-web"');
+    expect(rewritten).not.toContain('"stringValue":"feeblo-server"');
+    expect(rewritten).not.toContain("attacker.attribute");
+    expect(rewritten).toContain('"name":"post.delete"');
+  });
+
+  it("replaces a forged service identity on logs", () => {
+    const body = JSON.stringify({
+      resourceLogs: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "feeblo-server" } },
+            ],
+          },
+          scopeLogs: [
+            {
+              scope: { name: "forged" },
+              logRecords: [{ body: { stringValue: "x" } }],
+            },
+          ],
+        },
+      ],
+    });
+    const rewritten = browserBatch("logs", body, identity);
+    expect(rewritten).toBeDefined();
+    expect(rewritten).toContain('"stringValue":"feeblo-server-web"');
+    expect(rewritten).not.toContain('"stringValue":"feeblo-server"');
+  });
+
+  it("refuses a body that is not an OTLP batch for the signal", () => {
+    expect(browserBatch("traces", "{}", identity)).toBeUndefined();
+    expect(browserBatch("logs", "not json", identity)).toBeUndefined();
+    expect(
+      browserBatch("traces", JSON.stringify({ resourceLogs: [] }), identity)
+    ).toBeUndefined();
   });
 });

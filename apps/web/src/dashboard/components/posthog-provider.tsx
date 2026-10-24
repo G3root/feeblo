@@ -262,11 +262,11 @@ export const pageContext = (pathname: string) => {
 
 /** Record resolved SPA navigation without a path, search parameters, or fragment. */
 export const capturePageview = (pathname: string) => {
+  if (!posthogKey) return;
   updateReplay();
-  if (started)
-    withPostHog((posthog) =>
-      posthog.capture("$pageview", pageContext(pathname))
-    );
+  // `withPostHog` queues until the SDK loads, so a cold load still records the
+  // first pageview even when the dynamic import has not resolved yet.
+  withPostHog((posthog) => posthog.capture("$pageview", pageContext(pathname)));
 };
 
 const operationFailed = z.object({

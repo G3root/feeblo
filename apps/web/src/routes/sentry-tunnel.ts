@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { readBoundedText } from "~/lib/bounded-body";
 import { envelopeTarget, maxEnvelopeBytes } from "~/lib/sentry-envelope";
 import { getPublicEnvServer } from "~/lib/server-runtime-public-env";
 
@@ -28,12 +29,13 @@ const tunnel = async (request: Request): Promise<Response> => {
     return empty(415);
   // Sentry always sends a Content-Length. Requiring it keeps a chunked
   // request from buffering an unbounded body before the size check runs.
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (!Number.isFinite(declaredLength) || declaredLength > maxEnvelopeBytes)
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength === null) return empty(411);
+  const length = Number(declaredLength);
+  if (!Number.isInteger(length) || length < 0 || length > maxEnvelopeBytes)
     return empty(413);
-  const body = await request.text();
-  if (new TextEncoder().encode(body).byteLength > maxEnvelopeBytes)
-    return empty(413);
+  const body = await readBoundedText(request, maxEnvelopeBytes);
+  if (body === undefined) return empty(413);
   const target = envelopeTarget(body, dsn);
   if (target === undefined) return empty(400);
   try {
