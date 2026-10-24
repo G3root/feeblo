@@ -355,7 +355,12 @@ describe("CommentRpcHandlers on-behalf", () => {
 
             const activity = yield* getActivity(fixture.postId, commentId);
             expect(activity?.metadata).toEqual({
-              onBehalfOf: { userId: teammateUserId },
+              onBehalfOf: {
+                userId: teammateUserId,
+                name: "Teammate",
+                email: `teammate_${fixture.organizationId}@example.com`,
+                kind: "member",
+              },
             });
           })
       );

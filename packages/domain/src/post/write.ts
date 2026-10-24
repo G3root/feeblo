@@ -544,6 +544,11 @@ const makePostWriteService = Effect.gen(function* () {
             creatorId: subject
               ? subject.userId
               : (userId ?? options.creatorUserId ?? null),
+            // The post names its author, not just its account: a contact-only
+            // subject has no `creator_id`, and deleting the contact would
+            // otherwise leave the row with nobody at all. A self-authored post
+            // stores nothing because its live account name always wins.
+            authorName: subject ? (subject.name ?? subject.email) : null,
             ...(writeSource !== undefined && { source: writeSource }),
             // An on-behalf staff subject keeps its member row so the member
             // tick survives; a customer subject has none. A self-authored post
@@ -906,6 +911,7 @@ const makePostWriteService = Effect.gen(function* () {
           ) {
             const onBehalfMetadata = toOnBehalfMetadata(subject);
             yield* repository.updateAuthor({
+              authorName: subject.name ?? subject.email,
               contactId: subject.contactId,
               // A staff subject keeps its member row; a customer subject has
               // none (see the create path).

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { ContactId, WorkspaceId } from "@feeblo/id";
+import { BoardId, ContactId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -249,6 +249,75 @@ describe("ResolvePrincipalService", () => {
         })
     );
 
+    it.effect(
+      "enriching a nameless contact refreshes the author fallback its posts carry",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          const email = "enrich.author@example.com";
+
+          // The contact-only case: no user row, no name yet — the post's
+          // fallback carries the bare address.
+          const now = yield* DateTime.nowAsDate;
+          yield* db.insert(schema.contactTable).values({
+            id: "contact_enrich_author",
+            organizationId,
+            email,
+            name: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+          const boardId = yield* BoardId.generate;
+          const statusId = yield* PostStatusId.generate;
+          yield* db.insert(schema.boardTable).values({
+            id: boardId,
+            name: "Board",
+            slug: boardId,
+            visibility: "PUBLIC",
+            organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postStatusTable).values({
+            id: statusId,
+            type: "PENDING",
+            orderIndex: 0,
+            organizationId,
+          });
+          yield* db.insert(schema.postTable).values({
+            id: "post_enrich_author",
+            title: "Enrich",
+            slug: "post_enrich_author",
+            content: "Content",
+            boardId,
+            statusId,
+            organizationId,
+            contactId: "contact_enrich_author",
+            authorName: email,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          // Attribution-time enrichment names the contact; the anchored
+          // post's fallback must follow so deleting the contact later does
+          // not resurface the bare address.
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email, name: "Jane Enriched" },
+          });
+          expect(resolved.contactId).toBe("contact_enrich_author");
+
+          const [post] = yield* db
+            .select({ authorName: schema.postTable.authorName })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, "post_enrich_author"));
+          expect(post?.authorName).toBe("Jane Enriched");
+        })
+    );
+
     it.effect("provisions a shadow user when a user row is required", () =>
       Effect.gen(function* () {
         const service = yield* ResolvePrincipalService;
@@ -357,12 +426,69 @@ describe("ResolvePrincipalService", () => {
           });
 
           // Attribution must match `findAdoptableByIdentityHash` precedence
-          // (org-scoped wins) so it stays consistent with the SSO session
-          // identity and the `sso` notification-access class.
+          // (a verified org-scoped identity wins) so it stays consistent with
+          // the SSO session identity and the `sso` notification-access class.
           expect(resolved.userId).toBe("user_both_org_resolve");
           const contact = yield* getContactById(resolved.contactId);
           expect(contact?.userId).toBe("user_both_org_resolve");
         })
+    );
+
+    it.effect("adopts a real account over an attribution-only shadow", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        const email = "orphan-shadow@example.com";
+        yield* insertGlobalUser({ id: "user_real_over_shadow", email });
+        // What deleting a contact leaves behind: the shadow survives on the
+        // content it authored, with no contact to anchor it. Binding new
+        // attribution to it would strand the real account.
+        yield* db.insert(schema.userTable).values({
+          id: "user_orphan_shadow",
+          name: "Customer",
+          email: "behalf-0123456789abcdef@feeblo.com",
+          emailHash: hashEmail(email),
+          emailVerified: false,
+          restrictedToOrganizationId: organizationId,
+        });
+
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: true,
+          subject: { email, name: "Jane" },
+        });
+
+        expect(resolved.userId).toBe("user_real_over_shadow");
+        const contact = yield* getContactById(resolved.contactId);
+        expect(contact?.userId).toBe("user_real_over_shadow");
+      })
+    );
+
+    it.effect("adopts a global account that carries no email hash", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* ResolvePrincipalService;
+        const organizationId = yield* makeOrganization();
+        const email = "no-hash-signup@example.com";
+        // What better-auth actually creates: verified, no `email_hash`.
+        yield* db.insert(schema.userTable).values({
+          id: "user_no_hash",
+          name: "No Hash",
+          email,
+          emailVerified: true,
+        });
+
+        const resolved = yield* service.resolve({
+          organizationId,
+          needsUser: true,
+          subject: { email, name: "No Hash" },
+        });
+
+        expect(resolved.userId).toBe("user_no_hash");
+        const contact = yield* getContactById(resolved.contactId);
+        expect(contact?.userId).toBe("user_no_hash");
+      })
     );
 
     it.effect(
@@ -440,10 +566,12 @@ describe("ResolvePrincipalService", () => {
 
           // Staff are not customers: the member row carries the attribution
           // and the CRM stays untouched, so a full CRM must not even be
-          // consulted.
+          // consulted. The snapshot names the account so history survives it.
           expect(resolved).toEqual({
             contactId: null,
+            email: "staff@example.com",
             memberId: "member_staff",
+            name: "Staff Member",
             userId: "user_staff",
           });
           expect(yield* getContactCount(organizationId)).toBe(0);

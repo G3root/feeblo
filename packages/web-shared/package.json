@@ -62,6 +62,10 @@
       "types": "./src/hooks/use-feature-flag.ts",
       "default": "./src/hooks/use-feature-flag.ts"
     },
+    "./use-hydrated": {
+      "types": "./src/hooks/use-hydrated.ts",
+      "default": "./src/hooks/use-hydrated.ts"
+    },
     "./user-validation": {
       "types": "./src/utils/user-validation.ts",
       "default": "./src/utils/user-validation.ts"

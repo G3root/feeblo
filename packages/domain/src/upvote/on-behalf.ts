@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
+import { isSyntheticEmail } from "../identity/emails";
 import { InvalidSubjectError } from "../identity/errors";
 import {
   resolveOnBehalfSubject,
@@ -106,11 +107,13 @@ export const addVoteOnBehalf = (args: {
  * Records the `VOTE_REMOVED` timeline entry for one voter, inside the caller's
  * transaction.
  *
- * The entry keeps its documented `{ contactId, userId }` provenance shape: the
- * contact is resolved when the voter has one, and a pre-existing voter with no
- * contact records only the account id, because nothing is invented. Shared by
- * the remove-by-voter and remove-by-id paths so the two cannot disagree about
- * what a removal records.
+ * The entry snapshots the voter's display name and address alongside the
+ * documented `{ contactId, userId }` provenance: the contact can be deleted
+ * later, and history that resolved its subject from a live collection would
+ * then read "on behalf of a customer". `kind` marks a staff voter as staff so
+ * losing their member row cannot relabel them. A voter whose account row no
+ * longer resolves records identifiers only: the entry never asserts a class
+ * it did not verify.
  */
 export const recordVoteRemoved = (args: {
   readonly actor: VoteWriteActor;
@@ -122,16 +125,43 @@ export const recordVoteRemoved = (args: {
     const db = yield* currentDb;
     const activityRepository = yield* PostActivityRepository;
 
-    const [voterContact] = yield* db
-      .select({ contactId: schema.contactTable.id })
-      .from(schema.contactTable)
-      .where(
+    // One round trip for every display fact the entry records. Reading the
+    // contact in its own query missed members and account-only voters, whose
+    // names would then vanish from history the moment the row changed.
+    const [voter] = yield* db
+      .select({
+        contactEmail: schema.contactTable.email,
+        contactId: schema.contactTable.id,
+        contactName: schema.contactTable.name,
+        memberId: schema.memberTable.id,
+        userEmail: schema.userTable.email,
+        userName: schema.userTable.name,
+      })
+      .from(schema.userTable)
+      .leftJoin(
+        schema.contactTable,
         and(
           eq(schema.contactTable.organizationId, args.organizationId),
-          eq(schema.contactTable.userId, args.userId)
+          eq(schema.contactTable.userId, schema.userTable.id)
         )
       )
+      .leftJoin(
+        schema.memberTable,
+        and(
+          eq(schema.memberTable.organizationId, args.organizationId),
+          eq(schema.memberTable.userId, schema.userTable.id)
+        )
+      )
+      .where(eq(schema.userTable.id, args.userId))
       .limit(1);
+
+    const contactId = voter?.contactId;
+    const name = voter?.contactName ?? voter?.userName ?? null;
+    // A shadow's synthetic inbox names nothing reachable, so it is never
+    // stored as the voter's address.
+    const email =
+      voter?.contactEmail ??
+      (voter && !isSyntheticEmail(voter.userEmail) ? voter.userEmail : null);
 
     yield* activityRepository.create({
       organizationId: args.organizationId,
@@ -141,8 +171,15 @@ export const recordVoteRemoved = (args: {
       kind: "VOTE_REMOVED",
       metadata: {
         onBehalfOf: {
-          ...(voterContact && { contactId: voterContact.contactId }),
+          ...(contactId != null && { contactId }),
           userId: args.userId,
+          ...(name !== null && { name }),
+          ...(email !== null && { email }),
+          // The class is asserted only when the account row resolved. A vote's
+          // `user_id` cascades with its account, so an unresolved row is not
+          // reachable through the callers today — but if that ever changes,
+          // the entry must not claim a class it did not verify.
+          ...(voter && { kind: voter.memberId ? "member" : "customer" }),
         },
       },
     });
