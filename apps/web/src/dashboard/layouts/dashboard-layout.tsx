@@ -21,6 +21,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 
 import { AppSidebar } from "~/components/common/app-sidebar";
+import { FeedbackWidgetProvider } from "~/components/common/feedback-widget";
 import { MobileBottomSlotProvider } from "~/components/common/mobile-bottom-slot";
 import { MobileNav } from "~/components/common/mobile-nav";
 import { NotificationsMenu } from "~/components/common/notifications-menu";
@@ -139,7 +140,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                                   } as React.CSSProperties
                                 }
                               >
-                                <AppSidebar variant="inset" />
+                                {/* One widget per page. Sits above `AppSidebar`
+                                    so the sidebar's "Send Feedback" button can
+                                    open it, and above the sidebar's
+                                    mobile/desktop branch so a breakpoint
+                                    change never destroys an open embed. */}
+                                <FeedbackWidgetProvider>
+                                  <AppSidebar variant="inset" />
+                                </FeedbackWidgetProvider>
                                 <SidebarInset className="h-full min-h-0 overflow-hidden">
                                   <header className="flex h-(--header-height) shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
                                     <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">

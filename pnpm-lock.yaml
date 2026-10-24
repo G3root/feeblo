@@ -413,6 +413,9 @@ importers:
       '@feeblo/rpc-client':
         specifier: workspace:*
         version: link:../../packages/rpc-client
+      '@feeblo/sdk-react':
+        specifier: workspace:*
+        version: link:../../packages/sdk-react
       '@feeblo/ui':
         specifier: workspace:*
         version: link:../../packages/ui

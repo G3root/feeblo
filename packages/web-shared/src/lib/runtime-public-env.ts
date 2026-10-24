@@ -11,6 +11,7 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
     posthogKey: env.POSTHOG_KEY,
     posthogHost: env.POSTHOG_HOST,
+    feedbackWidgetOrganizationId: env.FEEDBACK_WIDGET_ORGANIZATION_ID,
   };
 }
 

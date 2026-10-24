@@ -19,6 +19,7 @@ const serverEnvSchema = z.object({
   NO_INDEX: z.string().optional(),
   POSTHOG_KEY: z.string().optional(),
   POSTHOG_HOST: z.string().optional(),
+  FEEDBACK_WIDGET_ORGANIZATION_ID: z.string().trim().optional(),
 });
 
 export type ServerPublicEnv = z.infer<typeof serverEnvSchema>;
@@ -33,6 +34,8 @@ export function getPublicEnvServer(): ServerPublicEnv {
     NO_INDEX: process.env.NO_INDEX,
     POSTHOG_KEY: process.env.POSTHOG_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
+    FEEDBACK_WIDGET_ORGANIZATION_ID:
+      process.env.FEEDBACK_WIDGET_ORGANIZATION_ID,
   });
 }
 
@@ -69,6 +72,7 @@ export function getBrowserPublicEnv() {
     TURNSTILE_SITE_KEY: env.TURNSTILE_SITE_KEY,
     POSTHOG_KEY: env.POSTHOG_KEY,
     POSTHOG_HOST: env.POSTHOG_HOST,
+    FEEDBACK_WIDGET_ORGANIZATION_ID: env.FEEDBACK_WIDGET_ORGANIZATION_ID,
   };
 }
 
