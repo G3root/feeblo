@@ -223,6 +223,7 @@ function ContactPage() {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>Account</TableHead>
             <TableHead>Phone</TableHead>
             <TableHead>External ID</TableHead>
             <TableHead>Source</TableHead>

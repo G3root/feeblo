@@ -101,6 +101,8 @@ interface TPostDelete {
 interface TPostCreate {
   boardId: string;
   contactId?: string | null;
+  /** Display snapshot of the attributed author; see the column comment. */
+  authorName?: string | null;
   content: string;
   /** Backdated creation instant, for an import. Defaults to the write clock. */
   createdAt?: Date | undefined;
@@ -199,11 +201,13 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
     // no user row, e.g. from on-behalf creation or UpdatePostAuthor) to
     // their contact name instead of rendering "Unknown author". The
     // fallback is dashboard-only: public selects keep the user join alone
-    // so customer names never leak onto public boards.
+    // so customer names never leak onto public boards. `authorName` is the
+    // last resort: it is what keeps the author visible once the contact
+    // itself has been deleted, and it is never read on a public surface.
     name: opts?.contactFallback
       ? sql<
           string | null
-        >`COALESCE(${schema.userTable.name}, ${schema.contactTable.name})`
+        >`COALESCE(${schema.userTable.name}, ${schema.contactTable.name}, ${schema.postTable.authorName})`
       : sql<string | null>`${schema.userTable.name}`,
     image: opts?.contactFallback
       ? sql<
@@ -895,17 +899,20 @@ const makePostRepository = Effect.gen(function* () {
      * Re-attributes a post to a resolved on-behalf subject. A customer
      * subject sets `contactId` and clears `creatorMemberId`; a workspace
      * member keeps its member row and may have a null `contactId`
-     * (ADR 0017).
+     * (ADR 0017). `authorName` is rewritten from the new subject so the
+     * display snapshot never names the previous author.
      */
     updateAuthor: ({
       id,
       organizationId,
+      authorName,
       creatorId,
       creatorMemberId,
       contactId,
     }: {
       id: string;
       organizationId: string;
+      authorName: string | null;
       creatorId: string | null;
       creatorMemberId: string | null;
       /** Null for a staff subject: staff never resolve to a contact. */
@@ -913,7 +920,7 @@ const makePostRepository = Effect.gen(function* () {
     }) =>
       db
         .update(schema.postTable)
-        .set({ creatorId, creatorMemberId, contactId })
+        .set({ authorName, creatorId, creatorMemberId, contactId })
         .where(
           and(
             eq(schema.postTable.id, id),
@@ -1164,6 +1171,7 @@ const makePostRepository = Effect.gen(function* () {
       creatorId,
       creatorMemberId,
       contactId,
+      authorName,
       createdAt: inputCreatedAt,
       metadata,
       source,
@@ -1211,6 +1219,7 @@ const makePostRepository = Effect.gen(function* () {
                     creatorId: creatorId ?? null,
                     creatorMemberId: creatorMemberId ?? null,
                     contactId: contactId ?? null,
+                    authorName: authorName ?? null,
                     source: source ?? "DASHBOARD",
                     metadata: metadata ?? {},
                     // A backdated import keeps its own `createdAt` while

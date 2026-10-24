@@ -12,7 +12,12 @@ import * as Option from "effect/Option";
 import { isShadowUserEmail } from "../identity/emails";
 import { UserPersistenceError } from "./errors";
 
-const hashEmail = (email: string) =>
+/**
+ * SHA-256 of a normalised address, hex encoded. Shared with identity linking
+ * so a shadow can be found from the address its owner just proved even when no
+ * contact row links them any more.
+ */
+export const hashEmail = (email: string) =>
   Effect.gen(function* () {
     const crypto = yield* Crypto.Crypto;
     return Buffer.from(
@@ -76,13 +81,19 @@ const makeUserRepository = Effect.gen(function* () {
      * workspace's portal identities.
      *
      * Precedence: when both a global account and an organization-scoped
-     * (shadow/SSO portal) account share the same email hash, the
+     * (shadow/SSO portal) account share the same email, a verified
      * organization-scoped row wins. It is the workspace's own view of that
      * human and matches the session identity returned by `upsertSsoUser`
      * (which never returns a global account), so on-behalf attribution and
      * the organization-access notification gate (`evaluateOrganizationAccess`,
      * `sso` class) consistently use the same user ID instead of splitting
-     * history across two IDs.
+     * history across two IDs. An unverified organization-scoped row (an
+     * attribution-only shadow) never outranks a real global account.
+     *
+     * Matching is by email hash, plus the address itself for a global account:
+     * a better-auth-created row carries no `email_hash`, so the address is the
+     * only identity it has. Org-scoped rows match by hash alone, so a
+     * synthetic inbox typed as a subject can never adopt one.
      */
     findAdoptableByIdentityHash: (args: {
       email: string;
@@ -90,17 +101,34 @@ const makeUserRepository = Effect.gen(function* () {
     }) =>
       Effect.gen(function* () {
         const emailHash = yield* hashEmail(args.email);
+        const normalisedEmail = args.email.toLowerCase().trim();
         const rows = yield* db
           .select()
           .from(schema.userTable)
           .where(
             and(
-              eq(schema.userTable.emailHash, emailHash),
+              sql`(
+                (
+                  ${schema.userTable.restrictedToOrganizationId} IS NULL
+                  AND lower(${schema.userTable.email}) = ${normalisedEmail}
+                )
+                OR ${schema.userTable.emailHash} = ${emailHash}
+              )`,
               sql`(${schema.userTable.restrictedToOrganizationId} IS NULL OR ${schema.userTable.restrictedToOrganizationId} = ${args.organizationId})`
             )
           )
+          // Precedence: a verified portal identity bound to this workspace,
+          // then a real unrestricted account, then an attribution-only shadow.
+          // A shadow must never outrank a verified account: deleting a contact
+          // leaves its shadow behind while attributed content still refers to
+          // it, and adopting that orphan would strand the human's real
+          // identity on content history they can never sign in to.
           .orderBy(
-            sql`CASE WHEN ${schema.userTable.restrictedToOrganizationId} IS NULL THEN 1 ELSE 0 END`,
+            sql`CASE
+              WHEN ${schema.userTable.restrictedToOrganizationId} IS NULL THEN 1
+              WHEN ${schema.userTable.emailVerified} IS TRUE THEN 0
+              ELSE 2
+            END`,
             schema.userTable.id
           )
           .limit(1);

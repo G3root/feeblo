@@ -37,6 +37,10 @@ import {
   OgImageRouterLive,
   PublicApiDocsRoute,
 } from "../http/routers";
+import {
+  deploymentServesHttps,
+  makeSecurityHeadersMiddleware,
+} from "../http/security-headers";
 import { serverTimingMiddleware } from "../http/server-timing";
 import { SesEmailFeedbackRouter } from "../http/ses";
 import { errorReportingMiddleware } from "../infra/sentry";
@@ -209,6 +213,18 @@ export const withGlobalMiddleware = <A, E, R>(
     ),
     Layer.provide(
       HttpRouter.middleware(bodySizeLimitMiddleware, { global: true })
+    ),
+    // Framing and content-type controls for every response, error bodies and
+    // router-level 404s included. See `http/security-headers.ts` for why the
+    // policy has no `default-src` and why the session cookie makes framing the
+    // load-bearing directive.
+    Layer.provide(
+      HttpRouter.middleware(
+        makeSecurityHeadersMiddleware({
+          includeHsts: deploymentServesHttps(config),
+        }),
+        { global: true }
+      )
     ),
     Layer.provide(
       HttpRouter.middleware(serverTimingMiddleware, { global: true })

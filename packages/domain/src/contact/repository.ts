@@ -8,19 +8,39 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import { isSyntheticEmail } from "../identity/emails";
+import {
+  type EmailRecipientAccessClass,
+  evaluateOrganizationAccess,
+} from "../email-outbox/access";
+import { isShadowUserEmail, isSyntheticEmail } from "../identity/emails";
+import { linkShadowUser } from "../identity/linking";
+import { hashEmail } from "../user/repository";
 import {
   ContactAlreadyExistsError,
   FailedToUpdateContactError,
 } from "./errors";
 import type {
+  TContactAccountKind,
   TContactCreate,
   TContactDelete,
   TContactUpdate,
   TContactUpsert,
+  TContactWithAccount,
 } from "./schema";
 
 export type Contact = typeof schema.contactTable.$inferSelect;
+
+/**
+ * Account class → the Customers-table vocabulary. Exhaustive, so a new class in
+ * `evaluateOrganizationAccess` is a compile error here rather than a silently
+ * unlabelled row.
+ */
+const ACCOUNT_KIND_BY_CLASS = {
+  global: "ACCOUNT",
+  member: "MEMBER",
+  shadow: "SHADOW",
+  sso: "PORTAL",
+} as const satisfies Record<EmailRecipientAccessClass, TContactAccountKind>;
 
 /**
  * Keeps a synthetic account's display name in step with the customer record
@@ -55,6 +75,106 @@ export const renameSyntheticAccount = (args: {
     yield* args.db
       .update(schema.userTable)
       .set({ name: args.name, updatedAt: args.now })
+      .where(eq(schema.userTable.id, args.userId));
+    return true;
+  });
+
+/**
+ * Refreshes the display snapshot on posts attributed to a contact.
+ *
+ * `post.author_name` is what a post renders once its live contact is gone, so
+ * a CRM rename or address correction has to reach it. `updatedAt` is pinned to
+ * its current value: this is metadata about someone else's post, not a change
+ * to the post itself.
+ */
+const refreshPostAuthorFallback = (args: {
+  db: PgDrizzle.EffectPgDatabase;
+  contact: Contact;
+}) =>
+  args.db
+    .update(schema.postTable)
+    .set({
+      authorName: args.contact.name ?? args.contact.email,
+      updatedAt: sql`${schema.postTable.updatedAt}`,
+    })
+    .where(eq(schema.postTable.contactId, args.contact.id));
+
+/**
+ * Keeps a shadow account's identity hash in step with its contact's address.
+ *
+ * Identity linking finds orphaned shadows by the hash of the address their
+ * owner proved. If `UpdateContact` corrects a contact from A to B without
+ * moving the hash, a later signup that verifies A can still claim the shadow's
+ * posts, votes, and contact link. Real and portal accounts own their own
+ * identity and are left alone; only an attribution-only `behalf-*` shadow is
+ * refreshed.
+ *
+ * A deleted customer can leave its shadow alive when attributed content still
+ * refers to it, so the target address may already have an org-scoped identity.
+ * Writing the hash over that one would violate the unique
+ * `(emailHash, restrictedToOrganizationId)` index and roll back the contact
+ * edit. The existing identity is the person the contact is being corrected to:
+ * heal this shadow into it instead, moving the content rather than duplicating
+ * the identity.
+ *
+ * Takes the transaction handle so the hash (or merge) commits with the contact
+ * write.
+ */
+const refreshShadowEmailHash = (args: {
+  db: PgDrizzle.EffectPgDatabase;
+  email: string;
+  /** The transaction's timestamp, shared with the contact write. */
+  now: Date;
+  userId: string;
+}) =>
+  Effect.gen(function* () {
+    const [user] = yield* args.db
+      .select({
+        email: schema.userTable.email,
+        restrictedToOrganizationId: schema.userTable.restrictedToOrganizationId,
+      })
+      .from(schema.userTable)
+      .where(eq(schema.userTable.id, args.userId))
+      .limit(1);
+    if (
+      !user ||
+      !isShadowUserEmail(user.email) ||
+      user.restrictedToOrganizationId === null
+    ) {
+      return false;
+    }
+
+    const emailHash = yield* hashEmail(args.email);
+    const [existing] = yield* args.db
+      .select({ id: schema.userTable.id })
+      .from(schema.userTable)
+      .where(
+        and(
+          eq(schema.userTable.emailHash, emailHash),
+          eq(
+            schema.userTable.restrictedToOrganizationId,
+            user.restrictedToOrganizationId
+          )
+        )
+      )
+      .limit(1);
+
+    if (existing !== undefined && existing.id !== args.userId) {
+      yield* linkShadowUser({
+        shadowUserId: args.userId,
+        realUserId: existing.id,
+        deleteShadowUser: true,
+      }).pipe(
+        Effect.catchTag("SubjectNotFoundError", () =>
+          Effect.fail(new FailedToUpdateContactError())
+        )
+      );
+      return true;
+    }
+
+    yield* args.db
+      .update(schema.userTable)
+      .set({ emailHash, updatedAt: args.now })
       .where(eq(schema.userTable.id, args.userId));
     return true;
   });
@@ -148,6 +268,37 @@ const makeContactRepository = Effect.gen(function* () {
             yield* renameSyntheticAccount({
               db: tx,
               name: contact.value.name,
+              now,
+              userId: contact.value.userId,
+            });
+          }
+          // The post-level display snapshot follows the CRM too. It is only
+          // read once the live contact is gone, so leaving it stale would bring
+          // the old name back at exactly the wrong moment. An email change
+          // refreshes too: a nameless contact's fallback carries the address,
+          // so an email-only correction must not resurface the superseded
+          // address after the contact is deleted.
+          if (
+            Option.isSome(contact) &&
+            (args.name !== undefined || args.email !== undefined)
+          ) {
+            yield* refreshPostAuthorFallback({
+              db: tx,
+              contact: contact.value,
+            });
+          }
+          // The shadow's hash is the proof identity linking uses for a shadow
+          // whose contact is later deleted. A corrected address must move the
+          // hash too, or the superseded address can still claim the account.
+          if (
+            Option.isSome(contact) &&
+            args.email !== undefined &&
+            args.email !== null &&
+            contact.value.userId !== null
+          ) {
+            yield* refreshShadowEmailHash({
+              db: tx,
+              email: args.email,
               now,
               userId: contact.value.userId,
             });
@@ -339,6 +490,24 @@ const makeContactRepository = Effect.gen(function* () {
         }
 
         const now = yield* DateTime.nowAsDate;
+        // Refresh the shadow the contact points at *before* the update swaps
+        // in the SSO identity: `updated.userId` would be that identity, which
+        // is not the account holding the old address hash. When the new
+        // address already has an identity (the SSO user being signed in), the
+        // helper heals the old shadow into it.
+        if (
+          args.email &&
+          existing.userId !== null &&
+          existing.email !== args.email
+        ) {
+          yield* refreshShadowEmailHash({
+            db,
+            email: args.email,
+            now,
+            userId: existing.userId,
+          });
+        }
+
         const [updated = null] = yield* db
           .update(schema.contactTable)
           .set({
@@ -356,6 +525,12 @@ const makeContactRepository = Effect.gen(function* () {
           .returning();
         if (!updated) {
           return yield* new FailedToUpdateContactError();
+        }
+        if (
+          (args.name !== undefined && updated.name !== existing.name) ||
+          (args.email !== undefined && updated.email !== existing.email)
+        ) {
+          yield* refreshPostAuthorFallback({ db, contact: updated });
         }
         return updated;
       }),
@@ -393,16 +568,81 @@ const makeContactRepository = Effect.gen(function* () {
         return Option.fromNullishOr(created);
       }),
 
+    /**
+     * The Customers-table read: every contact in the workspace plus the state
+     * of its linked account.
+     *
+     * `accountKind` / `notifyAccess` are derived here, from the same
+     * `evaluateOrganizationAccess` the delivery gate uses, so the CRM and the
+     * on-behalf picker cannot disagree about who has an account and who will be
+     * emailed. The picker evaluates with a concrete post; this page has none,
+     * so an unrestricted account reads as `PUBLIC_ONLY` instead of guessing.
+     */
     findManyContacts: (
       organizationId: string,
       options?: { limit?: number }
     ) => {
       const query = db
-        .select()
+        .select({
+          accountEmail: schema.userTable.email,
+          accountEmailVerified: schema.userTable.emailVerified,
+          accountRestrictedToOrganizationId:
+            schema.userTable.restrictedToOrganizationId,
+          contact: schema.contactTable,
+          memberId: schema.memberTable.id,
+        })
         .from(schema.contactTable)
+        .leftJoin(
+          schema.userTable,
+          eq(schema.userTable.id, schema.contactTable.userId)
+        )
+        .leftJoin(
+          schema.memberTable,
+          and(
+            eq(schema.memberTable.organizationId, organizationId),
+            eq(schema.memberTable.userId, schema.contactTable.userId)
+          )
+        )
         .where(eq(schema.contactTable.organizationId, organizationId));
 
-      return options?.limit === undefined ? query : query.limit(options.limit);
+      const rows =
+        options?.limit === undefined ? query : query.limit(options.limit);
+
+      return Effect.map(rows, (found) =>
+        found.map(({ contact, ...link }): TContactWithAccount => {
+          const account =
+            link.accountEmail === null
+              ? null
+              : {
+                  email: link.accountEmail,
+                  emailVerified: link.accountEmailVerified === true,
+                  restrictedToOrganizationId:
+                    link.accountRestrictedToOrganizationId ?? null,
+                };
+          // `PUBLIC` only affects the unrestricted-global branch: the CRM page
+          // has no post, so this is the most that account can be promised.
+          const verdict = evaluateOrganizationAccess({
+            account,
+            boardVisibility: "PUBLIC",
+            hasMembership: link.memberId !== null,
+            organizationId,
+          });
+
+          return {
+            ...contact,
+            accountKind:
+              account === null
+                ? null
+                : ACCOUNT_KIND_BY_CLASS[verdict.recipientClass],
+            notifyAccess:
+              account === null || !verdict.eligible
+                ? "NO"
+                : verdict.recipientClass === "global"
+                  ? "PUBLIC_ONLY"
+                  : "YES",
+          };
+        })
+      );
     },
 
     /**

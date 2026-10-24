@@ -15,11 +15,12 @@ import {
   ContactSearchResult,
   ContactUnsubscribe,
   ContactUpdate,
+  ContactWithAccount,
 } from "./schema";
 
 export class ContactRpcs extends RpcGroup.make(
   Rpc.make("ListContacts", {
-    success: Schema.Array(Contact),
+    success: Schema.Array(ContactWithAccount),
     payload: ContactList,
     error: ContactServiceErrors,
   }).middleware(AuthMiddleware),

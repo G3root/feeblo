@@ -25,11 +25,33 @@ export function ContactDeleteDialog() {
           <span className="block">
             This cannot be undone. The contact is removed from your workspace.
           </span>
-          <span className="block">
-            Their posts, votes, and comments stay attributed to them, and they
-            are not unsubscribed from email updates.
-          </span>
           {contact?.userId ? (
+            <span className="block">
+              Their posts, votes, and comments stay attributed to them, and they
+              are not unsubscribed from email updates.
+            </span>
+          ) : (
+            <span className="block">
+              Posts created on their behalf keep their author name, but the link
+              to this contact is removed. They are not unsubscribed from email
+              updates.
+            </span>
+          )}
+          {contact?.accountKind === "SHADOW" ? (
+            <span className="block">
+              Their on-behalf account cannot sign in and is kept only while
+              content refers to it. Deleting the contact does not remove their
+              name from what they wrote.
+            </span>
+          ) : null}
+          {contact?.accountKind === "MEMBER" ? (
+            <span className="block">
+              This contact belongs to a workspace member. Deleting it does not
+              remove the member or change their access.
+            </span>
+          ) : null}
+          {contact?.accountKind === "ACCOUNT" ||
+          contact?.accountKind === "PORTAL" ? (
             <span className="block">
               This contact is linked to a Feeblo account. Deleting the contact
               does not change that account's access or email settings.
@@ -49,8 +71,9 @@ export function ContactDeleteDialog() {
               title: "Contact deleted",
               // Deletion is a CRM change, not a retraction of what the person
               // wrote; the copy says so at the moment it matters.
-              description:
-                "Their attributed posts, votes, and comments are unchanged.",
+              description: contact?.userId
+                ? "Their posts, votes, and comments are unchanged."
+                : "Posts keep their author name; the CRM link is removed.",
               type: "success",
             });
           },

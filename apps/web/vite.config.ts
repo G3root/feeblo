@@ -145,7 +145,37 @@ function eagerPreloadHints(): Plugin {
         }
       );
 
-      return { code: next, map: null };
+      // The closure above overlaps the shared chunks TanStack already lists on
+      // child routes (`/s` names the router and query vendors too). Emitting
+      // both sets puts duplicate `<link rel="modulepreload">` elements in the
+      // document; React sees the repeated meta keys when hydrating and discards
+      // hydration for the page (error #418). Keep the first occurrence — the
+      // root array, which is generated first — and drop later repeats.
+      const seen = new Set<string>();
+      const deduped = next.replace(
+        /(preloads:\s*\[)([\s\S]*?)(\])/g,
+        (_whole, head: string, body: string, tail: string) => {
+          const kept = [...body.matchAll(/"([^"]+)"/g)]
+            .map(
+              // SAFETY: the pattern captures one group, so index 1 exists.
+              (match) => match[1] as string
+            )
+            .filter((href) => {
+              if (seen.has(href)) {
+                return false;
+              }
+              seen.add(href);
+              return true;
+            });
+          const entries = kept
+            .map((href) => `\n\t\t\t${JSON.stringify(href)},`)
+            .join("");
+
+          return `${head}${entries}\n\t\t${tail}`;
+        }
+      );
+
+      return { code: deduped, map: null };
     },
   };
 }

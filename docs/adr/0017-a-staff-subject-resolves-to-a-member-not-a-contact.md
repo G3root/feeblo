@@ -4,7 +4,7 @@
 
 An on-behalf action whose subject is a member of the acting workspace resolves to that account and its `member` row. The resolver creates no `contact` for it, and the write spends no CRM-entry allowance. A contact that already exists for that account still wins: it stays the attribution anchor, and nothing is deleted.
 
-`ResolvedPrincipal.contactId` is therefore nullable. A customer subject always carries one; a staff subject never does. The on-behalf metadata records what the subject has: `{ onBehalfOf: { contactId?, userId? } }`. Posts and comments written for a staff subject keep the member row (`post.creatorMemberId`, `comment.memberId`), so the member tick survives.
+`ResolvedPrincipal.contactId` is therefore nullable. A customer subject always carries one; a staff subject never does. The on-behalf metadata records what the subject has: `{ onBehalfOf: { contactId?, userId? } }` (later extended with a `name` / `email` / `kind` snapshot; see ADR 0023). Posts and comments written for a staff subject keep the member row (`post.creatorMemberId`, `comment.memberId`), so the member tick survives.
 
 The check runs only when no contact exists for the account, so a human who was a customer before joining the workspace keeps the single customer record their history already points at.
 

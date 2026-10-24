@@ -1,5 +1,10 @@
 import handler from "@tanstack/react-start/server-entry";
 
+import {
+  applyPageSecurityHeaders,
+  deploymentServesHttps,
+  parseImageOrigins,
+} from "./lib/security-headers";
 import { paraglideMiddleware } from "./paraglide/server.js";
 
 /**
@@ -15,9 +20,39 @@ import { paraglideMiddleware } from "./paraglide/server.js";
  * Subdomain routing is *not* handled here: it is a router `rewrite`
  * (`lib/public-board-rewrite`), so the server and the browser make the same
  * public-to-internal mapping and links keep the visitor's spelling.
+ *
+ * Response headers are attached after the handler resolves, so they land on
+ * every document — SSR pages, route errors, redirects, and the widget shell.
+ * The one place they cannot move is `apps/web/server.mjs`'s static middleware,
+ * which answers `/assets/*` and `/widget/*` before this entry runs; those are
+ * fingerprinted bundles and fonts, not documents, so the directives that
+ * matter (framing, `img-src`, referrer) have nothing to act on there.
+ * `nosniff` is the exception, and the asset response's own `Content-Type`
+ * already comes from Vite/srvx.
  */
 export default {
-  fetch(request: Request) {
-    return paraglideMiddleware(request, () => handler.fetch(request));
+  async fetch(request: Request) {
+    const response = await paraglideMiddleware(request, () =>
+      handler.fetch(request)
+    );
+
+    const url = new URL(request.url);
+    return applyPageSecurityHeaders(response, {
+      // `MEDIA_PUBLIC_BASE_URL` is where uploaded editor media and workspace
+      // logos are served from; without it the `img-src` allow-list would blank
+      // every uploaded image. `CONTENT_IMAGE_ORIGINS` is the operator's
+      // extension for avatar hosts a workspace's own SSO returns.
+      imageOrigins: parseImageOrigins([
+        process.env.MEDIA_PUBLIC_BASE_URL,
+        process.env.CONTENT_IMAGE_ORIGINS,
+      ]),
+      // Read from the deployment's own configuration, not the request URL: the
+      // Node container answers plain HTTP behind the TLS-terminating proxy, and
+      // the bundle inlines `NODE_ENV` to the build mode.
+      includeHsts: deploymentServesHttps({
+        appUrl: process.env.APP_URL,
+      }),
+      pathname: url.pathname,
+    });
   },
 };
