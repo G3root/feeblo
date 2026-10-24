@@ -1,5 +1,5 @@
 import { serve } from "srvx/node";
-import { serveStatic } from "srvx/static";
+import { staticMiddleware } from "srvx/static";
 
 import handler from "./dist/server/server.js";
 
@@ -55,7 +55,7 @@ serve({
   fetch: handler.fetch,
   middleware: [
     staticCacheControl,
-    serveStatic({
+    staticMiddleware({
       dir: clientDirectory,
     }),
   ],
