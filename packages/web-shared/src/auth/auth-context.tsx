@@ -7,6 +7,7 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
+import { useHydrated } from "../hooks/use-hydrated";
 import { authAtomRegistry, meAtom } from "./atoms";
 import { readAuthHintFromCookie } from "./hint-cookie";
 
@@ -112,14 +113,13 @@ function AuthProviderClient({
   );
   // The atom can resolve before hydration (a route loader may have awaited it),
   // so the first client render would otherwise see `unauthenticated` while the
-  // server rendered `loading`. Hold the server's state until after mount, then
-  // let the resolved session and hint take over.
-  const [isHydrated, setIsHydrated] = useState(!hydrationSafe);
+  // server rendered `loading`. Hold the server's state until hydration commits,
+  // then let the resolved session and hint take over.
+  const isHydrated = useHydrated();
 
   useEffect(() => {
     if (hydrationSafe) {
       setInitialHint(readAuthHintFromCookie());
-      setIsHydrated(true);
     }
   }, [hydrationSafe]);
 
