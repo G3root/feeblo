@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { readBoundedText } from "~/lib/bounded-body";
-import { envelopeTarget, maxEnvelopeBytes } from "~/lib/sentry-envelope";
+import {
+  envelopeTarget,
+  isEnvelopeContentType,
+  maxEnvelopeBytes,
+} from "~/lib/sentry-envelope";
 import { getPublicEnvServer } from "~/lib/server-runtime-public-env";
 
 /**
@@ -21,11 +25,7 @@ const empty = (status: number, headers?: Record<string, string>): Response => {
 const tunnel = async (request: Request): Promise<Response> => {
   const dsn = getPublicEnvServer().SENTRY_DSN;
   if (dsn === undefined || dsn.length === 0) return empty(404);
-  if (
-    !request.headers
-      .get("content-type")
-      ?.startsWith("application/x-sentry-envelope")
-  )
+  if (!isEnvelopeContentType(request.headers.get("content-type")))
     return empty(415);
   // Sentry always sends a Content-Length. Requiring it keeps a chunked
   // request from buffering an unbounded body before the size check runs.

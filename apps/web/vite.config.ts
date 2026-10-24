@@ -254,12 +254,19 @@ export default defineConfig({
       telemetry: false,
       silent: true,
       disable: !process.env.SENTRY_AUTH_TOKEN,
+      // Uploaded maps do not belong in the deployed bundle; the plugin
+      // removes them after a successful upload.
+      sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
     }),
   ],
   ssr: {
     noExternal: [/^@feeblo\//],
   },
   build: {
+    // The Sentry plugin uploads these and then removes them from the output.
+    // Hidden maps carry no `sourceMappingURL`, so without a token no map is
+    // emitted at all — a build never ships a public source map by accident.
+    sourcemap: process.env.SENTRY_AUTH_TOKEN ? "hidden" : false,
     chunkSizeWarningLimit: 750,
     rolldownOptions: {
       output: {

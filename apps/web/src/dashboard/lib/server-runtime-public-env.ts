@@ -15,6 +15,11 @@ const serverEnvSchema = z.object({
   APP_URL: z.string().min(1),
   APP_ROOT_DOMAIN: z.string().min(1),
   APP_RELEASE: z.string().optional(),
+  // The deployment environment name (`APP_ENV`, defaulting to `NODE_ENV` on
+  // the server). The browser uses it for Sentry and PostHog when
+  // `SENTRY_ENVIRONMENT` is unset, so an event's environment matches the
+  // server's instead of Vite's build mode.
+  APP_ENV: z.string().optional(),
   TURNSTILE_SITE_KEY: z.string().optional(),
   NO_INDEX: z.string().optional(),
   POSTHOG_KEY: z.string().optional(),
@@ -34,6 +39,7 @@ export function getPublicEnvServer(): ServerPublicEnv {
     APP_URL: process.env.APP_URL,
     APP_ROOT_DOMAIN: process.env.APP_ROOT_DOMAIN,
     APP_RELEASE: process.env.APP_RELEASE,
+    APP_ENV: process.env.APP_ENV,
     TURNSTILE_SITE_KEY: process.env.TURNSTILE_SITE_KEY,
     NO_INDEX: process.env.NO_INDEX,
     POSTHOG_KEY: process.env.POSTHOG_KEY,
@@ -51,6 +57,7 @@ export function getServerRuntimePublicEnv() {
     appUrl: env.APP_URL,
     appRootDomain: env.APP_ROOT_DOMAIN,
     appRelease: env.APP_RELEASE,
+    appEnv: env.APP_ENV,
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
     posthogKey: env.POSTHOG_KEY,
     posthogHost: env.POSTHOG_HOST,
@@ -75,6 +82,7 @@ export function getBrowserPublicEnv() {
     APP_URL: env.APP_URL,
     APP_ROOT_DOMAIN: env.APP_ROOT_DOMAIN,
     APP_RELEASE: env.APP_RELEASE,
+    APP_ENV: env.APP_ENV,
     TURNSTILE_SITE_KEY: env.TURNSTILE_SITE_KEY,
     POSTHOG_KEY: env.POSTHOG_KEY,
     POSTHOG_HOST: env.POSTHOG_HOST,

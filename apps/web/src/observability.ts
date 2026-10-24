@@ -30,6 +30,7 @@ const environment = (): string => {
   const env = getRuntimePublicEnv();
   return (
     env.sentryEnvironment ??
+    env.appEnv ??
     (import.meta.env.DEV ? "development" : "production")
   );
 };

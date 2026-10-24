@@ -12,7 +12,10 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
     posthogKey: env.POSTHOG_KEY,
     posthogHost: env.POSTHOG_HOST,
     sentryDsn: env.SENTRY_DSN,
-    sentryEnvironment: env.SENTRY_ENVIRONMENT,
+    // `.env.example` leaves these blank, and an empty label is not a useful
+    // environment; treat it as unset so the app-env and mode fallbacks run.
+    sentryEnvironment: env.SENTRY_ENVIRONMENT || undefined,
+    appEnv: env.APP_ENV || undefined,
   };
 }
 

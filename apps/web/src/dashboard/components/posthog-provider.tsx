@@ -59,6 +59,7 @@ const deploymentProperties = () => ({
   release: env.appRelease ?? "dev",
   environment:
     env.sentryEnvironment ??
+    env.appEnv ??
     (import.meta.env.DEV ? "development" : "production"),
 });
 
@@ -272,7 +273,13 @@ export const capturePageview = (pathname: string) => {
 const operationFailed = z.object({
   error_type: z.string().max(80),
   page_id: z.string().optional(),
-  tags: z.record(z.string(), z.string()).optional(),
+  // The event is a DOM event any script on the page can dispatch. Only the
+  // boundary this code emits is accepted; an injected script cannot add
+  // arbitrary properties to a product event. `{}` is still a valid tags value.
+  tags: z
+    .object({ boundary: z.literal("route") })
+    .strict()
+    .optional(),
 });
 
 /**
