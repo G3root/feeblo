@@ -282,6 +282,111 @@ describe("ContactRepository", () => {
           expect(post?.updatedAt).toEqual(dateAt("2020-01-01T00:00:00.000Z"));
         })
     );
+    it.effect(
+      "heals the previous shadow into the SSO identity before relinking",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const repository = yield* ContactRepository;
+          const organizationId = yield* WorkspaceId.generate;
+          const now = yield* DateTime.nowAsDate;
+          const contactId = yield* ContactId.generate;
+          const postId = yield* PostId.generate;
+          const boardId = yield* BoardId.generate;
+          const statusId = yield* PostStatusId.generate;
+          const oldEmail = "before-sso@example.com";
+          const newEmail = "after-sso@example.com";
+          const shadowUserId = `shadow_${contactId}`;
+          const ssoUserId = `sso_${contactId}`;
+          const ssoEmail = `sso-${createHash("sha256")
+            .update(ssoUserId)
+            .digest("hex")
+            .slice(0, 16)}@feeblo.com`;
+
+          yield* createOrganization(organizationId);
+          // The SSO user already owns the target address; the contact still
+          // points at the old shadow until this upsert relinks it.
+          yield* db.insert(schema.userTable).values([
+            {
+              id: shadowUserId,
+              name: "Ada",
+              email: shadowInbox(shadowUserId),
+              emailHash: hashEmail(oldEmail),
+              emailVerified: false,
+              restrictedToOrganizationId: organizationId,
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: ssoUserId,
+              name: "Ada",
+              email: ssoEmail,
+              emailHash: hashEmail(newEmail),
+              emailVerified: true,
+              restrictedToOrganizationId: organizationId,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ]);
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId,
+            externalId: "sso-move",
+            email: oldEmail,
+            userId: shadowUserId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* createPostForContact({
+            authorName: "Ada",
+            boardId,
+            contactId,
+            creatorId: shadowUserId,
+            organizationId,
+            postId,
+            statusId,
+          });
+
+          const existingContact = yield* repository.findUpsertContact({
+            organizationId,
+            externalId: "sso-move",
+          });
+          if (Option.isNone(existingContact)) {
+            return yield* Effect.die(
+              new Error("the external id must match the SSO contact")
+            );
+          }
+
+          yield* repository.updateUpsertContact({
+            organizationId,
+            externalId: "sso-move",
+            email: newEmail,
+            userId: ssoUserId,
+            existing: existingContact.value,
+          });
+
+          // The old shadow is healed into the SSO identity, then the contact
+          // is relinked to that same identity by the update.
+          const [contact] = yield* db
+            .select()
+            .from(schema.contactTable)
+            .where(eq(schema.contactTable.id, contactId));
+          expect(contact?.email).toBe(newEmail);
+          expect(contact?.userId).toBe(ssoUserId);
+
+          const [oldShadow] = yield* db
+            .select({ id: schema.userTable.id })
+            .from(schema.userTable)
+            .where(eq(schema.userTable.id, shadowUserId));
+          expect(oldShadow).toBeUndefined();
+
+          const [post] = yield* db
+            .select({ creatorId: schema.postTable.creatorId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(post?.creatorId).toBe(ssoUserId);
+        })
+    );
   });
 
   layer(TestLayer)("update", (it) => {

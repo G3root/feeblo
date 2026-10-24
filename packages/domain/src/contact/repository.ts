@@ -490,6 +490,24 @@ const makeContactRepository = Effect.gen(function* () {
         }
 
         const now = yield* DateTime.nowAsDate;
+        // Refresh the shadow the contact points at *before* the update swaps
+        // in the SSO identity: `updated.userId` would be that identity, which
+        // is not the account holding the old address hash. When the new
+        // address already has an identity (the SSO user being signed in), the
+        // helper heals the old shadow into it.
+        if (
+          args.email &&
+          existing.userId !== null &&
+          existing.email !== args.email
+        ) {
+          yield* refreshShadowEmailHash({
+            db,
+            email: args.email,
+            now,
+            userId: existing.userId,
+          });
+        }
+
         const [updated = null] = yield* db
           .update(schema.contactTable)
           .set({
