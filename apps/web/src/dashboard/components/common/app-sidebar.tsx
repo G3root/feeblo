@@ -57,7 +57,7 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
 import { usePublicSiteUrl } from "~/hooks/use-site";
 
-import { FeedbackWidgetButton } from "./feedback-widget";
+import { SupportButton } from "./feedback-widget";
 import { NavUser } from "./nav-user";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
@@ -192,7 +192,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupContent>
             <SidebarMenu>
               <UpgradePlanButton />
-              <FeedbackWidgetButton />
+              <SupportButton />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

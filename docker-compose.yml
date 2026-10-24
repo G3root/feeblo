@@ -53,10 +53,14 @@ services:
       APP_URL: ${APP_URL:-http://localhost:3001}
       API_URL: ${API_URL:-http://localhost:3000}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
-      # Optional in-app feedback button: the workspace that receives what it
+      # Optional in-app support button: the workspace that receives what it
       # submits, and mints each submitter's identity token. Empty keeps the
       # button out. See .env.example.
       FEEDBACK_WIDGET_ORGANIZATION_ID: ${FEEDBACK_WIDGET_ORGANIZATION_ID:-}
+      # Optional: the workspace's signing key, when the deployment keeps its
+      # configuration in env instead of Settings -> Security. Must be the same
+      # secret the widget verifies with. See .env.example.
+      FEEDBACK_WIDGET_SSO_SECRET: ${FEEDBACK_WIDGET_SSO_SECRET:-}
       # Browser origins allowed to call the API (better-auth trustedOrigins).
       # Public board subdomains require a wildcard for their root domain.
       AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-${APP_URL:-http://localhost:3001},${API_URL:-http://localhost:3000},*.${APP_ROOT_DOMAIN:-localhost}}

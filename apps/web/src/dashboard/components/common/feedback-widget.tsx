@@ -4,7 +4,7 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
-import { MessageAdd01Icon } from "@hugeicons/core-free-icons";
+import { CustomerSupportIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   createContext,
@@ -76,8 +76,12 @@ export function FeedbackWidgetProvider({ children }: { children: ReactNode }) {
  * The sidebar trigger, and the only way into the widget: the embed passes no
  * `placement`, so the SDK draws no launcher of its own. Opening before the
  * iframe reports ready is safe — the SDK re-sends `SHOW` once it loads.
+ *
+ * Labelled "Support" because that is the door a customer looks for when
+ * something is wrong; the panel it opens is Feeblo's own feedback widget, so
+ * the report lands on our board attributed to whoever is signed in.
  */
-export function FeedbackWidgetButton() {
+export function SupportButton() {
   const open = useContext(FeedbackWidgetContext);
   const { isMobile, setOpenMobile } = useSidebar();
 
@@ -97,8 +101,8 @@ export function FeedbackWidgetButton() {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton onClick={handleClick}>
-        <HugeiconsIcon icon={MessageAdd01Icon} />
-        <span>Send Feedback</span>
+        <HugeiconsIcon icon={CustomerSupportIcon} />
+        <span>Support</span>
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
