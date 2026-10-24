@@ -191,16 +191,55 @@ export const linkShadowUser = ({
 
         // Email-keyed subscriptions hang off `email_contact`, not the user;
         // the identity reference moves unconditionally, activation is gated.
-        yield* db
+        // The moved addresses are captured because a shadow whose CRM record
+        // is gone (its contact was deleted) has no contact-driven activation
+        // left: without them its deferred rows would stay `deferred_no_access`
+        // even after the person proves the address.
+        const movedEmailContacts = yield* db
           .update(schema.emailContactTable)
           .set({ updatedAt: now, userId: realUserId })
-          .where(eq(schema.emailContactTable.userId, shadowUserId));
+          .where(eq(schema.emailContactTable.userId, shadowUserId))
+          .returning({
+            email: schema.emailContactTable.email,
+            organizationId: schema.emailContactTable.organizationId,
+          });
+
+        // Activation runs per address drawn from the healed CRM contacts and
+        // the moved `email_contact` rows, deduplicated by (organization,
+        // email): a surviving contact covers its own address, a deleted one
+        // leaves only the email rows.
+        const activationAddresses = new Map<
+          string,
+          { contactEmail: string; organizationId: string }
+        >();
+        for (const contact of healedContacts) {
+          if (contact.email && !isSyntheticEmail(contact.email)) {
+            activationAddresses.set(
+              `${contact.organizationId}:${contact.email.toLowerCase()}`,
+              {
+                contactEmail: contact.email,
+                organizationId: contact.organizationId,
+              }
+            );
+          }
+        }
+        for (const moved of movedEmailContacts) {
+          if (!isSyntheticEmail(moved.email)) {
+            activationAddresses.set(
+              `${moved.organizationId}:${moved.email.toLowerCase()}`,
+              {
+                contactEmail: moved.email,
+                organizationId: moved.organizationId,
+              }
+            );
+          }
+        }
 
         let subscriptionsActivated = 0;
-        for (const contact of healedContacts) {
-          if (!contact.email || isSyntheticEmail(contact.email)) {
-            continue;
-          }
+        for (const {
+          contactEmail,
+          organizationId,
+        } of activationAddresses.values()) {
           // Activation must only ever verify an address the surviving
           // account proved; callers may link identities whose emails differ
           // in case, never in substance.
@@ -208,10 +247,10 @@ export const linkShadowUser = ({
             yield* activateDeferredSubscriptionsForContact({
               addressProved:
                 realUser.emailVerified &&
-                realUser.email.toLowerCase() === contact.email.toLowerCase(),
-              contactEmail: contact.email,
+                realUser.email.toLowerCase() === contactEmail.toLowerCase(),
+              contactEmail,
               now,
-              organizationId: contact.organizationId,
+              organizationId,
               realUser,
             });
         }
@@ -511,6 +550,13 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
     // `post.contact_id`). Without this pass, signing up after a CRM cleanup
     // would leave the person's own posts and votes owned by an account they can
     // never sign in to. The email hash is the same proof the scan uses.
+    //
+    // The scan is restricted to shadows with no live contact left. A shadow
+    // still attached to a contact is the contact scan's job, which matches the
+    // contact's current address: `UpdateContact` can correct a contact's email
+    // after the shadow recorded the original one, and the hash must not hand
+    // the shadow's content — or its contact link — to whoever controls the
+    // superseded address.
     const currentEmailHash = yield* hashEmail(user.email);
     const survivingShadows = yield* db
       .select({
@@ -522,7 +568,11 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
       .where(
         and(
           eq(schema.userTable.emailHash, currentEmailHash),
-          isNotNull(schema.userTable.restrictedToOrganizationId)
+          isNotNull(schema.userTable.restrictedToOrganizationId),
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${schema.contactTable}
+            WHERE ${schema.contactTable.userId} = ${schema.userTable.id}
+          )`
         )
       );
 

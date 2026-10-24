@@ -210,6 +210,22 @@ const makeResolvePrincipalService = Effect.gen(function* () {
         })
         .where(eq(schema.contactTable.id, contact.id))
         .returning();
+
+      // A name the subject just enriched onto a nameless contact also names
+      // the posts anchored to it: their author-name fallback was the bare
+      // address, and once the contact is deleted the fallback is what renders.
+      // `updatedAt` is pinned so enrichment does not reorder "recently
+      // updated" lists.
+      if (nextName !== null && nextName !== contact.name) {
+        yield* db
+          .update(schema.postTable)
+          .set({
+            authorName: nextName,
+            updatedAt: sql`${schema.postTable.updatedAt}`,
+          })
+          .where(eq(schema.postTable.contactId, contact.id));
+      }
+
       return updated ?? contact;
     });
 

@@ -172,8 +172,14 @@ const makeContactRepository = Effect.gen(function* () {
           }
           // The post-level display snapshot follows the CRM too. It is only
           // read once the live contact is gone, so leaving it stale would bring
-          // the old name back at exactly the wrong moment.
-          if (Option.isSome(contact) && args.name !== undefined) {
+          // the old name back at exactly the wrong moment. An email change
+          // refreshes too: a nameless contact's fallback carries the address,
+          // so an email-only correction must not resurface the superseded
+          // address after the contact is deleted.
+          if (
+            Option.isSome(contact) &&
+            (args.name !== undefined || args.email !== undefined)
+          ) {
             yield* tx
               .update(schema.postTable)
               .set({

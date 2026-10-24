@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { ContactId, WorkspaceId } from "@feeblo/id";
+import { BoardId, ContactId, PostStatusId, WorkspaceId } from "@feeblo/id";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -246,6 +246,75 @@ describe("ResolvePrincipalService", () => {
           expect(resolved.userId).toBeNull();
           // A customer resolution says so explicitly: no member row.
           expect(resolved.memberId).toBeNull();
+        })
+    );
+
+    it.effect(
+      "enriching a nameless contact refreshes the author fallback its posts carry",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ResolvePrincipalService;
+          const organizationId = yield* makeOrganization();
+          const email = "enrich.author@example.com";
+
+          // The contact-only case: no user row, no name yet — the post's
+          // fallback carries the bare address.
+          const now = yield* DateTime.nowAsDate;
+          yield* db.insert(schema.contactTable).values({
+            id: "contact_enrich_author",
+            organizationId,
+            email,
+            name: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+          const boardId = yield* BoardId.generate;
+          const statusId = yield* PostStatusId.generate;
+          yield* db.insert(schema.boardTable).values({
+            id: boardId,
+            name: "Board",
+            slug: boardId,
+            visibility: "PUBLIC",
+            organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postStatusTable).values({
+            id: statusId,
+            type: "PENDING",
+            orderIndex: 0,
+            organizationId,
+          });
+          yield* db.insert(schema.postTable).values({
+            id: "post_enrich_author",
+            title: "Enrich",
+            slug: "post_enrich_author",
+            content: "Content",
+            boardId,
+            statusId,
+            organizationId,
+            contactId: "contact_enrich_author",
+            authorName: email,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          // Attribution-time enrichment names the contact; the anchored
+          // post's fallback must follow so deleting the contact later does
+          // not resurface the bare address.
+          const resolved = yield* service.resolve({
+            organizationId,
+            needsUser: false,
+            subject: { email, name: "Jane Enriched" },
+          });
+          expect(resolved.contactId).toBe("contact_enrich_author");
+
+          const [post] = yield* db
+            .select({ authorName: schema.postTable.authorName })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, "post_enrich_author"));
+          expect(post?.authorName).toBe("Jane Enriched");
         })
     );
 

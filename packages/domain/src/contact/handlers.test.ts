@@ -311,6 +311,81 @@ describe("ContactRpcHandlers", () => {
         })
     );
 
+    it.effect(
+      "refreshes the author-name fallback when an email-only update changes the address",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* ContactRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const now = yield* DateTime.nowAsDate;
+          const boardId = yield* BoardId.generate;
+          const statusId = yield* PostStatusId.generate;
+          const contactId = yield* ContactId.generate;
+          const postId = yield* PostId.generate;
+
+          // A nameless, contact-only author: the post's only identity is the
+          // contact, and the fallback carries the address the post was
+          // written with.
+          yield* db.insert(schema.boardTable).values({
+            id: boardId,
+            name: "Board",
+            slug: boardId,
+            visibility: "PUBLIC",
+            organizationId: fixture.organizationId,
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postStatusTable).values({
+            id: statusId,
+            type: "PENDING",
+            orderIndex: 0,
+            organizationId: fixture.organizationId,
+          });
+          yield* db.insert(schema.contactTable).values({
+            id: contactId,
+            organizationId: fixture.organizationId,
+            name: null,
+            email: "nameless@example.com",
+            createdAt: now,
+            updatedAt: now,
+          });
+          yield* db.insert(schema.postTable).values({
+            id: postId,
+            title: "Contact-anchored",
+            slug: `contact-anchored-${postId}`,
+            content: "Body",
+            excerpt: "Body",
+            boardId,
+            statusId,
+            organizationId: fixture.organizationId,
+            contactId,
+            authorName: "nameless@example.com",
+            source: "DASHBOARD",
+            metadata: {},
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          // Email-only correction: no `name` in the payload. The fallback
+          // must follow, or deleting the contact later would resurface the
+          // superseded address as the post's author.
+          yield* handlers
+            .UpdateContact({
+              id: contactId,
+              email: "renamed-address@example.com",
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [post] = yield* db
+            .select({ authorName: schema.postTable.authorName })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(post?.authorName).toBe("renamed-address@example.com");
+        })
+    );
+
     it.effect("lists contacts for organization members", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
