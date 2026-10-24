@@ -131,6 +131,13 @@ services:
       API_URL: ${API_URL:-http://localhost:3000}
       APP_URL: ${APP_URL:-http://localhost:3001}
       APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-localhost}
+      # The web process attaches the page security headers, and its `img-src`
+      # allow-list has to name the media origin or every uploaded image is
+      # blocked. Optional here because a deployment that has not configured
+      # object storage has no uploaded media to render.
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-}
+      # Extra image origins (OAuth/SSO avatars, a custom CDN), comma-separated.
+      CONTENT_IMAGE_ORIGINS: ${CONTENT_IMAGE_ORIGINS:-}
     ports:
       # Only the host side varies. The image pins the container listen
       # port (PORT=4321), so the mapping target must stay 4321.

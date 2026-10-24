@@ -52,6 +52,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "msw": "^2.15.0",
     "typescript": "catalog:"
   }
 }
