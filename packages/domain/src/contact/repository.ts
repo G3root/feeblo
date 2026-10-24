@@ -12,7 +12,8 @@ import {
   type EmailRecipientAccessClass,
   evaluateOrganizationAccess,
 } from "../email-outbox/access";
-import { isSyntheticEmail } from "../identity/emails";
+import { isShadowUserEmail, isSyntheticEmail } from "../identity/emails";
+import { hashEmail } from "../user/repository";
 import {
   ContactAlreadyExistsError,
   FailedToUpdateContactError,
@@ -73,6 +74,62 @@ export const renameSyntheticAccount = (args: {
     yield* args.db
       .update(schema.userTable)
       .set({ name: args.name, updatedAt: args.now })
+      .where(eq(schema.userTable.id, args.userId));
+    return true;
+  });
+
+/**
+ * Refreshes the display snapshot on posts attributed to a contact.
+ *
+ * `post.author_name` is what a post renders once its live contact is gone, so
+ * a CRM rename or address correction has to reach it. `updatedAt` is pinned to
+ * its current value: this is metadata about someone else's post, not a change
+ * to the post itself.
+ */
+const refreshPostAuthorFallback = (args: {
+  db: PgDrizzle.EffectPgDatabase;
+  contact: Contact;
+}) =>
+  args.db
+    .update(schema.postTable)
+    .set({
+      authorName: args.contact.name ?? args.contact.email,
+      updatedAt: sql`${schema.postTable.updatedAt}`,
+    })
+    .where(eq(schema.postTable.contactId, args.contact.id));
+
+/**
+ * Keeps a shadow account's identity hash in step with its contact's address.
+ *
+ * Identity linking finds orphaned shadows by the hash of the address their
+ * owner proved. If `UpdateContact` corrects a contact from A to B without
+ * moving the hash, a later signup that verifies A can still claim the shadow's
+ * posts, votes, and contact link. Real and portal accounts own their own
+ * identity and are left alone; only an attribution-only `behalf-*` shadow is
+ * refreshed.
+ *
+ * Takes the transaction handle so the hash commits with the contact write.
+ */
+const refreshShadowEmailHash = (args: {
+  db: PgDrizzle.EffectPgDatabase;
+  email: string;
+  /** The transaction's timestamp, shared with the contact write. */
+  now: Date;
+  userId: string;
+}) =>
+  Effect.gen(function* () {
+    const [user] = yield* args.db
+      .select({ email: schema.userTable.email })
+      .from(schema.userTable)
+      .where(eq(schema.userTable.id, args.userId))
+      .limit(1);
+    if (!user || !isShadowUserEmail(user.email)) {
+      return false;
+    }
+
+    yield* args.db
+      .update(schema.userTable)
+      .set({ emailHash: yield* hashEmail(args.email), updatedAt: args.now })
       .where(eq(schema.userTable.id, args.userId));
     return true;
   });
@@ -180,16 +237,26 @@ const makeContactRepository = Effect.gen(function* () {
             Option.isSome(contact) &&
             (args.name !== undefined || args.email !== undefined)
           ) {
-            yield* tx
-              .update(schema.postTable)
-              .set({
-                authorName: contact.value.name ?? contact.value.email,
-                // Metadata about someone else's post must not reorder
-                // "recently updated" lists; `$onUpdate` only fills the column
-                // when the set clause omits it.
-                updatedAt: sql`${schema.postTable.updatedAt}`,
-              })
-              .where(eq(schema.postTable.contactId, contact.value.id));
+            yield* refreshPostAuthorFallback({
+              db: tx,
+              contact: contact.value,
+            });
+          }
+          // The shadow's hash is the proof identity linking uses for a shadow
+          // whose contact is later deleted. A corrected address must move the
+          // hash too, or the superseded address can still claim the account.
+          if (
+            Option.isSome(contact) &&
+            args.email !== undefined &&
+            args.email !== null &&
+            contact.value.userId !== null
+          ) {
+            yield* refreshShadowEmailHash({
+              db: tx,
+              email: args.email,
+              now,
+              userId: contact.value.userId,
+            });
           }
           return contact;
         })
@@ -395,6 +462,12 @@ const makeContactRepository = Effect.gen(function* () {
           .returning();
         if (!updated) {
           return yield* new FailedToUpdateContactError();
+        }
+        if (
+          (args.name !== undefined && updated.name !== existing.name) ||
+          (args.email !== undefined && updated.email !== existing.email)
+        ) {
+          yield* refreshPostAuthorFallback({ db, contact: updated });
         }
         return updated;
       }),

@@ -1,3 +1,4 @@
+import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import {
@@ -112,7 +113,8 @@ describe("ContactRpcHandlers", () => {
     ),
     Repositories,
     Entitlements,
-    Database.PgliteDatabaseLive
+    Database.PgliteDatabaseLive,
+    NodeCrypto.layer
   );
 
   layer(TestLayer)("handlers", (it) => {
