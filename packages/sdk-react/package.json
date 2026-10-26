@@ -39,10 +39,10 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.build.json",
+    "build": "vite build && tsrs -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@feeblo/sdk": "workspace:*"
@@ -54,7 +54,7 @@
     "@vitest/browser-playwright": "^5.0.2",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "typescript": "catalog:",
+    "tsrs": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "^2.3.0"

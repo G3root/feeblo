@@ -16,7 +16,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@feeblo/db": "workspace:*",
@@ -28,7 +28,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@feeblo/config": "workspace:*",
-    "typescript": "catalog:",
+    "tsrs": "catalog:",
     "vitest": "catalog:"
   }
 }

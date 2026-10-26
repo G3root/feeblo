@@ -6,7 +6,7 @@
   "scripts": {
     "migrate": "pnpm build && MIGRATIONS_DIR=../db/src/migrations node ./dist/index.js",
     "build": "rolldown -c",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -17,6 +17,6 @@
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "rolldown": "catalog:",
-    "typescript": "catalog:"
+    "tsrs": "catalog:"
   }
 }

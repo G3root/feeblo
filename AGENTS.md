@@ -10,10 +10,11 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 
 - pnpm workspaces + Turborepo. Node `26.4.0` (`.node-version`), pnpm `11.0.3` (`packageManager`). Do not introduce a second package manager.
 - Effect `4.0.5`, `@effect/platform-node` `4.0.5`, `@effect/vitest` `4.0.5`. These three are one release train; bump them together. Every `@effect/*` package shares the one version, so the catalog pins `effect`, `@effect/platform-node`, `@effect/vitest`, `@effect/sql-pg`, `@effect/sql-pglite`, `@effect/atom-react` and `@effect/ai-openai` in lockstep.
-- TypeScript `7.0.2`, Oxlint `1.89.0`, `oxlint-tsgolint` `7.0.2004`, `@effect/tsgo` `0.56.0`. These four are also one release train: `effect-tsgo patch` (run from `prepare` on every install) names the versions it supports and refuses to patch a mismatch. A bump is a four-line change or it is wrong. `@effect/tsgo` is not cosmetic: it embeds the module paths its rules match on, so the version has to be one that knows the Effect version in the catalog or the diagnostics go quiet — `0.45` keyed off `effect/unstable/*` and would have reported nothing once the `unstable` segment was dropped. `pnpm check` runs `check-toolchain.ts`, which fails when these two trains disagree across the catalog, the manifests and the workspace overrides, or when a `patchedDependencies` selector names a version that is not installed. Each `@effect/tsgo` release publishes a table of the TypeScript, Oxlint and `oxlint-tsgolint` versions it supports; `0.56.0` accepts Oxlint `1.87`–`1.89` and `oxlint-tsgolint` `7.0.2003`/`7.0.2004`, which is what pins those two.
+- tsrs `0.20.0-ts7.1.0-beta`, Oxlint `1.89.0`, `oxlint-tsgolint` `7.0.2005`, `@effect/tsgo` `0.59.0`. These four are also one release train: `effect-tsgo patch` (run from `prepare` on every install) names the versions it supports and refuses to patch a mismatch. A bump is a four-line change or it is wrong. `@effect/tsgo` is not cosmetic: it embeds the module paths its rules match on, so the version has to be one that knows the Effect version in the catalog or the diagnostics go quiet — `0.45` keyed off `effect/unstable/*` and would have reported nothing once the `unstable` segment was dropped. `pnpm check` runs `check-toolchain.ts`, which fails when these two trains disagree across the catalog, the manifests and the workspace overrides, or when a `patchedDependencies` selector names a version that is not installed. Each `@effect/tsgo` release publishes a table of the compiler, Oxlint and `oxlint-tsgolint` versions it supports; `0.59.0` accepts tsrs `0.20.0-ts7.1.0-beta`, Oxlint `1.87`–`1.89` and `oxlint-tsgolint` `7.0.2004`/`7.0.2005`, which is what pins those three.
+- The compiler is [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript's compiler, not the `typescript` package. Its version names the TypeScript release it ports (`0.20.0-ts7.1.0-beta` is a port of `7.1.0-beta`), so a tsrs bump is also a compiler-behavior bump: the port reproduces that release's diagnostics, including ones the previous compiler did not report. `typescript` still appears in `node_modules` because `@tanstack/db`, `msw` and the Paraglide toolchain peer on it; no workspace package depends on it, and the catalog must not pin it, or the two compilers become a second source of truth. `tsrs` is the binary in every `typecheck` script and the SDKs' declaration build.
 - Drizzle `1.0.0-rc.5` — `drizzle-orm` and `drizzle-kit` are one version — better-auth `1.7.2`, React `19`, TanStack Start for `apps/web`. rc.5's kit peers on the rc.5 ORM and reads snapshot format 9, so the two move together or neither runs. The committed snapshots in `packages/db/src/migrations` are format 9, which is a **diff chain**: each snapshot holds only its delta from its parent rather than the whole schema, so a snapshot is no longer self-contained and the chain has to stay intact and ordered. `drizzle-kit up` produced that rewrite; it is one-way, and going back means regenerating. The ORM's own migrator — what deployments run through `packages/db-migrator` — never reads a snapshot, so this is a tooling constraint and not a production one.
 
-`prepare` runs `effect-tsgo patch --typescript --oxlint`. That single command is what makes the Effect language service load in `tsc` and registers the `effecttsgo` Oxlint plugin; without it, Effect diagnostics silently disappear.
+`prepare` runs `effect-tsgo patch --tsrs --oxlint`. That single command is what patches the installed `tsrs` binary with the Effect language service and registers the `effecttsgo` Oxlint plugin; without it, Effect diagnostics silently disappear. `.vscode/settings.json` points the TypeScript 7 editor extension at `./node_modules/tsrs/tsdk`, which launches the same package's per-platform binary.
 
 ## Packages
 
@@ -46,7 +47,7 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsc --noEmit`, type-aware Oxlint plus the formatter check, and Knip. |
+| `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsrs --noEmit`, type-aware Oxlint plus the formatter check, and Knip. |
 | `pnpm knip` | Unused files, dependencies and exports. Also runs inside `pnpm check`; see "Knip" below for what fails and what only prints. |
 | `pnpm typecheck` | Types only. Cached per package. |
 | `pnpm lint` | `oxlint && oxfmt --check .` |
@@ -58,7 +59,7 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 | `pnpm db:*` | `push`, `generate`, `migrate`, `seed`, `studio`, `start`, `stop`, `nuke`. |
 | `pnpm build` | `turbo build`. |
 
-`apps/web` needs generated Paraglide output before it typechecks, so the `typecheck` turbo task depends on `build:paraglide`. `pnpm check` handles this on its own; a bare `tsc` in `apps/web` will not.
+`apps/web` needs generated Paraglide output before it typechecks, so the `typecheck` turbo task depends on `build:paraglide`. `pnpm check` handles this on its own; a bare `tsrs --noEmit` in `apps/web` will not.
 
 Run `pnpm check` before claiming a change is ready. It needs no database, no build output, and no environment file.
 
@@ -89,7 +90,7 @@ One `ignoreDependencies` is worth knowing about: `apps/server` declares `@feeblo
 
 ## Effect code
 
-Effect diagnostics live in Oxlint (`effecttsgo/*`), not in `tsc`. `packages/config/tsconfig.base.json` sets `diagnostics: false` on the language service so a finding is reported once, by the tool that can act on it. Put severity changes in `oxlint.config.ts`.
+Effect diagnostics live in Oxlint (`effecttsgo/*`), not in the compiler. `packages/config/tsconfig.base.json` sets `diagnostics: false` on the language service so a finding is reported once, by the tool that can act on it. Put severity changes in `oxlint.config.ts`.
 
 `oxlint.config.ts` extends two `@effect/tsgo` presets, `recommended` **and** `effect-native`, and both are load-bearing. `@effect/tsgo@0.46` moved twenty `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and `instance-of-schema` rules out of `recommended` into the opt-in `effect-native` preset, so extending only `recommended` drops `global-date-in-effect` — the defect this file's `off` entries are written against — with nothing failing to say so. The two presets together are exactly the rule set `0.45.0`'s `recommended` carried. See `docs/adr/0005`.
 
@@ -166,6 +167,6 @@ If a task seems to require one of these, do the rest and surface the decision in
 
 ## When something looks broken
 
-- **Effect diagnostics went quiet.** Check that `prepare` ran and patched both tools: `pnpm exec effect-tsgo patch --typescript --oxlint --force`. If `pnpm install` reported `skipped because its hash matches the replacement`, the pnpm store is serving a previously patched binary; `unpatch` then `patch --force` fixes it. This does not happen on a fresh CI runner.
-- **`tsc --noEmit` fails in `apps/web` on a missing `@/paraglide/*`.** Run `pnpm --filter @feeblo/web build:paraglide`, or use `pnpm check`.
+- **Effect diagnostics went quiet.** Check that `prepare` ran and patched both tools: `pnpm exec effect-tsgo patch --tsrs --oxlint --force`. If `pnpm install` reported `skipped because its hash matches the replacement`, the pnpm store is serving a previously patched binary; `unpatch` then `patch --force` fixes it. This does not happen on a fresh CI runner.
+- **`tsrs --noEmit` fails in `apps/web` on a missing `@/paraglide/*`.** Run `pnpm --filter @feeblo/web build:paraglide`, or use `pnpm check`.
 - **A run of `pnpm test` is slow.** The `test` turbo task is `cache: false`, so nothing about a test run is reused. Filter to the package you are working in.

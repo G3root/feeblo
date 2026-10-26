@@ -15,7 +15,7 @@
     "build": "turbo build",
     "test": "turbo run test --continue --filter=!@feeblo/e2e --concurrency=4",
     "test:e2e": "pnpm --filter @feeblo/e2e test",
-    "prepare": "effect-tsgo patch --typescript --oxlint",
+    "prepare": "effect-tsgo patch --tsrs --oxlint",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F @feeblo/web -F @feeblo/public-feature-board dev",
     "dev:server": "turbo -F server dev",
@@ -42,7 +42,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@dotenvx/dotenvx": "catalog:",
-    "@effect/tsgo": "0.56.0",
+    "@effect/tsgo": "0.59.0",
     "@feeblo/config": "workspace:*",
     "@oxlint/plugins": "1.89.0",
     "@types/node": "catalog:",
@@ -50,9 +50,9 @@
     "oxfmt": "^0.74.0",
     "oxlint": "1.89.0",
     "oxlint-plugin-react-doctor": "^0.9.12",
-    "oxlint-tsgolint": "7.0.2004",
-    "turbo": "^2.10.8",
-    "typescript": "catalog:"
+    "oxlint-tsgolint": "7.0.2005",
+    "tsrs": "catalog:",
+    "turbo": "^2.10.8"
   },
   "engines": {
     "node": "^26.4.0",

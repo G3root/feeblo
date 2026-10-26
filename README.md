@@ -62,7 +62,7 @@ docs/                   Topic docs and docs/adr/ decision records
    pnpm install
    ```
 
-   `prepare` runs `effect-tsgo patch` here, which wires the Effect language service into `tsc` and Oxlint. If Effect diagnostics never appear later, that step did not run.
+   `prepare` runs `effect-tsgo patch` here, which wires the Effect language service into the `tsrs` compiler and Oxlint. If Effect diagnostics never appear later, that step did not run.
 
 2. Copy the environment file and fill in values:
 
@@ -103,7 +103,7 @@ docs/                   Topic docs and docs/adr/ decision records
 pnpm check
 ```
 
-That runs every package's `tsc --noEmit`, then type-aware Oxlint, then the formatter check. It needs no database, no build output, and no env file, and CI runs it on every push. Run it before opening a pull request.
+That runs every package's `tsrs --noEmit`, then type-aware Oxlint, then the formatter check. It needs no database, no build output, and no env file, and CI runs it on every push. Run it before opening a pull request.
 
 `AGENTS.md` is the repo law: commands, architecture, and the changes that need an owner decision. `CONTEXT.md` fixes the product's vocabulary. `docs/adr/` records why specific boundaries exist.
 

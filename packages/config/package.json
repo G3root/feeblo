@@ -8,12 +8,12 @@
     "./tsconfig.base.json": "./tsconfig.base.json"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "effect": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "tsrs": "catalog:"
   }
 }

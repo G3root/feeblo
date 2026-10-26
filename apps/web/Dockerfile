@@ -20,7 +20,7 @@ WORKDIR /app
 # First install dependencies (as they change less often)
 COPY --from=prepare /app/out/json/ .
 # The image build does not use the Effect language service: `prepare` patches
-# `tsc` and Oxlint for the editor and the `check` gate, and `turbo build`
+# `tsrs` and Oxlint for the editor and the `check` gate, and `turbo build`
 # runs neither. `@effect/tsgo-<arch>` is an optional dependency, so a tarball
 # download that fails leaves `pnpm install` successful and then fails
 # `prepare`, which fails the build even though the image does not need the

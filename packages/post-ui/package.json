@@ -187,7 +187,7 @@
     "machine-translate": "inlang machine translate --project ../../project.inlang",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
@@ -216,8 +216,8 @@
     "@vitest/browser-playwright": "^5.0.2",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",
+    "tsrs": "catalog:",
     "tw-animate-css": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "^2.3.0"
   },
