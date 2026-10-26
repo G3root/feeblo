@@ -1,0 +1,440 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "bff403ca-227d-40f4-bc2c-19a1e6ed5f30",
+  "prevIds": [
+    "1a647892-f805-43bf-8b0d-3042d0101cee"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "member",
+        "member_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.member_organizationId_idx",
+        "n|idx|public.member_organizationId_idx",
+        "e|idx|public.member_organizationId_idx",
+        "n|rel|public.member_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.member",
+        "n|sch|public",
+        "e|col|public.member.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "organization",
+        "organization_slug_uidx"
+      ],
+      "writes": [
+        "s|idx|public.organization_slug_uidx",
+        "n|idx|public.organization_slug_uidx",
+        "e|idx|public.organization_slug_uidx",
+        "n|rel|public.organization_slug_uidx"
+      ],
+      "reads": [
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "e|col|public.organization.slug"
+      ],
+      "sharedWrites": [
+        "e|uniqueness|public.organization.slug"
+      ]
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post_status",
+        "post_status_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_status_organizationId_idx",
+        "n|idx|public.post_status_organizationId_idx",
+        "e|idx|public.post_status_organizationId_idx",
+        "n|rel|public.post_status_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.post_status",
+        "n|sch|public",
+        "e|col|public.post_status.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post_tag",
+        "post_tag_postId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_tag_postId_idx",
+        "n|idx|public.post_tag_postId_idx",
+        "e|idx|public.post_tag_postId_idx",
+        "n|rel|public.post_tag_postId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.post_tag",
+        "n|sch|public",
+        "e|col|public.post_tag.post_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "post_subscription",
+        "post_subscription_postId_idx"
+      ],
+      "writes": [
+        "s|idx|public.post_subscription_postId_idx",
+        "n|idx|public.post_subscription_postId_idx",
+        "e|idx|public.post_subscription_postId_idx",
+        "n|rel|public.post_subscription_postId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.post_subscription",
+        "n|sch|public",
+        "e|col|public.post_subscription.post_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "jwt_secret",
+        "jwt_secret_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.jwt_secret_organizationId_idx",
+        "n|idx|public.jwt_secret_organizationId_idx",
+        "e|idx|public.jwt_secret_organizationId_idx",
+        "n|rel|public.jwt_secret_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.jwt_secret",
+        "n|sch|public",
+        "e|col|public.jwt_secret.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "user",
+        "user_emailHash_idx"
+      ],
+      "writes": [
+        "s|idx|public.user_emailHash_idx",
+        "n|idx|public.user_emailHash_idx",
+        "e|idx|public.user_emailHash_idx",
+        "n|rel|public.user_emailHash_idx"
+      ],
+      "reads": [
+        "e|tbl|public.user",
+        "n|sch|public",
+        "e|col|public.user.email_hash"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "company_attribute_definition",
+        "company_attribute_definition_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.company_attribute_definition_organizationId_idx",
+        "n|idx|public.company_attribute_definition_organizationId_idx",
+        "e|idx|public.company_attribute_definition_organizationId_idx",
+        "n|rel|public.company_attribute_definition_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.company_attribute_definition",
+        "n|sch|public",
+        "e|col|public.company_attribute_definition.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "company_attribute_value",
+        "company_attribute_value_companyId_idx"
+      ],
+      "writes": [
+        "s|idx|public.company_attribute_value_companyId_idx",
+        "n|idx|public.company_attribute_value_companyId_idx",
+        "e|idx|public.company_attribute_value_companyId_idx",
+        "n|rel|public.company_attribute_value_companyId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.company_attribute_value",
+        "n|sch|public",
+        "e|col|public.company_attribute_value.company_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "company",
+        "company_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.company_organizationId_idx",
+        "n|idx|public.company_organizationId_idx",
+        "e|idx|public.company_organizationId_idx",
+        "n|rel|public.company_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.company",
+        "n|sch|public",
+        "e|col|public.company.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "contact_attribute_definition",
+        "contact_attribute_definition_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.contact_attribute_definition_organizationId_idx",
+        "n|idx|public.contact_attribute_definition_organizationId_idx",
+        "e|idx|public.contact_attribute_definition_organizationId_idx",
+        "n|rel|public.contact_attribute_definition_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.contact_attribute_definition",
+        "n|sch|public",
+        "e|col|public.contact_attribute_definition.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "contact_attribute_value",
+        "contact_attribute_value_contactId_idx"
+      ],
+      "writes": [
+        "s|idx|public.contact_attribute_value_contactId_idx",
+        "n|idx|public.contact_attribute_value_contactId_idx",
+        "e|idx|public.contact_attribute_value_contactId_idx",
+        "n|rel|public.contact_attribute_value_contactId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.contact_attribute_value",
+        "n|sch|public",
+        "e|col|public.contact_attribute_value.contact_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "contact",
+        "contact_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.contact_organizationId_idx",
+        "n|idx|public.contact_organizationId_idx",
+        "e|idx|public.contact_organizationId_idx",
+        "n|rel|public.contact_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.contact",
+        "n|sch|public",
+        "e|col|public.contact.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "roadmap_column",
+        "roadmap_column_roadmapId_idx"
+      ],
+      "writes": [
+        "s|idx|public.roadmap_column_roadmapId_idx",
+        "n|idx|public.roadmap_column_roadmapId_idx",
+        "e|idx|public.roadmap_column_roadmapId_idx",
+        "n|rel|public.roadmap_column_roadmapId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.roadmap_column",
+        "n|sch|public",
+        "e|col|public.roadmap_column.roadmap_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "roadmap",
+        "roadmap_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.roadmap_organizationId_idx",
+        "n|idx|public.roadmap_organizationId_idx",
+        "e|idx|public.roadmap_organizationId_idx",
+        "n|rel|public.roadmap_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.roadmap",
+        "n|sch|public",
+        "e|col|public.roadmap.organization_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "changelog_category_link",
+        "changelog_category_link_changelogId_idx"
+      ],
+      "writes": [
+        "s|idx|public.changelog_category_link_changelogId_idx",
+        "n|idx|public.changelog_category_link_changelogId_idx",
+        "e|idx|public.changelog_category_link_changelogId_idx",
+        "n|rel|public.changelog_category_link_changelogId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.changelog_category_link",
+        "n|sch|public",
+        "e|col|public.changelog_category_link.changelog_id"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "changelog_subscription",
+        "changelog_subscription_organizationId_idx"
+      ],
+      "writes": [
+        "s|idx|public.changelog_subscription_organizationId_idx",
+        "n|idx|public.changelog_subscription_organizationId_idx",
+        "e|idx|public.changelog_subscription_organizationId_idx",
+        "n|rel|public.changelog_subscription_organizationId_idx"
+      ],
+      "reads": [
+        "e|tbl|public.changelog_subscription",
+        "n|sch|public",
+        "e|col|public.changelog_subscription.organization_id"
+      ],
+      "sharedWrites": []
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"member_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"organization_slug_uidx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"post_status_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"post_tag_postId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"post_subscription_postId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"jwt_secret_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"user_emailHash_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"company_attribute_definition_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"company_attribute_value_companyId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"company_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"contact_attribute_definition_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"contact_attribute_value_contactId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"contact_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"roadmap_column_roadmapId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"roadmap_organizationId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"changelog_category_link_changelogId_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"changelog_subscription_organizationId_idx\"]"
+    }
+  ]
+}

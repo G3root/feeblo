@@ -279,7 +279,6 @@ export const postStatusTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("post_status_organizationId_idx").on(table.organizationId),
     uniqueIndex("post_status_organizationId_id_uidx").on(
       table.organizationId,
       table.id
@@ -349,7 +348,6 @@ export const roadmapTable = pgTable(
       table.organizationId,
       table.slug
     ),
-    index("roadmap_organizationId_idx").on(table.organizationId),
     uniqueIndex(ROADMAP_PRIMARY_ORGANIZATION_ID_UIDX)
       .on(table.organizationId)
       .where(sql`${table.isPrimary}`),
@@ -395,7 +393,6 @@ export const roadmapColumnTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("roadmap_column_roadmapId_idx").on(table.roadmapId),
     index("roadmap_column_roadmapId_position_idx").on(
       table.roadmapId,
       table.position
@@ -434,7 +431,6 @@ export const postTagTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("post_tag_postId_idx").on(table.postId),
     index("post_tag_tagId_idx").on(table.tagId),
     index("post_tag_organizationId_idx").on(table.organizationId),
     index("post_tag_mergedFromPostId_idx").on(table.mergedFromPostId),
@@ -466,7 +462,6 @@ export const companyTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("company_organizationId_idx").on(table.organizationId),
     uniqueIndex("company_organizationId_externalId_uidx").on(
       table.organizationId,
       table.externalId
@@ -509,7 +504,6 @@ export const contactTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("contact_organizationId_idx").on(table.organizationId),
     index("contact_companyId_idx").on(table.companyId),
     index("contact_userId_idx").on(table.userId),
     uniqueIndex("contact_organizationId_externalId_uidx").on(
@@ -758,7 +752,6 @@ export const postSubscriptionTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("post_subscription_postId_idx").on(table.postId),
     index("post_subscription_userId_idx").on(table.userId),
     index("post_subscription_memberId_idx").on(table.memberId),
     index("post_subscription_organizationId_idx").on(table.organizationId),
@@ -792,7 +785,6 @@ export const changelogSubscriptionTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("changelog_subscription_organizationId_idx").on(table.organizationId),
     index("changelog_subscription_userId_idx").on(table.userId),
     index("changelog_subscription_memberId_idx").on(table.memberId),
     uniqueIndex("changelog_subscription_organizationId_userId_uidx").on(
@@ -1060,7 +1052,6 @@ export const changelogCategoryLinkTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("changelog_category_link_changelogId_idx").on(table.changelogId),
     index("changelog_category_link_categoryId_idx").on(table.categoryId),
     index("changelog_category_link_organizationId_idx").on(
       table.organizationId
@@ -1132,9 +1123,6 @@ export const contactAttributeDefinitionTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("contact_attribute_definition_organizationId_idx").on(
-      table.organizationId
-    ),
     uniqueIndex("contact_attribute_definition_organizationId_key_uidx").on(
       table.organizationId,
       table.key
@@ -1174,7 +1162,6 @@ export const contactAttributeValueTable = pgTable(
     index("contact_attribute_value_organizationId_idx").on(
       table.organizationId
     ),
-    index("contact_attribute_value_contactId_idx").on(table.contactId),
     index("contact_attribute_value_attributeId_idx").on(table.attributeId),
     uniqueIndex("contact_attribute_value_contactId_attributeId_uidx").on(
       table.contactId,
@@ -1209,9 +1196,6 @@ export const companyAttributeDefinitionTable = pgTable(
       .notNull(),
   },
   (table) => [
-    index("company_attribute_definition_organizationId_idx").on(
-      table.organizationId
-    ),
     uniqueIndex("company_attribute_definition_organizationId_key_uidx").on(
       table.organizationId,
       table.key
@@ -1251,7 +1235,6 @@ export const companyAttributeValueTable = pgTable(
     index("company_attribute_value_organizationId_idx").on(
       table.organizationId
     ),
-    index("company_attribute_value_companyId_idx").on(table.companyId),
     index("company_attribute_value_attributeId_idx").on(table.attributeId),
     uniqueIndex("company_attribute_value_companyId_attributeId_uidx").on(
       table.companyId,
