@@ -24,7 +24,12 @@ import {
   collectionOptions,
   parseLoadSubsetOptions,
 } from "@tanstack/react-db";
-import type { DbClient } from "@tanstack/react-db";
+import type {
+  CollectionOptions,
+  DbClient,
+  NonSingleResult,
+  UtilsRecord,
+} from "@tanstack/react-db";
 import type { QueryClient } from "@tanstack/react-query";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import * as Duration from "effect/Duration";
@@ -1041,6 +1046,27 @@ export const publicDeleteEligibilityDescriptor = collectionOptions(
 );
 
 /**
+ * Materializes a descriptor with the row type its factory declares.
+ *
+ * `DbClient.collection` resolves its overload from the descriptor alone, and
+ * under TypeScript 7.1 the schema-taking overload also matches a schema-less
+ * descriptor: `T` is inferred as `never`, so a collection materialized through
+ * it answers every live query with `never` rows. Naming the three type
+ * arguments selects the schema-less overload, which keeps `T` — the row type
+ * `queryCollectionOptions` inferred from the descriptor's `queryFn`.
+ */
+function materialize<
+  T extends object,
+  TKey extends string | number,
+  TUtils extends UtilsRecord,
+>(
+  client: DbClient,
+  descriptor: CollectionOptions<T, TKey, never, TUtils> & NonSingleResult
+) {
+  return client.collection<T, TKey, TUtils>(descriptor);
+}
+
+/**
  * The board's collections for one `DbClient`.
  *
  * Materializing through the client (rather than exporting module-level
@@ -1052,44 +1078,53 @@ export function createPublicCollections(client: DbClient) {
   applyPublicCollectionIndexes(client);
 
   return {
-    publicBoardCollection: client.collection(publicBoardDescriptor),
-    publicChangelogCategoryCollection: client.collection(
+    publicBoardCollection: materialize(client, publicBoardDescriptor),
+    publicChangelogCategoryCollection: materialize(
+      client,
       publicChangelogCategoryDescriptor
     ),
-    publicChangelogCategoryLinkCollection: client.collection(
+    publicChangelogCategoryLinkCollection: materialize(
+      client,
       publicChangelogCategoryLinkDescriptor
     ),
-    publicChangelogCollection: client.collection(publicChangelogDescriptor),
-    publicChangelogDetailCollection: client.collection(
+    publicChangelogCollection: materialize(client, publicChangelogDescriptor),
+    publicChangelogDetailCollection: materialize(
+      client,
       publicChangelogDetailDescriptor
     ),
-    publicCommentCollection: client.collection(publicCommentDescriptor),
-    publicCommentReactionCollection: client.collection(
+    publicCommentCollection: materialize(client, publicCommentDescriptor),
+    publicCommentReactionCollection: materialize(
+      client,
       publicCommentReactionDescriptor
     ),
-    publicDeleteEligibilityCollection: client.collection(
+    publicDeleteEligibilityCollection: materialize(
+      client,
       publicDeleteEligibilityDescriptor
     ),
-    publicPostCollection: client.collection(publicPostDescriptor),
-    publicPostDetailCollection: client.collection(publicPostDetailDescriptor),
-    publicPostReactionCollection: client.collection(
+    publicPostCollection: materialize(client, publicPostDescriptor),
+    publicPostDetailCollection: materialize(client, publicPostDetailDescriptor),
+    publicPostReactionCollection: materialize(
+      client,
       publicPostReactionDescriptor
     ),
-    publicPostStatusCollection: client.collection(publicPostStatusDescriptor),
-    publicPostSubscriptionCollection: client.collection(
+    publicPostStatusCollection: materialize(client, publicPostStatusDescriptor),
+    publicPostSubscriptionCollection: materialize(
+      client,
       publicPostSubscriptionDescriptor
     ),
-    publicPostUpvoteCollection: client.collection(publicPostUpvoteDescriptor),
-    publicChangelogSubscriptionCollection: client.collection(
+    publicPostUpvoteCollection: materialize(client, publicPostUpvoteDescriptor),
+    publicChangelogSubscriptionCollection: materialize(
+      client,
       publicChangelogSubscriptionDescriptor
     ),
-    publicPostTagCollection: client.collection(publicPostTagDescriptor),
-    publicRoadmapCollection: client.collection(publicRoadmapDescriptor),
-    publicRoadmapColumnCollection: client.collection(
+    publicPostTagCollection: materialize(client, publicPostTagDescriptor),
+    publicRoadmapCollection: materialize(client, publicRoadmapDescriptor),
+    publicRoadmapColumnCollection: materialize(
+      client,
       publicRoadmapColumnDescriptor
     ),
-    publicTagCollection: client.collection(publicTagDescriptor),
-    publicUpvoteCollection: client.collection(publicUpvoteDescriptor),
+    publicTagCollection: materialize(client, publicTagDescriptor),
+    publicUpvoteCollection: materialize(client, publicUpvoteDescriptor),
   };
 }
 
@@ -1113,42 +1148,45 @@ export function applyPublicCollectionIndexes(client: DbClient) {
 
   indexedClients.add(client);
 
-  client
-    .collection(publicDeleteEligibilityDescriptor)
-    .createIndex((row) => row.postId, { indexType: BasicIndex });
-  client.collection(publicPostDescriptor).createIndex((row) => row.boardId, {
+  materialize(client, publicDeleteEligibilityDescriptor).createIndex(
+    (row) => row.postId,
+    { indexType: BasicIndex }
+  );
+  materialize(client, publicPostDescriptor).createIndex((row) => row.boardId, {
     indexType: BasicIndex,
   });
-  client.collection(publicPostDescriptor).createIndex((row) => row.statusId, {
+  materialize(client, publicPostDescriptor).createIndex((row) => row.statusId, {
     indexType: BasicIndex,
   });
-  client.collection(publicPostStatusDescriptor).createIndex((row) => row.id, {
+  materialize(client, publicPostStatusDescriptor).createIndex((row) => row.id, {
     indexType: BasicIndex,
   });
-  client.collection(publicBoardDescriptor).createIndex((row) => row.id, {
+  materialize(client, publicBoardDescriptor).createIndex((row) => row.id, {
     indexType: BasicIndex,
   });
-  client.collection(publicTagDescriptor).createIndex((row) => row.id, {
+  materialize(client, publicTagDescriptor).createIndex((row) => row.id, {
     indexType: BasicIndex,
   });
-  client.collection(publicPostTagDescriptor).createIndex((row) => row.tagId, {
+  materialize(client, publicPostTagDescriptor).createIndex((row) => row.tagId, {
     indexType: BasicIndex,
   });
-  client.collection(publicRoadmapDescriptor).createIndex((row) => row.id, {
+  materialize(client, publicRoadmapDescriptor).createIndex((row) => row.id, {
     indexType: BasicIndex,
   });
-  client
-    .collection(publicRoadmapColumnDescriptor)
-    .createIndex((row) => row.statusId, {
+  materialize(client, publicRoadmapColumnDescriptor).createIndex(
+    (row) => row.statusId,
+    {
       indexType: BasicIndex,
-    });
-  client
-    .collection(publicRoadmapColumnDescriptor)
-    .createIndex((row) => row.roadmapId, {
+    }
+  );
+  materialize(client, publicRoadmapColumnDescriptor).createIndex(
+    (row) => row.roadmapId,
+    {
       indexType: BasicIndex,
-    });
+    }
+  );
   // Upvote rows are joined back to posts by post id.
-  client.collection(publicUpvoteDescriptor).createIndex((row) => row.postId, {
+  materialize(client, publicUpvoteDescriptor).createIndex((row) => row.postId, {
     indexType: BasicIndex,
   });
 }

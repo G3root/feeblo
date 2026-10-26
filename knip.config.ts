@@ -76,7 +76,7 @@ export default defineConfig({
     },
 
     // `@effect/language-service` is the type-checker plugin `effect-tsgo`
-    // patches into `tsc`; `react` is the base config's `jsxImportSource`.
+    // patches into `tsrs`; `react` is the base config's `jsxImportSource`.
     // Neither is a package dependency of the workspace that names it.
     "packages/config": {
       ignoreDependencies: ["@effect/language-service", "react"],

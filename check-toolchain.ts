@@ -12,7 +12,7 @@
  *    `effect` version. `@effect/tsgo` is exempt: it is the language service and
  *    is versioned separately. The workspace `overrides` are checked too, because
  *    `@effect/platform-node-shared` is pinned there rather than in a manifest.
- * 2. The compiler train is declared exactly once. `typescript` lives in the
+ * 2. The compiler train is declared exactly once. `tsrs` lives in the
  *    catalog; `@effect/tsgo`, `oxlint`, `oxlint-tsgolint` and `@oxlint/plugins`
  *    live in the root `package.json`, `oxlint` and `@oxlint/plugins` share a
  *    release, and no package pins any of them to something else.
@@ -22,9 +22,9 @@
  *    absent: a patch is removable, and an empty set is expressed by not having
  *    the block rather than by leaving a selector that names nothing.
  *
- * The pairing between `@effect/tsgo` and TypeScript/Oxlint is not checked here:
- * `effect-tsgo patch` (run from `prepare` on every install) refuses a mismatch,
- * so a second, weaker copy of that rule would only add drift.
+ * The pairing between `@effect/tsgo` and the compiler/Oxlint is not checked
+ * here: `effect-tsgo patch` (run from `prepare` on every install) refuses a
+ * mismatch, so a second, weaker copy of that rule would only add drift.
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -206,14 +206,14 @@ const checkToolchain = (
     "oxlint-tsgolint",
     "@oxlint/plugins",
   ] as const;
-  const typescript = catalog.get("typescript");
+  const compiler = catalog.get("tsrs");
   const failures: Array<string> = [];
 
-  if (typescript === undefined) {
-    failures.push("  pnpm-workspace.yaml catalog has no `typescript` entry.");
-  } else if (!exactVersion.test(typescript)) {
+  if (compiler === undefined) {
+    failures.push("  pnpm-workspace.yaml catalog has no `tsrs` entry.");
+  } else if (!exactVersion.test(compiler)) {
     failures.push(
-      `  catalog.typescript is ${typescript}; the train must be an exact version.`
+      `  catalog.tsrs is ${compiler}; the train must be an exact version.`
     );
   }
 
@@ -240,7 +240,17 @@ const checkToolchain = (
       `  oxlint is ${pins.get("oxlint")} but @oxlint/plugins is ${pins.get("@oxlint/plugins")}; they share a release.`
     );
   }
-  if (typescript !== undefined) pins.set("typescript", typescript);
+  if (compiler !== undefined) pins.set("tsrs", compiler);
+
+  // The compiler is catalogued, so the root declaration must point at the
+  // catalog rather than repeat the version — otherwise the catalog could move
+  // and the root would keep calling the old binary.
+  const rootCompiler = dev["tsrs"];
+  if (rootCompiler !== "catalog:") {
+    failures.push(
+      `  root package.json devDependencies.tsrs is ${rootCompiler ?? "missing"}; it must be "catalog:", because the catalog owns the compiler version.`
+    );
+  }
 
   // A tool that is also catalogued would be a second source; if one is moved
   // there, it must agree with the root pin.
@@ -254,7 +264,7 @@ const checkToolchain = (
     }
   }
 
-  // Each of these has exactly one source: the catalog for `typescript`, the root
+  // Each of these has exactly one source: the catalog for `tsrs`, the root
   // manifest for the tools. A package that repeats the version — even the right
   // one — is a second source, and the next bump moves only one of them.
   for (const manifest of manifests) {
@@ -326,7 +336,7 @@ const checkPatches = (patches: Mapping): ReadonlyArray<string> => {
 const selfTest = () => {
   const catalog = new Map<string, string>([
     ["effect", "4.0.0"],
-    ["typescript", "7.0.2"],
+    ["tsrs", "0.20.0-ts7.1.0-beta"],
   ]);
   const rootFixture: Manifest = {
     file: "package.json",
@@ -336,6 +346,7 @@ const selfTest = () => {
         oxlint: "1.82.0",
         "oxlint-tsgolint": "7.0.2001",
         "@oxlint/plugins": "1.82.0",
+        tsrs: "catalog:",
       },
     },
   };
@@ -343,7 +354,7 @@ const selfTest = () => {
     file: "a/package.json",
     json: {
       dependencies: { effect: "catalog:", "@effect/sql-pg": "catalog:" },
-      devDependencies: { typescript: "catalog:" },
+      devDependencies: { tsrs: "catalog:" },
     },
   };
   const driftedEffect: Manifest = {
@@ -352,12 +363,26 @@ const selfTest = () => {
   };
   const driftedTool: Manifest = {
     file: "c/package.json",
-    json: { devDependencies: { typescript: "6.0.0" } },
+    json: { devDependencies: { tsrs: "0.18.0-ts7.1.0-dev.20261019" } },
   };
   // A package may not repeat the pin even when it repeats it correctly.
   const repeatedTool: Manifest = {
     file: "d/package.json",
-    json: { devDependencies: { typescript: "7.0.2" } },
+    json: { devDependencies: { tsrs: "0.20.0-ts7.1.0-beta" } },
+  };
+  // The root may not repeat the catalog version either, and a root that names
+  // a version is how the catalog and the installed binary drift apart.
+  const driftedRoot: Manifest = {
+    file: "package.json",
+    json: {
+      devDependencies: {
+        "@effect/tsgo": "0.47.2",
+        oxlint: "1.82.0",
+        "oxlint-tsgolint": "7.0.2001",
+        "@oxlint/plugins": "1.82.0",
+        tsrs: "0.20.0-ts7.1.0-beta",
+      },
+    },
   };
   const driftedCatalog = new Map(catalog);
   driftedCatalog.set("@effect/sql-pg", "4.0.1");
@@ -379,6 +404,7 @@ const selfTest = () => {
   );
   assert.notDeepEqual(checkToolchain(catalog, [rootFixture, driftedTool]), []);
   assert.notDeepEqual(checkToolchain(catalog, [rootFixture, repeatedTool]), []);
+  assert.notDeepEqual(checkToolchain(catalog, [driftedRoot, clean]), []);
   assert.notDeepEqual(
     checkToolchain(driftedCatalogTool, [rootFixture, clean]),
     []
@@ -415,7 +441,7 @@ const dev =
     ? {}
     : dependencies(rootManifest, "devDependencies");
 console.log(
-  `Toolchain: effect ${catalog.get("effect")}, typescript ${catalog.get("typescript")}, ` +
+  `Toolchain: effect ${catalog.get("effect")}, tsrs ${catalog.get("tsrs")}, ` +
     `oxlint ${dev["oxlint"]}, tsgolint ${dev["oxlint-tsgolint"]}, ` +
     `tsgo ${dev["@effect/tsgo"]}.`
 );

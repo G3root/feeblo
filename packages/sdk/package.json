@@ -41,18 +41,18 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && tsc -p tsconfig.build.json",
+    "build": "vite build && tsrs -p tsconfig.build.json",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {},
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@floating-ui/dom": "catalog:",
     "happy-dom": "^21.0.4",
-    "typescript": "catalog:",
+    "tsrs": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   }

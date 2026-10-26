@@ -20,7 +20,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@isaacs/ttlcache": "catalog:",
@@ -47,7 +47,7 @@
   "devDependencies": {
     "@feeblo/config": "workspace:*",
     "@types/hast": "^3.0.4",
-    "typescript": "catalog:",
+    "tsrs": "catalog:",
     "vitest": "catalog:"
   }
 }

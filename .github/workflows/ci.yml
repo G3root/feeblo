@@ -59,7 +59,7 @@ jobs:
           scope: checks
 
       # `turbo run check` runs the toolchain guard, each package's
-      # `tsc --noEmit`, then the type-aware Oxlint pass (which owns the Effect
+      # `tsrs --noEmit`, then the type-aware Oxlint pass (which owns the Effect
       # diagnostics), then the formatter check. It needs no database, no build
       # output, and no env.
       - name: Check and test

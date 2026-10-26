@@ -32,6 +32,11 @@ import {
   DbClient,
   parseLoadSubsetOptions,
 } from "@tanstack/react-db";
+import type {
+  CollectionOptions,
+  NonSingleResult,
+  UtilsRecord,
+} from "@tanstack/react-db";
 import type { QueryClient } from "@tanstack/react-query";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
@@ -1455,7 +1460,8 @@ export function planComplianceCollection(scope: DashboardCollectionScope) {
  * source organization's snapshot.
  */
 export const planComplianceCollectionFor = (organizationId: string) =>
-  getBrowserDbClient().collection(
+  materialize(
+    getBrowserDbClient(),
     planComplianceCollection({ organizationId, postSlug: undefined })
   );
 
@@ -2081,6 +2087,27 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
  */
 const indexedCollectionIds = new Set<string>();
 
+/**
+ * Materializes a descriptor with the row type its factory declares.
+ *
+ * `DbClient.collection` resolves its overload from the descriptor alone, and
+ * under TypeScript 7.1 the schema-taking overload also matches a schema-less
+ * descriptor: `T` is inferred as `never`, so a collection materialized through
+ * it answers every live query with `never` rows. Naming the three type
+ * arguments selects the schema-less overload, which keeps `T` — the row type
+ * `queryCollectionOptions` inferred from the descriptor's `queryFn`.
+ */
+function materialize<
+  T extends object,
+  TKey extends string | number,
+  TUtils extends UtilsRecord,
+>(
+  client: DbClient,
+  descriptor: CollectionOptions<T, TKey, never, TUtils> & NonSingleResult
+) {
+  return client.collection<T, TKey, TUtils>(descriptor);
+}
+
 function withIndexes<TCollection extends { id: string }>(
   collection: TCollection,
   addIndexes: (collection: TCollection) => void
@@ -2105,7 +2132,7 @@ function withIndexes<TCollection extends { id: string }>(
 export const dashboardCollections = {
   get boardCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(boardCollection(currentScope())),
+      materialize(getBrowserDbClient(), boardCollection(currentScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2118,21 +2145,29 @@ export const dashboardCollections = {
     );
   },
   get changelogCategoryCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       changelogCategoryCollection(currentScope())
     );
   },
   get changelogCategoryLinkCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       changelogCategoryLinkCollection(currentScope())
     );
   },
   get changelogCollection() {
-    return getBrowserDbClient().collection(changelogCollection(currentScope()));
+    return materialize(
+      getBrowserDbClient(),
+      changelogCollection(currentScope())
+    );
   },
   get changelogPostCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(changelogPostCollection(currentScope())),
+      materialize(
+        getBrowserDbClient(),
+        changelogPostCollection(currentScope())
+      ),
       (collection) => {
         // Changelog completed-posts joins entries against posts by post id.
         collection.createIndex((row) => row.postId, {
@@ -2142,19 +2177,21 @@ export const dashboardCollections = {
     );
   },
   get commentCollection() {
-    return getBrowserDbClient().collection(commentCollection(currentScope()));
+    return materialize(getBrowserDbClient(), commentCollection(currentScope()));
   },
   get commentReactionCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       commentReactionCollection(currentScope())
     );
   },
   get companyCollection() {
-    return getBrowserDbClient().collection(companyCollection(currentScope()));
+    return materialize(getBrowserDbClient(), companyCollection(currentScope()));
   },
   get deleteEligibilityCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(
+      materialize(
+        getBrowserDbClient(),
         deleteEligibilityCollection(currentScope())
       ),
       (collection) => {
@@ -2165,42 +2202,50 @@ export const dashboardCollections = {
     );
   },
   get companyAttributeDefinitionCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       companyAttributeDefinitionCollection(currentScope())
     );
   },
   get companyAttributeValueCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       companyAttributeValueCollection(currentScope())
     );
   },
   get contactAttributeDefinitionCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       contactAttributeDefinitionCollection(currentScope())
     );
   },
   get contactAttributeValueCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       contactAttributeValueCollection(currentScope())
     );
   },
   get contactCollection() {
-    return getBrowserDbClient().collection(contactCollection(currentScope()));
+    return materialize(getBrowserDbClient(), contactCollection(currentScope()));
   },
   get invitationsCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       invitationsCollection(currentScope())
     );
   },
   get jwtSecretCollection() {
-    return getBrowserDbClient().collection(jwtSecretCollection(currentScope()));
+    return materialize(
+      getBrowserDbClient(),
+      jwtSecretCollection(currentScope())
+    );
   },
   get membersCollection() {
-    return getBrowserDbClient().collection(membersCollection(currentScope()));
+    return materialize(getBrowserDbClient(), membersCollection(currentScope()));
   },
   get membershipCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(membershipCollection(currentScope())),
+      materialize(getBrowserDbClient(), membershipCollection(currentScope())),
       (collection) => {
         // Workspace details joins memberships against organizations by org id.
         collection.createIndex((row) => row.organizationId, {
@@ -2211,7 +2256,7 @@ export const dashboardCollections = {
   },
   get organizationCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(organizationCollection(currentScope())),
+      materialize(getBrowserDbClient(), organizationCollection(currentScope())),
       (collection) => {
         // Workspace details joins memberships against organizations by org id.
         collection.createIndex((row) => row.id, {
@@ -2222,7 +2267,7 @@ export const dashboardCollections = {
   },
   get postCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(postCollection(currentScope())),
+      materialize(getBrowserDbClient(), postCollection(currentScope())),
       (collection) => {
         collection.createIndex((row) => row.createdAt, {
           indexType: BasicIndex,
@@ -2240,23 +2285,26 @@ export const dashboardCollections = {
     );
   },
   get postDetailCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       postDetailCollection(currentScope())
     );
   },
   get postActivityCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       postActivityCollection(currentScope())
     );
   },
   get postReactionCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       postReactionCollection(currentScope())
     );
   },
   get postStatusCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(postStatusCollection(currentScope())),
+      materialize(getBrowserDbClient(), postStatusCollection(currentScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2269,16 +2317,20 @@ export const dashboardCollections = {
     );
   },
   get postSubscriptionCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       postSubscriptionCollection(currentScope())
     );
   },
   get roadmapCollection() {
-    return getBrowserDbClient().collection(roadmapCollection(currentScope()));
+    return materialize(getBrowserDbClient(), roadmapCollection(currentScope()));
   },
   get roadmapColumnCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(roadmapColumnCollection(currentScope())),
+      materialize(
+        getBrowserDbClient(),
+        roadmapColumnCollection(currentScope())
+      ),
       (collection) => {
         // Roadmap columns join statuses and roadmaps by their foreign keys.
         collection.createIndex((row) => row.statusId, {
@@ -2292,7 +2344,7 @@ export const dashboardCollections = {
   },
   get postTagCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(postTagCollection(currentScope())),
+      materialize(getBrowserDbClient(), postTagCollection(currentScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2307,11 +2359,11 @@ export const dashboardCollections = {
     );
   },
   get siteCollection() {
-    return getBrowserDbClient().collection(siteCollection(currentScope()));
+    return materialize(getBrowserDbClient(), siteCollection(currentScope()));
   },
   get tagCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(tagCollection(currentScope())),
+      materialize(getBrowserDbClient(), tagCollection(currentScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2321,7 +2373,7 @@ export const dashboardCollections = {
   },
   get upvoteCollection() {
     return withIndexes(
-      getBrowserDbClient().collection(upvoteCollection(currentScope())),
+      materialize(getBrowserDbClient(), upvoteCollection(currentScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2333,12 +2385,14 @@ export const dashboardCollections = {
     );
   },
   get workspacePlanCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       workspacePlanCollection(currentScope())
     );
   },
   get planComplianceCollection() {
-    return getBrowserDbClient().collection(
+    return materialize(
+      getBrowserDbClient(),
       planComplianceCollection(currentScope())
     );
   },

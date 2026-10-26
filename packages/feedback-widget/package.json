@@ -19,7 +19,7 @@
     "dev": "vite",
     "build:iframe": "vite build --config vite.config.iframe.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@feeblo/domain": "workspace:*",
@@ -36,7 +36,7 @@
     "@feeblo/config": "workspace:*",
     "@tailwindcss/vite": "catalog:",
     "tailwindcss": "catalog:",
-    "typescript": "catalog:",
+    "tsrs": "catalog:",
     "vite": "catalog:",
     "vite-plugin-icons-spritesheet": "catalog:",
     "vite-plugin-solid": "catalog:",
