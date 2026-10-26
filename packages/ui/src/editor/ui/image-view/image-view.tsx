@@ -65,7 +65,7 @@ export default function ImageView(props: ReactNodeViewProps) {
   return (
     <ResizableRoot
       aspectRatio={aspectRatio ?? null}
-      className="group data-selected:outline-primary relative my-2 box-border flex max-h-150 min-h-16 max-w-full min-w-16 items-center justify-center overflow-hidden outline-2 outline-transparent outline-solid"
+      className="group data-selected:outline-primary relative box-border flex max-h-150 min-h-16 max-w-full min-w-16 items-center justify-center overflow-hidden outline-2 outline-transparent outline-solid"
       data-selected={props.selected ? "" : undefined}
       height={attrs.height ?? null}
       onResizeEnd={(event) => props.setAttrs(event.detail)}

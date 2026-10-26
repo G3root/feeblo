@@ -21,6 +21,7 @@ import { useIsomorphicLayoutEffect } from "../hooks/use-isomorphic-layout-effect
 import { cn } from "../utils";
 import { useEditorContext } from "./editor-store";
 import { DEFAULT_PLACEHOLDER, defineExtension } from "./extension";
+import { unwrapImageParagraphs } from "./helpers/markdown-content";
 import useContentChange from "./hooks/use-content-change";
 import { BlockHandle } from "./ui/block-handle";
 import { DropIndicator } from "./ui/drop-indicator";
@@ -47,7 +48,9 @@ export function Editor(props: EditorProps) {
 
   const defaultContent = useMemo(() => {
     const markdown = store.get().context.postContent;
-    return markdown ? markdownToHtml(markdown) : undefined;
+    return markdown
+      ? unwrapImageParagraphs(markdownToHtml(markdown))
+      : undefined;
   }, []);
 
   // The editor instance is created once from the mount-time props. The
