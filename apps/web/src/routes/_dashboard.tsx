@@ -12,6 +12,7 @@ import { getLocale, setLocale } from "@/paraglide/runtime.js";
 import { DashboardPendingShell } from "~/components/dashboard-pending-shell";
 import {
   PostHogIdentify,
+  PostHogPageviews,
   PostHogProvider,
   posthogAnalyticsClient,
 } from "~/components/posthog-provider";
@@ -80,6 +81,7 @@ function DashboardBoundary() {
       <PostHogProvider>
         <AuthProvider>
           <PostHogIdentify />
+          <PostHogPageviews />
           <ThemeProvider>
             <ToastProvider>
               <AnchoredToastProvider>

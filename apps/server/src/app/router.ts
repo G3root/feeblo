@@ -43,6 +43,7 @@ import {
 } from "../http/security-headers";
 import { serverTimingMiddleware } from "../http/server-timing";
 import { SesEmailFeedbackRouter } from "../http/ses";
+import { errorReportingMiddleware } from "../infra/sentry";
 import type { IntegrationRuntime } from "../integrations";
 
 /**
@@ -142,16 +143,24 @@ export const makePublicRouters = ({
 
 export const makeMergedRoutes = ({
   appUrl,
+  browserTelemetry,
   integrationRuntime,
   publicRouters,
 }: {
   /** Dashboard base URL handed to provider routers for redirects. */
   readonly appUrl: string;
+  /**
+   * Browser OTLP relay. Built from the server's own OTLP config so the
+   * browser's spans land in the same backend as the server's, without the
+   * collector credential ever reaching the page.
+   */
+  readonly browserTelemetry: Layer.Layer<never, never, HttpRouter.HttpRouter>;
   readonly integrationRuntime: IntegrationRuntime;
   readonly publicRouters: ReturnType<typeof makePublicRouters>;
 }) =>
   Layer.mergeAll(
     publicRouters,
+    browserTelemetry,
     HealthRouter,
     makeRpcRoute(ProviderRpcLayer),
     HttpRoute,
@@ -228,6 +237,11 @@ export const withGlobalMiddleware = <A, E, R>(
     // the request span: the 400 is answered before any handler runs.
     Layer.provide(
       HttpRouter.middleware(requestRejectionMiddleware, { global: true })
+    ),
+    // Every failure that propagates out of a request reaches the configured
+    // reporters (Sentry); client rejections are filtered inside the reporter.
+    Layer.provide(
+      HttpRouter.middleware(errorReportingMiddleware, { global: true })
     ),
     // Provides the peer-anchored client IP (socket remoteAddress) to every
     // route, including RPC middleware, so public rate limits are keyed on an
