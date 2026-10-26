@@ -1,11 +1,13 @@
 {
   "extends": "@feeblo/config/tsconfig.base.json",
   "compilerOptions": {
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "dist",
-    "composite": true,
+    // This package is consumed as source: its `exports` map points at
+    // `./src/index.ts` and nothing builds it, so `declaration`, `declarationMap`,
+    // `sourceMap` and `outDir` would only ask the compiler to serialize output
+    // nothing reads — the same dead emit config `packages/domain` dropped. It is
+    // not harmless: TypeScript 7.1 reports TS2883 against the inferred type of
+    // `Rpc`, which is only a defect for a package that emits declarations.
+    "noEmit": true,
     "strictNullChecks": true
   }
 }
