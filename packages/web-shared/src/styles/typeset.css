@@ -381,7 +381,7 @@
       font-variant-numeric: tabular-nums;
       border-collapse: separate;
       border-spacing: 0;
-      border-block-end: 1px solid var(--typeset-rule);
+      border: 1px solid var(--typeset-rule);
       margin-block-start: var(--typeset-flow);
       margin-block-end: 0;
     }
@@ -415,8 +415,14 @@
     &:where(tbody th, tfoot th) {
       font-weight: 500;
     }
-    &:where(th:first-child, td:first-child) {
-      padding-inline-start: 0;
+    /* A visible grid: the outer border comes from the table, the row rules
+       from the body cells, and one separator between each cell pair. */
+    &:where(:is(th, td) + :is(th, td)) {
+      border-inline-start: 1px solid var(--typeset-rule);
+    }
+    /* No line above the first row when the table has no thead (raw HTML). */
+    &:where(tbody:first-child tr:first-child > :is(td, th)) {
+      border-block-start: 0;
     }
     &:where(th[align="center"], td[align="center"]) {
       text-align: center;

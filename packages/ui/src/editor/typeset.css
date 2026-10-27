@@ -78,6 +78,7 @@
   table-layout: auto;
   border-collapse: separate;
   border-spacing: 0;
+  border: 1px solid var(--typeset-rule);
 }
 
 .ProseMirror.typeset .tableWrapper :is(td, th) {
@@ -88,15 +89,18 @@
   vertical-align: top;
 }
 
-.ProseMirror.typeset .tableWrapper :is(th:first-child, td:first-child) {
-  padding-inline-start: 0;
+.ProseMirror.typeset .tableWrapper :is(th, td) + :is(th, td) {
+  border-inline-start: 1px solid var(--typeset-rule);
 }
 
 /* Every ProseMirror row lives in `tbody`, so a header row is the first `tr`
    holding `th` cells rather than a `thead`. Match `thead th` on it. */
+.ProseMirror.typeset .tableWrapper tr:first-child > :is(td, th) {
+  border-block-start: 0;
+}
+
 .ProseMirror.typeset .tableWrapper tr:first-child > th {
   padding-block: 0.65em;
-  border-block-start: 0;
   font-weight: 500;
   white-space: nowrap;
 }

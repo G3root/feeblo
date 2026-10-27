@@ -29,6 +29,8 @@ const sample = `# Heading one
 
 Paragraph with **bold**, *italic*, \`inline code\`, and a [link](https://example.com).
 
+A second paragraph, so a paragraph break is part of the comparison.
+
 ## Heading two
 
 - first item
@@ -255,12 +257,18 @@ describe("typeset parity", () => {
     expect(gapBefore(editorRoot, ".tableWrapper")).toBe(
       gapBefore(renderedRoot, "table")
     );
+    expect(gapBefore(editorRoot, "p + p")).toBe(
+      gapBefore(renderedRoot, "p + p")
+    );
     expect(rectWidth(editorRoot, "table")).toBe(
       rectWidth(renderedRoot, "table")
     );
     expect(readStyles(find(editorRoot, "pre")).whiteSpace).toBe("pre");
-    expect(readStyles(find(editorRoot, "td")).paddingInlineStart).toBe("0px");
-    expect(readStyles(find(editorRoot, "th")).paddingInlineStart).toBe("0px");
+    expect(readStyles(find(editorRoot, "td")).paddingInlineStart).toBe("18px");
+    expect(readStyles(find(editorRoot, "th")).paddingInlineStart).toBe("18px");
+    expect(readStyles(find(editorRoot, "table")).borderBlockStartWidth).toBe(
+      "1px"
+    );
   });
 
   it("maps editor chrome and typeset content onto the dark theme tokens", async () => {

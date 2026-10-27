@@ -1,3 +1,8 @@
+import {
+  GripHorizontalIcon,
+  GripVerticalIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { Editor } from "prosekit/core";
 import type { TableExtension } from "prosekit/extensions/table";
 import { useEditorDerivedValue } from "prosekit/react";
@@ -68,7 +73,11 @@ export default function TableHandle(props: Props) {
         <TableHandleColumnPopup className="box-border flex origin-(--transform-origin) translate-y-[50%] transition-[opacity,scale] transition-discrete duration-100 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none starting:scale-95 starting:opacity-0">
           <TableHandleColumnMenuRoot>
             <TableHandleColumnMenuTrigger className="border-border bg-background text-muted-foreground/50 hover:bg-accent hover:text-accent-foreground box-border flex h-4.5 w-6 items-center justify-center overflow-clip rounded-sm border border-solid p-0 transition-colors">
-              <div className="i-lucide-grip-horizontal block size-5 min-h-5 min-w-5" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-5 min-h-5 min-w-5"
+                icon={GripHorizontalIcon}
+              />
             </TableHandleColumnMenuTrigger>
             <MenuPositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
               <MenuPopup className="border-border bg-popover text-popover-foreground relative box-border flex max-h-100 min-w-32 origin-(--transform-origin) flex-col overflow-auto rounded-xl border p-1 whitespace-nowrap shadow-lg transition-[opacity,scale] transition-discrete duration-40 outline-none select-none data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none starting:scale-95 starting:opacity-0">
@@ -128,7 +137,11 @@ export default function TableHandle(props: Props) {
         <TableHandleRowPopup className="box-border flex origin-(--transform-origin) transition-[opacity,scale] transition-discrete duration-100 data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none ltr:translate-x-[50%] rtl:translate-x-[-50%] starting:scale-95 starting:opacity-0">
           <TableHandleRowMenuRoot>
             <TableHandleRowMenuTrigger className="border-border bg-background text-muted-foreground/50 hover:bg-accent hover:text-accent-foreground box-border flex h-6 w-4.5 items-center justify-center overflow-clip rounded-sm border border-solid p-0 transition-colors">
-              <div className="i-lucide-grip-vertical block size-5 min-h-5 min-w-5" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-5 min-h-5 min-w-5"
+                icon={GripVerticalIcon}
+              />
             </TableHandleRowMenuTrigger>
             <MenuPositioner className="z-50 block h-min w-min overflow-visible transition-transform duration-100 ease-out motion-reduce:transition-none">
               <MenuPopup className="border-border bg-popover text-popover-foreground relative box-border flex max-h-100 min-w-32 origin-(--transform-origin) flex-col overflow-auto rounded-xl border p-1 whitespace-nowrap shadow-lg transition-[opacity,scale] transition-discrete duration-40 outline-none select-none data-[state=closed]:scale-95 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 motion-reduce:transition-none starting:scale-95 starting:opacity-0">

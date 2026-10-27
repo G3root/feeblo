@@ -1,3 +1,9 @@
+import {
+  ArrowDownRight01Icon,
+  ImageOffIcon,
+  Loading03Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { UploadTask } from "prosekit/extensions/file";
 import type { ImageAttrs } from "prosekit/extensions/image";
 import type { ReactNodeViewProps } from "prosekit/react";
@@ -81,13 +87,21 @@ export default function ImageView(props: ReactNodeViewProps) {
       )}
       {uploading && !error && (
         <div className="bg-foreground/60 text-background/80 absolute start-0 bottom-0 m-1 flex content-center items-center gap-2 rounded-sm p-1.5 text-xs transition">
-          <div className="i-lucide-loader-circle block size-4 animate-spin" />
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="size-4 animate-spin"
+            icon={Loading03Icon}
+          />
           <div>{Math.round(progress * 100)}%</div>
         </div>
       )}
       {error && (
         <div className="bg-muted @container absolute start-0 end-0 top-0 bottom-0 flex flex-col items-center justify-center gap-4 p-2 text-sm">
-          <div className="i-lucide-image-off block size-8" />
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="size-8"
+            icon={ImageOffIcon}
+          />
           <div className="hidden opacity-80 @xs:block">
             Failed to upload image
           </div>
@@ -97,7 +111,11 @@ export default function ImageView(props: ReactNodeViewProps) {
         className="bg-foreground/30 text-background/50 hover:bg-foreground/60 active:bg-foreground/60 active:text-background/80 absolute end-0 bottom-0 m-1.5 rounded-sm p-1 opacity-0 transition group-hover:opacity-100 group-data-resizing:opacity-100 hover:opacity-100 active:translate-x-0.5 active:translate-y-0.5 rtl:active:-translate-x-0.5"
         position="bottom-right"
       >
-        <div className="i-lucide-arrow-down-right block size-4" />
+        <HugeiconsIcon
+          aria-hidden="true"
+          className="size-4"
+          icon={ArrowDownRight01Icon}
+        />
       </ResizableHandle>
     </ResizableRoot>
   );
