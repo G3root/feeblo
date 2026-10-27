@@ -1426,9 +1426,6 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.5
-      mdast-util-to-markdown:
-        specifier: ^2.1.2
-        version: 2.2.0
       rangi:
         specifier: 'catalog:'
         version: 2.2.0
@@ -1468,9 +1465,6 @@ importers:
       unist-util-visit:
         specifier: ^5.0.0
         version: 5.1.0
-      unist-util-visit-parents:
-        specifier: ^6.0.2
-        version: 6.0.2
     devDependencies:
       '@feeblo/config':
         specifier: workspace:*

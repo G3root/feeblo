@@ -1,3 +1,12 @@
+import {
+  CodeIcon,
+  Link01Icon,
+  TextBoldIcon,
+  TextItalicIcon,
+  TextStrikethroughIcon,
+  TextUnderlineIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { BasicExtension } from "prosekit/basic";
 import type { Editor } from "prosekit/core";
 import type { LinkAttrs } from "prosekit/extensions/link";
@@ -113,7 +122,11 @@ export default function InlineMenu() {
                 pressed={items.bold.isActive}
                 tooltip="Bold"
               >
-                <div className="i-lucide-bold block size-5" />
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-5"
+                  icon={TextBoldIcon}
+                />
               </Button>
             )}
             {items.italic && (
@@ -123,7 +136,11 @@ export default function InlineMenu() {
                 pressed={items.italic.isActive}
                 tooltip="Italic"
               >
-                <div className="i-lucide-italic block size-5" />
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-5"
+                  icon={TextItalicIcon}
+                />
               </Button>
             )}
             {items.underline && (
@@ -133,7 +150,11 @@ export default function InlineMenu() {
                 pressed={items.underline.isActive}
                 tooltip="Underline"
               >
-                <div className="i-lucide-underline block size-5" />
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-5"
+                  icon={TextUnderlineIcon}
+                />
               </Button>
             )}
             {items.strike && (
@@ -143,7 +164,11 @@ export default function InlineMenu() {
                 pressed={items.strike.isActive}
                 tooltip="Strikethrough"
               >
-                <div className="i-lucide-strikethrough block size-5" />
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-5"
+                  icon={TextStrikethroughIcon}
+                />
               </Button>
             )}
             {items.code && (
@@ -153,7 +178,11 @@ export default function InlineMenu() {
                 pressed={items.code.isActive}
                 tooltip="Code"
               >
-                <div className="i-lucide-code block size-5" />
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-5"
+                  icon={CodeIcon}
+                />
               </Button>
             )}
             {items.link?.canExec && (
@@ -165,7 +194,11 @@ export default function InlineMenu() {
                 pressed={items.link.isActive}
                 tooltip="Link"
               >
-                <div className="i-lucide-link block size-5" />
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-5"
+                  icon={Link01Icon}
+                />
               </Button>
             )}
           </InlinePopoverPopup>

@@ -72,15 +72,123 @@
 }
 
 .ProseMirror.typeset .tableWrapper table {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   margin-block-start: 0;
   table-layout: auto;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--typeset-rule);
 }
 
 .ProseMirror.typeset .tableWrapper :is(td, th) {
   border: 0;
+  padding-block: 0.75em;
+  padding-inline: 1em;
+  text-align: start;
+  vertical-align: top;
+}
+
+.ProseMirror.typeset .tableWrapper :is(th, td) + :is(th, td) {
+  border-inline-start: 1px solid var(--typeset-rule);
+}
+
+/* Every ProseMirror row lives in `tbody`, so a header row is the first `tr`
+   holding `th` cells rather than a `thead`. Match `thead th` on it. */
+.ProseMirror.typeset .tableWrapper tr:first-child > :is(td, th) {
+  border-block-start: 0;
+}
+
+.ProseMirror.typeset .tableWrapper tr:first-child > th {
+  padding-block: 0.65em;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .ProseMirror.typeset .tableWrapper :is(tbody, tfoot) :is(td, th) {
   border-block-start: 1px solid var(--typeset-rule);
+}
+
+/* `.ProseMirror pre` sets `white-space: pre-wrap` in ProseKit's structural
+   stylesheet, which is unlayered and beats the layered typeset rule. Rendered
+   Markdown scrolls a `pre` horizontally, so the editor must too. */
+.ProseMirror.typeset pre {
+  overflow-wrap: normal;
+  white-space: pre;
+  word-break: normal;
+}
+
+/* `defineHorizontalRule` wraps the `hr` in a div, which breaks the
+   `hr + heading` adjacency rule in typeset. Restore the reduced spacing. */
+.ProseMirror.typeset .prosekit-horizontal-rule {
+  margin: 0;
+  padding: 0;
+}
+
+.ProseMirror.typeset .prosekit-horizontal-rule + :is(h1, h2, h3, h4, h5, h6) {
+  margin-block-start: var(--typeset-flow);
+}
+
+/* ProseKit renders node views (images, code blocks) inside a wrapper div.
+   The image node view owns the block spacing; the rendered Markdown image is
+   wrapped in a paragraph, so both get one flow gap and no inner margin. */
+.ProseMirror.typeset prosekit-resizable-root {
+  margin-block: var(--typeset-flow) 0;
+}
+
+.ProseMirror.typeset
+  div[data-node-view-root="true"]:first-child
+  > prosekit-resizable-root {
+  margin-block-start: 0;
+}
+
+.ProseMirror.typeset [data-node-view-root] :is(img, video) {
+  margin-block-start: 0;
+}
+
+/* Autocomplete matches (`/head`, `@tag`) are an editor-only affordance that
+   `prosekit/basic/typography.css` would style. Keep it visible without
+   importing ProseKit's typography. */
+.ProseMirror.typeset .prosekit-autocomplete-match {
+  background-color: color-mix(
+    in oklab,
+    var(--color-muted-foreground, currentColor) 8%,
+    transparent
+  );
+  border-radius: 0.125em;
+  box-shadow: 0 0 0 0.2em
+    color-mix(
+      in oklab,
+      var(--color-muted-foreground, currentColor) 8%,
+      transparent
+    );
+}
+
+/* Selection chrome in `prosekit/basic/style.css` uses fixed light-mode colors.
+   Use the theme's ring/primary tokens so it stays legible in dark mode. */
+.ProseMirror.typeset .ProseMirror-selectednode {
+  outline-color: var(--color-ring, currentColor);
+  background-color: color-mix(
+    in oklab,
+    var(--color-primary, currentColor) 10%,
+    transparent
+  );
+}
+
+.ProseMirror.typeset li.ProseMirror-selectednode::after {
+  border-color: var(--color-ring, currentColor);
+}
+
+.ProseMirror.typeset .selectedCell {
+  border: 1px double var(--color-ring, currentColor);
+  background-color: color-mix(
+    in oklab,
+    var(--color-primary, currentColor) 10%,
+    transparent
+  );
+}
+
+.ProseMirror.typeset .column-resize-handle,
+.ProseMirror.typeset prosekit-table-handle-drop-indicator {
+  background-color: var(--color-ring, currentColor);
 }

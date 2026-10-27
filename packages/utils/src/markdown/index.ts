@@ -19,9 +19,7 @@ import remarkStringify from "remark-stringify";
 import { unified } from "unified";
 
 import { rehypeCodeHighlight } from "./rehype-code-highlight";
-import { rehypeJoinParagraph } from "./rehype-join-paragraph";
 import { rehypeSafeUrlAttributes } from "./rehype-safe-urls";
-import { customBreakHandler } from "./remark-break-handler";
 
 const unescapeUnderscore = (str: string) => {
   return str.replace(/(^|[^\\])\\_/g, "$1_");
@@ -30,12 +28,9 @@ const unescapeUnderscore = (str: string) => {
 export const htmlToMarkdown = (html: string): string => {
   const markdown = unified()
     .use(rehypeParse, { fragment: true })
-    .use(rehypeJoinParagraph)
     .use(rehypeRemark, { newlines: true })
     .use(remarkGfm)
-    .use(remarkStringify, {
-      handlers: { break: customBreakHandler, hardBreak: customBreakHandler },
-    })
+    .use(remarkStringify)
     .processSync(html)
     .toString();
 
