@@ -21,7 +21,7 @@ A single shared scope type would have to be mutable to serve the board, and the 
 
 ## Consequences
 
-`apps/web`'s accessor keeps 33 lazy properties: a property read is what pins a collection to the current scope, so the set cannot be a frozen map built at module load. The getters resolve *which* set to read; every identity rule lives in `createDashboardCollections` and its deps.
+`apps/web`'s accessor keeps 33 lazy properties: a property read is what pins a collection to the current scope, so the set cannot be a frozen map built at module load. The getters resolve _which_ set to read; every identity rule lives in `createDashboardCollections` and its deps.
 
 `createDashboardCollections` is a pure function of `(client, scope)`, which is the test surface: `collections.test.ts` builds a `DbClient`, hands it a scope, and asserts every collection's id, that two scopes never share a collection, and that the same scope returns the same instances. Before this, no collection could be instantiated outside the app — the only test asserted that importing the module did not call `crypto.randomUUID`.
 
