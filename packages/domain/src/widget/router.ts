@@ -45,7 +45,41 @@ export const WidgetApiInternals = Layer.mergeAll(
 );
 
 /**
- * The `/api/widget/v1` route tree.
+ * Builds the route with a given private bundle.
+ *
+ * `makePublicApiRoute` takes the key middleware so a test can compose the same
+ * route with a smaller rate-limit budget instead of re-declaring the route
+ * shape, which is what would let the test drift from what ships. This takes the
+ * internals bundle for the same reason: a test composes the widget's own route
+ * over an in-memory database, or with its own `SitePolicy`, and the route it
+ * gets is the one production mounts.
+ *
+ * The bundle is not defaulted, and that is a type-level constraint rather than
+ * a preference. `Layer` is invariant in the services it provides, so a default
+ * of `WidgetApiInternals` can only typecheck against an `internals` parameter
+ * whose output is pinned to `WidgetInternals` — and a pinned output would hide
+ * the one thing the parameter is for: `Layer.provide` subtracts what the bundle
+ * provides, so a substitute that also supplies a shared service (`SitePolicy`)
+ * must be able to say so in the route's type. `WidgetApiRoute` below is the
+ * one-line production composition instead.
+ *
+ * `A`, `E` and `R` are all inferred from the argument: a bundle built over
+ * `Database.PgliteDatabaseLive` drops the database requirement it replaces
+ * rather than restating it, and one that leaves a dependency out simply leaves
+ * it in the route's channel. Either way the route's requirements stay truthful.
+ */
+export const makeWidgetRoute = <A, E, R>({
+  internals,
+}: {
+  readonly internals: Layer.Layer<A, E, R>;
+}) =>
+  HttpApiBuilder.layer(WidgetApi).pipe(
+    Layer.provide(WidgetApiLive),
+    Layer.provide(internals)
+  );
+
+/**
+ * The `/api/widget/v1` route tree as production composes it.
  *
  * Its own `HttpApi` instance and its own route: the widget is the opposite
  * contract from the dashboard — cross-origin, session-less, embedded in
@@ -54,14 +88,12 @@ export const WidgetApiInternals = Layer.mergeAll(
  * dashboard's document at `/docs/openapi.json` therefore describes the
  * dashboard only.
  *
- * It needs no builder function the way `makePublicApiRoute` does: that one
- * takes the key middleware because a test composes the same route with a
- * smaller rate-limit budget, while the widget answers unauthenticated requests
- * and its rate limits are applied per handler against the request-scoped
- * `ClientIp`. A zero-argument wrapper around a `Layer` is indirection the
- * `effecttsgo/lazy-effect` rule rightly rejects.
+ * Requires the services it shares with the rest of the server — the database,
+ * the rate limiter, the plan decision, the site policy, `PostWriteService` and
+ * `PostEmbeddingService` — so a layer dropped from
+ * `apps/server/src/app/layers.ts` is a compose error rather than a
+ * missing-service defect on a live request.
  */
-export const WidgetApiRoute = HttpApiBuilder.layer(WidgetApi).pipe(
-  Layer.provide(WidgetApiLive),
-  Layer.provide(WidgetApiInternals)
-);
+export const WidgetApiRoute = makeWidgetRoute({
+  internals: WidgetApiInternals,
+});
