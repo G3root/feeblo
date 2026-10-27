@@ -9,7 +9,17 @@ import {
 import { createChangelogEmail } from "@feeblo/transactional/templates/changelog";
 import { createEmailSubscriptionVerificationEmail } from "@feeblo/transactional/templates/email-subscription-verification";
 import { createNotificationEmail } from "@feeblo/transactional/templates/notification";
-import { and, eq, gte, inArray, isNull, or, sql, sum } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -62,6 +72,7 @@ import {
   recordEmailOldestQueuedAge,
   recordEmailProviderSubmission,
   recordEmailReconciliationRecoveries,
+  recordEmailVolumeUsage,
 } from "./telemetry";
 
 const DeliveryAttemptOutcomeSchema = Schema.TaggedUnion({
@@ -844,29 +855,55 @@ const sendDeliveryAttempt = (
     }
     const monthStart = DateTime.toDateUtc(DateTime.startOf(now, "month"));
     /**
-     * One volume guard, shared by both scopes: defer the delivery by the
-     * monthly retry delay when this month's attempt count reaches the limit,
-     * and record which guard spent it.
+     * The month's spend, measured in emails the provider accepted.
+     *
+     * `attempt_count` was the earlier measure and it counted work rather than
+     * mail: a retry, a template-render failure, and a circuit-breaker deferral
+     * could each consume the allowance without a message leaving the building,
+     * so a workspace having a bad provider day drained its month several times
+     * faster than its owner would guess. `accepted_at` is written by
+     * `markDeliveryAccepted` at the one moment a send becomes real, and it
+     * survives the delivery's later state, so a bounce or a delivery
+     * confirmation afterwards neither refunds nor replays a send.
+     */
+    const acceptedSinceMonthStart = and(
+      isNotNull(schema.emailDeliveryTable.acceptedAt),
+      gte(schema.emailDeliveryTable.acceptedAt, monthStart)
+    );
+    /**
+     * One volume guard, shared by both scopes: record how much of the month is
+     * spent, then defer the delivery by the monthly retry delay once the count
+     * reaches the limit.
      */
     const deferOnVolumeLimit = (args: {
-      readonly attempts: number;
+      readonly used: number;
       readonly limit: number;
-      readonly reason:
-        | "monthly_volume_limit"
-        | "workspace_monthly_volume_limit";
+      readonly scope: "platform" | "workspace";
     }) =>
       Effect.gen(function* () {
-        if (args.attempts < args.limit) {
+        const reason =
+          args.scope === "platform"
+            ? "monthly_volume_limit"
+            : "workspace_monthly_volume_limit";
+        // Recorded before the limit check so the ratio reaches 1 exactly when
+        // the guard starts deferring, and so a workspace approaching its
+        // allowance is visible before any of its mail is delayed.
+        yield* recordEmailVolumeUsage({
+          limit: args.limit,
+          scope: args.scope,
+          used: args.used,
+        });
+        if (args.used < args.limit) {
           return undefined;
         }
-        yield* recordEmailDeliveryThrottle(args.reason);
+        yield* recordEmailDeliveryThrottle(reason);
         yield* Effect.logWarning(
           "Email delivery paused by monthly volume limit"
         ).pipe(
           Effect.annotateLogs({
             deliveryId,
             organizationId: intent.organizationId,
-            reason: args.reason,
+            reason,
           })
         );
         yield* repository.deferDeliveryForThrottle({
@@ -874,7 +911,7 @@ const sendDeliveryAttempt = (
           nextAttemptAt: DateTime.toDateUtc(
             DateTime.addDuration(now, monthlyVolumeRetryDelay)
           ),
-          reason: args.reason,
+          reason,
         });
         return {
           _tag: "retry" as const,
@@ -887,7 +924,7 @@ const sendDeliveryAttempt = (
     // workspace, so without this one flooded workspace defers every other
     // workspace's email until the month rolls over.
     const [workspaceVolume] = yield* db
-      .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
+      .select({ used: count() })
       .from(schema.emailDeliveryTable)
       .innerJoin(
         schema.emailOutboxTable,
@@ -895,27 +932,27 @@ const sendDeliveryAttempt = (
       )
       .where(
         and(
-          gte(schema.emailDeliveryTable.createdAt, monthStart),
+          acceptedSinceMonthStart,
           eq(schema.emailOutboxTable.organizationId, intent.organizationId)
         )
       );
     const workspaceOutcome = yield* deferOnVolumeLimit({
-      attempts: Number(workspaceVolume?.attempts ?? 0),
       limit: config.workspaceMonthlySendLimit,
-      reason: "workspace_monthly_volume_limit",
+      scope: "workspace",
+      used: workspaceVolume?.used ?? 0,
     });
     if (workspaceOutcome !== undefined) {
       return workspaceOutcome;
     }
 
     const [monthlyVolume] = yield* db
-      .select({ attempts: sum(schema.emailDeliveryTable.attemptCount) })
+      .select({ used: count() })
       .from(schema.emailDeliveryTable)
-      .where(gte(schema.emailDeliveryTable.createdAt, monthStart));
+      .where(acceptedSinceMonthStart);
     const platformOutcome = yield* deferOnVolumeLimit({
-      attempts: Number(monthlyVolume?.attempts ?? 0),
       limit: config.monthlySendLimit,
-      reason: "monthly_volume_limit",
+      scope: "platform",
+      used: monthlyVolume?.used ?? 0,
     });
     if (platformOutcome !== undefined) {
       return platformOutcome;

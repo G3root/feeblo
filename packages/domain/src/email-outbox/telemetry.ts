@@ -69,6 +69,20 @@ const emailOldestQueuedAge = Metric.gauge(
   { description: "Age of the oldest queued, deferred, or sending delivery" }
 );
 
+/**
+ * How much of a monthly email allowance is spent, as a fraction.
+ *
+ * Deliberately not tagged with the workspace id: one series per tenant is
+ * unbounded cardinality. The `scope` tag is enough to alert on the question
+ * that matters -- `feeblo_email_volume_usage_ratio{scope="workspace"} > 0.8`
+ * fires while some workspace still has headroom, and the throttle log that
+ * follows at 1.0 names the workspace.
+ */
+const emailVolumeUsageRatio = Metric.gauge("feeblo_email_volume_usage_ratio", {
+  description:
+    "Fraction of a monthly accepted-send allowance already spent, by scope",
+});
+
 /** Records a low-cardinality outbox lifecycle metric without recipient data. */
 export const recordEmailIntentTransition = (
   kind: TEmailIntentKind,
@@ -127,3 +141,20 @@ export const recordEmailProviderSubmission = (
 /** Updates the current oldest queued delivery age gauge. */
 export const recordEmailOldestQueuedAge = (ageMilliseconds: number) =>
   Metric.update(emailOldestQueuedAge, Math.max(0, ageMilliseconds));
+
+/**
+ * Records how much of a monthly allowance one scope has spent, as a fraction.
+ *
+ * A limit of zero or less would divide into infinity, so it reads as fully
+ * spent. The caller still owns the decision the number feeds; this gauge only
+ * has to make the approach visible before the guard trips.
+ */
+export const recordEmailVolumeUsage = (args: {
+  readonly limit: number;
+  readonly scope: "platform" | "workspace";
+  readonly used: number;
+}) =>
+  Metric.update(
+    Metric.withAttributes(emailVolumeUsageRatio, { scope: args.scope }),
+    args.limit <= 0 ? 1 : Math.max(0, args.used) / args.limit
+  );
