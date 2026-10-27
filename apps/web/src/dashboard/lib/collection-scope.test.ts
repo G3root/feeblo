@@ -3,11 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
+  dashboardScopeFromPathname,
+  dashboardScopeKey,
   organizationScopedCollectionId,
-  organizationScopedQueryKey,
-  scopePostSlug,
   slugScopedCollectionId,
-  slugScopedQueryKey,
   workspaceIdFromPathname,
 } from "./collection-scope";
 
@@ -78,55 +77,77 @@ describe("slugScopedCollectionId", () => {
   });
 });
 
-describe("scope-derived query keys", () => {
-  const postSlugFilter = (value: string) => [
-    { field: ["postSlug"], operator: "eq", value },
-  ];
-
-  it("keys an organization-scoped collection by its scope", () => {
-    expect(organizationScopedQueryKey(orgA, "post")).toEqual(["post", "org-a"]);
-    expect(organizationScopedQueryKey(orgB, "post")).toEqual(["post", "org-b"]);
+/**
+ * The query-key rules themselves live in `@feeblo/web-shared/collections` and
+ * are tested there; what is worth pinning here is that a dashboard pathname
+ * yields the scope those rules are applied to.
+ */
+describe("dashboardScopeFromPathname", () => {
+  it("reads the organization and the post slug from a dashboard post route", () => {
+    expect(
+      dashboardScopeFromPathname(
+        "/org_abc123/board/feature-requests/post/b1/dark-mode"
+      )
+    ).toEqual({ organizationId: "org_abc123", postSlug: "dark-mode" });
   });
 
-  it("prefers an explicit postSlug filter over the scope's slug", () => {
-    expect(
-      slugScopedQueryKey(orgA, "comment", postSlugFilter("post-2"))
-    ).toEqual(["comment", "org-a", "postSlug", "post-2"]);
+  it("leaves the slug undefined outside a post route", () => {
+    expect(dashboardScopeFromPathname("/org_abc123/settings/members")).toEqual({
+      organizationId: "org_abc123",
+      postSlug: undefined,
+    });
   });
 
-  it("falls back to the slug captured in the scope", () => {
-    expect(slugScopedQueryKey(orgA, "comment")).toEqual([
-      "comment",
-      "org-a",
-      "postSlug",
-      "post-1",
-    ]);
+  it("resolves no organization for the routes that share the dashboard's parent", () => {
+    for (const pathname of [
+      "/",
+      "/sign-in",
+      "/register",
+      "/invitation/inv_abc123",
+      "/s/acme/p/dark-mode",
+    ]) {
+      expect(dashboardScopeFromPathname(pathname)).toEqual({
+        organizationId: undefined,
+        postSlug: undefined,
+      });
+    }
+  });
+
+  it("does not mistake the public board's post shape for a dashboard post", () => {
+    // `/s/<host>/p/<slug>` is served by the same app; its slug offset must not
+    // leak into a dashboard scope.
     expect(
-      scopePostSlug({ organizationId: "org-a", postSlug: undefined })
+      dashboardScopeFromPathname("/s/acme/p/dark-mode").postSlug
     ).toBeUndefined();
   });
+});
 
-  it("carries extra key parts after the slug", () => {
-    expect(
-      slugScopedQueryKey(orgA, "post-subscription", undefined, "user-1")
-    ).toEqual(["post-subscription", "org-a", "postSlug", "post-1", "user-1"]);
+describe("dashboardScopeKey", () => {
+  it("is stable for equal scopes built separately", () => {
+    expect(dashboardScopeKey({ ...orgA })).toBe(dashboardScopeKey({ ...orgA }));
   });
 
-  it("falls back to the bare name without an organization", () => {
+  it("separates organizations and posts", () => {
+    expect(dashboardScopeKey(orgA)).not.toBe(dashboardScopeKey(orgB));
+    expect(dashboardScopeKey(orgA)).not.toBe(
+      dashboardScopeKey({ ...orgA, postSlug: "post-2" })
+    );
+  });
+
+  it("matches the ids a scope produces, so one memo entry per collection set", () => {
+    // An absent organization and an empty one produce the same ids, so they
+    // must produce the same key rather than two entries holding one set.
     expect(
-      organizationScopedQueryKey(
-        { organizationId: undefined, postSlug: undefined },
-        "post"
-      )
-    ).toEqual(["post"]);
+      dashboardScopeKey({ organizationId: undefined, postSlug: undefined })
+    ).toBe(dashboardScopeKey({ organizationId: "", postSlug: undefined }));
   });
 });
 
 /**
- * Source-level guard for the invariant the unit tests above encode: a collection
- * whose `queryKey` resolves a slug from the route must key its descriptor by
- * slug too. Without this, a collection added later could reintroduce the
- * cross-post bleed the slug id exists to prevent, and no unit test would see it.
+ * Source-level guards for invariants the unit tests above cannot see: they hold
+ * between descriptors, not inside one. Without them a collection added later
+ * could reintroduce the cross-post bleed the slug id exists to prevent, or be
+ * built but never handed to a caller.
  */
 describe("collections module invariants", () => {
   const source = readFileSync(
@@ -134,10 +155,10 @@ describe("collections module invariants", () => {
     "utf8"
   );
 
-  /** Splits `export function NAME(...) { ... }` blocks by brace matching. */
+  /** Splits `function NAME(deps) { ... }` blocks by brace matching. */
   function descriptorBlocks(): Array<{ name: string; body: string }> {
     const blocks: Array<{ name: string; body: string }> = [];
-    const re = /export function (\w+Collection)\(/g;
+    const re = /^function (\w+Collection)\(/gm;
     let match: RegExpExecArray | null;
     while ((match = re.exec(source))) {
       const braceOpen = source.indexOf("{", match.index);
@@ -159,6 +180,10 @@ describe("collections module invariants", () => {
   }
 
   const blocks = descriptorBlocks();
+  const built = source.slice(
+    source.indexOf("export function createDashboardCollections("),
+    source.indexOf("export type DashboardCollections")
+  );
 
   it("finds every collection descriptor", () => {
     expect(blocks.length).toBe(33);
@@ -166,32 +191,40 @@ describe("collections module invariants", () => {
 
   it("keys every route-slug-scoped collection by slug", () => {
     const slugScoped = blocks.filter((b) =>
-      /getCurrentPostSlug\(\)|scopePostSlug\(|slugScopedQueryKey\(/.test(b.body)
+      /resolvePostSlug\(|slugScopedQueryKey\(/.test(b.body)
     );
 
     expect(slugScoped.length).toBeGreaterThan(0);
     for (const block of slugScoped) {
       expect(
         block.body,
-        `${block.name} resolves a route slug but does not use slugScopedCollectionId`
-      ).toContain("slugScopedCollectionId(");
+        `${block.name} resolves a route slug but does not use slugCollectionId`
+      ).toContain("deps.slugCollectionId(");
     }
   });
 
   it("keys every org-scoped collection by organization", () => {
     for (const block of blocks) {
-      if (block.body.includes("slugScopedCollectionId(")) continue;
-      if (!block.body.includes("organizationScopedQueryKey(")) continue;
+      if (block.body.includes("deps.slugCollectionId(")) continue;
+      if (!block.body.includes("deps.organizationScopedQueryKey(")) continue;
       expect(
         block.body,
-        `${block.name} is org-scoped but does not use organizationScopedCollectionId`
-      ).toContain("organizationScopedCollectionId(");
+        `${block.name} is org-scoped but does not use collectionId`
+      ).toContain("deps.collectionId(");
     }
   });
 
-  it("gives every descriptor a unique id", () => {
-    const ids = blocks.map((b) => b.name);
-    expect(new Set(ids).size).toBe(ids.length);
+  it("gives every descriptor a unique name", () => {
+    const names = blocks.map((b) => b.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("materializes every descriptor in createDashboardCollections", () => {
+    for (const { name } of blocks) {
+      expect(built, `${name} is not materialized for callers`).toContain(
+        `${name}(deps)`
+      );
+    }
   });
 });
 
