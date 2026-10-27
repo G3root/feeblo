@@ -1,122 +1,51 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import * as Policy from "../policy";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
-import { redactActorIdentities } from "../public-actor";
-import { withPublicViewer } from "../public-read";
-import { withRemapDbErrors } from "../rpc-errors";
+import { makeReactionRpcHandlers } from "../reaction/handlers";
+import type { ReactionList } from "../reaction/schema";
 import type { RpcTagsOf } from "../rpc-group";
-import { CurrentSession } from "../session-middleware";
-import { definePublicEntry, defineSurfacePair } from "../surface";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
-import type { TPostReactionList, TPostReactionToggle } from "./schema";
+import type { TPostReactionToggle } from "./schema";
 
 /** The RPCs this group declares; a surface pair's operation must be one. */
 type PostReactionRpcTag = RpcTagsOf<typeof PostReactionRpcs>;
 
+/**
+ * Post reactions over the shared reaction family.
+ *
+ * The four handlers, the two surfaces' policies and limiters, the public
+ * redaction, and the db-error remap come from `reaction/handlers.ts`; this file
+ * is the post naming of that record onto `PostReactionRpcs`. A reaction target
+ * differs in its repository — which table, which visibility joins, which
+ * merged-content rule — not in how it is authorized.
+ */
 export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostReactionRepository;
-  const postPolicy = yield* PostPolicy;
-  // const sitePolicy = yield* SitePolicy;
-
-  // -- Surface-parameterized writes --
-  //
-  // The two surfaces read different projections: the dashboard checks
-  // `isUnlocked` in its policy and toggles directly, the public portal checks
-  // `isUnlockedPublic` and lets the repository's `togglePublic` join the
-  // board visibility.
-
-  const toggleWrite = defineSurfacePair<
-    TPostReactionToggle,
-    PostReactionRpcTag
+  const handlers = yield* makeReactionRpcHandlers<
+    PostReactionRpcTag,
+    ReactionList,
+    TPostReactionToggle
   >()({
-    operation: "TogglePostReaction",
-    remap: { action: "update", entity: "PostReaction" },
-    dashboard: {
-      rateLimit: undefined,
-      policy: (args: TPostReactionToggle) =>
-        Policy.all(
-          Policy.hasMembership(args.organizationId),
-          postPolicy.isUnlocked({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
-        ),
-    },
-    public: {
-      rateLimit: "write",
-      policy: (args: TPostReactionToggle) =>
-        Policy.all(
-          Policy.hasRestrictedOrganizationScope(args.organizationId),
-          postPolicy.isUnlockedPublic({
-            organizationId: args.organizationId,
-            postId: args.postId,
-          })
-        ),
-    },
+    entity: "PostReaction",
+    listOperation: "ListPostReactions",
+    service: repository,
+    toggleOperation: "TogglePostReaction",
   });
-
-  // The dashboard list projects from the repository's internal predicate; the
-  // public list projects its own, so the pair does not apply and the
-  // dashboard half stays hand-written.
-  const listPublicEntry = definePublicEntry<
-    TPostReactionList,
-    PostReactionRpcTag
-  >()({
-    operation: "ListPostReactions",
-    remap: { action: "select", entity: "PostReaction" },
-    config: { rateLimit: "read", policy: () => Policy.allow },
-  });
-
-  const toggleReaction = toggleWrite.handlers((surface, args) =>
-    Effect.gen(function* () {
-      const session = yield* CurrentSession;
-      const request = {
-        emoji: args.emoji,
-        organizationId: args.organizationId,
-        postId: args.postId,
-        userId: session.session.userId,
-      };
-
-      return yield* surface === "public"
-        ? repository.togglePublic(request)
-        : repository.toggle(request);
-    })
-  );
 
   return {
-    ListPostReactions: (args: TPostReactionList) =>
-      repository
-        .list({
-          slug: args.slug,
-          organizationId: args.organizationId,
-        })
-        .pipe(
-          Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("PostReaction", "select")
-        ),
-    TogglePostReaction: toggleReaction.dashboard,
-    ListPostReactionsPublic: listPublicEntry.entry((args) =>
-      withPublicViewer({
-        read: () =>
-          repository.listPublic({
-            slug: args.slug,
-            organizationId: args.organizationId,
-          }),
-        redact: redactActorIdentities,
-      })
-    ),
-    TogglePostReactionPublic: toggleReaction.public,
+    ListPostReactions: handlers.list,
+    ListPostReactionsPublic: handlers.listPublic,
+    TogglePostReaction: handlers.toggle,
+    TogglePostReactionPublic: handlers.togglePublic,
   };
 });
 
 export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
   PostReactionRpcHandlersEffect
 ).pipe(
-  // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(PostReactionRepository.layer)

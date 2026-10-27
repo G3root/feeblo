@@ -1,45 +1,35 @@
-import { ReactionEmojiSchema } from "@feeblo/utils/reaction";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as Schema from "effect/Schema";
 
 import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
+import { ReactionServiceErrors } from "../reaction/errors";
+import { ReactionList, ReactionToggleResult } from "../reaction/schema";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
-import { CommentReactionServiceErrors } from "./errors";
-import {
-  CommentReaction,
-  CommentReactionList,
-  CommentReactionToggle,
-} from "./schema";
+import { CommentReaction, CommentReactionToggle } from "./schema";
 
 export class CommentReactionRpcs extends RpcGroup.make(
   Rpc.make("ListCommentReactions", {
-    payload: CommentReactionList,
+    payload: ReactionList,
     success: Schema.Array(CommentReaction),
-    error: CommentReactionServiceErrors,
+    error: ReactionServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("ToggleCommentReaction", {
     payload: CommentReactionToggle,
-    success: Schema.Struct({
-      reacted: Schema.Boolean,
-      emoji: Schema.Union([ReactionEmojiSchema, Schema.Null]),
-    }),
-    error: CommentReactionServiceErrors,
+    success: ReactionToggleResult,
+    error: ReactionServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("ListCommentReactionsPublic", {
-    payload: CommentReactionList,
+    payload: ReactionList,
     success: Schema.Array(CommentReaction),
-    error: Schema.Union([CommentReactionServiceErrors, RateLimitErrors]),
+    error: Schema.Union([ReactionServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware),
   Rpc.make("ToggleCommentReactionPublic", {
     payload: CommentReactionToggle,
-    success: Schema.Struct({
-      reacted: Schema.Boolean,
-      emoji: Schema.Union([ReactionEmojiSchema, Schema.Null]),
-    }),
-    error: Schema.Union([CommentReactionServiceErrors, RateLimitErrors]),
+    success: ReactionToggleResult,
+    error: Schema.Union([ReactionServiceErrors, RateLimitErrors]),
   })
     .middleware(AuthMiddleware)
     .middleware(PublicRpcRateLimitMiddleware)
