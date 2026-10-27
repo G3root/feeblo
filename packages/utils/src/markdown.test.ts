@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { sanitizeMarkdown } from "./markdown-sanitizer";
-import { markdownToHtml } from "./markdown/index";
+import { htmlToMarkdown, markdownToHtml } from "./markdown/index";
 import { attributeViolations } from "./test-helpers/hast-safety";
 
 describe("markdownToHtml URL safety", () => {
@@ -32,6 +32,28 @@ describe("markdownToHtml URL safety", () => {
     const html = markdownToHtml(`before <img src=x onerror=alert(1)> after`);
     expect(html).not.toContain("onerror");
     expect(html).not.toContain("<img");
+  });
+});
+
+describe("markdown paragraph round trip", () => {
+  it("keeps adjacent paragraphs as separate Markdown paragraphs", () => {
+    expect(htmlToMarkdown("<p>first</p><p>second</p>")).toBe(
+      "first\n\nsecond\n"
+    );
+  });
+
+  it("does not collapse an editor paragraph break into a soft break", () => {
+    const markdown = htmlToMarkdown("<p>first</p><p>second</p>");
+
+    expect(markdownToHtml(markdown)).toContain("<p>first</p>");
+    expect(markdownToHtml(markdown)).toContain("<p>second</p>");
+  });
+
+  it("preserves a hard break as a hard break", () => {
+    const markdown = htmlToMarkdown("<p>first<br>second</p>");
+
+    expect(markdown).toBe("first\\\nsecond\n");
+    expect(markdownToHtml(markdown)).toContain("<br");
   });
 });
 
