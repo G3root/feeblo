@@ -40,6 +40,7 @@ import { PublicApiConfig } from "@feeblo/domain/public-api/config";
 import { RateLimitService } from "@feeblo/domain/rate-limit/service";
 import { S3UploadServiceLive } from "@feeblo/domain/services/s3";
 import { Auth } from "@feeblo/domain/session-middleware";
+import { SitePolicy } from "@feeblo/domain/site/policies";
 import { SiteRepository } from "@feeblo/domain/site/repository";
 import { UserRepository } from "@feeblo/domain/user/repository";
 import { makeWorkflowsTest, WorkflowsLive } from "@feeblo/domain/workflows";
@@ -245,6 +246,16 @@ export const makeServiceLayers = ({
   const EntitlementPolicies = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer)
   );
+  // The site visibility policy the widget's unauthenticated reads go through
+  // (`changelogVisibility`), built once from the same site repository and plan
+  // decision every other surface applies. `@feeblo/domain/widget/router`
+  // declares it as a requirement rather than closing over its own copy, so
+  // dropping this line fails this build's type instead of one request that
+  // reads a workspace's changelog privacy.
+  const SitePolicies = SitePolicy.layer.pipe(
+    Layer.provide(SiteRepository.layer),
+    Layer.provide(EntitlementPolicies)
+  );
   // The shared post write path's environment, provided once: the dashboard
   // RPCs, the Public API, the widget feedback endpoint, and the Slack and
   // Discord inbound feedback services all require this one service instead of
@@ -358,6 +369,7 @@ export const makeServiceLayers = ({
       Layer.provide(Database.DatabaseContextLive)
     ),
     EntitlementPolicies,
+    SitePolicies,
     WorkspaceRepository.layer,
     PostWrites,
     // The write path's optional fan-outs resolve from the request context, so
