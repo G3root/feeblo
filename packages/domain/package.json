@@ -481,6 +481,9 @@
     "./session-middleware": {
       "default": "./src/session-middleware.ts"
     },
+    "./site/policies": {
+      "default": "./src/site/policies.ts"
+    },
     "./site/repository": {
       "default": "./src/site/repository.ts"
     },
@@ -510,6 +513,9 @@
     },
     "./widget/api-live": {
       "default": "./src/widget/api-live.ts"
+    },
+    "./widget/router": {
+      "default": "./src/widget/router.ts"
     },
     "./widget/schema": {
       "default": "./src/widget/schema.ts"

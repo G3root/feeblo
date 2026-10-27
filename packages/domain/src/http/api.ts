@@ -8,7 +8,6 @@ import { NotificationPreferenceApiGroup } from "../notification-preference/api-c
 import { OrganizationApiGroup } from "../organization/api-contract";
 import { PricingApiGroup } from "../pricing/api-contract";
 import { ProfileApiGroup } from "../profile/api-contract";
-import { WidgetApi } from "../widget/api-contract";
 
 export class Api extends HttpApi.make("Api")
   .add(AuthApiGroup)
@@ -19,5 +18,4 @@ export class Api extends HttpApi.make("Api")
   .add(OrganizationApiGroup)
   .add(PricingApiGroup)
   .add(ProfileApiGroup)
-  .prefix("/api")
-  .addHttpApi(WidgetApi) {}
+  .prefix("/api") {}

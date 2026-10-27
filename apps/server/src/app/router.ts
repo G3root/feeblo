@@ -6,6 +6,7 @@ import {
   makeRpcRoute,
   type ProviderOwnedRpcName,
 } from "@feeblo/domain/rpc-router";
+import { WidgetApiRoute } from "@feeblo/domain/widget/router";
 import { makeDiscordRouters } from "@feeblo/integration-discord/routers";
 import { DiscordManagementRpcHandlers } from "@feeblo/integration-discord/rpc-handlers";
 import { makeGitHubRouters } from "@feeblo/integration-github/github-routers";
@@ -164,6 +165,12 @@ export const makeMergedRoutes = ({
     HealthRouter,
     makeRpcRoute(ProviderRpcLayer),
     HttpRoute,
+    // The widget is its own surface with its own `HttpApi` and its own version
+    // prefix, so it is mounted beside `HttpRoute` rather than inside it: the
+    // dashboard's `/docs/openapi.json` describes the dashboard only, and the
+    // widget's shared dependencies are supplied by the same service graph
+    // because the route declares them (see `@feeblo/domain/widget/router`).
+    WidgetApiRoute,
     // The Public API is mounted in every environment, including production:
     // it is the paid feature, and its OpenAPI document and reference page are
     // the customer-facing docs. The dashboard's `Api` is mounted too, but has
