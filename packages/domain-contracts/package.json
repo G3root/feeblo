@@ -7,13 +7,13 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "effect": "catalog:"
   },
   "devDependencies": {
     "@feeblo/config": "workspace:*",
-    "typescript": "catalog:"
+    "tsrs": "catalog:"
   }
 }

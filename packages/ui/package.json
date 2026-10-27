@@ -17,7 +17,7 @@
     "./*": "./src/*.tsx"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
@@ -40,6 +40,6 @@
   "devDependencies": {
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "typescript": "catalog:"
+    "tsrs": "catalog:"
   }
 }

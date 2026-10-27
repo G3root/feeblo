@@ -70,7 +70,7 @@
     "dev": "paraglide-js compile --project ../../project.inlang --outdir ./src/paraglide --strategy baseLocale --emit-ts-declarations --watch",
     "machine-translate": "inlang machine translate --project ../../project.inlang",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@effect/atom-react": "catalog:",
@@ -97,7 +97,7 @@
     "@inlang/paraglide-js": "^2.23.1",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "typescript": "catalog:",
+    "tsrs": "catalog:",
     "vitest": "catalog:"
   }
 }

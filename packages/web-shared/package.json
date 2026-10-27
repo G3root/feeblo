@@ -46,6 +46,14 @@
       "types": "./src/lib/client-hints.ts",
       "default": "./src/lib/client-hints.ts"
     },
+    "./error-reporting": {
+      "types": "./src/observability/error-reporting.ts",
+      "default": "./src/observability/error-reporting.ts"
+    },
+    "./browser-telemetry": {
+      "types": "./src/observability/browser-telemetry.ts",
+      "default": "./src/observability/browser-telemetry.ts"
+    },
     "./reaction-keys": {
       "types": "./src/lib/reaction-keys.ts",
       "default": "./src/lib/reaction-keys.ts"
@@ -97,7 +105,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@effect/atom-react": "catalog:",
@@ -107,6 +115,7 @@
     "@feeblo/permissions": "workspace:*",
     "@feeblo/rpc-client": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@sentry/react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "effect": "catalog:",
@@ -120,7 +129,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "^5.0.2",
-    "typescript": "catalog:",
+    "tsrs": "catalog:",
     "vitest": "catalog:",
     "vitest-browser-react": "^2.3.0"
   }

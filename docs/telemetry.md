@@ -1,6 +1,8 @@
 # Telemetry
 
-Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the server. The exporters are Effect's own (`effect/observability`); the transport adds `@bufbuild/protobuf` to read the OTLP acknowledgement. This is a port of `UsefulSoftwareCo/executor`'s `packages/telemetry`, trimmed to what a first-party server needs.
+Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the server, and traces from the dashboard and public board. The exporters are Effect's own (`effect/observability`); the transport adds `@bufbuild/protobuf` to read the OTLP acknowledgement. This is a port of `UsefulSoftwareCo/executor`'s `packages/telemetry`, trimmed to what a first-party server needs.
+
+Errors are separate: Sentry reports them in the server and the browser, and is initialized with `tracesSampleRate: 0`. Do not point Sentry at trace data; do not point OTLP at exception events.
 
 ## Wiring
 
@@ -15,6 +17,13 @@ Feeblo exports OpenTelemetry Protocol (OTLP) traces, logs, and metrics from the 
 | `apps/server/src/infra/telemetry/measurements.ts` | Export-failure and rejected-record counters |
 | `apps/server/src/infra/telemetry/process.ts` | Process CPU, memory, and event-loop gauges |
 | `apps/server/src/http/request-rejection.ts` | Records HTTP API schema rejections on the request span |
+| `apps/server/src/http/browser-telemetry.ts` | Forwards the browser's OTLP/JSON batches to the host's configured destination |
+| `apps/server/src/infra/sentry.ts` | Sentry error reporting (`ErrorReporter` integration) and the per-request reporting boundary |
+| `packages/web-shared/src/observability/browser-telemetry.ts` | The dashboard's Effect OTLP layer, navigation spans, and uncaught-error spans |
+| `packages/web-shared/src/observability/error-reporting.ts` | Sentry init, URL scrubbing, first-party capture filtering |
+| `apps/web/src/observability.ts` | Browser composition root: starts Sentry and OTLP, and opens router navigation spans |
+| `apps/web/src/routes/sentry-tunnel.ts` | Same-origin Sentry envelope relay |
+| `apps/web/src/routes/telemetry/$signal.ts` | Same-origin browser OTLP relay, forwarded server-to-server to the API |
 
 `program.ts` provides `makeObservabilityLayer` around the whole program, so layer construction, the forked workers, and the HTTP server all share one tracer and one logger set.
 
@@ -53,6 +62,14 @@ Two policies run in the tracer wrappers the OTLP layer installs (`span-attribute
 - **RPC methods.** `effect/rpc` names each server span `RpcServer.<Tag>`, but every call shares the same `POST /rpc` HTTP route. `rpc-spans.ts` adds `rpc.system.name=effect` and `rpc.method=<Tag>` to the RPC span, and records `rpc.method` on the parent HTTP span (or on the HTTP link when the client owns the trace context), so a backend can filter and group by method instead of the anonymous route. When one HTTP span serves more than one method, the shared span keeps every distinct method as an array instead of the last write winning; each RPC span still carries the scalar method it serves. The prefix is pinned by `rpcSpanPrefix` in `@feeblo/domain/rpc-router`, which also passes it to `RpcServer.layerHttp`.
 - **Root library spans.** Queue pollers and delivery workers run without a parent request, so Effect SQL's `sql.execute` and `sql.transaction` arrive as roots and every 1 Hz poll becomes a standalone trace. Those root names are dropped; a SQL span under a request keeps its parent and is exported.
 - **Path templates.** The router records `http.route` on a matched server span, and the allowlist replaces the concrete `url.path` with that template, so a path parameter such as the SES webhook's signing token never leaves the process. `recordRoute` and `routeTemplates` name a fixed endpoint served under a wildcard mount.
+
+## Browser telemetry
+
+Every page starts Effect's OTLP exporters in the browser, on the dashboard and the public board alike. Batches post as OTLP/JSON to the web app's same-origin `/telemetry/traces` and `/telemetry/logs`, which forward server-to-server to the API's `/api/telemetry/*`, which in turn owns the destination configured for the server. The collector credential never reaches the page, and a public board on a customer's custom domain works: its browser never posts cross-origin to the API. Both relays cap a batch at 256 KiB. When OTLP is not configured for the deployment, the API relay accepts the batch with 202 and discards it, rather than turning every page load into a console error.
+
+Browser spans use the `feeblo-web` service name: `ui.navigation` measures a client-side route transition, `ui.error` and `ui.unhandled-rejection` capture uncaught failures, and the page sends a final flush on `pagehide`. Both surfaces share the composition root in `apps/web/src/observability.ts`.
+
+Sentry's browser half uses the same public `SENTRY_DSN`. Envelopes post to the web app's `/sentry-tunnel` rather than `*.ingest.sentry.io` so privacy extensions do not drop them; the route validates that an envelope names this deployment's project and forwards it. First-party filtering drops automatic captures whose innermost located frame belongs to an extension or an injected script.
 
 ## Local development
 

@@ -2,9 +2,9 @@ import { effectNative, recommended } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "oxlint";
 
 /**
- * Effect diagnostics live here, not in `tsc`.
+ * Effect diagnostics live here, not in the compiler.
  *
- * `@effect/tsgo` patches both `tsc` and Oxlint. Running the Effect rules in
+ * `@effect/tsgo` patches both `tsrs` and Oxlint. Running the Effect rules in
  * both places reports every finding twice, so `packages/config/tsconfig.base.json`
  * sets `diagnostics: false` and Oxlint owns them: one surface, one severity
  * per rule, cached, and fast enough to run on every commit.
@@ -526,7 +526,7 @@ export default defineConfig({
 
   options: {
     // Type-aware rules run through `oxlint-tsgolint`, which `@effect/tsgo`
-    // patches so the `effecttsgo/*` rules resolve. tsc still owns plain type
+    // patches so the `effecttsgo/*` rules resolve. `tsrs` still owns plain type
     // checking; `typeCheck` stays off so diagnostics are not reported twice.
     typeAware: true,
     typeCheck: false,

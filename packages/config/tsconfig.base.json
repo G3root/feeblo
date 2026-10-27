@@ -27,8 +27,8 @@
         "name": "@effect/language-service",
         // Effect diagnostics are reported by Oxlint (`effecttsgo/*` rules in
         // oxlint.config.ts), which @effect/tsgo patches into both tools.
-        // Reporting them here too would double every finding. tsc keeps the
-        // language service for refactors, quickinfo, and completions.
+        // Reporting them here too would double every finding. The compiler keeps
+        // the language service for refactors, quickinfo, and completions.
         "diagnostics": false
       }
     ],

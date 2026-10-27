@@ -5,7 +5,9 @@ import { extractSubdomain } from "@feeblo/utils/url";
 import { createServerFn } from "@tanstack/react-start";
 import * as Effect from "effect/Effect";
 
+import { buildOgImageUrl } from "@/lib/og-image-url";
 import { fetchRpcServer } from "~/lib/runtime-server";
+import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
 import { resolveSite } from "~/lib/site";
 
 /**
@@ -208,9 +210,14 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
         : detail;
     }
 
-    const ogImageUrl = new URL("/og-image", process.env.API_URL);
-    ogImageUrl.searchParams.set("name", site.name);
-    ogImageUrl.searchParams.set("site", site.subdomain);
+    const ogImageUrl = buildOgImageUrl({
+      // The board document is rendered on the server, where `apiUrl` is the
+      // absolute API origin crawlers must fetch the image from.
+      apiUrl: getServerRuntimePublicEnv().apiUrl,
+      pathname: url.pathname,
+      postSlug: detail.post?.slug ?? null,
+      siteId: site.id,
+    });
 
     return {
       kind: "found",
@@ -219,7 +226,7 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
       changelog: detail.changelog,
       canonicalUrl: new URL(url.pathname, url.origin).toString(),
       siteUrl: new URL("/", url.origin).toString(),
-      ogImageUrl: ogImageUrl.toString(),
+      ogImageUrl,
       noIndex: Boolean(process.env.NO_INDEX) || site.noIndex,
     };
   });

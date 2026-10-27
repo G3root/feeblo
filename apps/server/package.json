@@ -8,7 +8,7 @@
     "dev": "dotenvx run -f ../../.env -- tsx watch src/index.ts",
     "start": "dotenvx run -f ../../.env -- tsx src/index.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
     "@bufbuild/protobuf": "catalog:",
@@ -25,6 +25,7 @@
     "@feeblo/integration-webhook": "workspace:*",
     "@feeblo/transactional": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@sentry/node": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:"
   },
@@ -32,8 +33,8 @@
     "@effect/vitest": "catalog:",
     "@feeblo/config": "workspace:*",
     "rolldown": "catalog:",
+    "tsrs": "catalog:",
     "tsx": "catalog:",
-    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }
