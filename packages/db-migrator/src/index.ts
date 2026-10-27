@@ -228,6 +228,14 @@ const concurrentIndexes = [
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "upvote_memberId_idx"
      ON "upvote" ("member_id")`,
   ],
+  // The monthly volume guard's count, run on every email send attempt. The
+  // predicate is the guard's own: a delivery the provider never accepted cannot
+  // spend an allowance, so the index holds only rows a count can match.
+  [
+    "email_delivery_acceptedAt_idx",
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "email_delivery_acceptedAt_idx"
+     ON "email_delivery" ("accepted_at") WHERE "accepted_at" is not null`,
+  ],
 ] as const;
 
 const runMigrate = async () => {

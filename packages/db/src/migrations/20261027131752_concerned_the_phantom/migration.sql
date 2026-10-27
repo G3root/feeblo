@@ -1,7 +1,16 @@
--- The monthly volume guard counts accepted sends since the start of the month,
--- and it runs on every send attempt, so without this index each check scans the
--- whole delivery table. The predicate is the guard's own: a delivery the
--- provider never accepted cannot spend an allowance. `accepted_at` is the
--- column that answers "did this actually go out", unlike `attempt_count`, which
--- also counts retries and render failures that never reached the provider.
-CREATE INDEX "email_delivery_acceptedAt_idx" ON "email_delivery" ("accepted_at") WHERE "accepted_at" is not null;
+-- The monthly volume guard's index is created by
+-- `packages/db-migrator/src/index.ts`, not here.
+--
+-- `CREATE INDEX` inside a migration takes a SHARE lock on the table for the
+-- whole build, and drizzle's migrator runs every pending migration in one
+-- transaction. `email_delivery` takes an INSERT for every recipient of every
+-- notification, so a plain index build here would block the queue's writes
+-- until the last migration in the batch committed. The migrator builds it with
+-- `CREATE INDEX CONCURRENTLY` after the transactional pass.
+--
+-- The snapshot beside this file records the index, which is what keeps
+-- `drizzle-kit generate` from emitting it again. The statement below exists
+-- only so this migration is a valid, explicitly no-op query. See
+-- `docs/adr/0020-lock-deadlines-and-transaction-retries.md`, and
+-- `20261020073319_rainy_adam_warlock` for the same shape.
+SELECT 1;
