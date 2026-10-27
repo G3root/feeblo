@@ -280,6 +280,16 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                 ...(nextState === "delivered" && {
                   deliveredAt: event.occurredAt,
                 }),
+                // Provider feedback can arrive before the worker's own
+                // acceptance write: the send moved the row to `sending`, the
+                // provider answered while the worker was still in flight, and
+                // this transition is what the row sees next. Recording the
+                // acceptance here is what keeps that send inside the monthly
+                // volume count, because `markDeliveryAccepted` only writes from
+                // `sending` and by now the row has left it. `coalesce` keeps a
+                // real acceptance timestamp: feedback reports a send that
+                // already happened, it does not supersede one.
+                acceptedAt: sql`coalesce(${schema.emailDeliveryTable.acceptedAt}, ${event.occurredAt})`,
                 ...(options?.nextAttemptAt !== undefined && {
                   nextAttemptAt: options.nextAttemptAt,
                 }),

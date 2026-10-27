@@ -118,6 +118,46 @@ describe("EmailProviderFeedbackService", () => {
         })
     );
 
+    it.effect(
+      "records the acceptance when feedback arrives before the worker's write",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* EmailProviderFeedbackService;
+          // `sending` is the state the worker holds between claiming a
+          // delivery and recording the provider's acceptance. A delivered
+          // event that lands inside that window moves the row without the
+          // worker ever reaching `markDeliveryAccepted`, which only writes
+          // from `sending` — so this transition has to record the acceptance
+          // itself or the send never enters the monthly volume count.
+          const delivery = yield* makeDelivery(
+            "sending",
+            "early-feedback@example.com"
+          );
+
+          yield* service.ingest({
+            eventId: "provider-delivered-early-1",
+            messageId: delivery.messageId,
+            occurredAt: "2026-08-09T12:00:00.000Z",
+            recipients: ["early-feedback@example.com"],
+            type: "delivered",
+          });
+
+          const [stored] = yield* db
+            .select({
+              acceptedAt: schema.emailDeliveryTable.acceptedAt,
+              state: schema.emailDeliveryTable.state,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+          // The later state wins, and the acceptance it implies is kept.
+          expect(stored?.state).toBe("delivered");
+          expect(stored?.acceptedAt?.toISOString()).toBe(
+            "2026-08-09T12:00:00.000Z"
+          );
+        })
+    );
+
     it.effect("records deferral without creating another Feeblo delivery", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
