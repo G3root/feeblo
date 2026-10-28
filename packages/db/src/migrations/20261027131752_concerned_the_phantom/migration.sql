@@ -6,7 +6,9 @@
 -- transaction. `email_delivery` takes an INSERT for every recipient of every
 -- notification, so a plain index build here would block the queue's writes
 -- until the last migration in the batch committed. The migrator builds it with
--- `CREATE INDEX CONCURRENTLY` after the transactional pass.
+-- `CREATE INDEX CONCURRENTLY` after the transactional pass. `pnpm db:migrate`
+-- dispatches to that migrator (`packages/db-migrator`), which is why only a
+-- bare `drizzle-kit migrate` would leave the index missing.
 --
 -- The snapshot beside this file records the index, which is what keeps
 -- `drizzle-kit generate` from emitting it again. The statement below exists
