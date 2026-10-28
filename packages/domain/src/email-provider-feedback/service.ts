@@ -283,6 +283,12 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
            * count reads that fact, so it is written whether or not the row
            * moves.
            *
+           * Every type here except `failed` proves the provider took the
+           * message; `failed` (SES `Reject`) proves the opposite — a message
+           * the provider rejected instead of accepting — so it is the one
+           * type that must not start this count. See the contract on the
+           * variant in `schema.ts`.
+           *
            * `coalesce` keeps the first acceptance: feedback reports a send that
            * already happened and never supersedes a timestamp a send recorded.
            */
@@ -301,7 +307,9 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               )
               .pipe(Effect.asVoid);
 
-          yield* recordProviderAcceptance();
+          if (event.type !== "failed") {
+            yield* recordProviderAcceptance();
+          }
 
           const transitionDelivery = (
             nextState: "delivered" | "deferred" | "bounced" | "failed",

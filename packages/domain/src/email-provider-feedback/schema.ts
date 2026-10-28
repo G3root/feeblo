@@ -61,6 +61,13 @@ export const ProviderLifecycleEvent = Schema.Union([
   }),
   Schema.Struct({
     ...LifecycleEventFields,
+    /**
+     * Proves the provider never took the message. `ses-mapping.ts` maps
+     * SES's `Reject` here — a message the provider rejected instead of
+     * accepting — so a delivery row this event touches must never start
+     * counting as an accepted send. Everything that happened after an
+     * accepted send is carried by the other types.
+     */
     type: Schema.tag("failed"),
   }),
   Schema.Struct({

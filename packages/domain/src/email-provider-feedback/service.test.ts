@@ -19,7 +19,7 @@ describe("EmailProviderFeedbackService", () => {
   );
 
   const makeDelivery = (
-    state: "accepted" | "deferred" | "delivered" | "sending",
+    state: "accepted" | "deferred" | "delivered" | "failed" | "sending",
     recipientEmail = "feedback@example.com",
     attemptCount = 1
   ) =>
@@ -198,6 +198,84 @@ describe("EmailProviderFeedbackService", () => {
             "2026-08-09T12:00:00.000Z"
           );
         })
+    );
+
+    it.effect(
+      "does not record acceptance from a rejection the provider never took",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* EmailProviderFeedbackService;
+          // A worker that could not confirm its submission marks the row
+          // `failed` with no acceptance, and the provider's `failed` event
+          // (`Reject` in `ses-mapping.ts`) names a message it rejected
+          // without taking. The event proves the opposite of a send, so the
+          // acceptance stamp must not fire or the mail the provider refused
+          // would spend the monthly volume allowance.
+          const delivery = yield* makeDelivery(
+            "failed",
+            "reject-feedback@example.com"
+          );
+
+          const result = yield* service.ingest({
+            eventId: "provider-reject-failed-1",
+            messageId: delivery.messageId,
+            occurredAt: "2026-08-09T12:00:00.000Z",
+            recipients: ["reject-feedback@example.com"],
+            type: "failed",
+          });
+
+          expect(result).toMatchObject({
+            _tag: "Processed",
+            deliveryUpdated: false,
+          });
+          const [stored] = yield* db
+            .select({
+              acceptedAt: schema.emailDeliveryTable.acceptedAt,
+              state: schema.emailDeliveryTable.state,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+          expect(stored?.state).toBe("failed");
+          expect(stored?.acceptedAt).toBeNull();
+        })
+    );
+
+    it.effect("transitions a failed event without stamping an acceptance", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* EmailProviderFeedbackService;
+        // The gate on `failed` events must not swallow their legal
+        // lifecycle work: from `sending`, `failed` is a real transition and
+        // still happens, while the acceptance stays unwritten — the row
+        // never stops counting as mail purely because its state moved.
+        const delivery = yield* makeDelivery(
+          "sending",
+          "send-fail@example.com"
+        );
+
+        const result = yield* service.ingest({
+          eventId: "provider-failed-sending-1",
+          messageId: delivery.messageId,
+          occurredAt: "2026-08-09T12:00:00.000Z",
+          recipients: ["send-fail@example.com"],
+          type: "failed",
+        });
+
+        expect(result).toMatchObject({
+          _tag: "Processed",
+          deliveryUpdated: true,
+        });
+        const [stored] = yield* db
+          .select({
+            acceptedAt: schema.emailDeliveryTable.acceptedAt,
+            state: schema.emailDeliveryTable.state,
+          })
+          .from(schema.emailDeliveryTable)
+          .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+        expect(stored?.state).toBe("failed");
+        expect(stored?.acceptedAt).toBeNull();
+      })
     );
 
     it.effect("records deferral without creating another Feeblo delivery", () =>
