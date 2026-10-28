@@ -60,6 +60,7 @@ import { WorkflowEngine } from "effect/workflow/WorkflowEngine";
 
 import { drizzleAdapter } from "./adapter/drizzle-adapter";
 import { enforcePublicApiKeyPlan, publicApiKeyPlugin } from "./api-key-config";
+import { AUTH_CLIENT_IP_HEADER } from "./auth-client-ip-header";
 import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
 import {
@@ -741,6 +742,12 @@ export const initAuthHandler = (
       trustedOrigins,
 
       advanced: {
+        ipAddress: {
+          // The mounted /api/auth/* route overwrites this header with the
+          // peer-validated ClientIp before Better Auth sees the request. Do
+          // not fall back to x-forwarded-for here: it is client-controlled.
+          ipAddressHeaders: [AUTH_CLIENT_IP_HEADER],
+        },
         crossSubDomainCookies: {
           // Production-only: a shared Domain cookie across *.localhost is
           // impossible because Chromium treats localhost as an effective TLD
