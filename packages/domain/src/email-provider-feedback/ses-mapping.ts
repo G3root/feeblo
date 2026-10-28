@@ -38,6 +38,26 @@ const findMessageId = (notification: SesEventNotification): string => {
   );
 };
 
+/**
+ * The moment the provider took custody of the message.
+ *
+ * `mail.timestamp` is when SES received the submitted message, which is the
+ * acceptance the monthly volume count reads — earlier and more truthful than
+ * the feedback event's own time, which can land after a month boundary. The
+ * field is optional because an absent or unparseable timestamp must leave it
+ * unset: fabricating "now" here would not be acceptance information, and the
+ * service already falls back to the event time when it is missing.
+ */
+const parseMailAcceptanceTimestamp = (
+  timestamp: string | undefined
+): Date | undefined => {
+  if (timestamp === undefined) {
+    return undefined;
+  }
+  const parsed = new Date(timestamp);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
 const findHeader = (
   notification: SesEventNotification,
   name: string
@@ -107,12 +127,19 @@ export const toProviderLifecycleEvent = (
 ): ProviderLifecycleEvent | undefined => {
   const messageId = normalizeProviderMessageId(findMessageId(notification));
   const mailTimestamp = notification.mail.timestamp;
+  const acceptance = parseMailAcceptanceTimestamp(mailTimestamp);
   const recipients = findRecipients(notification);
   const headerDeliveryId = findHeader(notification, "x-feeblo-delivery-id");
   const deliveryId =
     headerDeliveryId === undefined || headerDeliveryId === ""
       ? undefined
       : headerDeliveryId;
+  // Every mapped outcome except a rejection proves the provider took the
+  // message, so each of them carries the mail's acceptance timestamp; a
+  // `Reject` — a message the provider refused instead of accepting — must
+  // not carry one.
+  const acceptanceFields =
+    acceptance === undefined ? {} : { acceptedAt: acceptance };
 
   switch (notification.eventType) {
     case "Delivery": {
@@ -127,6 +154,7 @@ export const toProviderLifecycleEvent = (
         recipients,
         type: "delivered" as const,
         ...(deliveryId !== undefined && { deliveryId }),
+        ...acceptanceFields,
       };
       return smtpResponse !== undefined && smtpResponse !== ""
         ? {
@@ -163,6 +191,7 @@ export const toProviderLifecycleEvent = (
         bounceType,
         metadata: { category: truncate(category, 64) },
         ...(deliveryId !== undefined && { deliveryId }),
+        ...acceptanceFields,
       };
       return diagnosticCode !== undefined && diagnosticCode !== ""
         ? {
@@ -185,6 +214,7 @@ export const toProviderLifecycleEvent = (
         type: "complained",
         metadata: { category: truncate(category, 64) },
         ...(deliveryId !== undefined && { deliveryId }),
+        ...acceptanceFields,
       };
     }
     case "DeliveryDelay": {
@@ -197,6 +227,7 @@ export const toProviderLifecycleEvent = (
         recipients,
         type: "deferred" as const,
         ...(deliveryId !== undefined && { deliveryId }),
+        ...acceptanceFields,
       };
       return delayType !== undefined && delayType !== ""
         ? {

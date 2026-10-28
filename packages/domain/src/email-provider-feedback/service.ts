@@ -287,7 +287,10 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
            * message; `failed` (SES `Reject`) proves the opposite — a message
            * the provider rejected instead of accepting — so it is the one
            * type that must not start this count. See the contract on the
-           * variant in `schema.ts`.
+           * variant in `schema.ts`. The stamp prefers the provider's own
+           * acceptance moment, `event.acceptedAt` (SES `mail.timestamp`),
+           * and falls back to the feedback event's time — whose only claim
+           * is to be present.
            *
            * `coalesce` keeps the first acceptance: feedback reports a send that
            * already happened and never supersedes a timestamp a send recorded.
@@ -296,7 +299,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             db
               .update(schema.emailDeliveryTable)
               .set({
-                acceptedAt: sql`coalesce(${schema.emailDeliveryTable.acceptedAt}, ${event.occurredAt})`,
+                acceptedAt: sql`coalesce(${schema.emailDeliveryTable.acceptedAt}, ${event.acceptedAt ?? event.occurredAt})`,
                 updatedAt: sql`greatest(${schema.emailDeliveryTable.updatedAt}, ${event.occurredAt})`,
               })
               .where(

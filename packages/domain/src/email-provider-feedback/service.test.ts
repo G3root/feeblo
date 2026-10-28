@@ -159,6 +159,50 @@ describe("EmailProviderFeedbackService", () => {
     );
 
     it.effect(
+      "stamps acceptance from the provider's acceptance moment, not the event's",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* EmailProviderFeedbackService;
+          // `acceptedAt` on the event is when the provider took the message
+          // (SES `mail.timestamp`); `occurredAt` is when the feedback wired
+          // up. The row must carry the first as its acceptance — a send
+          // confirmed just before a month boundary keeps its month — and
+          // the transition keeps the event's time for
+          // `delivered_at`/`updated_at`, which describe the event itself.
+          const delivery = yield* makeDelivery(
+            "sending",
+            "mail-time@example.com"
+          );
+
+          yield* service.ingest({
+            acceptedAt: "2026-08-01T00:00:00.000Z",
+            eventId: "provider-delivered-mail-time-1",
+            messageId: delivery.messageId,
+            occurredAt: "2026-08-09T12:00:00.000Z",
+            recipients: ["mail-time@example.com"],
+            type: "delivered",
+          });
+
+          const [stored] = yield* db
+            .select({
+              acceptedAt: schema.emailDeliveryTable.acceptedAt,
+              deliveredAt: schema.emailDeliveryTable.deliveredAt,
+              state: schema.emailDeliveryTable.state,
+            })
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+          expect(stored?.state).toBe("delivered");
+          expect(stored?.acceptedAt?.toISOString()).toBe(
+            "2026-08-01T00:00:00.000Z"
+          );
+          expect(stored?.deliveredAt?.toISOString()).toBe(
+            "2026-08-09T12:00:00.000Z"
+          );
+        })
+    );
+
+    it.effect(
       "records acceptance even when the lifecycle transition is rejected",
       () =>
         Effect.gen(function* () {
