@@ -46,6 +46,52 @@ describe("toProviderLifecycleEvent", () => {
     });
   });
 
+  it("carries the mail timestamp as the acceptance moment", () => {
+    // The mail timestamp is when SES received the submitted message — two
+    // seconds before the delivery event's own time here. An acceptance
+    // recorded from the event time instead would land a send confirmed just
+    // before a month boundary into the next month's count.
+    expect(
+      toProviderLifecycleEvent(
+        "sns-delivery-acceptance",
+        deliveryNotification()
+      )
+    ).toMatchObject({
+      type: "delivered",
+      occurredAt: new Date("2026-08-18T00:00:02.000Z"),
+      acceptedAt: new Date("2026-08-18T00:00:00.000Z"),
+    });
+  });
+
+  it("carries no acceptance moment on a rejection", () => {
+    // SES's Reject names a message the provider refused instead of taking,
+    // so its event must not carry an acceptance the volume count could
+    // read.
+    const notification: SesEventNotification = {
+      eventType: "Reject",
+      mail: deliveryNotification().mail,
+      reject: { reason: "Bad content" },
+    };
+    const event = toProviderLifecycleEvent(
+      "sns-reject-acceptance",
+      notification
+    );
+    expect(event?.type).toBe("failed");
+    expect(event?.acceptedAt).toBeUndefined();
+  });
+
+  it("leaves the acceptance moment unset when the mail timestamp is invalid", () => {
+    const notification = deliveryNotification({
+      mail: { ...deliveryNotification().mail, timestamp: "not-a-date" },
+    });
+    const event = toProviderLifecycleEvent(
+      "sns-delivery-invalid-mail",
+      notification
+    );
+    expect(event?.type).toBe("delivered");
+    expect(event?.acceptedAt).toBeUndefined();
+  });
+
   it("prefers the original Message-ID header over SES-assigned ids", () => {
     const notification = deliveryNotification({
       mail: {
@@ -141,6 +187,7 @@ describe("toProviderLifecycleEvent", () => {
       eventId: "sns-bounce-1",
       type: "bounced",
       bounceType: "hard",
+      acceptedAt: new Date("2026-08-18T00:00:00.000Z"),
       metadata: {
         category: "General",
         reasonCode: "smtp; 550 5.1.1 user unknown",
@@ -189,6 +236,7 @@ describe("toProviderLifecycleEvent", () => {
         eventId: "sns-delay-1",
         messageId: "<email.hash@notifications.feeblo>",
         occurredAt: new Date("2026-08-18T00:00:03.000Z"),
+        acceptedAt: new Date("2026-08-18T00:00:00.000Z"),
         type: "deferred",
         metadata: { category: "Redirection" },
       }
@@ -320,6 +368,7 @@ describe("toProviderLifecycleEvent", () => {
     ).toMatchObject({
       eventId: "sns-complaint-1",
       type: "complained",
+      acceptedAt: new Date("2026-08-18T00:00:00.000Z"),
       metadata: { category: "abuse" },
     });
   });

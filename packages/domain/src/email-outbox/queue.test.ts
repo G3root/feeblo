@@ -2845,12 +2845,14 @@ describe("EmailOutbox queues with delivery paused", () => {
 
 /**
  * Two fresh workspaces, each with one materialized delivery, and the first
- * delivery marked as having spent one attempt this month.
+ * delivery already counted as an accepted send this month.
  *
- * Both volume-limit suites trip their guard by spending that one attempt; only
- * the layer config and the assertions differ.
+ * Both volume-limit suites trip their guard on that one send; only the layer
+ * config and the assertions differ. `accepted_at` is set directly rather than
+ * by delivering a first email, because the suites' subject is the guard's
+ * arithmetic, not the write that records acceptance.
  */
-const spendOneAttemptInTwoWorkspaces = Effect.gen(function* () {
+const spendOneEmailInTwoWorkspaces = Effect.gen(function* () {
   yield* resetTestMailer();
   const first = yield* fixture;
   const second = yield* fixture;
@@ -2863,13 +2865,49 @@ const spendOneAttemptInTwoWorkspaces = Effect.gen(function* () {
 
   yield* db
     .update(schema.emailDeliveryTable)
-    .set({ attemptCount: 1 })
+    .set({ acceptedAt: fixtureNow })
     .where(eq(schema.emailDeliveryTable.id, firstDeliveryId));
 
   yield* deliverEmailDelivery({ deliveryId: firstDeliveryId });
   yield* deliverEmailDelivery({ deliveryId: secondDeliveryId });
 
   return { db, firstDeliveryId, secondDeliveryId };
+});
+
+describe("EmailOutbox volume limit measures accepted sends", () => {
+  // The guard used to sum `attempt_count`, so a retry or a render failure spent
+  // a workspace's month without a message leaving the building. A delivery that
+  // burned five attempts but was never accepted must still send.
+  layer(makeTestLayer({ workspaceMonthlySendLimit: 1 }))(
+    "in-memory persisted queue",
+    (it) => {
+      it.effect("spends nothing on attempts the provider never accepted", () =>
+        Effect.gen(function* () {
+          yield* resetTestMailer();
+          const { intentId } = yield* fixture;
+          const db = yield* Database.Database;
+          const [deliveryId] = yield* materializeEmailIntent(intentId);
+          if (deliveryId === undefined) {
+            return yield* Effect.die("Expected one delivery");
+          }
+
+          yield* db
+            .update(schema.emailDeliveryTable)
+            .set({ attemptCount: 5 })
+            .where(eq(schema.emailDeliveryTable.id, deliveryId));
+
+          yield* deliverEmailDelivery({ deliveryId });
+
+          const [stored] = yield* db
+            .select()
+            .from(schema.emailDeliveryTable)
+            .where(eq(schema.emailDeliveryTable.id, deliveryId));
+          expect(stored?.state).toBe("accepted");
+          expect((yield* testMailerState).sentMessages).toHaveLength(1);
+        })
+      );
+    }
+  );
 });
 
 describe("EmailOutbox workspace volume limit", () => {
@@ -2883,7 +2921,7 @@ describe("EmailOutbox workspace volume limit", () => {
         () =>
           Effect.gen(function* () {
             const { db, firstDeliveryId, secondDeliveryId } =
-              yield* spendOneAttemptInTwoWorkspaces;
+              yield* spendOneEmailInTwoWorkspaces;
 
             const [throttled] = yield* db
               .select()
@@ -2917,7 +2955,7 @@ describe("EmailOutbox platform volume limit", () => {
         () =>
           Effect.gen(function* () {
             const { db, firstDeliveryId, secondDeliveryId } =
-              yield* spendOneAttemptInTwoWorkspaces;
+              yield* spendOneEmailInTwoWorkspaces;
 
             const [firstStored] = yield* db
               .select()

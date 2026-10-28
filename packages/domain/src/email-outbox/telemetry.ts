@@ -69,6 +69,30 @@ const emailOldestQueuedAge = Metric.gauge(
   { description: "Age of the oldest queued, deferred, or sending delivery" }
 );
 
+/**
+ * How much of a monthly email allowance is spent, as a share of the limit.
+ *
+ * A histogram rather than a gauge, because both allowances are reported by
+ * every workspace from the same process: a gauge holds one value, so the next
+ * send decides it and a workspace sitting at 0.96 is erased when a quiet one
+ * reports 0.01 a moment later. A histogram keeps every observation, so the
+ * share of sends landing above 0.8 stays alertable however quiet the workspace
+ * that reported last happens to be, and `Metric.value(...).max` still answers
+ * "how close has a workspace got".
+ *
+ * Deliberately not tagged with the workspace id: one series per tenant is
+ * unbounded cardinality. The `scope` tag separates the two allowances, and the
+ * throttle log that fires at a full allowance names the workspace.
+ */
+export const emailVolumeUsageRatio = Metric.histogram(
+  "feeblo_email_volume_usage_ratio",
+  {
+    description:
+      "Share of a monthly accepted-send allowance spent, per send attempt, by scope",
+    boundaries: [0.5, 0.8, 0.9, 1],
+  }
+);
+
 /** Records a low-cardinality outbox lifecycle metric without recipient data. */
 export const recordEmailIntentTransition = (
   kind: TEmailIntentKind,
@@ -127,3 +151,20 @@ export const recordEmailProviderSubmission = (
 /** Updates the current oldest queued delivery age gauge. */
 export const recordEmailOldestQueuedAge = (ageMilliseconds: number) =>
   Metric.update(emailOldestQueuedAge, Math.max(0, ageMilliseconds));
+
+/**
+ * Records how much of a monthly allowance one scope has spent, as a share.
+ *
+ * A limit of zero or less would divide into infinity, so it reads as fully
+ * spent. The caller still owns the decision the number feeds; this observation
+ * only has to make the approach visible before the guard trips.
+ */
+export const recordEmailVolumeUsage = (args: {
+  readonly limit: number;
+  readonly scope: "platform" | "workspace";
+  readonly used: number;
+}) =>
+  Metric.update(
+    Metric.withAttributes(emailVolumeUsageRatio, { scope: args.scope }),
+    args.limit <= 0 ? 1 : Math.max(0, args.used) / args.limit
+  );

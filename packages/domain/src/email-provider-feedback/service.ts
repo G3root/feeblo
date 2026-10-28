@@ -1,7 +1,7 @@
 import { currentDb, schema } from "@feeblo/db";
 import { EmailDeliveryState } from "@feeblo/db/validation-schema/email";
 import { EmailDeliveryId } from "@feeblo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -267,6 +267,51 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               yield* recordEmailProviderComplaint(false);
             }
             return { _tag: "UnknownDelivery" as const, suppressed: false };
+          }
+
+          /**
+           * Records that the provider took the message, independently of the
+           * lifecycle transition below.
+           *
+           * A transition only applies from the states `delivery-state.ts`
+           * permits, and feedback routinely lands on a row that has already
+           * left them: a `delivered` event for a delivery the worker deferred
+           * after an uncertain submission has no legal target, and a `failed`
+           * event that arrives after a `delivered` one does not either. The
+           * acceptance is not conditional on that transition. The provider
+           * having the message is a fact about the send, and the monthly volume
+           * count reads that fact, so it is written whether or not the row
+           * moves.
+           *
+           * Every type here except `failed` proves the provider took the
+           * message; `failed` (SES `Reject`) proves the opposite — a message
+           * the provider rejected instead of accepting — so it is the one
+           * type that must not start this count. See the contract on the
+           * variant in `schema.ts`. The stamp prefers the provider's own
+           * acceptance moment, `event.acceptedAt` (SES `mail.timestamp`),
+           * and falls back to the feedback event's time — whose only claim
+           * is to be present.
+           *
+           * `coalesce` keeps the first acceptance: feedback reports a send that
+           * already happened and never supersedes a timestamp a send recorded.
+           */
+          const recordProviderAcceptance = () =>
+            db
+              .update(schema.emailDeliveryTable)
+              .set({
+                acceptedAt: sql`coalesce(${schema.emailDeliveryTable.acceptedAt}, ${event.acceptedAt ?? event.occurredAt})`,
+                updatedAt: sql`greatest(${schema.emailDeliveryTable.updatedAt}, ${event.occurredAt})`,
+              })
+              .where(
+                and(
+                  eq(schema.emailDeliveryTable.id, delivery.id),
+                  isNull(schema.emailDeliveryTable.acceptedAt)
+                )
+              )
+              .pipe(Effect.asVoid);
+
+          if (event.type !== "failed") {
+            yield* recordProviderAcceptance();
           }
 
           const transitionDelivery = (

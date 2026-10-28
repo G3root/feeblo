@@ -1336,6 +1336,15 @@ export const emailDeliveryTable = pgTable(
       table.nextAttemptAt
     ),
     index("email_delivery_contactId_idx").on(table.contactId),
+    /**
+     * The monthly volume guard counts accepted sends since the start of the
+     * month, and it runs on every send attempt. Without this index each check
+     * scans the whole delivery table. The predicate mirrors the guard's: a
+     * delivery the provider never accepted cannot spend the allowance.
+     */
+    index("email_delivery_acceptedAt_idx")
+      .on(table.acceptedAt)
+      .where(sql`${table.acceptedAt} is not null`),
   ]
 );
 

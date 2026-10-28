@@ -1,0 +1,58 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "f59c1f8c-14d5-4e72-a7c6-3a726cf1a4a3",
+  "prevIds": [
+    "bff403ca-227d-40f4-bc2c-19a1e6ed5f30",
+    "3bfd96b3-b8a6-4c7b-ade9-da650a93f25e"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "email_delivery",
+        "email_delivery_acceptedAt_idx"
+      ],
+      "writes": [
+        "s|idx|public.email_delivery_acceptedAt_idx",
+        "n|idx|public.email_delivery_acceptedAt_idx",
+        "e|idx|public.email_delivery_acceptedAt_idx",
+        "n|rel|public.email_delivery_acceptedAt_idx"
+      ],
+      "reads": [
+        "n|tbl|public.email_delivery",
+        "n|sch|public",
+        "n|col|public.email_delivery.accepted_at"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "email_delivery",
+        "name": "email_delivery_acceptedAt_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "accepted_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"accepted_at\" is not null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

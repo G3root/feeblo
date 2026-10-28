@@ -30,6 +30,16 @@ const LifecycleEventFields = {
   metadata: Schema.optionalKey(SafeProviderMetadata),
   occurredAt: PersistedDate,
   /**
+   * The moment the provider took custody of the message — SES's
+   * `mail.timestamp`, when it received the submitted message — when the
+   * notification reports one. The monthly volume count records the
+   * acceptance with this moment rather than `occurredAt`, so a send whose
+   * feedback arrives late keeps the month it was accepted in. Absent when
+   * the provider does not report one, and absent from the one variant that
+   * proves no acceptance, `failed`.
+   */
+  acceptedAt: Schema.optionalKey(PersistedDate),
+  /**
    * The addresses the provider reported for this event. A bounce or complaint
    * names the recipient; `mail.destination` is the fallback. Suppression uses
    * this list, which is why it is required even when the delivery row is
@@ -61,6 +71,13 @@ export const ProviderLifecycleEvent = Schema.Union([
   }),
   Schema.Struct({
     ...LifecycleEventFields,
+    /**
+     * Proves the provider never took the message. `ses-mapping.ts` maps
+     * SES's `Reject` here — a message the provider rejected instead of
+     * accepting — so a delivery row this event touches must never start
+     * counting as an accepted send. Everything that happened after an
+     * accepted send is carried by the other types.
+     */
     type: Schema.tag("failed"),
   }),
   Schema.Struct({

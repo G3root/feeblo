@@ -1,0 +1,18 @@
+-- The monthly volume guard's index is created by
+-- `packages/db-migrator/src/index.ts`, not here.
+--
+-- `CREATE INDEX` inside a migration takes a SHARE lock on the table for the
+-- whole build, and drizzle's migrator runs every pending migration in one
+-- transaction. `email_delivery` takes an INSERT for every recipient of every
+-- notification, so a plain index build here would block the queue's writes
+-- until the last migration in the batch committed. The migrator builds it with
+-- `CREATE INDEX CONCURRENTLY` after the transactional pass. `pnpm db:migrate`
+-- dispatches to that migrator (`packages/db-migrator`), which is why only a
+-- bare `drizzle-kit migrate` would leave the index missing.
+--
+-- The snapshot beside this file records the index, which is what keeps
+-- `drizzle-kit generate` from emitting it again. The statement below exists
+-- only so this migration is a valid, explicitly no-op query. See
+-- `docs/adr/0020-lock-deadlines-and-transaction-retries.md`, and
+-- `20261020073319_rainy_adam_warlock` for the same shape.
+SELECT 1;
