@@ -15,9 +15,10 @@ type PostWithTransientAuthor = {
   author?: TPostCreateAuthor;
 };
 import {
+  createRpcCollectionHelpers,
   eqFilterValue,
-  postSlugFromPath,
   refetchInBackground,
+  type RpcCollectionHelpers,
 } from "@feeblo/web-shared/collections";
 import {
   getCommentReactionCollectionKey,
@@ -38,8 +39,6 @@ import type {
   UtilsRecord,
 } from "@tanstack/react-db";
 import type { QueryClient } from "@tanstack/react-query";
-import { createIsomorphicFn } from "@tanstack/react-start";
-import { getRequestUrl } from "@tanstack/react-start/server";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
@@ -48,12 +47,11 @@ import { getDbClient } from "@/lib/db-client";
 import { getContext } from "~/integrations/tanstack-query/root-provider";
 
 import {
+  currentDashboardScope,
   type DashboardCollectionScope,
+  dashboardScopeKey,
   organizationScopedCollectionId,
-  organizationScopedQueryKey,
-  scopePostSlug,
   slugScopedCollectionId,
-  slugScopedQueryKey,
 } from "./collection-scope";
 import { fetchRpc } from "./runtime";
 
@@ -61,25 +59,6 @@ type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
 type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
 type PostSubscriptionRow = Schema.Schema.Type<typeof PostSubscription>;
 type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
-
-/**
- * The request's pathname.
- *
- * Server rendering reads it from the request rather than `window`, which is
- * what lets a collection resolve its scope during SSR. The dashboard's
- * organization is the first path segment and the post slug sits in the path
- * too, so both branches parse the same string the same way.
- */
-const currentPathname = createIsomorphicFn()
-  .client(() => window.location.pathname)
-  .server(() => getRequestUrl().pathname);
-
-function currentScope(): DashboardCollectionScope {
-  return {
-    organizationId: getCurrentOrganizationId(),
-    postSlug: getCurrentPostSlug(),
-  };
-}
 
 /**
  * The client the dashboard's collections materialize through.
@@ -93,40 +72,79 @@ function getBrowserDbClient(): DbClient {
 }
 
 /**
- * The dashboard's organization, taken from the first path segment.
+ * Everything one dashboard collection reads besides its own RPC: the client it
+ * materializes through, the query client that owns its cache, and the identity
+ * rules of the scope it belongs to.
  *
- * Read when a descriptor is materialized (`currentScope`), which is what pins
- * the descriptor and its query key to one scope. The dashboard is client-only,
- * so `currentPathname` resolves from `window`.
+ * Resolved once per (client, scope) by `createDashboardCollections`, so a
+ * descriptor is a pure function of its deps. That is what lets a test build a
+ * `DbClient`, hand it a scope, and read every collection's id and query key
+ * without a router, a `window`, or the app's React tree.
+ *
+ * The scope is a *value* rather than a mutable dependency the way the public
+ * board's `BoardScope` is: a board client is built per request or per document
+ * and fills its scope after it exists, while the dashboard's browser client
+ * outlives a navigation between workspaces, so a descriptor has to capture the
+ * scope it was created for. That capture is what keeps one workspace's rows out
+ * of another's collection, and `collection-scope.test.ts` pins it at the id
+ * level.
  */
-function getCurrentOrganizationId() {
-  const organizationId = currentPathname()
-    .split("/")
-    .find((segment) => segment.length > 0);
-
-  return organizationId ? decodeURIComponent(organizationId) : undefined;
-}
+type DashboardCollectionDeps = {
+  readonly client: DbClient;
+  readonly queryClient: QueryClient;
+  /** Descriptor id for an organization-scoped collection. */
+  readonly collectionId: (name: string) => string;
+  /** Descriptor id for an organization-and-post-scoped collection. */
+  readonly slugCollectionId: (name: string) => string;
+  readonly getOrganizationId: () => string | undefined;
+  readonly organizationScopedQueryKey: RpcCollectionHelpers["organizationScopedQueryKey"];
+  readonly resolvePostSlug: RpcCollectionHelpers["resolvePostSlug"];
+  readonly slugScopedQueryKey: RpcCollectionHelpers["slugScopedQueryKey"];
+};
 
 /**
- * Post detail pages live at `/:organizationId/.../post/:boardSlug/:postSlug`;
- * parse the post slug from the current URL so a collection created without an
- * explicit filter (e.g. from a route loader) captures the post it belongs to
- * and keys itself to that post, not to whichever post is on screen later.
+ * Binds the shared collection helpers to one dashboard scope.
+ *
+ * The key and slug rules are `@feeblo/web-shared/collections`', the same ones
+ * the public board's `boardCollectionDeps` binds; the dashboard used to carry
+ * its own copies of all three, which is how the two surfaces were able to drift
+ * on the shape of a query key.
  */
-function getCurrentPostSlug() {
-  return postSlugFromPath(currentPathname(), "post", 2);
+function dashboardCollectionDeps(
+  client: DbClient,
+  scope: DashboardCollectionScope
+): DashboardCollectionDeps {
+  const helpers = createRpcCollectionHelpers({
+    getOrganizationId: () => scope.organizationId,
+    getPostSlug: () => scope.postSlug,
+  });
+
+  return {
+    client,
+    collectionId: (name) => organizationScopedCollectionId(name, scope),
+    getOrganizationId: () => scope.organizationId,
+    // Wrapped rather than referenced: the helpers are plain closures, but a
+    // method-shaped type reads as an unbound method to the type-aware linter.
+    organizationScopedQueryKey: (name, ...parts) =>
+      helpers.organizationScopedQueryKey(name, ...parts),
+    queryClient: client.requireDependency<QueryClient>("queryClient"),
+    resolvePostSlug: (filters) => helpers.resolvePostSlug(filters),
+    slugCollectionId: (name) => slugScopedCollectionId(name, scope),
+    slugScopedQueryKey: (name, filters, ...parts) =>
+      helpers.slugScopedQueryKey(name, filters, ...parts),
+  };
 }
 
-export function postCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("postCollection", scope);
+function postCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("postCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "post"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("post"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -164,7 +182,7 @@ export function postCollection(scope: DashboardCollectionScope) {
         // The post row is the mutation target (already reconciled optimistically)
         // and the activity entry is derived from it: refresh the entry detached.
         refetchInBackground(
-          client.collection(postActivityCollection(scope)).utils.refetch()
+          deps.client.collection(postActivityCollection(deps)).utils.refetch()
         );
       },
       onDelete: async ({ transaction }) => {
@@ -207,11 +225,13 @@ export function postCollection(scope: DashboardCollectionScope) {
         // the synced rows must be refreshed or the restored duplicates stay
         // hidden behind their stale `mergedIntoPostId`. This collection is the
         // mutation target, so the read-back is awaited.
-        await client.collection(postCollection(scope)).utils.refetch();
+        await deps.client.collection(postCollection(deps)).utils.refetch();
         // The delete-hint set is derived: refresh it detached so the delete
         // settles without waiting on a second round trip.
         refetchInBackground(
-          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+          deps.client
+            .collection(deleteEligibilityCollection(deps))
+            .utils.refetch()
         );
 
         const failure = results.find((result) => result.status === "rejected");
@@ -232,30 +252,30 @@ export function postCollection(scope: DashboardCollectionScope) {
  * transaction, so no sync handlers by design); all other mutations stay on
  * the list collection.
  */
-export function postDetailCollection(scope: DashboardCollectionScope) {
-  const id = slugScopedCollectionId("postDetailCollection", scope);
+function postDetailCollection(deps: DashboardCollectionDeps) {
+  const id = deps.slugCollectionId("postDetailCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       // Keyed by the explicit `slug` filter with a fallback to the route
       // slug, so detail subscribers (routes, content views) share one cache
       // entry per post regardless of where they subscribe from.
       queryKey: (opts) => {
         const filters = parseLoadSubsetOptions(opts).filters;
         const slug =
-          eqFilterValue(filters, "slug") ?? scopePostSlug(scope, filters);
-        return organizationScopedQueryKey(scope, "post-detail", slug);
+          eqFilterValue(filters, "slug") ?? deps.resolvePostSlug(filters);
+        return deps.organizationScopedQueryKey("post-detail", slug);
       },
       syncMode: "on-demand",
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
         const filters = parseLoadSubsetOptions(
           ctx.meta?.loadSubsetOptions
         ).filters;
         const slug =
-          eqFilterValue(filters, "slug") ?? scopePostSlug(scope, filters);
+          eqFilterValue(filters, "slug") ?? deps.resolvePostSlug(filters);
 
         if (!(organizationId && slug)) {
           return [];
@@ -282,16 +302,16 @@ export function postDetailCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function postStatusCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("postStatusCollection", scope);
+function postStatusCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("postStatusCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "post-status"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("post-status"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -310,7 +330,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
       onInsert: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newStatus } = mutation;
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           throw new Error("Missing organization id");
@@ -330,7 +350,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
       onUpdate: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: updatedStatus } = mutation;
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           throw new Error("Missing organization id");
@@ -361,16 +381,16 @@ const toWritableChangelogStatus = (
   status: "draft" | "published" | "scheduled"
 ): "draft" | "published" => (status === "scheduled" ? "draft" : status);
 
-export function changelogCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("changelogCollection", scope);
+function changelogCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("changelogCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "changelog"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("changelog"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -439,22 +459,17 @@ export function changelogCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function changelogCategoryLinkCollection(
-  scope: DashboardCollectionScope
-) {
-  const id = organizationScopedCollectionId(
-    "changelogCategoryLinkCollection",
-    scope
-  );
+function changelogCategoryLinkCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("changelogCategoryLinkCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: () =>
-        organizationScopedQueryKey(scope, "changelog-category-link"),
+        deps.organizationScopedQueryKey("changelog-category-link"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -474,19 +489,16 @@ export function changelogCategoryLinkCollection(
   );
 }
 
-export function changelogCategoryCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId(
-    "changelogCategoryCollection",
-    scope
-  );
+function changelogCategoryCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("changelogCategoryCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "changelog-category"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("changelog-category"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -567,16 +579,16 @@ export const getChangelogPostKey = ({
   postId: string;
 }) => `${changelogId}:${postId}`;
 
-export function changelogPostCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("changelogPostCollection", scope);
+function changelogPostCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("changelogPostCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "changelog-post"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("changelog-post"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
         if (!organizationId) {
           return [];
         }
@@ -612,17 +624,17 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function boardCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("boardCollection", scope);
+function boardCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("boardCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "board"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("board"),
       refetchInterval: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -685,17 +697,17 @@ export function boardCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function tagCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("tagCollection", scope);
+function tagCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("tagCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "tag"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("tag"),
 
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -747,17 +759,17 @@ export function tagCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function postTagCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("postTagCollection", scope);
+function postTagCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("postTagCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "post-tag"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("post-tag"),
 
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -777,13 +789,13 @@ export function postTagCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function membershipCollection(_scope: DashboardCollectionScope) {
+function membershipCollection(deps: DashboardCollectionDeps) {
   const id = "membershipCollection";
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: ["membership"],
       staleTime: Duration.toMillis(Duration.minutes(10)),
       queryFn: async (ctx) =>
@@ -795,13 +807,13 @@ export function membershipCollection(_scope: DashboardCollectionScope) {
   );
 }
 
-export function organizationCollection(_scope: DashboardCollectionScope) {
+function organizationCollection(deps: DashboardCollectionDeps) {
   const id = "organizationCollection";
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: ["organizations"],
       queryFn: async (ctx) => {
         const data = await fetchRpc((rpc) => rpc.ListOrganizations(), {
@@ -827,17 +839,17 @@ export function organizationCollection(_scope: DashboardCollectionScope) {
   );
 }
 
-export function membersCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("membersCollection", scope);
+function membersCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("membersCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       staleTime: Duration.toMillis(Duration.minutes(20)),
-      queryKey: () => organizationScopedQueryKey(scope, "members"),
+      queryKey: () => deps.organizationScopedQueryKey("members"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -877,17 +889,17 @@ export function membersCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function invitationsCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("invitationsCollection", scope);
+function invitationsCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("invitationsCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "invitations"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("invitations"),
 
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -914,25 +926,23 @@ export function invitationsCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function commentCollection(scope: DashboardCollectionScope) {
-  const id = slugScopedCollectionId("commentCollection", scope);
+function commentCollection(deps: DashboardCollectionDeps) {
+  const id = deps.slugCollectionId("commentCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: (opts) =>
-        slugScopedQueryKey(
-          scope,
+        deps.slugScopedQueryKey(
           "comment",
           parseLoadSubsetOptions(opts).filters
         ),
       syncMode: "on-demand",
 
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
-        const slug = scopePostSlug(
-          scope,
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -978,9 +988,11 @@ export function commentCollection(scope: DashboardCollectionScope) {
         // are derived from it, so they refresh detached rather than holding the
         // insert open for three round trips.
         refetchInBackground(
-          client.collection(postActivityCollection(scope)).utils.refetch(),
-          client.collection(postCollection(scope)).utils.refetch(),
-          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+          deps.client.collection(postActivityCollection(deps)).utils.refetch(),
+          deps.client.collection(postCollection(deps)).utils.refetch(),
+          deps.client
+            .collection(deleteEligibilityCollection(deps))
+            .utils.refetch()
         );
       },
       onDelete: async ({ transaction }) => {
@@ -1000,9 +1012,11 @@ export function commentCollection(scope: DashboardCollectionScope) {
         // Same as the insert path: the optimistic delete already removed the
         // row, so the derived collections refresh detached.
         refetchInBackground(
-          client.collection(postActivityCollection(scope)).utils.refetch(),
-          client.collection(postCollection(scope)).utils.refetch(),
-          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+          deps.client.collection(postActivityCollection(deps)).utils.refetch(),
+          deps.client.collection(postCollection(deps)).utils.refetch(),
+          deps.client
+            .collection(deleteEligibilityCollection(deps))
+            .utils.refetch()
         );
       },
       onUpdate: async ({ transaction }) => {
@@ -1023,20 +1037,20 @@ export function commentCollection(scope: DashboardCollectionScope) {
 
         // Only the activity entry is derived from an edit: refresh it detached.
         refetchInBackground(
-          client.collection(postActivityCollection(scope)).utils.refetch()
+          deps.client.collection(postActivityCollection(deps)).utils.refetch()
         );
       },
     })
   );
 }
 
-export function postActivityCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("postActivityCollection", scope);
+function postActivityCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("postActivityCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: (opts) => {
         const postId = eqFilterValue(
           parseLoadSubsetOptions(opts).filters,
@@ -1044,12 +1058,12 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
         );
 
         return postId
-          ? organizationScopedQueryKey(scope, "post-activity", "postId", postId)
-          : organizationScopedQueryKey(scope, "post-activity");
+          ? deps.organizationScopedQueryKey("post-activity", "postId", postId)
+          : deps.organizationScopedQueryKey("post-activity");
       },
       syncMode: "on-demand",
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
         const postId = eqFilterValue(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters,
           "postId"
@@ -1060,9 +1074,9 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
         }
 
         const existingData =
-          client
-            .requireDependency<QueryClient>("queryClient")
-            .getQueryData<readonly TPostActivity[]>(ctx.queryKey) ?? [];
+          deps.queryClient.getQueryData<readonly TPostActivity[]>(
+            ctx.queryKey
+          ) ?? [];
         const since = existingData.reduce<Date | undefined>(
           (latest, activity) =>
             latest === undefined || activity.createdAt > latest
@@ -1099,25 +1113,23 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function commentReactionCollection(scope: DashboardCollectionScope) {
-  const id = slugScopedCollectionId("commentReactionCollection", scope);
+function commentReactionCollection(deps: DashboardCollectionDeps) {
+  const id = deps.slugCollectionId("commentReactionCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: (opts) =>
-        slugScopedQueryKey(
-          scope,
+        deps.slugScopedQueryKey(
           "comment-reaction",
           parseLoadSubsetOptions(opts).filters
         ),
       syncMode: "on-demand",
 
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
-        const slug = scopePostSlug(
-          scope,
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -1167,18 +1179,18 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function upvoteCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("upvoteCollection", scope);
+function upvoteCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("upvoteCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       // Lazy key: resolved at query time so navigation between organizations
       // never reuses another organization's cache entry (matches queryFn).
-      queryKey: () => organizationScopedQueryKey(scope, "upvote"),
+      queryKey: () => deps.organizationScopedQueryKey("upvote"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1210,8 +1222,10 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
         // (post rows carry no count), so the post rows and the delete-hint set
         // are derived refreshes that run detached.
         refetchInBackground(
-          client.collection(postCollection(scope)).utils.refetch(),
-          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+          deps.client.collection(postCollection(deps)).utils.refetch(),
+          deps.client
+            .collection(deleteEligibilityCollection(deps))
+            .utils.refetch()
         );
       },
       onDelete: async ({ transaction }) => {
@@ -1226,8 +1240,10 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
         );
         // Same as the insert path: derived refreshes run detached.
         refetchInBackground(
-          client.collection(postCollection(scope)).utils.refetch(),
-          client.collection(deleteEligibilityCollection(scope)).utils.refetch()
+          deps.client.collection(postCollection(deps)).utils.refetch(),
+          deps.client
+            .collection(deleteEligibilityCollection(deps))
+            .utils.refetch()
         );
       },
     })
@@ -1241,19 +1257,16 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
  * backend delete path re-validates. Presence of a row means eligible.
  * Refetch after engagement mutations (see the call sites below).
  */
-export function deleteEligibilityCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId(
-    "deleteEligibilityCollection",
-    scope
-  );
+function deleteEligibilityCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("deleteEligibilityCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "delete-eligibility"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("delete-eligibility"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1273,25 +1286,23 @@ export function deleteEligibilityCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function postReactionCollection(scope: DashboardCollectionScope) {
-  const id = slugScopedCollectionId("postReactionCollection", scope);
+function postReactionCollection(deps: DashboardCollectionDeps) {
+  const id = deps.slugCollectionId("postReactionCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: (opts) =>
-        slugScopedQueryKey(
-          scope,
+        deps.slugScopedQueryKey(
           "post-reaction",
           parseLoadSubsetOptions(opts).filters
         ),
       syncMode: "on-demand",
 
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
-        const slug = scopePostSlug(
-          scope,
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -1339,16 +1350,16 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function siteCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("siteCollection", scope);
+function siteCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("siteCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "site"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("site"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1383,16 +1394,16 @@ export function siteCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function workspacePlanCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("workspacePlanCollection", scope);
+function workspacePlanCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("workspacePlanCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "workspace-plan"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("workspace-plan"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1422,16 +1433,16 @@ export function workspacePlanCollection(scope: DashboardCollectionScope) {
  * the gate refetches this collection after every remediation action, so there
  * is nothing to poll.
  */
-export function planComplianceCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("planComplianceCollection", scope);
+function planComplianceCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("planComplianceCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "plan-compliance"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("plan-compliance"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1459,30 +1470,43 @@ export function planComplianceCollection(scope: DashboardCollectionScope) {
  * workspace is what keeps a gate check on the destination from reading the
  * source organization's snapshot.
  */
-export const planComplianceCollectionFor = (organizationId: string) =>
-  materialize(
-    getBrowserDbClient(),
-    planComplianceCollection({ organizationId, postSlug: undefined })
+/**
+ * The plan-compliance collection for an explicit workspace.
+ *
+ * Route loaders run before the URL reflects the navigation, so they cannot use
+ * `dashboardCollections`, whose scope comes from the live pathname. Naming the
+ * workspace is what keeps a gate check on the destination from reading the
+ * source organization's snapshot.
+ */
+export const planComplianceCollectionFor = (organizationId: string) => {
+  const client = getBrowserDbClient();
+  const scope: DashboardCollectionScope = {
+    organizationId,
+    postSlug: undefined,
+  };
+
+  return materialize(
+    client,
+    planComplianceCollection(dashboardCollectionDeps(client, scope))
   );
+};
 
-export function postSubscriptionCollection(scope: DashboardCollectionScope) {
-  const id = slugScopedCollectionId("postSubscriptionCollection", scope);
+function postSubscriptionCollection(deps: DashboardCollectionDeps) {
+  const id = deps.slugCollectionId("postSubscriptionCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: (opts) =>
-        slugScopedQueryKey(
-          scope,
+        deps.slugScopedQueryKey(
           "post-subscription",
           parseLoadSubsetOptions(opts).filters
         ),
       syncMode: "on-demand",
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
-        const slug = scopePostSlug(
-          scope,
+        const organizationId = deps.getOrganizationId();
+        const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
 
@@ -1531,16 +1555,16 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function jwtSecretCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("jwtSecretCollection", scope);
+function jwtSecretCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("jwtSecretCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "jwt-secret"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("jwt-secret"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1557,16 +1581,16 @@ export function jwtSecretCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function contactCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("contactCollection", scope);
+function contactCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("contactCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "contact"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("contact"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1629,16 +1653,16 @@ export function contactCollection(scope: DashboardCollectionScope) {
   );
 }
 
-export function companyCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("companyCollection", scope);
+function companyCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("companyCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "company"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("company"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1698,22 +1722,17 @@ export function companyCollection(scope: DashboardCollectionScope) {
 }
 
 //Todo scope
-export function contactAttributeDefinitionCollection(
-  scope: DashboardCollectionScope
-) {
-  const id = organizationScopedCollectionId(
-    "contactAttributeDefinitionCollection",
-    scope
-  );
+function contactAttributeDefinitionCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("contactAttributeDefinitionCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: () =>
-        organizationScopedQueryKey(scope, "contact-attribute-definition"),
+        deps.organizationScopedQueryKey("contact-attribute-definition"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1774,22 +1793,17 @@ export function contactAttributeDefinitionCollection(
 }
 
 //Todo scope
-export function companyAttributeDefinitionCollection(
-  scope: DashboardCollectionScope
-) {
-  const id = organizationScopedCollectionId(
-    "companyAttributeDefinitionCollection",
-    scope
-  );
+function companyAttributeDefinitionCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("companyAttributeDefinitionCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: () =>
-        organizationScopedQueryKey(scope, "company-attribute-definition"),
+        deps.organizationScopedQueryKey("company-attribute-definition"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1849,22 +1863,17 @@ export function companyAttributeDefinitionCollection(
   );
 }
 
-export function contactAttributeValueCollection(
-  scope: DashboardCollectionScope
-) {
-  const id = organizationScopedCollectionId(
-    "contactAttributeValueCollection",
-    scope
-  );
+function contactAttributeValueCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("contactAttributeValueCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: () =>
-        organizationScopedQueryKey(scope, "contact-attribute-value"),
+        deps.organizationScopedQueryKey("contact-attribute-value"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1882,22 +1891,17 @@ export function contactAttributeValueCollection(
   );
 }
 
-export function companyAttributeValueCollection(
-  scope: DashboardCollectionScope
-) {
-  const id = organizationScopedCollectionId(
-    "companyAttributeValueCollection",
-    scope
-  );
+function companyAttributeValueCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("companyAttributeValueCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryClient: deps.queryClient,
       queryKey: () =>
-        organizationScopedQueryKey(scope, "company-attribute-value"),
+        deps.organizationScopedQueryKey("company-attribute-value"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -1915,16 +1919,16 @@ export function companyAttributeValueCollection(
   );
 }
 
-export function roadmapCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("roadmapCollection", scope);
+function roadmapCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("roadmapCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "roadmap"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("roadmap"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
         if (!organizationId) {
           return [];
         }
@@ -1989,22 +1993,22 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
         // transaction; read the rows back so the cached `isPrimary` flags match
         // the handoff instead of leaving the organization without a primary in
         // the client cache.
-        await client.collection(roadmapCollection(scope)).utils.refetch();
+        await deps.client.collection(roadmapCollection(deps)).utils.refetch();
       },
     })
   );
 }
 
-export function roadmapColumnCollection(scope: DashboardCollectionScope) {
-  const id = organizationScopedCollectionId("roadmapColumnCollection", scope);
+function roadmapColumnCollection(deps: DashboardCollectionDeps) {
+  const id = deps.collectionId("roadmapColumnCollection");
 
-  return collectionOptions(id, (client) =>
+  return collectionOptions(id, () =>
     queryCollectionOptions({
       id,
-      queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () => organizationScopedQueryKey(scope, "roadmap-column"),
+      queryClient: deps.queryClient,
+      queryKey: () => deps.organizationScopedQueryKey("roadmap-column"),
       queryFn: async (ctx) => {
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           return [];
@@ -2021,7 +2025,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
       onInsert: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newColumn } = mutation;
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           throw new Error("Missing organization id");
@@ -2041,7 +2045,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
       onUpdate: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: updatedColumn } = mutation;
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           throw new Error("Missing organization id");
@@ -2061,7 +2065,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
       onDelete: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
         const { original: deletedColumn } = mutation;
-        const organizationId = scope.organizationId;
+        const organizationId = deps.getOrganizationId();
 
         if (!organizationId) {
           throw new Error("Missing organization id");
@@ -2084,8 +2088,14 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
  * cannot live in a descriptor config. Indexes are applied on first
  * materialization instead, keyed by collection id — which is what `DbClient`
  * memoizes on — so repeated reads do not stack duplicate indexes.
+ *
+ * The set is per client, not per module: a collection id is unique within one
+ * `DbClient`, and two clients (a test's, or one request's per-request client
+ * once the dashboard renders on the server) each need their own copy indexed.
+ * Keying only on the id left every client after the first without indexes,
+ * which is invisible until a query stops using them.
  */
-const indexedCollectionIds = new Set<string>();
+const indexedCollectionIds = new WeakMap<DbClient, Set<string>>();
 
 /**
  * Materializes a descriptor with the row type its factory declares.
@@ -2108,16 +2118,25 @@ function materialize<
   return client.collection<T, TKey, TUtils>(descriptor);
 }
 
-function withIndexes<TCollection extends { id: string }>(
-  collection: TCollection,
-  addIndexes: (collection: TCollection) => void
-): TCollection {
-  if (!indexedCollectionIds.has(collection.id)) {
-    indexedCollectionIds.add(collection.id);
-    addIndexes(collection);
+function withIndexesFor(client: DbClient) {
+  let indexed = indexedCollectionIds.get(client);
+
+  if (indexed === undefined) {
+    indexed = new Set<string>();
+    indexedCollectionIds.set(client, indexed);
   }
 
-  return collection;
+  return <TCollection extends { id: string }>(
+    collection: TCollection,
+    addIndexes: (collection: TCollection) => void
+  ): TCollection => {
+    if (!indexed.has(collection.id)) {
+      indexed.add(collection.id);
+      addIndexes(collection);
+    }
+
+    return collection;
+  };
 }
 
 /**
@@ -2129,10 +2148,30 @@ function withIndexes<TCollection extends { id: string }>(
  * `DbClient` memoizes by descriptor id, so repeated reads within one scope
  * return the same instance and React memo dependencies stay stable.
  */
-export const dashboardCollections = {
-  get boardCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), boardCollection(currentScope())),
+
+/**
+ * Materializes every dashboard collection for one client and scope.
+ *
+ * The whole set is built from one `deps` value, so every descriptor shares the
+ * client, the query client, and the captured scope, and no descriptor can
+ * resolve a different identity than its neighbours. `DbClient.collection`
+ * memoizes by descriptor id, so a descriptor built here and a descriptor built
+ * by a cross-reference inside another collection's mutation handler point at
+ * the same instance.
+ */
+export function createDashboardCollections({
+  client,
+  scope,
+}: {
+  readonly client: DbClient;
+  readonly scope: DashboardCollectionScope;
+}) {
+  const deps = dashboardCollectionDeps(client, scope);
+  const indexOnce = withIndexesFor(client);
+
+  return {
+    boardCollection: indexOnce(
+      materialize(client, boardCollection(deps)),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2142,132 +2181,79 @@ export const dashboardCollections = {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get changelogCategoryCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      changelogCategoryCollection(currentScope())
-    );
-  },
-  get changelogCategoryLinkCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      changelogCategoryLinkCollection(currentScope())
-    );
-  },
-  get changelogCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      changelogCollection(currentScope())
-    );
-  },
-  get changelogPostCollection() {
-    return withIndexes(
-      materialize(
-        getBrowserDbClient(),
-        changelogPostCollection(currentScope())
-      ),
+    ),
+    changelogCategoryCollection: materialize(
+      client,
+      changelogCategoryCollection(deps)
+    ),
+    changelogCategoryLinkCollection: materialize(
+      client,
+      changelogCategoryLinkCollection(deps)
+    ),
+    changelogCollection: materialize(client, changelogCollection(deps)),
+    changelogPostCollection: indexOnce(
+      materialize(client, changelogPostCollection(deps)),
       (collection) => {
         // Changelog completed-posts joins entries against posts by post id.
         collection.createIndex((row) => row.postId, {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get commentCollection() {
-    return materialize(getBrowserDbClient(), commentCollection(currentScope()));
-  },
-  get commentReactionCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      commentReactionCollection(currentScope())
-    );
-  },
-  get companyCollection() {
-    return materialize(getBrowserDbClient(), companyCollection(currentScope()));
-  },
-  get deleteEligibilityCollection() {
-    return withIndexes(
-      materialize(
-        getBrowserDbClient(),
-        deleteEligibilityCollection(currentScope())
-      ),
+    ),
+    commentCollection: materialize(client, commentCollection(deps)),
+    commentReactionCollection: materialize(
+      client,
+      commentReactionCollection(deps)
+    ),
+    companyCollection: materialize(client, companyCollection(deps)),
+    deleteEligibilityCollection: indexOnce(
+      materialize(client, deleteEligibilityCollection(deps)),
       (collection) => {
         collection.createIndex((row) => row.postId, {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get companyAttributeDefinitionCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      companyAttributeDefinitionCollection(currentScope())
-    );
-  },
-  get companyAttributeValueCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      companyAttributeValueCollection(currentScope())
-    );
-  },
-  get contactAttributeDefinitionCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      contactAttributeDefinitionCollection(currentScope())
-    );
-  },
-  get contactAttributeValueCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      contactAttributeValueCollection(currentScope())
-    );
-  },
-  get contactCollection() {
-    return materialize(getBrowserDbClient(), contactCollection(currentScope()));
-  },
-  get invitationsCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      invitationsCollection(currentScope())
-    );
-  },
-  get jwtSecretCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      jwtSecretCollection(currentScope())
-    );
-  },
-  get membersCollection() {
-    return materialize(getBrowserDbClient(), membersCollection(currentScope()));
-  },
-  get membershipCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), membershipCollection(currentScope())),
+    ),
+    companyAttributeDefinitionCollection: materialize(
+      client,
+      companyAttributeDefinitionCollection(deps)
+    ),
+    companyAttributeValueCollection: materialize(
+      client,
+      companyAttributeValueCollection(deps)
+    ),
+    contactAttributeDefinitionCollection: materialize(
+      client,
+      contactAttributeDefinitionCollection(deps)
+    ),
+    contactAttributeValueCollection: materialize(
+      client,
+      contactAttributeValueCollection(deps)
+    ),
+    contactCollection: materialize(client, contactCollection(deps)),
+    invitationsCollection: materialize(client, invitationsCollection(deps)),
+    jwtSecretCollection: materialize(client, jwtSecretCollection(deps)),
+    membersCollection: materialize(client, membersCollection(deps)),
+    membershipCollection: indexOnce(
+      materialize(client, membershipCollection(deps)),
       (collection) => {
         // Workspace details joins memberships against organizations by org id.
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get organizationCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), organizationCollection(currentScope())),
+    ),
+    organizationCollection: indexOnce(
+      materialize(client, organizationCollection(deps)),
       (collection) => {
         // Workspace details joins memberships against organizations by org id.
         collection.createIndex((row) => row.id, {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get postCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), postCollection(currentScope())),
+    ),
+    postCollection: indexOnce(
+      materialize(client, postCollection(deps)),
       (collection) => {
         collection.createIndex((row) => row.createdAt, {
           indexType: BasicIndex,
@@ -2282,29 +2268,12 @@ export const dashboardCollections = {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get postDetailCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      postDetailCollection(currentScope())
-    );
-  },
-  get postActivityCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      postActivityCollection(currentScope())
-    );
-  },
-  get postReactionCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      postReactionCollection(currentScope())
-    );
-  },
-  get postStatusCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), postStatusCollection(currentScope())),
+    ),
+    postDetailCollection: materialize(client, postDetailCollection(deps)),
+    postActivityCollection: materialize(client, postActivityCollection(deps)),
+    postReactionCollection: materialize(client, postReactionCollection(deps)),
+    postStatusCollection: indexOnce(
+      materialize(client, postStatusCollection(deps)),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2314,23 +2283,14 @@ export const dashboardCollections = {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get postSubscriptionCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      postSubscriptionCollection(currentScope())
-    );
-  },
-  get roadmapCollection() {
-    return materialize(getBrowserDbClient(), roadmapCollection(currentScope()));
-  },
-  get roadmapColumnCollection() {
-    return withIndexes(
-      materialize(
-        getBrowserDbClient(),
-        roadmapColumnCollection(currentScope())
-      ),
+    ),
+    postSubscriptionCollection: materialize(
+      client,
+      postSubscriptionCollection(deps)
+    ),
+    roadmapCollection: materialize(client, roadmapCollection(deps)),
+    roadmapColumnCollection: indexOnce(
+      materialize(client, roadmapColumnCollection(deps)),
       (collection) => {
         // Roadmap columns join statuses and roadmaps by their foreign keys.
         collection.createIndex((row) => row.statusId, {
@@ -2340,11 +2300,9 @@ export const dashboardCollections = {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get postTagCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), postTagCollection(currentScope())),
+    ),
+    postTagCollection: indexOnce(
+      materialize(client, postTagCollection(deps)),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2356,24 +2314,18 @@ export const dashboardCollections = {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get siteCollection() {
-    return materialize(getBrowserDbClient(), siteCollection(currentScope()));
-  },
-  get tagCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), tagCollection(currentScope())),
+    ),
+    siteCollection: materialize(client, siteCollection(deps)),
+    tagCollection: indexOnce(
+      materialize(client, tagCollection(deps)),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
         });
       }
-    );
-  },
-  get upvoteCollection() {
-    return withIndexes(
-      materialize(getBrowserDbClient(), upvoteCollection(currentScope())),
+    ),
+    upvoteCollection: indexOnce(
+      materialize(client, upvoteCollection(deps)),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2382,20 +2334,168 @@ export const dashboardCollections = {
           indexType: BasicIndex,
         });
       }
-    );
+    ),
+    workspacePlanCollection: materialize(client, workspacePlanCollection(deps)),
+    planComplianceCollection: materialize(
+      client,
+      planComplianceCollection(deps)
+    ),
+  };
+}
+
+export type DashboardCollections = ReturnType<
+  typeof createDashboardCollections
+>;
+
+/**
+ * Built collections per client and captured scope.
+ *
+ * The accessor reads the live pathname on every property access, so the scope
+ * changes when the route does; keying on it is what keeps a navigation between
+ * workspaces from reusing the previous workspace's set. `DbClient` already
+ * memoizes by descriptor id, so an entry here saves the descriptor objects, not
+ * the rows.
+ */
+const collectionsByScope = new WeakMap<
+  DbClient,
+  Map<string, DashboardCollections>
+>();
+
+function collectionsFor(
+  client: DbClient,
+  scope: DashboardCollectionScope
+): DashboardCollections {
+  let byScope = collectionsByScope.get(client);
+
+  if (byScope === undefined) {
+    byScope = new Map();
+    collectionsByScope.set(client, byScope);
+  }
+
+  const key = dashboardScopeKey(scope);
+  const existing = byScope.get(key);
+
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const collections = createDashboardCollections({ client, scope });
+  byScope.set(key, collections);
+
+  return collections;
+}
+
+function currentCollections(): DashboardCollections {
+  return collectionsFor(getBrowserDbClient(), currentDashboardScope());
+}
+
+/**
+ * Every dashboard collection, for the scope the browser is on.
+ *
+ * Getter-based rather than a frozen map because a property read is what pins a
+ * collection to the current organization (and post); a frozen map would fix the
+ * identity at module load, which is what the earlier singleton shape did. The
+ * getters only resolve *which* set to read — every rule about what a collection
+ * is lives in `createDashboardCollections` and its deps.
+ */
+export const dashboardCollections = {
+  get boardCollection() {
+    return currentCollections().boardCollection;
+  },
+  get changelogCategoryCollection() {
+    return currentCollections().changelogCategoryCollection;
+  },
+  get changelogCategoryLinkCollection() {
+    return currentCollections().changelogCategoryLinkCollection;
+  },
+  get changelogCollection() {
+    return currentCollections().changelogCollection;
+  },
+  get changelogPostCollection() {
+    return currentCollections().changelogPostCollection;
+  },
+  get commentCollection() {
+    return currentCollections().commentCollection;
+  },
+  get commentReactionCollection() {
+    return currentCollections().commentReactionCollection;
+  },
+  get companyCollection() {
+    return currentCollections().companyCollection;
+  },
+  get deleteEligibilityCollection() {
+    return currentCollections().deleteEligibilityCollection;
+  },
+  get companyAttributeDefinitionCollection() {
+    return currentCollections().companyAttributeDefinitionCollection;
+  },
+  get companyAttributeValueCollection() {
+    return currentCollections().companyAttributeValueCollection;
+  },
+  get contactAttributeDefinitionCollection() {
+    return currentCollections().contactAttributeDefinitionCollection;
+  },
+  get contactAttributeValueCollection() {
+    return currentCollections().contactAttributeValueCollection;
+  },
+  get contactCollection() {
+    return currentCollections().contactCollection;
+  },
+  get invitationsCollection() {
+    return currentCollections().invitationsCollection;
+  },
+  get jwtSecretCollection() {
+    return currentCollections().jwtSecretCollection;
+  },
+  get membersCollection() {
+    return currentCollections().membersCollection;
+  },
+  get membershipCollection() {
+    return currentCollections().membershipCollection;
+  },
+  get organizationCollection() {
+    return currentCollections().organizationCollection;
+  },
+  get postCollection() {
+    return currentCollections().postCollection;
+  },
+  get postDetailCollection() {
+    return currentCollections().postDetailCollection;
+  },
+  get postActivityCollection() {
+    return currentCollections().postActivityCollection;
+  },
+  get postReactionCollection() {
+    return currentCollections().postReactionCollection;
+  },
+  get postStatusCollection() {
+    return currentCollections().postStatusCollection;
+  },
+  get postSubscriptionCollection() {
+    return currentCollections().postSubscriptionCollection;
+  },
+  get roadmapCollection() {
+    return currentCollections().roadmapCollection;
+  },
+  get roadmapColumnCollection() {
+    return currentCollections().roadmapColumnCollection;
+  },
+  get postTagCollection() {
+    return currentCollections().postTagCollection;
+  },
+  get siteCollection() {
+    return currentCollections().siteCollection;
+  },
+  get tagCollection() {
+    return currentCollections().tagCollection;
+  },
+  get upvoteCollection() {
+    return currentCollections().upvoteCollection;
   },
   get workspacePlanCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      workspacePlanCollection(currentScope())
-    );
+    return currentCollections().workspacePlanCollection;
   },
   get planComplianceCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      planComplianceCollection(currentScope())
-    );
+    return currentCollections().planComplianceCollection;
   },
 };
-
-export type DashboardCollections = typeof dashboardCollections;
