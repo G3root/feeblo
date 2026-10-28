@@ -187,6 +187,7 @@ describe("toProviderLifecycleEvent", () => {
       eventId: "sns-bounce-1",
       type: "bounced",
       bounceType: "hard",
+      acceptedAt: new Date("2026-08-18T00:00:00.000Z"),
       metadata: {
         category: "General",
         reasonCode: "smtp; 550 5.1.1 user unknown",
@@ -235,6 +236,7 @@ describe("toProviderLifecycleEvent", () => {
         eventId: "sns-delay-1",
         messageId: "<email.hash@notifications.feeblo>",
         occurredAt: new Date("2026-08-18T00:00:03.000Z"),
+        acceptedAt: new Date("2026-08-18T00:00:00.000Z"),
         type: "deferred",
         metadata: { category: "Redirection" },
       }
@@ -366,6 +368,7 @@ describe("toProviderLifecycleEvent", () => {
     ).toMatchObject({
       eventId: "sns-complaint-1",
       type: "complained",
+      acceptedAt: new Date("2026-08-18T00:00:00.000Z"),
       metadata: { category: "abuse" },
     });
   });
