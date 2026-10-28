@@ -920,6 +920,17 @@ const sendDeliveryAttempt = (
         } satisfies DeliveryAttemptOutcome;
       });
 
+    /**
+     * These counts and the sends are not synchronized: several workers can
+     * read the same number, each pass the check against it, and each submit
+     * to the provider, so one cycle's overshoot past the limit is bounded by
+     * `EMAIL_OUTBOX_MAX_CONCURRENT_SENDS` per replica against a month-long
+     * allowance. The guard is a breaker rather than a bill, and closing the
+     * race needs a durable reservation with a release path for every
+     * terminal outcome — a change of its own, not part of counting accepted
+     * sends here.
+     */
+
     // Per-workspace breaker first. The global allowance below is shared by every
     // workspace, so without this one flooded workspace defers every other
     // workspace's email until the month rolls over.
