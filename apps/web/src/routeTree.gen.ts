@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as AuthRouteImport } from "./routes/_auth"
 import { Route as DashboardRouteImport } from "./routes/_dashboard"
+import { Route as AuthDotmdRouteImport } from "./routes/auth[.]md"
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt"
 import { Route as SRouteRouteImport } from "./routes/s/route"
 import { Route as SentryTunnelRouteImport } from "./routes/sentry-tunnel"
 import { Route as SitemapDotxmlRouteImport } from "./routes/sitemap[.]xml"
+import { Route as DotwellKnownSplatRouteImport } from "./routes/[.]well-known.$"
 import { Route as AuthForgotPasswordRouteImport } from "./routes/_auth/forgot-password"
 import { Route as AuthSignInRouteImport } from "./routes/_auth/sign-in"
 import { Route as AuthSignUpRouteImport } from "./routes/_auth/sign-up"
@@ -91,6 +93,11 @@ const DashboardRoute = DashboardRouteImport.update({
   id: "/_dashboard",
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthDotmdRoute = AuthDotmdRouteImport.update({
+  id: "/auth.md",
+  path: "/auth.md",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: "/robots.txt",
   path: "/robots.txt",
@@ -109,6 +116,11 @@ const SentryTunnelRoute = SentryTunnelRouteImport.update({
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: "/sitemap.xml",
   path: "/sitemap.xml",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotwellKnownSplatRoute = DotwellKnownSplatRouteImport.update({
+  id: "/.well-known/$",
+  path: "/.well-known/$",
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
@@ -501,9 +513,11 @@ const DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute =
 export interface FileRoutesByFullPath {
   "/s": typeof SRouteRouteWithChildren
   "/": typeof DashboardRouteWithChildren
+  "/auth.md": typeof AuthDotmdRoute
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/sitemap.xml": typeof SitemapDotxmlRoute
+  "/.well-known/$": typeof DotwellKnownSplatRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
   "/sign-in": typeof AuthSignInRoute
   "/sign-up": typeof AuthSignUpRoute
@@ -573,9 +587,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/": typeof DashboardRouteWithChildren
+  "/auth.md": typeof AuthDotmdRoute
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/sitemap.xml": typeof SitemapDotxmlRoute
+  "/.well-known/$": typeof DotwellKnownSplatRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
   "/sign-in": typeof AuthSignInRoute
   "/sign-up": typeof AuthSignUpRoute
@@ -646,9 +662,11 @@ export interface FileRoutesById {
   "/s": typeof SRouteRouteWithChildren
   "/_auth": typeof AuthRouteWithChildren
   "/_dashboard": typeof DashboardRouteWithChildren
+  "/auth.md": typeof AuthDotmdRoute
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/sitemap.xml": typeof SitemapDotxmlRoute
+  "/.well-known/$": typeof DotwellKnownSplatRoute
   "/_auth/forgot-password": typeof AuthForgotPasswordRoute
   "/_auth/sign-in": typeof AuthSignInRoute
   "/_auth/sign-up": typeof AuthSignUpRoute
@@ -722,9 +740,11 @@ export interface FileRouteTypes {
   fullPaths:
     | "/s"
     | "/"
+    | "/auth.md"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/sitemap.xml"
+    | "/.well-known/$"
     | "/forgot-password"
     | "/sign-in"
     | "/sign-up"
@@ -794,9 +814,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/"
+    | "/auth.md"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/sitemap.xml"
+    | "/.well-known/$"
     | "/forgot-password"
     | "/sign-in"
     | "/sign-up"
@@ -866,9 +888,11 @@ export interface FileRouteTypes {
     | "/s"
     | "/_auth"
     | "/_dashboard"
+    | "/auth.md"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/sitemap.xml"
+    | "/.well-known/$"
     | "/_auth/forgot-password"
     | "/_auth/sign-in"
     | "/_auth/sign-up"
@@ -942,9 +966,11 @@ export interface RootRouteChildren {
   SRouteRoute: typeof SRouteRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
+  AuthDotmdRoute: typeof AuthDotmdRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SentryTunnelRoute: typeof SentryTunnelRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
   FeedbackWidgetOrganizationIdRoute: typeof FeedbackWidgetOrganizationIdRoute
   TelemetrySignalRoute: typeof TelemetrySignalRoute
 }
@@ -963,6 +989,13 @@ declare module "@tanstack/react-router" {
       path: ""
       fullPath: "/"
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/auth.md": {
+      id: "/auth.md"
+      path: "/auth.md"
+      fullPath: "/auth.md"
+      preLoaderRoute: typeof AuthDotmdRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/robots.txt": {
@@ -991,6 +1024,13 @@ declare module "@tanstack/react-router" {
       path: "/sitemap.xml"
       fullPath: "/sitemap.xml"
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/.well-known/$": {
+      id: "/.well-known/$"
+      path: "/.well-known/$"
+      fullPath: "/.well-known/$"
+      preLoaderRoute: typeof DotwellKnownSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/_auth/forgot-password": {
@@ -1705,9 +1745,11 @@ const rootRouteChildren: RootRouteChildren = {
   SRouteRoute: SRouteRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
+  AuthDotmdRoute: AuthDotmdRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SentryTunnelRoute: SentryTunnelRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  DotwellKnownSplatRoute: DotwellKnownSplatRoute,
   FeedbackWidgetOrganizationIdRoute: FeedbackWidgetOrganizationIdRoute,
   TelemetrySignalRoute: TelemetrySignalRoute,
 }

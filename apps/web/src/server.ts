@@ -1,6 +1,11 @@
 import handler from "@tanstack/react-start/server-entry";
 
 import {
+  DASHBOARD_DISCOVERY_LINK,
+  dashboardMarkdown,
+  isDashboardRequest,
+} from "./lib/agent-discovery";
+import {
   applyPageSecurityHeaders,
   deploymentServesHttps,
   parseImageOrigins,
@@ -32,12 +37,9 @@ import { paraglideMiddleware } from "./paraglide/server.js";
  */
 export default {
   async fetch(request: Request) {
-    const response = await paraglideMiddleware(request, () =>
-      handler.fetch(request)
-    );
-
     const url = new URL(request.url);
-    return applyPageSecurityHeaders(response, {
+    const dashboard = isDashboardRequest(request);
+    const securityOptions = {
       // `MEDIA_PUBLIC_BASE_URL` is where uploaded editor media and workspace
       // logos are served from; without it the `img-src` allow-list would blank
       // every uploaded image. `CONTENT_IMAGE_ORIGINS` is the operator's
@@ -53,6 +55,54 @@ export default {
         appUrl: process.env.APP_URL,
       }),
       pathname: url.pathname,
-    });
+    };
+
+    // An agent asking for Markdown on the root is not going to drive a React
+    // app. Answer before the document renderer, whose HTML-only guard would
+    // otherwise refuse the request with a 406.
+    if (
+      dashboard &&
+      request.method === "GET" &&
+      url.pathname === "/" &&
+      (request.headers.get("accept")?.includes("text/markdown") ?? false)
+    ) {
+      const body = dashboardMarkdown(url.origin);
+
+      return applyPageSecurityHeaders(
+        new Response(body, {
+          headers: {
+            "Cache-Control": "no-store",
+            "Content-Type": "text/markdown; charset=utf-8",
+            Vary: "Accept",
+            "x-markdown-tokens": String(Math.ceil(body.length / 4)),
+          },
+        }),
+        securityOptions
+      );
+    }
+
+    const response = await paraglideMiddleware(request, () =>
+      handler.fetch(request)
+    );
+
+    // The root document is the URL an agent probes first, so the discovery set
+    // rides on it whether or not the client asked for Markdown.
+    const document =
+      dashboard && url.pathname === "/"
+        ? withDiscoveryLink(response)
+        : response;
+
+    return applyPageSecurityHeaders(document, securityOptions);
   },
+};
+
+const withDiscoveryLink = (response: Response) => {
+  const headers = new Headers(response.headers);
+  headers.set("Link", DASHBOARD_DISCOVERY_LINK);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 };
