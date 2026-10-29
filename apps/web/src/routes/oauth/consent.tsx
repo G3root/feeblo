@@ -18,10 +18,10 @@ import { z } from "zod";
  * `oauth_query` on the consent call, so the server verifies the signature and
  * this page only chooses *what* to grant.
  *
- * The grant is scoped to the Public API vocabulary (ADR 0007). Identity scopes
- * are accepted as requested; workspace scopes start at the read-only default
- * so a client is never handed write access by a member who clicked "Allow"
- * without reading the list.
+ * Every requested scope is shown and the member chooses. Identity scopes start
+ * selected (the client needs them to sign the member in) and workspace scopes
+ * start at the read-only default, so a client is never handed write access by a
+ * member who clicked "Allow" without reading the list.
  */
 export const Route = createFileRoute("/oauth/consent")({
   validateSearch: (search) =>
@@ -53,6 +53,22 @@ const describeScope = (scope: PublicApiScope): string => {
   return sentence.charAt(0).toUpperCase() + sentence.slice(1);
 };
 
+/** What an OIDC scope lets the client see or do. */
+const describeIdentityScope = (scope: string): string => {
+  switch (scope) {
+    case "openid":
+      return "Confirm your identity";
+    case "profile":
+      return "Read your name and profile picture";
+    case "email":
+      return "Read your email address";
+    case "offline_access":
+      return "Stay connected after this session ends";
+    default:
+      return scope;
+  }
+};
+
 function ConsentPage() {
   const search = Route.useSearch();
   const auth = useResolvedAuth();
@@ -64,13 +80,19 @@ function ConsentPage() {
       ? [...OIDC_SCOPES, ...PUBLIC_API_SCOPES]
       : search.scope.split(" ").filter(Boolean);
   const requestedApiScopes = requested.filter(isPublicApiScope);
-  const acceptedIdentityScopes = requested.filter((scope) =>
+  const requestedIdentityScopes = requested.filter((scope) =>
     OIDC_SCOPES.has(scope)
   );
 
-  const [selected, setSelected] = useState<ReadonlySet<PublicApiScope>>(
+  // One selection over both vocabularies: identity scopes start accepted
+  // because the client needs them to sign the member in, and workspace scopes
+  // start at the read-only set.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(
     () =>
-      new Set(requestedApiScopes.filter((scope) => DEFAULT_SCOPES.has(scope)))
+      new Set([
+        ...requestedIdentityScopes,
+        ...requestedApiScopes.filter((scope) => DEFAULT_SCOPES.has(scope)),
+      ])
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +128,7 @@ function ConsentPage() {
     };
   }, [activeOrganizationId]);
 
-  const toggle = (scope: PublicApiScope, checked: boolean) => {
+  const toggle = (scope: string, checked: boolean) => {
     setSelected((current) => {
       const next = new Set(current);
       if (checked) {
@@ -126,15 +148,15 @@ function ConsentPage() {
     // `scope` would be read as "the originally requested set", so an acceptance
     // with nothing selected has to be refused here rather than sent.
     const accepted = accept
-      ? [...acceptedIdentityScopes, ...selected].join(" ")
+      ? requested.filter((scope) => selected.has(scope))
       : null;
-    if (accepted === "") {
+    if (accepted !== null && accepted.length === 0) {
       setError("Choose at least one permission, or cancel the request.");
       setPending(false);
       return;
     }
     const result = await authClient.oauth2.consent(
-      accepted === null ? { accept } : { accept, scope: accepted }
+      accepted === null ? { accept } : { accept, scope: accepted.join(" ") }
     );
 
     if (result.error) {
@@ -176,6 +198,29 @@ function ConsentPage() {
         <p className="text-destructive text-sm" role="alert">
           {error}
         </p>
+      )}
+
+      {requestedIdentityScopes.length === 0 ? null : (
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Account access</legend>
+          {requestedIdentityScopes.map((scope) => (
+            <label className="flex items-start gap-2 text-sm" key={scope}>
+              <input
+                checked={selected.has(scope)}
+                className="mt-1"
+                disabled={pending}
+                onChange={(event) => toggle(scope, event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                {describeIdentityScope(scope)}
+                <span className="text-muted-foreground block text-xs">
+                  {scope}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
       )}
 
       {requestedApiScopes.length === 0 ? (

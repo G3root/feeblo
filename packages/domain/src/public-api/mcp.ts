@@ -2,6 +2,7 @@ import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
 import * as Clock from "effect/Clock";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as HttpApiSchema from "effect/http-api/HttpApiSchema";
 import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
@@ -22,6 +23,7 @@ import {
   type PublicApiKeyBudget,
   publicApiRateLimitHeaders,
 } from "./api-key-auth";
+import { PublicApiConfig } from "./config";
 import {
   InternalError,
   internalError,
@@ -326,6 +328,7 @@ const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
       const auth = yield* Auth;
       const entitlementPolicy = yield* EntitlementPolicy;
       const rateLimitService = yield* RateLimitService;
+      const { apiUrl } = yield* PublicApiConfig;
 
       const withCaller = (
         httpEffect: Effect.Effect<
@@ -383,14 +386,32 @@ const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
             );
           }
 
-          const verification = yield* Effect.promise(() =>
-            auth.api.verifyMcpAccessToken({
-              authorizationHeader: request.headers["authorization"] ?? "",
-              method: request.method,
-              url: request.url,
-              dpopProof: request.headers["dpop"] ?? null,
-            })
+          // The verifier is a third-party call: it can reject on a database
+          // or JWKS fault, not only answer a refusal. `exit` keeps that out
+          // of the defect channel so it is answered as an internal error
+          // rather than an unlabeled 500.
+          const outcome = yield* Effect.exit(
+            Effect.promise(() =>
+              auth.api.verifyMcpAccessToken({
+                authorizationHeader: request.headers["authorization"] ?? "",
+                method: request.method,
+                // Effect exposes the request URL as a path; a verifier's DPoP
+                // check needs the absolute URL, so resolve it against the
+                // deployment's own origin rather than trusting forwarded
+                // headers.
+                url: new URL(request.url, apiUrl).href,
+                dpopProof: request.headers["dpop"] ?? null,
+              })
+            )
           );
+          if (Exit.isFailure(outcome)) {
+            yield* Effect.logError(
+              "MCP access token verification failed",
+              outcome.cause
+            );
+            return publicApiFailureResponse(internalError());
+          }
+          const verification = outcome.value;
 
           if (verification._tag === "Rejected") {
             // A request with no credential at all keeps the key surface's

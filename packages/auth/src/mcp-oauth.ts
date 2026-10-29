@@ -11,6 +11,7 @@ import {
   verifyAccessTokenRequest,
 } from "better-auth/oauth2";
 
+import { roleMayAuthorizeWorkspaceCredential } from "./organization-roles";
 import type { Auth as AuthInstance } from "./server";
 
 /**
@@ -67,6 +68,47 @@ const stringClaim = (claims: AccessTokenClaims, name: string) => {
 const grantedScopes = (claims: AccessTokenClaims) => {
   const scope = claims.scope;
   return isString(scope) ? scope.split(" ").filter(Boolean) : [];
+};
+
+/** What a token has to say before it can become a caller. */
+export type ParsedAccessTokenClaims =
+  | {
+      readonly _tag: "Parsed";
+      readonly clientId: string;
+      readonly organizationId: string;
+      readonly scopes: readonly string[];
+      readonly subject: string;
+    }
+  | { readonly _tag: "MissingCredential" }
+  | { readonly _tag: "MissingWorkspace" };
+
+/**
+ * Reads the claims the `/mcp` gate acts on.
+ *
+ * Split from verification so the workspace rule is testable without minting a
+ * JWT: a token that names no workspace is refused, never defaulted to one the
+ * member happens to be active in, because that would be a cross-tenant read.
+ */
+export const parseAccessTokenClaims = (
+  claims: AccessTokenClaims
+): ParsedAccessTokenClaims => {
+  const subject = stringClaim(claims, "sub");
+  const clientId =
+    stringClaim(claims, "azp") ?? stringClaim(claims, "client_id");
+  if (subject === null || clientId === null) {
+    return { _tag: "MissingCredential" };
+  }
+  const organizationId = stringClaim(claims, MCP_WORKSPACE_CLAIM);
+  if (organizationId === null) {
+    return { _tag: "MissingWorkspace" };
+  }
+  return {
+    _tag: "Parsed",
+    clientId,
+    organizationId,
+    scopes: grantedScopes(claims),
+    subject,
+  };
 };
 
 /**
@@ -127,6 +169,9 @@ export const makeMcpAccessTokenVerifier =
             audience: resource,
             requiredClaims: ["azp"],
           },
+          // `baseURL` is Better Auth's resolved base URL, which includes its
+          // `/api/auth` base path (`getBaseURL(API_URL, basePath)`); the JWKS
+          // endpoint is mounted under that path, not at the origin root.
           jwksUrl: `${baseURL}/jwks`,
           // The default store is process-local, which lets a captured proof be
           // replayed against another instance; the adapter-backed store is the
@@ -138,22 +183,17 @@ export const makeMcpAccessTokenVerifier =
       return reject(error);
     }
 
-    const subject = stringClaim(claims, "sub");
-    const clientId =
-      stringClaim(claims, "azp") ?? stringClaim(claims, "client_id");
-    const organizationId = stringClaim(claims, MCP_WORKSPACE_CLAIM);
-
-    if (subject === null || clientId === null) {
+    const parsed = parseAccessTokenClaims(claims);
+    if (parsed._tag === "MissingCredential") {
       return reject(
         new APIError("UNAUTHORIZED", {
           message: "The access token is missing its subject or client.",
         })
       );
     }
-    // A grant that names no workspace cannot be turned into a caller, and
-    // defaulting to any workspace would be a cross-tenant read. The member
-    // re-authorizes after choosing one.
-    if (organizationId === null) {
+    // A grant that names no workspace cannot be turned into a caller. The
+    // member re-authorizes after choosing one.
+    if (parsed._tag === "MissingWorkspace") {
       return {
         _tag: "Rejected",
         status: 403,
@@ -163,14 +203,18 @@ export const makeMcpAccessTokenVerifier =
       };
     }
 
-    // Consent is a snapshot: a member removed from the workspace keeps a
-    // usable token until it expires unless the claim is re-checked. A key dies
-    // with the workspace; a grant has to be re-authorized against membership.
-    const membership = await adapter.findOne<{ id: string }>({
+    // Consent is a snapshot: a member removed from the workspace — or demoted
+    // out of the role that may mint a workspace credential — keeps a usable
+    // token until it expires unless the claim is re-checked. A key dies with
+    // the workspace; a grant has to be re-authorized against membership.
+    const membership = await adapter.findOne<{
+      id: string;
+      role: string;
+    }>({
       model: "member",
       where: [
-        { field: "userId", value: subject },
-        { field: "organizationId", value: organizationId },
+        { field: "userId", value: parsed.subject },
+        { field: "organizationId", value: parsed.organizationId },
       ],
     });
     if (membership === null) {
@@ -181,14 +225,23 @@ export const makeMcpAccessTokenVerifier =
         headers: {},
       };
     }
+    if (!roleMayAuthorizeWorkspaceCredential(membership.role)) {
+      return {
+        _tag: "Rejected",
+        status: 403,
+        message:
+          "You no longer have permission to act for this workspace through this application.",
+        headers: {},
+      };
+    }
 
     return {
       _tag: "Verified",
       claims: {
-        clientId,
-        organizationId,
-        scopes: grantedScopes(claims),
-        subject,
+        clientId: parsed.clientId,
+        organizationId: parsed.organizationId,
+        scopes: parsed.scopes,
+        subject: parsed.subject,
       },
     };
   };

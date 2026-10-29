@@ -98,11 +98,13 @@ The same API is served as an MCP server, so an MCP client can read and manage th
 
 Two credentials, one contract: both resolve to the same workspace and the same scope set, and both are subject to the plan gate, the per-credential budget, and the published `X-RateLimit-*` headers. A key is budgeted per key; an OAuth grant is budgeted per member and workspace, so a client cannot mint tokens to multiply its allowance.
 
-An OAuth grant that names no workspace is refused rather than defaulted to one, and a grant whose member has since left the workspace is refused even before its token expires.
+An OAuth grant that names no workspace is refused rather than defaulted to one. A grant whose member has since left the workspace — or lost the owner/admin role the grant required — is refused even before its token expires, and only a member who could create a workspace key can authorize one in the first place.
 
 Every endpoint above is one tool, named after the operation it serves — `listTags`, `createPost`, and so on. A tool's input is the endpoint's input as JSON Schema; its result carries the same published DTO as the HTTP response, as structured content and as text. The hints a client shows in an approval prompt — read-only, destructive, idempotent, open world — are the same annotations the endpoint declares.
 
-Scopes, the plan gate, and the per-credential rate limit apply exactly as they do to HTTP requests: the credential is resolved once per request, and a refusal answers the envelope and status listed under [Errors](#errors). `tools/list` returns every tool regardless of the credential's scopes; calling one it does not hold answers a tool error whose text names the missing scope — `This credential is missing the … scope.` — so a client learns which scope is missing instead of silently lacking a capability.
+Scopes, the plan gate, and the per-credential rate limit apply exactly as they do to HTTP requests: the credential is resolved once per request. Once it is resolved, a refusal — a missing scope, a plan without the Public API, an exhausted budget — answers the envelope and status listed under [Errors](#errors). `tools/list` returns every tool regardless of the credential's scopes; calling one it does not hold answers a tool error whose text names the missing scope — `This credential is missing the … scope.` — so a client learns which scope is missing instead of silently lacking a capability.
+
+A rejected OAuth token is answered before that point, and not with the envelope: `/mcp` returns a JSON-RPC error and a `WWW-Authenticate` header (RFC 9728) pointing at `/.well-known/oauth-protected-resource`. That header is what tells an MCP client where to send the member to authorize; the key surface's `401` body is unchanged.
 
 Requests carrying an `Origin` header are rejected: the transport does not enable cross-origin access, so a browser-based client must reach it through a same-origin proxy. Clients that send no `Origin` — the desktop and server integrations — are unaffected.
 

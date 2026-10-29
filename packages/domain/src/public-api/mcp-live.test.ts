@@ -569,23 +569,18 @@ layer(
     })
   );
 
-  it.effect("refuses an OAuth grant whose workspace claim is missing", () =>
+  it.effect("refuses an unknown OAuth token with a discovery challenge", () =>
     Effect.gen(function* () {
-      yield* seedWorkspace();
-      registerMcpToken("mcp_token_no_workspace", {
-        clientId: "client_mcp_test",
-        // The gate must not default to the workspace a token names elsewhere.
-        organizationId: "",
-        scopes: ["tags.read"],
-        subject: "user_mcp_test",
-      });
-      const authorization = mcpBearer("mcp_token_no_workspace");
-
       const response = yield* executeMcp({
-        authorization,
+        authorization: mcpBearer("mcp_token_unknown"),
         body: MCP_INITIALIZE,
       });
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
+      // The refusal is not the `/api/v1` envelope: it is the challenge an MCP
+      // client follows to the authorization server.
+      expect(response.headers["www-authenticate"]).toContain(
+        "resource_metadata="
+      );
     })
   );
 

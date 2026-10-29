@@ -195,8 +195,10 @@ emails every subscriber.
  */
 export const authMarkdown = (origin: string) => `# Authentication for agents
 
-Feeblo's machine surfaces accept exactly one credential: a workspace API key.
-Never ask a person for a password, a session cookie, or a better-auth token.
+Feeblo's machine surfaces accept two credentials, and both resolve to the same
+workspace and scopes: a workspace API key, or an OAuth access token a member
+issues to a client through the authorization server. Never ask a person for a
+password or a session cookie.
 
 ## Create a key
 
@@ -234,12 +236,12 @@ A failure carries a machine-readable \`_tag\`:
 | 403 | \`PLAN_REQUIRES_UPGRADE\` | The workspace plan does not include the Public API. |
 | 404 | \`NOT_FOUND\` | The record does not exist in this workspace. |
 | 409 | \`CONFLICT\` | The write conflicts with the current state. |
-| 429 | \`RATE_LIMITED\` | The per-key budget is exhausted; read \`Retry-After\`. |
+| 429 | \`RATE_LIMITED\` | The credential's budget is exhausted; read \`Retry-After\`. |
 | 500 | \`INTERNAL_ERROR\` | Unexpected server failure. |
 | 503 | \`SERVICE_UNAVAILABLE\` | A required dependency is unavailable; requests fail closed. |
 
-The per-key budget is 300 requests per minute, shared by reads, writes, and MCP
-calls. A response carries \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, and
+The budget is 300 requests per minute, shared by reads, writes, and MCP calls:
+a key is budgeted per key, and an OAuth grant per member and workspace. A response carries \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, and
 \`X-RateLimit-Reset\`.
 
 ## Connect an MCP client
@@ -255,8 +257,13 @@ RFC 9728 metadata. They read
 \`${origin}/.well-known/oauth-protected-resource\`, register or identify
 themselves, and send the member through sign-in, workspace choice, and consent.
 The resulting access token is bound to this MCP endpoint and to the workspace
-the member chose; it carries the scopes the member approved. The member can
-revoke it from the account's connected applications.
+the member chose; it carries the scopes the member approved, and only a member
+who could create a workspace key (owner or admin) can authorize it.
+
+There is no connected-applications page yet. To disconnect a client, revoke its
+grant at \`POST ${origin}/api/auth/oauth2/revoke\` with the refresh token; that
+stops it renewing. An access token already issued is a JWT and stays usable
+until it expires (one hour by default).
 
 \`\`\`json
 {
@@ -275,6 +282,11 @@ revoke it from the account's connected applications.
 Supported protocol revisions: \`2026-07-28\`, \`2025-11-25\`, \`2025-06-18\`,
 \`2025-03-26\`, and \`2024-11-05\`. Requests carrying an \`Origin\` header are
 refused, so a browser client needs a same-origin proxy.
+
+An OAuth refusal is not the \`_tag\` envelope above: \`/mcp\` answers a rejected
+token with a JSON-RPC error and a \`WWW-Authenticate\` header (RFC 9728), which
+is what tells a client where the authorization server is. A key refusal keeps
+the envelope.
 
 ## Read without a key
 
@@ -368,7 +380,7 @@ export const mcpServerCard = (origin: string) => ({
     {
       name: "Feeblo Public API",
       description:
-        "Read and manage one Feeblo workspace's posts, comments, votes, tags, boards, changelog entries, companies, and end users. Requires a workspace API key.",
+        "Read and manage one Feeblo workspace's posts, comments, votes, tags, boards, changelog entries, companies, and end users. Requires a workspace API key or an OAuth access token; both resolve to the same workspace and scopes.",
       transport: "streamable-http",
       url: `${origin}${PUBLIC_API_MCP_PATH}`,
       authentication: {

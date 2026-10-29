@@ -1,3 +1,4 @@
+import { roleGrants } from "@feeblo/permissions";
 import { Button } from "@feeblo/ui/button";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useResolvedAuth } from "@feeblo/web-shared/auth-context";
@@ -77,6 +78,24 @@ function SelectWorkspacePage() {
     }
   };
 
+  // An OAuth grant is a workspace-wide credential, so only the roles that may
+  // create one may authorize. The server enforces the same rule; filtering
+  // here keeps the page from offering a choice that would be refused.
+  const authorizedOrganizationIds =
+    auth.status === "authenticated" && auth.data !== null
+      ? new Set(
+          auth.data.memberships
+            .filter((membership) =>
+              roleGrants(membership.role, "apiKeys.manage")
+            )
+            .map((membership) => membership.organizationId)
+        )
+      : new Set<string>();
+  const visibleWorkspaces =
+    workspaces?.filter((workspace) =>
+      authorizedOrganizationIds.has(workspace.id)
+    ) ?? null;
+
   if (!isAuthenticated) {
     return (
       <div className="space-y-2">
@@ -104,18 +123,19 @@ function SelectWorkspacePage() {
         </p>
       )}
 
-      {workspaces === null && error === null ? (
+      {visibleWorkspaces === null && error === null ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
       ) : null}
 
-      {workspaces?.length === 0 ? (
+      {visibleWorkspaces?.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          You are not a member of any workspace yet.
+          You need an owner or admin role in a workspace to authorize an
+          application.
         </p>
       ) : null}
 
       <ul className="space-y-2">
-        {workspaces?.map((workspace) => (
+        {visibleWorkspaces?.map((workspace) => (
           <li key={workspace.id}>
             <Button
               className="w-full justify-start"

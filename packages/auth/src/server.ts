@@ -75,6 +75,7 @@ import {
 import {
   ORGANIZATION_ROLES,
   organizationAccessControl,
+  roleMayAuthorizeWorkspaceCredential,
 } from "./organization-roles";
 import { jwtAutoLogin } from "./plugins/jwt-auto-login/plugin";
 import type { JwtAutoLoginOptions } from "./plugins/jwt-auto-login/types";
@@ -314,17 +315,22 @@ export const initAuthHandler = (
     };
 
     /**
-     * The workspaces a member belongs to.
+     * The workspaces a member belongs to, with the role they hold in each.
      *
      * The OAuth provider's workspace hooks and the dashboard's `customSession`
      * both read this, so the consent flow cannot authorize a workspace the
      * member is not in even though it reached the provider with a stale
-     * `activeOrganizationId`.
+     * `activeOrganizationId`. The role is what decides whether they may
+     * authorize at all: an OAuth grant is a workspace-wide credential, and
+     * the same ACL statement that gates `/api-key/create` gates this.
      */
-    const listMembershipOrganizationIds = (userId: string) =>
+    const listMemberships = (userId: string) =>
       callbackRuntime.runPromise(
         db
-          .select({ organizationId: schema.memberTable.organizationId })
+          .select({
+            organizationId: schema.memberTable.organizationId,
+            role: schema.memberTable.role,
+          })
           .from(schema.memberTable)
           .where(eq(schema.memberTable.userId, userId))
       );
@@ -876,44 +882,65 @@ export const initAuthHandler = (
             page: `${appUrl}/oauth/select-workspace`,
             shouldRedirect: async ({ user, session, isContinuation }) => {
               const activeOrganizationId = activeOrganizationIdOf(session);
-              const memberships = await listMembershipOrganizationIds(user.id);
+              const memberships = await listMemberships(user.id);
               // No workspace at all: let consent refuse with a clear message
               // rather than sending the member to a chooser with no options.
               if (memberships.length === 0) {
                 return false;
               }
+              const active = memberships.find(
+                (membership) =>
+                  membership.organizationId === activeOrganizationId
+              );
+              // An active workspace the member may not authorize is treated
+              // like no selection at all: the chooser explains the role
+              // requirement instead of the provider answering a bare error.
               if (
-                activeOrganizationId === null ||
-                !memberships.some(
-                  (membership) =>
-                    membership.organizationId === activeOrganizationId
-                )
+                active === undefined ||
+                !roleMayAuthorizeWorkspaceCredential(active.role)
               ) {
                 return true;
               }
               // Ask once per authorization; a continuation proves the page ran.
-              return !isContinuation && memberships.length > 1;
+              return (
+                !isContinuation &&
+                memberships.filter((membership) =>
+                  roleMayAuthorizeWorkspaceCredential(membership.role)
+                ).length > 1
+              );
             },
             // The consent's workspace. Consent is stored per reference, so a
             // member who authorizes the same client in two workspaces has two
             // independent grants.
             consentReferenceId: async ({ user, session }) => {
               const activeOrganizationId = activeOrganizationIdOf(session);
-              const memberships = await listMembershipOrganizationIds(user.id);
-              const isMember =
-                activeOrganizationId !== null &&
-                memberships.some(
-                  (membership) =>
-                    membership.organizationId === activeOrganizationId
-                );
-              if (!isMember) {
+              const memberships = await listMemberships(user.id);
+              const active =
+                activeOrganizationId === null
+                  ? undefined
+                  : memberships.find(
+                      (membership) =>
+                        membership.organizationId === activeOrganizationId
+                    );
+              if (active === undefined) {
                 throw new APIError("BAD_REQUEST", {
                   error: "set_organization",
                   error_description:
                     "Choose a workspace before authorizing this application.",
                 });
               }
-              return activeOrganizationId;
+              // A grant is a workspace-wide machine credential. Anyone could
+              // otherwise consent to scopes their own role does not hold —
+              // `companies.delete`, for a contributor — and then call the
+              // Public API with it.
+              if (!roleMayAuthorizeWorkspaceCredential(active.role)) {
+                throw new APIError("FORBIDDEN", {
+                  error: "access_denied",
+                  error_description:
+                    "Only workspace admins can authorize applications for this workspace.",
+                });
+              }
+              return active.organizationId;
             },
           },
 
