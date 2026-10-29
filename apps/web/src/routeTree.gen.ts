@@ -14,6 +14,7 @@ import { Route as DashboardRouteImport } from "./routes/_dashboard"
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt"
 import { Route as SRouteRouteImport } from "./routes/s/route"
 import { Route as SentryTunnelRouteImport } from "./routes/sentry-tunnel"
+import { Route as SitemapDotxmlRouteImport } from "./routes/sitemap[.]xml"
 import { Route as AuthForgotPasswordRouteImport } from "./routes/_auth/forgot-password"
 import { Route as AuthSignInRouteImport } from "./routes/_auth/sign-in"
 import { Route as AuthSignUpRouteImport } from "./routes/_auth/sign-up"
@@ -103,6 +104,11 @@ const SRouteRoute = SRouteRouteImport.update({
 const SentryTunnelRoute = SentryTunnelRouteImport.update({
   id: "/sentry-tunnel",
   path: "/sentry-tunnel",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: "/sitemap.xml",
+  path: "/sitemap.xml",
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
@@ -497,6 +503,7 @@ export interface FileRoutesByFullPath {
   "/": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
+  "/sitemap.xml": typeof SitemapDotxmlRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
   "/sign-in": typeof AuthSignInRoute
   "/sign-up": typeof AuthSignUpRoute
@@ -568,6 +575,7 @@ export interface FileRoutesByTo {
   "/": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
+  "/sitemap.xml": typeof SitemapDotxmlRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
   "/sign-in": typeof AuthSignInRoute
   "/sign-up": typeof AuthSignUpRoute
@@ -640,6 +648,7 @@ export interface FileRoutesById {
   "/_dashboard": typeof DashboardRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
+  "/sitemap.xml": typeof SitemapDotxmlRoute
   "/_auth/forgot-password": typeof AuthForgotPasswordRoute
   "/_auth/sign-in": typeof AuthSignInRoute
   "/_auth/sign-up": typeof AuthSignUpRoute
@@ -715,6 +724,7 @@ export interface FileRouteTypes {
     | "/"
     | "/robots.txt"
     | "/sentry-tunnel"
+    | "/sitemap.xml"
     | "/forgot-password"
     | "/sign-in"
     | "/sign-up"
@@ -786,6 +796,7 @@ export interface FileRouteTypes {
     | "/"
     | "/robots.txt"
     | "/sentry-tunnel"
+    | "/sitemap.xml"
     | "/forgot-password"
     | "/sign-in"
     | "/sign-up"
@@ -857,6 +868,7 @@ export interface FileRouteTypes {
     | "/_dashboard"
     | "/robots.txt"
     | "/sentry-tunnel"
+    | "/sitemap.xml"
     | "/_auth/forgot-password"
     | "/_auth/sign-in"
     | "/_auth/sign-up"
@@ -932,6 +944,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SentryTunnelRoute: typeof SentryTunnelRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   FeedbackWidgetOrganizationIdRoute: typeof FeedbackWidgetOrganizationIdRoute
   TelemetrySignalRoute: typeof TelemetrySignalRoute
 }
@@ -971,6 +984,13 @@ declare module "@tanstack/react-router" {
       path: "/sentry-tunnel"
       fullPath: "/sentry-tunnel"
       preLoaderRoute: typeof SentryTunnelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/sitemap.xml": {
+      id: "/sitemap.xml"
+      path: "/sitemap.xml"
+      fullPath: "/sitemap.xml"
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/_auth/forgot-password": {
@@ -1687,6 +1707,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SentryTunnelRoute: SentryTunnelRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   FeedbackWidgetOrganizationIdRoute: FeedbackWidgetOrganizationIdRoute,
   TelemetrySignalRoute: TelemetrySignalRoute,
 }

@@ -9,7 +9,7 @@ import { handleDashboardRobots } from "@/lib/public-board-endpoints";
 export const Route = createFileRoute("/robots.txt")({
   server: {
     handlers: {
-      GET: () => handleDashboardRobots(),
+      GET: ({ request }) => handleDashboardRobots(request),
     },
   },
 });

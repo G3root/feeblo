@@ -2,6 +2,7 @@ import type { TChangelog } from "@feeblo/domain/changelog/schema";
 import type { TSite } from "@feeblo/domain/site/schema";
 import { extractSubdomain } from "@feeblo/utils/url";
 import {
+  buildSitemap,
   renderSitemap,
   toIsoDateOnly,
   type SitemapUrl,
@@ -56,10 +57,61 @@ const robotsResponse = (lines: ReadonlyArray<string>) =>
  * robots.txt for the dashboard host (`app.<root-domain>` and the apex
  * domain), where every page sits behind authentication or is a client-side
  * app shell with no indexable content.
+ *
+ * The AI groups are explicit even though the policy is a blanket disallow:
+ * a crawler that reads only its own group would otherwise inherit no
+ * instruction, and the content signals say the same thing in the vocabulary a
+ * signal-aware crawler reads. Both are `no` because there is nothing here a
+ * crawler may use -- the public surface is the marketing site and the API.
  */
-export function handleDashboardRobots() {
-  return robotsResponse(["User-agent: *", "Disallow: /"]);
+export function handleDashboardRobots(request: Request) {
+  const origin = new URL(request.url).origin;
+
+  return robotsResponse([
+    "User-agent: *",
+    "Content-Signal: search=no, ai-input=no, ai-train=no",
+    "Disallow: /",
+    "",
+    ...AI_CRAWLER_GROUPS,
+    "Content-Signal: search=no, ai-input=no, ai-train=no",
+    "Disallow: /",
+    "",
+    `Sitemap: ${origin}/sitemap.xml`,
+  ]);
 }
+
+/**
+ * sitemap.xml for the dashboard host. The dashboard has one public URL: the
+ * root, which hands an anonymous visitor to the sign-in form. It is listed
+ * rather than omitted because an agent that checks for the protocol should
+ * find a valid document, not a 404 it has to interpret.
+ */
+export function handleDashboardSitemap(request: Request) {
+  const origin = new URL(request.url).origin;
+
+  return xmlResponse(buildSitemap([{ loc: `${origin}/` }]));
+}
+
+/**
+ * The crawler names the dashboard groups in robots.txt. Kept as directives
+ * rather than a list so the group reads the same as the one it mirrors on the
+ * API origin. The dashboard's policy is `Disallow: /` for every one of them.
+ */
+const AI_CRAWLER_GROUPS = [
+  "OAI-SearchBot",
+  "ChatGPT-User",
+  "Claude-SearchBot",
+  "Claude-User",
+  "ClaudeBot",
+  "PerplexityBot",
+  "Perplexity-User",
+  "GPTBot",
+  "Google-Extended",
+  "Applebot-Extended",
+  "CCBot",
+  "Bytespider",
+  "Amazonbot",
+].map((crawler) => `User-agent: ${crawler}`);
 
 /**
  * robots.txt for public board hosts. Sites flagged `noIndex` (or a deployment
