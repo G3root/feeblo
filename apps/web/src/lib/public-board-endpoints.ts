@@ -63,10 +63,13 @@ const robotsResponse = (lines: ReadonlyArray<string>) =>
  * instruction, and the content signals say the same thing in the vocabulary a
  * signal-aware crawler reads. Both are `no` because there is nothing here a
  * crawler may use -- the public surface is the marketing site and the API.
+ *
+ * No `Sitemap:` line: this host is an authenticated shell with nothing
+ * indexable, and `e2e/tests/seo.spec.ts` pins that policy. The `sitemap.xml`
+ * route still answers for agents that probe it; advertising it to search
+ * crawlers would contradict the blanket disallow.
  */
-export function handleDashboardRobots(request: Request) {
-  const origin = new URL(request.url).origin;
-
+export function handleDashboardRobots() {
   return robotsResponse([
     "User-agent: *",
     "Content-Signal: search=no, ai-input=no, ai-train=no",
@@ -75,16 +78,15 @@ export function handleDashboardRobots(request: Request) {
     ...AI_CRAWLER_GROUPS,
     "Content-Signal: search=no, ai-input=no, ai-train=no",
     "Disallow: /",
-    "",
-    `Sitemap: ${origin}/sitemap.xml`,
   ]);
 }
 
 /**
  * sitemap.xml for the dashboard host. The dashboard has one public URL: the
- * root, which hands an anonymous visitor to the sign-in form. It is listed
- * rather than omitted because an agent that checks for the protocol should
- * find a valid document, not a 404 it has to interpret.
+ * root, which hands an anonymous visitor to the sign-in form. It is served,
+ * but not advertised in robots.txt, because the host is an authenticated shell
+ * with nothing indexable -- the document exists so an agent checking for the
+ * protocol finds one instead of a 404.
  */
 export function handleDashboardSitemap(request: Request) {
   const origin = new URL(request.url).origin;
