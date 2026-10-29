@@ -405,7 +405,34 @@ export const mcpServerCard = (origin: string) => ({
  * surface changes in a way a client can observe, which is a slower clock than
  * a deploy.
  */
+export const MCP_PROTOCOL_VERSIONS = [
+  "2026-07-28",
+  "2025-11-25",
+  "2025-06-18",
+  "2025-03-26",
+  "2024-11-05",
+] as const;
+
 export const mcpServerCardDocument = (origin: string) => ({
+  // Required by the Server Card extension, which uses a different shape from
+  // the multi-origin list above: identity and `remotes`, not `serverInfo` and
+  // `endpoint`.
+  $schema:
+    "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
+  name: "com.feeblo/public-api",
+  version: "1.0.0",
+  description:
+    "Read and manage one Feeblo workspace: posts, comments, votes, boards, and changelog.",
+  remotes: [
+    {
+      type: "streamable-http",
+      url: `${origin}${PUBLIC_API_MCP_PATH}`,
+      supportedProtocolVersions: MCP_PROTOCOL_VERSIONS,
+    },
+  ],
+  // Aliases kept for clients built against the earlier card draft and for the
+  // readiness scanner, which reads `serverInfo.name` or `name`. The extension
+  // leaves additional properties open, so both shapes travel together.
   serverInfo: {
     name: "feeblo-public-api",
     version: "1.0.0",
@@ -612,6 +639,13 @@ export const makeAgentDiscoveryRouter = (apiUrl: string) => {
           JSON_CONTENT_TYPE,
           {
             link: `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`,
+            // A hosted card MUST be readable by a browser-based client.
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET",
+              "Access-Control-Allow-Headers": "Content-Type, If-None-Match",
+              "Access-Control-Expose-Headers": "ETag",
+            },
           }
         )
       );

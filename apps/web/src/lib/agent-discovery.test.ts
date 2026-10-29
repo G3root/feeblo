@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  acceptsMarkdown,
   DASHBOARD_AGENT_CATALOG_PATH,
   DASHBOARD_API_CATALOG_PATH,
   DASHBOARD_AUTH_PATH,
@@ -11,6 +12,7 @@ import {
   dashboardAuthMarkdown,
   dashboardMarkdown,
   dashboardMcpServerCard,
+  wellKnownPath,
 } from "./agent-discovery";
 
 afterEach(() => {
@@ -71,6 +73,38 @@ describe("dashboard discovery documents", () => {
     expect(markdown).toContain("https://api.feeblo.com/mcp");
   });
 
+  it("emits the Server Card extension's required fields", () => {
+    vi.stubEnv("API_URL", "https://api.example.test");
+    const card = dashboardMcpServerCard();
+
+    expect(card.$schema).toBe(
+      "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json"
+    );
+    expect(card.name).toMatch(/^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/u);
+    expect(card.version).not.toBe("");
+    expect(card.description.length).toBeLessThanOrEqual(100);
+    expect(card.remotes[0]).toMatchObject({
+      type: "streamable-http",
+      url: "https://api.example.test/mcp",
+    });
+  });
+
+  it("restores the well-known prefix the splat route strips", () => {
+    expect(wellKnownPath("api-catalog")).toBe("/.well-known/api-catalog");
+    expect(wellKnownPath("/mcp/server-card.json")).toBe(
+      "/.well-known/mcp/server-card.json"
+    );
+    expect(wellKnownPath(undefined)).toBe("/.well-known/");
+  });
+
+  it("selects Markdown only when it is explicitly accepted", () => {
+    expect(acceptsMarkdown("text/markdown")).toBe(true);
+    expect(acceptsMarkdown("text/html, text/markdown;q=0.9")).toBe(true);
+    expect(acceptsMarkdown("text/markdown;q=0")).toBe(false);
+    expect(acceptsMarkdown("text/html, */*;q=0.8")).toBe(false);
+    expect(acceptsMarkdown(null)).toBe(false);
+  });
+
   it("links every discovery document with a registered relation", () => {
     expect(DASHBOARD_DISCOVERY_LINK).toContain(
       `<${DASHBOARD_AUTH_PATH}>; rel="describedby"`
@@ -82,7 +116,7 @@ describe("dashboard discovery documents", () => {
       `<${DASHBOARD_API_CATALOG_PATH}>; rel="api-catalog"`
     );
     expect(DASHBOARD_DISCOVERY_LINK).toContain(
-      `<${DASHBOARD_AGENT_CATALOG_PATH}>; rel="describedby"`
+      `<${DASHBOARD_AGENT_CATALOG_PATH}>; rel="ai-catalog"; type="application/ai-catalog+json"`
     );
   });
 });

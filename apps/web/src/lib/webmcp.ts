@@ -88,8 +88,10 @@ const API_ORIGIN_FALLBACK = "https://api.feeblo.com";
  */
 const apiOrigin = (configuration: string) => {
   try {
-    const url = new URL(configuration);
-    return url.origin;
+    // A relative value is the development proxy prefix (`/api`), so resolving
+    // it against the page origin keeps the reference on the origin the browser
+    // is already talking to. An absolute value ignores the base.
+    return new URL(configuration, window.location.origin).origin;
   } catch {
     return API_ORIGIN_FALLBACK;
   }

@@ -1,6 +1,7 @@
 import handler from "@tanstack/react-start/server-entry";
 
 import {
+  acceptsMarkdown,
   DASHBOARD_DISCOVERY_LINK,
   dashboardMarkdown,
   isDashboardRequest,
@@ -64,19 +65,20 @@ export default {
       dashboard &&
       request.method === "GET" &&
       url.pathname === "/" &&
-      (request.headers.get("accept")?.includes("text/markdown") ?? false)
+      acceptsMarkdown(request.headers.get("accept"))
     ) {
       const body = dashboardMarkdown(url.origin);
 
       return applyPageSecurityHeaders(
-        new Response(body, {
-          headers: {
-            "Cache-Control": "no-store",
-            "Content-Type": "text/markdown; charset=utf-8",
-            Vary: "Accept",
-            "x-markdown-tokens": String(Math.ceil(body.length / 4)),
-          },
-        }),
+        withRootDiscovery(
+          new Response(body, {
+            headers: {
+              "Cache-Control": "no-store",
+              "Content-Type": "text/markdown; charset=utf-8",
+              "x-markdown-tokens": String(Math.ceil(body.length / 4)),
+            },
+          })
+        ),
         securityOptions
       );
     }
@@ -89,16 +91,33 @@ export default {
     // rides on it whether or not the client asked for Markdown.
     const document =
       dashboard && url.pathname === "/"
-        ? withDiscoveryLink(response)
+        ? withRootDiscovery(response)
         : response;
 
     return applyPageSecurityHeaders(document, securityOptions);
   },
 };
 
-const withDiscoveryLink = (response: Response) => {
+/**
+ * The headers the root document carries in both representations.
+ *
+ * `Vary: Accept` is what keeps a shared cache from storing the HTML and then
+ * serving it to an agent that asked for Markdown, or the reverse. The shell's
+ * own cache policy allows shared caching, so the key has to include the header
+ * that selects the representation.
+ */
+const withRootDiscovery = (response: Response) => {
   const headers = new Headers(response.headers);
   headers.set("Link", DASHBOARD_DISCOVERY_LINK);
+
+  const vary = new Set(
+    (headers.get("Vary") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value !== "")
+  );
+  vary.add("Accept");
+  headers.set("Vary", [...vary].join(", "));
 
   return new Response(response.body, {
     status: response.status,

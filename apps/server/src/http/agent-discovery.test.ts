@@ -175,15 +175,42 @@ it.live("serves a SEP-1649 server card next to the multi-origin list", () =>
       const parsed = JSON.parse(
         yield* Effect.promise(() => response.text())
       ) as {
+        $schema: string;
+        name: string;
+        version: string;
+        description: string;
+        remotes: ReadonlyArray<{
+          type: string;
+          url: string;
+          supportedProtocolVersions: ReadonlyArray<string>;
+        }>;
         serverInfo: { name: string; version: string };
         endpoint: string;
         capabilities: { tools: unknown };
       };
 
+      // The Server Card extension's required fields.
+      expect(parsed.$schema).toBe(
+        "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json"
+      );
+      expect(parsed.name).toMatch(/^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/u);
+      expect(parsed.version).not.toBe("");
+      expect(parsed.description.length).toBeLessThanOrEqual(100);
+      expect(parsed.remotes[0]).toMatchObject({
+        type: "streamable-http",
+        url: "https://api.feeblo.com/mcp",
+      });
+      expect(
+        parsed.remotes[0]?.supportedProtocolVersions.length
+      ).toBeGreaterThan(0);
+
+      // The earlier card draft's fields, kept for clients and the scanner.
       expect(parsed.serverInfo.name).toBe("feeblo-public-api");
-      expect(parsed.serverInfo.version).not.toBe("");
       expect(parsed.endpoint).toBe("https://api.feeblo.com/mcp");
       expect(parsed.capabilities).toHaveProperty("tools");
+
+      // A hosted card MUST be readable by a browser-based client.
+      expect(response.headers.get("access-control-allow-origin")).toBe("*");
 
       // The list the docs and the landing page link to stays available, so an
       // agent that learned that shape is not broken by the new one.

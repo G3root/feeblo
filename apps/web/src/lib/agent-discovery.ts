@@ -113,6 +113,29 @@ export const dashboardMcpServerCard = () => {
   const api = apiOrigin();
 
   return {
+    // The Server Card extension's required fields. `remotes` is where the
+    // transport lives; `serverInfo`/`endpoint` below are the earlier draft's
+    // fields, kept because the readiness scanner and older clients read them
+    // and the extension leaves additional properties open.
+    $schema:
+      "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
+    name: "com.feeblo/public-api",
+    version: "1.0.0",
+    description:
+      "Read and manage one Feeblo workspace: posts, comments, votes, boards, and changelog.",
+    remotes: [
+      {
+        type: "streamable-http",
+        url: `${api}${PUBLIC_API_MCP_PATH}`,
+        supportedProtocolVersions: [
+          "2026-07-28",
+          "2025-11-25",
+          "2025-06-18",
+          "2025-03-26",
+          "2024-11-05",
+        ],
+      },
+    ],
     serverInfo: { name: "feeblo-public-api", version: "1.0.0" },
     endpoint: `${api}${PUBLIC_API_MCP_PATH}`,
     transport: { type: "streamable-http" },
@@ -243,6 +266,50 @@ export const DASHBOARD_DISCOVERY_LINK = [
   `<${DASHBOARD_AUTH_PATH}>; rel="describedby"; type="text/markdown"`,
   `<${DASHBOARD_MCP_SERVER_CARD_PATH}>; rel="service-desc"; type="application/json"`,
   `<${DASHBOARD_API_CATALOG_PATH}>; rel="api-catalog"; type="application/linkset+json"`,
-  `<${DASHBOARD_AGENT_CATALOG_PATH}>; rel="describedby"; type="application/json"`,
+  `<${DASHBOARD_AGENT_CATALOG_PATH}>; rel="ai-catalog"; type="application/ai-catalog+json"`,
   `</sitemap.xml>; rel="alternate"; type="application/xml"`,
 ].join(", ");
+
+/**
+ * The full path for a splat captured by the `/.well-known/$` route.
+ *
+ * The splat is only the part after `/.well-known/`, so the prefix has to be
+ * restored before the document switch can match a path constant.
+ */
+export const wellKnownPath = (splat: string | undefined) =>
+  `/.well-known/${(splat ?? "").replace(/^\/+/u, "")}`;
+
+/**
+ * Whether the request asks for Markdown.
+ *
+ * Only an explicit `text/markdown` media range selects the Markdown document. A
+ * wildcard does not: a browser sends `*` / `*` on a normal navigation, and
+ * answering that with Markdown would replace the app for a person. A `q=0`
+ * range is a refusal, not a request.
+ */
+export const acceptsMarkdown = (accept: string | null) => {
+  if (accept === null) {
+    return false;
+  }
+
+  for (const range of accept.split(",")) {
+    const [type, ...parameters] = range.trim().split(";");
+
+    if (type.trim().toLowerCase() !== "text/markdown") {
+      continue;
+    }
+
+    const quality = parameters
+      .map((parameter) => parameter.trim())
+      .find((parameter) => parameter.startsWith("q="));
+
+    if (quality === undefined) {
+      return true;
+    }
+
+    const weight = Number.parseFloat(quality.slice(2));
+    return Number.isFinite(weight) && weight > 0;
+  }
+
+  return false;
+};

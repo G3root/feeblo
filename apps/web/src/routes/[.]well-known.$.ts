@@ -9,6 +9,7 @@ import {
   dashboardMcpServerCard,
   isDashboardRequest,
   type DashboardDiscoveryDocument,
+  wellKnownPath,
 } from "@/lib/agent-discovery";
 
 /**
@@ -39,11 +40,17 @@ export const Route = createFileRoute("/.well-known/$")({
           return new Response("Not found", { status: 404 });
         }
 
-        const path = `/${(params._splat ?? "").replace(/^\/+/u, "")}`;
+        const path = wellKnownPath(params._splat);
 
         switch (path) {
           case DASHBOARD_MCP_SERVER_CARD_PATH:
-            return jsonResponse(dashboardMcpServerCard());
+            return jsonResponse(dashboardMcpServerCard(), {
+              // A hosted card MUST be readable by a browser-based client.
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET",
+              "Access-Control-Allow-Headers": "Content-Type, If-None-Match",
+              "Access-Control-Expose-Headers": "ETag",
+            });
           case DASHBOARD_API_CATALOG_PATH:
             return jsonResponse(dashboardApiCatalog(), {
               "Content-Type":
