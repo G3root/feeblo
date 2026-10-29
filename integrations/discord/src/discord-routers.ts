@@ -131,6 +131,13 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
             );
           }
           if (code === null || state === null) {
+            yield* Effect.logWarning(
+              "Discord OAuth callback was missing its code or state",
+              {
+                organizationId: organizationIdFromOAuthState(state),
+                provider: "discord",
+              }
+            );
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
@@ -146,6 +153,11 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
             management.connectComplete({ code, state })
           );
           if (Exit.isFailure(completed)) {
+            yield* Effect.logError("Discord OAuth installation failed", {
+              cause: completed.cause,
+              organizationId: organizationIdFromOAuthState(state),
+              provider: "discord",
+            });
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
