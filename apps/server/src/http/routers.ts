@@ -16,10 +16,28 @@ import * as Layer from "effect/Layer";
 
 import { handleBetterAuthRequest } from "./body-limit";
 
+/**
+ * The OAuth provider's discovery documents that live at the API origin root.
+ *
+ * RFC 8414 puts authorization-server metadata at
+ * `/.well-known/oauth-authorization-server` with the issuer's path inserted,
+ * and RFC 9728 puts protected-resource metadata at
+ * `/.well-known/oauth-protected-resource` (plus the resource path). The auth
+ * handler is mounted under `/api/auth`, so these three paths would otherwise
+ * never reach the provider — and the provider, not a hand-copied document, has
+ * to be the authority. See `docs/adr/0024`.
+ */
+const OAUTH_DISCOVERY_PATHS = [
+  "/.well-known/oauth-protected-resource",
+  "/.well-known/oauth-protected-resource/mcp",
+  "/.well-known/oauth-authorization-server/api/auth",
+] as const;
+
 export const BetterAuthRouterLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const auth = yield* Auth;
-    return yield* router.add("*", "/api/auth/*", (request) =>
+
+    const forward = (request: HttpServerRequest.HttpServerRequest) =>
       Effect.gen(function* () {
         const clientIp = yield* ClientIp;
         const authApp = HttpEffect.fromWebHandler((webRequest) => {
@@ -43,8 +61,12 @@ export const BetterAuthRouterLive = HttpRouter.use((router) =>
           HttpServerRequest.HttpServerRequest,
           request
         );
-      }).pipe(Effect.orDie)
-    );
+      }).pipe(Effect.orDie);
+
+    yield* router.add("*", "/api/auth/*", forward);
+    for (const path of OAUTH_DISCOVERY_PATHS) {
+      yield* router.add("GET", path, forward);
+    }
   })
 );
 

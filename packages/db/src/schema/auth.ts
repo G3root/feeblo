@@ -93,10 +93,10 @@ export const accountTable = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
-    // better-auth >= 1.7 identifies OAuth identities by issuer (RFC 9207).
-    // Synthetic issuers: "local:credential" (email/password),
-    // "local:oauth:<providerId>" (social).
-    issuer: text("issuer").notNull(),
+    // No `issuer` column: 1.7.0–1.7.2 added a required one, and 1.7.3 removed
+    // the requirement (accounts are identified by providerId + accountId
+    // again). Better Auth never writes it, so keeping it NOT NULL rejects
+    // every sign-up; the migration drops the column and its compound index.
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -120,13 +120,10 @@ export const accountTable = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [
-    index("account_userId_idx").on(table.userId),
-    uniqueIndex("account_issuer_account_id_uidx").on(
-      table.issuer,
-      table.accountId
-    ),
-  ]
+  // The 1.7.0–1.7.2 compound unique index on (issuer, accountId) went with
+  // the column; `accountId` alone is not unique, because two providers may
+  // issue the same account id.
+  (table) => [index("account_userId_idx").on(table.userId)]
 );
 
 export const verificationTable = pgTable(

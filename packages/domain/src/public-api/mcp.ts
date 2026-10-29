@@ -18,6 +18,7 @@ import { RateLimitService } from "../rate-limit/service";
 import {
   authenticatePublicApiKey,
   type PublicApiAuthenticationFailure,
+  type PublicApiCall,
   type PublicApiKeyBudget,
   publicApiRateLimitHeaders,
 } from "./api-key-auth";
@@ -26,6 +27,7 @@ import {
   internalError,
   InvalidApiKeyError,
   MissingApiKeyError,
+  missingApiKeyError,
   PlanRequiresUpgradeError,
   RateLimitedError,
   ServiceUnavailableError,
@@ -35,6 +37,7 @@ import {
   PublicApiCaller,
   PUBLIC_API_KEY_RATE_LIMIT,
 } from "./middleware";
+import { authenticateMcpAccessToken } from "./oauth-auth";
 import { PublicApiOperations } from "./operations";
 import type { PublicApiDependencies } from "./operations";
 import { PublicApiProjections } from "./projections";
@@ -49,11 +52,13 @@ import { PublicApiInternals } from "./router";
  * cannot receive a different answer for the same call than the HTTP surface
  * does, and neither surface owns the behavior.
  *
- * The key is the Public API key, resolved by the same
- * `authenticatePublicApiKey` the HTTP middleware calls: presence, verification,
- * the per-key budget, and the plan gate are one implementation, and the caller
- * it returns is provided to the tool handlers. The operation still enforces its
- * own scope (`defineOperation` wraps every handler), so a key that lacks a
+ * Two credentials produce the same caller. An `x-api-key` is resolved by the
+ * same `authenticatePublicApiKey` the HTTP middleware calls; an
+ * `Authorization: Bearer` OAuth access token is verified by `@feeblo/auth` and
+ * mapped by `authenticateMcpAccessToken`. Presence, verification, the budget,
+ * and the plan gate are one implementation per credential, and the caller both
+ * return is provided to the tool handlers. The operation still enforces its own
+ * scope (`defineOperation` wraps every handler), so a credential that lacks a
  * scope sees the tool but is refused when it calls it.
  */
 
@@ -269,25 +274,89 @@ const publicApiFailureResponse = (
 };
 
 /**
- * The key gate for `/mcp`.
+ * The OAuth challenge, as a JSON-RPC error.
+ *
+ * The headers are the provider's own RFC 9728 `resource_metadata` pointer (and,
+ * for a scope failure, the RFC 6750 `insufficient_scope` challenge); this only
+ * frames the refusal in the shape an MCP client parses.
+ */
+const mcpChallengeResponse = (rejection: {
+  readonly headers: Readonly<Record<string, string>>;
+  readonly message: string;
+  readonly status: number;
+}) =>
+  HttpServerResponse.jsonUnsafe(
+    {
+      jsonrpc: "2.0",
+      error: { code: -32_000, message: rejection.message },
+      id: null,
+    },
+    { headers: rejection.headers, status: rejection.status }
+  );
+
+/**
+ * The credential gate for `/mcp`.
+ *
+ * Two credentials resolve to the same caller (docs/adr/0024):
+ *
+ * - `x-api-key` is a workspace's machine credential and is checked by
+ *   `authenticatePublicApiKey`, the same function the `/api/v1` middleware
+ *   calls.
+ * - `Authorization: Bearer` is an OAuth 2.1 access token from this deployment's
+ *   own authorization server. Its verification lives in `@feeblo/auth`; the
+ *   plan gate, budget and scope mapping are shared with the key path.
+ *
+ * A key wins when both are present, so a client that configures both keeps the
+ * key's exact behavior. A request with no credential at all takes the OAuth
+ * path so it receives the `WWW-Authenticate` header that starts the
+ * authorization flow — that header is additive to the key surface's 401 body.
  *
  * A route middleware rather than an `HttpApiMiddleware` because the MCP
- * transport registers its own `HttpRouter` route; it calls the same
- * `authenticatePublicApiKey`, so the two surfaces cannot drift into different
- * key, budget, or plan behavior. The `McpServer` layer is responsible for
- * origin and protocol checks; authentication runs first, so an unauthenticated
- * request never reaches JSON-RPC parsing.
+ * transport registers its own `HttpRouter` route. The `McpServer` layer is
+ * responsible for origin and protocol checks; authentication runs first, so an
+ * unauthenticated request never reaches JSON-RPC parsing.
  */
-const makePublicApiMcpKeyMiddleware = (budget: PublicApiKeyBudget) =>
+const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
   HttpRouter.middleware(
     Effect.gen(function* () {
-      // The services the key check needs are resolved once, when the route is
-      // built, and supplied to each request's check below. That is what lets
-      // this middleware take no request-time requirements of its own, which is
-      // the form a route-scoped `HttpRouter` middleware can be provided in.
+      // The services the checks need are resolved once, when the route is
+      // built, and supplied to each request below. That is what lets this
+      // middleware take no request-time requirements of its own, which is the
+      // form a route-scoped `HttpRouter` middleware can be provided in.
       const auth = yield* Auth;
       const entitlementPolicy = yield* EntitlementPolicy;
       const rateLimitService = yield* RateLimitService;
+
+      const withCaller = (
+        httpEffect: Effect.Effect<
+          HttpServerResponse.HttpServerResponse,
+          unhandled,
+          never
+        >,
+        call: PublicApiCall
+      ) =>
+        Effect.gen(function* () {
+          // The same `X-RateLimit-*` headers the HTTP surface sends, for the
+          // same reason: a client pacing itself should not have to learn the
+          // budget from a 429.
+          const now = yield* Clock.currentTimeMillis;
+          const headers = publicApiRateLimitHeaders(call.rateLimit, now);
+          return yield* httpEffect.pipe(
+            Effect.provideService(PublicApiCaller, call),
+            Effect.map((response) =>
+              HttpServerResponse.setHeaders(response, headers)
+            )
+          );
+        });
+
+      const resolved = <A, E>(
+        check: Effect.Effect<A, E, Auth | EntitlementPolicy | RateLimitService>
+      ) =>
+        check.pipe(
+          Effect.provideService(Auth, auth),
+          Effect.provideService(EntitlementPolicy, entitlementPolicy),
+          Effect.provideService(RateLimitService, rateLimitService)
+        );
 
       return (
         httpEffect: Effect.Effect<
@@ -302,30 +371,51 @@ const makePublicApiMcpKeyMiddleware = (budget: PublicApiKeyBudget) =>
             request.headers[PUBLIC_API_KEY_HEADER] ?? ""
           ).trim();
 
-          return yield* authenticatePublicApiKey(presented, budget).pipe(
-            Effect.provideService(Auth, auth),
-            Effect.provideService(EntitlementPolicy, entitlementPolicy),
-            Effect.provideService(RateLimitService, rateLimitService),
+          if (presented.length > 0) {
+            return yield* resolved(
+              authenticatePublicApiKey(presented, budget)
+            ).pipe(
+              Effect.matchEffect({
+                onFailure: (failure) =>
+                  Effect.succeed(publicApiFailureResponse(failure)),
+                onSuccess: (call) => withCaller(httpEffect, call),
+              })
+            );
+          }
+
+          const verification = yield* Effect.promise(() =>
+            auth.api.verifyMcpAccessToken({
+              authorizationHeader: request.headers["authorization"] ?? "",
+              method: request.method,
+              url: request.url,
+              dpopProof: request.headers["dpop"] ?? null,
+            })
+          );
+
+          if (verification._tag === "Rejected") {
+            // A request with no credential at all keeps the key surface's
+            // documented 401 envelope and gains the OAuth challenge header:
+            // a key client sees the body it always did, and a client that only
+            // speaks OAuth learns where the authorization server is.
+            if (
+              presented.length === 0 &&
+              (request.headers["authorization"] ?? "").trim().length === 0
+            ) {
+              return HttpServerResponse.setHeaders(
+                publicApiFailureResponse(missingApiKeyError()),
+                verification.headers
+              );
+            }
+            return mcpChallengeResponse(verification);
+          }
+
+          return yield* resolved(
+            authenticateMcpAccessToken(verification.claims, budget)
+          ).pipe(
             Effect.matchEffect({
               onFailure: (failure) =>
                 Effect.succeed(publicApiFailureResponse(failure)),
-              onSuccess: (call) =>
-                Effect.gen(function* () {
-                  // The same `X-RateLimit-*` headers the HTTP surface sends,
-                  // for the same reason: a client pacing itself should not
-                  // have to learn the budget from a 429.
-                  const now = yield* Clock.currentTimeMillis;
-                  const headers = publicApiRateLimitHeaders(
-                    call.rateLimit,
-                    now
-                  );
-                  return yield* httpEffect.pipe(
-                    Effect.provideService(PublicApiCaller, call),
-                    Effect.map((response) =>
-                      HttpServerResponse.setHeaders(response, headers)
-                    )
-                  );
-                }),
+              onSuccess: (call) => withCaller(httpEffect, call),
             })
           );
         });
@@ -384,7 +474,7 @@ export const makePublicApiMcpRoute = (
       );
     })
   ).pipe(
-    Layer.provide(makePublicApiMcpKeyMiddleware(budget)),
+    Layer.provide(makePublicApiMcpAuthMiddleware(budget)),
     // A protocol list this module declares is static; an illegal one (two
     // stateless adapters, for example) is a programming error, not a runtime
     // condition a caller can act on.

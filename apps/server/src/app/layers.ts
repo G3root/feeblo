@@ -208,12 +208,16 @@ export const makeWorkflowLayer = (
       );
 
 export const makeAuthLayer = (
+  /** `API_URL`: the MCP resource identifier is built from it. */
+  apiUrl: string,
   makeMailerLayer: () => Layer.Layer<Mailer, Layer.Error<typeof Mailer.layer>>,
   rateLimitLayer: Layer.Layer<RateLimitService, Redis.RedisError>
 ) =>
   Layer.effect(
     Auth,
-    Effect.map(initAuthHandler(makeMailerLayer, rateLimitLayer), toAuthHandler)
+    Effect.map(initAuthHandler(makeMailerLayer, rateLimitLayer), (auth) =>
+      toAuthHandler(auth, apiUrl)
+    )
   );
 
 export const makeServiceLayers = ({

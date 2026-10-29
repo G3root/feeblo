@@ -21,7 +21,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import type { ApiKeyAuthRecord } from "../api-key/schema";
-import { Auth } from "../auth-handler";
+import { Auth, type McpAccessTokenClaims } from "../auth-handler";
 import { BoardRepository } from "../board/repository";
 import { CompanyRepository } from "../company/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
@@ -61,6 +61,26 @@ export const dateAt = (instant: string | number | Date): Date =>
 /** Keys the stub verifier accepts, keyed by the presented secret. */
 const acceptedKeys = new Map<string, ApiKeyAuthRecord>();
 
+/**
+ * OAuth grants the stub verifier accepts, keyed by the bearer token.
+ *
+ * The real verifier checks a JWT against the deployment's JWKS and its
+ * `postLogin`-bound workspace claim; a test registers the claims it wants the
+ * `/mcp` gate to act on, which is the part the gate owns.
+ */
+const acceptedMcpTokens = new Map<string, McpAccessTokenClaims>();
+
+/** Registers an access token the stub verifier answers `Verified` for. */
+export const registerMcpToken = (
+  token: string,
+  claims: McpAccessTokenClaims
+) => {
+  acceptedMcpTokens.set(token, claims);
+};
+
+/** The `Authorization` value a test presents for a registered token. */
+export const mcpBearer = (token: string) => `Bearer ${token}`;
+
 const unusedApiKeyMethod = () => () =>
   Promise.reject(new Error("Not available in this composition"));
 
@@ -68,6 +88,24 @@ const AuthTest = Layer.succeed(Auth, {
   handler: () => new Response(),
   api: {
     getSession: async () => null,
+    // The real verifier answers an unauthenticated request with the RFC 9728
+    // challenge the provider builds; the resource is the test origin.
+    verifyMcpAccessToken: async ({ authorizationHeader }) => {
+      const token = authorizationHeader.replace(/^Bearer\s+/i, "");
+      const claims = acceptedMcpTokens.get(token);
+      if (claims === undefined) {
+        return {
+          _tag: "Rejected" as const,
+          status: 401,
+          message: "Not available in this composition.",
+          headers: {
+            "www-authenticate":
+              'Bearer resource_metadata="https://api.example.test/.well-known/oauth-protected-resource/mcp"',
+          },
+        };
+      }
+      return { _tag: "Verified" as const, claims };
+    },
     createApiKey: unusedApiKeyMethod(),
     verifyApiKey: async ({ body }) => {
       if (body.key === "fbk_verifier_failure") {

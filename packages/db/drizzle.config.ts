@@ -12,6 +12,7 @@ export default defineConfig({
     "./src/schema/feedback.ts",
     "./src/schema/integration.ts",
     "./src/schema/media.ts",
+    "./src/schema/oauth.ts",
   ],
   out: "./src/migrations",
   dialect: "postgresql",

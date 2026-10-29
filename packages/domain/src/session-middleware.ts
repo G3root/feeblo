@@ -8,7 +8,14 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
 
-import { Auth, type AuthHandler, type Session } from "./auth-handler";
+import {
+  Auth,
+  type AuthHandler,
+  type McpAccessTokenClaims,
+  type McpAccessTokenRequest,
+  type McpAccessTokenVerification,
+  type Session,
+} from "./auth-handler";
 import { UnauthorizedError } from "./rpc-errors";
 import {
   getSessionCookieName,
@@ -29,7 +36,14 @@ export const getSessionCookieForApiUrl = getSessionCookieNameForUrl;
  * and ADR 0004). Re-exported here for the many call sites that already import
  * it alongside session services.
  */
-export { Auth, type AuthHandler, type Session };
+export {
+  Auth,
+  type AuthHandler,
+  type McpAccessTokenClaims,
+  type McpAccessTokenRequest,
+  type McpAccessTokenVerification,
+  type Session,
+};
 
 /** @effect-leakable-service */
 export class CurrentSession extends Context.Service<CurrentSession, Session>()(

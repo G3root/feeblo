@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from "./routes/__root"
 import { Route as AuthRouteImport } from "./routes/_auth"
 import { Route as DashboardRouteImport } from "./routes/_dashboard"
+import { Route as OauthRouteImport } from "./routes/oauth"
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt"
 import { Route as SRouteRouteImport } from "./routes/s/route"
 import { Route as SentryTunnelRouteImport } from "./routes/sentry-tunnel"
@@ -23,6 +24,8 @@ import { Route as DashboardEmailVerifyRouteImport } from "./routes/_dashboard/em
 import { Route as DashboardRegisterRouteImport } from "./routes/_dashboard/register"
 import { Route as DashboardResetPasswordRouteImport } from "./routes/_dashboard/reset-password"
 import { Route as FeedbackWidgetOrganizationIdRouteImport } from "./routes/feedback-widget/$organizationId"
+import { Route as OauthConsentRouteImport } from "./routes/oauth/consent"
+import { Route as OauthSelectWorkspaceRouteImport } from "./routes/oauth/select-workspace"
 import { Route as SIndexRouteImport } from "./routes/s/index"
 import { Route as SSplatRouteImport } from "./routes/s/$"
 import { Route as SLlmsDottxtRouteImport } from "./routes/s/llms[.]txt"
@@ -90,6 +93,11 @@ const DashboardRoute = DashboardRouteImport.update({
   id: "/_dashboard",
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthRoute = OauthRouteImport.update({
+  id: "/oauth",
+  path: "/oauth",
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: "/robots.txt",
   path: "/robots.txt",
@@ -151,6 +159,16 @@ const FeedbackWidgetOrganizationIdRoute =
     path: "/feedback-widget/$organizationId",
     getParentRoute: () => rootRouteImport,
   } as any)
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: "/consent",
+  path: "/consent",
+  getParentRoute: () => OauthRoute,
+} as any)
+const OauthSelectWorkspaceRoute = OauthSelectWorkspaceRouteImport.update({
+  id: "/select-workspace",
+  path: "/select-workspace",
+  getParentRoute: () => OauthRoute,
+} as any)
 const SIndexRoute = SIndexRouteImport.update({
   id: "/",
   path: "/",
@@ -495,6 +513,7 @@ const DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute =
 export interface FileRoutesByFullPath {
   "/s": typeof SRouteRouteWithChildren
   "/": typeof DashboardRouteWithChildren
+  "/oauth": typeof OauthRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
@@ -506,6 +525,8 @@ export interface FileRoutesByFullPath {
   "/register": typeof DashboardRegisterRoute
   "/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
+  "/oauth/consent": typeof OauthConsentRoute
+  "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -566,6 +587,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   "/": typeof DashboardRouteWithChildren
+  "/oauth": typeof OauthRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/forgot-password": typeof AuthForgotPasswordRoute
@@ -577,6 +599,8 @@ export interface FileRoutesByTo {
   "/register": typeof DashboardRegisterRoute
   "/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
+  "/oauth/consent": typeof OauthConsentRoute
+  "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -638,6 +662,7 @@ export interface FileRoutesById {
   "/s": typeof SRouteRouteWithChildren
   "/_auth": typeof AuthRouteWithChildren
   "/_dashboard": typeof DashboardRouteWithChildren
+  "/oauth": typeof OauthRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/_auth/forgot-password": typeof AuthForgotPasswordRoute
@@ -649,6 +674,8 @@ export interface FileRoutesById {
   "/_dashboard/register": typeof DashboardRegisterRoute
   "/_dashboard/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
+  "/oauth/consent": typeof OauthConsentRoute
+  "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -713,6 +740,7 @@ export interface FileRouteTypes {
   fullPaths:
     | "/s"
     | "/"
+    | "/oauth"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/forgot-password"
@@ -724,6 +752,8 @@ export interface FileRouteTypes {
     | "/register"
     | "/reset-password"
     | "/feedback-widget/$organizationId"
+    | "/oauth/consent"
+    | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
     | "/s/robots.txt"
@@ -784,6 +814,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | "/"
+    | "/oauth"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/forgot-password"
@@ -795,6 +826,8 @@ export interface FileRouteTypes {
     | "/register"
     | "/reset-password"
     | "/feedback-widget/$organizationId"
+    | "/oauth/consent"
+    | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
     | "/s/robots.txt"
@@ -855,6 +888,7 @@ export interface FileRouteTypes {
     | "/s"
     | "/_auth"
     | "/_dashboard"
+    | "/oauth"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/_auth/forgot-password"
@@ -866,6 +900,8 @@ export interface FileRouteTypes {
     | "/_dashboard/register"
     | "/_dashboard/reset-password"
     | "/feedback-widget/$organizationId"
+    | "/oauth/consent"
+    | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
     | "/s/robots.txt"
@@ -930,6 +966,7 @@ export interface RootRouteChildren {
   SRouteRoute: typeof SRouteRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
+  OauthRoute: typeof OauthRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SentryTunnelRoute: typeof SentryTunnelRoute
   FeedbackWidgetOrganizationIdRoute: typeof FeedbackWidgetOrganizationIdRoute
@@ -950,6 +987,13 @@ declare module "@tanstack/react-router" {
       path: ""
       fullPath: "/"
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/oauth": {
+      id: "/oauth"
+      path: "/oauth"
+      fullPath: "/oauth"
+      preLoaderRoute: typeof OauthRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/robots.txt": {
@@ -1035,6 +1079,20 @@ declare module "@tanstack/react-router" {
       fullPath: "/feedback-widget/$organizationId"
       preLoaderRoute: typeof FeedbackWidgetOrganizationIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    "/oauth/consent": {
+      id: "/oauth/consent"
+      path: "/consent"
+      fullPath: "/oauth/consent"
+      preLoaderRoute: typeof OauthConsentRouteImport
+      parentRoute: typeof OauthRoute
+    }
+    "/oauth/select-workspace": {
+      id: "/oauth/select-workspace"
+      path: "/select-workspace"
+      fullPath: "/oauth/select-workspace"
+      preLoaderRoute: typeof OauthSelectWorkspaceRouteImport
+      parentRoute: typeof OauthRoute
     }
     "/s/": {
       id: "/s/"
@@ -1681,10 +1739,23 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
+interface OauthRouteChildren {
+  OauthConsentRoute: typeof OauthConsentRoute
+  OauthSelectWorkspaceRoute: typeof OauthSelectWorkspaceRoute
+}
+
+const OauthRouteChildren: OauthRouteChildren = {
+  OauthConsentRoute: OauthConsentRoute,
+  OauthSelectWorkspaceRoute: OauthSelectWorkspaceRoute,
+}
+
+const OauthRouteWithChildren = OauthRoute._addFileChildren(OauthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   SRouteRoute: SRouteRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
+  OauthRoute: OauthRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SentryTunnelRoute: SentryTunnelRoute,
   FeedbackWidgetOrganizationIdRoute: FeedbackWidgetOrganizationIdRoute,
@@ -1693,12 +1764,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from "./router.tsx"
-import type { createStart } from "@tanstack/react-start"
-declare module "@tanstack/react-start" {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

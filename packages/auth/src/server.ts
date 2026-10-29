@@ -1,3 +1,6 @@
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
+import { mcp } from "@better-auth/mcp";
 import { NodeCrypto } from "@effect/platform-node";
 import { Database, transaction } from "@feeblo/db";
 import * as schema from "@feeblo/db/schema";
@@ -37,6 +40,7 @@ import {
   captcha,
   customSession,
   emailOTP,
+  jwt,
   lastLoginMethod,
   organization,
   testUtils,
@@ -63,6 +67,11 @@ import { enforcePublicApiKeyPlan, publicApiKeyPlugin } from "./api-key-config";
 import { AUTH_CLIENT_IP_HEADER } from "./auth-client-ip-header";
 import { clientTimeZoneHeader, isValidTimeZone } from "./client-time-zone";
 import { AuthConfig } from "./config";
+import {
+  MCP_OAUTH_SCOPES,
+  MCP_WORKSPACE_CLAIM,
+  mcpResourceUrl,
+} from "./mcp-oauth";
 import {
   ORGANIZATION_ROLES,
   organizationAccessControl,
@@ -302,6 +311,33 @@ export const initAuthHandler = (
           })
         );
       },
+    };
+
+    /**
+     * The workspaces a member belongs to.
+     *
+     * The OAuth provider's workspace hooks and the dashboard's `customSession`
+     * both read this, so the consent flow cannot authorize a workspace the
+     * member is not in even though it reached the provider with a stale
+     * `activeOrganizationId`.
+     */
+    const listMembershipOrganizationIds = (userId: string) =>
+      callbackRuntime.runPromise(
+        db
+          .select({ organizationId: schema.memberTable.organizationId })
+          .from(schema.memberTable)
+          .where(eq(schema.memberTable.userId, userId))
+      );
+
+    const activeOrganizationIdOf = (session: {
+      // `userId` keeps this a concrete session record rather than a weak type
+      // with only an optional member, which an intersection with Better Auth's
+      // `Record<string, unknown>` is not assignable to.
+      readonly userId: string;
+      readonly activeOrganizationId?: unknown;
+    }): string | null => {
+      const value = session.activeOrganizationId;
+      return isString(value) && value.length > 0 ? value : null;
     };
 
     const runCallbackPolicy = async <A, E>(
@@ -696,6 +732,17 @@ export const initAuthHandler = (
           invitation: schema.invitationTable,
           twoFactor: schema.twoFactorTable,
           apikey: schema.apiKeyTable,
+          // The MCP authorization server's tables (docs/adr/0024). The keys
+          // are the provider's model names; the adapter resolves a model by
+          // this key, so a rename here fails at request time, not compile time.
+          jwks: schema.jwksTable,
+          oauthClient: schema.oauthClientTable,
+          oauthResource: schema.oauthResourceTable,
+          oauthClientResource: schema.oauthClientResourceTable,
+          oauthRefreshToken: schema.oauthRefreshTokenTable,
+          oauthAccessToken: schema.oauthAccessTokenTable,
+          oauthConsent: schema.oauthConsentTable,
+          oauthClientAssertion: schema.oauthClientAssertionTable,
         },
       }),
 
@@ -797,6 +844,89 @@ export const initAuthHandler = (
       },
       plugins: [
         ...baseConfig.plugins,
+
+        // The MCP surface's authorization server (docs/adr/0024). `jwt()` is
+        // required by the provider: it signs the access tokens and serves the
+        // JWKS the `/mcp` route verifies against. `mcp()` *is* the OAuth
+        // provider, so there must be no separate `oauthProvider()` plugin.
+        jwt(),
+        mcp({
+          loginPage: `${appUrl}/sign-in`,
+          consentPage: `${appUrl}/oauth/consent`,
+          // The protected-resource identifier; issued tokens carry it as
+          // `aud`, and `/mcp` verifies against the same value.
+          resource: mcpResourceUrl(apiUrl),
+          // The Public API's scope vocabulary, plus the OIDC scopes an MCP
+          // client requests for identity. The consent page narrows the grant;
+          // the operation's own scope check is still the authority.
+          scopes: [...MCP_OAUTH_SCOPES],
+
+          // Both client-registration mechanisms: CIMD is the MCP 2026-07-28
+          // profile, and current clients (Cursor, older Claude Code) still
+          // register dynamically. Consent is never skipped, so a registered
+          // client grants nothing until a member approves it for a workspace.
+          allowDynamicClientRegistration: true,
+          allowUnauthenticatedClientRegistration: true,
+          clientRegistrationDefaultApplicationType: "infer",
+
+          postLogin: {
+            // The workspace chooser. A member may belong to several
+            // workspaces, and an OAuth grant is for one of them, so the grant
+            // cannot be created from a user identity alone.
+            page: `${appUrl}/oauth/select-workspace`,
+            shouldRedirect: async ({ user, session, isContinuation }) => {
+              const activeOrganizationId = activeOrganizationIdOf(session);
+              const memberships = await listMembershipOrganizationIds(user.id);
+              // No workspace at all: let consent refuse with a clear message
+              // rather than sending the member to a chooser with no options.
+              if (memberships.length === 0) {
+                return false;
+              }
+              if (
+                activeOrganizationId === null ||
+                !memberships.some(
+                  (membership) =>
+                    membership.organizationId === activeOrganizationId
+                )
+              ) {
+                return true;
+              }
+              // Ask once per authorization; a continuation proves the page ran.
+              return !isContinuation && memberships.length > 1;
+            },
+            // The consent's workspace. Consent is stored per reference, so a
+            // member who authorizes the same client in two workspaces has two
+            // independent grants.
+            consentReferenceId: async ({ user, session }) => {
+              const activeOrganizationId = activeOrganizationIdOf(session);
+              const memberships = await listMembershipOrganizationIds(user.id);
+              const isMember =
+                activeOrganizationId !== null &&
+                memberships.some(
+                  (membership) =>
+                    membership.organizationId === activeOrganizationId
+                );
+              if (!isMember) {
+                throw new APIError("BAD_REQUEST", {
+                  error: "set_organization",
+                  error_description:
+                    "Choose a workspace before authorizing this application.",
+                });
+              }
+              return activeOrganizationId;
+            },
+          },
+
+          // The workspace is a claim, not a default: `/mcp` refuses a token
+          // without it instead of choosing a tenant.
+          customAccessTokenClaims: ({ referenceId }) =>
+            referenceId ? { [MCP_WORKSPACE_CLAIM]: referenceId } : {},
+        }),
+        cimd({
+          fetchClientMetadataResource,
+          metadataProfile: "mcp-2026-07-28",
+        }),
+
         ...(emulatorProviders.length > 0
           ? [genericOAuth({ config: emulatorProviders })]
           : []),
