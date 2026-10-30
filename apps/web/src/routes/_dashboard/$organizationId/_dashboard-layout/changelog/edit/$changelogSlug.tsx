@@ -9,7 +9,7 @@ import {
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useRef } from "react";
+import { useState } from "react";
 
 import { ChangelogCompletedPosts } from "~/features/changelog/components/changelog-completed-posts";
 import {
@@ -45,6 +45,9 @@ export const Route = createFileRoute(
   component: RouteComponent,
 });
 
+/** The changelog a URL slug last resolved to, so a rename can follow the row. */
+type SlugResolution = { forSlug: string; id: string };
+
 function RouteComponent() {
   const { organizationId, changelogSlug } = Route.useParams();
   const { changelogCollection } = useDashboardCollections();
@@ -74,16 +77,21 @@ function RouteComponent() {
   // resolved to so a rename this page started stays on screen. The allowance is
   // tied to the slug it was resolved under, so it expires as soon as the URL
   // names another slug and a genuinely missing entry still says so.
-  const resolvedRef = useRef<{ forSlug: string; id: string } | null>(null);
-  const resolved = resolvedRef.current;
+  //
+  // Adjusted during render rather than in an effect: React supports state
+  // derived from props this way, and a render it discards takes the adjustment
+  // with it, which a ref written during render would not. It cannot loop —
+  // `(organizationId, slug)` is unique, so once recorded the same slug keeps
+  // resolving to the same row and the condition goes false.
+  const [resolved, setResolved] = useState<SlugResolution | null>(null);
+  if (matched !== undefined && resolved?.forSlug !== changelogSlug) {
+    setResolved({ forSlug: changelogSlug, id: matched.id });
+  }
   const renamedRow =
     matched === undefined && resolved?.forSlug === changelogSlug
       ? changelogs.find((row) => row.id === resolved.id)
       : undefined;
   const changelog = matched ?? renamedRow;
-  if (matched !== undefined && resolved?.forSlug !== changelogSlug) {
-    resolvedRef.current = { forSlug: changelogSlug, id: matched.id };
-  }
 
   if (changelogsQuery.isLoading) {
     return <ChangelogEditorLoadingState />;

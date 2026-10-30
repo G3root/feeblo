@@ -47,9 +47,24 @@ test.describe("changelog editor", () => {
       });
     });
 
+    // The empty state is not the only way the page can come back looking right:
+    // it unmounts and remounts, and everything the assertions below read is
+    // restored by the remount. Tag the form the editor renders — it wraps the
+    // title field and is not keyed, so it survives a save but not a remount —
+    // and require the same node to still be there afterwards.
+    await page
+      .locator("form")
+      .filter({ has: page.getByLabel("Post Title") })
+      .evaluate((node) => {
+        node.setAttribute("data-changelog-editor-instance", "editor");
+      });
+
     await publishOpenChangelogEntry(page, slug);
     await expect(page).toHaveURL(new RegExp(`/changelog/edit/${slug}$`));
 
+    await expect(
+      page.locator('form[data-changelog-editor-instance="editor"]')
+    ).toHaveCount(1);
     await expect(page.locator("html")).not.toHaveAttribute(
       "data-changelog-editor-empty-state",
       "seen"
