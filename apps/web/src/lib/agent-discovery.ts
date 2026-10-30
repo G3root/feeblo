@@ -134,6 +134,15 @@ export const dashboardMcpServerCard = () => {
           "2025-03-26",
           "2024-11-05",
         ],
+        headers: [
+          {
+            name: PUBLIC_API_KEY_HEADER,
+            isRequired: true,
+            isSecret: true,
+            description:
+              "Workspace API key. The value is created in the dashboard and is never published in this card.",
+          },
+        ],
       },
     ],
     serverInfo: { name: "feeblo-public-api", version: "1.0.0" },
@@ -299,8 +308,10 @@ export const acceptsMarkdown = (accept: string | null) => {
       continue;
     }
 
+    // Parameter names are case-insensitive (RFC 9110), so `Q=0` is a refusal
+    // for the same reason `q=0` is.
     const quality = parameters
-      .map((parameter) => parameter.trim())
+      .map((parameter) => parameter.trim().toLowerCase())
       .find((parameter) => parameter.startsWith("q="));
 
     if (quality === undefined) {

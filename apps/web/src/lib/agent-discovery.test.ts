@@ -87,6 +87,12 @@ describe("dashboard discovery documents", () => {
       type: "streamable-http",
       url: "https://api.example.test/mcp",
     });
+    expect(card.remotes[0]?.headers[0]).toMatchObject({
+      name: "x-api-key",
+      isRequired: true,
+      isSecret: true,
+    });
+    expect(card.remotes[0]?.headers[0]).not.toHaveProperty("value");
   });
 
   it("restores the well-known prefix the splat route strips", () => {
@@ -101,6 +107,8 @@ describe("dashboard discovery documents", () => {
     expect(acceptsMarkdown("text/markdown")).toBe(true);
     expect(acceptsMarkdown("text/html, text/markdown;q=0.9")).toBe(true);
     expect(acceptsMarkdown("text/markdown;q=0")).toBe(false);
+    expect(acceptsMarkdown("text/markdown;Q=0")).toBe(false);
+    expect(acceptsMarkdown("TEXT/MARKDOWN")).toBe(true);
     expect(acceptsMarkdown("text/html, */*;q=0.8")).toBe(false);
     expect(acceptsMarkdown(null)).toBe(false);
   });

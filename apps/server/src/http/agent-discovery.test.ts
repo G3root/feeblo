@@ -183,6 +183,12 @@ it.live("serves a SEP-1649 server card next to the multi-origin list", () =>
           type: string;
           url: string;
           supportedProtocolVersions: ReadonlyArray<string>;
+          headers: ReadonlyArray<{
+            name: string;
+            isRequired?: boolean;
+            isSecret?: boolean;
+            value?: string;
+          }>;
         }>;
         serverInfo: { name: string; version: string };
         endpoint: string;
@@ -203,6 +209,13 @@ it.live("serves a SEP-1649 server card next to the multi-origin list", () =>
       expect(
         parsed.remotes[0]?.supportedProtocolVersions.length
       ).toBeGreaterThan(0);
+      expect(parsed.remotes[0]?.headers[0]).toMatchObject({
+        name: "x-api-key",
+        isRequired: true,
+        isSecret: true,
+      });
+      // The card is public: it names the header, never a value.
+      expect(parsed.remotes[0]?.headers[0]).not.toHaveProperty("value");
 
       // The earlier card draft's fields, kept for clients and the scanner.
       expect(parsed.serverInfo.name).toBe("feeblo-public-api");

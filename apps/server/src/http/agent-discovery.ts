@@ -428,6 +428,15 @@ export const mcpServerCardDocument = (origin: string) => ({
       type: "streamable-http",
       url: `${origin}${PUBLIC_API_MCP_PATH}`,
       supportedProtocolVersions: MCP_PROTOCOL_VERSIONS,
+      headers: [
+        {
+          name: PUBLIC_API_KEY_HEADER,
+          isRequired: true,
+          isSecret: true,
+          description:
+            "Workspace API key. The value is created in the dashboard and is never published in this card.",
+        },
+      ],
     },
   ],
   // Aliases kept for clients built against the earlier card draft and for the
@@ -578,6 +587,22 @@ export const agentCatalog = (origin: string) => {
     ],
   };
 };
+
+/**
+ * The documents an agent may read from any origin.
+ *
+ * Their preflight is handled ahead of the configured CORS policy, so the set
+ * has to name every route that serves a cross-origin-read document rather than
+ * every route the discovery router mounts.
+ */
+const PUBLIC_DISCOVERY_PATHS: ReadonlySet<string> = new Set([
+  API_CATALOG_PATH,
+  AGENT_CATALOG_PATH,
+  MCP_SERVER_CARD_PATH,
+]);
+
+export const isPublicDiscoveryPath = (pathname: string) =>
+  PUBLIC_DISCOVERY_PATHS.has(pathname);
 
 const route = (
   router: HttpRouter.HttpRouter,

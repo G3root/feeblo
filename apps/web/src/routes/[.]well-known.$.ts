@@ -58,6 +58,8 @@ export const Route = createFileRoute("/.well-known/$")({
             });
           case DASHBOARD_AGENT_CATALOG_PATH:
             return jsonResponse(dashboardAgentCatalog(), {
+              // The media type the discovery link advertises for the manifest.
+              "Content-Type": "application/ai-catalog+json",
               // A registry reads this manifest from another origin.
               "Access-Control-Allow-Origin": "*",
             });
