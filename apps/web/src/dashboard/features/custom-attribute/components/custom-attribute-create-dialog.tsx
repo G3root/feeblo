@@ -124,7 +124,7 @@ function CustomAttributeCreateForm({
                 id: await CompanyAttributeDefinitionId.unsafeGenerate(),
               });
 
-        await transaction.isPersisted.promise;
+        await transaction.when("settled");
         trackEvent("custom_attribute_created", {
           entity_type: entityType,
           success: true,

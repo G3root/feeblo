@@ -429,7 +429,7 @@ export function PostContentUpdateInput() {
             assetIds: content === "" ? [] : assetIds,
             content,
           });
-          await tx.isPersisted.promise;
+          await tx.when("settled");
         } catch (error) {
           toastManager.add({
             title: m.tame_such_reindeer(),

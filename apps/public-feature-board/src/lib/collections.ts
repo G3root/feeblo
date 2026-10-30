@@ -127,7 +127,7 @@ export const publicPostDescriptor = collectionOptions(
       // inside the shared form's optimistic action, so a bare insert fails
       // fast with `MissingInsertHandlerError` instead of persisting without
       // a body. Updates and deletes sync here as before.
-      onUpdate: async ({ transaction }) => {
+      onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: updatedPost } = mutation;
 
@@ -139,6 +139,7 @@ export const publicPostDescriptor = collectionOptions(
             organizationId: deps.getMutationOrganizationId(),
           })
         );
+        await collection.utils.refetch();
       },
       onDelete: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
@@ -525,7 +526,7 @@ export const publicCommentDescriptor = collectionOptions(
       },
       queryClient: deps.queryClient,
       getKey: (item) => item.id,
-      onInsert: async ({ transaction }) => {
+      onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newComment } = mutation;
 
@@ -540,15 +541,16 @@ export const publicCommentDescriptor = collectionOptions(
             statusUpdateId: newComment.statusUpdateId ?? null,
           })
         );
-        // The comment is already reconciled optimistically; the post rows'
-        // comment counts and the delete-hint set are derived, so both refresh
-        // detached instead of holding the insert open for two round trips.
+        // The post rows' comment counts and the delete-hint set are derived,
+        // so both refresh detached; the comment collection is the mutation
+        // target, so its own read-back is awaited below.
         refetchInBackground(
           client.collection(publicPostDescriptor).utils.refetch(),
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
+        await collection.utils.refetch();
       },
-      onUpdate: async ({ transaction }) => {
+      onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: updatedComment } = mutation;
 
@@ -561,8 +563,9 @@ export const publicCommentDescriptor = collectionOptions(
             visibility: updatedComment.visibility,
           })
         );
+        await collection.utils.refetch();
       },
-      onDelete: async ({ transaction }) => {
+      onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { original: deletedComment } = mutation;
 
@@ -579,6 +582,7 @@ export const publicCommentDescriptor = collectionOptions(
           client.collection(publicPostDescriptor).utils.refetch(),
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
+        await collection.utils.refetch();
       },
     });
   }
@@ -622,7 +626,7 @@ export const publicCommentReactionDescriptor = collectionOptions(
       getKey: getCommentReactionCollectionKey as (
         item: CommentReactionRow
       ) => string,
-      onInsert: async ({ transaction }) => {
+      onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newCommentReaction } = mutation;
 
@@ -634,8 +638,9 @@ export const publicCommentReactionDescriptor = collectionOptions(
             emoji: newCommentReaction.emoji,
           })
         );
+        await collection.utils.refetch();
       },
-      onDelete: async ({ transaction }) => {
+      onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { original: deletedCommentReaction } = mutation;
 
@@ -647,6 +652,7 @@ export const publicCommentReactionDescriptor = collectionOptions(
             emoji: deletedCommentReaction.emoji,
           })
         );
+        await collection.utils.refetch();
       },
     });
   }
@@ -680,7 +686,7 @@ export const publicUpvoteDescriptor = collectionOptions(
       queryClient: deps.queryClient,
       // SAFETY: The endpoint/API contract guarantees this response shape.
       getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
-      onInsert: async ({ transaction }) => {
+      onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newUpvote } = mutation;
 
@@ -695,8 +701,9 @@ export const publicUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
+        await collection.utils.refetch();
       },
-      onDelete: async ({ transaction }) => {
+      onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { original: deletedUpvote } = mutation;
 
@@ -710,6 +717,7 @@ export const publicUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
+        await collection.utils.refetch();
       },
     });
   }
@@ -752,7 +760,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
       queryClient: deps.queryClient,
       // SAFETY: The endpoint/API contract guarantees this response shape.
       getKey: getUpvoteCollectionKey as (item: UpvoteRow) => string,
-      onInsert: async ({ transaction }) => {
+      onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newUpvote } = mutation;
 
@@ -766,8 +774,9 @@ export const publicPostUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
+        await collection.utils.refetch();
       },
-      onDelete: async ({ transaction }) => {
+      onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { original: deletedUpvote } = mutation;
 
@@ -780,6 +789,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
+        await collection.utils.refetch();
       },
     });
   }
@@ -823,7 +833,7 @@ export const publicPostReactionDescriptor = collectionOptions(
       queryClient: deps.queryClient,
       // SAFETY: The endpoint/API contract guarantees this response shape.
       getKey: getPostReactionCollectionKey as (item: PostReactionRow) => string,
-      onInsert: async ({ transaction }) => {
+      onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newPostReaction } = mutation;
 
@@ -834,8 +844,9 @@ export const publicPostReactionDescriptor = collectionOptions(
             emoji: newPostReaction.emoji,
           })
         );
+        await collection.utils.refetch();
       },
-      onDelete: async ({ transaction }) => {
+      onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { original: deletedPostReaction } = mutation;
 
@@ -846,6 +857,7 @@ export const publicPostReactionDescriptor = collectionOptions(
             emoji: deletedPostReaction.emoji,
           })
         );
+        await collection.utils.refetch();
       },
     });
   }
@@ -891,7 +903,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
       getKey: getPostSubscriptionCollectionKey as (
         item: PostSubscriptionRow
       ) => string,
-      onInsert: async ({ transaction }) => {
+      onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: newSubscription } = mutation;
 
@@ -901,8 +913,9 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
             postId: newSubscription.postId,
           })
         );
+        await collection.utils.refetch();
       },
-      onDelete: async ({ transaction }) => {
+      onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { original: deletedSubscription } = mutation;
 
@@ -912,6 +925,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
             postId: deletedSubscription.postId,
           })
         );
+        await collection.utils.refetch();
       },
     });
   }
@@ -947,19 +961,21 @@ export const publicChangelogSubscriptionDescriptor = collectionOptions(
       getKey: getChangelogSubscriptionCollectionKey as (
         item: ChangelogSubscriptionRow
       ) => string,
-      onInsert: async () => {
+      onInsert: async ({ collection }) => {
         await fetchRpc((rpc) =>
           rpc.CreateChangelogSubscriptionPublic({
             organizationId: deps.getMutationOrganizationId(),
           })
         );
+        await collection.utils.refetch();
       },
-      onDelete: async () => {
+      onDelete: async ({ collection }) => {
         await fetchRpc((rpc) =>
           rpc.DeleteChangelogSubscriptionPublic({
             organizationId: deps.getMutationOrganizationId(),
           })
         );
+        await collection.utils.refetch();
       },
     });
   }

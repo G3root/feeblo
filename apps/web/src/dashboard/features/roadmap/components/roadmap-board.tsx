@@ -146,7 +146,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
       );
       setDragPreview(null);
 
-      void tx.isPersisted.promise.then(
+      void tx.when("settled").then(
         () => trackEvent("post_updated", { field: "status", success: true }),
         () => {
           trackEvent("post_updated", { field: "status", success: false });

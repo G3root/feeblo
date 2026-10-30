@@ -162,6 +162,14 @@ export function createRpcCollectionHelpers(
  *
  * Call sites still order correctly: start the refetch after the persisting
  * `fetchRpc` resolves, so the server has the write before the read-back.
+ *
+ * What a `QueryCollection` handler must not skip is the first half of that
+ * rule. TanStack DB 1.0 removed the adapter's implicit refetch, so a handler
+ * that only awaits its RPC lets the optimistic row revert to the stale Query
+ * cache value once the transaction settles — the write reached the server and
+ * the UI undoes it. Every `onInsert`/`onUpdate`/`onDelete` therefore ends with
+ * an awaited `collection.utils.refetch()`, and this helper is what remains for
+ * the collections *derived* from that write.
  */
 export function refetchInBackground(
   ...refetches: ReadonlyArray<Promise<unknown>>
@@ -171,9 +179,17 @@ export function refetchInBackground(
   }
 }
 
-/** Minimal structural view of a TanStack DB transaction. */
+/**
+ * Minimal structural view of a TanStack DB transaction.
+ *
+ * `when("settled")` replaced `isPersisted.promise` in the 1.0 RC. It resolves
+ * with the transaction once the mutation handler completes and rejects when
+ * the transaction fails or rolls back. The resolved value is deliberately
+ * unused here — only settlement is — but it is the transaction itself, so the
+ * type says so rather than widening to `unknown`.
+ */
 type SettleableTransaction = {
-  isPersisted: { promise: Promise<unknown> };
+  when: (state: "settled") => Promise<SettleableTransaction>;
 };
 
 /**
@@ -200,7 +216,7 @@ export function settleOptimisticMutation(
     return;
   }
 
-  void transaction.isPersisted.promise.then(onSuccess, onError);
+  void transaction.when("settled").then(onSuccess, onError);
 }
 
 /** Minimal structural view of a live query result's readiness. */
@@ -209,6 +225,10 @@ export interface LiveQueryResultState {
   readonly isEnabled?: boolean;
   readonly isIdle?: boolean;
   readonly isLoading?: boolean;
+  /** The first load failed: there is nothing to show. */
+  readonly isLoadingError?: boolean;
+  /** Local storage or an invariant broke; only a cleanup and a fresh start recover. */
+  readonly isCrashed?: boolean;
 }
 
 /**
@@ -238,4 +258,28 @@ export function isLiveQueryPending(result: LiveQueryResultState): boolean {
     result.data === undefined &&
     (result.isLoading === true || result.isIdle === true)
   );
+}
+
+/**
+ * Whether a live query will never show content without recovery.
+ *
+ * TanStack DB 1.0 replaced the single `isError` flag with three that describe
+ * *different* failures, and they belong in different UI:
+ *
+ * - `isLoadingError` — the first load failed, so there is nothing to show.
+ * - `isCrashed` — local storage or an invariant broke. Also nothing to show,
+ *   and only a cleanup plus a fresh start recovers.
+ * - `isSyncError` — the rows are on screen but something stopped the query
+ *   from staying current. Deliberately *not* a failure here: replacing visible
+ *   rows with an error screen because a background sync hiccuped is the
+ *   regression the 1.0 split exists to prevent. Surface it as a stale-data
+ *   banner instead.
+ *
+ * So "the query failed" in the sense every error screen in this repository
+ * means it is the two terminal states, never `status === "error"` alone — a
+ * `crashed` collection is not an `error` one, and a ready-but-stale one is
+ * neither.
+ */
+export function isLiveQueryFailed(result: LiveQueryResultState): boolean {
+  return result.isLoadingError === true || result.isCrashed === true;
 }

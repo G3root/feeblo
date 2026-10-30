@@ -29,7 +29,7 @@ export function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
           draft.noIndex = value;
         }
       );
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       toastManager.add({
         title: "Search engine visibility updated",
         type: "success",
@@ -91,7 +91,7 @@ export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
           draft.name = siteName;
         }
       );
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       toastManager.add({
         title: "Site name updated successfully",
         type: "success",

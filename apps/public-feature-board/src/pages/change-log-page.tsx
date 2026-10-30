@@ -15,7 +15,10 @@ import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { ScrollArea } from "@feeblo/ui/scroll-area";
 import { Separator } from "@feeblo/ui/separator";
 import { cn } from "@feeblo/ui/utils";
-import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import {
+  isLiveQueryFailed,
+  isLiveQueryPending,
+} from "@feeblo/web-shared/collections";
 import {
   Cancel01Icon,
   RssIcon,
@@ -144,7 +147,7 @@ function ChangelogContent() {
   }
 
   const changelogs = changelogsQuery.data ?? [];
-  const isError = changelogsQuery.isError;
+  const isError = isLiveQueryFailed(changelogsQuery);
   // Hydration lands rows — or an empty set — before the first client render
   // (see `isLiveQueryPending`).
   const isLoading = isLiveQueryPending(changelogsQuery);

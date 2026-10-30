@@ -33,7 +33,7 @@ export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
           const tx = postCollection.update(post.id, (draft) => {
             draft.statusId = nextPostStatus.id;
           });
-          await tx.isPersisted.promise;
+          await tx.when("settled");
           trackEvent("post_updated", { field: "status", success: true });
 
           toastManager.add({

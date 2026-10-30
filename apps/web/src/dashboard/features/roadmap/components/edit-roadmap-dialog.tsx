@@ -154,7 +154,7 @@ function EditRoadmapFormFields({
           );
         }
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
 
         const persistedById = new Map(
           columns.map((column) => [column.id, column])
@@ -166,8 +166,9 @@ function EditRoadmapFormFields({
         for (const column of columns) {
           if (!nextIds.has(column.id)) {
             mutations.push(
-              dashboardCollections.roadmapColumnCollection.delete(column.id)
-                .isPersisted.promise
+              dashboardCollections.roadmapColumnCollection
+                .delete(column.id)
+                .when("settled")
             );
           }
         }
@@ -179,15 +180,17 @@ function EditRoadmapFormFields({
 
           if (!persisted) {
             mutations.push(
-              dashboardCollections.roadmapColumnCollection.insert({
-                id: column.id,
-                roadmapId,
-                name: column.name,
-                position: index,
-                statusId: column.statusId,
-                createdAt: now,
-                updatedAt: now,
-              }).isPersisted.promise
+              dashboardCollections.roadmapColumnCollection
+                .insert({
+                  id: column.id,
+                  roadmapId,
+                  name: column.name,
+                  position: index,
+                  statusId: column.statusId,
+                  createdAt: now,
+                  updatedAt: now,
+                })
+                .when("settled")
             );
             continue;
           }
@@ -198,15 +201,14 @@ function EditRoadmapFormFields({
             persisted.position !== index
           ) {
             mutations.push(
-              dashboardCollections.roadmapColumnCollection.update(
-                column.id,
-                (draft) => {
+              dashboardCollections.roadmapColumnCollection
+                .update(column.id, (draft) => {
                   draft.name = column.name;
                   draft.statusId = column.statusId;
                   draft.position = index;
                   draft.updatedAt = now;
-                }
-              ).isPersisted.promise
+                })
+                .when("settled")
             );
           }
         }

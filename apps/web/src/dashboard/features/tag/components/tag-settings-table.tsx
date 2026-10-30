@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@feeblo/ui/table";
 import { cn } from "@feeblo/ui/utils";
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
   Delete02Icon,
@@ -88,7 +89,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
     );
   }
 
-  if (tagsQuery.isError) {
+  if (isLiveQueryFailed(tagsQuery)) {
     return (
       <section className="space-y-6">
         <TagTableActions

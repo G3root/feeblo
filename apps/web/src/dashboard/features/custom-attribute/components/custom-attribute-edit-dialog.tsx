@@ -154,7 +154,7 @@ function CustomAttributeEditFormFields({
           draft.updatedAt = new Date();
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         trackEvent("custom_attribute_updated", {
           entity_type: entityType,
           success: true,

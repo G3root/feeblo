@@ -106,7 +106,7 @@ function useUpvote({
 
     if (hasUpvoted) {
       const tx = upvoteCollection.delete(key);
-      await tx.isPersisted.promise;
+      await tx.when("settled");
     } else {
       const upvoteId = await UpvoteId.unsafeGenerate();
       const tx = upvoteCollection.insert({
@@ -124,7 +124,7 @@ function useUpvote({
           image: session.user.image ?? null,
         },
       });
-      await tx.isPersisted.promise;
+      await tx.when("settled");
     }
   };
 

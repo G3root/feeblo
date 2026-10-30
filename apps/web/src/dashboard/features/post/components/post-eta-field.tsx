@@ -85,7 +85,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
 
     try {
       const transaction = updatePostEta({ etaQuarter });
-      await transaction.isPersisted.promise;
+      await transaction.when("settled");
       trackEvent("post_updated", { field: "eta", success: true });
       toastManager.add({
         title: etaQuarter ? "ETA updated" : "ETA cleared",

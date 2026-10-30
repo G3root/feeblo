@@ -2,6 +2,7 @@ import { Input } from "@feeblo/ui/input";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { organizationLogoUploadEndpoint } from "@feeblo/web-shared/auth-client";
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { hasOwnerOrAdminRole, usePolicy } from "@feeblo/web-shared/use-policy";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useId, useRef } from "react";
@@ -38,7 +39,7 @@ export function WorkspaceDetailsSection() {
 
   if (
     organizationQuery.isLoading ||
-    organizationQuery.isError ||
+    isLiveQueryFailed(organizationQuery) ||
     isPolicyPending
   ) {
     return null;
@@ -116,7 +117,7 @@ function WorkspaceNameField({
           draft.name = name;
         }
       );
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       trackEvent("org_renamed", { success: true });
       toastManager.add({
         title: "Workspace name updated",
@@ -207,7 +208,7 @@ function WorkspaceLogoButton({
               draft.logo = null;
             }
           );
-          await tx.isPersisted.promise;
+          await tx.when("settled");
           trackEvent("org_logo_updated", { action: "removed", success: true });
         } catch (error) {
           trackEvent("org_logo_updated", { action: "removed", success: false });

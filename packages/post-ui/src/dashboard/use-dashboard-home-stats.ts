@@ -1,3 +1,4 @@
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import {
   and,
   count,
@@ -71,6 +72,11 @@ export type UseDashboardHomeStatsResult<
   statuses: TPostStatus[];
   recentPosts: TPost[];
   upvoteCounts: Array<{ count: number; postId: string }>;
+  /**
+   * A source failed before it could produce rows, so the stats cannot render.
+   * True only for a failed first load or a crash, never for a sync problem
+   * over rows that are already on screen — see `isLiveQueryFailed`.
+   */
   isError: boolean;
   isLoading: boolean;
 };
@@ -183,10 +189,10 @@ export function useDashboardHomeStats<
   });
 
   const isError =
-    boardsQuery.isError ||
-    statusesQuery.isError ||
-    recentPostsQuery.isError ||
-    upvoteCountsQuery.isError;
+    isLiveQueryFailed(boardsQuery) ||
+    isLiveQueryFailed(statusesQuery) ||
+    isLiveQueryFailed(recentPostsQuery) ||
+    isLiveQueryFailed(upvoteCountsQuery);
   const isLoading =
     boardsQuery.isLoading ||
     statusesQuery.isLoading ||

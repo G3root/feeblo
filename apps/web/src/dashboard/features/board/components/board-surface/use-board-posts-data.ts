@@ -1,4 +1,5 @@
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import {
   and,
   coalesce,
@@ -298,7 +299,8 @@ export function useBoardPostsData({
   );
 
   return {
-    hasError: postStatusesQuery.isError || postsQuery.isError,
+    hasError:
+      isLiveQueryFailed(postStatusesQuery) || isLiveQueryFailed(postsQuery),
     isLoading: postStatusesQuery.isLoading || postsQuery.isLoading,
     postStatuses,
     posts,

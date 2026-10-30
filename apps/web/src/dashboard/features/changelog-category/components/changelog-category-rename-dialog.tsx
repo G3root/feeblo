@@ -112,7 +112,7 @@ function ChangelogCategoryRenameFormFields({
           draft.icon = value.color;
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         toastManager.add({
           title: "Category updated successfully",
           type: "success",

@@ -207,7 +207,7 @@ export function BoardGridView({
         }
       );
 
-      void tx.isPersisted.promise.then(
+      void tx.when("settled").then(
         () => trackEvent("post_updated", { field: "status", success: true }),
         () => {
           trackEvent("post_updated", { field: "status", success: false });
