@@ -14,15 +14,21 @@ import { makeSlackRouters } from "@feeblo/integration-slack/routers";
 import { SlackManagementRpcHandlers } from "@feeblo/integration-slack/rpc-handlers";
 import { WebhookManagementRpcHandlers } from "@feeblo/integration-webhook/rpc-handlers";
 import type { TestMailerState } from "@feeblo/transactional/mailer/test";
+import * as Effect from "effect/Effect";
 import * as HttpMiddleware from "effect/http/HttpMiddleware";
 import * as HttpRouter from "effect/http/HttpRouter";
+import * as HttpServerRequest from "effect/http/HttpServerRequest";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import type * as Ref from "effect/Ref";
 
 import type { ServerConfigValue } from "../config";
-import { makeAgentDiscoveryRouter } from "../http/agent-discovery";
+import {
+  isPublicDiscoveryPath,
+  makeAgentDiscoveryRouter,
+} from "../http/agent-discovery";
 import { bodySizeLimitMiddleware } from "../http/body-limit";
-import { makeIsAllowedOrigin } from "../http/cors";
+import { type AllowedOriginConfig, makeIsAllowedOrigin } from "../http/cors";
 import {
   e2eRoadmapSeedRouter,
   e2eSetPlanRouter,
@@ -187,22 +193,58 @@ export const makeMergedRoutes = ({
     SesEmailFeedbackRouter
   );
 
+/**
+ * CORS with one scoped exception: the discovery documents are meant to be read
+ * from any origin, so their preflight has to succeed even though every other
+ * route keeps the configured origin policy.
+ *
+ * Effect's CORS middleware answers every `OPTIONS` itself, before routing, and
+ * a disallowed origin gets only `Vary: Origin` back -- which is why the
+ * exception has to sit outside it rather than on the route. It covers the
+ * discovery paths only and returns no credentials, so it cannot be used to
+ * reach a credentialed route.
+ */
+export const makeHttpCorsMiddleware = (config: AllowedOriginConfig) => {
+  const cors = HttpMiddleware.cors({
+    allowedOrigins: makeIsAllowedOrigin(config),
+    allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    maxAge: 86_400,
+    exposedHeaders: ["Server-Timing", "Cache-Control"],
+  });
+
+  return HttpMiddleware.make((httpApp) =>
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const pathname = request.url.split("?")[0] ?? "";
+
+      if (
+        request.method.toUpperCase() === "OPTIONS" &&
+        isPublicDiscoveryPath(pathname)
+      ) {
+        return HttpServerResponse.empty({
+          status: 204,
+          headers: {
+            "access-control-allow-origin": "*",
+            "access-control-allow-methods": "GET, OPTIONS",
+            "access-control-allow-headers": "Content-Type, If-None-Match",
+            "access-control-max-age": "86400",
+          },
+        });
+      }
+
+      return yield* cors(httpApp);
+    })
+  );
+};
+
 export const withGlobalMiddleware = <A, E, R>(
   routes: Layer.Layer<A, E, R>,
   config: ServerConfigValue
 ) =>
   routes.pipe(
     Layer.provide(
-      HttpRouter.middleware(
-        HttpMiddleware.cors({
-          allowedOrigins: makeIsAllowedOrigin(config),
-          allowedMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-          credentials: true,
-          maxAge: 86_400,
-          exposedHeaders: ["Server-Timing", "Cache-Control"],
-        }),
-        { global: true }
-      )
+      HttpRouter.middleware(makeHttpCorsMiddleware(config), { global: true })
     ),
     // CORS decorates responses but never blocks requests, so credentialed
     // state-changing requests need an explicit origin check (CSRF defense).
