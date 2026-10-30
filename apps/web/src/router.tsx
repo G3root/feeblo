@@ -2,7 +2,6 @@ import { isObject, isString } from "@feeblo/utils/runtime-kind";
 import { DbClient } from "@tanstack/react-db";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
-import { routerWithDbClient } from "@tanstack/react-router-with-db";
 import { createIsomorphicFn } from "@tanstack/react-start";
 
 import { DashboardRoutePending } from "./dashboard/components/dashboard-route-pending";
@@ -12,6 +11,7 @@ import {
   createPublicBoardRewrite,
   type PublicBoardRewrite,
 } from "./lib/public-board-rewrite";
+import { withDbClient } from "./lib/router-with-db-client";
 import {
   reportRouteError,
   startNavigationTelemetry,
@@ -119,7 +119,7 @@ export function getRouter() {
 
   // Hydrates the client from the server render's dehydrated DB state and, on
   // the server, dehydrates the queries the render preloaded.
-  return routerWithDbClient(router, dbClient);
+  return withDbClient(router, dbClient);
 }
 
 // Register the router instance for type safety

@@ -84,9 +84,6 @@ catalogs:
     '@tanstack/react-router':
       specifier: ^1.170.46
       version: 1.170.46
-    '@tanstack/react-router-with-db':
-      specifier: 1.0.0-rc.1
-      version: 1.0.0-rc.1
     '@tanstack/react-start':
       specifier: ^1.169.4
       version: 1.169.4
@@ -464,9 +461,6 @@ importers:
       '@tanstack/react-router':
         specifier: 'catalog:'
         version: 1.170.46(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@tanstack/react-router-with-db':
-        specifier: 'catalog:'
-        version: 1.0.0-rc.1(@tanstack/react-db@1.0.0-rc.1(react@19.2.8)(typescript@7.0.2))(@tanstack/react-router@1.170.46(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tanstack/router-core@1.171.39)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@tanstack/react-start':
         specifier: 'catalog:'
         version: 1.169.4(esbuild@0.28.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(rolldown@1.2.15)(vite-plugin-solid@2.11.14(solid-js@1.9.17)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -4477,15 +4471,6 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
-
-  '@tanstack/react-router-with-db@1.0.0-rc.1':
-    resolution: {integrity: sha512-Z3P9EbK5VfT8XLYWZlV2OXXoNQy8jZQaei8Q/ViIjCRahMdGUJMrzqz5n7jQz0lbL7f7AVCaWmvAtbkARktrjg==}
-    peerDependencies:
-      '@tanstack/react-db': '>=1.0.0-rc.1'
-      '@tanstack/react-router': '>=1.43.2'
-      '@tanstack/router-core': '>=1.127.0'
-      react: '>=18.0.0'
-      react-dom: '>=18.0.0'
 
   '@tanstack/react-router@1.170.46':
     resolution: {integrity: sha512-ez1iNIhsPjGlaDHg3BXWs67EWVIYzB2tbopEHYDESdkO7owgkGb5de52+5Kv2v1fxdkggcNzo35bdk4arTVGQw==}
@@ -10964,14 +10949,6 @@ snapshots:
       react: 19.2.8
     optionalDependencies:
       '@types/react': 19.3.0
-
-  '@tanstack/react-router-with-db@1.0.0-rc.1(@tanstack/react-db@1.0.0-rc.1(react@19.2.8)(typescript@7.0.2))(@tanstack/react-router@1.170.46(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@tanstack/router-core@1.171.39)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
-    dependencies:
-      '@tanstack/react-db': 1.0.0-rc.1(react@19.2.8)(typescript@7.0.2)
-      '@tanstack/react-router': 1.170.46(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@tanstack/router-core': 1.171.39
-      react: 19.2.8
-      react-dom: 19.2.8(react@19.2.8)
 
   '@tanstack/react-router@1.170.46(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:

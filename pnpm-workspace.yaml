@@ -33,14 +33,12 @@ minimumReleaseAgeExclude:
   # once they are a day old.
   - "@effect/tsgo@0.59.0"
   - tsrs@0.20.0-ts7.1.0-beta
-  # The TanStack DB 1.0 RC. `@tanstack/react-db`, `@tanstack/react-router-with-db`
-  # and `@tanstack/query-db-collection` are one track: the router adapter peers
-  # on `react-db >=1.0.0-rc.1`, and the query adapter peers on
-  # `@tanstack/db ^1.0.0-rc.0`, so the three move together or the install
-  # resolves two copies of the DB core. Same rule as above: a version, never a
-  # bare name. Drop these once the RC is a day old.
+  # The TanStack DB 1.0 RC. `@tanstack/react-db` and
+  # `@tanstack/query-db-collection` are one track: the query adapter peers on
+  # `@tanstack/db ^1.0.0-rc.0`, so they move together or the install resolves
+  # two copies of the DB core. Same rule as above: a version, never a bare
+  # name. Drop these once the RC is a day old.
   - "@tanstack/react-db@1.0.0-rc.1"
-  - "@tanstack/react-router-with-db@1.0.0-rc.1"
   - "@tanstack/query-db-collection@1.5.0"
 
 allowBuilds:
@@ -83,15 +81,13 @@ catalog:
   "@tailwindcss/vite": ^4.3.3
   # The TanStack DB track is pinned to exact versions, not carets: `1.0.0-rc.1`
   # is a release candidate, and a caret would let `1.0.0` and later RCs in
-  # without review. `query-db-collection` 1.5.0 and
-  # `react-router-with-db` 1.0.0-rc.1 both peer on the RC core, so all three
-  # bump together.
+  # without review. `query-db-collection` 1.5.0 peers on the RC core, so the
+  # two bump together.
   "@tanstack/query-db-collection": 1.5.0
   "@tanstack/react-db": 1.0.0-rc.1
   "@tanstack/react-form": ^1.33.3
   "@tanstack/react-query": ^5.101.0
   "@tanstack/react-router": ^1.170.46
-  "@tanstack/react-router-with-db": 1.0.0-rc.1
   "@tanstack/react-start": ^1.169.4
   "@tanstack/react-virtual": ^3.13.23
   "@types/node": ^26.6.5
