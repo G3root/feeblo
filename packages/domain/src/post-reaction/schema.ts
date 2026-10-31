@@ -18,13 +18,6 @@ export const PostReaction = S.Struct({
 
 export type TPostReaction = S.Schema.Type<typeof PostReaction>;
 
-export const PostReactionList = S.Struct({
-  organizationId: S.String,
-  slug: S.String,
-});
-
-export type TPostReactionList = S.Schema.Type<typeof PostReactionList>;
-
 export const PostReactionToggle = S.Struct({
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,

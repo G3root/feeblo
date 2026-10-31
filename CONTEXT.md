@@ -14,6 +14,8 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Public portal**: The feedback-board and widget surface that is readable without a dashboard session. `*Public` in RPC names — `ListPostsPublic`, `GetPostPublic` — refers to this surface, not to anonymity and not to the Public API. _Avoid_: Public API, anonymous API
 
+**Reaction**: An emoji a person attaches to a post or to a comment, one per person per emoji; toggling the same emoji again removes it. A reaction is not an upvote: an upvote is a vote for a post and counts toward its ranking, while a reaction is a lightweight expression on a post or a comment. Each target owns its own table, DTO, and RPC group; the two share one authorization shape, one toggle semantic, and one failure vocabulary. _Avoid_: like, emoji vote, thumbs up
+
 ### Data transfer
 
 **Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup
