@@ -15,6 +15,7 @@ import {
   localeScript,
   themeScript,
 } from "@/lib/pre-hydration-scripts";
+import { registerWebMcpTools } from "@/lib/webmcp";
 import { getLocale, getTextDirection } from "@/paraglide/runtime.js";
 import { RouteNotFoundPage } from "~/components/route-not-found-page";
 import {
@@ -106,6 +107,19 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   const { env } = Route.useLoaderData();
   const clientHintCheckScript = getClientHintCheckScript();
+
+  // WebMCP tools are registered once per document, after hydration, because
+  // the browser API only exists in the page and the tools are navigation-only.
+  // The registration is a no-op off the dashboard host and in browsers without
+  // the API.
+  useEffect(
+    () =>
+      registerWebMcpTools({
+        rootDomain: env.APP_ROOT_DOMAIN,
+        apiUrl: env.API_URL,
+      }),
+    [env.APP_ROOT_DOMAIN, env.API_URL]
+  );
 
   // `suppressHydrationWarning` covers this element only: the inline
   // pre-hydration scripts below (theme, locale) write `class`/`lang`/`dir` on

@@ -13,7 +13,8 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
  * and the MCP transport are before it can call anything. These routes answer
  * that question from the same origin the API is served from, following the
  * discovery set rat-stack documents: a Markdown landing page, `/auth.md`,
- * `/llms.txt`, an RFC 9727 API catalog, and an MCP server card.
+ * `/llms.txt`, crawler rules in `/robots.txt` and `/sitemap.xml`, an RFC 9727
+ * API catalog, an MCP server card, and an ARD capability manifest.
  *
  * The documents are derived from the request's origin, so a self-hosted
  * deployment and a preview environment advertise themselves rather than
@@ -27,11 +28,21 @@ export const API_OPENAPI_PATH = `${API_VERSION_PATH}/openapi.json`;
 export const API_REFERENCE_PATH = `${API_VERSION_PATH}/docs`;
 export const AGENT_AUTH_PATH = "/auth.md";
 export const AGENT_LLMS_PATH = "/llms.txt";
+export const AGENT_ROBOTS_PATH = "/robots.txt";
+export const AGENT_SITEMAP_PATH = "/sitemap.xml";
 export const API_CATALOG_PATH = "/.well-known/api-catalog";
-export const MCP_SERVER_CARD_PATH = "/.well-known/mcp.json";
+export const AGENT_CATALOG_PATH = "/.well-known/ai-catalog.json";
+/**
+ * The multi-origin server list the docs site already publishes as
+ * `/.well-known/mcp.json`. Kept because the documentation and the landing page
+ * link to it; SEP-1649 clients read `MCP_SERVER_CARD_PATH` instead.
+ */
+export const MCP_SERVERS_PATH = "/.well-known/mcp.json";
+export const MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json";
 
 const MARKDOWN_CONTENT_TYPE = "text/markdown; charset=utf-8";
 const TEXT_CONTENT_TYPE = "text/plain; charset=utf-8";
+const XML_CONTENT_TYPE = "application/xml; charset=utf-8";
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 const MARKDOWN_LINK_TYPE = "text/markdown";
 const TEXT_LINK_TYPE = "text/plain";
@@ -95,12 +106,22 @@ const discoveryLinkHeader = [
   `<${API_OPENAPI_PATH}>; rel="service-desc"; type="${JSON_LINK_TYPE}"`,
   `<${API_REFERENCE_PATH}>; rel="service-doc"; type="text/html"`,
   `<${PUBLIC_API_MCP_PATH}>; rel="service-desc"; type="${JSON_LINK_TYPE}"`,
-  `</.well-known/mcp.json>; rel="service-desc"; type="${JSON_LINK_TYPE}"`,
+  `<${MCP_SERVERS_PATH}>; rel="service-desc"; type="${JSON_LINK_TYPE}"`,
+  `<${MCP_SERVER_CARD_PATH}>; rel="service-desc"; type="${JSON_LINK_TYPE}"`,
   `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`,
   `<${AGENT_LLMS_PATH}>; rel="describedby"; type="${TEXT_LINK_TYPE}"`,
 ].join(", ");
 
-const discoveryResponse = (body: string, contentType: string, extraLink = "") =>
+type DiscoveryResponseOptions = {
+  readonly link?: string;
+  readonly headers?: Readonly<Record<string, string>>;
+};
+
+const discoveryResponse = (
+  body: string,
+  contentType: string,
+  options: DiscoveryResponseOptions = {}
+) =>
   HttpServerResponse.text(body, {
     contentType,
     headers: {
@@ -109,9 +130,10 @@ const discoveryResponse = (body: string, contentType: string, extraLink = "") =>
       // URL. These documents are cheap to regenerate.
       "Cache-Control": "no-store",
       Link:
-        extraLink === ""
+        options.link === undefined
           ? discoveryLinkHeader
-          : `${discoveryLinkHeader}, ${extraLink}`,
+          : `${discoveryLinkHeader}, ${options.link}`,
+      ...options.headers,
     },
   });
 
@@ -136,6 +158,10 @@ export const apiMarkdown = (origin: string) => `# Feeblo Public API
 - Authentication guide: ${origin}${AGENT_AUTH_PATH}
 - API catalog: ${origin}${API_CATALOG_PATH}
 - MCP server card: ${origin}${MCP_SERVER_CARD_PATH}
+- MCP server list: ${origin}${MCP_SERVERS_PATH}
+- Capability manifest: ${origin}${AGENT_CATALOG_PATH}
+- Crawler rules: ${origin}${AGENT_ROBOTS_PATH}
+- Sitemap: ${origin}${AGENT_SITEMAP_PATH}
 
 ## Authenticate
 
@@ -193,12 +219,13 @@ emails every subscriber.
  * copies are hand-written; a change to the header, the key format, the scopes,
  * or the MCP setup belongs in both.
  */
-export const authMarkdown = (origin: string) => `# Authentication for agents
+export const authMarkdown = (origin: string) => `# Feeblo auth.md
 
-Feeblo's machine surfaces accept two credentials, and both resolve to the same
-workspace and scopes: a workspace API key, or an OAuth access token a member
-issues to a client through the authorization server. Never ask a person for a
-password or a session cookie.
+The authentication guide for agents reaching this origin. Feeblo's machine
+surfaces accept two credentials, and both resolve to the same workspace and
+scopes: a workspace API key, or an OAuth access token a member issues to a
+client through the authorization server. Never ask a person for a password or
+a session cookie.
 
 ## Create a key
 
@@ -398,6 +425,218 @@ export const mcpServerCard = (origin: string) => ({
   ],
 });
 
+/**
+ * The SEP-1649 card served at `/.well-known/mcp/server-card.json`.
+ *
+ * A different shape from `mcpServerCard` above, not a replacement: that one is
+ * the multi-origin list the docs site and the landing page already publish,
+ * while this one is the single-server card a SEP-1649 client looks for. Both
+ * are served so a client that learned either shape finds a document instead of
+ * a redirect.
+ *
+ * The version is the card's own, not the package's. It moves when the tool
+ * surface changes in a way a client can observe, which is a slower clock than
+ * a deploy.
+ */
+export const MCP_PROTOCOL_VERSIONS = [
+  "2026-07-28",
+  "2025-11-25",
+  "2025-06-18",
+  "2025-03-26",
+  "2024-11-05",
+] as const;
+
+export const mcpServerCardDocument = (origin: string) => ({
+  // Required by the Server Card extension, which uses a different shape from
+  // the multi-origin list above: identity and `remotes`, not `serverInfo` and
+  // `endpoint`.
+  $schema:
+    "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
+  name: "com.feeblo/public-api",
+  version: "1.0.0",
+  description:
+    "Read and manage one Feeblo workspace: posts, comments, votes, boards, and changelog.",
+  remotes: [
+    {
+      type: "streamable-http",
+      url: `${origin}${PUBLIC_API_MCP_PATH}`,
+      supportedProtocolVersions: MCP_PROTOCOL_VERSIONS,
+      headers: [
+        {
+          name: PUBLIC_API_KEY_HEADER,
+          isRequired: true,
+          isSecret: true,
+          description:
+            "Workspace API key. The value is created in the dashboard and is never published in this card.",
+        },
+      ],
+    },
+  ],
+  // Aliases kept for clients built against the earlier card draft and for the
+  // readiness scanner, which reads `serverInfo.name` or `name`. The extension
+  // leaves additional properties open, so both shapes travel together.
+  serverInfo: {
+    name: "feeblo-public-api",
+    version: "1.0.0",
+  },
+  endpoint: `${origin}${PUBLIC_API_MCP_PATH}`,
+  transport: { type: "streamable-http" },
+  capabilities: { tools: {} },
+  authentication: {
+    required: true,
+    scheme: PUBLIC_API_KEY_HEADER,
+    documentation: `${origin}${AGENT_AUTH_PATH}`,
+  },
+  documentation: "https://docs.feeblo.com/developers/mcp",
+});
+
+/**
+ * The crawlers named explicitly in `robots.txt`.
+ *
+ * A crawler that reads only its own group would otherwise inherit nothing, and
+ * the AI-rules check treats a rules-free file as no policy at all. Search
+ * crawlers and training crawlers are listed together because this origin
+ * publishes the same policy for both: the API reference is public, and the
+ * data endpoints behind it answer 401 without a key.
+ */
+const AI_CRAWLERS = [
+  "OAI-SearchBot",
+  "ChatGPT-User",
+  "Claude-SearchBot",
+  "Claude-User",
+  "ClaudeBot",
+  "PerplexityBot",
+  "Perplexity-User",
+  "GPTBot",
+  "Google-Extended",
+  "Applebot-Extended",
+  "CCBot",
+  "Bytespider",
+  "Amazonbot",
+] as const;
+
+const CONTENT_SIGNALS =
+  "Content-Signal: search=yes, ai-input=yes, ai-train=yes";
+
+/**
+ * `/robots.txt` — the crawler policy an API origin did not have before.
+ *
+ * `Agentmap` is the ARD discovery hint for a registry that reads robots.txt
+ * before it tries a well-known path. It is not a registered directive, so a
+ * parser that does not know it ignores the line.
+ */
+export const agentRobots = (origin: string) =>
+  [
+    "User-agent: *",
+    CONTENT_SIGNALS,
+    "Allow: /",
+    "",
+    ...AI_CRAWLERS.map((crawler) => `User-agent: ${crawler}`),
+    CONTENT_SIGNALS,
+    "Allow: /",
+    "",
+    `Sitemap: ${origin}${AGENT_SITEMAP_PATH}`,
+    `Agentmap: ${origin}${AGENT_CATALOG_PATH}`,
+    "",
+  ].join("\n");
+
+const SITEMAP_PATHS = [
+  "/",
+  API_REFERENCE_PATH,
+  AGENT_AUTH_PATH,
+  AGENT_LLMS_PATH,
+  API_CATALOG_PATH,
+  MCP_SERVERS_PATH,
+  MCP_SERVER_CARD_PATH,
+  AGENT_CATALOG_PATH,
+] as const;
+
+// The origin is rebuilt from `Host`, so a proxy that forwards a malformed host
+// must not be able to break the document around it.
+const escapeXml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+
+/**
+ * `/sitemap.xml` — the machine-readable index of what this origin publishes.
+ *
+ * Only discovery documents and the API reference appear here. The data
+ * endpoints are excluded on purpose: they answer 401 without a key, and a
+ * sitemap entry that cannot be fetched is noise to every crawler that reads
+ * it.
+ */
+export const agentSitemap = (origin: string) =>
+  [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...SITEMAP_PATHS.map(
+      (path) => `  <url><loc>${escapeXml(`${origin}${path}`)}</loc></url>`
+    ),
+    "</urlset>",
+    "",
+  ].join("\n");
+
+/**
+ * The ARD capability manifest at `/.well-known/ai-catalog.json`.
+ *
+ * Each entry carries exactly one of `url` and `data` (spec section 3.4), and
+ * the identifiers use the `urn:air:<fqdn>:<namespace>:<name>` form so a
+ * registry can key them without dereferencing the URL first. The queries are
+ * examples of what the capability answers, which is what a registry embeds to
+ * match a request against this entry.
+ */
+export const agentCatalog = (origin: string) => {
+  const host = new URL(origin).hostname;
+
+  return {
+    specVersion: "1.0",
+    host: { displayName: "Feeblo", identifier: `urn:feeblo:${host}` },
+    entries: [
+      {
+        identifier: `urn:air:${host}:mcp:public-api`,
+        displayName: "Feeblo Public API MCP server",
+        type: "application/mcp-server-card+json",
+        url: `${origin}${MCP_SERVER_CARD_PATH}`,
+        representativeQueries: [
+          "list the boards in my workspace",
+          "which posts are open and unassigned",
+          "create a post from this bug report",
+        ],
+      },
+      {
+        identifier: `urn:air:${host}:openapi:public-api`,
+        displayName: "Feeblo Public API",
+        type: "application/vnd.oai.openapi+json",
+        url: `${origin}${API_OPENAPI_PATH}`,
+        representativeQueries: [
+          "add a comment to a post",
+          "read the changelog entries for this workspace",
+        ],
+      },
+    ],
+  };
+};
+
+/**
+ * The documents an agent may read from any origin.
+ *
+ * Their preflight is handled ahead of the configured CORS policy, so the set
+ * has to name every route that serves a cross-origin-read document rather than
+ * every route the discovery router mounts.
+ */
+const PUBLIC_DISCOVERY_PATHS: ReadonlySet<string> = new Set([
+  API_CATALOG_PATH,
+  AGENT_CATALOG_PATH,
+  MCP_SERVER_CARD_PATH,
+]);
+
+export const isPublicDiscoveryPath = (pathname: string) =>
+  PUBLIC_DISCOVERY_PATHS.has(pathname);
+
 const route = (
   router: HttpRouter.HttpRouter,
   path: HttpRouter.PathInput,
@@ -438,14 +677,50 @@ export const makeAgentDiscoveryRouter = (apiUrl: string) => {
         discoveryResponse(
           JSON.stringify(apiCatalog(originOf(request)), null, 2),
           API_CATALOG_CONTENT_TYPE,
-          `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`
+          {
+            link: `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`,
+          }
+        )
+      );
+      yield* route(router, MCP_SERVERS_PATH, (request) =>
+        discoveryResponse(
+          JSON.stringify(mcpServerCard(originOf(request)), null, 2),
+          JSON_CONTENT_TYPE,
+          {
+            link: `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`,
+          }
         )
       );
       yield* route(router, MCP_SERVER_CARD_PATH, (request) =>
         discoveryResponse(
-          JSON.stringify(mcpServerCard(originOf(request)), null, 2),
+          JSON.stringify(mcpServerCardDocument(originOf(request)), null, 2),
           JSON_CONTENT_TYPE,
-          `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`
+          {
+            link: `<${AGENT_AUTH_PATH}>; rel="describedby"; type="${MARKDOWN_LINK_TYPE}"`,
+            // A hosted card MUST be readable by a browser-based client.
+            headers: {
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Methods": "GET",
+              "Access-Control-Allow-Headers": "Content-Type, If-None-Match",
+              "Access-Control-Expose-Headers": "ETag",
+            },
+          }
+        )
+      );
+      yield* route(router, AGENT_ROBOTS_PATH, (request) =>
+        discoveryResponse(agentRobots(originOf(request)), TEXT_CONTENT_TYPE)
+      );
+      yield* route(router, AGENT_SITEMAP_PATH, (request) =>
+        discoveryResponse(agentSitemap(originOf(request)), XML_CONTENT_TYPE)
+      );
+      yield* route(router, AGENT_CATALOG_PATH, (request) =>
+        discoveryResponse(
+          JSON.stringify(agentCatalog(originOf(request)), null, 2),
+          JSON_CONTENT_TYPE,
+          {
+            // The manifest exists to be read by a registry on another origin.
+            headers: { "Access-Control-Allow-Origin": "*" },
+          }
         )
       );
     })
