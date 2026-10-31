@@ -403,6 +403,7 @@ const makePostRepository = Effect.gen(function* () {
           slug: schema.postTable.slug,
           statusId: schema.postTable.statusId,
           title: schema.postTable.title,
+          updatedAt: schema.postTable.updatedAt,
         })
         .from(schema.postTable)
         .where(

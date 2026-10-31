@@ -1580,6 +1580,81 @@ describe("PostRpcHandlers", () => {
           expect(detail.content).toContain("Updated content");
         })
       );
+
+      it.effect("rejects a content update based on an outdated version", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .CreatePost(
+              postCreateInput(
+                fixture,
+                postId,
+                "Versioned feedback",
+                "Original content"
+              )
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [row] = yield* db
+            .select({ updatedAt: schema.postTable.updatedAt })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          // SAFETY: CreatePost above guarantees the row exists.
+          const staleUpdatedAt = dateAt(row!.updatedAt.getTime() - 1000);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostContent({
+                assetIds: [],
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                content: "Stale content",
+                expectedUpdatedAt: staleUpdatedAt,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              )
+          );
+          expect(error._tag).toBe("PostVersionConflictError");
+
+          const [unchanged] = yield* db
+            .select({ content: schema.postTable.content })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(unchanged?.content).toContain("Original content");
+
+          yield* handlers
+            .UpdatePostContent({
+              assetIds: [],
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              content: "Updated content",
+              // SAFETY: The row read above is the version this save loaded.
+              expectedUpdatedAt: row!.updatedAt,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const [updated] = yield* db
+            .select({ content: schema.postTable.content })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(updated?.content).toContain("Updated content");
+        })
+      );
     });
 
     describe("UpdatePostEta", () => {
@@ -1798,6 +1873,56 @@ describe("PostRpcHandlers", () => {
             title: "Original feedback",
           });
         })
+      );
+
+      it.effect(
+        "rejects a public content update based on an outdated version",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+            const session = makeSession(fixture, null);
+
+            yield* handlers
+              .CreatePostPublic(
+                postCreateInput(
+                  fixture,
+                  postId,
+                  "Versioned feedback",
+                  "Original content"
+                )
+              )
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            const [row] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            // SAFETY: CreatePostPublic above guarantees the row exists.
+            const staleUpdatedAt = dateAt(row!.updatedAt.getTime() - 1000);
+
+            const error = yield* Effect.flip(
+              handlers
+                .UpdatePostContentPublic({
+                  assetIds: [],
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                  content: "Stale content",
+                  expectedUpdatedAt: staleUpdatedAt,
+                })
+                .pipe(Effect.provideService(CurrentSession, session))
+            );
+            expect(error._tag).toBe("PostVersionConflictError");
+
+            const [unchanged] = yield* db
+              .select({ content: schema.postTable.content })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            expect(unchanged?.content).toContain("Original content");
+          })
       );
 
       it.effect("denies changing the status of their own public post", () =>

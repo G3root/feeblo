@@ -139,7 +139,7 @@ export const publicPostDescriptor = collectionOptions(
             organizationId: deps.getMutationOrganizationId(),
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
@@ -155,7 +155,9 @@ export const publicPostDescriptor = collectionOptions(
         // Same as the dashboard: a survivor delete reverts merged children
         // server-side, so refresh the synced rows that still point at it. This
         // collection is the mutation target, so the read-back is awaited.
-        await client.collection(publicPostDescriptor).utils.refetch();
+        await client
+          .collection(publicPostDescriptor)
+          .utils.refetch({ throwOnError: true });
         // The delete-hint set is derived from the write, not part of it: it
         // refreshes in the background so the delete settles without waiting on
         // a second round trip.
@@ -548,7 +550,7 @@ export const publicCommentDescriptor = collectionOptions(
           client.collection(publicPostDescriptor).utils.refetch(),
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -563,7 +565,7 @@ export const publicCommentDescriptor = collectionOptions(
             visibility: updatedComment.visibility,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -582,7 +584,7 @@ export const publicCommentDescriptor = collectionOptions(
           client.collection(publicPostDescriptor).utils.refetch(),
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     });
   }
@@ -638,7 +640,7 @@ export const publicCommentReactionDescriptor = collectionOptions(
             emoji: newCommentReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -652,7 +654,7 @@ export const publicCommentReactionDescriptor = collectionOptions(
             emoji: deletedCommentReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     });
   }
@@ -701,7 +703,7 @@ export const publicUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -717,7 +719,7 @@ export const publicUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     });
   }
@@ -774,7 +776,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -789,7 +791,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
         refetchInBackground(
           client.collection(publicDeleteEligibilityDescriptor).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     });
   }
@@ -844,7 +846,7 @@ export const publicPostReactionDescriptor = collectionOptions(
             emoji: newPostReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -857,7 +859,7 @@ export const publicPostReactionDescriptor = collectionOptions(
             emoji: deletedPostReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     });
   }
@@ -913,7 +915,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
             postId: newSubscription.postId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -925,7 +927,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
             postId: deletedSubscription.postId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     });
   }
@@ -967,7 +969,7 @@ export const publicChangelogSubscriptionDescriptor = collectionOptions(
             organizationId: deps.getMutationOrganizationId(),
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection }) => {
         await fetchRpc((rpc) =>
@@ -975,7 +977,7 @@ export const publicChangelogSubscriptionDescriptor = collectionOptions(
             organizationId: deps.getMutationOrganizationId(),
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     });
   }

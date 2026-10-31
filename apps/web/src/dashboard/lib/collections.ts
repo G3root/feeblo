@@ -167,7 +167,7 @@ export function postCollection(scope: DashboardCollectionScope) {
         refetchInBackground(
           client.collection(postActivityCollection(scope)).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ transaction }) => {
         const [firstMutation] = transaction.mutations;
@@ -209,7 +209,9 @@ export function postCollection(scope: DashboardCollectionScope) {
         // the synced rows must be refreshed or the restored duplicates stay
         // hidden behind their stale `mergedIntoPostId`. This collection is the
         // mutation target, so the read-back is awaited.
-        await client.collection(postCollection(scope)).utils.refetch();
+        await client
+          .collection(postCollection(scope))
+          .utils.refetch({ throwOnError: true });
         // The delete-hint set is derived: refresh it detached so the delete
         // settles without waiting on a second round trip.
         refetchInBackground(
@@ -328,7 +330,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
             orderIndex: newStatus.orderIndex,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -348,7 +350,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
             color: updatedStatus.color ?? null,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -408,7 +410,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
             organizationId: updatedChangelog.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -420,7 +422,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
             organizationId: deletedChangelog.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -440,7 +442,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
             organizationId: newChangelog.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -529,7 +531,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
             organizationId: newCategory.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -551,7 +553,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
             organizationId: updatedCategory.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -563,7 +565,7 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
             organizationId: deletedCategory.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -607,7 +609,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
             organizationId: modified.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const { original } = transaction.mutations[0];
@@ -618,7 +620,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
             organizationId: original.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -663,7 +665,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
             }),
           {}
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -678,7 +680,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
             }),
           {}
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -694,7 +696,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
             }),
           {}
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -734,7 +736,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
             organizationId: newTag.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -747,7 +749,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
             organizationId: updatedTag.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -759,7 +761,7 @@ export function tagCollection(scope: DashboardCollectionScope) {
             organizationId: deletedTag.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -840,7 +842,7 @@ export function organizationCollection(_scope: DashboardCollectionScope) {
             logo: updatedOrganization.logo,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -879,7 +881,7 @@ export function membersCollection(scope: DashboardCollectionScope) {
             organizationId: deletedMember.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -892,7 +894,7 @@ export function membersCollection(scope: DashboardCollectionScope) {
             role: updatedMember.role,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -930,7 +932,7 @@ export function invitationsCollection(scope: DashboardCollectionScope) {
             organizationId: deletedInvitation.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1004,7 +1006,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
           client.collection(postCollection(scope)).utils.refetch(),
           client.collection(deleteEligibilityCollection(scope)).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1027,7 +1029,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
           client.collection(postCollection(scope)).utils.refetch(),
           client.collection(deleteEligibilityCollection(scope)).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1049,7 +1051,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
         refetchInBackground(
           client.collection(postActivityCollection(scope)).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1174,7 +1176,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
             emoji: newCommentReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1188,7 +1190,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
             emoji: deletedCommentReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1240,7 +1242,7 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
           client.collection(postCollection(scope)).utils.refetch(),
           client.collection(deleteEligibilityCollection(scope)).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1257,7 +1259,7 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
           client.collection(postCollection(scope)).utils.refetch(),
           client.collection(deleteEligibilityCollection(scope)).utils.refetch()
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1351,7 +1353,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
             emoji: newPostReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1364,7 +1366,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
             emoji: deletedPostReaction.emoji,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1409,7 +1411,7 @@ export function siteCollection(scope: DashboardCollectionScope) {
             name: updatedSite.name,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1547,7 +1549,7 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
             postId: newSubscription.postId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1559,7 +1561,7 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
             postId: deletedSubscription.postId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1630,7 +1632,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
             companyId: updatedContact.companyId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1648,7 +1650,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
             companyId: newContact.companyId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1660,7 +1662,7 @@ export function contactCollection(scope: DashboardCollectionScope) {
             organizationId: deletedContact.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1703,7 +1705,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
             externalCreatedAt: updatedCompany.externalCreatedAt,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1719,7 +1721,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
             externalCreatedAt: newCompany.externalCreatedAt,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1731,7 +1733,7 @@ export function companyCollection(scope: DashboardCollectionScope) {
             organizationId: deletedCompany.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1781,7 +1783,7 @@ export function contactAttributeDefinitionCollection(
             organizationId: definition.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1798,7 +1800,7 @@ export function contactAttributeDefinitionCollection(
             organizationId: definition.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1810,7 +1812,7 @@ export function contactAttributeDefinitionCollection(
             organizationId: definition.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -1860,7 +1862,7 @@ export function companyAttributeDefinitionCollection(
             organizationId: definition.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onInsert: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1877,7 +1879,7 @@ export function companyAttributeDefinitionCollection(
             organizationId: definition.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -1889,7 +1891,7 @@ export function companyAttributeDefinitionCollection(
             organizationId: definition.organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -2001,7 +2003,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
             filter: newRoadmap.filter,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -2020,7 +2022,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
             filter: updatedRoadmap.filter,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ transaction }) => {
         const mutation = transaction.mutations[0];
@@ -2037,7 +2039,9 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
         // transaction; read the rows back so the cached `isPrimary` flags match
         // the handoff instead of leaving the organization without a primary in
         // the client cache.
-        await client.collection(roadmapCollection(scope)).utils.refetch();
+        await client
+          .collection(roadmapCollection(scope))
+          .utils.refetch({ throwOnError: true });
       },
     })
   );
@@ -2085,7 +2089,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
             config: { type: "status", statusId: newColumn.statusId },
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -2106,7 +2110,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
             config: { type: "status", statusId: updatedColumn.statusId },
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
@@ -2124,7 +2128,7 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
             organizationId,
           })
         );
-        await collection.utils.refetch();
+        await collection.utils.refetch({ throwOnError: true });
       },
     })
   );

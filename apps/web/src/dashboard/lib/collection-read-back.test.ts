@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Pins why every `onInsert`/`onUpdate`/`onDelete` in `collections.ts` ends with
- * an awaited `collection.utils.refetch()`.
+ * an awaited `collection.utils.refetch({ throwOnError: true })`.
  *
  * TanStack DB 1.0 removed the Query Collection's implicit refetch. A handler
  * that only awaits its RPC now settles the transaction with the Query cache
@@ -47,7 +47,7 @@ function collectionWith(server: Array<Row>, readBack: boolean) {
         }
 
         if (readBack) {
-          await collection.utils.refetch();
+          await collection.utils.refetch({ throwOnError: true });
         }
       },
     })
@@ -86,6 +86,51 @@ describe("query collection mutation read-back", () => {
       .when("settled");
 
     expect(collection.get("1")?.text).toBe("after");
+  });
+
+  it("rejects the transaction when the required read-back fails", async () => {
+    const server: Array<Row> = [{ id: "1", text: "before" }];
+    let failReadBack = false;
+    const collection = createCollection(
+      queryCollectionOptions({
+        id: "read-back-failing",
+        queryClient: new QueryClient({
+          defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+        }),
+        queryKey: ["read-back-failing"],
+        queryFn: async () => {
+          if (failReadBack) {
+            throw new Error("read-back failed");
+          }
+          return server.map((row) => ({ ...row }));
+        },
+        getKey: (row) => row.id,
+        onUpdate: async ({ collection: target, transaction }) => {
+          const [mutation] = transaction.mutations;
+          const changed = server.find((row) => row.id === mutation!.key);
+
+          if (changed) {
+            changed.text = String(mutation!.changes.text);
+          }
+
+          await target.utils.refetch({ throwOnError: true });
+        },
+      })
+    );
+    await collection.preload();
+    failReadBack = true;
+
+    await expect(
+      collection
+        .update("1", (draft) => {
+          draft.text = "after";
+        })
+        .when("settled")
+    ).rejects.toThrow("read-back failed");
+
+    // The unconfirmed write rolls back instead of leaving an optimistic row
+    // the client could not read back.
+    expect(collection.get("1")?.text).toBe("before");
   });
 });
 

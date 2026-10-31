@@ -168,8 +168,11 @@ export function createRpcCollectionHelpers(
  * that only awaits its RPC lets the optimistic row revert to the stale Query
  * cache value once the transaction settles — the write reached the server and
  * the UI undoes it. Every `onInsert`/`onUpdate`/`onDelete` therefore ends with
- * an awaited `collection.utils.refetch()`, and this helper is what remains for
- * the collections *derived* from that write.
+ * `collection.utils.refetch({ throwOnError: true })`: the read-back is part of
+ * the write, so a failed one must reject the transaction instead of settling
+ * over rows the client could not confirm. This helper is what remains for the
+ * collections *derived* from that write, where a failure is contained by the
+ * derived collection's own sync state.
  */
 export function refetchInBackground(
   ...refetches: ReadonlyArray<Promise<unknown>>
