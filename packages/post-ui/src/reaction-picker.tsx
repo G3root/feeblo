@@ -368,7 +368,7 @@ export function PostReactionPicker() {
           userId: currentUserId,
         })
       );
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       return;
     }
     const tx = postReactionCollection.insert({
@@ -382,7 +382,7 @@ export function PostReactionPicker() {
       memberId: membership?.membershipId ?? null,
       emoji,
     });
-    await tx.isPersisted.promise;
+    await tx.when("settled");
   };
 
   const existingReactions = new Set(
@@ -537,7 +537,7 @@ export function CommentReactionPicker({
           commentId,
         })
       );
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       return;
     }
     const tx = commentReactionCollection.insert({
@@ -552,7 +552,7 @@ export function CommentReactionPicker({
       emoji,
       commentId,
     });
-    await tx.isPersisted.promise;
+    await tx.when("settled");
   };
 
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.

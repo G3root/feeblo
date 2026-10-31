@@ -200,7 +200,7 @@ export function useCreateCommentAction() {
       });
 
       try {
-        await tx.isPersisted.promise;
+        await tx.when("settled");
       } catch (error) {
         toastManager.add({
           title: parseRpcError(error).message,

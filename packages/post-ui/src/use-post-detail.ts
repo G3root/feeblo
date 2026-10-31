@@ -1,4 +1,7 @@
-import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import {
+  isLiveQueryFailed,
+  isLiveQueryPending,
+} from "@feeblo/web-shared/collections";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 
 import { usePostCollectionData } from "./post-page-context";
@@ -44,9 +47,13 @@ export function usePostDetail() {
   return {
     assetIds: query.data?.assetIds,
     content: query.data?.content,
-    isError: query.isError,
+    // The detail row feeds writes, not just display: a sync failure means the
+    // body or its `updatedAt` may be stale, so the editor treats it as a
+    // failure until a refresh succeeds.
+    isError: isLiveQueryFailed(query) || query.isSyncError,
     // Hydration lands the detail row before the first client render, so
     // `isLoading` would flash the body skeleton over server-rendered content.
     isLoading: isLiveQueryPending(query),
+    updatedAt: query.data?.updatedAt,
   };
 }

@@ -373,6 +373,7 @@ export function PostContentUpdateInput() {
   const updatePostContent = createOptimisticAction<{
     assetIds: string[];
     content: string;
+    expectedUpdatedAt: Date;
   }>({
     onMutate: ({ assetIds, content }) => {
       // The body lives on the detail collection now (list rows are slim
@@ -382,28 +383,38 @@ export function PostContentUpdateInput() {
         draft.assetIds = assetIds;
       });
     },
-    mutationFn: async ({ assetIds, content }) => {
-      await fetchRpc((rpc) =>
-        pageType === "Dashboard"
-          ? rpc.UpdatePostContent({
-              id: post.id,
-              boardId: post.boardId,
-              organizationId,
-              content,
-              assetIds,
-            })
-          : rpc.UpdatePostContentPublic({
-              id: post.id,
-              boardId: post.boardId,
-              organizationId,
-              content,
-              assetIds,
-            })
-      );
+    mutationFn: async ({ assetIds, content, expectedUpdatedAt }) => {
+      try {
+        await fetchRpc((rpc) =>
+          pageType === "Dashboard"
+            ? rpc.UpdatePostContent({
+                id: post.id,
+                boardId: post.boardId,
+                organizationId,
+                content,
+                assetIds,
+                expectedUpdatedAt,
+              })
+            : rpc.UpdatePostContentPublic({
+                id: post.id,
+                boardId: post.boardId,
+                organizationId,
+                content,
+                assetIds,
+                expectedUpdatedAt,
+              })
+        );
+      } catch (error) {
+        // A rejected write (a version conflict is the common case) leaves the
+        // detail row at the version the server still holds. Refresh it before
+        // the caller can retry; a failed refresh is reported by the query.
+        await postDetailCollection.utils.refetch().catch(() => undefined);
+        throw error;
+      }
       // The detail row is the mutation target, so its read-back is awaited
       // before the optimistic state settles. The list row's derived excerpt
       // refreshes detached instead of adding a second round trip to the save.
-      await postDetailCollection.utils.refetch();
+      await postDetailCollection.utils.refetch({ throwOnError: true });
       refetchInBackground(postCollection.utils.refetch());
     },
   });
@@ -414,7 +425,13 @@ export function PostContentUpdateInput() {
     );
   }
 
-  if (detail.isLoading || detail.content === undefined) {
+  const expectedUpdatedAt = detail.updatedAt;
+
+  if (
+    detail.isLoading ||
+    detail.content === undefined ||
+    expectedUpdatedAt === undefined
+  ) {
     return <ContentSkeleton />;
   }
 
@@ -428,8 +445,9 @@ export function PostContentUpdateInput() {
           const tx = updatePostContent({
             assetIds: content === "" ? [] : assetIds,
             content,
+            expectedUpdatedAt,
           });
-          await tx.isPersisted.promise;
+          await tx.when("settled");
         } catch (error) {
           toastManager.add({
             title: m.tame_such_reindeer(),

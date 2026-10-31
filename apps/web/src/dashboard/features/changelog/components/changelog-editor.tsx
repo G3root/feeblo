@@ -183,7 +183,7 @@ function useChangelogEditorForm({
           draft.publishedAt = payload.publishedAt;
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         finalized.commit();
         trackEvent("changelog_saved", {
           status: payload.status,
@@ -269,7 +269,7 @@ export function ChangelogEditorProvider({
       const tx = changelogCollection.delete(changelog.id, {
         optimistic: false,
       });
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       trackEvent("changelog_deleted", { success: true });
 
       toastManager.add({

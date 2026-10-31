@@ -123,7 +123,7 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
           }
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         store.send({ type: "toggle" });
         toastManager.add({
           title: "Status updated",

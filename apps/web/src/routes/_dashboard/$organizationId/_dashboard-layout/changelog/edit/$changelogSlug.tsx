@@ -7,6 +7,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -97,7 +98,7 @@ function RouteComponent() {
     return <ChangelogEditorLoadingState />;
   }
 
-  if (changelogsQuery.isError) {
+  if (isLiveQueryFailed(changelogsQuery)) {
     return (
       <Empty>
         <EmptyHeader>

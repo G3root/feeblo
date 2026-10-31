@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@feeblo/ui/table";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import {
   Building03Icon,
   Contact01Icon,
@@ -100,7 +101,7 @@ export function CustomAttributesSettings() {
         <AttributeList
           attributes={contactAttributesQuery.data}
           entityType="contact"
-          isError={contactAttributesQuery.isError}
+          isError={isLiveQueryFailed(contactAttributesQuery)}
           isLoading={contactAttributesQuery.isLoading}
           onCreate={() => openCreateDialog("contact")}
           onDelete={(id) => openDeleteDialog(id, "contact")}
@@ -111,7 +112,7 @@ export function CustomAttributesSettings() {
         <AttributeList
           attributes={companyAttributesQuery.data}
           entityType="company"
-          isError={companyAttributesQuery.isError}
+          isError={isLiveQueryFailed(companyAttributesQuery)}
           isLoading={companyAttributesQuery.isLoading}
           onCreate={() => openCreateDialog("company")}
           onDelete={(id) => openDeleteDialog(id, "company")}

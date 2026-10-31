@@ -3,7 +3,10 @@ import {
   usePostCreateDialogContext,
 } from "@feeblo/post-ui/dialog-stores";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
-import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import {
+  isLiveQueryFailed,
+  isLiveQueryPending,
+} from "@feeblo/web-shared/collections";
 import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import {
   and,
@@ -69,7 +72,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         .where(({ status }) => eq(status.organizationId, site.organizationId)),
   });
   const statuses = statusesQuery.data ?? [];
-  const statusError = statusesQuery.isError;
+  const statusError = isLiveQueryFailed(statusesQuery);
 
   const boardsQuery = useLiveQuery({
     queryKey: ["home-boards", publicBoardCollection.id, site.organizationId],
@@ -80,7 +83,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         .orderBy(({ board }) => board.name, "asc"),
   });
   const boards = boardsQuery.data ?? [];
-  const boardError = boardsQuery.isError;
+  const boardError = isLiveQueryFailed(boardsQuery);
 
   const { data: statusCounts } = useLiveQuery({
     queryKey: [
@@ -307,7 +310,8 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const filteredPosts = filteredPostsQuery.data ?? [];
   const filteredPostsLoading = isLiveQueryPending(filteredPostsQuery);
   const isLoading = statusLoading || boardLoading || filteredPostsLoading;
-  const isError = statusError || boardError || filteredPostsQuery.isError;
+  const isError =
+    statusError || boardError || isLiveQueryFailed(filteredPostsQuery);
 
   const openGiveFeedback = useCallback(() => {
     if (session) {

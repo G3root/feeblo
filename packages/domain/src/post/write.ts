@@ -48,7 +48,11 @@ import {
   PostEmbeddingService,
   schedulePostEmbeddingBestEffort,
 } from "./embedding-service";
-import { FailedToUpdatePostError, PostNotFoundError } from "./errors";
+import {
+  FailedToUpdatePostError,
+  PostNotFoundError,
+  PostVersionConflictError,
+} from "./errors";
 import { PostRepository } from "./repository";
 
 const postStatusCoalescingDelayMs = 5 * 60 * 1000;
@@ -176,6 +180,11 @@ export type PostUpdateWrite = {
   readonly boardId?: string | undefined;
   /** Raw Markdown; the shared path sanitizes it before it is stored. */
   readonly content?: string | undefined;
+  /**
+   * The version the caller loaded. When present, a row that changed since
+   * that version fails the write instead of being silently overwritten.
+   */
+  readonly expectedUpdatedAt?: Date | undefined;
   readonly etaQuarter?: string | null | undefined;
   readonly id: string;
   readonly organizationId: string;
@@ -791,6 +800,16 @@ const makePostWriteService = Effect.gen(function* () {
           id: args.id,
           organizationId: args.organizationId,
         });
+
+        if (
+          args.expectedUpdatedAt !== undefined &&
+          previous.updatedAt.getTime() !== args.expectedUpdatedAt.getTime()
+        ) {
+          return yield* new PostVersionConflictError({
+            message:
+              "This post changed since it was loaded. Refresh it before saving.",
+          });
+        }
 
         const titleChanged =
           args.title !== undefined && previous.title !== args.title;

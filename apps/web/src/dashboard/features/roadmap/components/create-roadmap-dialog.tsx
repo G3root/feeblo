@@ -85,7 +85,7 @@ function CreateRoadmapForm() {
           organizationId,
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
 
         await Promise.all(
           value.columns.map(async (column, index) => {
@@ -100,7 +100,7 @@ function CreateRoadmapForm() {
                 updatedAt: now,
               });
 
-            await columnTx.isPersisted.promise;
+            await columnTx.when("settled");
           })
         );
 

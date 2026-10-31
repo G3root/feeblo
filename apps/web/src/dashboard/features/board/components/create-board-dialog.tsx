@@ -82,7 +82,7 @@ function CreateBoardForm() {
           organizationId,
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         store.send({ type: "toggle" });
         toastManager.add({
           title: "Board created successfully",
