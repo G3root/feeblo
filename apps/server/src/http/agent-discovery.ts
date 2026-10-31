@@ -148,7 +148,8 @@ export const apiMarkdown = (origin: string) => `# Feeblo Public API
 
 > The versioned HTTP and MCP surface for one Feeblo workspace: posts, comments,
 > votes, tags, boards, changelog entries, companies, and end users. Every
-> response is JSON and every request carries a workspace API key.
+> response is JSON. A request carries a workspace API key, or — on the MCP
+> endpoint — an OAuth access token from a client the workspace has authorized.
 
 - Base URL: ${origin}${API_VERSION_PATH}
 - OpenAPI 3.1 document: ${origin}${API_OPENAPI_PATH}
@@ -188,7 +189,10 @@ Point a streamable-HTTP MCP client at ${origin}${PUBLIC_API_MCP_PATH} and send
 the same key in the \`${PUBLIC_API_KEY_HEADER}\` header. Every operation in the
 OpenAPI document is one tool with the same input schema, result, and scope. A
 key that lacks a scope still lists the tool and receives a tool error naming the
-missing scope when it calls it. The transport refuses requests carrying an
+missing scope when it calls it. A hosted MCP client that does not accept a
+header can instead discover the OAuth authorization server at
+${origin}/.well-known/oauth-protected-resource; the member signs in, picks a
+workspace, and approves scopes. The transport refuses requests carrying an
 \`Origin\` header; a browser client needs a same-origin proxy.
 
 ## Read the docs
@@ -218,8 +222,10 @@ emails every subscriber.
 export const authMarkdown = (origin: string) => `# Feeblo auth.md
 
 The authentication guide for agents reaching this origin. Feeblo's machine
-surfaces accept exactly one credential: a workspace API key.
-Never ask a person for a password, a session cookie, or a better-auth token.
+surfaces accept two credentials, and both resolve to the same workspace and
+scopes: a workspace API key, or an OAuth access token a member issues to a
+client through the authorization server. Never ask a person for a password or
+a session cookie.
 
 ## Create a key
 
@@ -246,7 +252,7 @@ curl ${origin}${API_VERSION_PATH}/boards \\
 A failure carries a machine-readable \`_tag\`:
 
 \`\`\`json
-{ "_tag": "FORBIDDEN_SCOPE", "message": "This API key is missing the posts.create scope." }
+{ "_tag": "FORBIDDEN_SCOPE", "message": "This credential is missing the posts.create scope." }
 \`\`\`
 
 | Status | \`_tag\` | Meaning |
@@ -257,17 +263,34 @@ A failure carries a machine-readable \`_tag\`:
 | 403 | \`PLAN_REQUIRES_UPGRADE\` | The workspace plan does not include the Public API. |
 | 404 | \`NOT_FOUND\` | The record does not exist in this workspace. |
 | 409 | \`CONFLICT\` | The write conflicts with the current state. |
-| 429 | \`RATE_LIMITED\` | The per-key budget is exhausted; read \`Retry-After\`. |
+| 429 | \`RATE_LIMITED\` | The credential's budget is exhausted; read \`Retry-After\`. |
 | 500 | \`INTERNAL_ERROR\` | Unexpected server failure. |
 | 503 | \`SERVICE_UNAVAILABLE\` | A required dependency is unavailable; requests fail closed. |
 
-The per-key budget is 300 requests per minute, shared by reads, writes, and MCP
-calls. A response carries \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, and
+The budget is 300 requests per minute, shared by reads, writes, and MCP calls:
+a key is budgeted per key, and an OAuth grant per member and workspace. A response carries \`X-RateLimit-Limit\`, \`X-RateLimit-Remaining\`, and
 \`X-RateLimit-Reset\`.
 
 ## Connect an MCP client
 
-Use the same key. There is no OAuth flow and no separate MCP credential.
+Two credentials work, and both resolve to the same workspace and scopes.
+
+**An API key** is the simplest: send it in the \`${PUBLIC_API_KEY_HEADER}\`
+header. A client that cannot send a header, or that only speaks OAuth, should
+use the authorization server instead.
+
+**OAuth** is for hosted clients that discover an authorization server from
+RFC 9728 metadata. They read
+\`${origin}/.well-known/oauth-protected-resource\`, register or identify
+themselves, and send the member through sign-in, workspace choice, and consent.
+The resulting access token is bound to this MCP endpoint and to the workspace
+the member chose; it carries the scopes the member approved, and only a member
+who could create a workspace key (owner or admin) can authorize it.
+
+There is no connected-applications page yet. To disconnect a client, revoke its
+grant at \`POST ${origin}/api/auth/oauth2/revoke\` with the refresh token; that
+stops it renewing. An access token already issued is a JWT and stays usable
+until it expires (one hour by default).
 
 \`\`\`json
 {
@@ -286,6 +309,11 @@ Use the same key. There is no OAuth flow and no separate MCP credential.
 Supported protocol revisions: \`2026-07-28\`, \`2025-11-25\`, \`2025-06-18\`,
 \`2025-03-26\`, and \`2024-11-05\`. Requests carrying an \`Origin\` header are
 refused, so a browser client needs a same-origin proxy.
+
+An OAuth refusal is not the \`_tag\` envelope above: \`/mcp\` answers a rejected
+token with a JSON-RPC error and a \`WWW-Authenticate\` header (RFC 9728), which
+is what tells a client where the authorization server is. A key refusal keeps
+the envelope.
 
 ## Read without a key
 
@@ -379,12 +407,17 @@ export const mcpServerCard = (origin: string) => ({
     {
       name: "Feeblo Public API",
       description:
-        "Read and manage one Feeblo workspace's posts, comments, votes, tags, boards, changelog entries, companies, and end users. Requires a workspace API key.",
+        "Read and manage one Feeblo workspace's posts, comments, votes, tags, boards, changelog entries, companies, and end users. Requires a workspace API key or an OAuth access token; both resolve to the same workspace and scopes.",
       transport: "streamable-http",
       url: `${origin}${PUBLIC_API_MCP_PATH}`,
       authentication: {
         required: true,
         scheme: PUBLIC_API_KEY_HEADER,
+        // A hosted MCP client authenticates with OAuth instead; the provider
+        // serves this document at the API origin (docs/adr/0024).
+        oauth: {
+          resource_metadata: `${origin}/.well-known/oauth-protected-resource`,
+        },
         documentation: `${origin}${AGENT_AUTH_PATH}`,
       },
       documentation: "https://docs.feeblo.com/developers/mcp",

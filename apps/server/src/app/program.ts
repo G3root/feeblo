@@ -78,7 +78,11 @@ export const makeServerApp = Effect.gen(function* () {
 
   const WorkFlowLayer = makeWorkflowLayer(mailbox, makeMailerLayer);
   const RateLimitLayer = makeRateLimitLayer(config);
-  const AuthLayer = makeAuthLayer(makeMailerLayer, RateLimitLayer);
+  const AuthLayer = makeAuthLayer(
+    config.apiUrl,
+    makeMailerLayer,
+    RateLimitLayer
+  );
 
   // Built once so the integration kernel and the HTTP layer tree share a
   // single instance instead of building sibling copies in separate memo

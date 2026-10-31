@@ -56,3 +56,28 @@ export const ORGANIZATION_ROLES = {
     ac: ["read"],
   }),
 } as const;
+
+/**
+ * The roles that may mint a workspace-wide machine credential.
+ *
+ * Derived from the ACL statement the api-key plugin itself checks on
+ * `/api-key/create` (`apiKey: ["create"]`, granted to owner and admin), so a
+ * consent that issues an OAuth grant cannot authorize more than the member
+ * could authorize with a key. See `docs/adr/0024`.
+ */
+const WORKSPACE_CREDENTIAL_ROLES: ReadonlySet<string> = new Set(
+  Object.entries(ORGANIZATION_ROLES)
+    .filter(([, role]) => role.authorize({ apiKey: ["create"] }).success)
+    .map(([name]) => name)
+);
+
+/**
+ * Whether a stored `member.role` may authorize a client for the workspace.
+ *
+ * Comma-separated values are accepted because `member.role` is text and an
+ * owner can hold more than one role. The check runs twice: when the consent's
+ * workspace reference is resolved, and again on every access token, so a
+ * demoted member's existing grant stops working.
+ */
+export const roleMayAuthorizeWorkspaceCredential = (role: string): boolean =>
+  role.split(",").some((entry) => WORKSPACE_CREDENTIAL_ROLES.has(entry.trim()));

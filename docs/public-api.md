@@ -94,11 +94,17 @@ The same API is served as an MCP server, so an MCP client can read and manage th
 
 - **Endpoint:** `POST {API_URL}/mcp`, the MCP Streamable HTTP transport.
 - **Protocol revisions:** `2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`.
-- **Authentication:** the same API key, in the `x-api-key` header of every request. There is no separate MCP credential and no OAuth flow.
+- **Authentication:** the same API key, in the `x-api-key` header, or an OAuth 2.1 access token in the `Authorization: Bearer` header. A hosted client that discovers an authorization server uses OAuth: it reads `/.well-known/oauth-protected-resource`, signs the member in, asks them to choose a workspace, and asks for consent. The token is bound to this endpoint and to that workspace, and its scopes are the ones the member approved.
+
+Two credentials, one contract: both resolve to the same workspace and the same scope set, and both are subject to the plan gate, the per-credential budget, and the published `X-RateLimit-*` headers. A key is budgeted per key; an OAuth grant is budgeted per member and workspace, so a client cannot mint tokens to multiply its allowance.
+
+An OAuth grant that names no workspace is refused rather than defaulted to one. A grant whose member has since left the workspace — or lost the owner/admin role the grant required — is refused even before its token expires, and only a member who could create a workspace key can authorize one in the first place.
 
 Every endpoint above is one tool, named after the operation it serves — `listTags`, `createPost`, and so on. A tool's input is the endpoint's input as JSON Schema; its result carries the same published DTO as the HTTP response, as structured content and as text. The hints a client shows in an approval prompt — read-only, destructive, idempotent, open world — are the same annotations the endpoint declares.
 
-Scopes, the plan gate, and the per-key rate limit apply exactly as they do to HTTP requests: the key is resolved once per request, and a refusal answers the envelope and status listed under [Errors](#errors). `tools/list` returns every tool regardless of the key's scopes; calling one the key does not hold answers a tool error whose text names the missing scope — `This API key is missing the … scope.` — so a client learns which scope is missing instead of silently lacking a capability.
+Scopes, the plan gate, and the per-credential rate limit apply exactly as they do to HTTP requests: the credential is resolved once per request. Once it is resolved, a refusal — a missing scope, a plan without the Public API, an exhausted budget — answers the envelope and status listed under [Errors](#errors). `tools/list` returns every tool regardless of the credential's scopes; calling one it does not hold answers a tool error whose text names the missing scope — `This credential is missing the … scope.` — so a client learns which scope is missing instead of silently lacking a capability.
+
+A rejected OAuth token is answered before that point, and not with the envelope: `/mcp` returns a JSON-RPC error and a `WWW-Authenticate` header (RFC 9728) pointing at `/.well-known/oauth-protected-resource`. That header is what tells an MCP client where to send the member to authorize; the key surface's `401` body is unchanged.
 
 Requests carrying an `Origin` header are rejected: the transport does not enable cross-origin access, so a browser-based client must reach it through a same-origin proxy. Clients that send no `Origin` — the desktop and server integrations — are unaffected.
 
@@ -954,7 +960,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 ```json
 {
   "_tag": "FORBIDDEN_SCOPE",
-  "message": "This API key is missing the posts.read scope."
+  "message": "This credential is missing the posts.read scope."
 }
 ```
 
