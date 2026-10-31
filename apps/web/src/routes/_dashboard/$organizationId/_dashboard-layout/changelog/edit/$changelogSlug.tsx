@@ -8,8 +8,9 @@ import {
 } from "@feeblo/ui/empty";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { ChangelogCompletedPosts } from "~/features/changelog/components/changelog-completed-posts";
 import {
@@ -45,35 +46,59 @@ export const Route = createFileRoute(
   component: RouteComponent,
 });
 
+/** The changelog a URL slug last resolved to, so a rename can follow the row. */
+type SlugResolution = { forSlug: string; id: string };
+
 function RouteComponent() {
   const { organizationId, changelogSlug } = Route.useParams();
   const { changelogCollection } = useDashboardCollections();
 
-  const changelogQuery = useLiveQuery({
-    queryKey: [
-      "changelog-by-slug",
-      changelogCollection.id,
-      organizationId,
-      changelogSlug,
-    ],
+  // The row is matched in this component rather than by the query, because a
+  // rename moves it away from the slug that is still in the URL: a query
+  // filtered by that slug cannot hand back the row that just left it. Keying on
+  // the workspace instead also keeps the query stable across the navigation to
+  // the new slug. The collection is already scoped to the signed-in workspace,
+  // so reading it whole is not a wider read, and `(organizationId, slug)` is
+  // unique in the database, so the match below cannot be ambiguous.
+  const changelogsQuery = useLiveQuery({
+    queryKey: ["changelog-editor", changelogCollection.id, organizationId],
     query: (q) =>
       q
         .from({ changelog: changelogCollection })
-        .where(({ changelog }) =>
-          and(
-            eq(changelog.organizationId, organizationId),
-            eq(changelog.slug, changelogSlug)
-          )
-        )
-        .findOne(),
+        .where(({ changelog }) => eq(changelog.organizationId, organizationId)),
   });
-  const changelog = changelogQuery.data;
+  const changelogs = changelogsQuery.data ?? [];
+  const matched = changelogs.find((row) => row.slug === changelogSlug);
 
-  if (changelogQuery.isLoading) {
+  // A save writes the new slug into the collection before the editor navigates
+  // to it, and it waits out the whole round trip in between. For that long the
+  // row answers to the new slug while the URL still names the old one, nothing
+  // matches, and the page used to render "Changelog not found" — tearing down
+  // the editor and remounting it once the URL caught up. Keep the row the URL
+  // resolved to so a rename this page started stays on screen. The allowance is
+  // tied to the slug it was resolved under, so it expires as soon as the URL
+  // names another slug and a genuinely missing entry still says so.
+  //
+  // Adjusted during render rather than in an effect: React supports state
+  // derived from props this way, and a render it discards takes the adjustment
+  // with it, which a ref written during render would not. It cannot loop —
+  // `(organizationId, slug)` is unique, so once recorded the same slug keeps
+  // resolving to the same row and the condition goes false.
+  const [resolved, setResolved] = useState<SlugResolution | null>(null);
+  if (matched !== undefined && resolved?.forSlug !== changelogSlug) {
+    setResolved({ forSlug: changelogSlug, id: matched.id });
+  }
+  const renamedRow =
+    matched === undefined && resolved?.forSlug === changelogSlug
+      ? changelogs.find((row) => row.id === resolved.id)
+      : undefined;
+  const changelog = matched ?? renamedRow;
+
+  if (changelogsQuery.isLoading) {
     return <ChangelogEditorLoadingState />;
   }
 
-  if (isLiveQueryFailed(changelogQuery)) {
+  if (isLiveQueryFailed(changelogsQuery)) {
     return (
       <Empty>
         <EmptyHeader>
@@ -114,8 +139,12 @@ function RouteComponent() {
   }
 
   return (
+    // Keyed by row, not by slug: the provider seeds the form from the row and
+    // mints the asset-upload scope, so a different changelog must get a fresh
+    // one. A rename to the same row (the publish path above) must not.
     <ChangelogEditorProvider
       changelog={changelog}
+      key={changelog.id}
       organizationId={organizationId}
     >
       <ChangelogMoveToDraftDialogProvider>

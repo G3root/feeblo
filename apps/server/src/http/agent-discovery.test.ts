@@ -131,7 +131,7 @@ it.live("serves an RFC 9727 API catalog for the HTTP and MCP surfaces", () =>
         (entry) => entry.anchor === "https://api.feeblo.com/mcp"
       );
       expect(mcp?.["service-desc"]).toContainEqual({
-        href: "https://api.feeblo.com/.well-known/mcp.json",
+        href: "https://api.feeblo.com/.well-known/mcp/server-card.json",
         type: "application/json",
       });
     })
@@ -161,6 +161,164 @@ it.live("serves an MCP server card that states the key requirement", () =>
         url: "https://api.feeblo.com/mcp",
         authentication: { required: true, scheme: "x-api-key" },
       });
+    })
+  )
+);
+
+it.live("serves a SEP-1649 server card next to the multi-origin list", () =>
+  withApp((app) =>
+    Effect.gen(function* () {
+      const response = yield* get(app, "/.well-known/mcp/server-card.json");
+      expectOk(response, "application/json");
+      // SAFETY: The route serializes the `mcpServerCardDocument` value this
+      // module builds; the assertion below is its declared shape.
+      const parsed = JSON.parse(
+        yield* Effect.promise(() => response.text())
+      ) as {
+        $schema: string;
+        name: string;
+        version: string;
+        description: string;
+        remotes: ReadonlyArray<{
+          type: string;
+          url: string;
+          supportedProtocolVersions: ReadonlyArray<string>;
+          headers: ReadonlyArray<{
+            name: string;
+            isRequired?: boolean;
+            isSecret?: boolean;
+            value?: string;
+          }>;
+        }>;
+        serverInfo: { name: string; version: string };
+        endpoint: string;
+        capabilities: { tools: unknown };
+      };
+
+      // The Server Card extension's required fields.
+      expect(parsed.$schema).toBe(
+        "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json"
+      );
+      expect(parsed.name).toMatch(/^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/u);
+      expect(parsed.version).not.toBe("");
+      expect(parsed.description.length).toBeLessThanOrEqual(100);
+      expect(parsed.remotes[0]).toMatchObject({
+        type: "streamable-http",
+        url: "https://api.feeblo.com/mcp",
+      });
+      expect(
+        parsed.remotes[0]?.supportedProtocolVersions.length
+      ).toBeGreaterThan(0);
+      expect(parsed.remotes[0]?.headers[0]).toMatchObject({
+        name: "x-api-key",
+        isRequired: true,
+        isSecret: true,
+      });
+      // The card is public: it names the header, never a value.
+      expect(parsed.remotes[0]?.headers[0]).not.toHaveProperty("value");
+
+      // The earlier card draft's fields, kept for clients and the scanner.
+      expect(parsed.serverInfo.name).toBe("feeblo-public-api");
+      expect(parsed.endpoint).toBe("https://api.feeblo.com/mcp");
+      expect(parsed.capabilities).toHaveProperty("tools");
+
+      // A hosted card MUST be readable by a browser-based client.
+      expect(response.headers.get("access-control-allow-origin")).toBe("*");
+
+      // The list the docs and the landing page link to stays available, so an
+      // agent that learned that shape is not broken by the new one.
+      const legacy = yield* get(app, "/.well-known/mcp.json");
+      expectOk(legacy, "application/json");
+    })
+  )
+);
+
+it.live("serves crawler rules that name the AI bots and the sitemap", () =>
+  withApp((app) =>
+    Effect.gen(function* () {
+      const response = yield* get(app, "/robots.txt");
+      expectOk(response, "text/plain");
+      const body = yield* Effect.promise(() => response.text());
+
+      expect(body).toContain("User-agent: *");
+      expect(body).toContain("User-agent: OAI-SearchBot");
+      expect(body).toContain("User-agent: ClaudeBot");
+      expect(body).toContain("Content-Signal: search=yes");
+      expect(body).toContain("Allow: /");
+      expect(body).toContain("Sitemap: https://api.feeblo.com/sitemap.xml");
+      expect(body).toContain(
+        "Agentmap: https://api.feeblo.com/.well-known/ai-catalog.json"
+      );
+    })
+  )
+);
+
+it.live(
+  "serves a sitemap of the discovery documents on the request origin",
+  () =>
+    withApp((app) =>
+      Effect.gen(function* () {
+        const response = yield* get(app, "/sitemap.xml", {
+          "x-forwarded-host": "feedback.example.test",
+          "x-forwarded-proto": "https",
+        });
+        expectOk(response, "application/xml");
+        const body = yield* Effect.promise(() => response.text());
+
+        expect(body).toContain("<loc>https://feedback.example.test/</loc>");
+        expect(body).toContain(
+          "<loc>https://feedback.example.test/.well-known/mcp/server-card.json</loc>"
+        );
+        // A data endpoint answers 401 without a key, so it must not be listed.
+        expect(body).not.toContain("/api/v1/boards");
+      })
+    )
+);
+
+it.live("serves an ARD manifest whose entries are dereferenceable", () =>
+  withApp((app) =>
+    Effect.gen(function* () {
+      const response = yield* get(app, "/.well-known/ai-catalog.json");
+      expectOk(response, "application/json");
+      expect(response.headers.get("access-control-allow-origin")).toBe("*");
+      // SAFETY: The route serializes the `agentCatalog` value this module
+      // builds; the assertion below is its declared shape.
+      const parsed = JSON.parse(
+        yield* Effect.promise(() => response.text())
+      ) as {
+        specVersion: string;
+        host: { identifier: string };
+        entries: ReadonlyArray<{
+          identifier: string;
+          url?: string;
+          data?: unknown;
+        }>;
+      };
+
+      expect(parsed.specVersion).not.toBe("");
+      expect(parsed.host.identifier).toContain("api.feeblo.com");
+      expect(parsed.entries.length).toBeGreaterThan(0);
+
+      for (const entry of parsed.entries) {
+        // Spec section 3.4: exactly one of `url` and `data`, never both.
+        expect(Number(entry.url !== undefined)).toBe(1);
+        expect(entry.data).toBeUndefined();
+        expect(entry.identifier.startsWith("urn:air:api.feeblo.com:")).toBe(
+          true
+        );
+      }
+    })
+  )
+);
+
+it.live("titles the auth guide so an auth-md reader finds it", () =>
+  withApp((app) =>
+    Effect.gen(function* () {
+      const response = yield* get(app, "/auth.md");
+      const body = yield* Effect.promise(() => response.text());
+
+      expect(body.startsWith("# ")).toBe(true);
+      expect(body.split("\n", 1)[0]).toContain("auth.md");
     })
   )
 );

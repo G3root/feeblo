@@ -1,6 +1,12 @@
 import handler from "@tanstack/react-start/server-entry";
 
 import {
+  acceptsMarkdown,
+  DASHBOARD_DISCOVERY_LINK,
+  dashboardMarkdown,
+  isDashboardRequest,
+} from "./lib/agent-discovery";
+import {
   applyPageSecurityHeaders,
   deploymentServesHttps,
   parseImageOrigins,
@@ -32,12 +38,9 @@ import { paraglideMiddleware } from "./paraglide/server.js";
  */
 export default {
   async fetch(request: Request) {
-    const response = await paraglideMiddleware(request, () =>
-      handler.fetch(request)
-    );
-
     const url = new URL(request.url);
-    return applyPageSecurityHeaders(response, {
+    const dashboard = isDashboardRequest(request);
+    const securityOptions = {
       // `MEDIA_PUBLIC_BASE_URL` is where uploaded editor media and workspace
       // logos are served from; without it the `img-src` allow-list would blank
       // every uploaded image. `CONTENT_IMAGE_ORIGINS` is the operator's
@@ -53,6 +56,72 @@ export default {
         appUrl: process.env.APP_URL,
       }),
       pathname: url.pathname,
-    });
+    };
+
+    // An agent asking for Markdown on the root is not going to drive a React
+    // app. Answer before the document renderer, whose HTML-only guard would
+    // otherwise refuse the request with a 406.
+    if (
+      dashboard &&
+      request.method === "GET" &&
+      url.pathname === "/" &&
+      acceptsMarkdown(request.headers.get("accept"))
+    ) {
+      const body = dashboardMarkdown(url.origin);
+
+      return applyPageSecurityHeaders(
+        withRootDiscovery(
+          new Response(body, {
+            headers: {
+              "Cache-Control": "no-store",
+              "Content-Type": "text/markdown; charset=utf-8",
+              "x-markdown-tokens": String(Math.ceil(body.length / 4)),
+            },
+          })
+        ),
+        securityOptions
+      );
+    }
+
+    const response = await paraglideMiddleware(request, () =>
+      handler.fetch(request)
+    );
+
+    // The root document is the URL an agent probes first, so the discovery set
+    // rides on it whether or not the client asked for Markdown.
+    const document =
+      dashboard && url.pathname === "/"
+        ? withRootDiscovery(response)
+        : response;
+
+    return applyPageSecurityHeaders(document, securityOptions);
   },
+};
+
+/**
+ * The headers the root document carries in both representations.
+ *
+ * `Vary: Accept` is what keeps a shared cache from storing the HTML and then
+ * serving it to an agent that asked for Markdown, or the reverse. The shell's
+ * own cache policy allows shared caching, so the key has to include the header
+ * that selects the representation.
+ */
+const withRootDiscovery = (response: Response) => {
+  const headers = new Headers(response.headers);
+  headers.set("Link", DASHBOARD_DISCOVERY_LINK);
+
+  const vary = new Set(
+    (headers.get("Vary") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value !== "")
+  );
+  vary.add("Accept");
+  headers.set("Vary", [...vary].join(", "));
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 };
