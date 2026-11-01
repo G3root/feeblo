@@ -288,6 +288,7 @@ function PostEditorComponent({
   const [internalContent, setInternalContent] = useState(externalContent ?? "");
   const [resetKey, setResetKey] = useState(0);
   const contentRef = useRef(externalContent ?? "");
+  const contentPropRef = useRef(externalContent ?? "");
   const [generatedEditorScope] = useState(() => crypto.randomUUID());
   const editorScope = providedEditorScope ?? generatedEditorScope;
 
@@ -298,11 +299,17 @@ function PostEditorComponent({
     ? (externalContent as string)
     : internalContent;
 
-  // Sync the latest content into the ref after render; the ref is only ever
-  // read from event handlers, which run after effects have flushed.
   useEffect(() => {
-    contentRef.current = content;
+    contentPropRef.current = content;
   }, [content]);
+
+  // Seed the submission ref from the content the editor was mounted or reset
+  // with, never from a background refresh. The editor keeps showing the user's
+  // draft when the `content` prop changes, so syncing the ref on every prop
+  // change would submit the refreshed server body instead of that draft.
+  useEffect(() => {
+    contentRef.current = contentPropRef.current;
+  }, [resetKey]);
 
   const handleContentChange = (doc: string) => {
     contentRef.current = doc;
