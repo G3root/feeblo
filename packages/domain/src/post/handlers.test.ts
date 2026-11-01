@@ -45,6 +45,7 @@ import { WorkspaceRepository } from "../workspace/repository";
 import {
   DEFAULT_POST_EMBEDDING_DIMENSIONS,
   DEFAULT_POST_EMBEDDING_MODEL,
+  generatePostEmbedding,
   PostEmbeddingService,
 } from "./embedding-service";
 import { FailedToMergePostError, PostNotFoundError } from "./errors";
@@ -2239,6 +2240,84 @@ describe("PostRpcHandlers", () => {
 
           expect(post?.embedding).toBeNull();
         })
+      );
+
+      it.effect(
+        "keeps the editor version stable when only the embedding is written",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const vector = Array.from(
+              { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+              (_, index) => (index === 0 ? 1 : 0)
+            );
+
+            yield* handlers
+              .CreatePost(
+                postCreateInput(
+                  fixture,
+                  postId,
+                  "Versioned embedding",
+                  "Original body"
+                )
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [before] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            yield* generatePostEmbedding({
+              content: sanitizeMarkdown("Original body").sanitizedMarkdown,
+              organizationId: fixture.organizationId,
+              postId,
+              title: "Versioned embedding",
+            }).pipe(
+              Effect.provideService(PostEmbeddingService, {
+                embed: () =>
+                  Effect.succeedSome({
+                    model: DEFAULT_POST_EMBEDDING_MODEL,
+                    vector,
+                  }),
+              })
+            );
+
+            const [after] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            // SAFETY: CreatePost above guarantees the row exists.
+            expect(after?.updatedAt.getTime()).toBe(
+              // SAFETY: CreatePost above guarantees the row exists.
+              before!.updatedAt.getTime()
+            );
+
+            yield* handlers
+              .UpdatePostContent({
+                assetIds: [],
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                content: "Updated body",
+                // SAFETY: The version read before the embedding is the version
+                // the editor would have loaded.
+                expectedUpdatedAt: before!.updatedAt,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [updated] = yield* db
+              .select({ content: schema.postTable.content })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            expect(updated?.content).toContain("Updated body");
+          })
       );
 
       it.effect("orders stored vectors by cosine distance", () =>

@@ -47,10 +47,10 @@ export function usePostDetail() {
   return {
     assetIds: query.data?.assetIds,
     content: query.data?.content,
-    // The detail row feeds writes, not just display: a sync failure means the
-    // body or its `updatedAt` may be stale, so the editor treats it as a
-    // failure until a refresh succeeds.
-    isError: isLiveQueryFailed(query) || query.isSyncError,
+    isError: isLiveQueryFailed(query),
+    // The rows are still on screen, but they may be stale: the editor keeps
+    // its draft mounted and blocks saving until a refresh succeeds.
+    isSyncError: query.isSyncError,
     // Hydration lands the detail row before the first client render, so
     // `isLoading` would flash the body skeleton over server-rendered content.
     isLoading: isLiveQueryPending(query),

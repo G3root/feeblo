@@ -953,6 +953,9 @@ const makePostRepository = Effect.gen(function* () {
             embeddedAt: now,
             embedding: [...embedding],
             embeddingModel: model,
+            // Embedding generation is not an editor write. Preserve the
+            // version the editor loaded instead of letting `$onUpdate` bump it.
+            updatedAt: schema.postTable.updatedAt,
           })
           .where(
             and(

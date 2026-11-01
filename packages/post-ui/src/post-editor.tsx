@@ -3,6 +3,7 @@ import { Editor, finalizeEditorContent } from "@feeblo/ui/editor";
 import { EditorProvider } from "@feeblo/ui/editor/editor-store";
 import { anchoredToastManager, toastManager } from "@feeblo/ui/toast";
 import { refetchInBackground } from "@feeblo/web-shared/collections";
+import { isRpcErrorTag } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
 import {
@@ -365,6 +366,18 @@ export function PostContentUpdateInput() {
   // Initial body + attachments resolve through the detail collection (the
   // context row is a slim list item without `content`).
   const detail = usePostDetail();
+  const [draftVersion, setDraftVersion] = useState<Date>();
+  const [hasVersionConflict, setHasVersionConflict] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
+
+  // Pin the version to the row the editor was opened with. A background or
+  // conflict refresh may load a newer row; the mounted draft must not silently
+  // adopt its version and overwrite that newer content on the next save.
+  useEffect(() => {
+    if (draftVersion === undefined && detail.updatedAt !== undefined) {
+      setDraftVersion(detail.updatedAt);
+    }
+  }, [detail.updatedAt, draftVersion]);
 
   // Merged posts are read-only until unmerged (title/content mutations are
   // denied by PostPolicy for the same reason).
@@ -406,8 +419,9 @@ export function PostContentUpdateInput() {
         );
       } catch (error) {
         // A rejected write (a version conflict is the common case) leaves the
-        // detail row at the version the server still holds. Refresh it before
-        // the caller can retry; a failed refresh is reported by the query.
+        // detail row at the version the server still holds. Refresh the server
+        // row while leaving the mounted draft untouched; a failed refresh is
+        // reported by the query and keeps saving disabled.
         await postDetailCollection.utils.refetch().catch(() => undefined);
         throw error;
       }
@@ -425,7 +439,7 @@ export function PostContentUpdateInput() {
     );
   }
 
-  const expectedUpdatedAt = detail.updatedAt;
+  const expectedUpdatedAt = draftVersion;
 
   if (
     detail.isLoading ||
@@ -437,8 +451,9 @@ export function PostContentUpdateInput() {
 
   return (
     <PostEditor
+      key={editorKey}
       content={detail.content}
-      disabled={disabled}
+      disabled={disabled || detail.isSyncError}
       existingAssetIds={detail.assetIds ?? post.assetIds}
       onSubmit={async ({ assetIds, content }) => {
         try {
@@ -448,18 +463,68 @@ export function PostContentUpdateInput() {
             expectedUpdatedAt,
           });
           await tx.when("settled");
+          const refreshedVersion = postDetailCollection.get(post.id)?.updatedAt;
+          if (refreshedVersion !== undefined) {
+            setDraftVersion(refreshedVersion);
+          }
+          setHasVersionConflict(false);
         } catch (error) {
-          toastManager.add({
-            title: m.tame_such_reindeer(),
-            type: "error",
-          });
+          if (isRpcErrorTag(error, "PostVersionConflictError")) {
+            // The refresh in `mutationFn` loaded the newer server row. Keep the
+            // draft on its original version until the user explicitly chooses
+            // to overwrite that row or discard the draft.
+            setHasVersionConflict(true);
+          } else {
+            toastManager.add({
+              title: m.tame_such_reindeer(),
+              type: "error",
+            });
+          }
           throw error;
         }
       }}
       organizationId={organizationId}
       submitLabel={m.key_bald_mule()}
     >
-      <PostEditor.Submit />
+      {hasVersionConflict ? (
+        <div className="border-destructive/30 bg-destructive/5 mt-2 rounded-lg border p-3 text-sm">
+          <p>{m.amber_witty_ocelot()}</p>
+          <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+            <Button
+              disabled={detail.isSyncError || detail.updatedAt === undefined}
+              onClick={() => {
+                if (detail.updatedAt === undefined) {
+                  return;
+                }
+                setDraftVersion(detail.updatedAt);
+                setHasVersionConflict(false);
+                setEditorKey((key) => key + 1);
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {m.humble_sunny_auk()}
+            </Button>
+            <Button
+              disabled={detail.isSyncError || detail.updatedAt === undefined}
+              onClick={() => {
+                if (detail.updatedAt === undefined) {
+                  return;
+                }
+                setDraftVersion(detail.updatedAt);
+                setHasVersionConflict(false);
+              }}
+              size="sm"
+              type="button"
+            >
+              {m.noble_quiet_ibex()}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <PostEditor.Submit />
+      )}
     </PostEditor>
   );
 }
