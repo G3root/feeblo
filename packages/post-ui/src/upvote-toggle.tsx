@@ -99,15 +99,21 @@ function useUpvote({
 
     const userId = session.user.id;
     const key = getUpvoteCollectionKey({ userId, postId });
-    const hasUpvoted = upvoteCollection.has(key);
+    const intendedUpvoted = !upvoteCollection.has(key);
     const membership = session.memberships.find(
       (m) => m.organizationId === organizationId && m.userId === session.user.id
     );
 
-    if (hasUpvoted) {
-      const tx = upvoteCollection.delete(key);
-      await tx.when("settled");
-    } else {
+    // A previous attempt may have committed on the server and then failed its
+    // read-back, leaving this collection stale. Refresh before deciding, and
+    // treat a row that already matches the intended state as success so a
+    // retry cannot toggle it back.
+    await upvoteCollection.utils.refetch({ throwOnError: true });
+    if (upvoteCollection.has(key) === intendedUpvoted) {
+      return;
+    }
+
+    if (intendedUpvoted) {
       const upvoteId = await UpvoteId.unsafeGenerate();
       const tx = upvoteCollection.insert({
         id: upvoteId,
@@ -124,6 +130,9 @@ function useUpvote({
           image: session.user.image ?? null,
         },
       });
+      await tx.when("settled");
+    } else {
+      const tx = upvoteCollection.delete(key);
       await tx.when("settled");
     }
   };
