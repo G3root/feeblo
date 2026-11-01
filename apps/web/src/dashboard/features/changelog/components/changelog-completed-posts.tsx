@@ -84,7 +84,7 @@ export function ChangelogCompletedPosts({
         : changelogPostCollection.delete(
             getChangelogPostKey({ changelogId: changelog.id, postId })
           );
-      await tx.isPersisted.promise;
+      await tx.when("settled");
     } catch {
       toastManager.add({
         title: "Failed to update completed posts",

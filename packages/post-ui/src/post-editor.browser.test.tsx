@@ -1,4 +1,5 @@
 import { isFunction } from "@feeblo/utils/runtime-kind";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
@@ -115,6 +116,49 @@ describe("PostEditor", () => {
       expect(onSubmit.mock.calls[0]?.[0].assetIds).toEqual([
         "asset-uploaded-on-save",
       ]);
+    });
+  });
+
+  it("submits the draft when the content prop refreshes", async () => {
+    const onSubmit = vi.fn();
+
+    function Harness() {
+      const [content, setContent] = useState("Server body");
+
+      return (
+        <div>
+          <button
+            onClick={() => setContent("Refreshed server body")}
+            type="button"
+          >
+            Refresh server
+          </button>
+          <PostEditor
+            content={content}
+            onSubmit={onSubmit}
+            organizationId="organization-id"
+            submitLabel="Save"
+          >
+            <PostEditor.Submit />
+          </PostEditor>
+        </div>
+      );
+    }
+
+    const screen = await render(<Harness />);
+    const editor = screen.getByRole("textbox");
+    await editor.click();
+    await editor.fill("My draft");
+
+    await screen.getByRole("button", { name: "Refresh server" }).click();
+    await screen.getByRole("button", { name: "Save" }).click();
+
+    await vi.waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledOnce();
+      expect(onSubmit.mock.calls[0]?.[0].content).toContain("My draft");
+      expect(onSubmit.mock.calls[0]?.[0].content).not.toContain(
+        "Refreshed server body"
+      );
     });
   });
 

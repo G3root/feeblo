@@ -100,7 +100,7 @@ export function PostTitleUpdateInput() {
     try {
       const tx = updatePostTitle({ title: newValue });
 
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       trackEvent("post_updated", { field: "title", success: true });
 
       toastManager.add({

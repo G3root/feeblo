@@ -48,7 +48,7 @@ function RouteComponent() {
           }
         );
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
 
         toastManager.add({
           title: "Roadmap visibility updated",

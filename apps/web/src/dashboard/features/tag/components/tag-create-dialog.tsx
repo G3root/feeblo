@@ -79,7 +79,7 @@ function TagCreateForm({
           organizationId,
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         await onCreated?.({
           id,
           name: data.value.name,

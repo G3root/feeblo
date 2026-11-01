@@ -8,7 +8,10 @@ import {
 } from "@feeblo/ui/empty";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { cn } from "@feeblo/ui/utils";
-import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import {
+  isLiveQueryFailed,
+  isLiveQueryPending,
+} from "@feeblo/web-shared/collections";
 import { ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
@@ -58,7 +61,7 @@ export function ChangelogDetailPage({
   // Resolved before the dependent query below: its callback runs during the
   // hook call, so `changelog` has to be initialized by then.
   const changelog = changelogQuery.data;
-  const isError = changelogQuery.isError;
+  const isError = isLiveQueryFailed(changelogQuery);
 
   const { data: categoryLinks = [] } = useLiveQuery({
     queryKey: [

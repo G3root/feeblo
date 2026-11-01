@@ -23,7 +23,10 @@ import {
 } from "@feeblo/ui/empty";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { isString } from "@feeblo/utils/runtime-kind";
-import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import {
+  isLiveQueryFailed,
+  isLiveQueryPending,
+} from "@feeblo/web-shared/collections";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
@@ -126,7 +129,7 @@ export function PostPage({ slug }: { readonly slug: string }) {
   });
 
   const post = postQuery.data;
-  const postError = postQuery.isError;
+  const postError = isLiveQueryFailed(postQuery);
 
   // Board and status stay small org-scoped collections; look them up by the
   // detail row's ids instead of joining the full post list.
@@ -221,7 +224,7 @@ export function PostPage({ slug }: { readonly slug: string }) {
     if (isLiveQueryPending(postTagsQuery)) {
       return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
     }
-    if (postTagsQuery.isError) {
+    if (isLiveQueryFailed(postTagsQuery)) {
       return (
         <RootLayout>
           <Empty>

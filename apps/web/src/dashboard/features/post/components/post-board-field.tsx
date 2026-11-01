@@ -45,7 +45,7 @@ export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
               draft.boardId = boardId;
             }
           );
-          await tx.isPersisted.promise;
+          await tx.when("settled");
           trackEvent("post_updated", { field: "board", success: true });
 
           toastManager.add({

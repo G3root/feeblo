@@ -45,6 +45,7 @@ import { WorkspaceRepository } from "../workspace/repository";
 import {
   DEFAULT_POST_EMBEDDING_DIMENSIONS,
   DEFAULT_POST_EMBEDDING_MODEL,
+  generatePostEmbedding,
   PostEmbeddingService,
 } from "./embedding-service";
 import { FailedToMergePostError, PostNotFoundError } from "./errors";
@@ -1580,6 +1581,81 @@ describe("PostRpcHandlers", () => {
           expect(detail.content).toContain("Updated content");
         })
       );
+
+      it.effect("rejects a content update based on an outdated version", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .CreatePost(
+              postCreateInput(
+                fixture,
+                postId,
+                "Versioned feedback",
+                "Original content"
+              )
+            )
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const [row] = yield* db
+            .select({ updatedAt: schema.postTable.updatedAt })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          // SAFETY: CreatePost above guarantees the row exists.
+          const staleUpdatedAt = dateAt(row!.updatedAt.getTime() - 1000);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostContent({
+                assetIds: [],
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                content: "Stale content",
+                expectedUpdatedAt: staleUpdatedAt,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "manager")
+                )
+              )
+          );
+          expect(error._tag).toBe("PostVersionConflictError");
+
+          const [unchanged] = yield* db
+            .select({ content: schema.postTable.content })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(unchanged?.content).toContain("Original content");
+
+          yield* handlers
+            .UpdatePostContent({
+              assetIds: [],
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+              content: "Updated content",
+              // SAFETY: The row read above is the version this save loaded.
+              expectedUpdatedAt: row!.updatedAt,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "manager")
+              )
+            );
+
+          const [updated] = yield* db
+            .select({ content: schema.postTable.content })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, postId));
+          expect(updated?.content).toContain("Updated content");
+        })
+      );
     });
 
     describe("UpdatePostEta", () => {
@@ -1798,6 +1874,56 @@ describe("PostRpcHandlers", () => {
             title: "Original feedback",
           });
         })
+      );
+
+      it.effect(
+        "rejects a public content update based on an outdated version",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+            const session = makeSession(fixture, null);
+
+            yield* handlers
+              .CreatePostPublic(
+                postCreateInput(
+                  fixture,
+                  postId,
+                  "Versioned feedback",
+                  "Original content"
+                )
+              )
+              .pipe(Effect.provideService(CurrentSession, session));
+
+            const [row] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            // SAFETY: CreatePostPublic above guarantees the row exists.
+            const staleUpdatedAt = dateAt(row!.updatedAt.getTime() - 1000);
+
+            const error = yield* Effect.flip(
+              handlers
+                .UpdatePostContentPublic({
+                  assetIds: [],
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                  content: "Stale content",
+                  expectedUpdatedAt: staleUpdatedAt,
+                })
+                .pipe(Effect.provideService(CurrentSession, session))
+            );
+            expect(error._tag).toBe("PostVersionConflictError");
+
+            const [unchanged] = yield* db
+              .select({ content: schema.postTable.content })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            expect(unchanged?.content).toContain("Original content");
+          })
       );
 
       it.effect("denies changing the status of their own public post", () =>
@@ -2114,6 +2240,84 @@ describe("PostRpcHandlers", () => {
 
           expect(post?.embedding).toBeNull();
         })
+      );
+
+      it.effect(
+        "keeps the editor version stable when only the embedding is written",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const db = yield* currentDb;
+            const fixture = yield* makeFixture();
+            const postId = yield* PostId.generate;
+            const vector = Array.from(
+              { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
+              (_, index) => (index === 0 ? 1 : 0)
+            );
+
+            yield* handlers
+              .CreatePost(
+                postCreateInput(
+                  fixture,
+                  postId,
+                  "Versioned embedding",
+                  "Original body"
+                )
+              )
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [before] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            yield* generatePostEmbedding({
+              content: sanitizeMarkdown("Original body").sanitizedMarkdown,
+              organizationId: fixture.organizationId,
+              postId,
+              title: "Versioned embedding",
+            }).pipe(
+              Effect.provideService(PostEmbeddingService, {
+                embed: () =>
+                  Effect.succeedSome({
+                    model: DEFAULT_POST_EMBEDDING_MODEL,
+                    vector,
+                  }),
+              })
+            );
+
+            const [after] = yield* db
+              .select({ updatedAt: schema.postTable.updatedAt })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            // SAFETY: CreatePost above guarantees the row exists.
+            expect(after?.updatedAt.getTime()).toBe(
+              // SAFETY: CreatePost above guarantees the row exists.
+              before!.updatedAt.getTime()
+            );
+
+            yield* handlers
+              .UpdatePostContent({
+                assetIds: [],
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                content: "Updated body",
+                // SAFETY: The version read before the embedding is the version
+                // the editor would have loaded.
+                expectedUpdatedAt: before!.updatedAt,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture))
+              );
+
+            const [updated] = yield* db
+              .select({ content: schema.postTable.content })
+              .from(schema.postTable)
+              .where(eq(schema.postTable.id, postId));
+            expect(updated?.content).toContain("Updated body");
+          })
       );
 
       it.effect("orders stored vectors by cosine distance", () =>

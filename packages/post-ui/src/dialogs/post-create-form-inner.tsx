@@ -275,7 +275,7 @@ export function PostCreateForm() {
         ...(author ? { author } : undefined),
       });
       // The RPC returns the collision-resolved slug actually persisted.
-      // Reconcile the optimistic row before isPersisted settles so links
+      // Reconcile the optimistic row before the mutation settles so links
       // and detail queries target the stored post.
       if (canonicalSlug !== row.slug) {
         postCollection.update(row.id, (draft) => {
@@ -381,7 +381,7 @@ export function PostCreateForm() {
             : undefined),
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         finalized.commit();
         trackEvent("post_created", { source, success: true });
         toastManager.add({

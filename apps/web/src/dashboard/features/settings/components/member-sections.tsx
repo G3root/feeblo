@@ -31,6 +31,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import {
+  isLiveQueryFailed,
   refetchInBackground,
   settleOptimisticMutation,
 } from "@feeblo/web-shared/collections";
@@ -132,7 +133,7 @@ export function MembersSection() {
     );
   }
 
-  if (membersQuery.isError) {
+  if (isLiveQueryFailed(membersQuery)) {
     return (
       <MembersSettingsLayout.Section title="Members">
         <MembersSectionControls
@@ -282,7 +283,7 @@ export function InvitationsSection() {
     );
   }
 
-  if (invitationsQuery.isError) {
+  if (isLiveQueryFailed(invitationsQuery)) {
     return (
       <MembersSettingsLayout.Section title="Invitations">
         <MembersSectionErrorState

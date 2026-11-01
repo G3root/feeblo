@@ -66,7 +66,7 @@ vi.mock("@tanstack/react-db", () => ({
   and: (...args: unknown[]) => args,
   // Faithful seam for the form's optimistic create action: run the
   // optimistic insert, then the persistence function, surfacing failures
-  // through `isPersisted` exactly like a real transaction.
+  // through `when("settled")` exactly like a real transaction.
   createOptimisticAction: vi.fn(
     (options: {
       onMutate: (variables: PostCreateActionInput) => void;
@@ -77,7 +77,7 @@ vi.mock("@tanstack/react-db", () => ({
           options.onMutate(variables);
           await options.mutationFn(variables);
         })();
-        return { isPersisted: { promise } };
+        return { when: () => promise };
       }
   ),
   eq: () => ({ __eq: true }),
@@ -186,7 +186,7 @@ const postStatus = {
 };
 
 const insertSpy = vi.fn().mockReturnValue({
-  isPersisted: { promise: Promise.resolve() },
+  when: () => Promise.resolve(),
 });
 
 // Captures the surface persistence input the form's optimistic action

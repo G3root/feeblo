@@ -6,7 +6,10 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
-import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import {
+  isLiveQueryFailed,
+  isLiveQueryPending,
+} from "@feeblo/web-shared/collections";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 
@@ -94,7 +97,7 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
   // Resolved before the dependent query below: its callback runs during the
   // hook call, so `board` has to be initialized by then.
   const board = boardQuery.data;
-  const boardError = boardQuery.isError;
+  const boardError = isLiveQueryFailed(boardQuery);
 
   const postsQuery = useLiveQuery({
     queryKey: [
@@ -136,7 +139,7 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
   });
 
   const posts = postsQuery.data ?? [];
-  const postsError = postsQuery.isError;
+  const postsError = isLiveQueryFailed(postsQuery);
   // Hydration lands results before the first client render, so a query with a
   // result (rows or an empty set) is never "loading" for rendering (see
   // `isLiveQueryPending`).

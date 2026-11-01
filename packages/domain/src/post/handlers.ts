@@ -266,6 +266,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         {
           assetIds: args.assetIds,
           content: args.content,
+          expectedUpdatedAt: args.expectedUpdatedAt,
           id: args.id,
           organizationId: args.organizationId,
         },

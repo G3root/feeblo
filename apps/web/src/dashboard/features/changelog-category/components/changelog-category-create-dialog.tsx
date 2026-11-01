@@ -61,7 +61,7 @@ function ChangelogCategoryCreateForm() {
           organizationId,
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({

@@ -71,7 +71,7 @@ export const useChangelogAction = () => {
         },
       });
 
-      await tx.isPersisted.promise;
+      await tx.when("settled");
       trackEvent("changelog_created", { success: true });
 
       void navigate({
