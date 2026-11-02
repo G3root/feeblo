@@ -34,7 +34,7 @@ import {
   useBoardStore,
 } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";
-import { BoardViewsMenu } from "./board-views-menu";
+import { BoardSavedViews } from "./board-saved-views";
 
 const links = [
   {
@@ -48,10 +48,6 @@ const links = [
   {
     name: "Backlog",
     to: "/$organizationId/board/$boardSlug/backlog" as const,
-  },
-  {
-    name: "Assigned",
-    to: "/$organizationId/board/$boardSlug/assigned" as const,
   },
 ];
 
@@ -67,10 +63,6 @@ const feedbackLinks = [
   {
     name: "Backlog",
     to: "/$organizationId/feedback/backlog" as const,
-  },
-  {
-    name: "Assigned",
-    to: "/$organizationId/feedback/assigned" as const,
   },
 ];
 
@@ -145,8 +137,9 @@ export function BoardToolbar({
                 ))}
           </div>
           <div className="ml-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto">
-            <BoardViewsMenu
+            <BoardSavedViews
               boardId={boardId ?? null}
+              boardSlug={boardSlug}
               organizationId={organizationId}
             />
             <div className="min-w-0 flex-1 sm:w-72 sm:flex-none">

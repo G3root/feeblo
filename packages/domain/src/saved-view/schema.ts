@@ -1,5 +1,6 @@
 import {
   BoardQuery,
+  SAVED_VIEW_DESCRIPTION_MAX_LENGTH,
   SAVED_VIEW_NAME_MAX_LENGTH,
 } from "@feeblo/domain-contracts/board-query";
 import { WorkspaceId } from "@feeblo/id";
@@ -27,6 +28,18 @@ const SavedViewName = S.Trim.pipe(
 );
 
 /**
+ * An optional note.
+ *
+ * The bound is checked here; the trim-and-null normalization happens in the
+ * handler (`normalizeDescription`), because it describes what the *row* stores
+ * rather than what the wire accepts, and a schema transform would have to be
+ * mirrored in the client's encoder to keep the two agreeing about `""`.
+ */
+const SavedViewDescription = S.NullOr(
+  S.String.check(S.isMaxLength(SAVED_VIEW_DESCRIPTION_MAX_LENGTH))
+);
+
+/**
  * A stored view as clients read it.
  *
  * `memberId` is the owner and is returned because the toolbar needs it to
@@ -40,6 +53,10 @@ export const SavedView = S.Struct({
   /** Null for the organization-wide feedback list; set for one board. */
   boardId: S.NullOr(S.String),
   name: S.String,
+  /** Null when the member left it blank. */
+  description: S.NullOr(S.String),
+  /** Position among this member's views on this surface, ascending. */
+  orderIndex: S.Int,
   query: BoardQuery,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
@@ -69,6 +86,7 @@ export const SavedViewCreate = S.Struct({
   organizationId: WorkspaceId.schema,
   boardId: S.NullOr(S.String),
   name: SavedViewName,
+  description: SavedViewDescription,
   query: BoardQuery,
 });
 
@@ -82,6 +100,7 @@ export const SavedViewUpdate = S.Struct({
   id: S.String,
   organizationId: WorkspaceId.schema,
   name: SavedViewName,
+  description: SavedViewDescription,
   query: BoardQuery,
 });
 
@@ -91,5 +110,22 @@ export const SavedViewDelete = S.Struct({
   id: S.String,
   organizationId: WorkspaceId.schema,
 });
+
+/**
+ * The new order of one surface's views, named in full.
+ *
+ * A whole list rather than a move: positions are only meaningful relative to
+ * each other, so a drag that lands between two views is one statement about
+ * every view's position, and a caller cannot produce a half-applied order. The
+ * write rejects a list that does not name exactly the member's views on that
+ * surface, so a stale client cannot drop or adopt somebody else's row.
+ */
+export const SavedViewReorder = S.Struct({
+  organizationId: WorkspaceId.schema,
+  boardId: S.NullOr(S.String),
+  orderedIds: S.Array(S.String).check(S.isMinLength(1)),
+});
+
+export type TSavedViewReorder = S.Schema.Type<typeof SavedViewReorder>;
 
 export type TSavedViewDelete = S.Schema.Type<typeof SavedViewDelete>;

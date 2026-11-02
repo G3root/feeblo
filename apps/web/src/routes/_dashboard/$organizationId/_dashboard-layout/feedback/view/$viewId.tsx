@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AssignedBoardPage } from "~/features/board/components/board-route-pages";
+import { SavedFeedbackViewPage } from "~/features/board/components/board-route-pages";
 import { preloadBoardPosts } from "~/lib/preloads";
 
 export const Route = createFileRoute(
-  "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/assigned"
+  "/_dashboard/$organizationId/_dashboard-layout/feedback/view/$viewId"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
@@ -14,9 +14,9 @@ export const Route = createFileRoute(
 });
 
 function RouteComponent() {
-  const { organizationId, boardSlug } = Route.useParams();
+  const { organizationId, viewId } = Route.useParams();
 
   return (
-    <AssignedBoardPage boardSlug={boardSlug} organizationId={organizationId} />
+    <SavedFeedbackViewPage organizationId={organizationId} viewId={viewId} />
   );
 }

@@ -8,6 +8,7 @@ import {
   MenuGroup,
   MenuItem,
   MenuPortal,
+  MenuSeparator,
   MenuSub,
   MenuSubPopup,
   MenuSubTrigger,
@@ -64,6 +65,8 @@ type FilterMember = {
 
 type BoardFilterContextValue = {
   clearAllFilters: () => void;
+  /** The signed-in member, for the filter's "Assigned to me" shortcut. */
+  currentMemberId: string | undefined;
   clearAssigneeFilter: () => void;
   clearStatusFilter: () => void;
   clearTagFilter: () => void;
@@ -209,6 +212,7 @@ function BoardFilterRoot({
       clearAssigneeFilter,
       clearStatusFilter,
       clearTagFilter,
+      currentMemberId,
       filters,
       members,
       organizationId,
@@ -225,6 +229,7 @@ function BoardFilterRoot({
       clearAssigneeFilter,
       clearStatusFilter,
       clearTagFilter,
+      currentMemberId,
       filters,
       members,
       organizationId,
@@ -247,17 +252,21 @@ function BoardFilterRoot({
 
 function BoardFilterTrigger() {
   const {
+    currentMemberId,
     filters,
+    members,
     postStatuses,
     tags,
-    members,
+    toggleAssignee,
     toggleStatus,
     toggleTag,
-    toggleAssignee,
   } = useBoardFilterContext();
   const selectedStatuses = new Set(filters.statuses);
   const selectedTagIds = new Set(filters.tagIds);
   const selectedAssigneeIds = new Set(filters.assigneeMemberIds);
+  const otherMembers = members.filter(
+    (member) => member.id !== currentMemberId
+  );
 
   return (
     <Menu>
@@ -319,10 +328,27 @@ function BoardFilterTrigger() {
             </MenuSubTrigger>
             <MenuPortal>
               <MenuSubPopup>
-                {members.length === 0 ? (
-                  <MenuItem disabled>No members found</MenuItem>
+                {/* The current member gets their own entry rather than a row in
+                    the list below: "what am I on" is the common question, and
+                    scanning an alphabetized list for your own name to ask it is
+                    not. The list then excludes them, so their id appears once. */}
+                {currentMemberId ? (
+                  <>
+                    <MenuCheckboxItem
+                      checked={selectedAssigneeIds.has(currentMemberId)}
+                      onCheckedChange={() => {
+                        toggleAssignee(currentMemberId);
+                      }}
+                    >
+                      Assigned to me
+                    </MenuCheckboxItem>
+                    <MenuSeparator />
+                  </>
+                ) : null}
+                {otherMembers.length === 0 ? (
+                  <MenuItem disabled>No other members</MenuItem>
                 ) : (
-                  members.map((member) => (
+                  otherMembers.map((member) => (
                     <MenuCheckboxItem
                       checked={selectedAssigneeIds.has(member.id)}
                       key={member.id}
@@ -330,9 +356,7 @@ function BoardFilterTrigger() {
                         toggleAssignee(member.id);
                       }}
                     >
-                      {member.isCurrentUser
-                        ? `${member.name} (you)`
-                        : member.name}
+                      {member.name}
                     </MenuCheckboxItem>
                   ))
                 )}

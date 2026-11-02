@@ -145,3 +145,11 @@ export const emptyBoardQuery: TBoardQuery = {
 
 /** The longest name a saved view may carry. */
 export const SAVED_VIEW_NAME_MAX_LENGTH = 80;
+
+/**
+ * The longest description a saved view may carry.
+ *
+ * Shared with the client form so the field's counter and the persisted bound
+ * are the same number; a description is a note to oneself, not a document.
+ */
+export const SAVED_VIEW_DESCRIPTION_MAX_LENGTH = 280;

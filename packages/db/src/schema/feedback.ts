@@ -1691,6 +1691,18 @@ export const savedViewTable = pgTable(
       onDelete: "cascade",
     }),
     name: text("name").notNull(),
+    /**
+     * Free text the member wrote to explain what the view is for. Null when
+     * they left it blank — an empty string is not a state the write path
+     * stores, so "no description" has one spelling.
+     */
+    description: text("description"),
+    /**
+     * Position among the member's views on this surface, ascending. The create
+     * write appends (last), and `ReorderSavedViews` rewrites the whole order in
+     * one call; nothing else reads it except the list's sort.
+     */
+    orderIndex: integer("order_index").default(0).notNull(),
     query: jsonb("query").$type<TBoardQuery>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

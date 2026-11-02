@@ -131,6 +131,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: null,
             id,
+            description: null,
             name: "My triage",
             organizationId: f.organizationId,
             query: {
@@ -172,6 +173,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: f.boardId,
             id,
+            description: null,
             name: "Checkout bugs",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -209,6 +211,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: null,
             id,
+            description: null,
             name: "Mine",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -219,6 +222,7 @@ describe("SavedViewRpcHandlers", () => {
           f.alice,
           handlers.UpdateSavedView({
             id,
+            description: null,
             name: "Renamed",
             organizationId: f.organizationId,
             query: {
@@ -249,6 +253,161 @@ describe("SavedViewRpcHandlers", () => {
       })
     );
 
+    it.effect("trims a description and stores a blank one as null", () =>
+      Effect.gen(function* () {
+        const handlers = yield* SavedViewRpcHandlersEffect;
+        const f = yield* fixture();
+
+        yield* as(
+          f.alice,
+          handlers.CreateSavedView({
+            boardId: null,
+            description: "  Checkout regressions  ",
+            id: yield* SavedViewId.generate,
+            name: "Checkout",
+            organizationId: f.organizationId,
+            query: emptyBoardQuery,
+          })
+        );
+        yield* as(
+          f.alice,
+          handlers.CreateSavedView({
+            boardId: null,
+            description: "   ",
+            id: yield* SavedViewId.generate,
+            name: "Blank note",
+            organizationId: f.organizationId,
+            query: emptyBoardQuery,
+          })
+        );
+
+        const views = yield* as(
+          f.alice,
+          handlers.ListSavedViews({
+            boardId: null,
+            organizationId: f.organizationId,
+          })
+        );
+
+        expect(views.map((view) => view.description)).toEqual([
+          "Checkout regressions",
+          // Not `""`: one spelling of "no description" in the row.
+          null,
+        ]);
+      })
+    );
+
+    it.effect("appends new views and rewrites the order on reorder", () =>
+      Effect.gen(function* () {
+        const handlers = yield* SavedViewRpcHandlersEffect;
+        const f = yield* fixture();
+        const list = () =>
+          as(
+            f.alice,
+            handlers.ListSavedViews({
+              boardId: null,
+              organizationId: f.organizationId,
+            })
+          );
+
+        const first = yield* SavedViewId.generate;
+        const second = yield* SavedViewId.generate;
+        const third = yield* SavedViewId.generate;
+
+        for (const [id, name] of [
+          [first, "First"],
+          [second, "Second"],
+          [third, "Third"],
+        ] as const) {
+          yield* as(
+            f.alice,
+            handlers.CreateSavedView({
+              boardId: null,
+              description: null,
+              id,
+              name,
+              organizationId: f.organizationId,
+              query: emptyBoardQuery,
+            })
+          );
+        }
+
+        expect((yield* list()).map((view) => view.name)).toEqual([
+          "First",
+          "Second",
+          "Third",
+        ]);
+        expect((yield* list()).map((view) => view.orderIndex)).toEqual([
+          0, 1, 2,
+        ]);
+
+        yield* as(
+          f.alice,
+          handlers.ReorderSavedViews({
+            boardId: null,
+            orderedIds: [third, first, second],
+            organizationId: f.organizationId,
+          })
+        );
+
+        const reordered = yield* list();
+        expect(reordered.map((view) => view.name)).toEqual([
+          "Third",
+          "First",
+          "Second",
+        ]);
+        expect(reordered.map((view) => view.orderIndex)).toEqual([0, 1, 2]);
+      })
+    );
+
+    it.effect("refuses an order that does not name this surface's views", () =>
+      Effect.gen(function* () {
+        const handlers = yield* SavedViewRpcHandlersEffect;
+        const f = yield* fixture();
+        const first = yield* SavedViewId.generate;
+        const second = yield* SavedViewId.generate;
+
+        for (const [id, name] of [
+          [first, "First"],
+          [second, "Second"],
+        ] as const) {
+          yield* as(
+            f.alice,
+            handlers.CreateSavedView({
+              boardId: null,
+              description: null,
+              id,
+              name,
+              organizationId: f.organizationId,
+              query: emptyBoardQuery,
+            })
+          );
+        }
+
+        // A partial list would leave the unnamed view at a stale index.
+        const partial = yield* as(
+          f.alice,
+          handlers.ReorderSavedViews({
+            boardId: null,
+            orderedIds: [first],
+            organizationId: f.organizationId,
+          })
+        ).pipe(Effect.flip);
+        // An id from another member's surface is not the caller's to order.
+        const foreign = yield* as(
+          f.bob,
+          handlers.ReorderSavedViews({
+            boardId: null,
+            orderedIds: [first, second],
+            organizationId: f.organizationId,
+          })
+        ).pipe(Effect.flip);
+
+        expect(Predicate.isTagged(partial, "BadRequestError")).toBe(true);
+        expect(Predicate.isTagged(foreign, "BadRequestError")).toBe(true);
+      })
+    );
+
     it.effect("refuses to update or delete another member's view", () =>
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;
@@ -260,6 +419,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: null,
             id,
+            description: null,
             name: "Mine",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -270,6 +430,7 @@ describe("SavedViewRpcHandlers", () => {
           f.bob,
           handlers.UpdateSavedView({
             id,
+            description: null,
             name: "Stolen",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -325,6 +486,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: null,
             id: first,
+            description: null,
             name: "Triage",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -337,6 +499,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: null,
             id: second,
+            description: null,
             name: "Triage",
             organizationId: f.organizationId,
             query: emptyBoardQuery,

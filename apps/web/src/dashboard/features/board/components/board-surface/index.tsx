@@ -1,4 +1,5 @@
 import {
+  type BoardOrdering,
   BoardStoreProvider,
   type BoardView,
 } from "../../state/board-store-context";
@@ -9,11 +10,14 @@ export function BoardSurface({
   boardId,
   boardSlug,
   organizationId,
+  initialOrdering,
   initialView,
   variant = "board",
 }: {
   boardId?: string;
   boardSlug?: string;
+  /** A saved view's stored sort order; omitted for the built-in presets. */
+  initialOrdering?: BoardOrdering;
   initialView: BoardView;
   organizationId: string;
   variant?: "board" | "feedback";
@@ -25,6 +29,7 @@ export function BoardSurface({
       defaultValue={{
         activeView: initialView,
         boardId,
+        ...(initialOrdering !== undefined && { ordering: initialOrdering }),
       }}
       key={surfaceKey}
     >

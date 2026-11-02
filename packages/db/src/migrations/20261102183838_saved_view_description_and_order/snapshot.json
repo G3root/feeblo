@@ -1,0 +1,81 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "39adac59-1a83-452d-be8b-2ca60d6cdbd8",
+  "prevIds": [
+    "622e120c-65f4-4d87-85ab-423f6cc1166f"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "saved_view",
+        "description"
+      ],
+      "writes": [
+        "s|col|public.saved_view.description",
+        "n|col|public.saved_view.description",
+        "e|col|public.saved_view.description"
+      ],
+      "reads": [
+        "n|tbl|public.saved_view",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "saved_view",
+        "order_index"
+      ],
+      "writes": [
+        "s|col|public.saved_view.order_index",
+        "n|col|public.saved_view.order_index",
+        "e|col|public.saved_view.order_index"
+      ],
+      "reads": [
+        "n|tbl|public.saved_view",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "saved_view",
+        "name": "description",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "saved_view",
+        "name": "order_index",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

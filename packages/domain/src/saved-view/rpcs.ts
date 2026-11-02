@@ -9,6 +9,7 @@ import {
   SavedViewCreate,
   SavedViewDelete,
   SavedViewList,
+  SavedViewReorder,
   SavedViewUpdate,
 } from "./schema";
 
@@ -41,6 +42,14 @@ export class SavedViewRpcs extends RpcGroup.make(
 
   Rpc.make("DeleteSavedView", {
     payload: SavedViewDelete,
+    success: Schema.Void,
+    error: SavedViewServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  // The pills' drag order. A whole list rather than a single move: positions
+  // are only meaningful relative to each other.
+  Rpc.make("ReorderSavedViews", {
+    payload: SavedViewReorder,
     success: Schema.Void,
     error: SavedViewServiceErrors,
   }).middleware(AuthMiddleware)

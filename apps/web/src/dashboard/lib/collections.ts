@@ -2192,6 +2192,7 @@ export function savedViewCollection(
         await fetchRpc((rpc) =>
           rpc.CreateSavedView({
             boardId: view.boardId,
+            description: view.description,
             id: view.id,
             name: view.name,
             organizationId: view.organizationId,
@@ -2206,6 +2207,7 @@ export function savedViewCollection(
 
         await fetchRpc((rpc) =>
           rpc.UpdateSavedView({
+            description: view.description,
             id: view.id,
             name: view.name,
             organizationId: view.organizationId,

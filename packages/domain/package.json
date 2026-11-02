@@ -472,6 +472,9 @@
     "./rpc-kind": {
       "default": "./src/rpc-kind.ts"
     },
+    "./saved-view/schema": {
+      "default": "./src/saved-view/schema.ts"
+    },
     "./rpc-router": {
       "default": "./src/rpc-router.ts"
     },

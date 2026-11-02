@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { TBoardQuery } from "@feeblo/domain-contracts/board-query";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -12,9 +12,11 @@ import * as Layer from "effect/Layer";
 const SAVED_VIEW_FIELDS = {
   boardId: schema.savedViewTable.boardId,
   createdAt: schema.savedViewTable.createdAt,
+  description: schema.savedViewTable.description,
   id: schema.savedViewTable.id,
   memberId: schema.savedViewTable.memberId,
   name: schema.savedViewTable.name,
+  orderIndex: schema.savedViewTable.orderIndex,
   organizationId: schema.savedViewTable.organizationId,
   query: schema.savedViewTable.query,
   updatedAt: schema.savedViewTable.updatedAt,
@@ -33,14 +35,20 @@ interface TSavedViewListInput {
 }
 
 interface TSavedViewCreateInput extends TSavedViewListInput {
+  readonly description: string | null;
   readonly id: string;
   readonly name: string;
   readonly query: TBoardQuery;
 }
 
 interface TSavedViewUpdateInput extends TSavedViewOwner {
+  readonly description: string | null;
   readonly name: string;
   readonly query: TBoardQuery;
+}
+
+interface TSavedViewReorderInput extends TSavedViewListInput {
+  readonly orderedIds: readonly string[];
 }
 
 export const makeSavedViewRepository = Effect.gen(function* () {
@@ -67,10 +75,13 @@ export const makeSavedViewRepository = Effect.gen(function* () {
         .select(SAVED_VIEW_FIELDS)
         .from(schema.savedViewTable)
         .where(ownedScope(args))
-        // Creation order rather than insertion id: a member's views are a
-        // short hand-curated list, and the order they added them in is the
-        // only stable one the client can predict.
-        .orderBy(asc(schema.savedViewTable.createdAt)),
+        // Position first, creation second: `orderIndex` is what the drag
+        // rewrites, and `createdAt` breaks the tie two rows can share when a
+        // create raced another on the same surface.
+        .orderBy(
+          asc(schema.savedViewTable.orderIndex),
+          asc(schema.savedViewTable.createdAt)
+        ),
 
     findOwned: ({ id, memberId, organizationId }: TSavedViewOwner) =>
       db
@@ -86,8 +97,18 @@ export const makeSavedViewRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0])),
 
+    /**
+     * Inserts a view at the end of its surface.
+     *
+     * The position is computed by the statement itself rather than read first:
+     * a read-then-insert has a window where two creates take the same index,
+     * and the subquery inside `values` closes it without a transaction or a
+     * lock. `is not distinct from` is what lets the same expression serve the
+     * feedback list (whose `board_id` is null) and a board.
+     */
     create: ({
       boardId,
+      description,
       id,
       memberId,
       name,
@@ -96,10 +117,25 @@ export const makeSavedViewRepository = Effect.gen(function* () {
     }: TSavedViewCreateInput) =>
       db
         .insert(schema.savedViewTable)
-        .values({ boardId, id, memberId, name, organizationId, query })
+        .values({
+          boardId,
+          description,
+          id,
+          memberId,
+          name,
+          organizationId,
+          orderIndex: sql`(
+            select coalesce(max(${schema.savedViewTable.orderIndex}), -1) + 1
+            from ${schema.savedViewTable}
+            where ${schema.savedViewTable.memberId} = ${memberId}
+              and ${schema.savedViewTable.boardId} is not distinct from ${boardId}
+          )`,
+          query,
+        })
         .pipe(Effect.asVoid),
 
     update: ({
+      description,
       id,
       memberId,
       name,
@@ -108,12 +144,44 @@ export const makeSavedViewRepository = Effect.gen(function* () {
     }: TSavedViewUpdateInput) =>
       db
         .update(schema.savedViewTable)
-        .set({ name, query })
+        .set({ description, name, query })
         .where(
           and(
             eq(schema.savedViewTable.id, id),
             eq(schema.savedViewTable.organizationId, organizationId),
             eq(schema.savedViewTable.memberId, memberId)
+          )
+        )
+        .pipe(Effect.asVoid),
+
+    /**
+     * Rewrites the position of one surface's views in a single statement.
+     *
+     * A `CASE` over the named ids rather than a loop of updates: a drag is one
+     * change to the list, and a half-applied order is not a state the board
+     * should be able to observe. Callers validate that `orderedIds` names
+     * exactly the member's views on this surface before calling; the `where`
+     * clause is the same scope, so an id from another member or surface is
+     * simply not matched.
+     */
+    reorder: ({
+      boardId,
+      memberId,
+      orderedIds,
+      organizationId,
+    }: TSavedViewReorderInput) =>
+      db
+        .update(schema.savedViewTable)
+        .set({
+          orderIndex: sql`case ${schema.savedViewTable.id} ${sql.join(
+            orderedIds.map((id, index) => sql`when ${id} then ${index}`),
+            sql` `
+          )} else ${schema.savedViewTable.orderIndex} end`,
+        })
+        .where(
+          and(
+            ownedScope({ boardId, memberId, organizationId }),
+            inArray(schema.savedViewTable.id, [...orderedIds])
           )
         )
         .pipe(Effect.asVoid),

@@ -14,6 +14,7 @@ import type {
   TSavedViewCreate,
   TSavedViewDelete,
   TSavedViewList,
+  TSavedViewReorder,
   TSavedViewUpdate,
 } from "./schema";
 
@@ -49,6 +50,19 @@ const duplicateSavedViewName = () =>
     message: "A saved view with that name already exists",
   });
 
+/**
+ * Trims a description and stores a blank one as `null`.
+ *
+ * The client's field is a plain text input, so "cleared" arrives as `""`. One
+ * spelling of "no description" in the row is what lets the pill and the dialog
+ * test a null rather than trying both.
+ */
+const normalizeDescription = (description: string | null): string | null => {
+  const trimmed = description?.trim() ?? "";
+
+  return trimmed === "" ? null : trimmed;
+};
+
 export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* SavedViewRepository;
 
@@ -66,7 +80,11 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const memberId = yield* currentMemberId(session, args.organizationId);
-      yield* repository.create({ ...args, memberId });
+      yield* repository.create({
+        ...args,
+        description: normalizeDescription(args.description),
+        memberId,
+      });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),
       // The unique index on (member, board, name) is what actually rejects a
@@ -95,7 +113,11 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       if (existing === undefined) {
         return yield* new NotFoundError({ message: "Saved view not found" });
       }
-      yield* repository.update({ ...args, memberId });
+      yield* repository.update({
+        ...args,
+        description: normalizeDescription(args.description),
+        memberId,
+      });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),
       withRemapDbErrors({
@@ -127,11 +149,53 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       withRemapDbErrors("SavedView", "delete")
     );
 
+  /**
+   * Rewrites the order of one surface's pills.
+   *
+   * The payload names every view it expects to reorder, so the set it sends is
+   * checked against the set the member actually has before anything is written:
+   * a stale client that missed a create or a delete is refused, rather than
+   * silently leaving one view at its old index or reordering a row it no longer
+   * owns.
+   */
+  const reorder = (args: TSavedViewReorder) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const memberId = yield* currentMemberId(session, args.organizationId);
+      const existing = yield* repository.list({
+        boardId: args.boardId,
+        memberId,
+        organizationId: args.organizationId,
+      });
+      const existingIds = new Set(existing.map((view) => view.id));
+      const orderedIds = new Set(args.orderedIds);
+
+      if (
+        existingIds.size !== orderedIds.size ||
+        [...existingIds].some((id) => !orderedIds.has(id))
+      ) {
+        return yield* new BadRequestError({
+          message: "Saved view order does not match this surface's views",
+        });
+      }
+
+      yield* repository.reorder({
+        boardId: args.boardId,
+        memberId,
+        orderedIds: args.orderedIds,
+        organizationId: args.organizationId,
+      });
+    }).pipe(
+      Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+      withRemapDbErrors("SavedView", "update")
+    );
+
   return {
     ListSavedViews: list,
     CreateSavedView: create,
     UpdateSavedView: update,
     DeleteSavedView: remove,
+    ReorderSavedViews: reorder,
   };
 });
 
