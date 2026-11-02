@@ -542,17 +542,16 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           break;
         }
 
-        // Tags and boards are two independent lookups over the same batch (one
-        // by tag name, one by board name), so they resolve together. A batch is
-        // up to `DATA_IMPORT_BATCH_SIZE` rows, so this is per-batch latency the
-        // whole import waits on.
-        const [tagIdsByKey, boardResolution] = yield* Effect.all(
-          [
-            resolveBatchTags({ organizationId: job.organizationId, rows }),
-            resolveBatchBoards({ job, rows }),
-          ],
-          { concurrency: "unbounded" }
-        );
+        // Tags before boards, sequentially, and not as one concurrent pair:
+        // both resolvers create rows (`tags.create`, `boards.create`), so a tag
+        // lookup that fails must not be able to leave a board behind for a
+        // batch that will never apply. Running them together would also let a
+        // failure interrupt the other halfway through its create loop.
+        const tagIdsByKey = yield* resolveBatchTags({
+          organizationId: job.organizationId,
+          rows,
+        });
+        const boardResolution = yield* resolveBatchBoards({ job, rows });
         for (const row of rows) {
           const outcome = yield* applyPendingRow({
             actor,

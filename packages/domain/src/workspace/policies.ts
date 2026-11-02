@@ -30,18 +30,18 @@ const makeWorkspacePolicy = Effect.gen(function* () {
     Effect.gen(function* () {
       const owned = yield* repository.findOwnedWorkspaces(userId);
 
-      // One plan lookup per owned workspace, and they share nothing but the
-      // user: run them together instead of paying a round trip per workspace.
-      // `Effect.forEach` is sequential unless told otherwise; the account's
-      // workspace cap is small, so "unbounded" is a handful of queries.
-      const withPlans = yield* Effect.forEach(
-        owned,
-        (workspace) =>
-          repository
-            .findPlanByOrganizationId({ organizationId: workspace.id })
-            .pipe(Effect.map(({ plan }) => ({ ...workspace, plan }))),
-        { concurrency: "unbounded" }
+      // One statement for every owned workspace's plan, not one per workspace:
+      // this runs inside the create transaction, where a fan-out would just
+      // queue N statements on the transaction's single reserved connection.
+      // A workspace with no entitled subscription is absent from the map and
+      // is `free`, which is the same rule the single-workspace lookup applies.
+      const plans = yield* repository.findPlansByOrganizationIds(
+        owned.map((workspace) => workspace.id)
       );
+      const withPlans = owned.map((workspace) => ({
+        ...workspace,
+        plan: plans.get(workspace.id) ?? "free",
+      }));
 
       const freeWorkspaces = withPlans
         .filter(({ plan }) => plan === "free")
