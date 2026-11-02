@@ -34,6 +34,7 @@ import {
   useBoardStore,
 } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";
+import { BoardViewsMenu } from "./board-views-menu";
 
 const links = [
   {
@@ -47,6 +48,10 @@ const links = [
   {
     name: "Backlog",
     to: "/$organizationId/board/$boardSlug/backlog" as const,
+  },
+  {
+    name: "Assigned",
+    to: "/$organizationId/board/$boardSlug/assigned" as const,
   },
 ];
 
@@ -63,6 +68,10 @@ const feedbackLinks = [
     name: "Backlog",
     to: "/$organizationId/feedback/backlog" as const,
   },
+  {
+    name: "Assigned",
+    to: "/$organizationId/feedback/assigned" as const,
+  },
 ];
 
 const orderFieldOptions: ReadonlyArray<{
@@ -76,10 +85,12 @@ const orderFieldOptions: ReadonlyArray<{
 ];
 
 export function BoardToolbar({
+  boardId,
   boardSlug,
   organizationId,
   variant = "board",
 }: {
+  boardId?: string;
   boardSlug?: string;
   organizationId: string;
   variant?: "board" | "feedback";
@@ -134,6 +145,10 @@ export function BoardToolbar({
                 ))}
           </div>
           <div className="ml-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto">
+            <BoardViewsMenu
+              boardId={boardId ?? null}
+              organizationId={organizationId}
+            />
             <div className="min-w-0 flex-1 sm:w-72 sm:flex-none">
               <BoardSearchInput />
             </div>

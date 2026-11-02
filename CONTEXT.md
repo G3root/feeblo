@@ -14,6 +14,12 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Public portal**: The feedback-board and widget surface that is readable without a dashboard session. `*Public` in RPC names — `ListPostsPublic`, `GetPostPublic` — refers to this surface, not to anonymity and not to the Public API. _Avoid_: Public API, anonymous API
 
+**Assignee**: The workspace member currently working on a post. Every post has at most one, and an unassigned post is the default rather than an error state. The assignee is not the author: authorship is who wrote the post, assignment is who owns it. _Avoid_: owner, lead, responsible person
+
+**View**: What the board is showing — its filters and its ordering. `All feedbacks`, `Active`, `Backlog`, and `Assigned` are built-in views, one route each. _Avoid_: filter, tab
+
+**Saved view**: A view a member stored under a name, per surface (one board, or the organization-wide feedback list) and visible only to them. _Avoid_: preset, filter set, segment
+
 ### Data transfer
 
 **Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup

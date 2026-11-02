@@ -35,6 +35,7 @@ import {
 import type { TPostAdminUpdate } from "./schema";
 
 interface TPostUpdateInput {
+  assigneeMemberId?: string | null | undefined;
   boardId?: string;
   content?: string;
   etaQuarter?: string | null | undefined;
@@ -217,6 +218,7 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
   },
   creatorMemberId: schema.postTable.creatorMemberId,
   creatorId: schema.postTable.creatorId,
+  assigneeMemberId: schema.postTable.assigneeMemberId,
   // The member tick the author's avatar draws. Derived here rather than in
   // the client because the public selects redact `creatorMemberId`.
   authorIsMember: sql<boolean>`${schema.postTable.creatorMemberId} is not null`,
@@ -392,6 +394,7 @@ const makePostRepository = Effect.gen(function* () {
       db
         .select({
           archivedAt: schema.postTable.archivedAt,
+          assigneeMemberId: schema.postTable.assigneeMemberId,
           boardId: schema.postTable.boardId,
           contactId: schema.postTable.contactId,
           content: schema.postTable.content,
@@ -467,6 +470,36 @@ const makePostRepository = Effect.gen(function* () {
           and(
             eq(schema.postStatusTable.id, id),
             eq(schema.postStatusTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .pipe(Effect.map((rows) => rows[0])),
+
+    /**
+     * Resolves an assignee candidate against the workspace's membership.
+     *
+     * The `post.assignee_member_id` foreign key only proves the member row
+     * exists somewhere; the single-column reference cannot also pin the
+     * organization without blanking the not-null `organization_id` on delete
+     * (see the column comment). A member of a different workspace therefore has
+     * to be rejected here, before the write, so the caller gets a
+     * `BadRequestError` they can act on instead of an internal error raised by
+     * a constraint.
+     */
+    findMember: ({
+      id,
+      organizationId,
+    }: {
+      readonly id: string;
+      readonly organizationId: string;
+    }) =>
+      db
+        .select({ id: schema.memberTable.id })
+        .from(schema.memberTable)
+        .where(
+          and(
+            eq(schema.memberTable.id, id),
+            eq(schema.memberTable.organizationId, organizationId)
           )
         )
         .limit(1)
@@ -854,6 +887,7 @@ const makePostRepository = Effect.gen(function* () {
       content,
       excerpt,
       etaQuarter,
+      assigneeMemberId,
     }: TPostUpdateInput) =>
       db
         .update(schema.postTable)
@@ -867,6 +901,7 @@ const makePostRepository = Effect.gen(function* () {
               ? (excerpt ?? htmlToExcerpt(content))
               : excerpt,
           etaQuarter,
+          assigneeMemberId,
         })
         .where(
           and(

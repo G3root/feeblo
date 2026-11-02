@@ -48,18 +48,26 @@ function filterPostStatusesByPreset(
 }
 
 type UseBoardPostsDataOptions = {
+  /**
+   * Filter arrays are `readonly` because they come from the persisted
+   * `BoardFilters` schema, whose decoded arrays the board reads directly. The
+   * live query only reads them, so widening here is the whole change rather
+   * than copying every filter into a mutable array on each render.
+   */
+  assigneeMemberIds: readonly string[];
   boardId?: string;
   ordering: BoardOrdering;
   organizationId: string;
   postStatusFilter: BoardPostStatusFilter;
   search: string;
   statusOperator: BoardStatusOperator;
-  statuses: BoardPostStatus[];
-  tagIds: string[];
+  statuses: readonly BoardPostStatus[];
+  tagIds: readonly string[];
   tagOperator: BoardTagOperator;
 };
 
 export function useBoardPostsData({
+  assigneeMemberIds,
   boardId,
   ordering,
   organizationId,
@@ -116,6 +124,7 @@ export function useBoardPostsData({
       statuses,
       tagOperator,
       tagIds,
+      assigneeMemberIds,
       ordering.field,
       ordering.direction,
     ],
@@ -145,7 +154,7 @@ export function useBoardPostsData({
         .where(({ postTag }) =>
           and(
             eq(postTag.organizationId, organizationId),
-            inArray(postTag.tagId, tagIds)
+            inArray(postTag.tagId, [...tagIds])
           )
         )
         .groupBy(({ postTag }) => postTag.postId)
@@ -212,8 +221,19 @@ export function useBoardPostsData({
             condition = and(
               condition,
               statusOperator === "isNot"
-                ? not(inArray(postStatus.type, statuses))
-                : inArray(postStatus.type, statuses)
+                ? not(inArray(postStatus.type, [...statuses]))
+                : inArray(postStatus.type, [...statuses])
+            );
+          }
+
+          if (assigneeMemberIds.length > 0) {
+            // `inArray` over an empty list matches nothing, which is why the
+            // empty case is a skipped branch rather than a predicate: no
+            // assignee filter means "anyone, including unassigned", not
+            // "nobody".
+            condition = and(
+              condition,
+              inArray(post.assigneeMemberId, [...assigneeMemberIds])
             );
           }
 
@@ -268,6 +288,7 @@ export function useBoardPostsData({
       return orderedQuery.select(
         ({ board, post, postStatus, upvoteCounts }) => ({
           archivedAt: post.archivedAt,
+          assigneeMemberId: post.assigneeMemberId,
           authorIsMember: post.authorIsMember,
           boardId: post.boardId,
           boardName: coalesce(board.name, ""),

@@ -27,6 +27,7 @@ import {
   createPostActivityQuery,
   PostActivityList,
 } from "~/features/post/components/post-activity-list";
+import { PostAssigneeField } from "~/features/post/components/post-assignee-field";
 import { PostBoardField } from "~/features/post/components/post-board-field";
 import { PostEtaField } from "~/features/post/components/post-eta-field";
 import { PostMergedAlert } from "~/features/post/components/post-merged-alert";
@@ -283,6 +284,8 @@ function RouteComponent() {
             </div>
 
             <PostBoardField />
+
+            <PostAssigneeField />
 
             <PostEtaField />
 

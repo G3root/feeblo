@@ -1,26 +1,34 @@
-import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { emptyBoardQuery } from "@feeblo/domain-contracts/board-query";
+import type {
+  TBoardFilters,
+  TBoardOrderDirection,
+  TBoardOrderField,
+  TBoardOrdering,
+  TBoardPostStatusFilter,
+  TBoardStatusOperator,
+  TBoardTagOperator,
+} from "@feeblo/domain-contracts/board-query";
+import { type BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { createStoreContext } from "@feeblo/web-shared/xstate";
 import { createStore } from "@xstate/store";
 import { useSelector } from "@xstate/store-react";
 
+/**
+ * The board's filter vocabulary is the persisted one.
+ *
+ * A saved view stores exactly what this store holds, so the two cannot be
+ * allowed to drift into near-identical types with different field names: the
+ * store derives its state from `@feeblo/domain-contracts/board-query`, and
+ * `setActiveView` accepts a stored query with no translation.
+ */
 export type BoardDisplayMode = "list" | "grid";
-export type BoardOrderDirection = "asc" | "desc";
-export type BoardOrderField =
-  | "createdAt"
-  | "title"
-  | "updatedAt"
-  | "upvoteCount";
-export type BoardOrdering = {
-  direction: BoardOrderDirection;
-  field: BoardOrderField;
-};
-export type BoardPostStatusFilter = "all" | "active" | "backlog";
-export type BoardStatusOperator = "isAnyOf" | "isNot";
-export type BoardTagOperator =
-  | "includeAllOf"
-  | "includeAnyOf"
-  | "excludeIfAnyOf"
-  | "excludeIfAllOf";
+export type BoardOrderDirection = TBoardOrderDirection;
+export type BoardOrderField = TBoardOrderField;
+export type BoardOrdering = TBoardOrdering;
+export type BoardPostStatusFilter = TBoardPostStatusFilter;
+export type BoardStatusOperator = TBoardStatusOperator;
+export type BoardTagOperator = TBoardTagOperator;
+export type BoardFilters = TBoardFilters;
 
 const DEFAULT_STATUS_OPERATOR: BoardStatusOperator = "isAnyOf";
 const DEFAULT_TAG_OPERATOR: BoardTagOperator = "includeAllOf";
@@ -30,14 +38,7 @@ const DEFAULT_ORDERING: BoardOrdering = {
 };
 
 export type BoardView = {
-  filters: {
-    postStatus: BoardPostStatusFilter;
-    search: string;
-    statusOperator: BoardStatusOperator;
-    statuses: BoardPostStatus[];
-    tagOperator: BoardTagOperator;
-    tagIds: string[];
-  };
+  filters: BoardFilters;
   id: string;
   name: string;
 };
@@ -63,21 +64,35 @@ export type BoardStoreDefaultValue = {
   ordering?: BoardOrdering;
 };
 
+/**
+ * The filter set a board starts with: nothing selected, both operators at their
+ * neutral value, and the "all statuses" preset.
+ *
+ * A function rather than a shared constant so two boards mounted at once never
+ * hold the same filter objects — every event replaces them rather than mutating
+ * them, but a future event that did mutate would silently reach across boards.
+ */
+const defaultBoardFilters = (): BoardFilters => ({
+  ...emptyBoardQuery.filters,
+  // Copied rather than shared: the constants on `emptyBoardQuery` are
+  // module-level, and two mounted boards must not be able to reach one array.
+  assigneeMemberIds: [...emptyBoardQuery.filters.assigneeMemberIds],
+  statuses: [...emptyBoardQuery.filters.statuses],
+  tagIds: [...emptyBoardQuery.filters.tagIds],
+});
+
 const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
   createStore({
-    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    // SAFETY: `createStore` infers its event payload map from this object, and a
+    // `satisfies` on it widens every handler's event to `EventObject`, which
+    // makes the events untyped at every `store.send` call site. The assertion
+    // keeps the context shape checked against `BoardStoreContext` without giving
+    // up the per-event payload inference.
     context: {
       activeView: defaultValue?.activeView ?? {
         id: "all-feedback",
         name: "All feedbacks",
-        filters: {
-          postStatus: "all",
-          search: "",
-          statusOperator: DEFAULT_STATUS_OPERATOR,
-          statuses: [],
-          tagOperator: DEFAULT_TAG_OPERATOR,
-          tagIds: [],
-        },
+        filters: defaultBoardFilters(),
       },
       boardId: defaultValue?.boardId ?? "",
       bulkDeleteOpen: false,
@@ -90,9 +105,13 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
         ...context,
         selectedPosts: [],
       }),
-      setActiveView: (context, event: { view: BoardView }) => ({
+      setActiveView: (
+        context,
+        event: { ordering?: BoardOrdering; view: BoardView }
+      ) => ({
         ...context,
         activeView: event.view,
+        ...(event.ordering !== undefined && { ordering: event.ordering }),
         selectedPosts: [],
       }),
       setBulkDeleteOpen: (context, event: { open: boolean }) => ({
@@ -128,11 +147,12 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
           ...context.activeView,
           filters: {
             ...context.activeView.filters,
+            assigneeMemberIds: [],
             search: "",
             statusOperator: DEFAULT_STATUS_OPERATOR,
             statuses: [],
-            tagOperator: DEFAULT_TAG_OPERATOR,
             tagIds: [],
+            tagOperator: DEFAULT_TAG_OPERATOR,
           },
         },
       }),
@@ -209,6 +229,38 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
           },
         };
       },
+      toggleAssigneeFilter: (context, event: { memberId: string }) => {
+        const assigneeMemberIds = new Set(
+          context.activeView.filters.assigneeMemberIds
+        );
+
+        if (assigneeMemberIds.has(event.memberId)) {
+          assigneeMemberIds.delete(event.memberId);
+        } else {
+          assigneeMemberIds.add(event.memberId);
+        }
+
+        return {
+          ...context,
+          activeView: {
+            ...context.activeView,
+            filters: {
+              ...context.activeView.filters,
+              assigneeMemberIds: [...assigneeMemberIds],
+            },
+          },
+        };
+      },
+      clearAssigneeFilter: (context) => ({
+        ...context,
+        activeView: {
+          ...context.activeView,
+          filters: {
+            ...context.activeView.filters,
+            assigneeMemberIds: [],
+          },
+        },
+      }),
       syncAvailablePostIds: (context, event: { postIds: string[] }) => {
         const available = new Set(event.postIds);
         return {

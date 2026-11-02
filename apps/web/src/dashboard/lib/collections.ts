@@ -2143,6 +2143,110 @@ export function roadmapColumnCollection(scope: DashboardCollectionScope) {
 const indexedCollectionIds = new Set<string>();
 
 /**
+ * A member's saved board queries for one surface.
+ *
+ * `boardId` is part of the collection's identity because the board toolbar and
+ * the organization-wide feedback list are separate surfaces: a view saved on
+ * one board must not appear on another, and the two lists must not share a
+ * cache entry. `null` is the feedback list, spelled out in the id so it cannot
+ * collide with a board id.
+ */
+export function savedViewCollection(
+  scope: DashboardCollectionScope,
+  boardId: string | null
+) {
+  const id = `${organizationScopedCollectionId(
+    "savedViewCollection",
+    scope
+  )}:${boardId ?? "all-feedback"}`;
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () =>
+        organizationScopedQueryKey(
+          scope,
+          "saved-view",
+          boardId ?? "all-feedback"
+        ),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ListSavedViews({ boardId, organizationId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ collection, transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: view } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.CreateSavedView({
+            boardId: view.boardId,
+            id: view.id,
+            name: view.name,
+            organizationId: view.organizationId,
+            query: view.query,
+          })
+        );
+        await collection.utils.refetch({ throwOnError: true });
+      },
+      onUpdate: async ({ collection, transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { modified: view } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.UpdateSavedView({
+            id: view.id,
+            name: view.name,
+            organizationId: view.organizationId,
+            query: view.query,
+          })
+        );
+        await collection.utils.refetch({ throwOnError: true });
+      },
+      onDelete: async ({ collection, transaction }) => {
+        const mutation = transaction.mutations[0];
+        const { original: view } = mutation;
+
+        await fetchRpc((rpc) =>
+          rpc.DeleteSavedView({
+            id: view.id,
+            organizationId: view.organizationId,
+          })
+        );
+        await collection.utils.refetch({ throwOnError: true });
+      },
+    })
+  );
+}
+
+/**
+ * The saved views for one workspace surface, through the browser `DbClient`.
+ *
+ * Exported as a function rather than a getter on `dashboardCollections`
+ * because the board toolbar and the feedback toolbar ask for different
+ * surfaces at the same time — a single getter would have to pick one.
+ */
+export const savedViewCollectionFor = (
+  organizationId: string,
+  boardId: string | null
+) =>
+  materialize(
+    getBrowserDbClient(),
+    savedViewCollection({ organizationId, postSlug: undefined }, boardId)
+  );
+
+/**
  * Materializes a descriptor with the row type its factory declares.
  *
  * `DbClient.collection` resolves its overload from the descriptor alone, and

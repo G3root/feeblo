@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
 
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
@@ -368,6 +369,119 @@ describe("PostWriteService", () => {
         expect(recordedIntegrationEvents).toEqual([
           expect.objectContaining({ type: "post.status_changed" }),
         ]);
+      })
+    );
+
+    it.effect("assigns a member of the workspace on the timeline", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const writes = yield* PostWriteService;
+        const db = yield* currentDb;
+        const postId = yield* PostId.generate;
+
+        yield* writes.create(
+          {
+            assetIds: [],
+            boardId: fixture.boardId,
+            content: "Body",
+            id: postId,
+            organizationId: fixture.organizationId,
+            statusId: fixture.statusId,
+            title: "Dark mode",
+          },
+          memberActor(fixture)
+        );
+        recordedIntegrationEvents.length = 0;
+
+        yield* writes.update(
+          {
+            assigneeMemberId: fixture.membershipId,
+            id: postId,
+            organizationId: fixture.organizationId,
+          },
+          memberActor(fixture)
+        );
+
+        const [post] = yield* db
+          .select()
+          .from(schema.postTable)
+          .where(eq(schema.postTable.id, postId));
+        expect(post?.assigneeMemberId).toBe(fixture.membershipId);
+
+        const activity = yield* db
+          .select({
+            kind: schema.postActivityTable.kind,
+            nextValue: schema.postActivityTable.nextValue,
+            previousValue: schema.postActivityTable.previousValue,
+          })
+          .from(schema.postActivityTable)
+          .where(eq(schema.postActivityTable.postId, postId));
+        const assignment = activity.find(
+          ({ kind }) => kind === "ASSIGNEE_CHANGED"
+        );
+        expect(assignment?.previousValue).toBeNull();
+        expect(assignment?.nextValue).toBe(fixture.membershipId);
+
+        // Unassigning is a real transition, not a no-op.
+        yield* writes.update(
+          {
+            assigneeMemberId: null,
+            id: postId,
+            organizationId: fixture.organizationId,
+          },
+          memberActor(fixture)
+        );
+
+        const [unassigned] = yield* db
+          .select({ assigneeMemberId: schema.postTable.assigneeMemberId })
+          .from(schema.postTable)
+          .where(eq(schema.postTable.id, postId));
+        expect(unassigned?.assigneeMemberId).toBeNull();
+      })
+    );
+
+    it.effect("rejects an assignee who belongs to another workspace", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        // A second workspace, with its own member: the single-column foreign
+        // key would happily accept their row, which is exactly why the write
+        // path checks membership itself.
+        const other = yield* makeFixture();
+        const writes = yield* PostWriteService;
+        const db = yield* currentDb;
+        const postId = yield* PostId.generate;
+
+        yield* writes.create(
+          {
+            assetIds: [],
+            boardId: fixture.boardId,
+            content: "Body",
+            id: postId,
+            organizationId: fixture.organizationId,
+            statusId: fixture.statusId,
+            title: "Dark mode",
+          },
+          memberActor(fixture)
+        );
+
+        const error = yield* writes
+          .update(
+            {
+              assigneeMemberId: other.membershipId,
+              id: postId,
+              organizationId: fixture.organizationId,
+            },
+            memberActor(fixture)
+          )
+          .pipe(Effect.flip);
+
+        expect(Predicate.isTagged(error, "BadRequestError")).toBe(true);
+
+        const [post] = yield* db
+          .select({ assigneeMemberId: schema.postTable.assigneeMemberId })
+          .from(schema.postTable)
+          .where(eq(schema.postTable.id, postId));
+        expect(post?.assigneeMemberId).toBeNull();
       })
     );
   });

@@ -2,6 +2,8 @@ import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 
 export type BoardPostRow = {
   archivedAt: Date | string | null;
+  /** The member working on this post; null when unassigned. */
+  assigneeMemberId: string | null;
   authorIsMember: boolean;
   boardId: string;
   boardName?: string;

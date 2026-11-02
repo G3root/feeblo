@@ -32,6 +32,7 @@ import {
   StatusIcon,
   Tag01Icon,
   Tag02Icon,
+  UserCircleIcon,
   ThumbsUpIcon,
   Undo02Icon,
   UserAdd01Icon,
@@ -67,6 +68,7 @@ const activityIconMap = {
   STATUS_CHANGED: StatusIcon,
   BOARD_CHANGED: MoveIcon,
   ETA_CHANGED: Calendar03Icon,
+  ASSIGNEE_CHANGED: UserCircleIcon,
   POST_LOCKED: SquareLock02Icon,
   POST_UNLOCKED: SquareUnlock02Icon,
   POST_ARCHIVED: Archive01Icon,
@@ -100,12 +102,14 @@ function formatEta(value: string | null) {
 function getActivityDescription({
   activity,
   boardNames,
+  memberNames,
   postNames,
   statusNames,
   tagNames,
 }: {
   activity: TPostActivity;
   boardNames: NameLookup;
+  memberNames: NameLookup;
   postNames: NameLookup;
   statusNames: NameLookup;
   tagNames: NameLookup;
@@ -120,6 +124,10 @@ function getActivityDescription({
       activity.nextValue == null
         ? "cleared the ETA"
         : `set the ETA to ${formatEta(activity.nextValue) ?? activity.nextValue}`,
+    ASSIGNEE_CHANGED:
+      activity.nextValue == null
+        ? "unassigned the post"
+        : `assigned the post to ${memberNames.get(activity.nextValue) ?? "a member"}`,
     POST_LOCKED: "locked the post",
     POST_UNLOCKED: "unlocked the post",
     POST_ARCHIVED: "archived the post",
@@ -260,6 +268,18 @@ export function PostActivityList({
     () => new Map(members.map((member) => [member.userId, member])),
     [members]
   );
+  // `ASSIGNEE_CHANGED` records the `member` row id, not the user id, so the
+  // timeline needs its own lookup rather than the on-behalf one above.
+  const memberNames = useMemo(
+    () =>
+      new Map(
+        members.map((member) => [
+          member.id,
+          member.user.name || member.user.email,
+        ])
+      ),
+    [members]
+  );
 
   if (isLoading) {
     return null;
@@ -303,6 +323,7 @@ export function PostActivityList({
             {getActivityDescription({
               activity,
               boardNames,
+              memberNames,
               postNames,
               statusNames,
               tagNames,

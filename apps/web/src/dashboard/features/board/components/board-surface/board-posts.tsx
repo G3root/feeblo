@@ -32,6 +32,7 @@ export function BoardPosts({
   const ordering = useBoardOrdering();
   const activeView = useActiveBoardView();
   const {
+    assigneeMemberIds,
     postStatus: postStatusFilter,
     search,
     statusOperator,
@@ -40,6 +41,7 @@ export function BoardPosts({
     tagOperator,
   } = activeView.filters;
   const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
+    assigneeMemberIds,
     boardId,
     ordering,
     organizationId,
@@ -80,7 +82,10 @@ export function BoardPosts({
       <BoardPostsEmpty
         boardId={boardId}
         hasFilters={
-          search.trim().length > 0 || statuses.length > 0 || tagIds.length > 0
+          search.trim().length > 0 ||
+          statuses.length > 0 ||
+          tagIds.length > 0 ||
+          assigneeMemberIds.length > 0
         }
         organizationId={organizationId}
       />

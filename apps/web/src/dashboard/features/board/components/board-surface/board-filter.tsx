@@ -20,6 +20,7 @@ import {
   DashedLineCircleIcon,
   FilterMailIcon,
   Tag01Icon,
+  UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@xstate/store-react";
@@ -31,6 +32,8 @@ import {
   useMemo,
 } from "react";
 
+import { useCurrentMemberId } from "~/hooks/use-current-member-id";
+import { useOrgMembers } from "~/hooks/use-org-members";
 import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useOrgTags } from "~/hooks/use-org-tags";
 
@@ -45,16 +48,33 @@ type FilterTag = {
   name: string;
 };
 
+/**
+ * One assignable member.
+ *
+ * `id` is the `member` row id — the value `post.assigneeMemberId` holds — not
+ * the user id, because a user can be a member of several workspaces and only
+ * the member row belongs to this board's workspace.
+ */
+type FilterMember = {
+  id: string;
+  image: string | null;
+  isCurrentUser: boolean;
+  name: string;
+};
+
 type BoardFilterContextValue = {
   clearAllFilters: () => void;
+  clearAssigneeFilter: () => void;
   clearStatusFilter: () => void;
   clearTagFilter: () => void;
   filters: ReturnType<typeof useBoardFilterState>;
+  members: FilterMember[];
   organizationId: string;
+  postStatuses: Array<{ id: string; type: BoardPostStatus; label: string }>;
   setStatusOperator: (operator: BoardStatusOperator) => void;
   setTagOperator: (operator: BoardTagOperator) => void;
-  postStatuses: Array<{ id: string; type: BoardPostStatus; label: string }>;
   tags: FilterTag[];
+  toggleAssignee: (memberId: string) => void;
   toggleStatus: (status: BoardPostStatus) => void;
   toggleTag: (tagId: string) => void;
 };
@@ -107,6 +127,29 @@ function BoardFilterRoot({
   const filters = useBoardFilterState();
   const { data: postStatuses } = useOrgPostStatuses(organizationId);
   const { data: tags } = useOrgTags(organizationId);
+  const { data: organizationMembers } = useOrgMembers(organizationId);
+  const currentMemberId = useCurrentMemberId(organizationId);
+
+  const members = useMemo<FilterMember[]>(() => {
+    const rows = (organizationMembers ?? []).map((member) => ({
+      id: member.id,
+      image: member.user.image,
+      isCurrentUser: member.id === currentMemberId,
+      // A member row always has a user, and the session's user list is what
+      // names them; the email is the fallback so a member who has not set a
+      // name still appears in the assignee list as something recognisable.
+      name: member.user.name || member.user.email,
+    }));
+
+    // "Me" first: the common filter is "what am I working on", and it should
+    // not need a scan down an alphabetized list to find.
+    return rows.sort((left, right) => {
+      if (left.isCurrentUser !== right.isCurrentUser) {
+        return left.isCurrentUser ? -1 : 1;
+      }
+      return left.name.localeCompare(right.name);
+    });
+  }, [organizationMembers, currentMemberId]);
 
   const clearStatusFilter = useCallback(() => {
     store.send({ type: "setStatusOperator", operator: "isAnyOf" });
@@ -121,6 +164,10 @@ function BoardFilterRoot({
       store.send({ type: "toggleTagFilter", tagId });
     }
   }, [filters.tagIds, store]);
+
+  const clearAssigneeFilter = useCallback(() => {
+    store.send({ type: "clearAssigneeFilter" });
+  }, [store]);
 
   const clearAllFilters = useCallback(() => {
     store.send({ type: "clearFilters" });
@@ -149,31 +196,43 @@ function BoardFilterRoot({
     },
     [store]
   );
+  const toggleAssignee = useCallback(
+    (memberId: string) => {
+      store.send({ type: "toggleAssigneeFilter", memberId });
+    },
+    [store]
+  );
 
   const value = useMemo<BoardFilterContextValue>(
     () => ({
       clearAllFilters,
+      clearAssigneeFilter,
       clearStatusFilter,
       clearTagFilter,
       filters,
+      members,
       organizationId,
+      postStatuses,
       setStatusOperator,
       setTagOperator,
-      postStatuses,
       tags,
+      toggleAssignee,
       toggleStatus,
       toggleTag,
     }),
     [
       clearAllFilters,
+      clearAssigneeFilter,
       clearStatusFilter,
       clearTagFilter,
       filters,
+      members,
       organizationId,
       postStatuses,
       setStatusOperator,
       setTagOperator,
       tags,
+      toggleAssignee,
       toggleStatus,
       toggleTag,
     ]
@@ -187,10 +246,18 @@ function BoardFilterRoot({
 }
 
 function BoardFilterTrigger() {
-  const { filters, postStatuses, tags, toggleStatus, toggleTag } =
-    useBoardFilterContext();
+  const {
+    filters,
+    postStatuses,
+    tags,
+    members,
+    toggleStatus,
+    toggleTag,
+    toggleAssignee,
+  } = useBoardFilterContext();
   const selectedStatuses = new Set(filters.statuses);
   const selectedTagIds = new Set(filters.tagIds);
+  const selectedAssigneeIds = new Set(filters.assigneeMemberIds);
 
   return (
     <Menu>
@@ -245,6 +312,33 @@ function BoardFilterTrigger() {
               </MenuSubPopup>
             </MenuPortal>
           </MenuSub>
+          <MenuSub>
+            <MenuSubTrigger>
+              <HugeiconsIcon icon={UserCircleIcon} />
+              Assigned
+            </MenuSubTrigger>
+            <MenuPortal>
+              <MenuSubPopup>
+                {members.length === 0 ? (
+                  <MenuItem disabled>No members found</MenuItem>
+                ) : (
+                  members.map((member) => (
+                    <MenuCheckboxItem
+                      checked={selectedAssigneeIds.has(member.id)}
+                      key={member.id}
+                      onCheckedChange={() => {
+                        toggleAssignee(member.id);
+                      }}
+                    >
+                      {member.isCurrentUser
+                        ? `${member.name} (you)`
+                        : member.name}
+                    </MenuCheckboxItem>
+                  ))
+                )}
+              </MenuSubPopup>
+            </MenuPortal>
+          </MenuSub>
         </MenuGroup>
       </MenuPopup>
     </Menu>
@@ -252,20 +346,27 @@ function BoardFilterTrigger() {
 }
 
 function BoardFilterActiveRow() {
-  const { clearAllFilters, filters, tags } = useBoardFilterContext();
+  const { clearAllFilters, filters, tags, members } = useBoardFilterContext();
   const hasStatusFilter = filters.statuses.length > 0;
   const hasTagFilter = filters.tagIds.length > 0;
+  const hasAssigneeFilter = filters.assigneeMemberIds.length > 0;
 
-  if (!(hasStatusFilter || hasTagFilter)) {
+  if (!(hasStatusFilter || hasTagFilter || hasAssigneeFilter)) {
     return null;
   }
 
   const tagNameMap = new Map(tags.map((tag) => [tag.id, tag.name]));
+  const memberNameMap = new Map(
+    members.map((member) => [member.id, member.name])
+  );
 
   return (
     <div className="border-border/60 bg-muted/20 flex flex-col gap-2 rounded-2xl border px-3 py-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {hasStatusFilter ? <BoardFilterStatusGroup /> : null}
+        {hasAssigneeFilter ? (
+          <BoardFilterAssigneeGroup memberNameMap={memberNameMap} />
+        ) : null}
         {hasTagFilter ? (
           <BoardFilterLabelsGroup tagNameMap={tagNameMap} />
         ) : null}
@@ -318,6 +419,45 @@ function BoardFilterStatusGroup() {
       <BoardFilterClearButton
         ariaLabel="Clear status filter"
         onClick={clearStatusFilter}
+      />
+    </BoardFilterActiveGroup>
+  );
+}
+
+/**
+ * The assignee chip.
+ *
+ * No operator menu: an assignee filter is always "assigned to any of these
+ * people". "Assigned to nobody" would need a union with `IS NULL`, which is a
+ * different question from the one the board asks — the unassigned posts are
+ * what you see when the filter is cleared, not a category to select.
+ */
+function BoardFilterAssigneeGroup({
+  memberNameMap,
+}: {
+  memberNameMap: Map<string, string>;
+}) {
+  const { clearAssigneeFilter, filters, members, toggleAssignee } =
+    useBoardFilterContext();
+  const selectedIds = new Set(filters.assigneeMemberIds);
+
+  return (
+    <BoardFilterActiveGroup>
+      <BoardFilterReadonlySegment icon={UserCircleIcon}>
+        Assigned
+      </BoardFilterReadonlySegment>
+      <BoardFilterValueMenu
+        items={members.map((member) => ({
+          checked: selectedIds.has(member.id),
+          key: member.id,
+          label: member.isCurrentUser ? `${member.name} (you)` : member.name,
+        }))}
+        label={getAssigneeSummary(filters.assigneeMemberIds, memberNameMap)}
+        onToggle={toggleAssignee}
+      />
+      <BoardFilterClearButton
+        ariaLabel="Clear assignee filter"
+        onClick={clearAssigneeFilter}
       />
     </BoardFilterActiveGroup>
   );
@@ -499,7 +639,7 @@ function BoardFilterClearButton({
 }
 
 function getStatusSummary(
-  statuses: BoardPostStatus[],
+  statuses: readonly BoardPostStatus[],
   postStatuses: Array<{ id: string; type: BoardPostStatus; label: string }>
 ) {
   if (statuses.length === 1) {
@@ -512,12 +652,26 @@ function getStatusSummary(
   return `${statuses.length} statuses`;
 }
 
-function getTagSummary(tagIds: string[], tagNameMap: Map<string, string>) {
+function getTagSummary(
+  tagIds: readonly string[],
+  tagNameMap: Map<string, string>
+) {
   if (tagIds.length === 1) {
     return tagNameMap.get(tagIds[0]) ?? "1 label";
   }
 
   return `${tagIds.length} labels`;
+}
+
+function getAssigneeSummary(
+  memberIds: readonly string[],
+  memberNameMap: Map<string, string>
+) {
+  if (memberIds.length === 1) {
+    return memberNameMap.get(memberIds[0]) ?? "1 assignee";
+  }
+
+  return `${memberIds.length} assignees`;
 }
 
 export const BoardFilter = {

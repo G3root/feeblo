@@ -31,6 +31,7 @@ export function BoardSurface({
       <div className="mx-auto flex h-full min-h-0 w-full flex-col">
         <div className="shrink-0">
           <BoardToolbar
+            boardId={boardId}
             boardSlug={boardSlug}
             organizationId={organizationId}
             variant={variant}
