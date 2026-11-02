@@ -169,6 +169,9 @@ export const generatePostEmbedding = Effect.fn("PostEmbedding.generate")(
         embeddedAt: now,
         embedding: [...embedding.value.vector],
         embeddingModel: embedding.value.model,
+        // A background embedding refresh must not invalidate a body the user
+        // is editing; only post edits advance the version.
+        updatedAt: schema.postTable.updatedAt,
       })
       .where(
         and(

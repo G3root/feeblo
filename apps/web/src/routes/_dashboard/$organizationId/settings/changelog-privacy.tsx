@@ -48,7 +48,7 @@ function ChangelogPrivacySettingsPage() {
           }
         );
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
 
         toastManager.add({
           title: "Changelog privacy updated",

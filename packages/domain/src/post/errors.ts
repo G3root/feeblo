@@ -43,6 +43,13 @@ export class FailedToUpdatePostError extends Schema.TaggedError<FailedToUpdatePo
   { httpApiStatus: 500, identifier: "FailedToUpdatePostError" }
 ) {}
 
+/** A content save named a version older than the row it tried to update. */
+export class PostVersionConflictError extends Schema.TaggedError<PostVersionConflictError>()(
+  "PostVersionConflictError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 409, identifier: "PostVersionConflictError" }
+) {}
+
 /**
  * Why a merge or unmerge was refused.
  *
@@ -86,6 +93,7 @@ export const PostServiceErrors = Schema.Union([
   FailedToCreatePostError,
   FailedToDeletePostError,
   FailedToUpdatePostError,
+  PostVersionConflictError,
   FailedToMergePostError,
   // On-behalf creation resolves an author subject and can reject invalid
   // identifiers with the shared identity failures.

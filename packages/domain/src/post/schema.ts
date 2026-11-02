@@ -195,6 +195,12 @@ export const PostUpdateContent = S.Struct({
   assetIds: S.Array(S.String),
   id: PostId.schema,
   content: S.String.check(S.isMaxLength(POST_CONTENT_MAX_LENGTH)),
+  /**
+   * The `updatedAt` the editor loaded. When present, the write is rejected if
+   * the post changed since then, so a stale save cannot overwrite a newer one.
+   * Optional for callers that are not saving a previously loaded body.
+   */
+  expectedUpdatedAt: S.optional(S.DateFromString),
   boardId: BoardId.schema,
   organizationId: WorkspaceId.schema,
 });

@@ -7,6 +7,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { SkeletonLoader } from "@feeblo/ui/skeleton-loader";
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { and, eq, ilike, inArray, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 
@@ -100,7 +101,7 @@ function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
     statusesLength: statuses.length,
   });
 
-  if (changelogsQuery.isError) {
+  if (isLiveQueryFailed(changelogsQuery)) {
     return (
       <div className="mx-auto w-full">
         <ChangelogToolbar />

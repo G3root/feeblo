@@ -85,7 +85,7 @@ function TagRenameFormFields({ tag }: { tag: { name: string } }) {
           draft.slug = slugify(data.value.name);
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         toastManager.add({
           title: "Tag renamed successfully",
           type: "success",

@@ -109,7 +109,7 @@ export function SubscribeButton() {
 
       if (postSubscriptionCollection.has(key)) {
         const transaction = postSubscriptionCollection.delete(key);
-        await transaction.isPersisted.promise;
+        await transaction.when("settled");
       } else {
         const membership = session.memberships.find(
           (value) =>
@@ -127,7 +127,7 @@ export function SubscribeButton() {
           userId,
           memberId: membership?.membershipId ?? null,
         });
-        await transaction.isPersisted.promise;
+        await transaction.when("settled");
       }
 
       if (anchor) {

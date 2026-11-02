@@ -3,7 +3,10 @@ import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TStatusRoadmapColumn } from "@feeblo/domain/roadmap-column/schema";
 import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
-import { isLiveQueryPending } from "@feeblo/web-shared/collections";
+import {
+  isLiveQueryFailed,
+  isLiveQueryPending,
+} from "@feeblo/web-shared/collections";
 import {
   and,
   eq,
@@ -107,6 +110,11 @@ export type UseRoadmapDataResult = {
   allRoadmaps: RoadmapSummary[];
   columns: RoadmapColumnDefinition[];
   posts: RoadmapBoardPost[];
+  /**
+   * A source failed before it could produce rows, so the roadmap cannot render.
+   * True only for a failed first load or a crash, never for a sync problem
+   * over rows that are already on screen — see `isLiveQueryFailed`.
+   */
   isError: boolean;
   isLoading: boolean;
   lanesFor: (roadmapId: string) => RoadmapLane<RoadmapBoardPost>[];
@@ -296,10 +304,10 @@ export function useRoadmapData<
   });
 
   const isError =
-    roadmapsQuery.isError ||
-    allRoadmapsQuery.isError ||
-    columnsQuery.isError ||
-    postsQuery.isError;
+    isLiveQueryFailed(roadmapsQuery) ||
+    isLiveQueryFailed(allRoadmapsQuery) ||
+    isLiveQueryFailed(columnsQuery) ||
+    isLiveQueryFailed(postsQuery);
   // A query with a result — including an empty roadmap — is content, not a
   // loading state: hydration lands results before the first client render and
   // a skeleton gated on `isLoading` would replace them (see

@@ -100,7 +100,7 @@ export function ChangelogSubscribeButton() {
 
       if (publicChangelogSubscriptionCollection.has(key)) {
         const transaction = publicChangelogSubscriptionCollection.delete(key);
-        await transaction.isPersisted.promise;
+        await transaction.when("settled");
       } else {
         const id = await ChangelogSubscriptionId.unsafeGenerate();
         const row: TChangelogSubscription = {
@@ -115,7 +115,7 @@ export function ChangelogSubscribeButton() {
             )?.membershipId ?? null,
         };
         const transaction = publicChangelogSubscriptionCollection.insert(row);
-        await transaction.isPersisted.promise;
+        await transaction.when("settled");
       }
 
       if (anchor) {

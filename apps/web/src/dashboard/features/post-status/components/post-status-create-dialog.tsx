@@ -91,7 +91,7 @@ function PostStatusCreateForm({ type }: { type: TPostStatusType }) {
           updatedAt: new Date(),
         });
 
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         form.reset();
         store.send({ type: "toggle" });
         toastManager.add({

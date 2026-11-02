@@ -91,7 +91,7 @@ function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
           draft.visibility = data.value.visibility;
           draft.slug = boardSlug;
         });
-        await tx.isPersisted.promise;
+        await tx.when("settled");
         toastManager.add({
           title: "Board renamed successfully",
           type: "success",
