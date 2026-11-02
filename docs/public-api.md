@@ -1,6 +1,6 @@
 # Public API (v1)
 
-The Public API lets a workspace read and manage its own Feeblo data programmatically. It is versioned, authenticated with an API key, and available on paid plans.
+The Public API lets a workspace read and manage its own Feeblo data programmatically. It is versioned and available on paid plans. The `/api/v1` endpoints are authenticated with an API key; the MCP endpoint also accepts an OAuth access token.
 
 It is **not** the public portal — the feedback board and widget that anyone can read — and **not** the dashboard transport, which is session-authenticated.
 
@@ -19,7 +19,7 @@ The API origin publishes the documents an agent reads before it has a credential
 | Markdown landing | `GET /` and `GET /llms.txt` | What the origin is, the base URL, the key header, and the docs links. |
 | Auth guide | `GET /auth.md` | Create a key, call the API, connect an MCP client, and read the error vocabulary. |
 | API catalog | `GET /.well-known/api-catalog` | RFC 9727 linkset: the OpenAPI document, the reference, and the MCP server card. |
-| MCP server card | `GET /.well-known/mcp.json` | The MCP endpoint, its transport, and its `x-api-key` requirement. |
+| MCP server card | `GET /.well-known/mcp.json` | The MCP endpoint, its transport, and the credentials it accepts. |
 
 Every discovery response carries a `Link` header with the same relations (`api-catalog`, `service-desc`, `service-doc`, `describedby`). Discovery never reads the database: an outage that fails `/api/v1` still answers these documents.
 
@@ -27,12 +27,14 @@ Each public board also serves `/llms.txt`, a Markdown index of the board's publi
 
 ## Authentication
 
-Every request carries an API key:
+Every `/api/v1` request carries an API key:
 
 ```http
 GET /api/v1/boards/brd_example/posts HTTP/1.1
 x-api-key: fbk_...
 ```
+
+The `/mcp` endpoint accepts the same header or an OAuth 2.1 access token in `Authorization: Bearer`; see [Model Context Protocol (MCP)](#model-context-protocol-mcp). The rest of this section describes the key credential.
 
 Keys are **organization-owned machine credentials**. A key reads only the workspace that owns it; no request parameter can change that, and there is no way to reach another workspace's data. Keys are stored hashed — the plaintext value is shown once, when the key is created, and cannot be retrieved again.
 
@@ -969,11 +971,11 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 | 400 | `INVALID_REQUEST` | Malformed parameter, cursor, limit, `tagIds` list (empty or malformed), or `updatedAfter` instant (not an ISO 8601 date or timestamp naming a real day); a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; an end-user upsert that names neither an `externalId` nor an email; a board, status, or company id that is not in the workspace; a post that has been merged into another; merging a post into itself; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent, or its value was empty. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
-| 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
+| 403 | `FORBIDDEN_SCOPE` | The credential lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
 | 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, a changelog slug already taken, a post title whose slug suffixes are all taken, or comments on a post whose conversation is locked; or the resource's state cannot satisfy the request, such as merging an archived or already-merged post, unmerging one that is not merged, or an end-user upsert whose identifiers name two different people. |
-| 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds, and the `X-RateLimit-*` headers described under [Rate limits](#rate-limits). |
+| 429 | `RATE_LIMITED` | The credential's rate limit is exceeded. Carries `Retry-After` in seconds, and the `X-RateLimit-*` headers described under [Rate limits](#rate-limits). |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
 
@@ -981,7 +983,7 @@ Switch on `_tag`. Codes are append-only within v1 — a new one may appear, an e
 
 ## Rate limits
 
-Limits are per key, not per IP, and are shared across server instances: **300 requests per minute**, shared by reads and writes. Limits may increase without notice; decreases are announced in advance.
+Limits are per credential, not per IP, and are shared across server instances: **300 requests per minute**, shared by reads and writes. A key is budgeted per key; an OAuth grant on `/mcp` is budgeted per member and workspace, so a client cannot mint tokens to multiply its allowance. Limits may increase without notice; decreases are announced in advance.
 
 Every successful response, and every `429`, carries the state of the caller's budget:
 
@@ -997,7 +999,7 @@ The per-key bucket means a customer behind a shared NAT is not throttled by thei
 
 ## Plans
 
-The Public API is included in **Starter** and **Professional**. A workspace on the Free plan cannot create keys, and requests made with keys from a workspace that has downgraded return `403 PLAN_REQUIRES_UPGRADE`.
+The Public API is included in **Starter** and **Professional**. A workspace on the Free plan cannot create keys, and requests from a workspace that has downgraded return `403 PLAN_REQUIRES_UPGRADE`.
 
 On downgrade, keys are **kept and not disabled**. They start working again when the workspace upgrades, with no rotation and no reconfiguration in your integrations. Existing keys stay listed and can still be revoked while the workspace is on Free — only creating new ones is blocked.
 
