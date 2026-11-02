@@ -46,6 +46,7 @@ import { Route as SRoadmapSlugRouteImport } from "./routes/s/roadmap/$slug"
 import { Route as DashboardOrganizationIdDashboardLayoutIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/index"
 import { Route as DashboardOrganizationIdSettingsIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/index"
 import { Route as DashboardOrganizationIdSettingsBillingRouteImport } from "./routes/_dashboard/$organizationId/settings/billing"
+import { Route as DashboardOrganizationIdSettingsBlockedUsersRouteImport } from "./routes/_dashboard/$organizationId/settings/blocked-users"
 import { Route as DashboardOrganizationIdSettingsChangelogCategoriesRouteImport } from "./routes/_dashboard/$organizationId/settings/changelog-categories"
 import { Route as DashboardOrganizationIdSettingsChangelogPrivacyRouteImport } from "./routes/_dashboard/$organizationId/settings/changelog-privacy"
 import { Route as DashboardOrganizationIdSettingsCustomAttributesRouteImport } from "./routes/_dashboard/$organizationId/settings/custom-attributes"
@@ -273,6 +274,12 @@ const DashboardOrganizationIdSettingsBillingRoute =
   DashboardOrganizationIdSettingsBillingRouteImport.update({
     id: "/billing",
     path: "/billing",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
+const DashboardOrganizationIdSettingsBlockedUsersRoute =
+  DashboardOrganizationIdSettingsBlockedUsersRouteImport.update({
+    id: "/blocked-users",
+    path: "/blocked-users",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
 const DashboardOrganizationIdSettingsChangelogCategoriesRoute =
@@ -544,6 +551,7 @@ export interface FileRoutesByFullPath {
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
+  "/$organizationId/settings/blocked-users": typeof DashboardOrganizationIdSettingsBlockedUsersRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/custom-attributes": typeof DashboardOrganizationIdSettingsCustomAttributesRoute
@@ -617,6 +625,7 @@ export interface FileRoutesByTo {
   "/s/changelog": typeof SChangelogIndexRoute
   "/s/roadmap": typeof SRoadmapIndexRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
+  "/$organizationId/settings/blocked-users": typeof DashboardOrganizationIdSettingsBlockedUsersRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   "/$organizationId/settings/custom-attributes": typeof DashboardOrganizationIdSettingsCustomAttributesRoute
@@ -694,6 +703,7 @@ export interface FileRoutesById {
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
   "/_dashboard/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
+  "/_dashboard/$organizationId/settings/blocked-users": typeof DashboardOrganizationIdSettingsBlockedUsersRoute
   "/_dashboard/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/_dashboard/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   "/_dashboard/$organizationId/settings/custom-attributes": typeof DashboardOrganizationIdSettingsCustomAttributesRoute
@@ -771,6 +781,7 @@ export interface FileRouteTypes {
     | "/s/changelog/"
     | "/s/roadmap/"
     | "/$organizationId/settings/billing"
+    | "/$organizationId/settings/blocked-users"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/custom-attributes"
@@ -844,6 +855,7 @@ export interface FileRouteTypes {
     | "/s/changelog"
     | "/s/roadmap"
     | "/$organizationId/settings/billing"
+    | "/$organizationId/settings/blocked-users"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
     | "/$organizationId/settings/custom-attributes"
@@ -920,6 +932,7 @@ export interface FileRouteTypes {
     | "/s/changelog/"
     | "/s/roadmap/"
     | "/_dashboard/$organizationId/settings/billing"
+    | "/_dashboard/$organizationId/settings/blocked-users"
     | "/_dashboard/$organizationId/settings/changelog-categories"
     | "/_dashboard/$organizationId/settings/changelog-privacy"
     | "/_dashboard/$organizationId/settings/custom-attributes"
@@ -1234,6 +1247,13 @@ declare module "@tanstack/react-router" {
       path: "/billing"
       fullPath: "/$organizationId/settings/billing"
       preLoaderRoute: typeof DashboardOrganizationIdSettingsBillingRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
+    "/_dashboard/$organizationId/settings/blocked-users": {
+      id: "/_dashboard/$organizationId/settings/blocked-users"
+      path: "/blocked-users"
+      fullPath: "/$organizationId/settings/blocked-users"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsBlockedUsersRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
     "/_dashboard/$organizationId/settings/changelog-categories": {
@@ -1614,6 +1634,7 @@ const DashboardOrganizationIdDashboardLayoutRouteWithChildren =
 
 interface DashboardOrganizationIdSettingsRouteChildren {
   DashboardOrganizationIdSettingsBillingRoute: typeof DashboardOrganizationIdSettingsBillingRoute
+  DashboardOrganizationIdSettingsBlockedUsersRoute: typeof DashboardOrganizationIdSettingsBlockedUsersRoute
   DashboardOrganizationIdSettingsChangelogCategoriesRoute: typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   DashboardOrganizationIdSettingsChangelogPrivacyRoute: typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
   DashboardOrganizationIdSettingsCustomAttributesRoute: typeof DashboardOrganizationIdSettingsCustomAttributesRoute
@@ -1644,6 +1665,8 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
   {
     DashboardOrganizationIdSettingsBillingRoute:
       DashboardOrganizationIdSettingsBillingRoute,
+    DashboardOrganizationIdSettingsBlockedUsersRoute:
+      DashboardOrganizationIdSettingsBlockedUsersRoute,
     DashboardOrganizationIdSettingsChangelogCategoriesRoute:
       DashboardOrganizationIdSettingsChangelogCategoriesRoute,
     DashboardOrganizationIdSettingsChangelogPrivacyRoute:
