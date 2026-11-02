@@ -3,6 +3,7 @@ import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import type { TBoardQuery } from "@feeblo/domain-contracts/board-query";
 import type { TSavedView } from "@feeblo/domain/saved-view/schema";
+import { SavedViewId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import {
   ContextMenu,
@@ -23,13 +24,12 @@ import { toastManager } from "@feeblo/ui/toast";
 import { toggleVariants } from "@feeblo/ui/toggle";
 import { cn } from "@feeblo/ui/utils";
 import {
-  Add01Icon,
   ArrowDown01Icon,
   Copy01Icon,
   Delete02Icon,
   Edit01Icon,
+  LayersPlusIcon,
   MoreHorizontalIcon,
-  Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -57,8 +57,8 @@ import { SavedViewDialog, type SavedViewTarget } from "./saved-view-dialog";
 export type SavedViewCollection = ReturnType<typeof savedViewCollectionFor>;
 
 type SavedViewActions = {
-  onCopy: () => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   onEdit: () => void;
 };
 
@@ -133,13 +133,8 @@ export function BoardSavedViews({
     store,
     (state) => state.context.activeView.filters
   );
-  const activeViewId = useSelector(
-    store,
-    (state) => state.context.activeView.id
-  );
   const ordering = useBoardOrdering();
   const currentQuery: TBoardQuery = { filters, ordering };
-  const appliedView = rows.find((view) => view.id === activeViewId);
 
   /**
    * The order the row shows between a drop and the server confirming it.
@@ -169,6 +164,12 @@ export function BoardSavedViews({
    * measurement can still see them.
    */
   const [visibleCount, setVisibleCount] = useState(rows.length);
+  /**
+   * True when the pill row is `display: none` — i.e. a phone. The row reports a
+   * zero width there, which is also how the popover learns it is the only
+   * affordance and has to offer creation even with no views saved.
+   */
+  const [rowHidden, setRowHidden] = useState(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
@@ -178,7 +179,10 @@ export function BoardSavedViews({
       return undefined;
     }
 
-    const measure = () => setVisibleCount(countFullyVisible(row));
+    const measure = () => {
+      setRowHidden(row.clientWidth === 0);
+      setVisibleCount(countFullyVisible(row));
+    };
 
     // `ResizeObserver` reports the row's own box only, so a drag's transforms
     // and this component's re-renders never re-trigger it — which is the guard
@@ -191,6 +195,9 @@ export function BoardSavedViews({
   }, [rows.length]);
 
   const overflowCount = Math.max(ordered.length - visibleCount, 0);
+  // On a phone the row is hidden, so the popover is the only way in — it has to
+  // exist even when every view fits (or there are none).
+  const showPopover = overflowCount > 0 || rowHidden;
 
   const commitOrder = async (orderedIds: string[]) => {
     setPendingOrder(orderedIds);
@@ -240,22 +247,28 @@ export function BoardSavedViews({
   const closeDialog = () => setDialog({ kind: "closed" });
 
   /**
-   * "Save changes" targets the view the board is showing, so it replaces that
-   * view instead of saving a duplicate. "New view" always creates, which keeps
-   * a way out of the applied view.
+   * The dialog creates a view, or renames one. Nothing overwrites a stored
+   * query: the toolbar's only write is "new view", so a saved view's filters
+   * are what they were when it was saved. Editing therefore names the view and
+   * leaves `query` alone — which is why the dialog receives the query as a
+   * prop rather than reading it from the board.
    */
-  const target =
-    dialog.kind === "edit"
-      ? dialog.view
-      : dialog.kind === "save" && appliedView !== undefined
-        ? appliedView
-        : undefined;
-  // Editing renames; saving re-filters. The dialog writes what it is handed.
+  const target = dialog.kind === "edit" ? dialog.view : undefined;
   const dialogQuery = dialog.kind === "edit" ? dialog.view.query : currentQuery;
 
   const actionsFor = (view: TSavedView): SavedViewActions => ({
-    onCopy: () => void copyViewLink({ boardSlug, organizationId, view }),
     onDelete: () => void deleteView(collection, view),
+    onDuplicate: () =>
+      void duplicateView({
+        collection,
+        memberId,
+        name: duplicateViewName(
+          view.name,
+          new Set(rows.map((row) => row.name))
+        ),
+        orderIndex: rows.length,
+        view,
+      }),
     onEdit: () => setDialog({ kind: "edit", view }),
   });
 
@@ -281,20 +294,7 @@ export function BoardSavedViews({
           </div>
         </DragDropProvider>
 
-        <Button
-          className="shrink-0 rounded-full"
-          onClick={() =>
-            setDialog(appliedView ? { kind: "save" } : { kind: "create" })
-          }
-          size="sm"
-          type="button"
-          variant={appliedView ? "secondary" : "outline"}
-        >
-          <HugeiconsIcon icon={appliedView ? Tick02Icon : Add01Icon} />
-          {appliedView ? "Save changes" : "New view"}
-        </Button>
-
-        {overflowCount > 0 ? (
+        {showPopover ? (
           <SavedViewsPopover
             actionsFor={actionsFor}
             boardSlug={boardSlug}
@@ -304,12 +304,28 @@ export function BoardSavedViews({
             views={ordered}
           />
         ) : null}
+
+        {/* Icon-only, and hidden on a phone: the popover header carries the
+            same action there, because the pill row it would sit beside is
+            `display: none` at that width. */}
+        <Button
+          aria-label="New view"
+          className="hidden shrink-0 rounded-full sm:inline-flex"
+          onClick={() => setDialog({ kind: "create" })}
+          size="icon-sm"
+          type="button"
+          // Matches the other icon buttons in this toolbar (filter, display),
+          // so the create action reads as a control rather than as another pill.
+          variant="outline"
+        >
+          <HugeiconsIcon icon={LayersPlusIcon} />
+        </Button>
       </div>
 
       <SavedViewDialog
         // `useAppForm` reads its defaults at mount, so the dialog is re-keyed
         // per open and target rather than holding the first one it saw.
-        key={dialog.kind === "edit" ? `edit:${dialog.view.id}` : dialog.kind}
+        key={dialog.kind === "edit" ? `edit:${dialog.view.id}` : "create"}
         boardId={boardId}
         boardSlug={boardSlug}
         collection={collection}
@@ -332,7 +348,6 @@ export function BoardSavedViews({
 type DialogState =
   | { kind: "closed" }
   | { kind: "create" }
-  | { kind: "save" }
   | { kind: "edit"; view: TSavedView };
 
 const toTarget = (view: TSavedView): SavedViewTarget => ({
@@ -364,20 +379,6 @@ const countFullyVisible = (row: HTMLElement): number => {
 
   return fitting;
 };
-
-/** The view's own path, so a link to it survives a reload. */
-const savedViewPath = ({
-  boardSlug,
-  organizationId,
-  viewId,
-}: {
-  boardSlug: string | undefined;
-  organizationId: string;
-  viewId: string;
-}) =>
-  boardSlug
-    ? `/${organizationId}/board/${boardSlug}/view/${viewId}`
-    : `/${organizationId}/feedback/view/${viewId}`;
 
 /**
  * A link to a saved view, on whichever surface it belongs to.
@@ -468,7 +469,12 @@ function SavedViewPill({
     <ContextMenu>
       <ContextMenuTrigger
         className={cn(
-          "shrink-0",
+          // A flex wrapper, not a block one: an inline-flex anchor inside a
+          // block box sits on a line box that adds leading under the pill, so
+          // the saved pills ended up a couple of pixels taller than the fixed
+          // presets and the row's rhythm drifted. As a flex item the anchor's
+          // height is the row's height, exactly like them.
+          "flex shrink-0",
           // `invisible` keeps the pill's layout, so the next measurement still
           // sees its width and can bring it back when the row grows.
           isClipped && "invisible",
@@ -495,9 +501,9 @@ function SavedViewPill({
           <HugeiconsIcon icon={Edit01Icon} />
           Edit
         </ContextMenuItem>
-        <ContextMenuItem onClick={actions.onCopy}>
+        <ContextMenuItem onClick={actions.onDuplicate}>
           <HugeiconsIcon icon={Copy01Icon} />
-          Copy link
+          Duplicate
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={actions.onDelete} variant="destructive">
@@ -546,27 +552,29 @@ function SavedViewsPopover({
         }
       >
         <HugeiconsIcon icon={ArrowDown01Icon} />
-        {overflowCount} more
+        {/* Zero here means the row is hidden rather than nothing overflowing,
+            so the label names the list instead of counting it. */}
+        {overflowCount > 0 ? `${overflowCount} more` : "Views"}
       </PopoverTrigger>
       <PopoverPopup align="start" className="w-72">
-        <div className="px-1 pb-2">
+        <div className="flex items-center justify-between gap-2 px-1 pb-2">
           <span className="text-sm font-medium">
             {views.length} {views.length === 1 ? "view" : "views"}
           </span>
+          <Button
+            aria-label="New view"
+            onClick={() => {
+              setOpen(false);
+              onCreate();
+            }}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <HugeiconsIcon icon={LayersPlusIcon} />
+          </Button>
         </div>
-        <Button
-          className="w-full justify-start"
-          onClick={() => {
-            setOpen(false);
-            onCreate();
-          }}
-          size="sm"
-          variant="outline"
-        >
-          <HugeiconsIcon icon={Add01Icon} />
-          New view
-        </Button>
-        <ul className="mt-2 flex flex-col gap-0.5">
+        <ul className="flex flex-col gap-0.5">
           {views.map((view) => (
             <SavedViewPopoverRow
               actions={actionsFor(view)}
@@ -630,9 +638,9 @@ function SavedViewPopoverRow({
             <HugeiconsIcon icon={Edit01Icon} />
             Edit
           </MenuItem>
-          <MenuItem onClick={actions.onCopy}>
+          <MenuItem onClick={actions.onDuplicate}>
             <HugeiconsIcon icon={Copy01Icon} />
-            Copy link
+            Duplicate
           </MenuItem>
           <MenuSeparator />
           <MenuItem onClick={actions.onDelete} variant="destructive">
@@ -645,26 +653,78 @@ function SavedViewPopoverRow({
   );
 }
 
-const copyViewLink = async ({
-  boardSlug,
-  organizationId,
+/**
+ * A free name for a copy on this surface.
+ *
+ * The copy has to be named before it is written — the unique constraint is
+ * `(member, board, name)` — so the suffix is computed from the names the member
+ * already has. `copy`, then `copy 2`, `copy 3`… keeps the original readable
+ * while staying predictable. Bounded by the number of taken names, since the
+ * suffix advances every iteration.
+ */
+const duplicateViewName = (
+  baseName: string,
+  takenNames: ReadonlySet<string>
+) => {
+  let name = `${baseName} copy`;
+  let suffix = 2;
+
+  while (takenNames.has(name)) {
+    name = `${baseName} copy ${suffix}`;
+    suffix += 1;
+  }
+
+  return name;
+};
+
+/**
+ * Copies a view: same query, same description, a new row at the end.
+ *
+ * Deliberately does not navigate. Duplicating from a pill's menu is a "keep
+ * this one and make me another" move, and pulling the board to the copy would
+ * be a context switch the member did not ask for; the toast names what was
+ * created and the new pill appears at the end of the row.
+ */
+const duplicateView = async ({
+  collection,
+  memberId,
+  name,
+  orderIndex,
   view,
 }: {
-  boardSlug: string | undefined;
-  organizationId: string;
+  collection: SavedViewCollection;
+  memberId: string | undefined;
+  name: string;
+  orderIndex: number;
   view: TSavedView;
 }) => {
-  const url = `${window.location.origin}${savedViewPath({
-    boardSlug,
-    organizationId,
-    viewId: view.id,
-  })}`;
+  if (!memberId) {
+    toastManager.add({
+      title: "Only workspace members can duplicate a view",
+      type: "error",
+    });
+    return;
+  }
 
   try {
-    await navigator.clipboard.writeText(url);
-    toastManager.add({ title: "View link copied", type: "success" });
+    const id = await SavedViewId.unsafeGenerate();
+    const transaction = collection.insert({
+      boardId: view.boardId,
+      createdAt: new Date(),
+      description: view.description,
+      id,
+      memberId,
+      name,
+      orderIndex,
+      organizationId: view.organizationId,
+      query: view.query,
+      updatedAt: new Date(),
+    });
+
+    await transaction.when("settled");
+    toastManager.add({ title: `Duplicated as "${name}"`, type: "success" });
   } catch {
-    toastManager.add({ title: "Failed to copy link", type: "error" });
+    toastManager.add({ title: "Failed to duplicate view", type: "error" });
   }
 };
 

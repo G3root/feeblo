@@ -91,6 +91,10 @@ export function BoardToolbar({
     <BoardFilter.Root organizationId={organizationId}>
       <div className="flex flex-col gap-3 p-3">
         <div className="flex flex-wrap items-center gap-3">
+          {/* The fixed presets and the member's own views are one group: they
+              are the same kind of thing (a way to look at this board), so they
+              share a row instead of sitting on opposite sides of the search
+              box. */}
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             {variant === "feedback"
               ? feedbackLinks.map((link) => (
@@ -135,13 +139,13 @@ export function BoardToolbar({
                     {link.name}
                   </Link>
                 ))}
-          </div>
-          <div className="ml-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto">
             <BoardSavedViews
               boardId={boardId ?? null}
               boardSlug={boardSlug}
               organizationId={organizationId}
             />
+          </div>
+          <div className="ml-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto">
             <div className="min-w-0 flex-1 sm:w-72 sm:flex-none">
               <BoardSearchInput />
             </div>
