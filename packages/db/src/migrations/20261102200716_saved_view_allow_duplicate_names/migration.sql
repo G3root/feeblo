@@ -1,0 +1,1 @@
+ALTER TABLE "saved_view" DROP CONSTRAINT "saved_view_memberId_boardId_name_uq";

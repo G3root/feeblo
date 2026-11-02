@@ -3,7 +3,6 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import { emptyBoardQuery } from "@feeblo/domain-contracts/board-query";
 import { SavedViewId, WorkspaceId } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
-import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -474,46 +473,42 @@ describe("SavedViewRpcHandlers", () => {
       })
     );
 
-    it.effect("treats a duplicate name on one surface as a bad request", () =>
+    it.effect("allows two views to share a name on one surface", () =>
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;
         const f = yield* fixture();
-        const db = yield* currentDb;
-        const first = yield* SavedViewId.generate;
 
-        yield* as(
+        for (const [id, name] of [
+          [yield* SavedViewId.generate, "Triage"],
+          [yield* SavedViewId.generate, "Triage"],
+        ] as const) {
+          yield* as(
+            f.alice,
+            handlers.CreateSavedView({
+              boardId: null,
+              description: null,
+              id,
+              name,
+              organizationId: f.organizationId,
+              query: emptyBoardQuery,
+            })
+          );
+        }
+
+        const views = yield* as(
           f.alice,
-          handlers.CreateSavedView({
+          handlers.ListSavedViews({
             boardId: null,
-            id: first,
-            description: null,
-            name: "Triage",
             organizationId: f.organizationId,
-            query: emptyBoardQuery,
           })
         );
 
-        const second = yield* SavedViewId.generate;
-        const error = yield* as(
-          f.alice,
-          handlers.CreateSavedView({
-            boardId: null,
-            id: second,
-            description: null,
-            name: "Triage",
-            organizationId: f.organizationId,
-            query: emptyBoardQuery,
-          })
-        ).pipe(Effect.flip);
-
-        expect(Predicate.isTagged(error, "BadRequestError")).toBe(true);
-
-        // The rejected insert left no row behind.
-        const rows = yield* db
-          .select({ id: schema.savedViewTable.id })
-          .from(schema.savedViewTable)
-          .where(eq(schema.savedViewTable.id, second));
-        expect(rows).toEqual([]);
+        // Names are a label, not an identity: duplicating a view to try a
+        // variation should not need an invented suffix first.
+        expect(views.map((view) => view.name)).toEqual(["Triage", "Triage"]);
+        expect(views.map((view) => view.id)).toHaveLength(
+          new Set(views.map((view) => view.id)).size
+        );
       })
     );
   });

@@ -1717,16 +1717,11 @@ export const savedViewTable = pgTable(
       table.organizationId,
       table.memberId
     ),
-    // A member naming two views the same thing makes the toolbar ambiguous,
-    // and the second one is always a mistake rather than a deliberate twin.
-    //
-    // `nullsNotDistinct` is load-bearing rather than tidiness: `board_id` is
-    // null for the organization-wide feedback list, and Postgres treats nulls
-    // as distinct in a plain unique index, so "Triage" could be saved twice on
-    // exactly the surface a member uses most.
-    unique("saved_view_memberId_boardId_name_uq")
-      .on(table.memberId, table.boardId, table.name)
-      .nullsNotDistinct(),
+    // Names are deliberately not unique. A view is a personal shortcut, and a
+    // member who duplicates one to try a variation ("Triage", "Triage") should
+    // not have to invent a suffix before they know which one they want to keep.
+    // The cost is two pills with the same label; the row is ordered, and each
+    // pill links to a different id.
   ]
 );
 

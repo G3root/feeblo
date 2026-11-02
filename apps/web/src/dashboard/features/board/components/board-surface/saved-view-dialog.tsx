@@ -20,7 +20,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
-import type { SavedViewCollection } from "./board-saved-views";
+import type { SavedViewCollection } from "./board-view-tabs";
 
 /**
  * The row being edited, when the dialog is renaming rather than saving.
@@ -125,6 +125,7 @@ export function SavedViewDialog({
           });
           await transaction.when("settled");
 
+          form.reset();
           onOpenChange(false);
           toastManager.add({
             title: `Updated "${value.name}"`,
@@ -148,6 +149,7 @@ export function SavedViewDialog({
         });
         await transaction.when("settled");
 
+        form.reset();
         onOpenChange(false);
         toastManager.add({ title: `Saved "${value.name}"`, type: "success" });
 

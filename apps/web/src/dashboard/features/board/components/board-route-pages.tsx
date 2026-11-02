@@ -7,6 +7,10 @@ import { useMemo } from "react";
 import { BoardNotFound } from "~/features/board/components/board-not-found";
 import { BoardSurface } from "~/features/board/components/board-surface";
 import { BoardPostsLoading } from "~/features/board/components/board-surface/board-posts-loading";
+import {
+  BUILT_IN_VIEWS,
+  type BuiltInView,
+} from "~/features/board/lib/built-in-views";
 import type {
   BoardOrdering,
   BoardPostStatusFilter,
@@ -336,25 +340,27 @@ function SavedViewUnavailable({
  * drift apart by a field in the first place.
  */
 const builtInView = (
-  id: string,
-  name: string,
+  key: BuiltInView,
   postStatus: BoardPostStatusFilter
-): BoardView => ({
-  filters: {
-    ...emptyBoardQuery.filters,
-    assigneeMemberIds: [...emptyBoardQuery.filters.assigneeMemberIds],
-    postStatus,
-    statuses: [...emptyBoardQuery.filters.statuses],
-    tagIds: [...emptyBoardQuery.filters.tagIds],
-  },
-  id,
-  name,
-});
+): BoardView => {
+  const view = BUILT_IN_VIEWS[key];
 
-const allFeedbackView = builtInView("all-feedback", "All feedbacks", "all");
-const activeFeedbackView = builtInView("active-feedback", "Active", "active");
-const backlogFeedbackView = builtInView(
-  "backlog-feedback",
-  "Backlog",
-  "backlog"
-);
+  return {
+    filters: {
+      ...emptyBoardQuery.filters,
+      assigneeMemberIds: [...emptyBoardQuery.filters.assigneeMemberIds],
+      postStatus,
+      statuses: [...emptyBoardQuery.filters.statuses],
+      tagIds: [...emptyBoardQuery.filters.tagIds],
+    },
+    // The id is what the tab strip matches against `activeView.id` to know
+    // which tab is current, so it has to be the same definition the strip
+    // labels itself from.
+    id: view.id,
+    name: view.name,
+  };
+};
+
+const allFeedbackView = builtInView("all", "all");
+const activeFeedbackView = builtInView("active", "active");
+const backlogFeedbackView = builtInView("backlog", "backlog");

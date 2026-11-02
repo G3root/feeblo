@@ -39,18 +39,6 @@ const currentMemberId = (session: Session, organizationId: string) =>
   });
 
 /**
- * The duplicate-name answer for both writes.
- *
- * A function rather than a shared error instance: an error object carries a
- * stack and is thrown once, so reusing one across requests would report the
- * first caller's location for every later conflict.
- */
-const duplicateSavedViewName = () =>
-  new BadRequestError({
-    message: "A saved view with that name already exists",
-  });
-
-/**
  * Trims a description and stores a blank one as `null`.
  *
  * The client's field is a plain text input, so "cleared" arrives as `""`. One
@@ -87,15 +75,7 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-      // The unique index on (member, board, name) is what actually rejects a
-      // duplicate name. It is a 400 rather than the generic 500 the other
-      // entities' create paths answer with, because the name is the one value
-      // the caller chose and can change.
-      withRemapDbErrors({
-        action: "create",
-        entity: "SavedView",
-        onUniqueViolation: duplicateSavedViewName,
-      })
+      withRemapDbErrors("SavedView", "create")
     );
 
   const update = (args: TSavedViewUpdate) =>
@@ -120,11 +100,7 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-      withRemapDbErrors({
-        action: "update",
-        entity: "SavedView",
-        onUniqueViolation: duplicateSavedViewName,
-      })
+      withRemapDbErrors("SavedView", "update")
     );
 
   const remove = (args: TSavedViewDelete) =>
