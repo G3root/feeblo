@@ -40,6 +40,9 @@ export const ROLE_PERMISSIONS = {
     "contacts.update",
     "companies.create",
     "companies.update",
+    // Managers run moderation: a blocked end user stops writing on the
+    // public portal and widget, but keeps reading and keeps their content.
+    "userBlocks.manage",
   ],
   admin: [
     "workspace.update",

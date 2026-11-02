@@ -28,6 +28,7 @@ import {
   verifyJwt,
 } from "../jwt-secret/verification";
 import { OrganizationRepository } from "../organization/repository";
+import { PolicyDeniedError } from "../policy";
 import { PostStatusRepository } from "../post-status/repository";
 import { PostEmbeddingService } from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
@@ -41,6 +42,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
+import { ParticipationPolicy } from "../user-block/policies";
 import { WidgetCreateFeedbackErrors } from "./api-contract";
 import {
   type TWidgetFeedbackMetadata,
@@ -49,19 +51,23 @@ import {
 import { upsertContactFromParsed } from "./sso";
 
 /**
- * The failures the widget feedback endpoint publishes for a bad SSO token.
+ * The failures the widget feedback endpoint publishes from the token
+ * transaction.
  *
  * `verifyJwt` answers `UnauthorizedError` (expired, bad signature, wrong
- * audience, missing claims) and `parsePersonAttributes` answers
- * `DataValidationError` (missing or malformed claims). Both are in the
- * endpoint's declared error union, so the write path passes them through;
- * everything else in the token transaction is a contact-store failure and is
- * answered as internal.
+ * audience, missing claims), `parsePersonAttributes` answers
+ * `DataValidationError` (missing or malformed claims), and a blocked SSO
+ * identity answers `PolicyDeniedError`. All three are in the endpoint's
+ * declared error union, so the write path passes them through; everything
+ * else in the token transaction is a contact-store failure and is answered as
+ * internal.
  */
-const isFeedbackTokenFailure = <T>(
+const isPublishedFeedbackFailure = <T>(
   error: T
-): error is T & (UnauthorizedError | DataValidationError) =>
-  Schema.is(UnauthorizedError)(error) || Schema.is(DataValidationError)(error);
+): error is T & (UnauthorizedError | DataValidationError | PolicyDeniedError) =>
+  Schema.is(UnauthorizedError)(error) ||
+  Schema.is(DataValidationError)(error) ||
+  Schema.is(PolicyDeniedError)(error);
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   organizationId,
@@ -146,6 +152,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
       const entitlementPolicy = yield* EntitlementPolicy;
       const postRepository = yield* PostRepository;
       const postEmbeddings = yield* PostEmbeddingService;
+      const participation = yield* ParticipationPolicy;
       // The same suggestion program the dashboard and public portal RPCs run,
       // with the widget's public-only rule. Its collaborators are captured
       // here so the handler does not build a layer per request.
@@ -353,6 +360,17 @@ export const WidgetApiLive = HttpApiBuilder.group(
                     return yield* upsertContactFromParsed(
                       organizationId,
                       parsedContact
+                    ).pipe(
+                      // A blocked SSO identity is a self-service submission, not
+                      // staff writing on behalf: the block is checked after the
+                      // contact is resolved so an address-only block applies to
+                      // a contact that has no account yet.
+                      Effect.tap((contactId) =>
+                        participation.canSubjectParticipate({
+                          ...(contactId !== undefined && { contactId }),
+                          organizationId,
+                        })
+                      )
                     );
                   })
                 ).pipe(
@@ -362,13 +380,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
                   // A rejected or malformed SSO token is the caller's mistake,
                   // and the endpoint publishes both tags for it: answer with
                   // the real 401/400 instead of folding them into a 500 that
-                  // says the server failed and can never be retried. Only the
-                  // contact-store failures left in this effect are internal.
+                  // says the server failed and can never be retried. A block
+                  // denial is published as the same 403 the portal answers.
                   // `mapError`, not `catchIf`: the type predicate is what
                   // removes the contact-store errors from the channel, so the
                   // handler's declared error union stays exact.
                   Effect.mapError((error) =>
-                    isFeedbackTokenFailure(error)
+                    isPublishedFeedbackFailure(error)
                       ? error
                       : new InternalServerError({
                           message: "Failed to create feedback contact",
@@ -455,7 +473,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
       PostEmbeddingService.layer,
       PostRepository.layer,
       PostStatusRepository.layer,
-      SitePolicy.layer
+      SitePolicy.layer,
+      ParticipationPolicy.layer
     )
   )
 );

@@ -40,6 +40,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-block/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
@@ -278,7 +279,8 @@ describe("PostRpcHandlers", () => {
     NodeCrypto.layer,
     S3Test,
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
-    IntegrationEventRecorderTest
+    IntegrationEventRecorderTest,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
   );
 
   const TestLayer = PostWriteService.layer.pipe(

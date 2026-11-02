@@ -31,6 +31,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-block/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
@@ -229,6 +230,7 @@ describe("CommentRpcHandlers", () => {
     HandlerTest,
     Database.PgliteDatabaseLive,
     NodeCrypto.layer,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Layer.succeed(
@@ -890,6 +892,44 @@ describe("CommentRpcHandlers", () => {
             });
             expect(comments[0]?.content).toContain("Public feedback");
           })
+      );
+
+      it.effect("rejects a blocked non-member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* db.insert(schema.userBlockTable).values({
+            createdAt: now,
+            email: "user@example.com",
+            id: `block_${fixture.userId}`,
+            organizationId: fixture.organizationId,
+            reason: "Abuse report",
+            updatedAt: now,
+            userId: fixture.userId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateCommentPublic(
+                commentCreateInput(fixture, commentId, "Blocked comment")
+              )
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+          expect(error).toMatchObject({
+            reason: "You cannot participate in this workspace.",
+          });
+        })
       );
 
       it.effect("rejects status updates from non-members", () =>

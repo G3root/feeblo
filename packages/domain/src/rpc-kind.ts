@@ -43,6 +43,7 @@ export const readRpcVerbs = [
 export const writeRpcVerbs = [
   "Add",
   "AdminUpdate",
+  "Block",
   "Cancel",
   "Confirm",
   "Connect",
@@ -67,6 +68,7 @@ export const writeRpcVerbs = [
   "Subscribe",
   "Test",
   "Toggle",
+  "Unblock",
   "Unmerge",
   "Unpin",
   "Unsubscribe",

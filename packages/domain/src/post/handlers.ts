@@ -20,6 +20,7 @@ import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, type Session } from "../session-middleware";
 import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
+import { ParticipationPolicy } from "../user-block/policies";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostEmbeddingService } from "./embedding-service";
 import {
@@ -60,6 +61,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
   const postPolicy = yield* PostPolicy;
   const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
   // const sitePolicy = yield* SitePolicy;
+  const participation = yield* ParticipationPolicy;
 
   // -- Shared effect helpers (no policy applied) --
 
@@ -197,7 +199,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             postId: args.id,
             statusId: args.statusId,
-          })
+          }),
+          participation.canParticipate(args.organizationId)
         ),
     },
   });
@@ -213,6 +216,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       source: surface,
     });
 
+  // The portal half of an edit is also a participation write: a blocked end
+  // user can still delete their own post, but cannot keep editing it.
+  const canUpdatePublicAs = (args: TPostUpdateContent | TPostUpdateTitle) =>
+    Policy.all(
+      canUpdateAs(args, "public"),
+      participation.canParticipate(args.organizationId)
+    );
+
   const updateContentWrite = defineSurfacePair<
     TPostUpdateContent,
     PostRpcTag
@@ -220,14 +231,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     operation: "UpdatePostContent",
     remap: { action: "update", entity: "Post" },
     dashboard: { rateLimit: undefined, policy: canUpdateAs },
-    public: { rateLimit: "expensive", policy: canUpdateAs },
+    public: { rateLimit: "expensive", policy: canUpdatePublicAs },
   });
 
   const updateTitleWrite = defineSurfacePair<TPostUpdateTitle, PostRpcTag>()({
     operation: "UpdatePostTitle",
     remap: { action: "update", entity: "Post" },
     dashboard: { rateLimit: undefined, policy: canUpdateAs },
-    public: { rateLimit: "expensive", policy: canUpdateAs },
+    public: { rateLimit: "expensive", policy: canUpdatePublicAs },
   });
 
   const removePost = deleteWrite.handlers((_surface, args) =>
@@ -309,7 +320,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         }),
     },
     dashboard: { rateLimit: undefined, policy: canCreateAs },
-    public: { rateLimit: "expensive", policy: canCreateAs },
+    public: {
+      rateLimit: "expensive",
+      policy: (args: TPostCreate) =>
+        Policy.all(
+          canCreateAs(args, "public"),
+          participation.canParticipate(args.organizationId)
+        ),
+    },
   });
 
   const createPost = createWrite.handlers((surface, args) =>
@@ -661,5 +679,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
   Layer.provide(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),
-  Layer.provide(PostEmbeddingService.layer)
+  Layer.provide(PostEmbeddingService.layer),
+  Layer.provide(ParticipationPolicy.layer)
 );

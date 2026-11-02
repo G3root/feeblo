@@ -17,6 +17,7 @@ import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { CurrentSession, type Session } from "../session-middleware";
+import { ParticipationPolicy } from "../user-block/policies";
 import { PostSubscriptionRpcHandlersEffect } from "./handlers";
 import { PostSubscriptionRepository } from "./repository";
 
@@ -134,27 +135,76 @@ describe("PostSubscriptionRpcHandlers", () => {
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
-  layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
-    "handlers",
-    (it) => {
-      it.effect(
-        "does not expose subscribers to users without a membership",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* PostSubscriptionRpcHandlersEffect;
-            const f = yield* fixture();
-            const error = yield* Effect.flip(
-              handlers
-                .ListPostSubscriptions({
-                  organizationId: f.organizationId,
-                  slug: f.postSlug,
-                })
-                .pipe(Effect.provideService(CurrentSession, session(f, false)))
-            );
-            expect(error._tag).toBe("PolicyDenied");
-          })
-      );
-      it.effect("subscribes, lists, and unsubscribes members", () =>
+  const FullTestLayer = Layer.mergeAll(
+    TestLayer,
+    Database.PgliteDatabaseLive,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
+  );
+
+  layer(FullTestLayer)("handlers", (it) => {
+    it.effect("does not expose subscribers to users without a membership", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostSubscriptionRpcHandlersEffect;
+        const f = yield* fixture();
+        const error = yield* Effect.flip(
+          handlers
+            .ListPostSubscriptions({
+              organizationId: f.organizationId,
+              slug: f.postSlug,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+    it.effect("subscribes, lists, and unsubscribes members", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostSubscriptionRpcHandlersEffect;
+        const f = yield* fixture();
+        const listInput = {
+          organizationId: f.organizationId,
+          slug: f.postSlug,
+        };
+        const mutationInput = {
+          organizationId: f.organizationId,
+          postId: f.postId,
+        };
+        expect(
+          yield* handlers
+            .CreatePostSubscription(mutationInput)
+            .pipe(Effect.provideService(CurrentSession, session(f)))
+        ).toEqual({ subscribed: true });
+        expect(
+          yield* handlers
+            .ListPostSubscriptions(listInput)
+            .pipe(Effect.provideService(CurrentSession, session(f)))
+        ).toMatchObject([
+          { postId: f.postId, userId: f.userId, memberId: f.membershipId },
+        ]);
+        expect(
+          yield* handlers
+            .DeletePostSubscription(mutationInput)
+            .pipe(Effect.provideService(CurrentSession, session(f)))
+        ).toEqual({ subscribed: false });
+        expect(
+          yield* handlers
+            .ListPostSubscriptions(listInput)
+            .pipe(Effect.provideService(CurrentSession, session(f)))
+        ).toHaveLength(0);
+        const emailSubscription =
+          yield* (yield* EmailSubscriptionRepository).findSubscription({
+            email: "user@example.com",
+            organizationId: f.organizationId,
+            topic: { topicId: f.postId, topicType: "post" },
+          });
+        expect(emailSubscription.pipe(Option.getOrUndefined)).toMatchObject({
+          state: "unsubscribed",
+        });
+      })
+    );
+    it.effect(
+      "rolls back the legacy subscription when email consent fails",
+      () =>
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture();
@@ -166,209 +216,159 @@ describe("PostSubscriptionRpcHandlers", () => {
             organizationId: f.organizationId,
             postId: f.postId,
           };
-          expect(
-            yield* handlers
+          const validSession = session(f);
+          const invalidEmailSession: Session = {
+            ...validSession,
+            user: { ...validSession.user, email: "invalid-email" },
+          };
+
+          const error = yield* Effect.flip(
+            handlers
               .CreatePostSubscription(mutationInput)
-              .pipe(Effect.provideService(CurrentSession, session(f)))
-          ).toEqual({ subscribed: true });
+              .pipe(Effect.provideService(CurrentSession, invalidEmailSession))
+          );
+
+          expect(error._tag).toBe("InternalServerError");
           expect(
             yield* handlers
               .ListPostSubscriptions(listInput)
-              .pipe(Effect.provideService(CurrentSession, session(f)))
-          ).toMatchObject([
-            { postId: f.postId, userId: f.userId, memberId: f.membershipId },
-          ]);
-          expect(
-            yield* handlers
-              .DeletePostSubscription(mutationInput)
-              .pipe(Effect.provideService(CurrentSession, session(f)))
-          ).toEqual({ subscribed: false });
-          expect(
-            yield* handlers
-              .ListPostSubscriptions(listInput)
-              .pipe(Effect.provideService(CurrentSession, session(f)))
+              .pipe(Effect.provideService(CurrentSession, validSession))
           ).toHaveLength(0);
-          const emailSubscription =
-            yield* (yield* EmailSubscriptionRepository).findSubscription({
-              email: "user@example.com",
-              organizationId: f.organizationId,
-              topic: { topicId: f.postId, topicType: "post" },
-            });
-          expect(emailSubscription.pipe(Option.getOrUndefined)).toMatchObject({
-            state: "unsubscribed",
-          });
         })
-      );
-      it.effect(
-        "rolls back the legacy subscription when email consent fails",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* PostSubscriptionRpcHandlersEffect;
-            const f = yield* fixture();
-            const listInput = {
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            };
-            const mutationInput = {
-              organizationId: f.organizationId,
-              postId: f.postId,
-            };
-            const validSession = session(f);
-            const invalidEmailSession: Session = {
-              ...validSession,
-              user: { ...validSession.user, email: "invalid-email" },
-            };
-
-            const error = yield* Effect.flip(
-              handlers
-                .CreatePostSubscription(mutationInput)
-                .pipe(
-                  Effect.provideService(CurrentSession, invalidEmailSession)
-                )
-            );
-
-            expect(error._tag).toBe("InternalServerError");
-            expect(
-              yield* handlers
-                .ListPostSubscriptions(listInput)
-                .pipe(Effect.provideService(CurrentSession, validSession))
-            ).toHaveLength(0);
-          })
-      );
-      it.effect("lists only the authenticated public subscriber", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostSubscriptionRpcHandlersEffect;
-          const f = yield* fixture("PUBLIC");
-          const db = yield* currentDb;
-          const listInput = {
-            organizationId: f.organizationId,
-            slug: f.postSlug,
-          };
-          const mutationInput = {
-            organizationId: f.organizationId,
-            postId: f.postId,
-          };
-          const otherUserId = `other_${f.organizationId}`;
-          const otherSession: Session = {
-            ...session(f, false),
-            user: {
-              id: otherUserId,
-              email: "other@example.com",
-              name: "Other user",
-              restrictedToOrganizationId: null,
-            },
-            session: { userId: otherUserId, token: "other-token" },
-          };
-          yield* db.insert(schema.userTable).values({
+    );
+    it.effect("lists only the authenticated public subscriber", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostSubscriptionRpcHandlersEffect;
+        const f = yield* fixture("PUBLIC");
+        const db = yield* currentDb;
+        const listInput = {
+          organizationId: f.organizationId,
+          slug: f.postSlug,
+        };
+        const mutationInput = {
+          organizationId: f.organizationId,
+          postId: f.postId,
+        };
+        const otherUserId = `other_${f.organizationId}`;
+        const otherSession: Session = {
+          ...session(f, false),
+          user: {
             id: otherUserId,
             email: "other@example.com",
             name: "Other user",
-          });
-          expect(
-            yield* handlers
-              .CreatePostSubscriptionPublic(mutationInput)
-              .pipe(Effect.provideService(CurrentSession, session(f, false)))
-          ).toEqual({ subscribed: true });
+            restrictedToOrganizationId: null,
+          },
+          session: { userId: otherUserId, token: "other-token" },
+        };
+        yield* db.insert(schema.userTable).values({
+          id: otherUserId,
+          email: "other@example.com",
+          name: "Other user",
+        });
+        expect(
           yield* handlers
             .CreatePostSubscriptionPublic(mutationInput)
-            .pipe(Effect.provideService(CurrentSession, otherSession));
-          expect(
-            yield* handlers
-              .ListPostSubscriptionsPublic(listInput)
-              .pipe(Effect.provideService(CurrentSession, session(f, false)))
-          ).toMatchObject([{ userId: f.userId, memberId: null }]);
-          expect(
-            yield* handlers
-              .ListPostSubscriptionsPublic(listInput)
-              .pipe(Effect.provideService(CurrentSession, session(f, false)))
-          ).toHaveLength(1);
-        })
-      );
-      // This endpoint runs on `PublicAuthMiddleware`, which admits the
-      // restricted sessions widget SSO mints. Without the organization-scope
-      // policy a restricted session could name any workspace.
-      it.effect(
-        "refuses a restricted session asking about another organization",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* PostSubscriptionRpcHandlersEffect;
-            const f = yield* fixture();
-            const listInput = {
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            };
-
-            const error = yield* Effect.flip(
-              handlers
-                .ListPostSubscriptionsPublic(listInput)
-                .pipe(
-                  Effect.provideService(
-                    CurrentSession,
-                    session(f, true, "org_somewhere_else")
-                  )
-                )
-            );
-
-            expect(error._tag).toBe("PolicyDenied");
-          })
-      );
-
-      it.effect("allows a restricted session inside its own organization", () =>
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        ).toEqual({ subscribed: true });
+        yield* handlers
+          .CreatePostSubscriptionPublic(mutationInput)
+          .pipe(Effect.provideService(CurrentSession, otherSession));
+        expect(
+          yield* handlers
+            .ListPostSubscriptionsPublic(listInput)
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        ).toMatchObject([{ userId: f.userId, memberId: null }]);
+        expect(
+          yield* handlers
+            .ListPostSubscriptionsPublic(listInput)
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        ).toHaveLength(1);
+      })
+    );
+    // This endpoint runs on `PublicAuthMiddleware`, which admits the
+    // restricted sessions widget SSO mints. Without the organization-scope
+    // policy a restricted session could name any workspace.
+    it.effect(
+      "refuses a restricted session asking about another organization",
+      () =>
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture();
+          const listInput = {
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          };
+
+          const error = yield* Effect.flip(
+            handlers
+              .ListPostSubscriptionsPublic(listInput)
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  session(f, true, "org_somewhere_else")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+    );
+
+    it.effect("allows a restricted session inside its own organization", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostSubscriptionRpcHandlersEffect;
+        const f = yield* fixture();
+        yield* handlers
+          .CreatePostSubscription({
+            organizationId: f.organizationId,
+            postId: f.postId,
+          })
+          .pipe(
+            Effect.provideService(
+              CurrentSession,
+              session(f, true, f.organizationId)
+            )
+          );
+
+        expect(
           yield* handlers
-            .CreatePostSubscription({
+            .ListPostSubscriptionsPublic({
               organizationId: f.organizationId,
-              postId: f.postId,
+              slug: f.postSlug,
             })
             .pipe(
               Effect.provideService(
                 CurrentSession,
                 session(f, true, f.organizationId)
               )
-            );
+            )
+        ).toHaveLength(1);
+      })
+    );
 
+    it.effect(
+      "hides subscribers of private board posts from the public endpoint",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostSubscriptionRpcHandlersEffect;
+          const f = yield* fixture("PRIVATE");
+          const listInput = {
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          };
+          const mutationInput = {
+            organizationId: f.organizationId,
+            postId: f.postId,
+          };
+          yield* handlers
+            .CreatePostSubscription(mutationInput)
+            .pipe(Effect.provideService(CurrentSession, session(f)));
           expect(
             yield* handlers
-              .ListPostSubscriptionsPublic({
-                organizationId: f.organizationId,
-                slug: f.postSlug,
-              })
-              .pipe(
-                Effect.provideService(
-                  CurrentSession,
-                  session(f, true, f.organizationId)
-                )
-              )
-          ).toHaveLength(1);
+              .ListPostSubscriptionsPublic(listInput)
+              .pipe(Effect.provideService(CurrentSession, session(f)))
+          ).toHaveLength(0);
         })
-      );
-
-      it.effect(
-        "hides subscribers of private board posts from the public endpoint",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* PostSubscriptionRpcHandlersEffect;
-            const f = yield* fixture("PRIVATE");
-            const listInput = {
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            };
-            const mutationInput = {
-              organizationId: f.organizationId,
-              postId: f.postId,
-            };
-            yield* handlers
-              .CreatePostSubscription(mutationInput)
-              .pipe(Effect.provideService(CurrentSession, session(f)));
-            expect(
-              yield* handlers
-                .ListPostSubscriptionsPublic(listInput)
-                .pipe(Effect.provideService(CurrentSession, session(f)))
-            ).toHaveLength(0);
-          })
-      );
-    }
-  );
+    );
+  });
 });

@@ -5,6 +5,7 @@ import * as OpenApi from "effect/http-api/OpenApi";
 import * as Schema from "effect/Schema";
 
 import { DataValidationError } from "../contact/errors";
+import { PolicyDeniedError } from "../policy";
 import { RateLimitErrors } from "../rate-limit";
 import {
   InternalServerError,
@@ -31,6 +32,9 @@ export const WidgetCreateFeedbackErrors = Schema.Union([
   NotFoundError,
   InternalServerError,
   UnauthorizedError,
+  // A blocked SSO identity is a real 403, not a server failure. The private
+  // board policy refusal also reaches this union for the same reason.
+  PolicyDeniedError,
   RateLimitErrors,
 ]);
 

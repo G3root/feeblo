@@ -42,6 +42,7 @@ import {
 import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
+import { UserBlockRpcHandlers } from "./user-block/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
 /**
@@ -84,6 +85,7 @@ export const RpcHandlerRegistrations = {
   Site: SiteRpcHandlers,
   Tag: TagRpcHandlers,
   Upvote: UpvoteRpcHandlers,
+  UserBlock: UserBlockRpcHandlers,
   PostReaction: PostReactionRpcHandlers,
   PostStatus: PostStatusRpcHandlers,
   PostSubscription: PostSubscriptionRpcHandlers,

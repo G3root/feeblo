@@ -28,6 +28,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-block/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
@@ -216,6 +217,7 @@ describe("CommentRpcHandlers on-behalf", () => {
     HandlerTest,
     Database.PgliteDatabaseLive,
     NodeCrypto.layer,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
     EntitlementsTest,
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),

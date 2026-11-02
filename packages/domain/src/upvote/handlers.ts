@@ -14,6 +14,7 @@ import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
+import { ParticipationPolicy } from "../user-block/policies";
 import { UserRepository } from "../user/repository";
 import { addVoteOnBehalf, removeVoteOnBehalf } from "./on-behalf";
 import { UpvotePolicy } from "./policies";
@@ -32,6 +33,7 @@ type UpvoteRpcTag = RpcTagsOf<typeof UpvoteRpcs>;
 export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* UpvoteRepository;
   const upvotePolicy = yield* UpvotePolicy;
+  const participation = yield* ParticipationPolicy;
 
   // -- Surface-parameterized writes --
   //
@@ -51,7 +53,14 @@ export const UpvoteRpcHandlersEffect = Effect.gen(function* () {
     operation: "ToggleUpvote",
     remap: { action: "update", entity: "Upvote" },
     dashboard: { rateLimit: undefined, policy: canToggleFor },
-    public: { rateLimit: "write", policy: canToggleFor },
+    public: {
+      rateLimit: "write",
+      policy: (args: TUpvoteToggle) =>
+        Policy.all(
+          canToggleFor(args, "public"),
+          participation.canParticipate(args.organizationId)
+        ),
+    },
   });
 
   const toggleVote = toggleWrite.handlers((_surface, args) =>
@@ -189,5 +198,6 @@ export const UpvoteRpcHandlers = UpvoteRpcs.toLayer(
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
   Layer.provide(ResolvePrincipalService.layer),
-  Layer.provide(UserRepository.layer)
+  Layer.provide(UserRepository.layer),
+  Layer.provide(ParticipationPolicy.layer)
 );

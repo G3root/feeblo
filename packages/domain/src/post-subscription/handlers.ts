@@ -12,6 +12,7 @@ import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { definePublicEntry, defineSurfacePair } from "../surface";
+import { ParticipationPolicy } from "../user-block/policies";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
 import type {
@@ -27,6 +28,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostSubscriptionRepository;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
   const postPolicy = yield* PostPolicy;
+  const participation = yield* ParticipationPolicy;
 
   // -- Shared effect helpers (no policy applied) --
 
@@ -153,7 +155,8 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
           postPolicy.isUnlockedPublic({
             organizationId: args.organizationId,
             postId: args.postId,
-          })
+          }),
+          participation.canParticipate(args.organizationId)
         ),
     },
   });
@@ -253,5 +256,6 @@ export const PostSubscriptionRpcHandlers = PostSubscriptionRpcs.toLayer(
   Layer.provide(PostPolicy.layer),
   Layer.provide(PostRepository.layer),
   Layer.provide(PostSubscriptionRepository.layer),
-  Layer.provide(EmailSubscriptionRepository.layer)
+  Layer.provide(EmailSubscriptionRepository.layer),
+  Layer.provide(ParticipationPolicy.layer)
 );

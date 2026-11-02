@@ -15,6 +15,7 @@ import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
+import { ParticipationPolicy } from "../user-block/policies";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 import { CommentRpcs } from "./rpcs";
@@ -40,6 +41,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
   // machinery this surface uses. What stays here is the part only a member
   // session can decide: who is acting and whether they are allowed to.
   const comments = yield* CommentService;
+  const participation = yield* ParticipationPolicy;
 
   /** The session as the post timeline records it: the acting user and membership. */
   const actorOf = (
@@ -103,7 +105,14 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     operation: "UpdateComment",
     remap: { action: "update", entity: "Comment" },
     dashboard: { rateLimit: undefined, policy: canUpdateFor },
-    public: { rateLimit: "expensive", policy: canUpdateFor },
+    public: {
+      rateLimit: "expensive",
+      policy: (args: TCommentUpdate) =>
+        Policy.all(
+          canUpdateFor(args, "public"),
+          participation.canParticipate(args.organizationId)
+        ),
+    },
   });
 
   const removeComment = deleteWrite.handlers((_surface, args) =>
@@ -153,7 +162,14 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     operation: "CreateComment",
     remap: { action: "create", entity: "Comment" },
     dashboard: { rateLimit: undefined, policy: canCreateFor },
-    public: { rateLimit: "expensive", policy: canCreateFor },
+    public: {
+      rateLimit: "expensive",
+      policy: (args: TCommentCreate) =>
+        Policy.all(
+          canCreateFor(args, "public"),
+          participation.canParticipate(args.organizationId)
+        ),
+    },
   });
 
   // The dashboard list projects with `isMember` visibility shared with the
@@ -327,5 +343,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(PostActivityRepository.layer),
   Layer.provide(ResolvePrincipalService.layer),
   Layer.provide(NotificationService.layer),
-  Layer.provide(EmailOutboxConfig.layer)
+  Layer.provide(EmailOutboxConfig.layer),
+  Layer.provide(ParticipationPolicy.layer)
 );
