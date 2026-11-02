@@ -34,18 +34,26 @@ export const Route = createFileRoute("/s/p/$slug")({
     }
 
     const { organizationId } = context.boardPage.site;
+
+    // Subscription and delete hints are per-user private state: skip the RPC
+    // for anonymous visitors. The page's own subscriptions load them if a
+    // session resolves after hydration. For a signed-in visitor the two
+    // preloads read independent collections and neither needs the other's
+    // rows, so the state read runs alongside the detail read rather than
+    // behind it: one round trip instead of two. Both settle internally with
+    // `Promise.allSettled`, so neither promise can reject early, and the
+    // scope write they share sets the same id.
+    const userStatePromise = getCachedAuthSession()
+      ? preloadPostUserState(context.dbClient, { organizationId })
+      : undefined;
+
     const outcome = await preloadPostDetail(context.dbClient, {
       organizationId,
       slug: params.slug,
     });
 
-    // Subscription and delete hints are per-user private state: skip the RPC
-    // for anonymous visitors. The page's own subscriptions load them if a
-    // session resolves after hydration.
-    if (getCachedAuthSession()) {
-      const userState = await preloadPostUserState(context.dbClient, {
-        organizationId,
-      });
+    if (userStatePromise) {
+      const userState = await userStatePromise;
 
       return { degraded: outcome.degraded || userState.degraded };
     }

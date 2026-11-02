@@ -649,61 +649,73 @@ const makeDataTransferRepository = Effect.gen(function* () {
       guard(
         "summarizeReport",
         Effect.gen(function* () {
-          const [counts] = yield* db
-            .select({
-              created: sql<
-                string | number
-              >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'created')`,
-              failed: sql<
-                string | number
-              >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'failed')`,
-              pending: sql<
-                string | number
-              >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'pending')`,
-              total: sql<string | number>`count(*)`,
-              warned: sql<
-                string | number
-              >`count(*) filter (where ${rowHasWarnings})`,
-            })
-            .from(schema.dataImportRowTable)
-            .where(eq(schema.dataImportRowTable.jobId, jobId));
-          const failureRows = yield* db
-            .select({
-              count: sql<string | number>`count(*)`,
-              message: schema.dataImportRowTable.message,
-            })
-            .from(schema.dataImportRowTable)
-            .where(
-              and(
-                eq(schema.dataImportRowTable.jobId, jobId),
-                eq(schema.dataImportRowTable.outcome, "failed"),
-                isNotNull(schema.dataImportRowTable.message)
-              )
-            )
-            .groupBy(schema.dataImportRowTable.message)
-            .orderBy(
-              desc(sql`count(*)`),
-              asc(schema.dataImportRowTable.message)
-            );
-          const boardRows = yield* db
-            .select({
-              count: sql<string | number>`count(*)`,
-              name: sql<
-                string | null
-              >`${schema.dataImportRowTable.payload} ->> 'boardName'`,
-            })
-            .from(schema.dataImportRowTable)
-            .where(
-              and(
-                eq(schema.dataImportRowTable.jobId, jobId),
-                sql`${schema.dataImportRowTable.payload} ->> 'boardName' is not null`
-              )
-            )
-            .groupBy(sql`${schema.dataImportRowTable.payload} ->> 'boardName'`)
-            .orderBy(
-              desc(sql`count(*)`),
-              asc(sql`${schema.dataImportRowTable.payload} ->> 'boardName'`)
-            );
+          // Three aggregates over the same rows table. They share only the job
+          // id — the counts read every outcome, the failure rows group failed
+          // ones and the board rows group the payload's board name — and none
+          // feeds another, so they run together: one round trip for the report
+          // instead of three. `Effect.all` is sequential unless told otherwise.
+          const [[counts], failureRows, boardRows] = yield* Effect.all(
+            [
+              db
+                .select({
+                  created: sql<
+                    string | number
+                  >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'created')`,
+                  failed: sql<
+                    string | number
+                  >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'failed')`,
+                  pending: sql<
+                    string | number
+                  >`count(*) filter (where ${schema.dataImportRowTable.outcome} = 'pending')`,
+                  total: sql<string | number>`count(*)`,
+                  warned: sql<
+                    string | number
+                  >`count(*) filter (where ${rowHasWarnings})`,
+                })
+                .from(schema.dataImportRowTable)
+                .where(eq(schema.dataImportRowTable.jobId, jobId)),
+              db
+                .select({
+                  count: sql<string | number>`count(*)`,
+                  message: schema.dataImportRowTable.message,
+                })
+                .from(schema.dataImportRowTable)
+                .where(
+                  and(
+                    eq(schema.dataImportRowTable.jobId, jobId),
+                    eq(schema.dataImportRowTable.outcome, "failed"),
+                    isNotNull(schema.dataImportRowTable.message)
+                  )
+                )
+                .groupBy(schema.dataImportRowTable.message)
+                .orderBy(
+                  desc(sql`count(*)`),
+                  asc(schema.dataImportRowTable.message)
+                ),
+              db
+                .select({
+                  count: sql<string | number>`count(*)`,
+                  name: sql<
+                    string | null
+                  >`${schema.dataImportRowTable.payload} ->> 'boardName'`,
+                })
+                .from(schema.dataImportRowTable)
+                .where(
+                  and(
+                    eq(schema.dataImportRowTable.jobId, jobId),
+                    sql`${schema.dataImportRowTable.payload} ->> 'boardName' is not null`
+                  )
+                )
+                .groupBy(
+                  sql`${schema.dataImportRowTable.payload} ->> 'boardName'`
+                )
+                .orderBy(
+                  desc(sql`count(*)`),
+                  asc(sql`${schema.dataImportRowTable.payload} ->> 'boardName'`)
+                ),
+            ],
+            { concurrency: "unbounded" }
+          );
           return {
             boardGroups: boardRows.flatMap((row) =>
               row.name === null

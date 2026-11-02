@@ -208,30 +208,36 @@ export const makeSlackConnectionServiceLive = (
             })
             .pipe(mapSlackApiError("OAuth handshake"));
           const botToken = Redacted.make(oauth.access_token);
-          const authTest = yield* apiClient
-            .authTest({ botToken })
-            .pipe(mapSlackApiError("workspace verification"));
-          const teamInfo = yield* apiClient
-            .teamInfo({ botToken })
-            .pipe(mapSlackApiError("workspace lookup"));
-          const ciphertext = yield* encryptSlackCredentialMaterial(
-            config.encryptionKey,
-            {
-              botToken: oauth.access_token,
-              ...(oauth.authed_user?.access_token !== undefined && {
-                userToken: oauth.authed_user.access_token,
-              }),
-              ...(oauth.incoming_webhook?.url !== undefined && {
-                incomingWebhookUrl: oauth.incoming_webhook.url,
-              }),
-            }
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Slack credentials could not be encrypted",
-                })
-            )
+          // The two Slack calls share only the token and the encryption is a
+          // local operation over the token material, so all three run
+          // together: one Slack round trip instead of two. `Effect.all` is
+          // sequential unless told otherwise.
+          const [authTest, teamInfo, ciphertext] = yield* Effect.all(
+            [
+              apiClient
+                .authTest({ botToken })
+                .pipe(mapSlackApiError("workspace verification")),
+              apiClient
+                .teamInfo({ botToken })
+                .pipe(mapSlackApiError("workspace lookup")),
+              encryptSlackCredentialMaterial(config.encryptionKey, {
+                botToken: oauth.access_token,
+                ...(oauth.authed_user?.access_token !== undefined && {
+                  userToken: oauth.authed_user.access_token,
+                }),
+                ...(oauth.incoming_webhook?.url !== undefined && {
+                  incomingWebhookUrl: oauth.incoming_webhook.url,
+                }),
+              }).pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Slack credentials could not be encrypted",
+                    })
+                )
+              ),
+            ],
+            { concurrency: "unbounded" }
           );
           return yield* db.transaction(() =>
             Effect.gen(function* () {
