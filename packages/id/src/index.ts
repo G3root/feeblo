@@ -233,3 +233,8 @@ export const DataImportJobId = makeId("data_import_job", "dij", {
 export const DataImportRowId = makeId("data_import_row", "dir", {
   approximateLength,
 });
+
+/** Identifies one workspace-scoped block of an end user. */
+export const UserBlockId = makeId("user_block", "ubl", {
+  approximateLength,
+});
