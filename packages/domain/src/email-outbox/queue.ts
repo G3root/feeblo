@@ -1873,17 +1873,24 @@ export const reconcileEmailOutbox = ({
     const subscriptions = yield* EmailSubscriptionRepository;
     const policy = yield* EntitlementPolicy;
     const { maxConcurrentSends } = yield* EmailOutboxConfig;
-    const pending = yield* repository.findPending({
-      before: reconciliationNowDate,
-      limit: reconciliationBatchSize,
-    });
-    const paused = yield* repository.findPausedByPlan({
-      before: reconciliationNowDate,
-      limit: reconciliationBatchSize,
-    });
+    // Both sweeps read the same reconciliation instant and neither filters by
+    // the other's rows, so they run together; the same is true of the plan
+    // state that decides which paused deliveries may resume.
+    const [pending, paused, subscriptionOrganizations] = yield* Effect.all(
+      [
+        repository.findPending({
+          before: reconciliationNowDate,
+          limit: reconciliationBatchSize,
+        }),
+        repository.findPausedByPlan({
+          before: reconciliationNowDate,
+          limit: reconciliationBatchSize,
+        }),
+        subscriptions.findPlanStateOrganizationIds(),
+      ],
+      { concurrency: "unbounded" }
+    );
     yield* repository.expirePausedDeliveries({ now: reconciliationNowDate });
-    const subscriptionOrganizations =
-      yield* subscriptions.findPlanStateOrganizationIds();
     const resumedPausedDeliveryIds = yield* Effect.forEach(
       [
         ...new Set([
