@@ -39,24 +39,31 @@ export const Route = createFileRoute("/s/p/$slug")({
     // for anonymous visitors. The page's own subscriptions load them if a
     // session resolves after hydration. For a signed-in visitor the two
     // preloads read independent collections and neither needs the other's
-    // rows, so the state read runs alongside the detail read rather than
-    // behind it: one round trip instead of two. Both settle internally with
-    // `Promise.allSettled`, so neither promise can reject early, and the
-    // scope write they share sets the same id.
-    const userStatePromise = getCachedAuthSession()
-      ? preloadPostUserState(context.dbClient, { organizationId })
-      : undefined;
+    // rows, so they settle together: the wait is whichever preload is slower,
+    // not their sum. `Promise.all` is the thing that makes starting both at
+    // once safe on the client, not a decoration: a preload that fails there
+    // rejects the navigation, and a promise started but only `await`ed after
+    // another resolves holds no handler meanwhile — a rejection on either
+    // side could escape unhandled. `Promise.all` attaches to both at once, so
+    // whoever fails first reaches the router's error boundary and the other
+    // never rejects alone. (Server renders all-settle inside `preloadsFor`
+    // and never reject, but this route's `beforeLoad` runs client-first.)
+    if (getCachedAuthSession()) {
+      const [outcome, userState] = await Promise.all([
+        preloadPostDetail(context.dbClient, {
+          organizationId,
+          slug: params.slug,
+        }),
+        preloadPostUserState(context.dbClient, { organizationId }),
+      ]);
+
+      return { degraded: outcome.degraded || userState.degraded };
+    }
 
     const outcome = await preloadPostDetail(context.dbClient, {
       organizationId,
       slug: params.slug,
     });
-
-    if (userStatePromise) {
-      const userState = await userStatePromise;
-
-      return { degraded: outcome.degraded || userState.degraded };
-    }
 
     return outcome;
   },
