@@ -108,6 +108,25 @@ const makeUserBlockRepository = Effect.gen(function* () {
       return row !== undefined;
     });
 
+  /** A contact row that links this account to the workspace, if one exists. */
+  const findContactByUserId = (input: {
+    readonly organizationId: string;
+    readonly userId: string;
+  }) =>
+    Effect.gen(function* () {
+      const [contact] = yield* db
+        .select({ name: schema.contactTable.name })
+        .from(schema.contactTable)
+        .where(
+          and(
+            eq(schema.contactTable.organizationId, input.organizationId),
+            eq(schema.contactTable.userId, input.userId)
+          )
+        )
+        .limit(1);
+      return contact;
+    });
+
   /**
    * Whether this identity is blocked in this workspace.
    *
@@ -173,8 +192,64 @@ const makeUserBlockRepository = Effect.gen(function* () {
       const target = input.target;
       if (target._tag === "email") {
         const email = normalizeBlockEmail(target.email);
+
+        // A workspace contact is the strongest relationship the address can
+        // have: it is already the workspace's record of this person. A
+        // contact with no linked account never adopts a same-address global
+        // account — the block stays address-scoped and does not reach an
+        // account the workspace has no relationship with.
+        const [contact] = yield* db
+          .select({
+            name: schema.contactTable.name,
+            userId: schema.contactTable.userId,
+          })
+          .from(schema.contactTable)
+          .where(
+            and(
+              eq(schema.contactTable.organizationId, input.organizationId),
+              sql`lower(${schema.contactTable.email}) = ${email}`
+            )
+          )
+          .limit(1);
+        if (contact !== undefined) {
+          if (contact.userId === null) {
+            return {
+              email,
+              name: contact.name,
+              status: "ok",
+              userId: null,
+            } as const;
+          }
+          const member = yield* isMember({
+            organizationId: input.organizationId,
+            userId: contact.userId,
+          });
+          if (member) {
+            return { status: "member" } as const;
+          }
+          const [user] = yield* db
+            .select({ name: schema.userTable.name })
+            .from(schema.userTable)
+            .where(eq(schema.userTable.id, contact.userId))
+            .limit(1);
+          return {
+            email,
+            name: contact.name ?? user?.name ?? null,
+            status: "ok",
+            userId: contact.userId,
+          } as const;
+        }
+
+        // No contact: an account may still be blocked by address if it is
+        // related to this workspace through a restricted identity or a
+        // membership. An unrelated global account is not adopted by address.
         const [user] = yield* db
-          .select({ id: schema.userTable.id, name: schema.userTable.name })
+          .select({
+            id: schema.userTable.id,
+            name: schema.userTable.name,
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
           .from(schema.userTable)
           .where(sql`lower(${schema.userTable.email}) = ${email}`)
           .limit(1);
@@ -186,13 +261,24 @@ const makeUserBlockRepository = Effect.gen(function* () {
           if (member) {
             return { status: "member" } as const;
           }
+          const contact = yield* findContactByUserId({
+            organizationId: input.organizationId,
+            userId: user.id,
+          });
+          const related =
+            user.restrictedToOrganizationId === input.organizationId ||
+            contact !== undefined;
+          if (related) {
+            return {
+              email,
+              name: contact?.name ?? user.name,
+              status: "ok",
+              userId: user.id,
+            } as const;
+          }
         }
-        return {
-          email,
-          name: user?.name ?? null,
-          status: "ok",
-          userId: user?.id ?? null,
-        } as const;
+
+        return { email, name: null, status: "ok", userId: null } as const;
       }
 
       if (target._tag === "user") {
@@ -201,6 +287,8 @@ const makeUserBlockRepository = Effect.gen(function* () {
             email: schema.userTable.email,
             id: schema.userTable.id,
             name: schema.userTable.name,
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
           })
           .from(schema.userTable)
           .where(eq(schema.userTable.id, target.userId))
@@ -215,9 +303,25 @@ const makeUserBlockRepository = Effect.gen(function* () {
         if (member) {
           return { status: "member" } as const;
         }
+
+        // A user id is only addressable from this workspace when the account
+        // is related to it: a restricted portal identity, a membership, or a
+        // contact row. An unrelated account is reported as not found rather
+        // than revealing its name and address to this tenant.
+        const contact = yield* findContactByUserId({
+          organizationId: input.organizationId,
+          userId: user.id,
+        });
+        const related =
+          user.restrictedToOrganizationId === input.organizationId ||
+          contact !== undefined;
+        if (!related) {
+          return { status: "not_found" } as const;
+        }
+
         return {
           email: normalizedEmail(user.email),
-          name: user.name,
+          name: contact?.name ?? user.name,
           status: "ok",
           userId: user.id,
         } as const;

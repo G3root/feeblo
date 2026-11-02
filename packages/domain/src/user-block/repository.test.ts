@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { ContactId, UserId, WorkspaceId, asLegid } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -187,6 +188,101 @@ describe("UserBlockRepository", () => {
           target: { _tag: "user", userId: asLegid(UserId)("missing") },
         });
         expect(missing).toEqual({ status: "not_found" });
+      })
+    );
+
+    it.effect("does not adopt an account with no workspace relationship", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBlockRepository;
+        const organizationId = yield* createOrganization();
+        const otherOrganizationId = yield* createOrganization();
+        const unrelated = yield* createUser("unrelated");
+        const otherOrgUser = yield* createUser("other-org");
+        const restrictedUser = yield* createUser("restricted");
+        const db = yield* currentDb;
+        const now = yield* DateTime.nowAsDate;
+
+        yield* db
+          .update(schema.userTable)
+          .set({ restrictedToOrganizationId: otherOrganizationId })
+          .where(eq(schema.userTable.id, otherOrgUser.id));
+        yield* db
+          .update(schema.userTable)
+          .set({ restrictedToOrganizationId: organizationId })
+          .where(eq(schema.userTable.id, restrictedUser.id));
+
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "email", email: unrelated.email },
+          })
+        ).toEqual({
+          email: unrelated.email,
+          name: null,
+          status: "ok",
+          userId: null,
+        });
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "user", userId: unrelated.id },
+          })
+        ).toEqual({ status: "not_found" });
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "user", userId: otherOrgUser.id },
+          })
+        ).toEqual({ status: "not_found" });
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "user", userId: restrictedUser.id },
+          })
+        ).toMatchObject({ status: "ok", userId: restrictedUser.id });
+
+        // A contact with the address but no linked account keeps the address
+        // target address-scoped; it does not make the unrelated account
+        // addressable. Linking the contact to the account is what creates the
+        // user-id relationship.
+        const contactId = yield* createContact({
+          email: unrelated.email,
+          organizationId,
+          userId: null,
+        });
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "email", email: unrelated.email },
+          })
+        ).toEqual({
+          email: unrelated.email,
+          name: "Customer",
+          status: "ok",
+          userId: null,
+        });
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "user", userId: unrelated.id },
+          })
+        ).toEqual({ status: "not_found" });
+
+        yield* db
+          .update(schema.contactTable)
+          .set({ updatedAt: now, userId: unrelated.id })
+          .where(eq(schema.contactTable.id, contactId));
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "user", userId: unrelated.id },
+          })
+        ).toMatchObject({
+          email: unrelated.email,
+          name: "Customer",
+          status: "ok",
+          userId: unrelated.id,
+        });
       })
     );
 

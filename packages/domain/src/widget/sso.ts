@@ -123,7 +123,7 @@ const upsertSsoContact = (args: {
   readonly avatar?: string | undefined;
   readonly companyId: string | null;
   readonly organizationId: string;
-  readonly userId: string | null;
+  readonly userId?: string | null;
 }) =>
   Effect.gen(function* () {
     const contactRepository = yield* ContactRepository;
@@ -197,7 +197,7 @@ export function upsertContactFromParsed(
       name: parsedContact.commonFields.name,
       avatar: parsedContact.commonFields.avatar,
       companyId: linkedCompanyId ?? null,
-      userId: userId ?? null,
+      ...(userId !== undefined && { userId }),
     });
 
     let contactId: string | undefined;

@@ -174,7 +174,7 @@ export function BlockedUsersSection() {
               <EmptyDescription>
                 {hasFilter
                   ? "Try a different name or email address."
-                  : "Block a person from a request, a customer profile, or by email to stop them writing here."}
+                  : "Block a person by email address to stop them writing here. They can still read, and their existing content stays visible."}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
