@@ -463,32 +463,40 @@ const makeDataImportService = Effect.gen(function* () {
         });
       }
       const window = clampReportWindow(input.limit, input.offset);
-      const report = yield* fromStore(
-        "listRows",
-        repository.listRows({
-          board: input.board,
-          filter: input.filter,
-          jobId: input.id,
-          limit: window.limit,
-          message: input.message,
-          offset: window.offset,
-          sort: input.sort,
-        })
+      // The row window, its summary, and the pending board names are three
+      // reads of the same staged job and none needs another's answer, so they
+      // resolve together; the report is polled while an import runs, which is
+      // exactly when it should not cost three round trips.
+      const [report, summary, newBoards] = yield* Effect.all(
+        [
+          fromStore(
+            "listRows",
+            repository.listRows({
+              board: input.board,
+              filter: input.filter,
+              jobId: input.id,
+              limit: window.limit,
+              message: input.message,
+              offset: window.offset,
+              sort: input.sort,
+            })
+          ),
+          fromStore(
+            "summarizeReport",
+            repository.summarizeReport({ jobId: input.id })
+          ),
+          // A staged file may name boards that do not exist yet, and the
+          // confirmation names them. Once the job runs, the worker creates
+          // them, so an unchanged list would only be stale.
+          job.value.status === "awaiting_confirmation"
+            ? fromStore(
+                "listNewBoardNames",
+                repository.listNewBoardNames({ jobId: input.id })
+              )
+            : Effect.succeed([]),
+        ],
+        { concurrency: "unbounded" }
       );
-      const summary = yield* fromStore(
-        "summarizeReport",
-        repository.summarizeReport({ jobId: input.id })
-      );
-      // A staged file may name boards that do not exist yet, and the
-      // confirmation names them. Once the job runs, the worker creates them,
-      // so an unchanged list would only be stale.
-      const newBoards =
-        job.value.status === "awaiting_confirmation"
-          ? yield* fromStore(
-              "listNewBoardNames",
-              repository.listNewBoardNames({ jobId: input.id })
-            )
-          : [];
       return {
         job: job.value,
         newBoards: [...newBoards],

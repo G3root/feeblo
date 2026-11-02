@@ -766,8 +766,14 @@ export const initAuthHandler = (
       emailVerification: {
         autoSignInAfterVerification: true,
         afterEmailVerification: async (user) => {
-          await healVerifiedIdentities(user);
-          await scheduleWelcome(user);
+          // Healing the verified account's shadow identities and enqueueing the
+          // welcome email touch different rows and neither needs the other's
+          // result, so they run together: the verification response no longer
+          // waits for the sum of both.
+          await Promise.all([
+            healVerifiedIdentities(user),
+            scheduleWelcome(user),
+          ]);
         },
       },
       emailAndPassword: {

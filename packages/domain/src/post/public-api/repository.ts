@@ -393,31 +393,38 @@ const makePublicApiPostRepository = Effect.gen(function* () {
 
   const countByPostIds = (postIds: readonly string[]) =>
     Effect.gen(function* () {
-      const voteRows = yield* db
-        .select({
-          postId: schema.upvoteTable.postId,
-          total: count(schema.upvoteTable.id),
-        })
-        .from(schema.upvoteTable)
-        .where(inArray(schema.upvoteTable.postId, postIds))
-        .groupBy(schema.upvoteTable.postId);
-
-      // Only public comments are counted: an internal comment is a workspace
-      // note, and counting it would make this number disagree with the same
-      // post's count on the public portal.
-      const commentRows = yield* db
-        .select({
-          postId: schema.commentTable.postId,
-          total: count(schema.commentTable.id),
-        })
-        .from(schema.commentTable)
-        .where(
-          and(
-            inArray(schema.commentTable.postId, postIds),
-            eq(schema.commentTable.visibility, "PUBLIC")
-          )
-        )
-        .groupBy(schema.commentTable.postId);
+      // The two aggregates read different tables and share only the id list, so
+      // they run together: a page is one round trip for its counts rather than
+      // two, and `Effect.all` is sequential unless told otherwise.
+      const [voteRows, commentRows] = yield* Effect.all(
+        [
+          db
+            .select({
+              postId: schema.upvoteTable.postId,
+              total: count(schema.upvoteTable.id),
+            })
+            .from(schema.upvoteTable)
+            .where(inArray(schema.upvoteTable.postId, postIds))
+            .groupBy(schema.upvoteTable.postId),
+          // Only public comments are counted: an internal comment is a
+          // workspace note, and counting it would make this number disagree
+          // with the same post's count on the public portal.
+          db
+            .select({
+              postId: schema.commentTable.postId,
+              total: count(schema.commentTable.id),
+            })
+            .from(schema.commentTable)
+            .where(
+              and(
+                inArray(schema.commentTable.postId, postIds),
+                eq(schema.commentTable.visibility, "PUBLIC")
+              )
+            )
+            .groupBy(schema.commentTable.postId),
+        ],
+        { concurrency: "unbounded" }
+      );
 
       return {
         voteCount: new Map(voteRows.map((row) => [row.postId, row.total])),
@@ -567,8 +574,12 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       }
 
       const postIds = pageRows.map((row) => row.id);
-      const counts = yield* countByPostIds(postIds);
-      const tagRows = yield* tagsByPostIds(postIds);
+      // Counts and tags are keyed by the same ids and depend on nothing else,
+      // so the page pays one round trip for its enrichment instead of two.
+      const [counts, tagRows] = yield* Effect.all(
+        [countByPostIds(postIds), tagsByPostIds(postIds)],
+        { concurrency: "unbounded" }
+      );
 
       const tagsByPost = new Map<string, { id: string; name: string }[]>();
       for (const tag of tagRows) {
@@ -663,8 +674,11 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         return Option.none();
       }
 
-      const counts = yield* countByPostIds([row.id]);
-      const tagRows = yield* tagsByPostIds([row.id]);
+      // Same enrichment as a page row, run together for the same reason.
+      const [counts, tagRows] = yield* Effect.all(
+        [countByPostIds([row.id]), tagsByPostIds([row.id])],
+        { concurrency: "unbounded" }
+      );
 
       return Option.some({
         ...toSource(
@@ -710,35 +724,40 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       updatedAfter: Date | null;
     }) =>
       Effect.gen(function* () {
-        const board = yield* db
-          .select({ id: schema.boardTable.id })
-          .from(schema.boardTable)
-          .where(
-            and(
-              eq(schema.boardTable.id, boardId),
-              eq(schema.boardTable.organizationId, organizationId)
-            )
-          )
-          .limit(1);
-
-        if (board.length === 0) {
-          return Option.none();
-        }
-
-        return Option.some(
-          yield* pagePosts({
-            conditions: postPageConditions({
-              boardId,
-              cursor,
-              includeArchived,
-              organizationId,
-              statusId,
-              tagIds,
-              updatedAfter,
+        // The existence probe exists only to tell an empty board from a missing
+        // one, so it needs nothing from the page query and the page query needs
+        // nothing from it: run them together and answer not-found afterwards.
+        // A missing board's page comes back empty and is discarded; the round
+        // trip saved is on every successful list.
+        const [board, page] = yield* Effect.all(
+          [
+            db
+              .select({ id: schema.boardTable.id })
+              .from(schema.boardTable)
+              .where(
+                and(
+                  eq(schema.boardTable.id, boardId),
+                  eq(schema.boardTable.organizationId, organizationId)
+                )
+              )
+              .limit(1),
+            pagePosts({
+              conditions: postPageConditions({
+                boardId,
+                cursor,
+                includeArchived,
+                organizationId,
+                statusId,
+                tagIds,
+                updatedAfter,
+              }),
+              limit,
             }),
-            limit,
-          })
+          ],
+          { concurrency: "unbounded" }
         );
+
+        return board.length === 0 ? Option.none() : Option.some(page);
       }).pipe(withRemapDbErrors("PublicApiPost", "select")),
 
     /**

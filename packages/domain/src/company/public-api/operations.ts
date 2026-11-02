@@ -85,6 +85,19 @@ const COMPANY_UNIQUE_VIOLATION_MESSAGE =
   "A company with this name or externalId already exists.";
 
 /**
+ * A conflict lookup that is skipped when the field is not part of the write.
+ *
+ * Both branches are typed by this signature, so `Effect.all` over the pair
+ * infers one result type instead of a union of effect types (which degrades
+ * the combined error channel to `any`).
+ */
+const lookupConflict = <A, E, R>(
+  value: string | null,
+  lookup: (value: string) => Effect.Effect<Option.Option<A>, E, R>
+): Effect.Effect<Option.Option<A>, E, R> =>
+  value === null ? Effect.succeed(Option.none<A>()) : lookup(value);
+
+/**
  * Rejects a name, or an external id, another company in the workspace holds.
  *
  * A courtesy to the caller, not the authority: the two unique indexes are, and
@@ -110,37 +123,43 @@ const failIfCompanyIsTaken = (args: {
   Effect.gen(function* () {
     const companies = yield* CompanyRepository;
 
-    if (args.name !== null) {
-      const nameTaken = yield* companies
-        .findNameConflict({
-          excludeCompanyId: args.excludeCompanyId,
-          name: args.name,
-          organizationId: args.organizationId,
-        })
-        .pipe(
-          withRemapDbErrors("PublicApiCompany", "select"),
-          Effect.catchTag("InternalServerError", () => onInternalError)
-        );
+    // Both collisions are checked on the same row and for the same workspace,
+    // and neither check reads the other's answer: run them together, then
+    // report in the documented order (name first). A field that is not being
+    // written is skipped rather than queried.
+    const [nameTaken, externalIdTaken] = yield* Effect.all(
+      [
+        lookupConflict(args.name, (name) =>
+          companies
+            .findNameConflict({
+              excludeCompanyId: args.excludeCompanyId,
+              name,
+              organizationId: args.organizationId,
+            })
+            .pipe(
+              withRemapDbErrors("PublicApiCompany", "select"),
+              Effect.catchTag("InternalServerError", () => onInternalError)
+            )
+        ),
+        lookupConflict(args.externalId, (externalId) =>
+          companies
+            .findExternalIdConflict({
+              excludeCompanyId: args.excludeCompanyId,
+              externalId,
+              organizationId: args.organizationId,
+            })
+            .pipe(
+              withRemapDbErrors("PublicApiCompany", "select"),
+              Effect.catchTag("InternalServerError", () => onInternalError)
+            )
+        ),
+      ],
+      { concurrency: "unbounded" }
+    );
 
-      if (Option.isSome(nameTaken)) {
-        return yield* conflictError(COMPANY_NAME_CONFLICT);
-      }
+    if (Option.isSome(nameTaken)) {
+      return yield* conflictError(COMPANY_NAME_CONFLICT);
     }
-
-    if (args.externalId === null) {
-      return undefined;
-    }
-
-    const externalIdTaken = yield* companies
-      .findExternalIdConflict({
-        excludeCompanyId: args.excludeCompanyId,
-        externalId: args.externalId,
-        organizationId: args.organizationId,
-      })
-      .pipe(
-        withRemapDbErrors("PublicApiCompany", "select"),
-        Effect.catchTag("InternalServerError", () => onInternalError)
-      );
 
     if (Option.isSome(externalIdTaken)) {
       return yield* conflictError(COMPANY_EXTERNAL_ID_CONFLICT);

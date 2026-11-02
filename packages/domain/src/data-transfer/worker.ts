@@ -477,11 +477,17 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
     const tags = yield* TagRepository;
     const statuses = yield* PostStatusRepository;
     const writes = yield* PostWriteService;
-    const actor = yield* resolveImportActor(job);
 
-    const statusRows = yield* statuses.findMany({
-      organizationId: job.organizationId,
-    });
+    // The importer's actor and the workspace's statuses are read from
+    // different tables and neither needs the other, so a pass resolves them
+    // together instead of stacking two round trips before the first batch.
+    const [actor, statusRows] = yield* Effect.all(
+      [
+        resolveImportActor(job),
+        statuses.findMany({ organizationId: job.organizationId }),
+      ],
+      { concurrency: "unbounded" }
+    );
     // The workspace's stored default, not the `PENDING` type: a workspace may
     // repoint which status is the default, and several statuses may share a
     // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several),
@@ -536,11 +542,17 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           break;
         }
 
-        const tagIdsByKey = yield* resolveBatchTags({
-          organizationId: job.organizationId,
-          rows,
-        });
-        const boardResolution = yield* resolveBatchBoards({ job, rows });
+        // Tags and boards are two independent lookups over the same batch (one
+        // by tag name, one by board name), so they resolve together. A batch is
+        // up to `DATA_IMPORT_BATCH_SIZE` rows, so this is per-batch latency the
+        // whole import waits on.
+        const [tagIdsByKey, boardResolution] = yield* Effect.all(
+          [
+            resolveBatchTags({ organizationId: job.organizationId, rows }),
+            resolveBatchBoards({ job, rows }),
+          ],
+          { concurrency: "unbounded" }
+        );
         for (const row of rows) {
           const outcome = yield* applyPendingRow({
             actor,

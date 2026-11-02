@@ -305,22 +305,28 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
         );
       }
 
-      const contacts = yield* db
-        .select({ userId: schema.contactTable.userId })
-        .from(schema.contactTable)
-        .where(and(...contactConditions));
-
-      // The user-table leg is for a member, who has no contact row: it runs
-      // only when the email is the sole identifier, so it can never widen a
-      // filter that also names an id or an external id.
+      // The contact leg always runs; the user-table leg is for a member, who
+      // has no contact row: it runs only when the email is the sole identifier,
+      // so it can never widen a filter that also names an id or an external id.
       const emailOnly =
         hasEmail && voter?.id === undefined && voter?.externalId === undefined;
-      const emailUsers = emailOnly
-        ? yield* db
-            .select({ id: schema.userTable.id })
-            .from(schema.userTable)
-            .where(sql`lower(${schema.userTable.email}) = ${email}`)
-        : [];
+      // Both legs are lookups the caller's filter names; neither needs the
+      // other's rows, so they resolve together instead of back to back.
+      const [contacts, emailUsers] = yield* Effect.all(
+        [
+          db
+            .select({ userId: schema.contactTable.userId })
+            .from(schema.contactTable)
+            .where(and(...contactConditions)),
+          emailOnly
+            ? db
+                .select({ id: schema.userTable.id })
+                .from(schema.userTable)
+                .where(sql`lower(${schema.userTable.email}) = ${email}`)
+            : Effect.succeed<ReadonlyArray<{ id: string }>>([]),
+        ],
+        { concurrency: "unbounded" }
+      );
 
       const ids = new Set<string>();
       for (const contact of contacts) {
@@ -408,30 +414,31 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       voter: TPublicApiVoterFilter | undefined;
     }) =>
       Effect.gen(function* () {
-        // Distinguish a post with no votes from one that does not exist in this
-        // workspace before running the page query: otherwise both come back as
-        // a successful empty page, and the caller cannot tell them apart.
-        // Another workspace's post is reported the same way as a missing one,
-        // so the id cannot be used to probe other workspaces.
-        const post = yield* db
-          .select({ id: schema.postTable.id })
-          .from(schema.postTable)
-          .where(
-            and(
-              eq(schema.postTable.id, postId),
-              eq(schema.postTable.organizationId, organizationId)
-            )
-          )
-          .limit(1);
+        // A post with no votes and a post that does not exist read the same
+        // way, so the existence probe and the voter filter resolve together:
+        // the probe needs nothing from the filter and the filter needs nothing
+        // from it. A missing post's page is discarded below.
+        const [post, voterUserIds] = yield* Effect.all(
+          [
+            db
+              .select({ id: schema.postTable.id })
+              .from(schema.postTable)
+              .where(
+                and(
+                  eq(schema.postTable.id, postId),
+                  eq(schema.postTable.organizationId, organizationId)
+                )
+              )
+              .limit(1),
+            resolveVoterUserIds({ organizationId, voter }),
+          ],
+          { concurrency: "unbounded" }
+        );
 
         if (post.length === 0) {
           return Option.none();
         }
 
-        const voterUserIds = yield* resolveVoterUserIds({
-          organizationId,
-          voter,
-        });
         if (Option.isSome(voterUserIds) && voterUserIds.value.length === 0) {
           return emptyVotePage;
         }
@@ -476,42 +483,48 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       voter: TPublicApiVoterFilter | undefined;
     }) =>
       Effect.gen(function* () {
-        if (postId !== null) {
-          const post = yield* db
-            .select({ id: schema.postTable.id })
-            .from(schema.postTable)
-            .where(
-              and(
-                eq(schema.postTable.id, postId),
-                eq(schema.postTable.organizationId, organizationId)
-              )
-            )
-            .limit(1);
-          if (post.length === 0) {
-            return Option.none();
-          }
+        // Three independent probes: each answers a filter the caller named and
+        // none reads another's rows. They resolve together, and the answers are
+        // still judged in the same order as before (post, board, voter).
+        const [post, board, voterUserIds] = yield* Effect.all(
+          [
+            postId === null
+              ? Effect.succeed<ReadonlyArray<{ id: string }>>([])
+              : db
+                  .select({ id: schema.postTable.id })
+                  .from(schema.postTable)
+                  .where(
+                    and(
+                      eq(schema.postTable.id, postId),
+                      eq(schema.postTable.organizationId, organizationId)
+                    )
+                  )
+                  .limit(1),
+            boardId === null
+              ? Effect.succeed<ReadonlyArray<{ id: string }>>([])
+              : db
+                  .select({ id: schema.boardTable.id })
+                  .from(schema.boardTable)
+                  .where(
+                    and(
+                      eq(schema.boardTable.id, boardId),
+                      eq(schema.boardTable.organizationId, organizationId)
+                    )
+                  )
+                  .limit(1),
+            resolveVoterUserIds({ organizationId, voter }),
+          ],
+          { concurrency: "unbounded" }
+        );
+
+        if (postId !== null && post.length === 0) {
+          return Option.none();
         }
 
-        if (boardId !== null) {
-          const board = yield* db
-            .select({ id: schema.boardTable.id })
-            .from(schema.boardTable)
-            .where(
-              and(
-                eq(schema.boardTable.id, boardId),
-                eq(schema.boardTable.organizationId, organizationId)
-              )
-            )
-            .limit(1);
-          if (board.length === 0) {
-            return Option.none();
-          }
+        if (boardId !== null && board.length === 0) {
+          return Option.none();
         }
 
-        const voterUserIds = yield* resolveVoterUserIds({
-          organizationId,
-          voter,
-        });
         if (Option.isSome(voterUserIds) && voterUserIds.value.length === 0) {
           return emptyVotePage;
         }

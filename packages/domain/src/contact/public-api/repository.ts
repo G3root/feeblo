@@ -276,29 +276,38 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
         const wantedEmail =
           email === null || email === undefined ? email : normalizeEmail(email);
 
-        if (companyId !== undefined && companyId !== null) {
-          const company = yield* db
-            .select({ id: schema.companyTable.id })
-            .from(schema.companyTable)
-            .where(
-              and(
-                eq(schema.companyTable.id, companyId),
-                eq(schema.companyTable.organizationId, organizationId)
-              )
-            )
-            .limit(1);
-          if (company.length === 0) {
-            return yield* invalidRequestError(
-              "companyId does not name a company in this workspace."
-            );
-          }
-        }
+        // The company check rejects the request and the identity lookup decides
+        // create-versus-update; neither needs the other's answer, so they run
+        // together and the company verdict is applied after both resolve.
+        const checksCompany = companyId !== undefined && companyId !== null;
+        const [company, found] = yield* Effect.all(
+          [
+            checksCompany
+              ? db
+                  .select({ id: schema.companyTable.id })
+                  .from(schema.companyTable)
+                  .where(
+                    and(
+                      eq(schema.companyTable.id, companyId),
+                      eq(schema.companyTable.organizationId, organizationId)
+                    )
+                  )
+                  .limit(1)
+              : Effect.succeed<ReadonlyArray<{ id: string }>>([]),
+            findByIdentifiers({
+              email: wantedEmail,
+              externalId: wantedExternalId,
+              organizationId,
+            }),
+          ],
+          { concurrency: "unbounded" }
+        );
 
-        const found = yield* findByIdentifiers({
-          email: wantedEmail,
-          externalId: wantedExternalId,
-          organizationId,
-        });
+        if (checksCompany && company.length === 0) {
+          return yield* invalidRequestError(
+            "companyId does not name a company in this workspace."
+          );
+        }
 
         // Two identifiers that name different records: the caller's own data
         // disagrees with itself, and picking one would merge two customers.
