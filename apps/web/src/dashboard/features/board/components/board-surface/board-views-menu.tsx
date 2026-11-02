@@ -174,6 +174,7 @@ export function BoardViewsMenu({
         onOpenChange={setSaveOpen}
         open={isSaveOpen}
         organizationId={organizationId}
+        savedView={appliedView}
       />
     </>
   );
@@ -198,9 +199,11 @@ async function deleteView(
 /**
  * Names the view being saved and stores the board's current query under it.
  *
- * Re-saving over the active saved view is an update, not a second row: the
- * unique index on (member, board, name) would reject the duplicate anyway, and
- * "save current view" while a view is applied means "make this the view".
+ * Saving while a saved view is applied *updates that view* rather than adding a
+ * second row: the name field is prefilled with it, the dialog says so, and the
+ * unique constraint on (member, board, name) would reject the duplicate anyway.
+ * To branch off a new view instead, apply a built-in tab first — that clears the
+ * applied view, so the dialog goes back to creating one.
  */
 function SaveViewDialog({
   boardId,
@@ -209,6 +212,7 @@ function SaveViewDialog({
   onOpenChange,
   open,
   organizationId,
+  savedView,
 }: {
   boardId: string | null;
   collection: SavedViewCollection;
@@ -216,6 +220,8 @@ function SaveViewDialog({
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organizationId: string;
+  /** The applied saved view, when the board is showing one. */
+  savedView: { id: string; name: string } | undefined;
 }) {
   const store = useBoardStore();
   const activeView = useSelector(store, (state) => state.context.activeView);
@@ -245,26 +251,49 @@ function SaveViewDialog({
       const name = data.value.name;
 
       try {
-        const id = await SavedViewId.unsafeGenerate();
-        const transaction = collection.insert({
-          boardId,
-          createdAt: new Date(),
-          id,
-          memberId,
-          name,
-          organizationId,
-          query,
-          updatedAt: new Date(),
-        });
+        // The id the board will keep pointing at: the applied view's when this
+        // write replaces one, a fresh one when it creates a view.
+        const viewId = savedView?.id ?? (await SavedViewId.unsafeGenerate());
+        const transaction = savedView
+          ? collection.update(savedView.id, (draft) => {
+              draft.name = name;
+              // The draft proxy takes mutable values while the persisted query
+              // decodes to readonly arrays, so the row gets its own copies
+              // rather than the store's objects.
+              draft.query = {
+                filters: {
+                  ...filters,
+                  assigneeMemberIds: [...filters.assigneeMemberIds],
+                  statuses: [...filters.statuses],
+                  tagIds: [...filters.tagIds],
+                },
+                ordering: { ...ordering },
+              };
+            })
+          : collection.insert({
+              boardId,
+              createdAt: new Date(),
+              id: viewId,
+              memberId,
+              name,
+              organizationId,
+              query,
+              updatedAt: new Date(),
+            });
 
         await transaction.when("settled");
+        // Re-point the active view at the record just written, so the
+        // toolbar's label follows a rename instead of showing the old name.
         store.send({
           type: "setActiveView",
-          view: { filters, id, name },
+          view: { filters, id: viewId, name },
         });
         form.reset();
         onOpenChange(false);
-        toastManager.add({ title: `Saved "${name}"`, type: "success" });
+        toastManager.add({
+          title: savedView ? `Updated "${name}"` : `Saved "${name}"`,
+          type: "success",
+        });
       } catch {
         toastManager.add({ title: "Failed to save view", type: "error" });
       }
@@ -275,10 +304,11 @@ function SaveViewDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Save view</DialogTitle>
+          <DialogTitle>{savedView ? "Update view" : "Save view"}</DialogTitle>
           <DialogDescription>
-            Saves this board&apos;s filters and ordering under a name you can
-            apply again later.
+            {savedView
+              ? `Replaces the filters and ordering stored in "${savedView.name}".`
+              : "Saves this board's filters and ordering under a name you can apply again later."}
           </DialogDescription>
         </DialogHeader>
         <form

@@ -198,6 +198,57 @@ describe("SavedViewRpcHandlers", () => {
       })
     );
 
+    it.effect("replaces a view's name and query in place", () =>
+      Effect.gen(function* () {
+        const handlers = yield* SavedViewRpcHandlersEffect;
+        const f = yield* fixture();
+        const id = yield* SavedViewId.generate;
+
+        yield* as(
+          f.alice,
+          handlers.CreateSavedView({
+            boardId: null,
+            id,
+            name: "Mine",
+            organizationId: f.organizationId,
+            query: emptyBoardQuery,
+          })
+        );
+
+        yield* as(
+          f.alice,
+          handlers.UpdateSavedView({
+            id,
+            name: "Renamed",
+            organizationId: f.organizationId,
+            query: {
+              filters: { ...emptyBoardQuery.filters, search: "checkout" },
+              ordering: { direction: "asc", field: "title" },
+            },
+          })
+        );
+
+        const views = yield* as(
+          f.alice,
+          handlers.ListSavedViews({
+            boardId: null,
+            organizationId: f.organizationId,
+          })
+        );
+
+        // One row, renamed and re-queried: "save current view" over an applied
+        // view is an update, not a second view.
+        expect(views).toHaveLength(1);
+        expect(views[0]?.id).toBe(id);
+        expect(views[0]?.name).toBe("Renamed");
+        expect(views[0]?.query.filters.search).toBe("checkout");
+        expect(views[0]?.query.ordering).toEqual({
+          direction: "asc",
+          field: "title",
+        });
+      })
+    );
+
     it.effect("refuses to update or delete another member's view", () =>
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;
