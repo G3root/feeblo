@@ -1,4 +1,8 @@
-import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
+import {
+  KeyboardSensor,
+  PointerActivationConstraints,
+  PointerSensor,
+} from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
 import { isSortable } from "@dnd-kit/react/sortable";
 import type { TSavedView } from "@feeblo/domain/saved-view/schema";
@@ -45,17 +49,29 @@ const isSavedTab = (
 ): tab is { id: string; name: string; view: TSavedView } => "view" in tab;
 
 /**
- * The pointer sensor's defaults suppress activation on an interactive
- * descendant, so a pill can be both a link and a drag source only when the
- * draggable node is the anchor itself — which is why `element` is named here.
- * A press has to survive the delay and travel before a drag starts, so a click
- * still navigates.
+ * The pointer sensor, configured for a pill that is both a link and a drag
+ * source.
+ *
+ * Two overrides of the defaults, and both are needed:
+ *
+ * - `preventActivation` returns false because the defaults refuse to start a
+ *   drag when the pointer went down on an interactive element that is not the
+ *   draggable node — and here it always is, since the draggable node is the
+ *   pill's wrapper and the pointer lands on the link inside it.
+ * - `activationConstraints` restates the delay-then-distance rule by hand. The
+ *   defaults skip it whenever the target is the draggable node, which would make
+ *   every press on a pill start a drag and swallow the navigation click.
  */
 const sensors = [
   PointerSensor.configure({
+    activationConstraints: () => [
+      new PointerActivationConstraints.Delay({ tolerance: 10, value: 200 }),
+      new PointerActivationConstraints.Distance({ value: 5 }),
+    ],
     activatorElements(source) {
       return [source.element];
     },
+    preventActivation: () => false,
   }),
   KeyboardSensor,
 ];

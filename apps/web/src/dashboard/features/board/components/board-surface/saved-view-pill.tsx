@@ -1,3 +1,4 @@
+import { mergeProps } from "@base-ui/react/merge-props";
 import { useSortable } from "@dnd-kit/react/sortable";
 import type { TSavedView } from "@feeblo/domain/saved-view/schema";
 import { Button } from "@feeblo/ui/button";
@@ -108,6 +109,12 @@ export function SavedViewLink({
  * toggling the popover or measuring the strip does not re-render every pill.
  * The name ellipsizes inside `max-w-40`, so a long name truncates inside its own
  * tab instead of costing the strip another tab's worth of width.
+ *
+ * The sortable ref is on the wrapper — the strip's flex item — not on the link
+ * inside it. The plugin translates the element it owns, and a transform applied
+ * to the link left the wrapper (and the gap it carries) where it was, so after a
+ * drop the two swapped pills sat flush: the transform was a gap out of step with
+ * the layout that had already moved.
  */
 export const SavedViewPill = memo(function SavedViewPill({
   boardSlug,
@@ -138,13 +145,19 @@ export const SavedViewPill = memo(function SavedViewPill({
 
   return (
     <ContextMenu>
-      {/* The tooltip sits on the pill's wrapper rather than on the link: the
-          link is a drag source with its own ref, and Base UI's trigger has to
-          own the element it listens on. */}
+      {/* The tooltip wraps the pill's wrapper rather than the link: Base UI's
+          trigger has to own the element it listens on, and that element is also
+          the sortable one. The drag still starts from the link — the sensor's
+          `preventActivation` is off and its delay/distance constraints keep a
+          plain click a click. */}
       <Tooltip>
         <TooltipTrigger
           render={(triggerProps) => (
-            <ContextMenuTrigger {...triggerProps} className={pillClassName}>
+            <ContextMenuTrigger
+              // Base UI's tooltip trigger and dnd-kit both want a ref to this
+              // node; `mergeProps` composes them instead of one winning.
+              {...mergeProps(triggerProps, { className: pillClassName, ref })}
+            >
               <SavedViewLink
                 activeOptions={{ exact: true }}
                 activeProps={{ "data-pressed": "true" }}
@@ -154,7 +167,6 @@ export const SavedViewPill = memo(function SavedViewPill({
                   "cursor-grab active:cursor-grabbing"
                 )}
                 organizationId={organizationId}
-                ref={ref}
                 viewId={view.id}
               >
                 <span className="max-w-40 truncate">{view.name}</span>
