@@ -12,6 +12,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@feeblo/ui/context-menu";
+import { useMediaQuery } from "@feeblo/ui/hooks/use-media-query";
 import {
   Menu,
   MenuItem,
@@ -88,9 +89,12 @@ const sensors = [
  *    pills stay in the DOM and are hidden with `visibility`, not unmounted:
  *    their layout is what the measuring pass reads on the next resize, so
  *    removing them would make the count impossible to recover.
- * 2. On a phone the row is `display: none` (its `sm:flex` breakpoint), which
- *    reports a zero width — so every pill counts as clipped and the same button
- *    carries them all. One mechanism, no media query in JavaScript.
+ * 2. On a phone the row is `display: none` (its `sm:flex` breakpoint), so every
+ *    pill counts as clipped and the popover carries them all. Whether the
+ *    popover exists at all comes from the same breakpoint as the CSS
+ *    (`useMediaQuery("sm")`), not from the measured width: an empty row on a
+ *    wide viewport also measures zero, and inferring "hidden" from that is what
+ *    used to show a "0 views" popover on a desktop with nothing saved.
  */
 export function BoardSavedViews({
   boardId,
@@ -164,12 +168,6 @@ export function BoardSavedViews({
    * measurement can still see them.
    */
   const [visibleCount, setVisibleCount] = useState(rows.length);
-  /**
-   * True when the pill row is `display: none` — i.e. a phone. The row reports a
-   * zero width there, which is also how the popover learns it is the only
-   * affordance and has to offer creation even with no views saved.
-   */
-  const [rowHidden, setRowHidden] = useState(false);
   const rowRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
@@ -179,10 +177,7 @@ export function BoardSavedViews({
       return undefined;
     }
 
-    const measure = () => {
-      setRowHidden(row.clientWidth === 0);
-      setVisibleCount(countFullyVisible(row));
-    };
+    const measure = () => setVisibleCount(countFullyVisible(row));
 
     // `ResizeObserver` reports the row's own box only, so a drag's transforms
     // and this component's re-renders never re-trigger it — which is the guard
@@ -195,9 +190,22 @@ export function BoardSavedViews({
   }, [rows.length]);
 
   const overflowCount = Math.max(ordered.length - visibleCount, 0);
+
+  /**
+   * Whether the pill row is on screen, asked of the breakpoint rather than
+   * inferred from a measured width.
+   *
+   * The row is `hidden sm:flex`, so at `sm` and up it is displayed. Inferring
+   * this from `clientWidth === 0` conflated two different states: the row being
+   * hidden, and the row being visible but empty — an empty row of pills also
+   * measures zero, which is why the popover used to appear with "0 views" on a
+   * desktop that had none. `useMediaQuery("sm")` is Tailwind's `sm`, because no
+   * `--breakpoint-*` override exists in the theme.
+   */
+  const isWideViewport = useMediaQuery("sm");
   // On a phone the row is hidden, so the popover is the only way in — it has to
-  // exist even when every view fits (or there are none).
-  const showPopover = overflowCount > 0 || rowHidden;
+  // exist even when every view fits, or when none are saved.
+  const showPopover = overflowCount > 0 || !isWideViewport;
 
   const commitOrder = async (orderedIds: string[]) => {
     setPendingOrder(orderedIds);
