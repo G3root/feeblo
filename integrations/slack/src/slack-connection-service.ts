@@ -12,7 +12,10 @@ import {
   IntegrationConnectionId,
   IntegrationRouteId,
 } from "@feeblo/id";
-import { LISTED_CONNECTION_LIFECYCLES } from "@feeblo/integration-core/lifecycle";
+import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
 import {
   makeSlackApiClient,
   SLACK_OAUTH_AUTHORIZE_URL,
@@ -497,7 +500,12 @@ export const makeSlackConnectionServiceLive = (
                     updatedAt: now,
                   })
                   .where(
-                    eq(schema.integrationConnectionTable.id, connectionId)
+                    and(
+                      eq(schema.integrationConnectionTable.id, connectionId),
+                      inArray(schema.integrationConnectionTable.lifecycle, [
+                        ...connectionSourceStatesFor("archive"),
+                      ])
+                    )
                   );
               })
             ),

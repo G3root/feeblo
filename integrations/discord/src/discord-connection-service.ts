@@ -13,7 +13,10 @@ import {
   IntegrationRouteId,
   WorkspaceId,
 } from "@feeblo/id";
-import { LISTED_CONNECTION_LIFECYCLES } from "@feeblo/integration-core/lifecycle";
+import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
 import {
   DISCORD_GUILD_COMMANDS,
   DISCORD_OAUTH_AUTHORIZE_URL,
@@ -579,7 +582,14 @@ export const makeDiscordConnectionServiceLive = (
             ),
             updatedAt: now,
           })
-          .where(eq(schema.integrationConnectionTable.id, connectionId))
+          .where(
+            and(
+              eq(schema.integrationConnectionTable.id, connectionId),
+              inArray(schema.integrationConnectionTable.lifecycle, [
+                ...connectionSourceStatesFor("archive"),
+              ])
+            )
+          )
           .pipe(mapManagementError("disconnect archive"));
       });
 

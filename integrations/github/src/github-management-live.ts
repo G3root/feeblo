@@ -28,9 +28,10 @@ import {
   IntegrationRouteId,
   PostStatusId,
 } from "@feeblo/id";
+import { connectionSourceStatesFor } from "@feeblo/integration-core/lifecycle";
 import { makeGitHubIssueExternalResourceDraft } from "@feeblo/integration-github";
 import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manifest";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -328,7 +329,10 @@ const makeGitHubManagementService = Effect.gen(function* () {
               eq(
                 schema.integrationConnectionTable.provider,
                 IntegrationProviderKey.make("github")
-              )
+              ),
+              inArray(schema.integrationConnectionTable.lifecycle, [
+                ...connectionSourceStatesFor("archive"),
+              ])
             )
           )
           .pipe(Effect.mapError(databaseError("connection removal")));

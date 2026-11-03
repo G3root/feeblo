@@ -298,7 +298,7 @@ export interface DataTransferRepositoryContract {
     readonly after: { readonly createdAt: Date; readonly id: string } | null;
   }) => Effect.Effect<readonly PostCsvSourceRow[], DataTransferRepositoryError>;
 
-  /** Moves an `awaiting_confirmation` job to `queued`; None when it is not one. */
+  /** Answers `confirm` on the job; None when the machine would not move it. */
   readonly markQueued: (input: {
     readonly id: string;
     readonly organizationId: string;

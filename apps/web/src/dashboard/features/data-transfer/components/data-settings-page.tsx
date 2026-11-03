@@ -86,7 +86,7 @@ import {
   dataTransferBoardsAtom,
   type DataTransferBoard,
 } from "../atoms";
-import { isActiveStatus, plannedRowCount } from "../format";
+import { canConfirmStatus, isActiveStatus, plannedRowCount } from "../format";
 import { CancelImportDialog } from "./import-dialogs";
 import {
   ImportProgressBar,
@@ -361,8 +361,7 @@ function ImportCard({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const staged =
-    activeJob !== null && activeJob.status === "awaiting_confirmation";
+  const staged = activeJob !== null && canConfirmStatus(activeJob.status);
 
   const handleUpload = async () => {
     if (file === null) {
@@ -749,7 +748,7 @@ export function DataSettingsPage() {
       : null;
   const activeJob = listedActive ?? unlistedLocal;
   const awaitingJob =
-    activeJob?.status === "awaiting_confirmation" ? activeJob : null;
+    activeJob !== null && canConfirmStatus(activeJob.status) ? activeJob : null;
 
   const showImport = canImport && !importPolicyPending;
   const showExport = canExport && !exportPolicyPending;

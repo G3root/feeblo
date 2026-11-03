@@ -24,7 +24,10 @@ import {
   PostId,
   PostStatusId,
 } from "@feeblo/id";
-import { LISTED_CONNECTION_LIFECYCLES } from "@feeblo/integration-core/lifecycle";
+import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -651,7 +654,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                     eq(
                       schema.integrationConnectionTable.organizationId,
                       input.organizationId
-                    )
+                    ),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("archive"),
+                    ])
                   )
                 );
               yield* db

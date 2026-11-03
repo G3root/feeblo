@@ -29,7 +29,8 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
-import { and, asc, eq } from "drizzle-orm";
+import { connectionSourceStatesFor } from "@feeblo/integration-core/lifecycle";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -364,9 +365,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 archivedAt: yield* DateTime.nowAsDate,
               })
               .where(
-                eq(
-                  schema.integrationConnectionTable.id,
-                  installation.connectionId
+                and(
+                  eq(
+                    schema.integrationConnectionTable.id,
+                    installation.connectionId
+                  ),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("archive"),
+                  ])
                 )
               )
               .pipe(
