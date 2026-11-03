@@ -66,6 +66,7 @@ function PostAdminActionButtons() {
     canBanAuthors,
     canDeletePost,
     canModeratePost,
+    canUnbanAuthors,
     isLocked,
     isMerged,
     organizationId,
@@ -232,10 +233,17 @@ function PostAdminActionButtons() {
         <TooltipPopup>{lockLabel}</TooltipPopup>
       </Tooltip>
 
-      {canBanAuthors && !post.authorIsMember && post.creatorId
-        ? post.authorIsBanned === true
-          ? unbanAuthorButton
-          : banAuthorButton
+      {canBanAuthors &&
+      !post.authorIsMember &&
+      post.creatorId &&
+      post.authorIsBanned !== true
+        ? banAuthorButton
+        : null}
+      {canUnbanAuthors &&
+      !post.authorIsMember &&
+      post.creatorId &&
+      post.authorIsBanned === true
+        ? unbanAuthorButton
         : null}
 
       <Tooltip>

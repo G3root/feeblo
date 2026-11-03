@@ -96,10 +96,11 @@ function RouteComponent() {
     hasPermission(organizationId, "integrations.manage")
   );
   // Banning a comment or post author is a manager action behind the paid plan
-  // gate; the server enforces both, and the actions are hidden otherwise. The
-  // action waits for the entitlements read: while it is loading the capability
-  // is unknown, and showing a ban button that the plan may not support is worse
-  // than a frame of nothing.
+  // gate. Lifting a ban is the same permission with no plan gate, so a workspace
+  // that downgrades can still clear the bans it kept. The server enforces the
+  // permission on both, and the plan only on the write. The actions wait for the
+  // entitlements read: while it is loading the capability is unknown, and
+  // showing a ban button the plan may not cover is worse than a frame of nothing.
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
   const { allowed: canManageUserBans } = usePolicy(
     hasPermission(organizationId, "userBans.manage")
@@ -235,6 +236,7 @@ function RouteComponent() {
     <PostPage.Root
       board={board}
       canBanAuthors={canBanAuthors}
+      canUnbanAuthors={canManageUserBans}
       organizationId={organizationId}
       pageType="Dashboard"
       post={post}

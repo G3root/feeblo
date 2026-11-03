@@ -175,10 +175,10 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           target: args.target,
         });
-        // `member` and `not_found` both mean no ban covers this author, which
-        // the caller learns as the same NotFound a missing id produces. The
-        // policy runs before either branch, so an unrelated target cannot be
-        // probed by guessing a comment id.
+        // `member` and `not_found` both leave nothing to remove. A member
+        // cannot be banned, so a row naming one predates their membership and
+        // has no effect; the settings list names that row directly and can
+        // still clear it.
         if (resolved.status !== "ok") {
           return { removed: false };
         }

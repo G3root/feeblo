@@ -95,8 +95,10 @@ export function PostAuthorField() {
           sidebar gives no sign that the person writing on this post can no
           longer comment, vote, or react here. It is an indicator rather than
           an action: unbanning lives on the security settings page, where the
-          rest of the ban list is. */}
-      {post.authorIsBanned ? (
+          rest of the ban list is. A member never draws it: the server refuses to
+          ban staff, so a row naming one is left over from before they joined
+          and has no effect. */}
+      {post.authorIsBanned === true && !post.authorIsMember ? (
         <Tooltip>
           <TooltipTrigger
             render={(props) => (

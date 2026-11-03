@@ -110,7 +110,10 @@ vi.mock("./use-post-detail", () => ({
 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 const board = { visibility: "PUBLIC" } as TBoard;
 
-/** A stand-in for the dashboard's atom-backed writes; the badge tests never call it. */
+/**
+ * Stand-ins for the dashboard's atom-backed writes. A render that needs to see
+ * calls passes its own so the assertion targets that render.
+ */
 const banActions = {
   ban: () => Promise.resolve({ deletedComments: 0, deletedPosts: 0 }),
   unban: () => Promise.resolve(),
@@ -119,10 +122,21 @@ const banActions = {
 function state({
   authenticated = false,
   canBanAuthor = false,
+  canUnbanAuthor = canBanAuthor,
   canDelete = false,
   canManage = false,
   canModerate = false,
   locked = false,
+  userBanActions = banActions,
+}: {
+  authenticated?: boolean;
+  canBanAuthor?: boolean;
+  canUnbanAuthor?: boolean;
+  canDelete?: boolean;
+  canManage?: boolean;
+  canModerate?: boolean;
+  locked?: boolean;
+  userBanActions?: typeof banActions;
 } = {}) {
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const post = {
@@ -136,6 +150,7 @@ function state({
   return createPostCollectionState({
     board,
     canBanAuthors: canBanAuthor,
+    canUnbanAuthors: canUnbanAuthor,
     canDeletePost: canDelete,
     canManagePost: canManage,
     canModeratePost: canModerate,
@@ -146,7 +161,7 @@ function state({
     post,
     // The real host writes through its ban atoms. The state flag needs both:
     // an offered action with no write behind it is not offered at all.
-    userBanActions: canBanAuthor ? banActions : undefined,
+    userBanActions: canBanAuthor || canUnbanAuthor ? userBanActions : undefined,
   });
 }
 
@@ -211,18 +226,31 @@ const stubCollections = {
  * The ban action is gated inside `CommentDisplayDropdown`, not in the state, so
  * the test renders that component rather than a copy of its condition.
  */
-function renderBanMenu({
+async function renderBanMenu({
   authorIsBanned = false,
   authorIsMember = false,
   canBanAuthor = true,
+  canUnbanAuthor = true,
 }: {
   authorIsBanned?: boolean;
   authorIsMember?: boolean;
   canBanAuthor?: boolean;
+  canUnbanAuthor?: boolean;
 } = {}) {
-  return render(
+  const userBanActions = {
+    ban: vi.fn(banActions.ban),
+    unban: vi.fn(banActions.unban),
+  };
+
+  const screen = await render(
     <PostCollectionStateProvider
-      value={state({ authenticated: true, canBanAuthor, canModerate: true })}
+      value={state({
+        authenticated: true,
+        canBanAuthor,
+        canUnbanAuthor,
+        canModerate: true,
+        userBanActions,
+      })}
     >
       <PostCollectionsProvider
         collections={stubCollections}
@@ -254,6 +282,8 @@ function renderBanMenu({
       </PostCollectionsProvider>
     </PostCollectionStateProvider>
   );
+
+  return { screen, userBanActions };
 }
 
 /**
@@ -294,7 +324,7 @@ describe("PostPage composition", () => {
   });
 
   it("hides the ban action when the host does not offer one", async () => {
-    const screen = await renderBanMenu({ canBanAuthor: false });
+    const { screen } = await renderBanMenu({ canBanAuthor: false });
     await screen.getByRole("button", { name: "Comment menu" }).click();
     await expect
       .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
@@ -302,7 +332,7 @@ describe("PostPage composition", () => {
   });
 
   it("offers the ban action for a customer", async () => {
-    const screen = await renderBanMenu();
+    const { screen } = await renderBanMenu();
     await screen.getByRole("button", { name: "Comment menu" }).click();
     await expect
       .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
@@ -310,7 +340,7 @@ describe("PostPage composition", () => {
   });
 
   it("offers neither ban nor unban for a member", async () => {
-    const screen = await renderBanMenu({ authorIsMember: true });
+    const { screen } = await renderBanMenu({ authorIsMember: true });
     await screen.getByRole("button", { name: "Comment menu" }).click();
     await expect
       .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
@@ -321,7 +351,7 @@ describe("PostPage composition", () => {
   });
 
   it("offers unban instead of ban for a banned author", async () => {
-    const screen = await renderBanMenu({ authorIsBanned: true });
+    const { screen } = await renderBanMenu({ authorIsBanned: true });
     await screen.getByRole("button", { name: "Comment menu" }).click();
     await expect
       .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
@@ -329,6 +359,36 @@ describe("PostPage composition", () => {
     await expect
       .element(screen.getByRole("menuitem", { name: /^Unban user$/ }))
       .toBeVisible();
+  });
+
+  it("offers neither action to a member who also carries a ban", async () => {
+    const { screen } = await renderBanMenu({
+      authorIsBanned: true,
+      authorIsMember: true,
+    });
+    await screen.getByRole("button", { name: "Comment menu" }).click();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
+      .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Unban user$/ }))
+      .not.toBeInTheDocument();
+  });
+
+  it("lifts the ban on the comment the action was opened from", async () => {
+    const { screen, userBanActions } = await renderBanMenu({
+      authorIsBanned: true,
+    });
+    await screen.getByRole("button", { name: "Comment menu" }).click();
+    await screen.getByRole("menuitem", { name: /^Unban user$/ }).click();
+
+    // The menu item writes detached, so the assertion waits for the call that
+    // carries the row the ban is named by.
+    await vi.waitFor(() => {
+      expect(userBanActions.unban).toHaveBeenCalledWith({
+        target: { _tag: "comment", commentId: "comment-id" },
+      });
+    });
   });
 
   it("shows locked content instead of unlocked content", async () => {

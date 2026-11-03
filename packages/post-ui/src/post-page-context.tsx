@@ -41,6 +41,15 @@ export interface PostCollectionState {
    * menu item that cannot do anything.
    */
   canBanAuthors: boolean;
+  /**
+   * Whether the host offers the lift action for a banned author.
+   *
+   * Separate from {@link canBanAuthors} because the two cost different things.
+   * Banning needs the `userBans` plan capability; lifting one does not, so a
+   * workspace that downgrades can still clear the bans it kept. Both need
+   * `userBans.manage`, which the server enforces.
+   */
+  canUnbanAuthors: boolean;
   /** The host's ban and unban writes; see {@link UserBanActions}. */
   userBanActions: UserBanActions | undefined;
   canDeletePost: boolean;
@@ -67,6 +76,7 @@ export interface PostCollectionState {
 export interface PostCollectionDataProviderProps {
   board: TBoard;
   canBanAuthors?: boolean;
+  canUnbanAuthors?: boolean;
   children?: ReactNode;
   organizationId: string;
   pageType: TPageType;
@@ -106,6 +116,7 @@ export function PostCollectionStateProvider({
 export function createPostCollectionState({
   board,
   canBanAuthors = false,
+  canUnbanAuthors = false,
   canDeletePost,
   canManagePost,
   canModeratePost,
@@ -127,6 +138,7 @@ export function createPostCollectionState({
   return {
     board,
     canBanAuthors: canBanAuthors && userBanActions !== undefined,
+    canUnbanAuthors: canUnbanAuthors && userBanActions !== undefined,
     canDeletePost,
     canManagePost,
     canModeratePost,

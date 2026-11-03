@@ -14,7 +14,8 @@ import { ToggleVisibilityButton } from "./toggle-visibility-button";
 import { UnbanAuthorButton } from "./unban-author-button";
 
 export function CommentDisplayDropdown() {
-  const { canBanAuthors, canModeratePost } = usePostCollectionData();
+  const { canBanAuthors, canModeratePost, canUnbanAuthors } =
+    usePostCollectionData();
   const { state } = useCommentDisplay();
 
   if (state.disabled || !(canModeratePost || state.isAuthor)) {
@@ -28,7 +29,7 @@ export function CommentDisplayDropdown() {
   const canBanAuthor =
     canBanAuthors && !state.authorIsMember && !state.authorIsBanned;
   const canUnbanAuthor =
-    canBanAuthors && !state.authorIsMember && state.authorIsBanned;
+    canUnbanAuthors && !state.authorIsMember && state.authorIsBanned;
 
   return (
     <Menu>

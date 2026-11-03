@@ -34,6 +34,7 @@ type ResolvedProviderProps = PostCollectionDataProviderProps & {
 function ResolvedPostCollectionProvider({
   board,
   canBanAuthors = false,
+  canUnbanAuthors = false,
   canDeletePost,
   canManageAllPosts,
   canManagePost,
@@ -48,6 +49,7 @@ function ResolvedPostCollectionProvider({
   const state = buildPostCollectionState({
     board,
     canBanAuthors,
+    canUnbanAuthors,
     canDeletePost,
     post,
     canManagePost,
@@ -120,6 +122,7 @@ function ContributorEligibilityProvider({
 export function PostCollectionDataProvider({
   board,
   canBanAuthors = false,
+  canUnbanAuthors = false,
   children,
   post,
   organizationId,
@@ -167,6 +170,7 @@ export function PostCollectionDataProvider({
     pageType,
     post,
     userBanActions,
+    canUnbanAuthors,
   };
 
   // A post id is always present here; the guard documents what the branch
