@@ -18,6 +18,11 @@ import {
   type EmailSubscriptionRecord as Subscription,
 } from "./schema";
 import {
+  nextStateForRequest,
+  sourceStatesFor,
+  targetStateFor,
+} from "./subscription-machine";
+import {
   type EmailSubscriptionToken,
   type EmailSubscriptionTokenError,
   EmailSubscriptionTokenService,
@@ -102,35 +107,6 @@ const topicCondition = (
         eq(table.topicType, topic.topicType),
         eq(table.topicId, topic.topicId)
       );
-
-const verifiedStateFor = (
-  subscription: Subscription | undefined,
-  alreadyVerified: boolean,
-  deferredNoAccess: boolean
-): Subscription["state"] => {
-  if (alreadyVerified) {
-    return "active";
-  }
-  if (
-    subscription?.state === "paused_by_plan" ||
-    subscription?.state === "unsubscribed"
-  ) {
-    return subscription.state;
-  }
-  // Established consent is never downgraded by a deferred request.
-  if (subscription?.state === "active") {
-    return "active";
-  }
-  // A pending verification keeps its token/expiry; a deferred request must
-  // not clear them by flipping the state to deferred_no_access.
-  if (subscription?.state === "pending_verification") {
-    return "pending_verification";
-  }
-  if (deferredNoAccess) {
-    return "deferred_no_access";
-  }
-  return "pending_verification";
-};
 
 const makeEmailSubscriptionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -295,11 +271,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         verificationToken: Option.none<EmailSubscriptionToken>(),
       };
     }
-    const state = verifiedStateFor(
-      priorSubscription,
+    const state = nextStateForRequest(priorSubscription?.state, {
       alreadyVerified,
-      deferredNoAccess
-    );
+      deferredNoAccess,
+    });
     const subscriptionId =
       priorSubscription?.id ?? (yield* EmailSubscriptionId.generate);
     const unsubscribeToken =
@@ -456,11 +431,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                     verificationToken: Option.none<EmailSubscriptionToken>(),
                   };
                 }
-                const winnerState = verifiedStateFor(
-                  winner,
+                const winnerState = nextStateForRequest(winner.state, {
                   alreadyVerified,
-                  deferredNoAccess
-                );
+                  deferredNoAccess,
+                });
                 // A fresh verification token is derived from the winner's own
                 // id and its hash is what the row stores, so the token this
                 // request returns names the stored row — never the losing
@@ -554,13 +528,20 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const [updated] = yield* db
       .update(schema.emailSubscriptionTable)
       .set({
-        state: "active",
+        state: targetStateFor("verify"),
         verificationExpiresAt: null,
         verificationTokenHash: null,
         verifiedAt: input.now,
         updatedAt: input.now,
       })
-      .where(eq(schema.emailSubscriptionTable.id, subscription.id))
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.id, subscription.id),
+          inArray(schema.emailSubscriptionTable.state, [
+            ...sourceStatesFor("verify"),
+          ])
+        )
+      )
       .returning();
     if (updated === undefined) {
       return yield* dataError(
@@ -671,9 +652,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         and(
           inArray(schema.emailSubscriptionTable.id, subscribedIds),
           inArray(schema.emailSubscriptionTable.state, [
-            "pending_verification",
-            "active",
-            "paused_by_plan",
+            ...sourceStatesFor("unsubscribe"),
           ])
         )
       )
@@ -781,13 +760,15 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       : yield* db
           .update(schema.emailSubscriptionTable)
           .set({
-            state: "paused_by_plan",
+            state: targetStateFor("pause"),
             updatedAt: now,
           })
           .where(
             and(
               eq(schema.emailSubscriptionTable.organizationId, organizationId),
-              eq(schema.emailSubscriptionTable.state, "active")
+              inArray(schema.emailSubscriptionTable.state, [
+                ...sourceStatesFor("pause"),
+              ])
             )
           )
           .returning({ id: schema.emailSubscriptionTable.id });
@@ -795,13 +776,15 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       ? yield* db
           .update(schema.emailSubscriptionTable)
           .set({
-            state: "active",
+            state: targetStateFor("resume"),
             updatedAt: now,
           })
           .where(
             and(
               eq(schema.emailSubscriptionTable.organizationId, organizationId),
-              eq(schema.emailSubscriptionTable.state, "paused_by_plan")
+              inArray(schema.emailSubscriptionTable.state, [
+                ...sourceStatesFor("resume"),
+              ])
             )
           )
           .returning({ id: schema.emailSubscriptionTable.id })

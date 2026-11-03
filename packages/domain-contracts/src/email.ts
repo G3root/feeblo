@@ -112,7 +112,7 @@ export type TEmailSubscriptionSource = S.Schema.Type<
 >;
 
 /** Canonical `email_subscription.state` vocabulary. */
-export const EmailSubscriptionState = S.Literals([
+export const EMAIL_SUBSCRIPTION_STATES = [
   "pending_verification",
   "active",
   "paused_by_plan",
@@ -124,7 +124,9 @@ export const EmailSubscriptionState = S.Literals([
    * gains organization access.
    */
   "deferred_no_access",
-]);
+] as const;
+
+export const EmailSubscriptionState = S.Literals(EMAIL_SUBSCRIPTION_STATES);
 
 export type TEmailSubscriptionState = S.Schema.Type<
   typeof EmailSubscriptionState

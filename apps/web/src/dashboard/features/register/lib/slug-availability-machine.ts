@@ -72,6 +72,11 @@ type SlugCheckSettledEvent = {
   readonly output: SlugCheckResult;
 };
 
+type SlugAvailabilityInput = {
+  readonly enabled: boolean;
+  readonly slug: string;
+};
+
 /** How long the slug field must sit still before a check is worth a request. */
 const SLUG_CHECK_DEBOUNCE_MS = 350;
 
@@ -169,7 +174,7 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
       input: SlugInputSchema,
     },
   }).createMachine({
-    context: ({ input }: { input: SlugAvailabilityContext }) => ({
+    context: ({ input }: { input: SlugAvailabilityInput }) => ({
       enabled: input.enabled,
       reason: null,
       slug: input.slug,

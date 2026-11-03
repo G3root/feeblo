@@ -11,6 +11,13 @@ import { toWorkspaceSlug } from "../utils";
 /** The field's shortest allowed subdomain. Below it there is nothing to ask. */
 const MIN_SLUG_LENGTH = 4;
 
+/** What the slug field needs from this hook. */
+export type WorkspaceSlugAvailability = {
+  readonly availability: SlugAvailability;
+  /** Called by whoever changes the name; the lifecycle's only input event. */
+  readonly reportWorkspaceName: (workspaceName: string) => void;
+};
+
 /**
  * Reports whether a workspace slug is available, debounced.
  *
@@ -26,10 +33,9 @@ const MIN_SLUG_LENGTH = 4;
  * shows, and it must be written carefully enough not to loop. A handler cannot
  * do either.
  */
-export function useWorkspaceSlugAvailability(workspaceName: string): {
-  readonly availability: SlugAvailability;
-  readonly reportWorkspaceName: (workspaceName: string) => void;
-} {
+export function useWorkspaceSlugAvailability(
+  workspaceName: string
+): WorkspaceSlugAvailability {
   const slug = toWorkspaceSlug(workspaceName);
   const [snapshot, send] = useMachine(slugAvailabilityMachine, {
     input: { enabled: slug.length >= MIN_SLUG_LENGTH, slug },
