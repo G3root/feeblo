@@ -2212,25 +2212,28 @@ export function savedViewCollection(
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: view, original } = mutation;
-        // An unchanged query is omitted so the handler keeps the stored one.
+        // Unchanged fields are omitted so the handler keeps the stored value.
         // The sheet leaves `query` untouched for a rename or description edit,
-        // but the row itself may be stale; letting the server decide is what
-        // stops that stale copy from overwriting newer filters.
+        // and `isPrivate` untouched unless the member toggled it, but the row
+        // itself may be stale; letting the server decide is what stops that
+        // stale copy from overwriting a newer query or visibility.
         const queryChanged =
           JSON.stringify(original.query) !== JSON.stringify(view.query);
+        const isPrivateChanged = original.isPrivate !== view.isPrivate;
         const update = {
           description: view.description,
           id: view.id,
-          isPrivate: view.isPrivate,
           name: view.name,
           organizationId: view.organizationId,
         };
+        const withVisibility = isPrivateChanged
+          ? { ...update, isPrivate: view.isPrivate }
+          : update;
+        const payload = queryChanged
+          ? { ...withVisibility, query: view.query }
+          : withVisibility;
 
-        await fetchRpc((rpc) =>
-          rpc.UpdateSavedView(
-            queryChanged ? { ...update, query: view.query } : update
-          )
-        );
+        await fetchRpc((rpc) => rpc.UpdateSavedView(payload));
         await collection.utils.refetch({ throwOnError: true });
       },
       onDelete: async ({ collection, transaction }) => {

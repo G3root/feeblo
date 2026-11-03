@@ -4,7 +4,9 @@ import { emptyBoardQuery } from "@feeblo/domain-contracts/board-query";
 import { SavedViewId, WorkspaceId } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
 import * as DateTime from "effect/DateTime";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Predicate from "effect/Predicate";
 
@@ -311,6 +313,7 @@ describe("SavedViewRpcHandlers", () => {
     it.effect("keeps the stored query when an update omits it", () =>
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;
+        const repository = yield* SavedViewRepository;
         const f = yield* fixture();
         const id = yield* SavedViewId.generate;
 
@@ -341,7 +344,7 @@ describe("SavedViewRpcHandlers", () => {
           })
         );
 
-        const views = yield* as(
+        const renamed = yield* as(
           f.alice,
           handlers.ListSavedViews({
             boardId: null,
@@ -349,9 +352,78 @@ describe("SavedViewRpcHandlers", () => {
           })
         );
 
-        expect(views[0]?.name).toBe("Renamed");
-        expect(views[0]?.description).toBe("Renamed only");
-        expect(views[0]?.query.filters.search).toBe("checkout");
+        expect(renamed[0]?.name).toBe("Renamed");
+        expect(renamed[0]?.description).toBe("Renamed only");
+        expect(renamed[0]?.query.filters.search).toBe("checkout");
+
+        // The metadata-only write leaves `query` out of its `set` clause. This
+        // gate pauses such an update after its ownership read, so a query
+        // update can commit while the metadata update still holds the stale
+        // row that read returned. The resumed metadata write must not put that
+        // stale query back.
+        const read = yield* Deferred.make<void>();
+        const resume = yield* Deferred.make<void>();
+        const gatedHandlers = yield* SavedViewRpcHandlersEffect.pipe(
+          Effect.provideService(
+            SavedViewRepository,
+            SavedViewRepository.of({
+              ...repository,
+              findOwned: (args) =>
+                repository
+                  .findOwned(args)
+                  .pipe(
+                    Effect.tap(() =>
+                      Deferred.succeed(read, undefined).pipe(
+                        Effect.andThen(Deferred.await(resume))
+                      )
+                    )
+                  ),
+            })
+          )
+        );
+
+        const metadataUpdate = yield* as(
+          f.alice,
+          gatedHandlers.UpdateSavedView({
+            id,
+            description: "Renamed concurrently",
+            isPrivate: true,
+            name: "Renamed concurrently",
+            organizationId: f.organizationId,
+          })
+        ).pipe(Effect.forkChild);
+
+        yield* Deferred.await(read);
+
+        yield* as(
+          f.alice,
+          handlers.UpdateSavedView({
+            id,
+            description: "Query edit",
+            isPrivate: true,
+            name: "Query edit",
+            organizationId: f.organizationId,
+            query: {
+              ...emptyBoardQuery,
+              filters: { ...emptyBoardQuery.filters, search: "refund" },
+            },
+          })
+        );
+
+        yield* Deferred.succeed(resume, undefined);
+        yield* Fiber.join(metadataUpdate);
+
+        const [concurrent] = yield* as(
+          f.alice,
+          handlers.ListSavedViews({
+            boardId: null,
+            organizationId: f.organizationId,
+          })
+        );
+
+        expect(concurrent?.name).toBe("Renamed concurrently");
+        expect(concurrent?.description).toBe("Renamed concurrently");
+        expect(concurrent?.query.filters.search).toBe("refund");
       })
     );
 

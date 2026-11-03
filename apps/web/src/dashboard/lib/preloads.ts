@@ -107,9 +107,11 @@ export async function preloadBoardPosts({
 }: {
   /**
    * Whether the surface may start on a query that names an assignee. Only a
-   * saved view can: the built-in presets filter and group by status. The member
-   * read is then part of the route gate, but its failure is best-effort so a
-   * member-list hiccup cannot block the board; the live query still retries it.
+   * saved view can: the built-in presets filter and group by status. An
+   * assignee-grouped board needs the member names, so it still fails when the
+   * members read fails; the rejection handler only keeps that failure from
+   * rejecting this preload and blocking the route gate. Other groupings do not
+   * read the member collection, so they can render without it.
    */
   readonly needsMembers?: boolean;
 } = {}): Promise<void> {

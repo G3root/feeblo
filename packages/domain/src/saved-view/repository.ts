@@ -47,7 +47,12 @@ interface TSavedViewUpdateInput extends TSavedViewOwner {
   readonly description: string | null;
   readonly isPrivate: boolean;
   readonly name: string;
-  readonly query: TBoardQuery;
+  /**
+   * Omitted for a rename or description edit. The column is then left out of
+   * the `set` clause, so a query written after this update's ownership read is
+   * not replaced by the stale row that read returned.
+   */
+  readonly query?: TBoardQuery;
 }
 
 interface TSavedViewReorderInput extends TSavedViewListInput {
@@ -176,18 +181,26 @@ export const makeSavedViewRepository = Effect.gen(function* () {
       name,
       organizationId,
       query,
-    }: TSavedViewUpdateInput) =>
-      db
-        .update(schema.savedViewTable)
-        .set({ description, isPrivate, name, query })
-        .where(
-          and(
-            eq(schema.savedViewTable.id, id),
-            eq(schema.savedViewTable.organizationId, organizationId),
-            eq(schema.savedViewTable.memberId, memberId)
+    }: TSavedViewUpdateInput) => {
+      const set = { description, isPrivate, name };
+
+      return (
+        db
+          .update(schema.savedViewTable)
+          // An omitted query must not be written back from the row read before
+          // this statement: that would overwrite a query another request saved
+          // in between. Leaving the column out keeps the stored value.
+          .set(query === undefined ? set : { ...set, query })
+          .where(
+            and(
+              eq(schema.savedViewTable.id, id),
+              eq(schema.savedViewTable.organizationId, organizationId),
+              eq(schema.savedViewTable.memberId, memberId)
+            )
           )
-        )
-        .pipe(Effect.asVoid),
+          .pipe(Effect.asVoid)
+      );
+    },
 
     /**
      * Rewrites the position of one surface's views in a single statement.

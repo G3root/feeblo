@@ -119,19 +119,25 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       if (existing === undefined) {
         return yield* new NotFoundError({ message: "Saved view not found" });
       }
-      yield* repository.update({
-        ...args,
+      const update = {
         description: normalizeDescription(args.description),
+        id: args.id,
         isPrivate: args.isPrivate ?? existing.isPrivate,
         memberId,
+        name: args.name,
+        organizationId: args.organizationId,
+      };
+
+      yield* repository.update(
         // An omitted query is a rename or description edit: the stored row is
         // the source of truth, so a stale client cannot overwrite filters that
-        // another member has saved since it read the view.
-        query:
-          args.query === undefined
-            ? existing.query
-            : normalizeBoardQuery(args.query),
-      });
+        // another member has saved since it read the view. The repository also
+        // leaves the column out of the statement, so a query written after the
+        // ownership read above is not replaced by this stale `existing` row.
+        args.query === undefined
+          ? update
+          : { ...update, query: normalizeBoardQuery(args.query) }
+      );
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),
       withRemapDbErrors("SavedView", "update")
