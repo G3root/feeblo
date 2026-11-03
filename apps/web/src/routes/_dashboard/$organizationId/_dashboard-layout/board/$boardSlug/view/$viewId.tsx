@@ -8,7 +8,7 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await preloadBoardPosts();
+    await preloadBoardPosts({ needsMembers: true });
     return null;
   },
 });

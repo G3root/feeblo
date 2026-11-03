@@ -107,7 +107,12 @@ export const SavedViewUpdate = S.Struct({
   description: SavedViewDescription,
   /** Omitted keeps the row's current visibility. */
   isPrivate: S.optionalKey(S.Boolean),
-  query: BoardQuery,
+  /**
+   * Omitted keeps the stored query. A rename or description edit sends no
+   * query, so a client holding a stale row cannot overwrite filters another
+   * member has since saved.
+   */
+  query: S.optionalKey(BoardQuery),
 });
 
 export type TSavedViewUpdate = S.Schema.Type<typeof SavedViewUpdate>;

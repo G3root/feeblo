@@ -139,6 +139,11 @@ export function ViewTabStrip({
   // Two drops can overlap while the first request is still in flight, and they
   // can settle out of order. Only the latest one owns `pendingOrder`.
   const latestReorder = useRef(0);
+  // Writes are serialized: an older request finishing after a newer one would
+  // otherwise commit the older order last and leave the server behind the
+  // strip. The chain swallows rejections so one failed write cannot skip every
+  // later one; each caller reports its own failure below.
+  const reorderQueue = useRef<Promise<void>>(Promise.resolve());
   const ownedRows = useMemo(
     () => rows.filter((view) => view.memberId === currentMemberId),
     [currentMemberId, rows]
@@ -251,8 +256,11 @@ export function ViewTabStrip({
     latestReorder.current = request;
     setPendingOrder(orderedIds);
 
+    const write = reorderQueue.current.then(() => onReorder(orderedIds));
+    reorderQueue.current = write.catch(() => undefined);
+
     try {
-      await onReorder(orderedIds);
+      await write;
     } catch {
       toastManager.add({ title: "Failed to reorder views", type: "error" });
     } finally {

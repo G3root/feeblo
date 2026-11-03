@@ -124,7 +124,13 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
         description: normalizeDescription(args.description),
         isPrivate: args.isPrivate ?? existing.isPrivate,
         memberId,
-        query: normalizeBoardQuery(args.query),
+        // An omitted query is a rename or description edit: the stored row is
+        // the source of truth, so a stale client cannot overwrite filters that
+        // another member has saved since it read the view.
+        query:
+          args.query === undefined
+            ? existing.query
+            : normalizeBoardQuery(args.query),
       });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),

@@ -308,6 +308,53 @@ describe("SavedViewRpcHandlers", () => {
       })
     );
 
+    it.effect("keeps the stored query when an update omits it", () =>
+      Effect.gen(function* () {
+        const handlers = yield* SavedViewRpcHandlersEffect;
+        const f = yield* fixture();
+        const id = yield* SavedViewId.generate;
+
+        yield* as(
+          f.alice,
+          handlers.CreateSavedView({
+            boardId: null,
+            id,
+            description: null,
+            isPrivate: true,
+            name: "Mine",
+            organizationId: f.organizationId,
+            query: {
+              ...emptyBoardQuery,
+              filters: { ...emptyBoardQuery.filters, search: "checkout" },
+            },
+          })
+        );
+
+        yield* as(
+          f.alice,
+          handlers.UpdateSavedView({
+            id,
+            description: "Renamed only",
+            isPrivate: true,
+            name: "Renamed",
+            organizationId: f.organizationId,
+          })
+        );
+
+        const views = yield* as(
+          f.alice,
+          handlers.ListSavedViews({
+            boardId: null,
+            organizationId: f.organizationId,
+          })
+        );
+
+        expect(views[0]?.name).toBe("Renamed");
+        expect(views[0]?.description).toBe("Renamed only");
+        expect(views[0]?.query.filters.search).toBe("checkout");
+      })
+    );
+
     it.effect("trims a description and stores a blank one as null", () =>
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;

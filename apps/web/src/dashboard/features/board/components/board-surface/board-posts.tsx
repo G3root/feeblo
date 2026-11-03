@@ -61,7 +61,7 @@ export function BoardPosts({
     members,
     postTagsByPostId,
     tags,
-  } = useBoardGroupingData(organizationId);
+  } = useBoardGroupingData(organizationId, grouping.field);
   const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
     boardId,
     myFeedbackScope,

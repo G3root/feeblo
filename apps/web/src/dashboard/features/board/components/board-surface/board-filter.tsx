@@ -182,6 +182,36 @@ const unavailableLabel = (kind: "label" | "member", id: string) =>
   `Unavailable ${kind} (${id.slice(-6)})`;
 
 /**
+ * The status checklist, including selected types whose status row is gone.
+ *
+ * The filter stores a type rather than a row id, so a workspace can delete the
+ * last status of a type while a saved view still names it. That type still
+ * filters the board and has to stay visible, or the member cannot uncheck it.
+ */
+const statusFilterItems = (
+  postStatuses: readonly FilterStatus[],
+  selectedTypes: ReadonlySet<BoardPostStatus>
+) => {
+  const knownTypes = new Set(postStatuses.map((status) => status.type));
+  const unknownTypes = [...selectedTypes].filter(
+    (type) => !knownTypes.has(type)
+  );
+
+  return [
+    ...postStatuses.map((status) => ({
+      checked: selectedTypes.has(status.type),
+      key: status.type,
+      label: status.label || formatPostStatus(status.type),
+    })),
+    ...unknownTypes.map((type) => ({
+      checked: true,
+      key: type,
+      label: formatPostStatus(type),
+    })),
+  ];
+};
+
+/**
  * The statuses, labels and members a filter menu may offer.
  *
  * Shared by the store-connected toolbar filter and the controlled editor, so
@@ -307,25 +337,20 @@ function useBoardFilterActions(
       toggleAssignee: (memberId) => {
         const current = filters.assigneeMemberIds ?? [];
 
-        // Removing an id the member list no longer resolves is always allowed.
-        // It is rendered precisely so a saved view that names a member who
-        // left the workspace can be cleaned up, and the cap must not trap it.
-        if (
-          knownMemberIds !== null &&
-          !knownMemberIds.has(memberId) &&
-          current.includes(memberId)
-        ) {
+        // Removing an id keeps the other selected ids exactly as they are. In
+        // particular, removing the last resolvable member must not also drop
+        // unresolved ids: they are still part of the stored filter and have
+        // their own remove action in the menu.
+        if (current.includes(memberId)) {
           const next = current.filter((id) => id !== memberId);
 
           update({ assigneeMemberIds: next.length === 0 ? null : next });
           return;
         }
 
-        // Stale ids do not count toward the cap once the member list is known:
-        // they cannot be selected from it, and keeping them would block adding
-        // a valid member while still writing a filter that matches nothing.
-        // Adding a valid member drops them, which also keeps the stored list
-        // within the cap.
+        // Adding a member drops ids the member list no longer resolves. They
+        // cannot be selected from it, and keeping them would block adding a
+        // valid member while still writing a filter that matches nothing.
         const selectable =
           knownMemberIds === null
             ? current
@@ -573,6 +598,7 @@ function BoardFilterTrigger() {
   const selectedStatuses = new Set(filters.status?.types ?? []);
   const selectedTagIds = new Set(filters.tag?.tagIds ?? []);
   const selectedAssigneeIds = new Set(filters.assigneeMemberIds ?? []);
+  const statusItems = statusFilterItems(postStatuses, selectedStatuses);
   const otherMembers = members.filter(
     (member) => member.id !== currentMemberId
   );
@@ -609,15 +635,15 @@ function BoardFilterTrigger() {
             </MenuSubTrigger>
             <MenuPortal>
               <MenuSubPopup>
-                {postStatuses.map((postStatus) => (
+                {statusItems.map((item) => (
                   <MenuCheckboxItem
-                    checked={selectedStatuses.has(postStatus.type)}
-                    key={postStatus.type}
+                    checked={item.checked}
+                    key={item.key}
                     onCheckedChange={() => {
-                      toggleStatus(postStatus.type);
+                      toggleStatus(item.key);
                     }}
                   >
-                    {postStatus.label || formatPostStatus(postStatus.type)}
+                    {item.label}
                   </MenuCheckboxItem>
                 ))}
               </MenuSubPopup>
@@ -831,16 +857,9 @@ function BoardFilterStatusGroup() {
         />
       ) : null}
       <BoardFilterValueMenu
-        items={postStatuses.map((postStatus) => ({
-          checked: selectedStatuses.has(postStatus.type),
-          key: postStatus.type,
-          label: postStatus.label || formatPostStatus(postStatus.type),
-        }))}
+        items={statusFilterItems(postStatuses, selectedStatuses)}
         label={getStatusSummary(filters.status?.types ?? [], postStatuses)}
-        onToggle={(status) => {
-          // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-          toggleStatus(status as BoardPostStatus);
-        }}
+        onToggle={toggleStatus}
       />
       {filters.status ? (
         <BoardFilterClearButton
@@ -1016,14 +1035,14 @@ function BoardFilterOperatorMenu<T extends string>({
   );
 }
 
-function BoardFilterValueMenu({
+function BoardFilterValueMenu<T extends string>({
   items,
   label,
   onToggle,
 }: {
-  items: Array<{ checked: boolean; key: string; label: string }>;
+  items: Array<{ checked: boolean; key: T; label: string }>;
   label: string;
-  onToggle: (value: string) => void;
+  onToggle: (value: T) => void;
 }) {
   return (
     <BoardFilterMenuSegment className="max-w-48" label={label}>

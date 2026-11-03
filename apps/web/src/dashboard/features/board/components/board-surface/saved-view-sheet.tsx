@@ -197,7 +197,13 @@ export function SavedViewSheet({
             draft.description = value.description;
             draft.isPrivate = value.isPrivate;
             draft.name = value.name;
-            draft.query = writableQuery;
+            // Only a real query edit writes the query. A rename or description
+            // change leaves the row's current query alone, so a row refetched
+            // while the sheet was open is not overwritten by the sheet's
+            // starting copy.
+            if (queryChanged) {
+              draft.query = writableQuery;
+            }
           });
           await transaction.when("settled");
 

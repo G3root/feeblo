@@ -1,3 +1,4 @@
+import type { TBoardGroupBy } from "@feeblo/domain-contracts/board-query";
 import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useMemo } from "react";
@@ -18,7 +19,10 @@ import type { BoardGroupingMember, BoardGroupingTag } from "./types";
  * post. `isCurrentUser` is deliberately absent: a grouping lane is a fact about
  * the work, not a shortcut like the filter menu's "Assigned to me" entry.
  */
-export function useBoardGroupingData(organizationId: string) {
+export function useBoardGroupingData(
+  organizationId: string,
+  groupBy: TBoardGroupBy
+) {
   const { postTagCollection } = useDashboardCollections();
   const membersQuery = useOrgMembers(organizationId);
   const tagsQuery = useOrgTags(organizationId);
@@ -66,10 +70,14 @@ export function useBoardGroupingData(organizationId: string) {
   }, [postTags]);
 
   return {
+    // A failed read only fails the board when the active grouping actually
+    // reads it: member names for assignee lanes, labels and post-tag rows for
+    // label lanes. An unrelated read hiccup must not replace the board with an
+    // error screen.
     hasError:
-      isLiveQueryFailed(membersQuery) ||
-      isLiveQueryFailed(postTagsQuery) ||
-      isLiveQueryFailed(tagsQuery),
+      (groupBy === "assignee" && isLiveQueryFailed(membersQuery)) ||
+      (groupBy === "label" &&
+        (isLiveQueryFailed(postTagsQuery) || isLiveQueryFailed(tagsQuery))),
     members,
     postTagsByPostId,
     tags: tags ?? [],

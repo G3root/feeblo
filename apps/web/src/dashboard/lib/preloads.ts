@@ -102,11 +102,23 @@ export async function preloadDashboardHome(): Promise<void> {
  * way — do not "optimize" this into paginated server queries without
  * replacing the whole board data model.
  */
-export async function preloadBoardPosts(): Promise<void> {
+export async function preloadBoardPosts({
+  needsMembers = false,
+}: {
+  /**
+   * Whether the surface may start on a query that names an assignee. Only a
+   * saved view can: the built-in presets filter and group by status. The member
+   * read is then part of the route gate, but its failure is best-effort so a
+   * member-list hiccup cannot block the board; the live query still retries it.
+   */
+  readonly needsMembers?: boolean;
+} = {}): Promise<void> {
   await Promise.all([
     dashboardCollections.boardCollection.preload(),
     dashboardCollections.deleteEligibilityCollection.preload(),
-    dashboardCollections.membersCollection.preload(),
+    needsMembers
+      ? dashboardCollections.membersCollection.preload().catch(() => undefined)
+      : Promise.resolve(),
     dashboardCollections.postCollection.preload(),
     dashboardCollections.postStatusCollection.preload(),
     dashboardCollections.tagCollection.preload(),
