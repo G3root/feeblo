@@ -479,7 +479,14 @@ export const makeDiscordConnectionServiceLive = (
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
-                .where(eq(schema.integrationConnectionTable.id, connectionId));
+                .where(
+                  and(
+                    eq(schema.integrationConnectionTable.id, connectionId),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
+                  )
+                );
               yield* db
                 .update(schema.integrationRouteTable)
                 .set({ enabled: false, updatedAt: now })
@@ -533,7 +540,14 @@ export const makeDiscordConnectionServiceLive = (
                 lifecycle: "revocation_unconfirmed",
                 updatedAt: yield* DateTime.nowAsDate,
               })
-              .where(eq(schema.integrationConnectionTable.id, connectionId))
+              .where(
+                and(
+                  eq(schema.integrationConnectionTable.id, connectionId),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("revocation_unconfirmed"),
+                  ])
+                )
+              )
               .pipe(mapManagementError("disconnect state update"));
             return yield* Effect.failCause(leftGuild.cause).pipe(
               mapDiscordApiError("guild disconnect")

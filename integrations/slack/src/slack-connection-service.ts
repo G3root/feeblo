@@ -414,13 +414,40 @@ export const makeSlackConnectionServiceLive = (
                 });
               }
               if (connection.lifecycle === "archived") {
+                // The graph refuses to move an archived row, and a tombstone
+                // still holds whatever credentials it kept at archive time.
+                // Scrubbing them is the one part of a disconnect an archived
+                // connection still owes; it stays inside the transaction
+                // because it is database work only.
+                yield* db
+                  .update(schema.integrationConnectionTable)
+                  .set({
+                    credentialsCiphertext: null,
+                    updatedAt: yield* DateTime.nowAsDate,
+                  })
+                  .where(
+                    and(
+                      eq(schema.integrationConnectionTable.id, connectionId),
+                      eq(
+                        schema.integrationConnectionTable.lifecycle,
+                        "archived"
+                      )
+                    )
+                  );
                 return;
               }
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
-                .where(eq(schema.integrationConnectionTable.id, connectionId));
+                .where(
+                  and(
+                    eq(schema.integrationConnectionTable.id, connectionId),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
+                  )
+                );
               yield* db
                 .update(schema.integrationRouteTable)
                 .set({ enabled: false, updatedAt: now })

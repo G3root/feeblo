@@ -272,7 +272,10 @@ const makeGitHubManagementService = Effect.gen(function* () {
                     eq(
                       schema.integrationConnectionTable.provider,
                       IntegrationProviderKey.make("github")
-                    )
+                    ),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
                   )
                 )
                 .pipe(
@@ -334,7 +337,14 @@ const makeGitHubManagementService = Effect.gen(function* () {
               lifecycle: "revocation_unconfirmed",
               updatedAt: yield* DateTime.nowAsDate,
             })
-            .where(eq(schema.integrationConnectionTable.id, input.connectionId))
+            .where(
+              and(
+                eq(schema.integrationConnectionTable.id, input.connectionId),
+                inArray(schema.integrationConnectionTable.lifecycle, [
+                  ...connectionSourceStatesFor("revocation_unconfirmed"),
+                ])
+              )
+            )
             .pipe(Effect.mapError(databaseError("disconnect state update")));
           return yield* Effect.failCause(uninstall.cause);
         }
