@@ -15,7 +15,6 @@ import {
   ApiIcon,
   ArrowLeft01Icon,
   Building03Icon,
-  BanIcon,
   Chat01Icon,
   CreditCardIcon,
   CursorInWindowIcon,
@@ -95,7 +94,8 @@ const settingsItems = [
       {
         label: "Security",
         icon: LockIcon,
-        permission: "workspace.update" as const,
+        // Admins manage widget SSO there; managers manage the ban list.
+        permissions: ["workspace.update", "userBans.manage"] as const,
         to: "/$organizationId/settings/security" as const,
       },
       {
@@ -156,12 +156,6 @@ const settingsItems = [
         label: "Tags",
         icon: Tag01Icon,
         to: "/$organizationId/settings/feedback-tags" as const,
-      },
-      {
-        label: "Blocked users",
-        icon: BanIcon,
-        permission: "userBlocks.manage" as const,
-        to: "/$organizationId/settings/blocked-users" as const,
       },
     ],
   },

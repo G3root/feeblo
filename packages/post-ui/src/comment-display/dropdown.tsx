@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 
 import { m } from "../paraglide/messages.js";
 import { usePostCollectionData } from "../post-page-context";
+import { BanAuthorButton } from "./ban-author-button";
 import { useCommentDisplay } from "./context";
 import { DeleteButton } from "./delete-button";
 import { EditButton } from "./edit-button";
@@ -12,12 +13,16 @@ import { PinButton } from "./pin-button";
 import { ToggleVisibilityButton } from "./toggle-visibility-button";
 
 export function CommentDisplayDropdown() {
-  const { canModeratePost } = usePostCollectionData();
+  const { canBanAuthors, canModeratePost } = usePostCollectionData();
   const { state } = useCommentDisplay();
 
   if (state.disabled || !(canModeratePost || state.isAuthor)) {
     return null;
   }
+
+  // A ban is for end users: staff are managed through membership, and the
+  // server refuses a member target for the same reason.
+  const canBanAuthor = canBanAuthors && !state.authorIsMember;
 
   return (
     <Menu>
@@ -38,6 +43,7 @@ export function CommentDisplayDropdown() {
         {state.isAuthor ? <ToggleVisibilityButton /> : null}
         {canModeratePost ? <PinButton /> : null}
         <DeleteButton />
+        {canBanAuthor ? <BanAuthorButton /> : null}
       </MenuPopup>
     </Menu>
   );

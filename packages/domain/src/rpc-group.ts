@@ -34,7 +34,7 @@ import { RoadmapRpcs } from "./roadmap/rpcs";
 import { SiteRpcs } from "./site/rpcs";
 import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
-import { UserBlockRpcs } from "./user-block/rpcs";
+import { UserBanRpcs } from "./user-ban/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
 /**
@@ -80,7 +80,7 @@ export const RpcGroups = [
   ["Site", SiteRpcs],
   ["Tag", TagRpcs],
   ["Upvote", UpvoteRpcs],
-  ["UserBlock", UserBlockRpcs],
+  ["UserBan", UserBanRpcs],
   ["PostReaction", PostReactionRpcs],
   ["PostStatus", PostStatusRpcs],
   ["PostSubscription", PostSubscriptionRpcs],

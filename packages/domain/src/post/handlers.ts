@@ -20,7 +20,7 @@ import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession, type Session } from "../session-middleware";
 import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostEmbeddingService } from "./embedding-service";
 import {
@@ -216,7 +216,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       source: surface,
     });
 
-  // The portal half of an edit is also a participation write: a blocked end
+  // The portal half of an edit is also a participation write: a banned end
   // user can still delete their own post, but cannot keep editing it.
   const canUpdatePublicAs = (args: TPostUpdateContent | TPostUpdateTitle) =>
     Policy.all(

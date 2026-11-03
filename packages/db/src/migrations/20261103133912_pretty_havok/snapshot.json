@@ -2,7 +2,7 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "36a39799-d0b4-47d1-8964-d55edbf16a95",
+  "id": "f332849a-bbad-44b9-9097-e503209c3f91",
   "prevIds": [
     "f59c1f8c-14d5-4e72-a7c6-3a726cf1a4a3"
   ],
@@ -12,15 +12,15 @@
       "statementTarget": [
         "table",
         "public",
-        "user_block"
+        "user_ban"
       ],
       "writes": [
-        "s|tbl|public.user_block",
-        "n|tbl|public.user_block",
-        "e|tbl|public.user_block",
-        "n|rel|public.user_block",
-        "n|type|public.user_block",
-        "n|rel|public.user_block_pkey"
+        "s|tbl|public.user_ban",
+        "n|tbl|public.user_ban",
+        "e|tbl|public.user_ban",
+        "n|rel|public.user_ban",
+        "n|type|public.user_ban",
+        "n|rel|public.user_ban_pkey"
       ],
       "reads": [
         "n|sch|public"
@@ -31,20 +31,20 @@
       "statementTarget": [
         "index",
         "public",
-        "user_block",
-        "user_block_organizationId_userId_uidx"
+        "user_ban",
+        "user_ban_organizationId_userId_uidx"
       ],
       "writes": [
-        "s|idx|public.user_block_organizationId_userId_uidx",
-        "n|idx|public.user_block_organizationId_userId_uidx",
-        "e|idx|public.user_block_organizationId_userId_uidx",
-        "n|rel|public.user_block_organizationId_userId_uidx"
+        "s|idx|public.user_ban_organizationId_userId_uidx",
+        "n|idx|public.user_ban_organizationId_userId_uidx",
+        "e|idx|public.user_ban_organizationId_userId_uidx",
+        "n|rel|public.user_ban_organizationId_userId_uidx"
       ],
       "reads": [
-        "n|tbl|public.user_block",
+        "n|tbl|public.user_ban",
         "n|sch|public",
-        "n|col|public.user_block.organization_id",
-        "n|col|public.user_block.user_id"
+        "n|col|public.user_ban.organization_id",
+        "n|col|public.user_ban.user_id"
       ]
     },
     {
@@ -52,20 +52,20 @@
       "statementTarget": [
         "index",
         "public",
-        "user_block",
-        "user_block_organizationId_email_uidx"
+        "user_ban",
+        "user_ban_organizationId_email_uidx"
       ],
       "writes": [
-        "s|idx|public.user_block_organizationId_email_uidx",
-        "n|idx|public.user_block_organizationId_email_uidx",
-        "e|idx|public.user_block_organizationId_email_uidx",
-        "n|rel|public.user_block_organizationId_email_uidx"
+        "s|idx|public.user_ban_organizationId_email_uidx",
+        "n|idx|public.user_ban_organizationId_email_uidx",
+        "e|idx|public.user_ban_organizationId_email_uidx",
+        "n|rel|public.user_ban_organizationId_email_uidx"
       ],
       "reads": [
-        "n|tbl|public.user_block",
+        "n|tbl|public.user_ban",
         "n|sch|public",
-        "n|col|public.user_block.organization_id",
-        "n|col|public.user_block.email"
+        "n|col|public.user_ban.organization_id",
+        "n|col|public.user_ban.email"
       ]
     },
     {
@@ -73,20 +73,20 @@
       "statementTarget": [
         "index",
         "public",
-        "user_block",
-        "user_block_organizationId_createdAt_idx"
+        "user_ban",
+        "user_ban_organizationId_createdAt_idx"
       ],
       "writes": [
-        "s|idx|public.user_block_organizationId_createdAt_idx",
-        "n|idx|public.user_block_organizationId_createdAt_idx",
-        "e|idx|public.user_block_organizationId_createdAt_idx",
-        "n|rel|public.user_block_organizationId_createdAt_idx"
+        "s|idx|public.user_ban_organizationId_createdAt_idx",
+        "n|idx|public.user_ban_organizationId_createdAt_idx",
+        "e|idx|public.user_ban_organizationId_createdAt_idx",
+        "n|rel|public.user_ban_organizationId_createdAt_idx"
       ],
       "reads": [
-        "n|tbl|public.user_block",
+        "n|tbl|public.user_ban",
         "n|sch|public",
-        "n|col|public.user_block.organization_id",
-        "n|col|public.user_block.created_at"
+        "n|col|public.user_ban.organization_id",
+        "n|col|public.user_ban.created_at"
       ]
     },
     {
@@ -94,20 +94,20 @@
       "statementTarget": [
         "table",
         "public",
-        "user_block"
+        "user_ban"
       ],
       "writes": [
-        "s|fk|public.user_block.user_block_organization_id_organization_id_fkey",
-        "n|fk|public.user_block.user_block_organization_id_organization_id_fkey",
-        "e|fk|public.user_block.user_block_organization_id_organization_id_fkey",
-        "n|con|public.user_block.user_block_organization_id_organization_id_fkey"
+        "s|fk|public.user_ban.user_ban_organization_id_organization_id_fkey",
+        "n|fk|public.user_ban.user_ban_organization_id_organization_id_fkey",
+        "e|fk|public.user_ban.user_ban_organization_id_organization_id_fkey",
+        "n|con|public.user_ban.user_ban_organization_id_organization_id_fkey"
       ],
       "reads": [
-        "n|tbl|public.user_block",
+        "n|tbl|public.user_ban",
         "n|sch|public",
         "n|tbl|public.organization",
         "n|sch|public",
-        "n|col|public.user_block.organization_id",
+        "n|col|public.user_ban.organization_id",
         "n|col|public.organization.id",
         "e|uniqueness|public.organization.id"
       ]
@@ -117,20 +117,20 @@
       "statementTarget": [
         "table",
         "public",
-        "user_block"
+        "user_ban"
       ],
       "writes": [
-        "s|fk|public.user_block.user_block_user_id_user_id_fkey",
-        "n|fk|public.user_block.user_block_user_id_user_id_fkey",
-        "e|fk|public.user_block.user_block_user_id_user_id_fkey",
-        "n|con|public.user_block.user_block_user_id_user_id_fkey"
+        "s|fk|public.user_ban.user_ban_user_id_user_id_fkey",
+        "n|fk|public.user_ban.user_ban_user_id_user_id_fkey",
+        "e|fk|public.user_ban.user_ban_user_id_user_id_fkey",
+        "n|con|public.user_ban.user_ban_user_id_user_id_fkey"
       ],
       "reads": [
-        "n|tbl|public.user_block",
+        "n|tbl|public.user_ban",
         "n|sch|public",
         "n|tbl|public.user",
         "n|sch|public",
-        "n|col|public.user_block.user_id",
+        "n|col|public.user_ban.user_id",
         "n|col|public.user.id",
         "e|uniqueness|public.user.id"
       ]
@@ -140,20 +140,20 @@
       "statementTarget": [
         "table",
         "public",
-        "user_block"
+        "user_ban"
       ],
       "writes": [
-        "s|fk|public.user_block.user_block_created_by_member_id_member_id_fkey",
-        "n|fk|public.user_block.user_block_created_by_member_id_member_id_fkey",
-        "e|fk|public.user_block.user_block_created_by_member_id_member_id_fkey",
-        "n|con|public.user_block.user_block_created_by_member_id_member_id_fkey"
+        "s|fk|public.user_ban.user_ban_created_by_member_id_member_id_fkey",
+        "n|fk|public.user_ban.user_ban_created_by_member_id_member_id_fkey",
+        "e|fk|public.user_ban.user_ban_created_by_member_id_member_id_fkey",
+        "n|con|public.user_ban.user_ban_created_by_member_id_member_id_fkey"
       ],
       "reads": [
-        "n|tbl|public.user_block",
+        "n|tbl|public.user_ban",
         "n|sch|public",
         "n|tbl|public.member",
         "n|sch|public",
-        "n|col|public.user_block.created_by_member_id",
+        "n|col|public.user_ban.created_by_member_id",
         "n|col|public.member.id",
         "e|uniqueness|public.member.id"
       ]
@@ -164,7 +164,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "name": "user_block",
+        "name": "user_ban",
         "isRlsEnabled": false,
         "entityType": "tables"
       }
@@ -173,7 +173,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "id",
         "type": "text",
         "typeSchema": null,
@@ -189,7 +189,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "organization_id",
         "type": "text",
         "typeSchema": null,
@@ -205,7 +205,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "user_id",
         "type": "text",
         "typeSchema": null,
@@ -221,7 +221,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "email",
         "type": "text",
         "typeSchema": null,
@@ -237,7 +237,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "reason",
         "type": "text",
         "typeSchema": null,
@@ -253,7 +253,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "created_by_member_id",
         "type": "text",
         "typeSchema": null,
@@ -269,7 +269,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "created_at",
         "type": "timestamp with time zone",
         "typeSchema": null,
@@ -285,7 +285,7 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
+        "table": "user_ban",
         "name": "updated_at",
         "type": "timestamp with time zone",
         "typeSchema": null,
@@ -301,8 +301,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_organizationId_userId_uidx",
+        "table": "user_ban",
+        "name": "user_ban_organizationId_userId_uidx",
         "nameExplicit": true,
         "columns": [
           {
@@ -332,8 +332,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_organizationId_email_uidx",
+        "table": "user_ban",
+        "name": "user_ban_organizationId_email_uidx",
         "nameExplicit": true,
         "columns": [
           {
@@ -363,8 +363,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_organizationId_createdAt_idx",
+        "table": "user_ban",
+        "name": "user_ban_organizationId_createdAt_idx",
         "nameExplicit": true,
         "columns": [
           {
@@ -394,8 +394,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_organization_id_organization_id_fkey",
+        "table": "user_ban",
+        "name": "user_ban_organization_id_organization_id_fkey",
         "nameExplicit": false,
         "columns": [
           "organization_id"
@@ -414,8 +414,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_user_id_user_id_fkey",
+        "table": "user_ban",
+        "name": "user_ban_user_id_user_id_fkey",
         "nameExplicit": false,
         "columns": [
           "user_id"
@@ -434,8 +434,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_created_by_member_id_member_id_fkey",
+        "table": "user_ban",
+        "name": "user_ban_created_by_member_id_member_id_fkey",
         "nameExplicit": false,
         "columns": [
           "created_by_member_id"
@@ -454,8 +454,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_pkey",
+        "table": "user_ban",
+        "name": "user_ban_pkey",
         "columns": [
           "id"
         ],
@@ -467,8 +467,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_subject_chk",
+        "table": "user_ban",
+        "name": "user_ban_subject_chk",
         "value": "\"user_id\" is not null or \"email\" is not null",
         "entityType": "checks"
       }
@@ -477,8 +477,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_email_normalized_chk",
+        "table": "user_ban",
+        "name": "user_ban_email_normalized_chk",
         "value": "\"email\" is null or \"email\" = lower(btrim(\"email\"))",
         "entityType": "checks"
       }
@@ -487,8 +487,8 @@
       "op": "create",
       "row": {
         "schema": "public",
-        "table": "user_block",
-        "name": "user_block_reason_chk",
+        "table": "user_ban",
+        "name": "user_ban_reason_chk",
         "value": "\"reason\" is null or (length(\"reason\") between 1 and 500)",
         "entityType": "checks"
       }

@@ -12,7 +12,7 @@ import { AttributeDefinitionRepository } from "../attribute-definition/repositor
 import { EntitlementPolicy } from "../entitlement/policies";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import { OrganizationRepository } from "../organization/repository";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { WorkspaceRepository } from "../workspace/repository";
 import { resolveFeedbackContact } from "./api-live";
 import { SsoRepositoriesLive } from "./sso";
@@ -61,7 +61,7 @@ describe("resolveFeedbackContact", () => {
       secret,
     });
     // A plan with room for the contact the SSO upsert files. Without it the
-    // request would fail on the CRM-entry allowance before the block is read.
+    // request would fail on the CRM-entry allowance before the ban is read.
     const productId = `prod_feedback_${organizationId}`;
     yield* db.insert(schema.productTable).values({
       externalOrganizationId: "polar_org",
@@ -142,18 +142,18 @@ describe("resolveFeedbackContact", () => {
       return row?.total ?? 0;
     });
 
-  layer(TestLayer)("block checks", (it) => {
-    it.effect("denies an email-only block and rolls back the new contact", () =>
+  layer(TestLayer)("ban checks", (it) => {
+    it.effect("denies an email-only ban and rolls back the new contact", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture();
         const db = yield* currentDb;
         const now = yield* DateTime.nowAsDate;
-        const email = "blocked-by-email@example.com";
+        const email = "banned-by-email@example.com";
 
-        yield* db.insert(schema.userBlockTable).values({
+        yield* db.insert(schema.userBanTable).values({
           createdAt: now,
           email,
-          id: `block_email_${fixture.organizationId}`,
+          id: `ban_email_${fixture.organizationId}`,
           organizationId: fixture.organizationId,
           reason: "Abuse report",
           updatedAt: now,
@@ -170,20 +170,20 @@ describe("resolveFeedbackContact", () => {
         );
 
         expect(error._tag).toBe("PolicyDenied");
-        // The contact upsert and the block check share a transaction, so a
+        // The contact upsert and the ban check share a transaction, so a
         // denial must not leave the customer the upsert just created.
         expect(yield* contactCount(fixture.organizationId, email)).toBe(0);
         expect(yield* postCount(fixture.organizationId)).toBe(0);
       })
     );
 
-    it.effect("denies a user-id block through a linked contact's address", () =>
+    it.effect("denies a user-id ban through a linked contact's address", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture();
         const db = yield* currentDb;
         const now = yield* DateTime.nowAsDate;
-        const accountEmail = "blocked-account@example.com";
-        const contactEmail = "blocked-contact@example.com";
+        const accountEmail = "banned-account@example.com";
+        const contactEmail = "banned-contact@example.com";
         const userId = yield* UserId.generate;
         const contactId = yield* ContactId.generate;
 
@@ -204,10 +204,10 @@ describe("resolveFeedbackContact", () => {
         // The session check keys off the account address; the widget
         // token names the linked contact's different address. The user id is
         // the facet that covers both.
-        yield* db.insert(schema.userBlockTable).values({
+        yield* db.insert(schema.userBanTable).values({
           createdAt: now,
           email: accountEmail,
-          id: `block_user_${fixture.organizationId}`,
+          id: `ban_user_${fixture.organizationId}`,
           organizationId: fixture.organizationId,
           reason: null,
           updatedAt: now,
@@ -234,13 +234,13 @@ describe("resolveFeedbackContact", () => {
           .from(schema.contactTable)
           .where(eq(schema.contactTable.id, contactId));
         // The feedback upsert does not unlink an existing account while the
-        // block is being checked, and the denial rolls back its other changes.
+        // ban is being checked, and the denial rolls back its other changes.
         expect(contact?.userId).toBe(userId);
       })
     );
 
     it.effect(
-      "lets a member's linked contact through an address-only block",
+      "lets a member's linked contact through an address-only ban",
       () =>
         Effect.gen(function* () {
           const fixture = yield* makeFixture();
@@ -272,11 +272,11 @@ describe("resolveFeedbackContact", () => {
             userId,
           });
           // The row predates the membership; a member must not be denied by an
-          // address-only block the widget's SSO flow happens to match.
-          yield* db.insert(schema.userBlockTable).values({
+          // address-only ban the widget's SSO flow happens to match.
+          yield* db.insert(schema.userBanTable).values({
             createdAt: now,
             email,
-            id: `block_member_${fixture.organizationId}`,
+            id: `ban_member_${fixture.organizationId}`,
             organizationId: fixture.organizationId,
             reason: null,
             updatedAt: now,

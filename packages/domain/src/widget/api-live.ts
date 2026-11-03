@@ -42,7 +42,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { WidgetCreateFeedbackErrors } from "./api-contract";
 import {
   type TWidgetFeedbackMetadata,
@@ -56,7 +56,7 @@ import { upsertContactFromParsed } from "./sso";
  *
  * `verifyJwt` answers `UnauthorizedError` (expired, bad signature, wrong
  * audience, missing claims), `parsePersonAttributes` answers
- * `DataValidationError` (missing or malformed claims), and a blocked SSO
+ * `DataValidationError` (missing or malformed claims), and a banned SSO
  * identity answers `PolicyDeniedError`. All three are in the endpoint's
  * declared error union, so the write path passes them through; everything
  * else in the token transaction is a contact-store failure and is answered as
@@ -127,7 +127,7 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
  * Resolves the SSO customer a feedback submission is attributed to.
  *
  * The contact upsert and the participation check run in one transaction, so a
- * blocked submission rolls back the contact it just created: a denial leaves
+ * banned submission rolls back the contact it just created: a denial leaves
  * neither a post nor a contact behind. Reads and providers are passed in
  * rather than resolved from the context so a test can exercise this step
  * without building the whole widget HTTP surface.
@@ -210,7 +210,7 @@ export const resolveFeedbackContact = (input: {
     // A rejected or malformed SSO token is the caller's mistake, and the
     // endpoint publishes both tags for it: answer with the real 401/400
     // instead of folding them into a 500 that says the server failed and can
-    // never be retried. A block denial is published as the same 403 the
+    // never be retried. A ban denial is published as the same 403 the
     // portal answers. `mapError`, not `catchIf`: the type predicate is what
     // removes the contact-store errors from the channel, so the handler's
     // declared error union stays exact.
@@ -393,7 +393,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             }
 
             // The SSO contact upsert and the participation check share one
-            // transaction: a blocked submission rolls back the contact it just
+            // transaction: a banned submission rolls back the contact it just
             // created, so a denial leaves neither a post nor a contact. The
             // post write itself runs afterwards, so a later write failure still
             // leaves a known customer in place.

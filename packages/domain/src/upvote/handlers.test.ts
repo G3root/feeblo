@@ -24,7 +24,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { UpvoteRpcHandlersEffect } from "./handlers";
 import { UpvotePolicy } from "./policies";

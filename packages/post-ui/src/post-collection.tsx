@@ -33,6 +33,7 @@ type ResolvedProviderProps = PostCollectionDataProviderProps & {
 
 function ResolvedPostCollectionProvider({
   board,
+  canBanAuthors = false,
   canDeletePost,
   canManageAllPosts,
   canManagePost,
@@ -45,6 +46,7 @@ function ResolvedPostCollectionProvider({
 }: ResolvedProviderProps) {
   const state = buildPostCollectionState({
     board,
+    canBanAuthors,
     canDeletePost,
     post,
     canManagePost,
@@ -115,6 +117,7 @@ function ContributorEligibilityProvider({
 
 export function PostCollectionDataProvider({
   board,
+  canBanAuthors = false,
   children,
   post,
   organizationId,
@@ -148,6 +151,7 @@ export function PostCollectionDataProvider({
 
   const resolved = {
     board,
+    canBanAuthors,
     canManageAllPosts,
     canManagePost,
     children,

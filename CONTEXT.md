@@ -60,7 +60,7 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 ### Moderation
 
-**Block**: A workspace-scoped instruction that stops one end user from participating — posting, commenting, voting, reacting, or subscribing — on that workspace's public portal and widget. A block does not stop them reading, does not stop email delivery (that is a suppression), and does not ban their account from signing in. _Avoid_: ban, suspension, suppression
+**Ban**: A workspace-scoped instruction that stops one end user from participating — posting, commenting, voting, reacting, or subscribing — on that workspace's public portal and widget. A ban does not stop them reading, does not stop email delivery (that is a suppression), and does not lock their account from signing in. A ban does remove their votes and their post, changelog, and email subscriptions in that workspace; deleting their existing posts and comments is an explicit option on the ban, never part of it. Requires the `userBans` plan capability to create. _Avoid_: block, blocklist, suspension, suppression
 
 ### Plans
 

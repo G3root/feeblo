@@ -12,7 +12,7 @@ import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { definePublicEntry, defineSurfacePair } from "../surface";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { PostSubscriptionRepository } from "./repository";
 import { PostSubscriptionRpcs } from "./rpcs";
 import type {

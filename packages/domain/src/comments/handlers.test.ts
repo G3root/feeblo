@@ -31,7 +31,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
@@ -894,7 +894,7 @@ describe("CommentRpcHandlers", () => {
           })
       );
 
-      it.effect("rejects a blocked non-member", () =>
+      it.effect("rejects a banned non-member", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
@@ -903,16 +903,16 @@ describe("CommentRpcHandlers", () => {
           const now = yield* DateTime.nowAsDate;
 
           // The fixture creates the member row its board and post reference.
-          // This case is a non-member, so remove it before the block check;
+          // This case is a non-member, so remove it before the ban check;
           // the database membership check would otherwise exempt it.
           yield* db
             .delete(schema.memberTable)
             .where(eq(schema.memberTable.id, fixture.membershipId));
 
-          yield* db.insert(schema.userBlockTable).values({
+          yield* db.insert(schema.userBanTable).values({
             createdAt: now,
             email: "user@example.com",
-            id: `block_${fixture.userId}`,
+            id: `ban_${fixture.userId}`,
             organizationId: fixture.organizationId,
             reason: "Abuse report",
             updatedAt: now,
@@ -922,7 +922,7 @@ describe("CommentRpcHandlers", () => {
           const error = yield* Effect.flip(
             handlers
               .CreateCommentPublic(
-                commentCreateInput(fixture, commentId, "Blocked comment")
+                commentCreateInput(fixture, commentId, "Banned comment")
               )
               .pipe(
                 Effect.provideService(
@@ -934,7 +934,7 @@ describe("CommentRpcHandlers", () => {
 
           expect(error._tag).toBe("PolicyDenied");
           expect(error).toMatchObject({
-            reason: "You cannot participate in this workspace.",
+            reason: "You are banned from participating in this workspace.",
           });
         })
       );

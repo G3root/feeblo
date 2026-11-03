@@ -1,3 +1,4 @@
+import { useBanAuthorDialogContext } from "@feeblo/post-ui/dialog-stores";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import {
   AlertDialog,
@@ -22,6 +23,7 @@ import {
   CircleUnlockIcon,
   LinkSquare02Icon,
   Trash2,
+  UserBlock01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createOptimisticAction } from "@tanstack/react-db";
@@ -59,6 +61,7 @@ function PostAdminActionButtons() {
   const {
     post,
     board,
+    canBanAuthors,
     canDeletePost,
     canModeratePost,
     isLocked,
@@ -67,6 +70,7 @@ function PostAdminActionButtons() {
   } = usePostCollectionData();
   const { postActivityCollection, postCollection } = useDashboardCollections();
   const postDialogStore = usePostDeleteDialogContext();
+  const banDialogStore = useBanAuthorDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
 
   const lockLabel = isLocked ? "Unlock post" : "Lock post";
@@ -145,6 +149,34 @@ function PostAdminActionButtons() {
         />
         <TooltipPopup>{lockLabel}</TooltipPopup>
       </Tooltip>
+
+      {canBanAuthors && !post.authorIsMember && post.creatorId ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={(props) => (
+              <Button
+                {...props}
+                aria-label="Ban author"
+                className="rounded-full"
+                onClick={() =>
+                  banDialogStore.send({
+                    type: "toggle",
+                    data: {
+                      authorName: post.user.name ?? "this user",
+                      target: { _tag: "post", postId: post.id },
+                    },
+                  })
+                }
+                size="icon-sm"
+                variant="outline"
+              >
+                <HugeiconsIcon icon={UserBlock01Icon} />
+              </Button>
+            )}
+          />
+          <TooltipPopup>Ban author</TooltipPopup>
+        </Tooltip>
+      ) : null}
 
       <Tooltip>
         <TooltipTrigger

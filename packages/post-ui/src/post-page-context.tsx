@@ -6,6 +6,14 @@ type TPageType = "Dashboard" | "PublicPage";
 
 export interface PostCollectionState {
   board: TBoard;
+  /**
+   * Whether the host offers a ban action for comment and post authors.
+   *
+   * Supplied by the dashboard from the `userBans.manage` permission and the
+   * plan's `userBans` capability; the public surfaces never pass it, so the
+   * action does not exist there.
+   */
+  canBanAuthors: boolean;
   canDeletePost: boolean;
   canManagePost: boolean;
   canModeratePost: boolean;
@@ -29,6 +37,7 @@ export interface PostCollectionState {
 
 export interface PostCollectionDataProviderProps {
   board: TBoard;
+  canBanAuthors?: boolean;
   children?: ReactNode;
   organizationId: string;
   pageType: TPageType;
@@ -65,6 +74,7 @@ export function PostCollectionStateProvider({
 
 export function createPostCollectionState({
   board,
+  canBanAuthors = false,
   canDeletePost,
   canManagePost,
   canModeratePost,
@@ -84,6 +94,7 @@ export function createPostCollectionState({
   >): PostCollectionState {
   return {
     board,
+    canBanAuthors,
     canDeletePost,
     canManagePost,
     canModeratePost,

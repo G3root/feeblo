@@ -17,7 +17,7 @@ import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
 import { PostPolicy } from "../post/policies";
 import { PostRepository } from "../post/repository";
 import { CurrentSession, type Session } from "../session-middleware";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { PostSubscriptionRpcHandlersEffect } from "./handlers";
 import { PostSubscriptionRepository } from "./repository";
 

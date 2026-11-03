@@ -93,6 +93,7 @@ const board = { visibility: "PUBLIC" } as TBoard;
 
 function state({
   authenticated = false,
+  canBanAuthor = false,
   canDelete = false,
   canManage = false,
   canModerate = false,
@@ -109,6 +110,7 @@ function state({
 
   return createPostCollectionState({
     board,
+    canBanAuthors: canBanAuthor,
     canDeletePost: canDelete,
     canManagePost: canManage,
     canModeratePost: canModerate,
@@ -131,8 +133,18 @@ function renderState(options?: Parameters<typeof state>[0]) {
       <PostPage.Locked>locked</PostPage.Locked>
       <PostPage.Unlocked>unlocked</PostPage.Unlocked>
       <AdminControls />
+      <BanAuthorControl />
     </PostCollectionStateProvider>
   );
+}
+
+/**
+ * Mirrors the comment menu's ban gate: the action exists only when the host
+ * offers it, and the public surfaces never do.
+ */
+function BanAuthorControl() {
+  const { canBanAuthors } = usePostCollectionData();
+  return canBanAuthors ? <span>Ban user</span> : null;
 }
 
 /**
@@ -170,6 +182,19 @@ describe("PostPage composition", () => {
     await expect.element(screen.getByText("authenticated")).toBeVisible();
     await expect.element(screen.getByText("manager: true")).toBeVisible();
     await expect.element(screen.getByText("guest")).not.toBeInTheDocument();
+  });
+
+  it("offers the ban action only when the host enables it", async () => {
+    const withoutBan = await renderState({ authenticated: true });
+    await expect
+      .element(withoutBan.getByText("Ban user"))
+      .not.toBeInTheDocument();
+
+    const withBan = await renderState({
+      authenticated: true,
+      canBanAuthor: true,
+    });
+    await expect.element(withBan.getByText("Ban user")).toBeVisible();
   });
 
   it("shows locked content instead of unlocked content", async () => {

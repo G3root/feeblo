@@ -32,7 +32,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostRpcHandlersEffect } from "./handlers";

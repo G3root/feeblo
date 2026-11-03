@@ -5,7 +5,11 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
-import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import {
+  anyPolicy,
+  hasPermission,
+  usePolicy,
+} from "@feeblo/web-shared/use-policy";
 import { MoreVerticalIcon, ReloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
@@ -15,6 +19,7 @@ import { useRef } from "react";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
+import { BannedUsersSection } from "~/features/user-ban/components/banned-users-section";
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { dashboardCollections } from "~/lib/collections";
@@ -46,7 +51,16 @@ function formatDate(date: Date): string {
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
+  // The page hosts two independent sections: widget SSO is an admin setting,
+  // while banning is a manager one. Either grant opens the page; each section
+  // gates itself.
   const { allowed: canManageSecurity, isPending: isPolicyPending } = usePolicy(
+    anyPolicy(
+      hasPermission(organizationId, "workspace.update"),
+      hasPermission(organizationId, "userBans.manage")
+    )
+  );
+  const { allowed: canManageSso } = usePolicy(
     hasPermission(organizationId, "workspace.update")
   );
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
@@ -59,21 +73,38 @@ function RouteComponent() {
   }
 
   return (
-    <SecuritySettingsContent
-      organizationId={organizationId}
-      widgetSsoAvailable={
-        isEntitlementsLoading || entitlements.capabilities.widgetSso
-      }
-    />
+    <SettingsLayout.Root>
+      <SettingsLayout.Header>
+        <SettingsLayout.HeaderTitle>Security</SettingsLayout.HeaderTitle>
+        <SettingsLayout.HeaderDescription>
+          Manage who can participate and how the widget identifies them.
+        </SettingsLayout.HeaderDescription>
+      </SettingsLayout.Header>
+      <SettingsLayout.Content>
+        {canManageSso ? (
+          <SsoSection
+            organizationId={organizationId}
+            widgetSsoAvailable={
+              isEntitlementsLoading || entitlements.capabilities.widgetSso
+            }
+          />
+        ) : null}
+        <BannedUsersSection
+          userBansAvailable={
+            isEntitlementsLoading || entitlements.capabilities.userBans
+          }
+        />
+      </SettingsLayout.Content>
+    </SettingsLayout.Root>
   );
 }
 
-function SecuritySettingsContent({
-  widgetSsoAvailable,
+function SsoSection({
   organizationId,
+  widgetSsoAvailable,
 }: {
-  widgetSsoAvailable: boolean;
   organizationId: string;
+  widgetSsoAvailable: boolean;
 }) {
   // Ref (not state) because nothing needs to re-render while generating: the
   // guard blocks duplicate invocations synchronously, which also covers a
@@ -177,194 +208,178 @@ function SecuritySettingsContent({
   };
 
   return (
-    <SettingsLayout.Root>
-      <SettingsLayout.Header>
-        <SettingsLayout.HeaderTitle>Security</SettingsLayout.HeaderTitle>
-        <SettingsLayout.HeaderDescription>
-          Manage JWT secrets for widget SSO authentication.{" "}
+    <SettingsItem.Root>
+      <SettingsItem.Header>
+        <SettingsItem.Title>
+          JWT Authentication
+          {widgetSsoAvailable ? null : (
+            <SettingsItem.PaidPlanIndicator
+              className="ml-2 inline-block"
+              content="Widget SSO requires the Starter plan or higher."
+            />
+          )}
+        </SettingsItem.Title>
+        <SettingsItem.Description>
+          Sign user data with your secret so Feeblo can verify who is submitting
+          feedback.{" "}
           {widgetSsoAvailable
             ? null
-            : "Widget SSO is available only on paid plans."}
-        </SettingsLayout.HeaderDescription>
-      </SettingsLayout.Header>
-      <SettingsLayout.Content>
-        <SettingsItem.Root>
-          <SettingsItem.Header>
-            <SettingsItem.Title>
-              JWT Authentication
-              {widgetSsoAvailable ? null : (
-                <SettingsItem.PaidPlanIndicator
-                  className="ml-2 inline-block"
-                  content="Widget SSO requires the Starter plan or higher."
-                />
-              )}
-            </SettingsItem.Title>
-            <SettingsItem.Description>
-              Sign user data with your secret so Feeblo can verify who is
-              submitting feedback.{" "}
-              {widgetSsoAvailable
-                ? null
-                : "Widget SSO requires the Starter plan or higher."}
-            </SettingsItem.Description>
-          </SettingsItem.Header>
-          <SettingsItem.Content>
-            {activeSecret ? (
-              <SettingsItem.Item>
-                <SettingsItem.ItemContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="default">Active</Badge>
-                      <span className="text-muted-foreground text-sm">
-                        Created {formatDate(activeSecret.createdAt)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CopyButton
-                        aria-label="Copy Secret"
-                        onCopy={handleCopy}
-                        size="sm"
-                        successMessage="Secret copied to clipboard!"
-                        tooltipPopup="Copy Secret"
-                        variant="brand"
-                      >
-                        Copy Secret
-                      </CopyButton>
-                      <Menu>
-                        <MenuTrigger
-                          render={
-                            <Button size="icon-sm" variant="outline">
-                              <HugeiconsIcon icon={MoreVerticalIcon} />
-                            </Button>
+            : "Widget SSO requires the Starter plan or higher."}
+        </SettingsItem.Description>
+      </SettingsItem.Header>
+      <SettingsItem.Content>
+        {activeSecret ? (
+          <SettingsItem.Item>
+            <SettingsItem.ItemContent>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Badge variant="default">Active</Badge>
+                  <span className="text-muted-foreground text-sm">
+                    Created {formatDate(activeSecret.createdAt)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CopyButton
+                    aria-label="Copy Secret"
+                    onCopy={handleCopy}
+                    size="sm"
+                    successMessage="Secret copied to clipboard!"
+                    tooltipPopup="Copy Secret"
+                    variant="brand"
+                  >
+                    Copy Secret
+                  </CopyButton>
+                  <Menu>
+                    <MenuTrigger
+                      render={
+                        <Button size="icon-sm" variant="outline">
+                          <HugeiconsIcon icon={MoreVerticalIcon} />
+                        </Button>
+                      }
+                    />
+
+                    <MenuPopup align="end" className="w-40">
+                      <MenuItem onClick={handleRevoke} variant="destructive">
+                        Revoke Immediately
+                      </MenuItem>
+                      <MenuItem onClick={handleRotate}>
+                        Rotate (24h grace period)
+                      </MenuItem>
+                    </MenuPopup>
+                  </Menu>
+                </div>
+              </div>
+            </SettingsItem.ItemContent>
+          </SettingsItem.Item>
+        ) : (
+          <SettingsItem.Item>
+            <SettingsItem.ItemContent>
+              <div className="flex items-center justify-between">
+                <p className="text-muted-foreground text-sm">
+                  No active JWT secret. Generate one to enable widget SSO.
+                </p>
+                <Button onClick={handleGenerate} size="sm" variant="brand">
+                  <HugeiconsIcon icon={ReloadIcon} /> Generate Secret
+                </Button>
+              </div>
+            </SettingsItem.ItemContent>
+          </SettingsItem.Item>
+        )}
+
+        {gracePeriodSecrets.map((s) => (
+          <SettingsItem.Item key={s.id}>
+            <SettingsItem.ItemContent>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary">Grace period</Badge>
+                  <span className="text-muted-foreground text-sm">
+                    Expires {formatDate(s.revokedAt!)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => {
+                      navigator.clipboard.writeText(s.secret).then(
+                        () => {
+                          trackEvent("sso_secret_copied", {
+                            success: true,
+                          });
+                          toastManager.add({
+                            title: "Secret copied to clipboard",
+                            type: "success",
+                          });
+                        },
+                        () => {
+                          trackEvent("sso_secret_copied", {
+                            success: false,
+                          });
+                          toastManager.add({
+                            title: "Failed to copy secret",
+                            type: "error",
+                          });
+                        }
+                      );
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Copy Secret
+                  </Button>
+                  <Menu>
+                    <MenuTrigger
+                      render={
+                        <Button size="icon-sm" variant="outline">
+                          <HugeiconsIcon icon={MoreVerticalIcon} />
+                        </Button>
+                      }
+                    />
+                    <MenuPopup align="end" className="w-40">
+                      <MenuItem
+                        onClick={async () => {
+                          try {
+                            await fetchRpc((rpc) =>
+                              rpc.RevokeJwtSecret({
+                                organizationId,
+                                secretId: s.id,
+                              })
+                            );
+                            trackEvent("sso_secret_revoked", {
+                              success: true,
+                            });
+                            toastManager.add({
+                              title: "Secret revoked immediately",
+                              type: "success",
+                            });
+                          } catch {
+                            trackEvent("sso_secret_revoked", {
+                              success: false,
+                            });
+                            toastManager.add({
+                              title: "Failed to revoke secret",
+                              type: "error",
+                            });
+                            return;
                           }
-                        />
-
-                        <MenuPopup align="end" className="w-40">
-                          <MenuItem
-                            onClick={handleRevoke}
-                            variant="destructive"
-                          >
-                            Revoke Immediately
-                          </MenuItem>
-                          <MenuItem onClick={handleRotate}>
-                            Rotate (24h grace period)
-                          </MenuItem>
-                        </MenuPopup>
-                      </Menu>
-                    </div>
-                  </div>
-                </SettingsItem.ItemContent>
-              </SettingsItem.Item>
-            ) : (
-              <SettingsItem.Item>
-                <SettingsItem.ItemContent>
-                  <div className="flex items-center justify-between">
-                    <p className="text-muted-foreground text-sm">
-                      No active JWT secret. Generate one to enable widget SSO.
-                    </p>
-                    <Button onClick={handleGenerate} size="sm" variant="brand">
-                      <HugeiconsIcon icon={ReloadIcon} /> Generate Secret
-                    </Button>
-                  </div>
-                </SettingsItem.ItemContent>
-              </SettingsItem.Item>
-            )}
-
-            {gracePeriodSecrets.map((s) => (
-              <SettingsItem.Item key={s.id}>
-                <SettingsItem.ItemContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Badge variant="secondary">Grace period</Badge>
-                      <span className="text-muted-foreground text-sm">
-                        Expires {formatDate(s.revokedAt!)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => {
-                          navigator.clipboard.writeText(s.secret).then(
-                            () => {
-                              trackEvent("sso_secret_copied", {
-                                success: true,
-                              });
-                              toastManager.add({
-                                title: "Secret copied to clipboard",
-                                type: "success",
-                              });
-                            },
-                            () => {
-                              trackEvent("sso_secret_copied", {
-                                success: false,
-                              });
-                              toastManager.add({
-                                title: "Failed to copy secret",
-                                type: "error",
-                              });
-                            }
-                          );
+                          await dashboardCollections.jwtSecretCollection.utils.refetch();
                         }}
-                        size="sm"
-                        variant="outline"
+                        variant="destructive"
                       >
-                        Copy Secret
-                      </Button>
-                      <Menu>
-                        <MenuTrigger
-                          render={
-                            <Button size="icon-sm" variant="outline">
-                              <HugeiconsIcon icon={MoreVerticalIcon} />
-                            </Button>
-                          }
-                        />
-                        <MenuPopup align="end" className="w-40">
-                          <MenuItem
-                            onClick={async () => {
-                              try {
-                                await fetchRpc((rpc) =>
-                                  rpc.RevokeJwtSecret({
-                                    organizationId,
-                                    secretId: s.id,
-                                  })
-                                );
-                                trackEvent("sso_secret_revoked", {
-                                  success: true,
-                                });
-                                toastManager.add({
-                                  title: "Secret revoked immediately",
-                                  type: "success",
-                                });
-                              } catch {
-                                trackEvent("sso_secret_revoked", {
-                                  success: false,
-                                });
-                                toastManager.add({
-                                  title: "Failed to revoke secret",
-                                  type: "error",
-                                });
-                                return;
-                              }
-                              await dashboardCollections.jwtSecretCollection.utils.refetch();
-                            }}
-                            variant="destructive"
-                          >
-                            Revoke Immediately
-                          </MenuItem>
-                        </MenuPopup>
-                      </Menu>
-                    </div>
-                  </div>
-                </SettingsItem.ItemContent>
-              </SettingsItem.Item>
-            ))}
+                        Revoke Immediately
+                      </MenuItem>
+                    </MenuPopup>
+                  </Menu>
+                </div>
+              </div>
+            </SettingsItem.ItemContent>
+          </SettingsItem.Item>
+        ))}
 
-            {lastRevokedAt && (
-              <p className="text-muted-foreground text-sm">
-                Last revoked: {formatDate(lastRevokedAt)}
-              </p>
-            )}
-          </SettingsItem.Content>
-        </SettingsItem.Root>
-      </SettingsLayout.Content>
-    </SettingsLayout.Root>
+        {lastRevokedAt && (
+          <p className="text-muted-foreground text-sm">
+            Last revoked: {formatDate(lastRevokedAt)}
+          </p>
+        )}
+      </SettingsItem.Content>
+    </SettingsItem.Root>
   );
 }

@@ -10,7 +10,7 @@ import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { definePublicEntry, defineSurfacePair } from "../surface";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
 import type { TCommentReactionList, TCommentReactionToggle } from "./schema";

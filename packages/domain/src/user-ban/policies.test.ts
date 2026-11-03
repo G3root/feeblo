@@ -7,7 +7,7 @@ import * as Layer from "effect/Layer";
 
 import { CurrentSession, type Session } from "../session-middleware";
 import { ParticipationPolicy } from "./policies";
-import { PARTICIPATION_BLOCKED_REASON } from "./schema";
+import { PARTICIPATION_BANNED_REASON } from "./schema";
 
 describe("ParticipationPolicy", () => {
   const TestLayer = ParticipationPolicy.layer.pipe(
@@ -18,7 +18,7 @@ describe("ParticipationPolicy", () => {
     const db = yield* currentDb;
     const organizationId = yield* WorkspaceId.generate;
     const userId = yield* UserId.generate;
-    const email = `blocked-${userId.toLowerCase()}@example.com`;
+    const email = `banned-${userId.toLowerCase()}@example.com`;
     const now = yield* DateTime.nowAsDate;
     yield* db.insert(schema.organizationTable).values({
       id: organizationId,
@@ -29,12 +29,12 @@ describe("ParticipationPolicy", () => {
     yield* db.insert(schema.userTable).values({
       id: userId,
       email,
-      name: "Blocked end user",
+      name: "Banned end user",
     });
-    yield* db.insert(schema.userBlockTable).values({
+    yield* db.insert(schema.userBanTable).values({
       createdAt: now,
       email,
-      id: `block_${userId}`,
+      id: `ban_${userId}`,
       organizationId,
       reason: "Abuse report",
       updatedAt: now,
@@ -54,13 +54,13 @@ describe("ParticipationPolicy", () => {
     user: {
       email,
       id: userId,
-      name: "Blocked end user",
+      name: "Banned end user",
       restrictedToOrganizationId: organizationId,
     },
   });
 
   layer(TestLayer)("policy", (it) => {
-    it.effect("denies a blocked end user and states why", () =>
+    it.effect("denies a banned end user and states why", () =>
       Effect.gen(function* () {
         const policy = yield* ParticipationPolicy;
         const fixture = yield* makeFixture();
@@ -82,12 +82,12 @@ describe("ParticipationPolicy", () => {
 
         expect(error).toMatchObject({
           _tag: "PolicyDenied",
-          reason: PARTICIPATION_BLOCKED_REASON,
+          reason: PARTICIPATION_BANNED_REASON,
         });
       })
     );
 
-    it.effect("lets a member through even when a block row names them", () =>
+    it.effect("lets a member through even when a ban row names them", () =>
       Effect.gen(function* () {
         const policy = yield* ParticipationPolicy;
         const fixture = yield* makeFixture();
@@ -111,7 +111,7 @@ describe("ParticipationPolicy", () => {
       })
     );
 
-    it.effect("lets a member's contact through an address-only block", () =>
+    it.effect("lets a member's contact through an address-only ban", () =>
       Effect.gen(function* () {
         const policy = yield* ParticipationPolicy;
         const fixture = yield* makeFixture();
@@ -144,10 +144,10 @@ describe("ParticipationPolicy", () => {
         });
         // An address-only row that predates the membership must not deny the
         // member's widget SSO feedback.
-        yield* db.insert(schema.userBlockTable).values({
+        yield* db.insert(schema.userBanTable).values({
           createdAt: now,
           email,
-          id: `block_member_${userId}`,
+          id: `ban_member_${userId}`,
           organizationId: fixture.organizationId,
           reason: null,
           updatedAt: now,

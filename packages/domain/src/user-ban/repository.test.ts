@@ -6,10 +6,10 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import { UserBlockRepository } from "./repository";
+import { UserBanRepository } from "./repository";
 
-describe("UserBlockRepository", () => {
-  const TestLayer = UserBlockRepository.layer.pipe(
+describe("UserBanRepository", () => {
+  const TestLayer = UserBanRepository.layer.pipe(
     Layer.provideMerge(Database.PgliteDatabaseLive)
   );
 
@@ -19,7 +19,7 @@ describe("UserBlockRepository", () => {
     const now = yield* DateTime.nowAsDate;
     yield* db.insert(schema.organizationTable).values({
       id: organizationId,
-      name: "Block workspace",
+      name: "Ban workspace",
       slug: organizationId,
       createdAt: now,
     });
@@ -63,7 +63,7 @@ describe("UserBlockRepository", () => {
   layer(TestLayer)("repository", (it) => {
     it.effect("matches an account and an address in one workspace only", () =>
       Effect.gen(function* () {
-        const repository = yield* UserBlockRepository;
+        const repository = yield* UserBanRepository;
         const organizationId = yield* createOrganization();
         const otherOrganizationId = yield* createOrganization();
         const account = yield* createUser("account");
@@ -79,22 +79,22 @@ describe("UserBlockRepository", () => {
         });
 
         expect(
-          yield* repository.isBlocked({ organizationId, userId: account.id })
+          yield* repository.isBanned({ organizationId, userId: account.id })
         ).toBe(true);
         expect(
-          yield* repository.isBlocked({
+          yield* repository.isBanned({
             email: account.email.toUpperCase(),
             organizationId,
           })
         ).toBe(true);
         expect(
-          yield* repository.isBlocked({
+          yield* repository.isBanned({
             organizationId: otherOrganizationId,
             userId: account.id,
           })
         ).toBe(false);
         expect(
-          yield* repository.isBlocked({
+          yield* repository.isBanned({
             organizationId,
             userId: "someone_else",
           })
@@ -102,9 +102,9 @@ describe("UserBlockRepository", () => {
       })
     );
 
-    it.effect("merges an address block with the account it later matches", () =>
+    it.effect("merges an address ban with the account it later matches", () =>
       Effect.gen(function* () {
-        const repository = yield* UserBlockRepository;
+        const repository = yield* UserBanRepository;
         const organizationId = yield* createOrganization();
         const account = yield* createUser("merge");
         const now = yield* DateTime.nowAsDate;
@@ -137,7 +137,7 @@ describe("UserBlockRepository", () => {
           userId: account.id,
         });
         expect(
-          yield* repository.isBlocked({
+          yield* repository.isBanned({
             email: account.email,
             organizationId,
             userId: account.id,
@@ -148,7 +148,7 @@ describe("UserBlockRepository", () => {
 
     it.effect("resolves a contact and rejects a member target", () =>
       Effect.gen(function* () {
-        const repository = yield* UserBlockRepository;
+        const repository = yield* UserBanRepository;
         const organizationId = yield* createOrganization();
         const account = yield* createUser("contact");
         const contactId = yield* createContact({
@@ -193,7 +193,7 @@ describe("UserBlockRepository", () => {
 
     it.effect("does not adopt an account with no workspace relationship", () =>
       Effect.gen(function* () {
-        const repository = yield* UserBlockRepository;
+        const repository = yield* UserBanRepository;
         const organizationId = yield* createOrganization();
         const otherOrganizationId = yield* createOrganization();
         const unrelated = yield* createUser("unrelated");
@@ -290,7 +290,7 @@ describe("UserBlockRepository", () => {
       "rejects an unlinked contact whose address belongs to a member",
       () =>
         Effect.gen(function* () {
-          const repository = yield* UserBlockRepository;
+          const repository = yield* UserBanRepository;
           const organizationId = yield* createOrganization();
           const member = yield* createUser("unlinked-member");
           const db = yield* currentDb;
@@ -320,7 +320,7 @@ describe("UserBlockRepository", () => {
 
     it.effect("prefers a linked contact over a case-variant unlinked row", () =>
       Effect.gen(function* () {
-        const repository = yield* UserBlockRepository;
+        const repository = yield* UserBanRepository;
         const organizationId = yield* createOrganization();
         const account = yield* createUser("case-linked");
 
@@ -348,9 +348,9 @@ describe("UserBlockRepository", () => {
       })
     );
 
-    it.effect("removes a block only inside its workspace", () =>
+    it.effect("removes a ban only inside its workspace", () =>
       Effect.gen(function* () {
-        const repository = yield* UserBlockRepository;
+        const repository = yield* UserBanRepository;
         const organizationId = yield* createOrganization();
         const otherOrganizationId = yield* createOrganization();
         const account = yield* createUser("remove");
@@ -383,7 +383,7 @@ describe("UserBlockRepository", () => {
           })
         ).toEqual({ removed: true });
         expect(
-          yield* repository.isBlocked({ organizationId, userId: account.id })
+          yield* repository.isBanned({ organizationId, userId: account.id })
         ).toBe(false);
       })
     );

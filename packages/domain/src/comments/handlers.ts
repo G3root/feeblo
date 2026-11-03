@@ -15,7 +15,7 @@ import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { CommentPolicy } from "./policies";
 import { CommentRepository } from "./repository";
 import { CommentRpcs } from "./rpcs";

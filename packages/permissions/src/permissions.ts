@@ -69,7 +69,7 @@ const PERMISSION_ACTIONS = {
   integrations: ["manage"],
   apiKeys: ["manage"],
   emailSuppressions: ["manage"],
-  userBlocks: ["manage"],
+  userBans: ["manage"],
 } as const satisfies Record<string, readonly string[]>;
 
 type PermissionGroups = typeof PERMISSION_ACTIONS;
@@ -108,7 +108,7 @@ export const PERMISSIONS = [
     "emailSuppressions",
     PERMISSION_ACTIONS.emailSuppressions
   ),
-  ...createPermissions("userBlocks", PERMISSION_ACTIONS.userBlocks),
+  ...createPermissions("userBans", PERMISSION_ACTIONS.userBans),
 ] satisfies readonly Permission[];
 
 export type PermissionDefinition = {

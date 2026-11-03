@@ -14,7 +14,7 @@ import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { type Surface, definePublicEntry, defineSurfacePair } from "../surface";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { addVoteOnBehalf, removeVoteOnBehalf } from "./on-behalf";
 import { UpvotePolicy } from "./policies";

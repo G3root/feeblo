@@ -32,7 +32,7 @@ export const WidgetCreateFeedbackErrors = Schema.Union([
   NotFoundError,
   InternalServerError,
   UnauthorizedError,
-  // A blocked SSO identity is a real 403, not a server failure. The private
+  // A banned SSO identity is a real 403, not a server failure. The private
   // board policy refusal also reaches this union for the same reason.
   PolicyDeniedError,
   RateLimitErrors,

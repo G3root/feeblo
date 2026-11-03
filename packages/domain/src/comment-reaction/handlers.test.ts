@@ -20,7 +20,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
-import { ParticipationPolicy } from "../user-block/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { CommentReactionRpcHandlersEffect } from "./handlers";
 import { CommentReactionRepository } from "./repository";
 

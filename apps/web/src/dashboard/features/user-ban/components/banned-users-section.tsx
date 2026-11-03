@@ -1,5 +1,6 @@
-import { asLegid, UserBlockId } from "@feeblo/id";
+import { asLegid, UserBanId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
+import { Checkbox } from "@feeblo/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -19,6 +20,11 @@ import {
 } from "@feeblo/ui/empty";
 import { Input } from "@feeblo/ui/input";
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@feeblo/ui/input-group";
+import {
   ItemActions,
   ItemContent,
   ItemDescription,
@@ -30,7 +36,7 @@ import { Textarea } from "@feeblo/ui/textarea";
 import { toastManager } from "@feeblo/ui/toast";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
-import { BanIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, BanIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
@@ -39,30 +45,36 @@ import { SettingsItem } from "~/features/settings/components/settings-item";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { fetchRpc } from "~/lib/runtime";
 
-const blocksQueryKey = (organizationId: string, search: string) =>
-  ["user-blocks", organizationId, search] as const;
+const bansQueryKey = (organizationId: string, search: string) =>
+  ["user-bans", organizationId, search] as const;
 
 /**
- * The workspace's blocked end users.
+ * The workspace's banned end users.
  *
- * A block stops the person writing on the portal or through the widget; it does
- * not hide their existing posts, stop their email, or ban their account. The
+ * A ban stops the person writing on the portal or through the widget; it does
+ * not hide their existing posts, stop their email, or lock their account. The
  * copy says that because an operator who expects a delete will otherwise
- * assume the block did nothing.
+ * assume the ban did nothing — and the ban dialog offers that delete
+ * explicitly instead of doing it silently.
  */
-export function BlockedUsersSection() {
+export function BannedUsersSection({
+  userBansAvailable,
+}: {
+  /** The plan capability; the list stays readable when it lapses. */
+  userBansAvailable: boolean;
+}) {
   const organizationId = useOrganizationId();
   const queryClient = useQueryClient();
   const [search, setSearch] = React.useState("");
-  const [blockOpen, setBlockOpen] = React.useState(false);
+  const [banOpen, setBanOpen] = React.useState(false);
 
-  const queryKey = blocksQueryKey(organizationId, search);
-  const blocksQuery = useQuery({
+  const queryKey = bansQueryKey(organizationId, search);
+  const bansQuery = useQuery({
     queryKey,
     queryFn: ({ signal }) =>
       fetchRpc(
         (rpc) =>
-          rpc.ListUserBlocks({
+          rpc.ListUserBans({
             limit: 100,
             offset: 0,
             organizationId,
@@ -72,11 +84,11 @@ export function BlockedUsersSection() {
       ),
   });
 
-  const unblock = useMutation({
+  const unban = useMutation({
     mutationFn: (id: string) =>
       fetchRpc((rpc) =>
-        rpc.UnblockUser({
-          id: asLegid(UserBlockId)(id),
+        rpc.UnbanUser({
+          id: asLegid(UserBanId)(id),
           organizationId,
         })
       ),
@@ -88,54 +100,68 @@ export function BlockedUsersSection() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ["user-blocks", organizationId],
+        queryKey: ["user-bans", organizationId],
       });
-      toastManager.add({ title: "User unblocked", type: "success" });
+      toastManager.add({ title: "User unbanned", type: "success" });
     },
   });
 
-  const blocks = blocksQuery.data?.items ?? [];
-  const total = blocksQuery.data?.total ?? 0;
+  const bans = bansQuery.data?.items ?? [];
+  const total = bansQuery.data?.total ?? 0;
   const hasFilter = search.trim() !== "";
 
   return (
     <SettingsItem.Root>
       <SettingsItem.Header>
-        <SettingsItem.Title>Blocked users</SettingsItem.Title>
+        <SettingsItem.Title>
+          Banned users
+          {userBansAvailable ? null : (
+            <SettingsItem.PaidPlanIndicator
+              className="ml-2 inline-block"
+              content="Banning users requires the Starter plan or higher."
+            />
+          )}
+        </SettingsItem.Title>
         <SettingsItem.Description>
-          Blocked people can still read the board, but cannot post, comment,
-          vote, react, or subscribe. Their existing content stays visible, and
-          their email preferences are unchanged.
+          Banned people can still read the board, but cannot post, comment,
+          vote, react, or subscribe. Banning removes their votes and
+          unsubscribes them from every post, changelog, and email subscription
+          here. Their existing content stays visible unless you ask for it to be
+          deleted when you ban them.
         </SettingsItem.Description>
       </SettingsItem.Header>
 
       <SettingsItem.Content>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-xs">
-            <HugeiconsIcon
-              className="text-muted-foreground pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2"
-              icon={Search01Icon}
-            />
-            <Input
-              aria-label="Search blocked users"
-              className="ps-8"
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name or email"
-              type="search"
-              value={search}
-            />
+          <div className="w-full sm:max-w-xs">
+            <InputGroup>
+              <InputGroupInput
+                aria-label="Search banned users"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by email"
+                type="search"
+                value={search}
+              />
+              <InputGroupAddon>
+                <HugeiconsIcon aria-hidden="true" icon={Search01Icon} />
+              </InputGroupAddon>
+            </InputGroup>
           </div>
           <PolicyGuard
-            policy={hasPermission(organizationId, "userBlocks.manage")}
+            policy={hasPermission(organizationId, "userBans.manage")}
           >
-            <Button onClick={() => setBlockOpen(true)} variant="outline">
-              <HugeiconsIcon icon={BanIcon} />
-              Block user
+            <Button
+              disabled={!userBansAvailable}
+              onClick={() => setBanOpen(true)}
+              variant="outline"
+            >
+              <HugeiconsIcon icon={Add01Icon} />
+              Add banned user
             </Button>
           </PolicyGuard>
         </div>
 
-        {blocksQuery.isPending ? (
+        {bansQuery.isPending ? (
           <SkeletonLoader isLoading>
             <div className="flex flex-col gap-2">
               {[0, 1, 2].map((key) => (
@@ -148,19 +174,19 @@ export function BlockedUsersSection() {
               ))}
             </div>
           </SkeletonLoader>
-        ) : blocksQuery.isError ? (
+        ) : bansQuery.isError ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <HugeiconsIcon icon={BanIcon} />
               </EmptyMedia>
-              <EmptyTitle>Unable to load blocked users</EmptyTitle>
+              <EmptyTitle>Unable to load banned users</EmptyTitle>
               <EmptyDescription>
-                {parseRpcError(blocksQuery.error).message}
+                {parseRpcError(bansQuery.error).message}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
-        ) : blocks.length === 0 ? (
+        ) : bans.length === 0 ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -168,46 +194,49 @@ export function BlockedUsersSection() {
               </EmptyMedia>
               <EmptyTitle>
                 {hasFilter
-                  ? "No blocked users match this search"
-                  : "No blocked users"}
+                  ? "No banned users match this search"
+                  : "No banned users"}
               </EmptyTitle>
               <EmptyDescription>
                 {hasFilter
                   ? "Try a different name or email address."
-                  : "Block a person by email address to stop them writing here. They can still read, and their existing content stays visible."}
+                  : "Ban a person by email address to stop them writing here. They can still read, and their existing content stays visible."}
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
           <div className="flex flex-col gap-2" role="list">
-            {blocks.map((block) => (
-              <SettingsItem.Item key={block.id} role="listitem">
+            {bans.map((ban) => (
+              <SettingsItem.Item key={ban.id} role="listitem">
                 <ItemContent>
                   <ItemTitle>
-                    {block.userName ?? block.email ?? "Blocked user"}
+                    {ban.userName ?? ban.email ?? "Banned user"}
                   </ItemTitle>
                   <ItemDescription>
+                    {/* The address is only worth its own line when the name
+                        above is not the address itself; otherwise the card
+                        says the same thing twice. */}
+                    {ban.userName !== null && ban.email !== null ? (
+                      <span className="block">{ban.email}</span>
+                    ) : null}
                     <span className="block">
-                      {block.email ?? "No email on file"}
-                    </span>
-                    <span className="block">
-                      {block.reason
-                        ? `Reason: ${block.reason}`
+                      {ban.reason
+                        ? `Reason: ${ban.reason}`
                         : "No reason recorded"}
                       {" · "}
-                      Blocked {new Date(block.createdAt).toLocaleDateString()}
-                      {block.createdByName ? ` by ${block.createdByName}` : ""}
+                      Banned {new Date(ban.createdAt).toLocaleDateString()}
+                      {ban.createdByName ? ` by ${ban.createdByName}` : ""}
                     </span>
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
                   <Button
-                    disabled={unblock.isPending}
-                    onClick={() => unblock.mutate(block.id)}
+                    disabled={unban.isPending}
+                    onClick={() => unban.mutate(ban.id)}
                     size="sm"
                     variant="outline"
                   >
-                    Unblock
+                    Unban
                   </Button>
                 </ItemActions>
               </SettingsItem.Item>
@@ -215,48 +244,50 @@ export function BlockedUsersSection() {
           </div>
         )}
 
-        {total > blocks.length ? (
+        {total > bans.length ? (
           <p className="text-muted-foreground text-sm">
-            Showing {blocks.length} of {total} blocked users. Narrow the search
-            to find the rest.
+            Showing {bans.length} of {total} banned users. Narrow the search to
+            find the rest.
           </p>
         ) : null}
       </SettingsItem.Content>
 
-      <BlockUserDialog
-        onBlocked={() => {
+      <BanUserDialog
+        onBanned={() => {
           void queryClient.invalidateQueries({
-            queryKey: ["user-blocks", organizationId],
+            queryKey: ["user-bans", organizationId],
           });
         }}
-        onOpenChange={setBlockOpen}
-        open={blockOpen}
+        onOpenChange={setBanOpen}
+        open={banOpen}
         organizationId={organizationId}
       />
     </SettingsItem.Root>
   );
 }
 
-function BlockUserDialog({
-  onBlocked,
+function BanUserDialog({
+  onBanned,
   onOpenChange,
   open,
   organizationId,
 }: {
-  onBlocked: () => void;
+  onBanned: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organizationId: string;
 }) {
   const [email, setEmail] = React.useState("");
   const [reason, setReason] = React.useState("");
+  const [deleteContent, setDeleteContent] = React.useState(false);
 
-  const block = useMutation({
+  const ban = useMutation({
     mutationFn: () =>
       fetchRpc((rpc) =>
-        rpc.BlockUser({
+        rpc.BanUser({
           organizationId,
           target: { _tag: "email", email: email.trim() },
+          deleteContent,
           ...(reason.trim() !== "" && { reason: reason.trim() }),
         })
       ),
@@ -267,11 +298,12 @@ function BlockUserDialog({
       });
     },
     onSuccess: () => {
-      onBlocked();
+      onBanned();
       setEmail("");
       setReason("");
+      setDeleteContent(false);
       onOpenChange(false);
-      toastManager.add({ title: "User blocked", type: "success" });
+      toastManager.add({ title: "User banned", type: "success" });
     },
   });
 
@@ -279,10 +311,13 @@ function BlockUserDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>Block user</DialogTitle>
+          <DialogTitle>Ban user</DialogTitle>
           <DialogDescription>
-            Enter the email address of the person you want to block. They can
-            still read the board; they just cannot write to it.
+            Enter the email address of the person you want to ban. They can
+            still read the board; they just cannot write to it. Their votes are
+            removed and they are unsubscribed from every post, changelog, and
+            email subscription here. Workspace members cannot be banned — remove
+            them from the workspace instead.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -290,15 +325,15 @@ function BlockUserDialog({
           onSubmit={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            block.mutate();
+            ban.mutate();
           }}
         >
           <DialogPanel className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="block-email">Email address</Label>
+              <Label htmlFor="ban-email">Email address</Label>
               <Input
                 autoComplete="email"
-                id="block-email"
+                id="ban-email"
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="person@example.com"
                 required
@@ -307,14 +342,27 @@ function BlockUserDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="block-reason">Reason (optional)</Label>
+              <Label htmlFor="ban-reason">Reason (optional)</Label>
               <Textarea
-                id="block-reason"
+                id="ban-reason"
                 maxLength={500}
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="Spam, abuse, or a note for your team"
                 value={reason}
               />
+            </div>
+            <div className="flex items-start gap-2">
+              <Checkbox
+                checked={deleteContent}
+                id="ban-delete-content"
+                onCheckedChange={(checked) => setDeleteContent(checked)}
+              />
+              <Label
+                className="text-sm font-normal"
+                htmlFor="ban-delete-content"
+              >
+                Also delete their posts and comments in this workspace
+              </Label>
             </div>
           </DialogPanel>
           <DialogFooter>
@@ -322,10 +370,10 @@ function BlockUserDialog({
               Cancel
             </DialogClose>
             <Button
-              disabled={block.isPending || email.trim() === ""}
+              disabled={ban.isPending || email.trim() === ""}
               type="submit"
             >
-              {block.isPending ? "Blocking..." : "Block user"}
+              {ban.isPending ? "Banning..." : "Ban user"}
             </Button>
           </DialogFooter>
         </form>

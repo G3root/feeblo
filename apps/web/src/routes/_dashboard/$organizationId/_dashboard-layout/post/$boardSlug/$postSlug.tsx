@@ -38,6 +38,7 @@ import {
 } from "~/features/post/components/post-page-sections";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
+import { useEntitlements } from "~/hooks/use-entitlements";
 import { preloadPostDetail } from "~/lib/preloads";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -73,6 +74,15 @@ function RouteComponent() {
   const githubResourcesPolicy = usePolicy(
     hasPermission(organizationId, "integrations.manage")
   );
+  // Banning a comment or post author is a manager action behind the paid plan
+  // gate; the server enforces both, and the actions are hidden otherwise.
+  const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
+  const { allowed: canManageUserBans } = usePolicy(
+    hasPermission(organizationId, "userBans.manage")
+  );
+  const canBanAuthors =
+    canManageUserBans &&
+    (isEntitlementsLoading || entitlements.capabilities.userBans);
   // The dialog lives here rather than inside the linked-resource menu: a menu
   // item click closes (and unmounts) the popup, so a dialog mounted in the
   // actions node would disappear with it.
@@ -166,6 +176,7 @@ function RouteComponent() {
   return (
     <PostPage.Root
       board={board}
+      canBanAuthors={canBanAuthors}
       organizationId={organizationId}
       pageType="Dashboard"
       post={post}

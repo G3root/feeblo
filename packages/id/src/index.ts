@@ -234,7 +234,7 @@ export const DataImportRowId = makeId("data_import_row", "dir", {
   approximateLength,
 });
 
-/** Identifies one workspace-scoped block of an end user. */
-export const UserBlockId = makeId("user_block", "ubl", {
+/** Identifies one workspace-scoped ban of an end user. */
+export const UserBanId = makeId("user_ban", "ubn", {
   approximateLength,
 });
