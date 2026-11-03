@@ -1,11 +1,12 @@
-import { transaction } from "@feeblo/db";
+import { Database, transaction } from "@feeblo/db";
 import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { PostId } from "@feeblo/id";
 import { markdownToHtmlCached } from "@feeblo/utils/markdown";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
-import * as Layer from "effect/Layer";
+import type * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -16,12 +17,12 @@ import type {
 } from "../attribute-definition/schema";
 import { BoardRepository } from "../board/repository";
 import { ChangelogRepository } from "../changelog/repository";
+import { ClientIp } from "../client-ip";
 import { CompanyRepository } from "../company/repository";
 import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
-import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
   maxTokenLifetimeFromMinutes,
@@ -34,6 +35,7 @@ import { PostRepository } from "../post/repository";
 import { makePostSuggestions } from "../post/suggestions";
 import { PostWriteService } from "../post/write";
 import * as RateLimit from "../rate-limit";
+import { RateLimitService } from "../rate-limit/service";
 import {
   InternalServerError,
   NotFoundError,
@@ -41,7 +43,11 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
-import { WidgetCreateFeedbackErrors } from "./api-contract";
+import {
+  WidgetApi,
+  WidgetApiGroup,
+  WidgetCreateFeedbackErrors,
+} from "./api-contract";
 import {
   type TWidgetFeedbackMetadata,
   WidgetFeedbackMetadataValue,
@@ -118,79 +124,104 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
 });
 
 /**
- * The widget HTTP surface, composed once.
+ * The services a widget handler reads while it answers a request.
  *
- * The feedback write is the shared post write path (`post/write.ts`), built
- * here at group construction so a widget submission lands in the same
- * timeline, webhook, staff notification, submission email window, and search
- * embedding as a dashboard or Public API create. The group depends on the
- * shared `PostWriteService`; the pieces only this surface's handlers touch
- * stay in the layer build below.
+ * This is the surface's whole reading list, declared once. The group builder
+ * captures it as one `Context` when the route is built and every handler below
+ * closes over that context, so a service a handler reads and this list omits
+ * fails the handler's `WidgetHandler` type, and a service this list names and
+ * the route does not supply fails `./router.ts`'s layer type. The previous
+ * shape listed the same services twice — once as `yield*`, once as
+ * `Effect.provideService` — and proved neither direction; see docs/adr/0006.
+ *
+ * `ClientIp` is deliberately absent: the global client-IP middleware supplies
+ * it per request, so it does not exist when the group is built and cannot be
+ * captured.
+ */
+export type WidgetApiDependencies =
+  | AttributeDefinitionRepository
+  | BoardRepository
+  | ChangelogRepository
+  | CompanyRepository
+  | ContactRepository
+  | Crypto.Crypto
+  | Database.Database
+  | EntitlementPolicy
+  | JwtSecretRepository
+  | OrganizationRepository
+  | PostEmbeddingService
+  | PostRepository
+  | PostStatusRepository
+  | PostWriteService
+  | RateLimitService
+  | SitePolicy;
+
+/** The group as composed, so a handler is typed against its own endpoints. */
+type ComposedWidgetGroup = InstanceType<typeof WidgetApiGroup>;
+
+/**
+ * One endpoint's implementation.
+ *
+ * `ClientIp` is the handler's entire residual requirement: the rate limiter
+ * reads it from the request, and the global client-IP middleware supplies it
+ * there. Stating it is what makes a handler that reads anything outside
+ * `WidgetApiDependencies` a compile error instead of a missing-service defect
+ * on a live request.
+ */
+type WidgetHandler<Identifier extends keyof ComposedWidgetGroup["endpoints"]> =
+  HttpApiEndpoint.Handler<
+    ComposedWidgetGroup["endpoints"][Identifier],
+    HttpApiEndpoint.MiddlewareError<
+      ComposedWidgetGroup["endpoints"][Identifier]
+    >,
+    ClientIp
+  >;
+
+/**
+ * The widget HTTP surface, composed once, against its own `HttpApi`.
+ *
+ * The feedback write is the shared post write path (`post/write.ts`), so a
+ * widget submission lands in the same timeline, webhook, staff notification,
+ * submission email window, and search embedding as a dashboard or Public API
+ * create. `PostWriteService` is a captured dependency; the write path's
+ * optional fan-outs stay request-context reads, which is why the route needs
+ * them supplied (`apps/server/src/app/layers.ts`).
+ *
+ * The group is registered on `WidgetApi`, not the dashboard's `Api`: the
+ * widget is its own surface with its own route (`./router.ts`), and its
+ * endpoints therefore no longer appear in the dashboard's `/docs/openapi.json`.
  */
 export const WidgetApiLive = HttpApiBuilder.group(
-  Api,
+  WidgetApi,
   "WidgetApiGroup",
   (handlers) =>
     Effect.gen(function* () {
-      const attributeDefinitionRepository =
-        yield* AttributeDefinitionRepository;
-      const boardRepository = yield* BoardRepository;
-      const changelogRepository = yield* ChangelogRepository;
-      const companyRepository = yield* CompanyRepository;
-      const contactRepository = yield* ContactRepository;
-      const jwtSecretRepository = yield* JwtSecretRepository;
-      const organizationRepository = yield* OrganizationRepository;
-      const postStatusRepository = yield* PostStatusRepository;
-      const sitePolicy = yield* SitePolicy;
-      const writes = yield* PostWriteService;
-      const entitlementPolicy = yield* EntitlementPolicy;
-      const postRepository = yield* PostRepository;
-      const postEmbeddings = yield* PostEmbeddingService;
+      // The one declaration of what this surface reads. `HttpApiBuilder` serves
+      // a handler with the context its group was built in, so capturing it here
+      // is what puts the list in the group layer's requirement channel; the
+      // handlers close over `context`, which is also what proves the list
+      // complete.
+      const context = yield* Effect.context<WidgetApiDependencies>();
+
       // The same suggestion program the dashboard and public portal RPCs run,
-      // with the widget's public-only rule. Its collaborators are captured
-      // here so the handler does not build a layer per request.
+      // with the widget's public-only rule. Its collaborators are read here so
+      // the handler does not build a layer per request.
       const suggestions = makePostSuggestions({
-        candidates: postRepository.findSuggestionCandidates,
-        embeddings: Option.some(postEmbeddings),
+        candidates: (yield* PostRepository).findSuggestionCandidates,
+        embeddings: Option.some(yield* PostEmbeddingService),
       });
 
-      /**
-       * The handler's own services, provided around the feedback effect.
-       *
-       * `HttpApiBuilder` reads a handler's requirements from its own effect,
-       * so these are closed over here rather than left to the route layer;
-       * the shared write path's environment comes from `PostWriteService`.
-       */
-      const provideHandlerEnvironment = <A, E, R>(
-        effect: Effect.Effect<A, E, R>
-      ) =>
-        effect.pipe(
-          Effect.provideService(
-            AttributeDefinitionRepository,
-            attributeDefinitionRepository
-          ),
-          Effect.provideService(BoardRepository, boardRepository),
-          Effect.provideService(ChangelogRepository, changelogRepository),
-          Effect.provideService(CompanyRepository, companyRepository),
-          Effect.provideService(ContactRepository, contactRepository),
-          Effect.provideService(JwtSecretRepository, jwtSecretRepository),
-          Effect.provideService(OrganizationRepository, organizationRepository),
-          Effect.provideService(PostStatusRepository, postStatusRepository),
-          Effect.provideService(SitePolicy, sitePolicy)
-        );
-
       return handlers
-        .handle("listUpdates", ({ payload }) =>
+        .handle("listUpdates", (({ payload }) =>
           listWidgetUpdates(payload).pipe(
             RateLimit.withPublicHttpRateLimit({
               name: "WidgetListUpdates",
               level: "read",
             }),
-            provideHandlerEnvironment,
-            withRemapDbErrors("Changelog", "select")
-          )
-        )
-        .handle("suggestPosts", ({ payload }) =>
+            withRemapDbErrors("Changelog", "select"),
+            Effect.provideContext(context)
+          )) satisfies WidgetHandler<"listUpdates">)
+        .handle("suggestPosts", (({ payload }) =>
           suggestions({ ...payload, publicOnly: true }).pipe(
             Effect.map((posts) =>
               posts.map(({ id, title, excerpt, slug }) => ({
@@ -210,10 +241,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
             RateLimit.withPublicHttpRateLimit({
               name: "WidgetSuggestPosts",
               level: "expensive",
-            })
-          )
-        )
-        .handle("listBoards", ({ payload }) =>
+            }),
+            Effect.provideContext(context)
+          )) satisfies WidgetHandler<"suggestPosts">)
+        .handle("listBoards", (({ payload }) =>
           Effect.gen(function* () {
             const repository = yield* BoardRepository;
             const boards = yield* repository.findMany({
@@ -227,11 +258,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetListBoards",
               level: "read",
             }),
-            provideHandlerEnvironment,
-            withRemapDbErrors("Boards", "select")
-          )
-        )
-        .handle("createFeedback", ({ payload }) => {
+            withRemapDbErrors("Boards", "select"),
+            Effect.provideContext(context)
+          )) satisfies WidgetHandler<"listBoards">)
+        .handle("createFeedback", (({ payload }) => {
           const { boardId, organizationId, title, content, metadata, token } =
             payload;
 
@@ -241,6 +271,12 @@ export const WidgetApiLive = HttpApiBuilder.group(
             const jwtSecretRepository = yield* JwtSecretRepository;
             const attributeDefinitionRepository =
               yield* AttributeDefinitionRepository;
+            // The shared write path. Its own environment is provided once by
+            // `PostWriteService.layer` at the composition root, so this is the
+            // one tag the widget depends on for a submission to land in the
+            // same timeline, webhook, notification, and embedding pipeline as
+            // a dashboard or Public API create.
+            const writes = yield* PostWriteService;
 
             // Defense-in-depth re-validation of the public request metadata
             // before it is stored / delivered downstream (webhooks, email,
@@ -356,9 +392,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
                     );
                   })
                 ).pipe(
-                  // The SSO contact upsert creates through the shared intake
-                  // module, which reads the plan decision from the context.
-                  Effect.provideService(EntitlementPolicy, entitlementPolicy),
                   // A rejected or malformed SSO token is the caller's mistake,
                   // and the endpoint publishes both tags for it: answer with
                   // the real 401/400 instead of folding them into a 500 that
@@ -410,7 +443,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetCreateFeedback",
               level: "write",
             }),
-            provideHandlerEnvironment,
             Effect.catchTags({
               PostAlreadyExistsError: () =>
                 Effect.logWarning(
@@ -438,24 +470,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
                 : new InternalServerError({
                     message: "Failed to create feedback",
                   })
-            )
+            ),
+            Effect.provideContext(context)
           );
-        });
+        }) satisfies WidgetHandler<"createFeedback">);
     })
-).pipe(
-  Layer.provide(
-    Layer.mergeAll(
-      AttributeDefinitionRepository.layer,
-      BoardRepository.layer,
-      ChangelogRepository.layer,
-      CompanyRepository.layer,
-      ContactRepository.layer,
-      JwtSecretRepository.layer,
-      OrganizationRepository.layer,
-      PostEmbeddingService.layer,
-      PostRepository.layer,
-      PostStatusRepository.layer,
-      SitePolicy.layer
-    )
-  )
 );

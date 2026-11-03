@@ -9,7 +9,6 @@ import { NotificationPreferenceApiLive } from "../notification-preference/api-li
 import { OrganizationApiLive } from "../organization/api-live";
 import { PricingApiLive } from "../pricing/api-live";
 import { ProfileApiLive } from "../profile/api-live";
-import { WidgetApiLive } from "../widget/api-live";
 import { Api } from "./api";
 
 export const HttpRoute = HttpApiBuilder.layer(Api, {
@@ -22,6 +21,5 @@ export const HttpRoute = HttpApiBuilder.layer(Api, {
   Layer.provide(NotificationPreferenceApiLive),
   Layer.provide(OrganizationApiLive),
   Layer.provide(PricingApiLive),
-  Layer.provide(ProfileApiLive),
-  Layer.provide(WidgetApiLive)
+  Layer.provide(ProfileApiLive)
 );
