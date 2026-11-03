@@ -301,6 +301,7 @@ describe("UserBanRpcHandlers", () => {
 
         yield* handlers
           .UnbanUser({
+            _tag: "row",
             id: asLegid(UserBanId)(result.ban.id),
             organizationId: fixture.organizationId,
           })
@@ -423,6 +424,66 @@ describe("UserBanRpcHandlers", () => {
           email: author.email,
           userId: author.id,
         });
+      })
+    );
+
+    it.effect("lifts a ban named by the row it was made from", () =>
+      Effect.gen(function* () {
+        const handlers = yield* UserBanRpcHandlersEffect;
+        const posts = yield* PostRepository;
+        const fixture = yield* makeFixture();
+        const author = yield* createEndUser({
+          organizationId: fixture.organizationId,
+          restricted: false,
+          suffix: "lift",
+        });
+        const postId = yield* createPost(fixture, author.id);
+
+        yield* handlers
+          .BanUser({
+            organizationId: fixture.organizationId,
+            target: { _tag: "post", postId },
+          })
+          .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
+        // The moderation menu has no ban id, so it names the post again and
+        // the server resolves the author from it.
+        yield* handlers
+          .UnbanUser({
+            _tag: "author",
+            organizationId: fixture.organizationId,
+            target: { _tag: "post", postId },
+          })
+          .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
+        const listed = yield* handlers
+          .ListUserBans({
+            limit: 20,
+            offset: 0,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session(fixture)));
+        expect(listed.total).toBe(0);
+
+        const post = yield* posts.findBySlug({
+          organizationId: fixture.organizationId,
+          slug: `slug-${postId}`,
+        });
+        expect(post?.authorIsBanned).toBe(false);
+
+        // Lifting a ban that is not there is the same NotFound a stale id
+        // produces, not a silent success.
+        const again = yield* handlers
+          .UnbanUser({
+            _tag: "author",
+            organizationId: fixture.organizationId,
+            target: { _tag: "post", postId },
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, session(fixture)),
+            Effect.flip
+          );
+        expect(again).toMatchObject({ _tag: "NotFoundError" });
       })
     );
 

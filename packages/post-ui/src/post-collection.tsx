@@ -43,6 +43,7 @@ function ResolvedPostCollectionProvider({
   organizationId,
   pageType,
   post,
+  userBanActions,
 }: ResolvedProviderProps) {
   const state = buildPostCollectionState({
     board,
@@ -55,6 +56,7 @@ function ResolvedPostCollectionProvider({
     isMember,
     isAuthenticated: isSessionAuthenticated,
     pageType,
+    userBanActions,
   });
 
   return <StateProvider value={state}>{children}</StateProvider>;
@@ -122,6 +124,7 @@ export function PostCollectionDataProvider({
   post,
   organizationId,
   pageType,
+  userBanActions,
 }: PostCollectionDataProviderProps) {
   const { data: session } = useAuthState();
   const { allowed: canManageAllPosts } = usePolicy(
@@ -163,6 +166,7 @@ export function PostCollectionDataProvider({
     organizationId,
     pageType,
     post,
+    userBanActions,
   };
 
   // A post id is always present here; the guard documents what the branch

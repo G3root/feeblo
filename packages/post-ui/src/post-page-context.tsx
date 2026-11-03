@@ -2,6 +2,31 @@ import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TPostListItem } from "@feeblo/domain/post/schema";
 import { createContext, type ReactNode, use } from "react";
 
+import type { BanAuthorTarget } from "./dialog-stores/ban-author";
+
+/**
+ * How the host records and lifts a ban.
+ *
+ * The dashboard supplies this so both writes go through its ban atoms. Those
+ * bump the reactivity key the settings list is cached under, which is what
+ * keeps that list and the author badges agreeing — a bare RPC would update
+ * one surface and leave the other stale. A surface with no ban action (the
+ * public board) omits it.
+ */
+export type UserBanActions = {
+  readonly ban: (input: {
+    readonly deleteContent: boolean;
+    readonly reason?: string;
+    readonly target: BanAuthorTarget;
+  }) => Promise<{
+    readonly deletedComments: number;
+    readonly deletedPosts: number;
+  }>;
+  readonly unban: (input: {
+    readonly target: BanAuthorTarget;
+  }) => Promise<void>;
+};
+
 type TPageType = "Dashboard" | "PublicPage";
 
 export interface PostCollectionState {
@@ -11,9 +36,13 @@ export interface PostCollectionState {
    *
    * Supplied by the dashboard from the `userBans.manage` permission and the
    * plan's `userBans` capability; the public surfaces never pass it, so the
-   * action does not exist there.
+   * action does not exist there. It also requires {@link UserBanActions}: a
+   * permission to offer the action without a way to perform it would render a
+   * menu item that cannot do anything.
    */
   canBanAuthors: boolean;
+  /** The host's ban and unban writes; see {@link UserBanActions}. */
+  userBanActions: UserBanActions | undefined;
   canDeletePost: boolean;
   canManagePost: boolean;
   canModeratePost: boolean;
@@ -42,6 +71,8 @@ export interface PostCollectionDataProviderProps {
   organizationId: string;
   pageType: TPageType;
   post: TPostListItem;
+  /** See {@link PostCollectionState.userBanActions}. */
+  userBanActions?: UserBanActions;
 }
 
 const PostCollectionDataContext = createContext<PostCollectionState | null>(
@@ -83,6 +114,7 @@ export function createPostCollectionState({
   organizationId,
   pageType,
   post,
+  userBanActions,
 }: PostCollectionDataProviderProps &
   Pick<
     PostCollectionState,
@@ -94,7 +126,7 @@ export function createPostCollectionState({
   >): PostCollectionState {
   return {
     board,
-    canBanAuthors,
+    canBanAuthors: canBanAuthors && userBanActions !== undefined,
     canDeletePost,
     canManagePost,
     canModeratePost,
@@ -108,5 +140,6 @@ export function createPostCollectionState({
     organizationId,
     pageType,
     post,
+    userBanActions,
   };
 }

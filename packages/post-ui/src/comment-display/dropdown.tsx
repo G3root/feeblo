@@ -11,6 +11,7 @@ import { DeleteButton } from "./delete-button";
 import { EditButton } from "./edit-button";
 import { PinButton } from "./pin-button";
 import { ToggleVisibilityButton } from "./toggle-visibility-button";
+import { UnbanAuthorButton } from "./unban-author-button";
 
 export function CommentDisplayDropdown() {
   const { canBanAuthors, canModeratePost } = usePostCollectionData();
@@ -22,10 +23,12 @@ export function CommentDisplayDropdown() {
 
   // A ban is for end users: staff are managed through membership, and the
   // server refuses a member target for the same reason. Offering it again for
-  // somebody already banned would only re-upsert the row the header badge is
-  // already reporting.
+  // somebody already banned would only re-upsert the row; that author gets the
+  // unban action instead.
   const canBanAuthor =
     canBanAuthors && !state.authorIsMember && !state.authorIsBanned;
+  const canUnbanAuthor =
+    canBanAuthors && !state.authorIsMember && state.authorIsBanned;
 
   return (
     <Menu>
@@ -47,6 +50,7 @@ export function CommentDisplayDropdown() {
         {canModeratePost ? <PinButton /> : null}
         <DeleteButton />
         {canBanAuthor ? <BanAuthorButton /> : null}
+        {canUnbanAuthor ? <UnbanAuthorButton /> : null}
       </MenuPopup>
     </Menu>
   );

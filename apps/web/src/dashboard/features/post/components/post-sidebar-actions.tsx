@@ -18,12 +18,14 @@ import {
   refetchInBackground,
   settleOptimisticMutation,
 } from "@feeblo/web-shared/collections";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import {
   CircleLockIcon,
   CircleUnlockIcon,
   LinkSquare02Icon,
   Trash2,
   UserBlock01Icon,
+  UserUnlock01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createOptimisticAction } from "@tanstack/react-db";
@@ -67,11 +69,14 @@ function PostAdminActionButtons() {
     isLocked,
     isMerged,
     organizationId,
+    userBanActions,
   } = usePostCollectionData();
-  const { postActivityCollection, postCollection } = useDashboardCollections();
+  const { commentCollection, postActivityCollection, postCollection } =
+    useDashboardCollections();
   const postDialogStore = usePostDeleteDialogContext();
   const banDialogStore = useBanAuthorDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
+  const [isUnbanning, setIsUnbanning] = useState(false);
 
   const lockLabel = isLocked ? "Unlock post" : "Lock post";
 
@@ -125,6 +130,83 @@ function PostAdminActionButtons() {
     );
   };
 
+  const unbanAuthor = async () => {
+    if (userBanActions === undefined) {
+      return;
+    }
+    setIsUnbanning(true);
+    try {
+      await userBanActions.unban({
+        target: { _tag: "post", postId: post.id },
+      });
+      toastManager.add({
+        title: `Unbanned ${post.user.name ?? "this author"}`,
+        type: "success",
+      });
+      // The badge on this page and every comment badge derive from these rows.
+      await postCollection.utils.refetch();
+      await commentCollection.utils.refetch();
+    } catch (error) {
+      toastManager.add({
+        title: parseRpcError(error).message,
+        type: "error",
+      });
+    } finally {
+      setIsUnbanning(false);
+    }
+  };
+
+  const banAuthorButton = (
+    <Tooltip>
+      <TooltipTrigger
+        render={(props) => (
+          <Button
+            {...props}
+            aria-label="Ban author"
+            className="rounded-full"
+            onClick={() =>
+              banDialogStore.send({
+                type: "toggle",
+                data: {
+                  authorName: post.user.name ?? "this user",
+                  target: { _tag: "post", postId: post.id },
+                },
+              })
+            }
+            size="icon-sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={UserBlock01Icon} />
+          </Button>
+        )}
+      />
+      <TooltipPopup>Ban author</TooltipPopup>
+    </Tooltip>
+  );
+
+  const unbanAuthorButton = (
+    <Tooltip>
+      <TooltipTrigger
+        render={(props) => (
+          <Button
+            {...props}
+            aria-label="Unban author"
+            className="rounded-full"
+            disabled={isUnbanning}
+            onClick={() => {
+              void unbanAuthor();
+            }}
+            size="icon-sm"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={UserUnlock01Icon} />
+          </Button>
+        )}
+      />
+      <TooltipPopup>Unban author</TooltipPopup>
+    </Tooltip>
+  );
+
   return (
     <>
       <PostMergeMenu />
@@ -150,37 +232,11 @@ function PostAdminActionButtons() {
         <TooltipPopup>{lockLabel}</TooltipPopup>
       </Tooltip>
 
-      {canBanAuthors && !post.authorIsMember && post.creatorId ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={(props) => (
-              <Button
-                {...props}
-                aria-label="Ban author"
-                className="rounded-full"
-                // A ban is idempotent on the server, but offering it again for
-                // somebody the post already marks as banned reads as if the
-                // first ban had not landed. `PostAuthorField` shows the badge.
-                disabled={post.authorIsBanned === true}
-                onClick={() =>
-                  banDialogStore.send({
-                    type: "toggle",
-                    data: {
-                      authorName: post.user.name ?? "this user",
-                      target: { _tag: "post", postId: post.id },
-                    },
-                  })
-                }
-                size="icon-sm"
-                variant="outline"
-              >
-                <HugeiconsIcon icon={UserBlock01Icon} />
-              </Button>
-            )}
-          />
-          <TooltipPopup>Ban author</TooltipPopup>
-        </Tooltip>
-      ) : null}
+      {canBanAuthors && !post.authorIsMember && post.creatorId
+        ? post.authorIsBanned === true
+          ? unbanAuthorButton
+          : banAuthorButton
+        : null}
 
       <Tooltip>
         <TooltipTrigger

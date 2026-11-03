@@ -1,4 +1,8 @@
+import { useAtomSet } from "@effect/atom-react";
+import { asLegid, CommentId, PostId } from "@feeblo/id";
+import type { BanAuthorTarget } from "@feeblo/post-ui/dialog-stores";
 import { PostPage } from "@feeblo/post-ui/post-page";
+import type { UserBanActions } from "@feeblo/post-ui/post-page-context";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
@@ -38,6 +42,11 @@ import {
 } from "~/features/post/components/post-page-sections";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
+import {
+  banUserAtom,
+  unbanUserAtom,
+  userBanReactivityKeys,
+} from "~/features/user-ban/atoms";
 import { useEntitlements } from "~/hooks/use-entitlements";
 import { preloadPostDetail } from "~/lib/preloads";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -65,6 +74,18 @@ type GitHubIssueDialog = {
   readonly postId: string;
 };
 
+/**
+ * post-ui names a participation row with the plain ids it renders; the RPC
+ * schema brands them.
+ */
+const toUserBanTarget = (target: BanAuthorTarget) =>
+  target._tag === "comment"
+    ? {
+        _tag: "comment" as const,
+        commentId: asLegid(CommentId)(target.commentId),
+      }
+    : { _tag: "post" as const, postId: asLegid(PostId)(target.postId) };
+
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
@@ -83,6 +104,39 @@ function RouteComponent() {
   const canBanAuthors =
     canManageUserBans &&
     (isEntitlementsLoading || entitlements.capabilities.userBans);
+  // Ban and unban go through the ban atoms rather than a bare RPC: the atoms
+  // bump the reactivity key the security settings list is cached under, so
+  // writing from here cannot leave that list — or the badges it agrees with —
+  // showing the previous answer.
+  const banUser = useAtomSet(banUserAtom, { mode: "promise" });
+  const unbanUser = useAtomSet(unbanUserAtom, { mode: "promise" });
+  const userBanActions = useMemo<UserBanActions>(
+    () => ({
+      ban: (input) =>
+        banUser({
+          payload: {
+            deleteContent: input.deleteContent,
+            organizationId,
+            target: toUserBanTarget(input.target),
+            ...(input.reason === undefined
+              ? undefined
+              : { reason: input.reason }),
+          },
+          reactivityKeys: userBanReactivityKeys(organizationId),
+        }),
+      unban: async (input) => {
+        await unbanUser({
+          payload: {
+            _tag: "author",
+            organizationId,
+            target: toUserBanTarget(input.target),
+          },
+          reactivityKeys: userBanReactivityKeys(organizationId),
+        });
+      },
+    }),
+    [banUser, organizationId, unbanUser]
+  );
   // The dialog lives here rather than inside the linked-resource menu: a menu
   // item click closes (and unmounts) the popup, so a dialog mounted in the
   // actions node would disappear with it.
@@ -180,6 +234,7 @@ function RouteComponent() {
       organizationId={organizationId}
       pageType="Dashboard"
       post={post}
+      userBanActions={userBanActions}
     >
       <div className="grid min-h-full lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-6 md:py-8">

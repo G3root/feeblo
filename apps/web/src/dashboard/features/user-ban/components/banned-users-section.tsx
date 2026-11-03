@@ -35,6 +35,7 @@ import { Label } from "@feeblo/ui/label";
 import { SkeletonLoader } from "@feeblo/ui/skeleton-loader";
 import { Textarea } from "@feeblo/ui/textarea";
 import { toastManager } from "@feeblo/ui/toast";
+import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { Add01Icon, BanIcon, Search01Icon } from "@hugeicons/core-free-icons";
@@ -45,6 +46,7 @@ import * as React from "react";
 
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
   banUserAtom,
@@ -70,6 +72,7 @@ export function BannedUsersSection({
   userBansAvailable: boolean;
 }) {
   const organizationId = useOrganizationId();
+  const { commentCollection, postCollection } = useDashboardCollections();
   const [search, setSearch] = React.useState("");
   const [banOpen, setBanOpen] = React.useState(false);
   const [unbanningId, setUnbanningId] = React.useState<string | null>(null);
@@ -134,9 +137,21 @@ export function BannedUsersSection({
     setUnbanningId(id);
     try {
       await unban({
-        payload: { id: asLegid(UserBanId)(id), organizationId },
+        payload: {
+          _tag: "row",
+          id: asLegid(UserBanId)(id),
+          organizationId,
+        },
         reactivityKeys: userBanReactivityKeys(organizationId),
       });
+      // The settings list is cached in an atom and refreshes through the
+      // reactivity key. The badges are collection rows, so they need saying
+      // separately: without this, a post page opened afterwards still reports
+      // the author as banned.
+      refetchInBackground(
+        postCollection.utils.refetch(),
+        commentCollection.utils.refetch()
+      );
       toastManager.add({ title: "User unbanned", type: "success" });
     } catch (failure) {
       toastManager.add({

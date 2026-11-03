@@ -903,6 +903,38 @@ const makeUserBanRepository = Effect.gen(function* () {
     return { removed: removed !== undefined };
   });
 
+  /**
+   * Removes the ban covering an author, named by the identities a ban can
+   * store.
+   *
+   * The caller has a participation row rather than a ban id, so it resolved
+   * the author first. Both facets are tested because a ban recorded against an
+   * address before the person had an account carries no `user_id` and would
+   * survive an account-only delete.
+   */
+  const removeByFacets = Effect.fn("UserBanRepository.removeByFacets")(
+    function* (input: {
+      readonly email: string | null;
+      readonly organizationId: string;
+      readonly userId: string | null;
+    }) {
+      const facets = [
+        ...(input.userId === null ? [] : [eq(table.userId, input.userId)]),
+        ...(input.email === null ? [] : [eq(table.email, input.email)]),
+      ];
+      if (facets.length === 0) {
+        return { removed: false };
+      }
+      const [removed] = yield* db
+        .delete(table)
+        .where(
+          and(eq(table.organizationId, input.organizationId), or(...facets))
+        )
+        .returning({ id: table.id });
+      return { removed: removed !== undefined };
+    }
+  );
+
   return {
     clearVotesAndSubscriptions,
     isBanned,
@@ -910,6 +942,7 @@ const makeUserBanRepository = Effect.gen(function* () {
     list,
     purgeContent,
     remove,
+    removeByFacets,
     resolveTarget,
     upsert,
   };

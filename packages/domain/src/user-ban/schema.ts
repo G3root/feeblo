@@ -106,10 +106,25 @@ export const UserBanResult = Schema.Struct({
 
 export type UserBanResult = Schema.Schema.Type<typeof UserBanResult>;
 
-export const UserBanRemove = Schema.Struct({
-  id: UserBanId.schema,
-  organizationId: WorkspaceId.schema,
-});
+/**
+ * Which ban to lift.
+ *
+ * The settings list names the row it shows. A moderation menu has no ban id to
+ * send: it has the post or comment the ban was made from, so it names the
+ * author the same way `BanUser` does and the server resolves the row. The
+ * second form is what makes unbanning work for an address-only ban, which has
+ * no account id for the client to match either.
+ */
+export const UserBanRemove = Schema.Union([
+  Schema.TaggedStruct("row", {
+    id: UserBanId.schema,
+    organizationId: WorkspaceId.schema,
+  }),
+  Schema.TaggedStruct("author", {
+    organizationId: WorkspaceId.schema,
+    target: UserBanTarget,
+  }),
+]);
 
 export type UserBanRemove = Schema.Schema.Type<typeof UserBanRemove>;
 

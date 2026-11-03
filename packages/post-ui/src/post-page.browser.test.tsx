@@ -91,6 +91,12 @@ vi.mock("./use-post-detail", () => ({
 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
 const board = { visibility: "PUBLIC" } as TBoard;
 
+/** A stand-in for the dashboard's atom-backed writes; the badge tests never call it. */
+const banActions = {
+  ban: () => Promise.resolve({ deletedComments: 0, deletedPosts: 0 }),
+  unban: () => Promise.resolve(),
+};
+
 function state({
   authenticated = false,
   canBanAuthor = false,
@@ -119,6 +125,9 @@ function state({
     organizationId: "organization-id",
     pageType: "Dashboard",
     post,
+    // The real host writes through its ban atoms. The state flag needs both:
+    // an offered action with no write behind it is not offered at all.
+    userBanActions: canBanAuthor ? banActions : undefined,
   });
 }
 

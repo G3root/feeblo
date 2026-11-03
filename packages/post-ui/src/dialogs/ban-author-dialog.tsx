@@ -13,7 +13,6 @@ import { Label } from "@feeblo/ui/label";
 import { Textarea } from "@feeblo/ui/textarea";
 import { toastManager } from "@feeblo/ui/toast";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
-import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useSelector } from "@xstate/store-react";
 import { useState } from "react";
 
@@ -28,12 +27,15 @@ import { usePostCollections } from "../providers/post-collections-provider";
  * client happens to have: the server resolves the author from a row this
  * workspace owns, so the request cannot be retargeted at another tenant's
  * account.
+ *
+ * The write itself belongs to the host (`userBanActions`), which is what makes
+ * the ban list and the badges refresh together.
  */
 export function BanAuthorDialog() {
   const store = useBanAuthorDialogContext();
   const open = useSelector(store, (state) => state.context.open);
   const data = useSelector(store, (state) => state.context.data);
-  const { organizationId } = usePostCollectionData();
+  const { userBanActions } = usePostCollectionData();
   const {
     collections: { commentCollection, postCollection },
   } = usePostCollections();
@@ -43,18 +45,18 @@ export function BanAuthorDialog() {
 
   const close = () => store.send({ type: "setOpen", open: false });
 
+  if (userBanActions === undefined) {
+    return null;
+  }
+
   const ban = async () => {
     setIsPending(true);
     try {
-      const result = await fetchRpc((rpc) =>
-        rpc.BanUser({
-          deleteContent,
-          organizationId,
-          target: data.target,
-          // Optional on the server; an empty box must not store "".
-          ...(reason.trim() === "" ? undefined : { reason: reason.trim() }),
-        })
-      );
+      const result = await userBanActions.ban({
+        deleteContent,
+        target: data.target,
+        ...(reason.trim() === "" ? undefined : { reason: reason.trim() }),
+      });
       close();
       setDeleteContent(false);
       setReason("");
@@ -94,11 +96,8 @@ export function BanAuthorDialog() {
         <AlertDialogHeader>
           <AlertDialogTitle>Ban {data.authorName}?</AlertDialogTitle>
           <AlertDialogDescription>
-            They will not be able to post, comment, vote, react, or subscribe in
-            this workspace. Their votes are removed and they are unsubscribed
-            from every post, changelog, and email subscription here. They can
-            still read the board, and their existing posts and comments stay
-            visible unless you delete them below.
+            They can still read the board, but cannot post, comment, vote,
+            react, or subscribe here. Their votes and subscriptions are removed.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="grid gap-2 px-6 pb-4">
