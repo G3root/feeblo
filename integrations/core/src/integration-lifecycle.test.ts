@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   INTEGRATION_CONNECTION_STATES,
   INTEGRATION_DELIVERY_STATES,
-  LEGACY_CONNECTION_LIFECYCLES,
   LISTED_CONNECTION_LIFECYCLES,
   canTransitionIntegrationConnectionLifecycle,
   canTransitionIntegrationDeliveryState,
@@ -36,10 +35,8 @@ describe("integration connection lifecycle", () => {
       "active",
       "archived",
       "connecting",
-      "disconnected",
       "disconnecting",
       "paused",
-      "reauth_required",
       "revocation_unconfirmed",
     ]);
   });
@@ -87,13 +84,8 @@ describe("integration connection lifecycle", () => {
       "paused -> active",
       "paused -> disconnecting",
       "paused -> archived",
-      "reauth_required -> active",
-      "reauth_required -> disconnecting",
-      "reauth_required -> archived",
       "disconnecting -> revocation_unconfirmed",
       "disconnecting -> archived",
-      "disconnected -> active",
-      "disconnected -> archived",
       "revocation_unconfirmed -> disconnecting",
       "revocation_unconfirmed -> archived",
     ]);
@@ -113,7 +105,7 @@ describe("integration connection lifecycle", () => {
   });
 
   it("derives the list filter from the graph", () => {
-    // The three provider list queries wrote these seven names out by hand.
+    // The provider list queries wrote these names out by hand.
     // "Listed" and "can still be archived" are the same set.
     expect(LISTED_CONNECTION_LIFECYCLES).toStrictEqual(
       connections.filter((state) => state !== "archived")
@@ -123,28 +115,19 @@ describe("integration connection lifecycle", () => {
     ]);
   });
 
-  it("keeps the legacy states drain-only", () => {
-    // Nothing writes `reauth_required` or `disconnected` any more; old rows may
-    // still hold one, so they keep their outgoing edges. What must not exist is
-    // an edge *into* them, or the code could create one again.
-    for (const legacy of LEGACY_CONNECTION_LIFECYCLES) {
-      const inbound = connections.filter(
-        (from) =>
-          from !== legacy &&
-          canTransitionIntegrationConnectionLifecycle({
-            from,
-            to: legacy,
-          })
-      );
-
-      expect(inbound).toStrictEqual([]);
-    }
-
-    // They are still sources, which is how an old row gets archived.
-    expect(connectionSourceStatesFor("active")).toContain("disconnected");
-    expect(connectionSourceStatesFor("disconnecting")).toContain(
-      "reauth_required"
-    );
+  it("stays free of the retired states", () => {
+    // `reauth_required` and `disconnected` were retired because nothing wrote
+    // them and no rows hold them; the vocabulary must not re-grow a state the
+    // services do not write. The vocabulary test above lists the six live
+    // names; this pins the retired names out of the graph forever.
+    const retired = ["reauth_required", "disconnected"] as const;
+    // SAFETY: the point of the assertion is that the list has WIDENED beyond
+    // the narrowed vocabulary type, so the includes has to see strings.
+    expect(
+      (connections as readonly string[]).some((state) =>
+        retired.includes(state as (typeof retired)[number])
+      )
+    ).toBe(false);
   });
 
   it("starts connecting", () => {

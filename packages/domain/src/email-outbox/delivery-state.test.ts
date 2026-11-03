@@ -1,5 +1,5 @@
 import { NodeCrypto } from "@effect/platform-node";
-import { describe, expect, layer } from "@effect/vitest";
+import { describe, expect, it, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { EMAIL_DELIVERY_STATES } from "@feeblo/domain-contracts/email";
 import { WorkspaceId } from "@feeblo/id";
@@ -18,6 +18,30 @@ const deterministicMessageIdPattern =
   /^<email\.[a-f0-9]{64}@notifications\.feeblo\.com>$/;
 
 describe("email delivery state", () => {
+  // Pure graph assertions sit outside the database layer: they need nothing
+  // the fixture provides, and running them costs one fewer PGlite open.
+  it("declares exactly the stored delivery vocabulary", () => {
+    // The state list is read off the machine; this is the assertion that
+    // fails the day a state is added to one and not the other.
+    expect([...EMAIL_DELIVERY_STATES].sort()).toStrictEqual(
+      Object.keys(emailDeliveryMachine.states).sort()
+    );
+  });
+
+  it("allows only valid lifecycle transitions", () => {
+    expect(canTransitionDelivery("queued", "sending")).toBe(true);
+    expect(canTransitionDelivery("queued", "failed")).toBe(true);
+    expect(canTransitionDelivery("deferred", "failed")).toBe(true);
+    expect(canTransitionDelivery("sending", "expired")).toBe(true);
+    expect(canTransitionDelivery("delivered", "sending")).toBe(false);
+    // `queued` never goes straight to `delivered`: the provider reports that
+    // only after the message was handed over, which means `sending` (or
+    // `accepted`) came first.
+    expect(canTransitionDelivery("queued", "delivered")).toBe(false);
+    expect(isTerminalDeliveryState("delivered")).toBe(true);
+    expect(isTerminalDeliveryState("deferred")).toBe(false);
+  });
+
   const TestLayer = EmailOutboxRepository.layer.pipe(
     // The repository's deterministic message id hashes through the Crypto
     // service now, so the fixture supplies the node implementation.
@@ -26,29 +50,6 @@ describe("email delivery state", () => {
   );
 
   layer(TestLayer)("repository", (it) => {
-    it("declares exactly the stored delivery vocabulary", () => {
-      // The state list is read off the machine; this is the assertion that
-      // fails the day a state is added to one and not the other.
-      expect([...EMAIL_DELIVERY_STATES].sort()).toStrictEqual(
-        Object.keys(emailDeliveryMachine.states).sort()
-      );
-    });
-
-    it("allows only valid lifecycle transitions", () => {
-      expect(canTransitionDelivery("queued", "sending")).toBe(true);
-      expect(canTransitionDelivery("queued", "failed")).toBe(true);
-      expect(canTransitionDelivery("deferred", "failed")).toBe(true);
-      expect(canTransitionDelivery("sending", "expired")).toBe(true);
-      expect(canTransitionDelivery("sending", "paused_by_plan")).toBe(true);
-      expect(canTransitionDelivery("delivered", "sending")).toBe(false);
-      // `queued` never goes straight to `delivered`: the provider reports that
-      // only after the message was handed over, which means `sending` (or
-      // `accepted`) came first.
-      expect(canTransitionDelivery("queued", "delivered")).toBe(false);
-      expect(isTerminalDeliveryState("delivered")).toBe(true);
-      expect(isTerminalDeliveryState("deferred")).toBe(false);
-    });
-
     it.effect(
       "creates one normalized recipient delivery and lets one claimant send it",
       () =>

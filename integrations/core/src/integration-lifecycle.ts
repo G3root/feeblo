@@ -15,23 +15,24 @@ import type {
  * re-derived the same rules inline — and while writing the graphs out it turned
  * out the rules in the code and the rules in the predicate had drifted apart.
  *
- * Three drifts are fixed by saying what is true instead of what was intended:
+ * Three drifts were fixed by saying what is true instead of what was intended:
  *
- * 1. **Only six states are ever persisted.** `reauth_required` and
- *    `disconnected` are never written; they appear in the column's type, in the
- *    vocabulary, and in three hand-written list filters, but no service stores
- *    them. They are kept here as {@link LEGACY_CONNECTION_LIFECYCLES} — states
- *    old rows may hold, with outgoing edges and none incoming — because deleting
- *    them would break reading a row that has one.
- * 2. **`disconnecting` goes straight to `archived`.** The old predicate said
- *    `disconnecting -> disconnected | revocation_unconfirmed`, skipping the fact
- *    that a successful disconnect archives. Every provider service does
- *    `disconnecting` then `archived`, so the predicate described a state nobody
- *    writes.
- * 3. **`archived` is the only terminal state.** Disconnect is allowed from
- *    anything else — each service's only precondition is "not archived" — and
- *    that same set is what the three list queries hard-code as seven names.
- *    {@link LISTED_CONNECTION_LIFECYCLES} derives it from the graph instead.
+ * 1. **`disconnecting` goes straight to `archived`.** The old predicate said
+ *    `disconnecting -> disconnected | revocation_unconfirmed`, skipping the
+ *    fact that a successful disconnect archives. Every provider service does
+ *    `disconnecting` then `archived`, so the predicate described a state
+ *    nobody writes.
+ * 2. **`archived` is reachable from every live state.** The webhook and GitHub
+ *    deletion paths archive a connection directly, with no disconnect step,
+ *    and every completed disconnect archives from `disconnecting`.
+ * 3. **`reauth_required` and `disconnected` are gone, not left as states
+ *    nothing writes.** The predicate had neither edges into them from a live
+ *    writer. They survived the first cut of this change as *legacy* states —
+ *    outgoing edges only, so a row that held one could still be archived —
+ *    but this deployment holds no rows that do, so they were retired outright:
+ *    removing them closes the reachable-shaped holes in the graph instead of
+ *    pinning them open. An unhealthy connection is paused or archived; the
+ *    vocabulary never re-gains a state the services do not write.
  *
  * Every event is named after the state it enters, so a target names its own
  * transition. That is what lets the state list, the reverse index and the
@@ -43,14 +44,6 @@ import type {
  * installation restores itself. `isUnhandled` is what makes it visible to the
  * derivations below, since a self-transition leaves the value unchanged.
  */
-
-/**
- * States old rows may hold and nothing writes any more. They keep outgoing
- * edges so a row that has one can still be disconnected or archived, and have
- * no incoming edge so nothing can create another one.
- */
-export const LEGACY_CONNECTION_LIFECYCLES: readonly IntegrationConnectionLifecycleStatus[] =
-  ["reauth_required", "disconnected"];
 
 export const integrationConnectionMachine = setupEffect({
   schemas: {
@@ -70,7 +63,8 @@ export const integrationConnectionMachine = setupEffect({
   initial: "connecting",
   states: {
     // A row exists and OAuth has not completed. The only way out is a
-    // successful callback, or the owner giving up and archiving it.
+    // successful callback, or the owner giving up on the row before any
+    // install to revoke exists.
     connecting: {
       on: {
         active: { target: "active" },
@@ -95,28 +89,12 @@ export const integrationConnectionMachine = setupEffect({
         disconnecting: { target: "disconnecting" },
       },
     },
-    // Legacy. Nothing writes it, but a row that holds it can be archived or
-    // disconnected, and reactivating it is what a completed reinstall does.
-    reauth_required: {
-      on: {
-        active: { target: "active" },
-        archived: { target: "archived" },
-        disconnecting: { target: "disconnecting" },
-      },
-    },
     // Revocation is in flight: routes are disabled and pending deliveries are
     // canceled before the remote call.
     disconnecting: {
       on: {
         archived: { target: "archived" },
         revocation_unconfirmed: { target: "revocation_unconfirmed" },
-      },
-    },
-    // Legacy, as above.
-    disconnected: {
-      on: {
-        active: { target: "active" },
-        archived: { target: "archived" },
       },
     },
     // The remote side could not be told. Nothing has been deleted, so a retry
@@ -266,9 +244,9 @@ export const connectionSourceStatesFor = (
 /**
  * The states a connection list shows: every state except the tombstone.
  *
- * Each of Slack, Discord and Webhook wrote this out as the same seven names.
- * It is exactly the set that may still be archived, which is the point — a
- * listed connection is one that can still be archived.
+ * Each of Slack, Discord and Webhook used to write this out by hand. It is
+ * exactly the set that may still be archived, which is the point — a listed
+ * connection is one that can still be archived.
  */
 export const LISTED_CONNECTION_LIFECYCLES: readonly IntegrationConnectionLifecycleStatus[] =
   connectionSourceStatesFor("archived");

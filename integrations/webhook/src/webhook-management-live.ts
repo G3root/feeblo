@@ -101,10 +101,6 @@ const endpointHealth = (connection: {
   return "healthy" as const;
 };
 
-const visibleWebhookLifecycle = (
-  lifecycle: typeof schema.integrationConnectionTable.$inferSelect.lifecycle
-) => (lifecycle === "archived" ? ("disconnected" as const) : lifecycle);
-
 /** Composite keyset cursor: `{createdAtISO}~{deliveryId}`; the ID disambiguates equal timestamps. */
 const encodeHistoryCursor = (delivery: {
   readonly createdAt: Date;
@@ -227,7 +223,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               id: asLegid(IntegrationConnectionId)(connection.id),
               lastFailedAt: connection.lastFailedAt,
               lastSucceededAt: connection.lastSucceededAt,
-              lifecycle: visibleWebhookLifecycle(connection.lifecycle),
+              lifecycle: connection.lifecycle,
               name: connection.name,
             }))
           )

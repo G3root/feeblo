@@ -54,7 +54,7 @@ import {
   maximumDeliveryAttempts,
   maximumInfrastructureFailures,
 } from "./limits";
-import { EmailOutboxRepository, type ResumedEmailDelivery } from "./repository";
+import { EmailOutboxRepository } from "./repository";
 import {
   ChangelogTemplatePayload,
   DeliveryAccessSnapshot,
@@ -71,7 +71,6 @@ import {
   recordEmailIntentTransition,
   recordEmailOldestQueuedAge,
   recordEmailProviderSubmission,
-  recordEmailReconciliationRecoveries,
   recordEmailVolumeUsage,
 } from "./telemetry";
 
@@ -343,21 +342,7 @@ export const materializeEmailIntent = (outboxId: string) =>
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
-    if (intent.state === "paused_by_plan") {
-      // Legacy plan-paused intents resume here: member deliveries are no
-      // longer plan-gated, and subscriber deliveries are filtered per
-      // recipient at materialization, so the pause no longer applies. A lost
-      // race with another worker resumes nothing and this attempt stops.
-      if (
-        !(yield* repository.transitionIntent({
-          id: intent.id,
-          event: "resume",
-        }))
-      ) {
-        // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
-        return [] as readonly string[];
-      }
-    } else if (intent.state !== "pending") {
+    if (intent.state !== "pending") {
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
@@ -1879,15 +1864,12 @@ export const reconcileEmailOutbox = ({
     const policy = yield* EntitlementPolicy;
     const { maxConcurrentSends } = yield* EmailOutboxConfig;
     // Both sweeps read the same reconciliation instant and neither filters by
-    // the other's rows, so they run together; the same is true of the plan
-    // state that decides which paused deliveries may resume.
-    const [pending, paused, subscriptionOrganizations] = yield* Effect.all(
+    // the other's rows, so they run together. The plan state reconciled here
+    // lives on subscription rows; the intent and delivery rows stopped being
+    // plan-paused with the retirement of their `paused_by_plan` states.
+    const [pending, subscriptionOrganizations] = yield* Effect.all(
       [
         repository.findPending({
-          before: reconciliationNowDate,
-          limit: reconciliationBatchSize,
-        }),
-        repository.findPausedByPlan({
           before: reconciliationNowDate,
           limit: reconciliationBatchSize,
         }),
@@ -1895,14 +1877,8 @@ export const reconcileEmailOutbox = ({
       ],
       { concurrency: "unbounded" }
     );
-    yield* repository.expirePausedDeliveries({ now: reconciliationNowDate });
-    const resumedPausedDeliveryIds = yield* Effect.forEach(
-      [
-        ...new Set([
-          ...subscriptionOrganizations,
-          ...paused.map((intent) => intent.organizationId),
-        ]),
-      ],
+    yield* Effect.forEach(
+      subscriptionOrganizations,
       (organizationId) =>
         Effect.gen(function* () {
           const eligible = yield* policy.mayEmailSubscribers(organizationId);
@@ -1914,26 +1890,8 @@ export const reconcileEmailOutbox = ({
             // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
           });
           // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-          return eligible
-            ? yield* repository.resumePausedDeliveries({
-                now: reconciliationNowDate,
-                organizationId,
-              })
-            : ([] as readonly ResumedEmailDelivery[]);
         }),
-      { concurrency: maxConcurrentSends }
-    );
-    // A previously paused dispatcher may already have completed under its
-    // deterministic key. Materialize resumed intents directly so that a plan
-    // upgrade never depends on replaying a cached workflow result.
-    const resumedDeliveryIds = yield* Effect.forEach(
-      paused,
-      (intent) => materializeEmailIntent(intent.id),
-      { concurrency: maxConcurrentSends }
-    );
-    yield* recordEmailReconciliationRecoveries(
-      resumedDeliveryIds.reduce((count, ids) => count + ids.length, 0) +
-        resumedPausedDeliveryIds.reduce((count, ids) => count + ids.length, 0)
+      { concurrency: maxConcurrentSends, discard: true }
     );
     const staleSendingBefore = DateTime.toDateUtc(
       DateTime.subtractDuration(reconciliationNow, staleSendingAfter)
@@ -1962,23 +1920,6 @@ export const reconcileEmailOutbox = ({
     });
     yield* Effect.forEach(
       deliveries,
-      (delivery) =>
-        enqueueEmailDelivery(
-          delivery.id,
-          delivery.attemptCount,
-          delivery.transitionVersion
-        ),
-      { concurrency: maxConcurrentSends, discard: true }
-    );
-    yield* Effect.forEach(
-      resumedDeliveryIds.flat(),
-      (deliveryId) => enqueueEmailDelivery(deliveryId, 0, 0),
-      { concurrency: maxConcurrentSends, discard: true }
-    );
-    yield* Effect.forEach(
-      resumedPausedDeliveryIds.flat(),
-      // `resumePausedDeliveries` returns the version its update just persisted,
-      // so the re-offer cannot collide with the completed pause element.
       (delivery) =>
         enqueueEmailDelivery(
           delivery.id,

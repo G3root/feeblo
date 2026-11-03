@@ -20,29 +20,14 @@ import { isUnhandled, transition } from "xstate";
  * ```
  *
  * Read quickly, that says "failed and expired may come from paused jobs, the
- * rest only from pending". It says the same thing here, as an edge list, and
- * the SQL is generated from it.
- *
- * `paused_by_plan` is **legacy**. Nothing writes it any more — members are no
- * longer plan-gated, and subscriber deliveries are filtered per recipient at
- * materialization — so the state survives only because rows may still hold it,
- * and `queue.ts` resumes them when it finds one. It therefore has outgoing
- * edges and no incoming edge, which is why the reachability test below lists it
- * as an allowed exception rather than letting a `pause` edge creep back in.
+ * rest only from pending". The machine that replaced it only needed one source:
+ * plan-gating on the intent path is gone, along with the `paused_by_plan` state
+ * and the drain path that walked rows out of it — this deployment holds no rows
+ * in either. Every write now starts from `pending`.
  */
-export const EMAIL_INTENT_EVENTS = [
-  "expire",
-  "fail",
-  "materialize",
-  "resume",
-] as const;
+export const EMAIL_INTENT_EVENTS = ["expire", "fail", "materialize"] as const;
 
 export type TEmailIntentEvent = (typeof EMAIL_INTENT_EVENTS)[number];
-
-/** States nothing writes any more, kept because rows still hold them. */
-export const LEGACY_EMAIL_INTENT_STATES: readonly TEmailOutboxState[] = [
-  "paused_by_plan",
-];
 
 export const emailIntentMachine = setupEffect({
   schemas: {
@@ -50,7 +35,6 @@ export const emailIntentMachine = setupEffect({
       expire: Schema.Struct({ type: Schema.Literal("expire") }),
       fail: Schema.Struct({ type: Schema.Literal("fail") }),
       materialize: Schema.Struct({ type: Schema.Literal("materialize") }),
-      resume: Schema.Struct({ type: Schema.Literal("resume") }),
     },
   },
 }).createMachine({
@@ -68,15 +52,6 @@ export const emailIntentMachine = setupEffect({
     },
     // Terminal: its deliveries exist, whether or not they were sent.
     materialized: {},
-    // Legacy, drain-only: `queue.ts` resumes a row it finds here and stops if
-    // it loses the race. No edge enters it.
-    paused_by_plan: {
-      on: {
-        expire: { target: "expired" },
-        fail: { target: "failed" },
-        resume: { target: "pending" },
-      },
-    },
     // Terminal: the intent's infrastructure budget was spent.
     failed: {},
     // Terminal: `expires_at` passed before the intent materialized.
@@ -102,7 +77,7 @@ const stateAfter = (
   const [next] = transition(emailIntentMachine, snapshotFor(state), {
     type: event,
   });
-  // SAFETY: the machine is flat — every state and target is one of the five
+  // SAFETY: the machine is flat — every state and target is one of the
   // `EmailOutboxState` members — and `intent-machine.test.ts` walks the whole
   // graph rather than trusting this comment.
   return next.value as TEmailOutboxState;

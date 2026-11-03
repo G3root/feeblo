@@ -46,11 +46,17 @@ export const EmailIntentKind = S.Literals([
 
 export type TEmailIntentKind = S.Schema.Type<typeof EmailIntentKind>;
 
-/** Canonical `email_outbox.state` vocabulary. */
+/**
+ * Canonical `email_outbox.state` vocabulary.
+ *
+ * `paused_by_plan` was retired outright rather than left as a legacy state:
+ * nothing on the intent path is plan-gated any more, and this deployment has
+ * no stored rows holding the value, so keeping it only kept a drain path
+ * alive for a state nothing could ever write again.
+ */
 export const EMAIL_OUTBOX_STATES = [
   "pending",
   "materialized",
-  "paused_by_plan",
   "failed",
   "expired",
 ] as const;
@@ -59,7 +65,14 @@ export const EmailOutboxState = S.Literals(EMAIL_OUTBOX_STATES);
 
 export type TEmailOutboxState = S.Schema.Type<typeof EmailOutboxState>;
 
-/** Canonical `email_delivery.state` vocabulary. */
+/**
+ * Canonical `email_delivery.state` vocabulary.
+ *
+ * `paused_by_plan` was retired outright rather than kept as a drain-only
+ * legacy state: no writer has stored it on a delivery since plan-gating moved
+ * to the subscription row, and this deployment has no rows holding the value.
+ * The subscription row's own `paused_by_plan` state is the live plan pause.
+ */
 export const EMAIL_DELIVERY_STATES = [
   "queued",
   "sending",
@@ -69,7 +82,6 @@ export const EMAIL_DELIVERY_STATES = [
   "bounced",
   "failed",
   "suppressed",
-  "paused_by_plan",
   "expired",
   /**
    * Terminal skip recorded by the dispatcher's organization-access gate: the

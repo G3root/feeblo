@@ -31,7 +31,6 @@ export const emailDeliveryMachine = setupEffect({
       no_organization_access: Schema.Struct({
         type: Schema.Literal("no_organization_access"),
       }),
-      paused_by_plan: Schema.Struct({ type: Schema.Literal("paused_by_plan") }),
       queued: Schema.Struct({ type: Schema.Literal("queued") }),
       sending: Schema.Struct({ type: Schema.Literal("sending") }),
       suppressed: Schema.Struct({ type: Schema.Literal("suppressed") }),
@@ -47,7 +46,6 @@ export const emailDeliveryMachine = setupEffect({
         expired: { target: "expired" },
         failed: { target: "failed" },
         no_organization_access: { target: "no_organization_access" },
-        paused_by_plan: { target: "paused_by_plan" },
         sending: { target: "sending" },
         suppressed: { target: "suppressed" },
       },
@@ -63,7 +61,6 @@ export const emailDeliveryMachine = setupEffect({
         expired: { target: "expired" },
         failed: { target: "failed" },
         no_organization_access: { target: "no_organization_access" },
-        paused_by_plan: { target: "paused_by_plan" },
         suppressed: { target: "suppressed" },
       },
     },
@@ -82,16 +79,8 @@ export const emailDeliveryMachine = setupEffect({
         expired: { target: "expired" },
         failed: { target: "failed" },
         no_organization_access: { target: "no_organization_access" },
-        paused_by_plan: { target: "paused_by_plan" },
         sending: { target: "sending" },
         suppressed: { target: "suppressed" },
-      },
-    },
-    // Reversible: the workspace's plan stopped allowing email.
-    paused_by_plan: {
-      on: {
-        expired: { target: "expired" },
-        queued: { target: "queued" },
       },
     },
     delivered: {},

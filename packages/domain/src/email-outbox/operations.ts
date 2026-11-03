@@ -24,7 +24,6 @@ const emptyIntentStates = () =>
   ({
     pending: 0,
     materialized: 0,
-    paused_by_plan: 0,
     failed: 0,
     expired: 0,
   }) satisfies Record<TEmailOutboxState, number>;
@@ -39,7 +38,6 @@ const emptyDeliveryStates = () =>
     bounced: 0,
     failed: 0,
     suppressed: 0,
-    paused_by_plan: 0,
     expired: 0,
     no_organization_access: 0,
   }) satisfies Record<TEmailDeliveryState, number>;
