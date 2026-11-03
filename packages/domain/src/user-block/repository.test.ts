@@ -286,6 +286,68 @@ describe("UserBlockRepository", () => {
       })
     );
 
+    it.effect(
+      "rejects an unlinked contact whose address belongs to a member",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* UserBlockRepository;
+          const organizationId = yield* createOrganization();
+          const member = yield* createUser("unlinked-member");
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* db.insert(schema.memberTable).values({
+            createdAt: now,
+            id: `member_${member.id}`,
+            organizationId,
+            role: "manager",
+            userId: member.id,
+          });
+          yield* createContact({
+            email: member.email,
+            organizationId,
+            userId: null,
+          });
+
+          expect(
+            yield* repository.resolveTarget({
+              organizationId,
+              target: { _tag: "email", email: member.email },
+            })
+          ).toEqual({ status: "member" });
+        })
+    );
+
+    it.effect("prefers a linked contact over a case-variant unlinked row", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBlockRepository;
+        const organizationId = yield* createOrganization();
+        const account = yield* createUser("case-linked");
+
+        yield* createContact({
+          email: "Case@example.com",
+          organizationId,
+          userId: null,
+        });
+        yield* createContact({
+          email: "case@example.com",
+          organizationId,
+          userId: account.id,
+        });
+
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "email", email: "CASE@example.com" },
+          })
+        ).toMatchObject({
+          email: "case@example.com",
+          status: "ok",
+          userId: account.id,
+        });
+      })
+    );
+
     it.effect("removes a block only inside its workspace", () =>
       Effect.gen(function* () {
         const repository = yield* UserBlockRepository;

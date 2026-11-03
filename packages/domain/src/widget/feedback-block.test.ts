@@ -177,34 +177,36 @@ describe("resolveFeedbackContact", () => {
       })
     );
 
-    it.effect("denies a user-id block and keeps the existing contact", () =>
+    it.effect("denies a user-id block through a linked contact's address", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture();
         const db = yield* currentDb;
         const now = yield* DateTime.nowAsDate;
-        const email = "blocked-by-user@example.com";
+        const accountEmail = "blocked-account@example.com";
+        const contactEmail = "blocked-contact@example.com";
         const userId = yield* UserId.generate;
         const contactId = yield* ContactId.generate;
 
         yield* db.insert(schema.userTable).values({
-          email,
+          email: accountEmail,
           id: userId,
           name: "Ada Lovelace",
         });
         yield* db.insert(schema.contactTable).values({
           createdAt: now,
-          email,
+          email: contactEmail,
           id: contactId,
           name: "Ada Lovelace",
           organizationId: fixture.organizationId,
           updatedAt: now,
           userId,
         });
-        // A user-id-only block: the contact already links the account, so the
-        // widget's block check resolves the account through the contact.
+        // The session check keys off the account address; the widget
+        // token names the linked contact's different address. The user id is
+        // the facet that covers both.
         yield* db.insert(schema.userBlockTable).values({
           createdAt: now,
-          email: null,
+          email: accountEmail,
           id: `block_user_${fixture.organizationId}`,
           organizationId: fixture.organizationId,
           reason: null,
@@ -212,7 +214,7 @@ describe("resolveFeedbackContact", () => {
           userId,
         });
 
-        const token = yield* feedbackToken(fixture, email);
+        const token = yield* feedbackToken(fixture, contactEmail);
         const error = yield* Effect.flip(
           resolveFeedbackContact({
             ...(yield* services),
@@ -222,7 +224,9 @@ describe("resolveFeedbackContact", () => {
         );
 
         expect(error._tag).toBe("PolicyDenied");
-        expect(yield* contactCount(fixture.organizationId, email)).toBe(1);
+        expect(yield* contactCount(fixture.organizationId, contactEmail)).toBe(
+          1
+        );
         expect(yield* postCount(fixture.organizationId)).toBe(0);
 
         const [contact] = yield* db
@@ -233,6 +237,63 @@ describe("resolveFeedbackContact", () => {
         // block is being checked, and the denial rolls back its other changes.
         expect(contact?.userId).toBe(userId);
       })
+    );
+
+    it.effect(
+      "lets a member's linked contact through an address-only block",
+      () =>
+        Effect.gen(function* () {
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+          const email = "member@example.com";
+          const userId = yield* UserId.generate;
+          const contactId = yield* ContactId.generate;
+
+          yield* db.insert(schema.userTable).values({
+            email,
+            id: userId,
+            name: "Workspace member",
+          });
+          yield* db.insert(schema.memberTable).values({
+            createdAt: now,
+            id: `member_${userId}`,
+            organizationId: fixture.organizationId,
+            role: "manager",
+            userId,
+          });
+          yield* db.insert(schema.contactTable).values({
+            createdAt: now,
+            email,
+            id: contactId,
+            name: "Workspace member",
+            organizationId: fixture.organizationId,
+            updatedAt: now,
+            userId,
+          });
+          // The row predates the membership; a member must not be denied by an
+          // address-only block the widget's SSO flow happens to match.
+          yield* db.insert(schema.userBlockTable).values({
+            createdAt: now,
+            email,
+            id: `block_member_${fixture.organizationId}`,
+            organizationId: fixture.organizationId,
+            reason: null,
+            updatedAt: now,
+            userId: null,
+          });
+
+          const token = yield* feedbackToken(fixture, email);
+          const contact = yield* resolveFeedbackContact({
+            ...(yield* services),
+            organizationId: fixture.organizationId,
+            token,
+          });
+
+          expect(contact).toBe(contactId);
+          expect(yield* contactCount(fixture.organizationId, email)).toBe(1);
+          expect(yield* postCount(fixture.organizationId)).toBe(0);
+        })
     );
   });
 });

@@ -21,15 +21,25 @@ const makeParticipationPolicy = Effect.gen(function* () {
   const repository = yield* UserBlockRepository;
 
   const canSubjectParticipate = (input: UserBlockLookup) =>
-    repository.isBlocked(input).pipe(
-      Effect.flatMap((blocked) =>
-        blocked
-          ? Effect.fail(
-              new Policy.PolicyDeniedError({
-                reason: PARTICIPATION_BLOCKED_REASON,
-              })
+    repository.isMember(input).pipe(
+      Effect.flatMap((member) =>
+        member
+          ? // The widget has no session to run `canParticipate`'s membership
+            // check on. A contact linked to a member, or an address that
+            // belongs to one, must bypass an address-only block for the same
+            // reason a member's session does.
+            Effect.void
+          : repository.isBlocked(input).pipe(
+              Effect.flatMap((blocked) =>
+                blocked
+                  ? Effect.fail(
+                      new Policy.PolicyDeniedError({
+                        reason: PARTICIPATION_BLOCKED_REASON,
+                      })
+                    )
+                  : Effect.void
+              )
             )
-          : Effect.void
       )
     );
 

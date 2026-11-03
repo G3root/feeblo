@@ -902,6 +902,13 @@ describe("CommentRpcHandlers", () => {
           const db = yield* currentDb;
           const now = yield* DateTime.nowAsDate;
 
+          // The fixture creates the member row its board and post reference.
+          // This case is a non-member, so remove it before the block check;
+          // the database membership check would otherwise exempt it.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.id, fixture.membershipId));
+
           yield* db.insert(schema.userBlockTable).values({
             createdAt: now,
             email: "user@example.com",

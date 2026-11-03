@@ -90,7 +90,7 @@ const normalizedEmail = (email: string | null | undefined): string | null =>
 const makeUserBlockRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
-  const isMember = (input: {
+  const isWorkspaceMember = (input: {
     readonly organizationId: string;
     readonly userId: string;
   }) =>
@@ -127,6 +127,48 @@ const makeUserBlockRepository = Effect.gen(function* () {
       return contact;
     });
 
+  /** An account by normalized address, with the tenancy field its callers need. */
+  const findUserByEmail = (email: string) =>
+    db
+      .select({
+        id: schema.userTable.id,
+        name: schema.userTable.name,
+        restrictedToOrganizationId: schema.userTable.restrictedToOrganizationId,
+      })
+      .from(schema.userTable)
+      .where(sql`lower(${schema.userTable.email}) = ${email}`)
+      .limit(1)
+      .pipe(Effect.map((rows) => rows[0]));
+
+  /** Resolves a lookup's contact facet into the account and address it names. */
+  const resolveLookup = (input: UserBlockLookup) =>
+    Effect.gen(function* () {
+      let userId = input.userId ?? null;
+      let email = normalizedEmail(input.email);
+
+      if (input.contactId) {
+        const [contact] = yield* db
+          .select({
+            email: schema.contactTable.email,
+            userId: schema.contactTable.userId,
+          })
+          .from(schema.contactTable)
+          .where(
+            and(
+              eq(schema.contactTable.id, input.contactId),
+              eq(schema.contactTable.organizationId, input.organizationId)
+            )
+          )
+          .limit(1);
+        if (contact !== undefined) {
+          userId ??= contact.userId;
+          email ??= normalizedEmail(contact.email);
+        }
+      }
+
+      return { email, userId };
+    });
+
   /**
    * Whether this identity is blocked in this workspace.
    *
@@ -137,29 +179,7 @@ const makeUserBlockRepository = Effect.gen(function* () {
   const isBlocked = Effect.fn("UserBlockRepository.isBlocked")(function* (
     input: UserBlockLookup
   ) {
-    let userId = input.userId ?? null;
-    let email = normalizedEmail(input.email);
-
-    if (input.contactId) {
-      const [contact] = yield* db
-        .select({
-          email: schema.contactTable.email,
-          userId: schema.contactTable.userId,
-        })
-        .from(schema.contactTable)
-        .where(
-          and(
-            eq(schema.contactTable.id, input.contactId),
-            eq(schema.contactTable.organizationId, input.organizationId)
-          )
-        )
-        .limit(1);
-      if (contact !== undefined) {
-        userId ??= contact.userId;
-        email ??= normalizedEmail(contact.email);
-      }
-    }
-
+    const { email, userId } = yield* resolveLookup(input);
     const facets = [
       ...(userId === null ? [] : [eq(table.userId, userId)]),
       ...(email === null ? [] : [eq(table.email, email)]),
@@ -174,6 +194,37 @@ const makeUserBlockRepository = Effect.gen(function* () {
       .where(and(eq(table.organizationId, input.organizationId), or(...facets)))
       .limit(1);
     return row !== undefined;
+  });
+
+  /**
+   * Whether the identity is a workspace member.
+   *
+   * The session path checks membership before it calls the policy, but the
+   * widget has no session: a contact linked to a member (or an address that
+   * belongs to a member) must bypass an address-only block here for the same
+   * reason `canParticipate` bypasses it for a member's session.
+   */
+  const isMember = Effect.fn("UserBlockRepository.isMember")(function* (
+    input: UserBlockLookup
+  ) {
+    const { email, userId } = yield* resolveLookup(input);
+    if (userId !== null) {
+      return yield* isWorkspaceMember({
+        organizationId: input.organizationId,
+        userId,
+      });
+    }
+    if (email === null) {
+      return false;
+    }
+    const user = yield* findUserByEmail(email);
+    if (user === undefined) {
+      return false;
+    }
+    return yield* isWorkspaceMember({
+      organizationId: input.organizationId,
+      userId: user.id,
+    });
   });
 
   /**
@@ -210,9 +261,26 @@ const makeUserBlockRepository = Effect.gen(function* () {
               sql`lower(${schema.contactTable.email}) = ${email}`
             )
           )
+          // Both rows can exist because the contact unique index is
+          // case-sensitive while the lookup is not. A linked row is the
+          // stronger relationship, so it wins the arbitrary-order tie.
+          .orderBy(asc(sql`${schema.contactTable.userId} is null`))
           .limit(1);
         if (contact !== undefined) {
           if (contact.userId === null) {
+            // The contact is unlinked, but its address may still belong to a
+            // workspace member. Do not create an address-only block for a
+            // member; the RPC would otherwise claim to block staff.
+            const user = yield* findUserByEmail(email);
+            if (user !== undefined) {
+              const member = yield* isWorkspaceMember({
+                organizationId: input.organizationId,
+                userId: user.id,
+              });
+              if (member) {
+                return { status: "member" } as const;
+              }
+            }
             return {
               email,
               name: contact.name,
@@ -220,7 +288,7 @@ const makeUserBlockRepository = Effect.gen(function* () {
               userId: null,
             } as const;
           }
-          const member = yield* isMember({
+          const member = yield* isWorkspaceMember({
             organizationId: input.organizationId,
             userId: contact.userId,
           });
@@ -243,18 +311,9 @@ const makeUserBlockRepository = Effect.gen(function* () {
         // No contact: an account may still be blocked by address if it is
         // related to this workspace through a restricted identity or a
         // membership. An unrelated global account is not adopted by address.
-        const [user] = yield* db
-          .select({
-            id: schema.userTable.id,
-            name: schema.userTable.name,
-            restrictedToOrganizationId:
-              schema.userTable.restrictedToOrganizationId,
-          })
-          .from(schema.userTable)
-          .where(sql`lower(${schema.userTable.email}) = ${email}`)
-          .limit(1);
+        const user = yield* findUserByEmail(email);
         if (user !== undefined) {
-          const member = yield* isMember({
+          const member = yield* isWorkspaceMember({
             organizationId: input.organizationId,
             userId: user.id,
           });
@@ -296,7 +355,7 @@ const makeUserBlockRepository = Effect.gen(function* () {
         if (user === undefined) {
           return { status: "not_found" } as const;
         }
-        const member = yield* isMember({
+        const member = yield* isWorkspaceMember({
           organizationId: input.organizationId,
           userId: user.id,
         });
@@ -319,6 +378,9 @@ const makeUserBlockRepository = Effect.gen(function* () {
           return { status: "not_found" } as const;
         }
 
+        // The block stores the account address. A linked contact may have a
+        // different address; the widget's block check resolves that contact's
+        // userId, so the account facet covers it without a second address row.
         return {
           email: normalizedEmail(user.email),
           name: contact?.name ?? user.name,
@@ -357,7 +419,7 @@ const makeUserBlockRepository = Effect.gen(function* () {
           .limit(1);
         user = row;
         if (user !== undefined) {
-          const member = yield* isMember({
+          const member = yield* isWorkspaceMember({
             organizationId: input.organizationId,
             userId: contact.userId,
           });
@@ -543,7 +605,7 @@ const makeUserBlockRepository = Effect.gen(function* () {
     return { removed: removed !== undefined };
   });
 
-  return { isBlocked, list, remove, resolveTarget, upsert };
+  return { isBlocked, isMember, list, remove, resolveTarget, upsert };
 });
 
 export class UserBlockRepository extends Context.Service<UserBlockRepository>()(

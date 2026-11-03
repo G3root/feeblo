@@ -1,6 +1,6 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { UserId, WorkspaceId } from "@feeblo/id";
+import { ContactId, UserId, WorkspaceId } from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -108,6 +108,60 @@ describe("ParticipationPolicy", () => {
             ],
           })
         );
+      })
+    );
+
+    it.effect("lets a member's contact through an address-only block", () =>
+      Effect.gen(function* () {
+        const policy = yield* ParticipationPolicy;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+        const now = yield* DateTime.nowAsDate;
+        const userId = yield* UserId.generate;
+        const contactId = yield* ContactId.generate;
+        const email = `member-${userId.toLowerCase()}@example.com`;
+
+        yield* db.insert(schema.userTable).values({
+          email,
+          id: userId,
+          name: "Workspace member",
+        });
+        yield* db.insert(schema.memberTable).values({
+          createdAt: now,
+          id: `member_${userId}`,
+          organizationId: fixture.organizationId,
+          role: "manager",
+          userId,
+        });
+        yield* db.insert(schema.contactTable).values({
+          createdAt: now,
+          email,
+          id: contactId,
+          name: "Workspace member",
+          organizationId: fixture.organizationId,
+          updatedAt: now,
+          userId,
+        });
+        // An address-only row that predates the membership must not deny the
+        // member's widget SSO feedback.
+        yield* db.insert(schema.userBlockTable).values({
+          createdAt: now,
+          email,
+          id: `block_member_${userId}`,
+          organizationId: fixture.organizationId,
+          reason: null,
+          updatedAt: now,
+          userId: null,
+        });
+
+        yield* policy.canSubjectParticipate({
+          contactId,
+          organizationId: fixture.organizationId,
+        });
+        yield* policy.canSubjectParticipate({
+          email,
+          organizationId: fixture.organizationId,
+        });
       })
     );
 
