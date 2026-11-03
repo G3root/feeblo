@@ -23,7 +23,11 @@ const makeAssetRepository = Effect.gen(function* () {
       readonly owner: AssetOwner;
     }) =>
       db
-        .select()
+        .select({
+          bucket: schema.assetTable.bucket,
+          id: schema.assetTable.id,
+          key: schema.assetTable.key,
+        })
         .from(schema.assetTable)
         .where(
           and(
