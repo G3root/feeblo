@@ -5,11 +5,15 @@ import {
   type ContactComboboxSelection,
 } from "@feeblo/post-ui/contact-combobox";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
+import { Badge } from "@feeblo/ui/badge";
 import { toastManager } from "@feeblo/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
 import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import { UserBlock01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -71,18 +75,43 @@ export function PostAuthorField() {
   };
 
   return (
-    <AuthorPicker
-      disabled={isLocked || isMerged || !canUpdateAuthor}
-      display={{
-        name: post.user.name ?? "Unknown author",
-        avatarUrl: post.user.image,
-      }}
-      label="Change author"
-      onSelect={handleSelect}
-      organizationId={organizationId}
-      postId={post.id}
-      searchPlaceholder="Search users..."
-      value={null}
-    />
+    <div className="flex items-center gap-1.5">
+      <div className="min-w-0 flex-1">
+        <AuthorPicker
+          disabled={isLocked || isMerged || !canUpdateAuthor}
+          display={{
+            name: post.user.name ?? "Unknown author",
+            avatarUrl: post.user.image,
+          }}
+          label="Change author"
+          onSelect={handleSelect}
+          organizationId={organizationId}
+          postId={post.id}
+          searchPlaceholder="Search users..."
+          value={null}
+        />
+      </div>
+      {/* A ban does not hide the author or their content, so without this the
+          sidebar gives no sign that the person writing on this post can no
+          longer comment, vote, or react here. It is an indicator rather than
+          an action: unbanning lives on the security settings page, where the
+          rest of the ban list is. */}
+      {post.authorIsBanned ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={(props) => (
+              <Badge {...props} aria-label="Banned author" variant="error">
+                <HugeiconsIcon icon={UserBlock01Icon} />
+              </Badge>
+            )}
+          />
+          <TooltipPopup>
+            This author is banned from participating here. They can still read,
+            but they cannot post, comment, vote, react, or subscribe until the
+            ban is removed in settings.
+          </TooltipPopup>
+        </Tooltip>
+      ) : null}
+    </div>
   );
 }

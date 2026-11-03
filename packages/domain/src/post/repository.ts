@@ -27,6 +27,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
+import { bannedAuthorPredicate } from "../user-ban/predicates";
 import { FailedToMergePostError, PostAlreadyExistsError } from "./errors";
 import {
   activePostVisibility,
@@ -184,7 +185,19 @@ const getWhereClause = (where: SQL[]) =>
  * table: contact names are workspace-internal and must not leak onto
  * public boards.
  */
-const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
+const selectPostFields = (opts?: {
+  contactFallback?: boolean;
+  /**
+   * Adds the author's ban flag. Set by the dashboard reads only: the flag is a
+   * moderation signal, and a public projection must not disclose that the
+   * person who wrote a post is banned from the board they are reading.
+   *
+   * It costs one indexed `exists` per row, which is why it is opt-in rather
+   * than always selected. Unlike the `canDeleteAsCreator` probe this file
+   * dropped, the answer differs per row and is the point of the query.
+   */
+  authorBan?: boolean;
+}) => ({
   id: schema.postTable.id,
   title: schema.postTable.title,
   boardId: schema.postTable.boardId,
@@ -220,6 +233,20 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
   // The member tick the author's avatar draws. Derived here rather than in
   // the client because the public selects redact `creatorMemberId`.
   authorIsMember: sql<boolean>`${schema.postTable.creatorMemberId} is not null`,
+  // The ban badge the dashboard draws beside the author. Same reasoning as
+  // `authorIsMember`, plus the address facet: an address-only ban has no
+  // account id to match, so the predicate tests the addresses the row can
+  // carry as well. Public reads select `null` — "not disclosed", which is not
+  // the same answer as `false` — so a consumer has to compare against `true`.
+  authorIsBanned: opts?.authorBan
+    ? bannedAuthorPredicate({
+        emails: opts.contactFallback
+          ? [schema.userTable.email, schema.contactTable.email]
+          : [schema.userTable.email],
+        organizationId: schema.postTable.organizationId,
+        userId: schema.postTable.creatorId,
+      })
+    : sql<boolean | null>`null`,
   metadata: schema.postTable.metadata,
   lockedAt: schema.postTable.lockedAt,
   archivedAt: schema.postTable.archivedAt,
@@ -227,7 +254,10 @@ const selectPostFields = (opts?: { contactFallback?: boolean }) => ({
   mergedAt: schema.postTable.mergedAt,
 });
 
-const selectPostListFields = (opts?: { contactFallback?: boolean }) => {
+const selectPostListFields = (opts?: {
+  contactFallback?: boolean;
+  authorBan?: boolean;
+}) => {
   // Lists never render the full body (cards show `excerpt`; detail pages
   // resolve `content` through `GetPost`/`GetPostPublic`), so drop the
   // heaviest column while keeping every other list field identical.
@@ -235,6 +265,10 @@ const selectPostListFields = (opts?: { contactFallback?: boolean }) => {
   // ran on every list fetch for every row, yet only the session user's own
   // rows can ever be true. Delete affordances resolve it on demand through
   // `PostDeleteEligibility`/`PostDeleteEligibilityPublic` instead.
+  //
+  // `authorIsBanned` is the exception, and only because the caller asks for it
+  // (`opts.authorBan`): the post detail page renders its shell from a list row,
+  // so a badge that lived on the detail projection alone would pop in late.
   const { content: _content, ...listFields } = selectPostFields(opts);
   return listFields;
 };
@@ -364,7 +398,7 @@ const makePostRepository = Effect.gen(function* () {
      */
     findBySlug: ({ organizationId, slug }: TPostFindPublicBySlug) =>
       db
-        .select(selectPostFields({ contactFallback: true }))
+        .select(selectPostFields({ authorBan: true, contactFallback: true }))
         .from(schema.postTable)
         .leftJoin(
           schema.userTable,
@@ -647,7 +681,9 @@ const makePostRepository = Effect.gen(function* () {
       const whereClause = getWhereClause(where);
 
       return db
-        .select(selectPostListFields({ contactFallback: true }))
+        .select(
+          selectPostListFields({ authorBan: true, contactFallback: true })
+        )
         .from(schema.postTable)
         .leftJoin(
           schema.userTable,

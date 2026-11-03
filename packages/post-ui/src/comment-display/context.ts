@@ -8,6 +8,15 @@ export type CommentDisplayState = {
    * tick on the avatar, telling a team reply from a customer's at a glance.
    */
   authorIsMember: boolean;
+  /**
+   * Whether the comment's author is banned from participating in this
+   * workspace. Renders the "Banned" badge in the header and withdraws the ban
+   * action, which would otherwise be offered again for someone already banned.
+   *
+   * Only the dashboard reads the flag (see `Comment.authorIsBanned`), so a
+   * public surface always passes `false`.
+   */
+  authorIsBanned: boolean;
   commentId: string;
   postId: string;
   postSlug: string;

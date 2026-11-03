@@ -16,7 +16,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { CommentRepository } from "../comments/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { PostRepository } from "../post/repository";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -37,6 +39,8 @@ describe("UserBanRpcHandlers", () => {
     UserBanRpcHandlers.pipe(Layer.provide(DatabaseLayer)),
     UserBanRepository.layer.pipe(Layer.provide(DatabaseLayer)),
     WorkspaceRepository.layer.pipe(Layer.provide(DatabaseLayer)),
+    PostRepository.layer.pipe(Layer.provide(DatabaseLayer)),
+    CommentRepository.layer.pipe(Layer.provide(DatabaseLayer)),
     EntitlementPolicy.layer.pipe(
       Layer.provide(WorkspaceRepository.layer),
       Layer.provide(DatabaseLayer)
@@ -695,6 +699,77 @@ describe("UserBanRpcHandlers", () => {
           })
           .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
         expect(status.banned).toBe(false);
+      })
+    );
+
+    /**
+     * The ban badge is a server-derived flag, so the one thing worth pinning is
+     * which projections carry the answer. The dashboard reads report
+     * `true`/`false`; the public ones report `null`, which reads as "not
+     * disclosed" and keeps a moderation decision off the board.
+     */
+    it.effect("derives the author ban flag on dashboard reads only", () =>
+      Effect.gen(function* () {
+        const handlers = yield* UserBanRpcHandlersEffect;
+        const posts = yield* PostRepository;
+        const comments = yield* CommentRepository;
+        const fixture = yield* makeFixture();
+        const author = yield* createEndUser({
+          organizationId: fixture.organizationId,
+          restricted: false,
+          suffix: "flagged",
+        });
+        const postId = yield* createPost(fixture, author.id);
+        const commentId = yield* createComment({
+          authorId: author.id,
+          fixture,
+          parentCommentId: null,
+          postId,
+        });
+        // `createPost` builds the slug from the id; the read below is by slug.
+        const slug = `slug-${postId}`;
+
+        const beforeDetail = yield* posts.findBySlug({
+          organizationId: fixture.organizationId,
+          slug,
+        });
+        expect(beforeDetail?.authorIsBanned).toBe(false);
+
+        yield* handlers
+          .BanUser({
+            organizationId: fixture.organizationId,
+            target: { _tag: "comment", commentId },
+          })
+          .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
+        const detail = yield* posts.findBySlug({
+          organizationId: fixture.organizationId,
+          slug,
+        });
+        expect(detail?.authorIsBanned).toBe(true);
+
+        const [listRow] = yield* posts.findMany({
+          organizationId: fixture.organizationId,
+        });
+        expect(listRow?.authorIsBanned).toBe(true);
+
+        const [dashboardComment] = yield* comments.findMany({
+          organizationId: fixture.organizationId,
+          slug,
+        });
+        expect(dashboardComment?.authorIsBanned).toBe(true);
+
+        const publicPost = yield* posts.findPublicBySlug({
+          organizationId: fixture.organizationId,
+          slug,
+        });
+        expect(publicPost?.authorIsBanned).toBeNull();
+
+        const [publicComment] = yield* comments.findManyPublic({
+          organizationId: fixture.organizationId,
+          slug,
+        });
+        expect(publicComment?.authorIsBanned).toBeNull();
       })
     );
   });

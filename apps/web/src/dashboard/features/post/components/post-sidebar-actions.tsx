@@ -158,6 +158,10 @@ function PostAdminActionButtons() {
                 {...props}
                 aria-label="Ban author"
                 className="rounded-full"
+                // A ban is idempotent on the server, but offering it again for
+                // somebody the post already marks as banned reads as if the
+                // first ban had not landed. `PostAuthorField` shows the badge.
+                disabled={post.authorIsBanned === true}
                 onClick={() =>
                   banDialogStore.send({
                     type: "toggle",

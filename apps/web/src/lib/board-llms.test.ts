@@ -50,6 +50,7 @@ const post = (overrides: Partial<TPostListItem> = {}): TPostListItem => ({
   creatorMemberId: null,
   creatorId: null,
   authorIsMember: false,
+  authorIsBanned: null,
   lockedAt: null,
   archivedAt: null,
   mergedIntoPostId: null,

@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { publicPostVisibility } from "../post/public-visibility";
+import { bannedAuthorPredicate } from "../user-ban/predicates";
 
 interface DeleteCommentArgs {
   id: string;
@@ -122,6 +123,15 @@ const makeCommentRepository = Effect.gen(function* () {
             resolvedParentCommentId: schema.commentTable.parentCommentId,
             memberId: schema.commentTable.memberId,
             authorIsMember: sql<boolean>`${schema.commentTable.memberId} is not null`,
+            // The ban badge the dashboard draws on a comment. The public list
+            // below selects `null` instead: a ban is a moderation decision,
+            // and that read exists precisely to withhold what identifies the
+            // person.
+            authorIsBanned: bannedAuthorPredicate({
+              emails: [schema.userTable.email],
+              organizationId: schema.commentTable.organizationId,
+              userId: schema.commentTable.userId,
+            }),
             statusUpdateId: schema.commentTable.statusUpdateId,
             pinnedAt: schema.commentTable.pinnedAt,
             user: {
@@ -159,6 +169,10 @@ const makeCommentRepository = Effect.gen(function* () {
           parentCommentId: schema.commentTable.parentCommentId,
           memberId: schema.commentTable.memberId,
           authorIsMember: sql<boolean>`${schema.commentTable.memberId} is not null`,
+          // See `Comment.authorIsBanned`: `null` is "not disclosed", so the
+          // public payload says nothing about a moderation decision it is not
+          // entitled to report.
+          authorIsBanned: sql<boolean | null>`null`,
           statusUpdateId: schema.commentTable.statusUpdateId,
           pinnedAt: schema.commentTable.pinnedAt,
           user: {

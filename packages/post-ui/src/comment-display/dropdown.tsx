@@ -21,8 +21,11 @@ export function CommentDisplayDropdown() {
   }
 
   // A ban is for end users: staff are managed through membership, and the
-  // server refuses a member target for the same reason.
-  const canBanAuthor = canBanAuthors && !state.authorIsMember;
+  // server refuses a member target for the same reason. Offering it again for
+  // somebody already banned would only re-upsert the row the header badge is
+  // already reporting.
+  const canBanAuthor =
+    canBanAuthors && !state.authorIsMember && !state.authorIsBanned;
 
   return (
     <Menu>
