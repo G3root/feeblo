@@ -1,6 +1,7 @@
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { EMAIL_DELIVERY_STATES } from "@feeblo/domain-contracts/email";
 import { WorkspaceId } from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -8,6 +9,7 @@ import * as Layer from "effect/Layer";
 
 import {
   canTransitionDelivery,
+  emailDeliveryMachine,
   isTerminalDeliveryState,
 } from "./delivery-state";
 import { EmailOutboxRepository } from "./repository";
@@ -24,6 +26,14 @@ describe("email delivery state", () => {
   );
 
   layer(TestLayer)("repository", (it) => {
+    it("declares exactly the stored delivery vocabulary", () => {
+      // The state list is read off the machine; this is the assertion that
+      // fails the day a state is added to one and not the other.
+      expect([...EMAIL_DELIVERY_STATES].sort()).toStrictEqual(
+        Object.keys(emailDeliveryMachine.states).sort()
+      );
+    });
+
     it("allows only valid lifecycle transitions", () => {
       expect(canTransitionDelivery("queued", "sending")).toBe(true);
       expect(canTransitionDelivery("queued", "failed")).toBe(true);

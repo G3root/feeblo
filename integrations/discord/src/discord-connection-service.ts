@@ -586,7 +586,7 @@ export const makeDiscordConnectionServiceLive = (
             and(
               eq(schema.integrationConnectionTable.id, connectionId),
               inArray(schema.integrationConnectionTable.lifecycle, [
-                ...connectionSourceStatesFor("archive"),
+                ...connectionSourceStatesFor("archived"),
               ])
             )
           )

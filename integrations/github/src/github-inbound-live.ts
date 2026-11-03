@@ -371,7 +371,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                     installation.connectionId
                   ),
                   inArray(schema.integrationConnectionTable.lifecycle, [
-                    ...connectionSourceStatesFor("archive"),
+                    ...connectionSourceStatesFor("archived"),
                   ])
                 )
               )

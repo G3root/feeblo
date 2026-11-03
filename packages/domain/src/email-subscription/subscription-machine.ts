@@ -4,7 +4,7 @@ import {
 } from "@feeblo/domain-contracts/email";
 import { setupEffect } from "@xstate/effect";
 import * as Schema from "effect/Schema";
-import { transition } from "xstate";
+import { isUnhandled, transition } from "xstate";
 
 /**
  * The lifecycle of one email subscription, as an XState machine.
@@ -193,6 +193,18 @@ export const nextStateForRequest = (
   return next.value as TEmailSubscriptionState;
 };
 
+/** True when the machine handles `event` from this node, self-transitions included. */
+const handles = (
+  node: TEmailSubscriptionNode,
+  event: TEmailSubscriptionEvent
+): boolean => {
+  const before = snapshotFor(node);
+  return !isUnhandled(
+    before,
+    transition(emailSubscriptionMachine, before, { type: event })
+  );
+};
+
 /**
  * The states from which `event` moves the subscription.
  *
@@ -203,9 +215,7 @@ export const nextStateForRequest = (
 export const sourceStatesFor = (
   event: TEmailSubscriptionEvent
 ): readonly TEmailSubscriptionState[] =>
-  EMAIL_SUBSCRIPTION_STATES.filter(
-    (state) => stateAfter(state, event) !== state
-  );
+  EMAIL_SUBSCRIPTION_STATES.filter((state) => handles(state, event));
 
 /** The single state `event` produces, for the `SET` half of a guarded update. */
 export const targetStateFor = (

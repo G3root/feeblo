@@ -60,7 +60,7 @@ export const EmailOutboxState = S.Literals(EMAIL_OUTBOX_STATES);
 export type TEmailOutboxState = S.Schema.Type<typeof EmailOutboxState>;
 
 /** Canonical `email_delivery.state` vocabulary. */
-export const EmailDeliveryState = S.Literals([
+export const EMAIL_DELIVERY_STATES = [
   "queued",
   "sending",
   "accepted",
@@ -78,7 +78,9 @@ export const EmailDeliveryState = S.Literals([
    * gains access later receives subsequent deliveries without backfill.
    */
   "no_organization_access",
-]);
+] as const;
+
+export const EmailDeliveryState = S.Literals(EMAIL_DELIVERY_STATES);
 
 export type TEmailDeliveryState = S.Schema.Type<typeof EmailDeliveryState>;
 

@@ -1,4 +1,4 @@
-import type { TEmailDeliveryState } from "@feeblo/db/validation-schema/email";
+import type { TEmailDeliveryState } from "@feeblo/domain-contracts/email";
 import { setupEffect } from "@xstate/effect";
 import * as Schema from "effect/Schema";
 import { isUnhandled, transition } from "xstate";
@@ -13,40 +13,11 @@ import { isUnhandled, transition } from "xstate";
  * held this file's hand-written table next to `intent-machine.ts`, one for each
  * half of the same pipeline.
  *
- * The events are named after the state they enter because the writes are
- * target-driven: `markDeliveryOutcome(state)` and its siblings decide a target
- * and ask which rows may reach it, never the other way round.
+ * There is exactly one source of truth in this file: the machine below. Every
+ * event is named after the state it enters, so a target names its own
+ * transition and no mapping table has to be kept beside it; the state list and
+ * the transition reverse-index are both read back off the machine.
  */
-
-export const EMAIL_DELIVERY_EVENTS = [
-  "accepted",
-  "bounced",
-  "deferred",
-  "delivered",
-  "expired",
-  "failed",
-  "noOrganizationAccess",
-  "pausedByPlan",
-  "queued",
-  "sending",
-  "suppressed",
-] as const;
-
-export type TEmailDeliveryEvent = (typeof EMAIL_DELIVERY_EVENTS)[number];
-
-export const EMAIL_DELIVERY_STATES = [
-  "queued",
-  "sending",
-  "accepted",
-  "delivered",
-  "deferred",
-  "bounced",
-  "failed",
-  "suppressed",
-  "paused_by_plan",
-  "expired",
-  "no_organization_access",
-] as const satisfies readonly TEmailDeliveryState[];
 
 export const emailDeliveryMachine = setupEffect({
   schemas: {
@@ -57,10 +28,10 @@ export const emailDeliveryMachine = setupEffect({
       delivered: Schema.Struct({ type: Schema.Literal("delivered") }),
       expired: Schema.Struct({ type: Schema.Literal("expired") }),
       failed: Schema.Struct({ type: Schema.Literal("failed") }),
-      noOrganizationAccess: Schema.Struct({
-        type: Schema.Literal("noOrganizationAccess"),
+      no_organization_access: Schema.Struct({
+        type: Schema.Literal("no_organization_access"),
       }),
-      pausedByPlan: Schema.Struct({ type: Schema.Literal("pausedByPlan") }),
+      paused_by_plan: Schema.Struct({ type: Schema.Literal("paused_by_plan") }),
       queued: Schema.Struct({ type: Schema.Literal("queued") }),
       sending: Schema.Struct({ type: Schema.Literal("sending") }),
       suppressed: Schema.Struct({ type: Schema.Literal("suppressed") }),
@@ -75,8 +46,8 @@ export const emailDeliveryMachine = setupEffect({
       on: {
         expired: { target: "expired" },
         failed: { target: "failed" },
-        noOrganizationAccess: { target: "no_organization_access" },
-        pausedByPlan: { target: "paused_by_plan" },
+        no_organization_access: { target: "no_organization_access" },
+        paused_by_plan: { target: "paused_by_plan" },
         sending: { target: "sending" },
         suppressed: { target: "suppressed" },
       },
@@ -91,8 +62,8 @@ export const emailDeliveryMachine = setupEffect({
         delivered: { target: "delivered" },
         expired: { target: "expired" },
         failed: { target: "failed" },
-        noOrganizationAccess: { target: "no_organization_access" },
-        pausedByPlan: { target: "paused_by_plan" },
+        no_organization_access: { target: "no_organization_access" },
+        paused_by_plan: { target: "paused_by_plan" },
         suppressed: { target: "suppressed" },
       },
     },
@@ -110,8 +81,8 @@ export const emailDeliveryMachine = setupEffect({
       on: {
         expired: { target: "expired" },
         failed: { target: "failed" },
-        noOrganizationAccess: { target: "no_organization_access" },
-        pausedByPlan: { target: "paused_by_plan" },
+        no_organization_access: { target: "no_organization_access" },
+        paused_by_plan: { target: "paused_by_plan" },
         sending: { target: "sending" },
         suppressed: { target: "suppressed" },
       },
@@ -132,43 +103,39 @@ export const emailDeliveryMachine = setupEffect({
   },
 });
 
-/** The event that enters `to`. Every state here has exactly one. */
-const eventFor = (to: TEmailDeliveryState): TEmailDeliveryEvent => {
-  switch (to) {
-    case "accepted":
-      return "accepted";
-    case "bounced":
-      return "bounced";
-    case "deferred":
-      return "deferred";
-    case "delivered":
-      return "delivered";
-    case "expired":
-      return "expired";
-    case "failed":
-      return "failed";
-    case "no_organization_access":
-      return "noOrganizationAccess";
-    case "paused_by_plan":
-      return "pausedByPlan";
-    case "queued":
-      return "queued";
-    case "sending":
-      return "sending";
-    case "suppressed":
-      return "suppressed";
-  }
-};
+/**
+ * The states the machine declares, read off the machine.
+ *
+ * `EMAIL_DELIVERY_STATES` in `@feeblo/domain-contracts` is the stored
+ * vocabulary and `delivery-state.test.ts` pins the two equal, so this cannot
+ * drift into a second list.
+ */
+// SAFETY: the machine declares exactly the states of the delivery vocabulary
+// (`delivery-state.test.ts` pins the two sets equal); `Object.keys` widens a
+// record's keys to `string` because the standard library does not preserve
+// them.
+const deliveryStates: readonly TEmailDeliveryState[] = Object.keys(
+  emailDeliveryMachine.states
+) as readonly TEmailDeliveryState[];
 
 const snapshotFor = (state: TEmailDeliveryState) =>
   emailDeliveryMachine.resolveState({ context: {}, value: state });
 
-/** True when `state` handles `event`, including a self-transition. */
-const handles = (state: TEmailDeliveryState, event: TEmailDeliveryEvent) => {
+/**
+ * True when `state` handles the event that enters `to`.
+ *
+ * `isUnhandled` rather than a value comparison: a self-transition leaves the
+ * value unchanged while still being a move, and comparing values would report
+ * it as rejected.
+ */
+const handles = (
+  state: TEmailDeliveryState,
+  to: TEmailDeliveryState
+): boolean => {
   const before = snapshotFor(state);
   return !isUnhandled(
     before,
-    transition(emailDeliveryMachine, before, { type: event })
+    transition(emailDeliveryMachine, before, { type: to })
   );
 };
 
@@ -176,16 +143,14 @@ const handles = (state: TEmailDeliveryState, event: TEmailDeliveryEvent) => {
 export const canTransitionDelivery = (
   from: TEmailDeliveryState,
   to: TEmailDeliveryState
-): boolean => from !== to && handles(from, eventFor(to));
+): boolean => from !== to && handles(from, to);
 
 /** Persisted states from which a guarded SQL update may enter the target state. */
 export const deliverySourceStatesFor = (
   to: TEmailDeliveryState
 ): readonly TEmailDeliveryState[] =>
-  EMAIL_DELIVERY_STATES.filter(
-    (from) => from !== to && handles(from, eventFor(to))
-  );
+  deliveryStates.filter((from) => from !== to && handles(from, to));
 
 /** Terminal delivery states are safe no-ops when a workflow is replayed. */
 export const isTerminalDeliveryState = (state: TEmailDeliveryState): boolean =>
-  !EMAIL_DELIVERY_EVENTS.some((event) => handles(state, event));
+  deliveryStates.every((to) => !handles(state, to));

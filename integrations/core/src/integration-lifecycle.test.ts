@@ -1,20 +1,23 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  INTEGRATION_CONNECTION_EVENTS,
   INTEGRATION_CONNECTION_STATES,
-  INTEGRATION_DELIVERY_EVENTS,
   INTEGRATION_DELIVERY_STATES,
   LEGACY_CONNECTION_LIFECYCLES,
   LISTED_CONNECTION_LIFECYCLES,
   canTransitionIntegrationConnectionLifecycle,
   canTransitionIntegrationDeliveryState,
   connectionSourceStatesFor,
-  connectionTargetStateFor,
   deliverySourceStatesFor,
-  deliveryTargetStateFor,
   integrationConnectionMachine,
 } from "./integration-lifecycle";
+
+/**
+ * Both graphs are derived from one machine each — the state list, the reverse
+ * index and the predicates all read back off it — so these tests are what keep
+ * the derivation honest. They enumerate the graphs rather than sampling them.
+ */
+
 const connections = INTEGRATION_CONNECTION_STATES;
 const connectionPairs = connections.flatMap((from) =>
   connections.map((to) => [from, to] as const)
@@ -27,6 +30,19 @@ const connectionTransitions = connectionPairs
   .map(([from, to]) => `${from} -> ${to}`);
 
 describe("integration connection lifecycle", () => {
+  it("declares every state the stored vocabulary allows", () => {
+    expect([...connections].sort()).toStrictEqual([
+      "active",
+      "archived",
+      "connecting",
+      "disconnected",
+      "disconnecting",
+      "paused",
+      "reauth_required",
+      "revocation_unconfirmed",
+    ]);
+  });
+
   it("permits documented connection transitions and rejects lifecycle skips", () => {
     expect(
       canTransitionIntegrationConnectionLifecycle({
@@ -101,7 +117,7 @@ describe("integration connection lifecycle", () => {
     expect(LISTED_CONNECTION_LIFECYCLES).toStrictEqual(
       connections.filter((state) => state !== "archived")
     );
-    expect([...connectionSourceStatesFor("archive")]).toStrictEqual([
+    expect([...connectionSourceStatesFor("archived")]).toStrictEqual([
       ...LISTED_CONNECTION_LIFECYCLES,
     ]);
   });
@@ -109,20 +125,25 @@ describe("integration connection lifecycle", () => {
   it("keeps the legacy states drain-only", () => {
     // Nothing writes `reauth_required` or `disconnected` any more; old rows may
     // still hold one, so they keep their outgoing edges. What must not exist is
-    // an edge *into* them: no event may target a legacy state, or the code
-    // would be able to create one again.
-    for (const event of INTEGRATION_CONNECTION_EVENTS) {
-      expect(LEGACY_CONNECTION_LIFECYCLES).not.toContain(
-        connectionTargetStateFor(event)
+    // an edge *into* them, or the code could create one again.
+    for (const legacy of LEGACY_CONNECTION_LIFECYCLES) {
+      const inbound = connections.filter(
+        (from) =>
+          from !== legacy &&
+          canTransitionIntegrationConnectionLifecycle({
+            from,
+            to: legacy,
+          })
       );
+
+      expect(inbound).toStrictEqual([]);
     }
 
     // They are still sources, which is how an old row gets archived.
-    expect(connectionSourceStatesFor("activate")).toContain("disconnected");
-    expect(connectionSourceStatesFor("disconnect")).toContain(
+    expect(connectionSourceStatesFor("active")).toContain("disconnected");
+    expect(connectionSourceStatesFor("disconnecting")).toContain(
       "reauth_required"
     );
-    expect(connectionSourceStatesFor("archive")).toContain("reauth_required");
   });
 
   it("starts connecting", () => {
@@ -131,16 +152,12 @@ describe("integration connection lifecycle", () => {
     );
   });
 
-  it("gives every event exactly one target", () => {
-    expect(
-      INTEGRATION_CONNECTION_EVENTS.map(connectionTargetStateFor)
-    ).toStrictEqual([
-      "active",
-      "archived",
-      "disconnecting",
-      "revocation_unconfirmed",
-      "paused",
-    ]);
+  it("re-derives the state list from the machine, not a second copy", () => {
+    // The list is `Object.keys(machine.states)`; this is the assertion that
+    // fails the day a state is added to one and not the other.
+    expect([...connections].sort()).toStrictEqual(
+      Object.keys(integrationConnectionMachine.states).sort()
+    );
   });
 });
 
@@ -169,6 +186,8 @@ describe("integration delivery state", () => {
       )
       .map(([from, to]) => `${from} -> ${to}`);
 
+    // Declaration order of the states, then of the edges out of each one:
+    // `canceled` is declared before `leased`, and `exhausted` after both.
     expect(transitions).toStrictEqual([
       "pending -> leased",
       "pending -> canceled",
@@ -181,22 +200,25 @@ describe("integration delivery state", () => {
   });
 
   it("derives each event's sources", () => {
-    expect(deliverySourceStatesFor("cancel")).toStrictEqual([
+    expect(deliverySourceStatesFor("canceled")).toStrictEqual([
       "pending",
       "leased",
     ]);
-    expect(deliverySourceStatesFor("lease")).toStrictEqual(["pending"]);
-    expect(deliverySourceStatesFor("release")).toStrictEqual(["leased"]);
-    expect(deliverySourceStatesFor("retry")).toStrictEqual(["exhausted"]);
+    expect(deliverySourceStatesFor("leased")).toStrictEqual(["pending"]);
+    expect(deliverySourceStatesFor("pending")).toStrictEqual([
+      "leased",
+      "exhausted",
+    ]);
+    expect(deliverySourceStatesFor("succeeded")).toStrictEqual(["leased"]);
+    expect(deliverySourceStatesFor("exhausted")).toStrictEqual(["leased"]);
   });
 
-  it("has no self-transition, so a generated WHERE can never miss a move", () => {
-    // A self-transition would leave the value unchanged while still being a
-    // move, and a `WHERE` generated from the sources would be missing it.
-    for (const event of INTEGRATION_DELIVERY_EVENTS) {
-      expect(deliverySourceStatesFor(event)).not.toContain(
-        deliveryTargetStateFor(event)
-      );
+  it("has no self-transition", () => {
+    // A self-transition would be invisible to `sourceStatesFor`, which filters
+    // the state it targets. The connection graph has one on purpose; this one
+    // must not.
+    for (const to of deliveries) {
+      expect(deliverySourceStatesFor(to)).not.toContain(to);
     }
   });
 });

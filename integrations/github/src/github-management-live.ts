@@ -331,7 +331,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 IntegrationProviderKey.make("github")
               ),
               inArray(schema.integrationConnectionTable.lifecycle, [
-                ...connectionSourceStatesFor("archive"),
+                ...connectionSourceStatesFor("archived"),
               ])
             )
           )

@@ -4,7 +4,7 @@ import {
 } from "@feeblo/domain-contracts/data-import";
 import { setupEffect } from "@xstate/effect";
 import * as Schema from "effect/Schema";
-import { transition } from "xstate";
+import { isUnhandled, transition } from "xstate";
 
 /**
  * The lifecycle of one import job, as an XState machine.
@@ -148,6 +148,24 @@ const statusAfter = (
   return next.value as TDataImportStatus;
 };
 
+/**
+ * True when the machine handles `event` at all.
+ *
+ * `isUnhandled` rather than comparing the resulting state to the starting one:
+ * the two disagree on a self-transition, which leaves the value unchanged while
+ * still being a move.
+ */
+const handles = (
+  status: TDataImportStatus,
+  event: TDataImportJobEvent
+): boolean => {
+  const before = snapshotFor(status);
+  return !isUnhandled(
+    before,
+    transition(dataImportJobMachine, before, { type: event })
+  );
+};
+
 /** True when the machine permits `from --event--> to`. */
 export const canTransitionDataImportJob = (
   from: TDataImportStatus,
@@ -166,7 +184,7 @@ export const canTransitionDataImportJob = (
 export const sourceStatesFor = (
   event: TDataImportJobEvent
 ): readonly TDataImportStatus[] =>
-  DATA_IMPORT_JOB_STATES.filter((from) => statusAfter(from, event) !== from);
+  DATA_IMPORT_JOB_STATES.filter((from) => handles(from, event));
 
 /** Every status `event` can produce from `from`, in declaration order. */
 export const targetStatesFor = (

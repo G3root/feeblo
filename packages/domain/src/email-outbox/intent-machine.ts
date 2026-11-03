@@ -4,7 +4,7 @@ import {
 } from "@feeblo/domain-contracts/email";
 import { setupEffect } from "@xstate/effect";
 import * as Schema from "effect/Schema";
-import { transition } from "xstate";
+import { isUnhandled, transition } from "xstate";
 
 /**
  * The lifecycle of one email intent, as an XState machine.
@@ -108,6 +108,18 @@ const stateAfter = (
   return next.value as TEmailOutboxState;
 };
 
+/** True when the machine handles `event` at all, self-transitions included. */
+const handles = (
+  state: TEmailOutboxState,
+  event: TEmailIntentEvent
+): boolean => {
+  const before = snapshotFor(state);
+  return !isUnhandled(
+    before,
+    transition(emailIntentMachine, before, { type: event })
+  );
+};
+
 /**
  * The states from which `event` moves the intent.
  *
@@ -117,7 +129,7 @@ const stateAfter = (
 export const sourceStatesFor = (
   event: TEmailIntentEvent
 ): readonly TEmailOutboxState[] =>
-  EMAIL_INTENT_STATES.filter((state) => stateAfter(state, event) !== state);
+  EMAIL_INTENT_STATES.filter((state) => handles(state, event));
 
 /** The `SET` a transition writes: the single state `event` produces. */
 export const targetStateFor = (event: TEmailIntentEvent): TEmailOutboxState => {

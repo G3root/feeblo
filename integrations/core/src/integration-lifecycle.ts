@@ -33,22 +33,16 @@ import type {
  *    that same set is what the three list queries hard-code as seven names.
  *    {@link LISTED_CONNECTION_LIFECYCLES} derives it from the graph instead.
  *
+ * Every event is named after the state it enters, so a target names its own
+ * transition. That is what lets the state list, the reverse index and the
+ * predicates all be read back off the machines: there is one source of truth
+ * per graph, and no mapping table beside it.
+ *
  * A self-transition is deliberate: re-activating an already-`active` connection
  * is how a webhook endpoint's health counters are reset, and how a GitHub
  * installation restores itself. `isUnhandled` is what makes it visible to the
- * derivation below, since a self-transition leaves the value unchanged.
+ * derivations below, since a self-transition leaves the value unchanged.
  */
-
-export const INTEGRATION_CONNECTION_EVENTS = [
-  "activate",
-  "archive",
-  "disconnect",
-  "failRevocation",
-  "pause",
-] as const;
-
-export type TIntegrationConnectionEvent =
-  (typeof INTEGRATION_CONNECTION_EVENTS)[number];
 
 /**
  * States old rows may hold and nothing writes any more. They keep outgoing
@@ -58,25 +52,16 @@ export type TIntegrationConnectionEvent =
 export const LEGACY_CONNECTION_LIFECYCLES: readonly IntegrationConnectionLifecycleStatus[] =
   ["reauth_required", "disconnected"];
 
-export const INTEGRATION_CONNECTION_STATES = [
-  "connecting",
-  "active",
-  "paused",
-  "reauth_required",
-  "disconnecting",
-  "disconnected",
-  "revocation_unconfirmed",
-  "archived",
-] as const;
-
 export const integrationConnectionMachine = setupEffect({
   schemas: {
     events: {
-      activate: Schema.Struct({ type: Schema.Literal("activate") }),
-      archive: Schema.Struct({ type: Schema.Literal("archive") }),
-      disconnect: Schema.Struct({ type: Schema.Literal("disconnect") }),
-      failRevocation: Schema.Struct({ type: Schema.Literal("failRevocation") }),
-      pause: Schema.Struct({ type: Schema.Literal("pause") }),
+      active: Schema.Struct({ type: Schema.Literal("active") }),
+      archived: Schema.Struct({ type: Schema.Literal("archived") }),
+      disconnecting: Schema.Struct({ type: Schema.Literal("disconnecting") }),
+      paused: Schema.Struct({ type: Schema.Literal("paused") }),
+      revocation_unconfirmed: Schema.Struct({
+        type: Schema.Literal("revocation_unconfirmed"),
+      }),
     },
   },
 }).createMachine({
@@ -88,58 +73,58 @@ export const integrationConnectionMachine = setupEffect({
     // successful callback, or the owner giving up and archiving it.
     connecting: {
       on: {
-        activate: { target: "active" },
-        archive: { target: "archived" },
-        disconnect: { target: "disconnecting" },
+        active: { target: "active" },
+        archived: { target: "archived" },
+        disconnecting: { target: "disconnecting" },
       },
     },
     active: {
       on: {
         // Self: re-activating resets delivery health and restores a suspended
         // installation. It is a real event even though the state does not move.
-        activate: { target: "active" },
-        archive: { target: "archived" },
-        disconnect: { target: "disconnecting" },
-        pause: { target: "paused" },
+        active: { target: "active" },
+        archived: { target: "archived" },
+        disconnecting: { target: "disconnecting" },
+        paused: { target: "paused" },
       },
     },
     paused: {
       on: {
-        activate: { target: "active" },
-        archive: { target: "archived" },
-        disconnect: { target: "disconnecting" },
+        active: { target: "active" },
+        archived: { target: "archived" },
+        disconnecting: { target: "disconnecting" },
       },
     },
     // Legacy. Nothing writes it, but a row that holds it can be archived or
     // disconnected, and reactivating it is what a completed reinstall does.
     reauth_required: {
       on: {
-        activate: { target: "active" },
-        archive: { target: "archived" },
-        disconnect: { target: "disconnecting" },
+        active: { target: "active" },
+        archived: { target: "archived" },
+        disconnecting: { target: "disconnecting" },
       },
     },
     // Revocation is in flight: routes are disabled and pending deliveries are
     // canceled before the remote call.
     disconnecting: {
       on: {
-        archive: { target: "archived" },
-        failRevocation: { target: "revocation_unconfirmed" },
+        archived: { target: "archived" },
+        revocation_unconfirmed: { target: "revocation_unconfirmed" },
       },
     },
     // Legacy, as above.
     disconnected: {
       on: {
-        activate: { target: "active" },
-        archive: { target: "archived" },
+        active: { target: "active" },
+        archived: { target: "archived" },
       },
     },
     // The remote side could not be told. Nothing has been deleted, so a retry
     // is allowed to start the disconnect again.
     revocation_unconfirmed: {
       on: {
-        archive: { target: "archived" },
-        disconnect: { target: "disconnecting" },
+        archived: { target: "archived" },
+        disconnecting: { target: "disconnecting" },
       },
     },
     // Terminal: the row is a tombstone kept for its retention window.
@@ -147,99 +132,14 @@ export const integrationConnectionMachine = setupEffect({
   },
 });
 
-const connectionSnapshot = (state: IntegrationConnectionLifecycleStatus) =>
-  integrationConnectionMachine.resolveState({ context: {}, value: state });
-
-/** True when the machine handles `event` at all, including a self-transition. */
-const connectionHandles = (
-  state: IntegrationConnectionLifecycleStatus,
-  event: TIntegrationConnectionEvent
-): boolean => {
-  const before = connectionSnapshot(state);
-  return !isUnhandled(
-    before,
-    transition(integrationConnectionMachine, before, { type: event })
-  );
-};
-
-/** The states from which `event` moves or re-affirms the connection. */
-export const connectionSourceStatesFor = (
-  event: TIntegrationConnectionEvent
-): readonly IntegrationConnectionLifecycleStatus[] =>
-  INTEGRATION_CONNECTION_STATES.filter((state) =>
-    connectionHandles(state, event)
-  );
-
-/** The state `event` produces, for a guarded `UPDATE`'s `SET`. */
-export const connectionTargetStateFor = (
-  event: TIntegrationConnectionEvent
-): IntegrationConnectionLifecycleStatus => {
-  const targets = new Set<IntegrationConnectionLifecycleStatus>();
-  for (const state of INTEGRATION_CONNECTION_STATES) {
-    if (!connectionHandles(state, event)) {
-      continue;
-    }
-    const [next] = transition(
-      integrationConnectionMachine,
-      connectionSnapshot(state),
-      {
-        type: event,
-      }
-    );
-    // SAFETY: the machine is flat and every target is one of the eight
-    // connection states, which `lifecycle.test` walks end to end.
-    targets.add(next.value as IntegrationConnectionLifecycleStatus);
-  }
-  const [target, ...rest] = [...targets];
-
-  if (target === undefined || rest.length > 0) {
-    throw new Error(
-      `Integration connection event "${event}" must have exactly one target, found ${targets.size}`
-    );
-  }
-
-  return target;
-};
-
-/**
- * The states a connection list shows: every state except the tombstone.
- *
- * Each of Slack, Discord and Webhook wrote this out as the same seven names.
- * It is exactly the set {@link connectionSourceStatesFor}`("archive")` returns,
- * which is the point — a listed connection is one that can still be archived.
- */
-export const LISTED_CONNECTION_LIFECYCLES: readonly IntegrationConnectionLifecycleStatus[] =
-  connectionSourceStatesFor("archive");
-
-export const INTEGRATION_DELIVERY_EVENTS = [
-  "cancel",
-  "exhaust",
-  "lease",
-  "release",
-  "retry",
-  "succeed",
-] as const;
-
-export type TIntegrationDeliveryEvent =
-  (typeof INTEGRATION_DELIVERY_EVENTS)[number];
-
-export const INTEGRATION_DELIVERY_STATES = [
-  "pending",
-  "leased",
-  "succeeded",
-  "exhausted",
-  "canceled",
-] as const;
-
 export const integrationDeliveryMachine = setupEffect({
   schemas: {
     events: {
-      cancel: Schema.Struct({ type: Schema.Literal("cancel") }),
-      exhaust: Schema.Struct({ type: Schema.Literal("exhaust") }),
-      lease: Schema.Struct({ type: Schema.Literal("lease") }),
-      release: Schema.Struct({ type: Schema.Literal("release") }),
-      retry: Schema.Struct({ type: Schema.Literal("retry") }),
-      succeed: Schema.Struct({ type: Schema.Literal("succeed") }),
+      canceled: Schema.Struct({ type: Schema.Literal("canceled") }),
+      exhausted: Schema.Struct({ type: Schema.Literal("exhausted") }),
+      leased: Schema.Struct({ type: Schema.Literal("leased") }),
+      pending: Schema.Struct({ type: Schema.Literal("pending") }),
+      succeeded: Schema.Struct({ type: Schema.Literal("succeeded") }),
     },
   },
 }).createMachine({
@@ -249,70 +149,131 @@ export const integrationDeliveryMachine = setupEffect({
   states: {
     pending: {
       on: {
-        cancel: { target: "canceled" },
-        lease: { target: "leased" },
+        canceled: { target: "canceled" },
+        leased: { target: "leased" },
       },
     },
     leased: {
       on: {
-        cancel: { target: "canceled" },
-        exhaust: { target: "exhausted" },
-        release: { target: "pending" },
-        succeed: { target: "succeeded" },
+        canceled: { target: "canceled" },
+        exhausted: { target: "exhausted" },
+        pending: { target: "pending" },
+        succeeded: { target: "succeeded" },
       },
     },
     succeeded: {},
-    // Terminal: the retry budget is spent. `retry` is the manual escape hatch.
+    // Terminal: the retry budget is spent. `pending` is the manual escape hatch.
     exhausted: {
-      on: { retry: { target: "pending" } },
+      on: { pending: { target: "pending" } },
     },
     // Terminal: canceled work is never revived.
     canceled: {},
   },
 });
 
-const deliverySnapshot = (state: IntegrationDeliveryState) =>
-  integrationDeliveryMachine.resolveState({ context: {}, value: state });
+/**
+ * The states one machine declares, read off the machine.
+ *
+ * `Object.keys` widens a record's keys to `string`; the SAFETY comment on each
+ * cast states the invariant, and `lifecycle.test.ts` walks both graphs so a
+ * mismatch fails rather than silently shortening a `WHERE ... IN`.
+ */
+export const INTEGRATION_CONNECTION_STATES: readonly IntegrationConnectionLifecycleStatus[] =
+  // SAFETY: the machine declares exactly the connection lifecycle vocabulary.
+  Object.keys(
+    integrationConnectionMachine.states
+  ) as readonly IntegrationConnectionLifecycleStatus[];
 
-/** The states from which `event` moves a delivery. */
-export const deliverySourceStatesFor = (
-  event: TIntegrationDeliveryEvent
-): readonly IntegrationDeliveryState[] =>
-  INTEGRATION_DELIVERY_STATES.filter((state) => {
-    // One snapshot for both halves: `isUnhandled` compares the snapshot it is
-    // given with the one the transition started from, so building two would
-    // report every event as handled.
-    const before = deliverySnapshot(state);
-    return !isUnhandled(
-      before,
-      transition(integrationDeliveryMachine, before, { type: event })
-    );
+export const INTEGRATION_DELIVERY_STATES: readonly IntegrationDeliveryState[] =
+  // SAFETY: the machine declares exactly the delivery state vocabulary.
+  Object.keys(
+    integrationDeliveryMachine.states
+  ) as readonly IntegrationDeliveryState[];
+
+/**
+ * The states some edge enters. `connecting` is the initial state and has no
+ * inbound edge, so it is not one of these — which is why asking for its sources
+ * answers "none" rather than naming an event nothing accepts.
+ */
+const CONNECTION_TARGETS = [
+  "active",
+  "archived",
+  "disconnecting",
+  "paused",
+  "revocation_unconfirmed",
+] as const;
+
+type TConnectionTarget = (typeof CONNECTION_TARGETS)[number];
+
+const isConnectionTarget = (
+  state: IntegrationConnectionLifecycleStatus
+): state is TConnectionTarget =>
+  CONNECTION_TARGETS.some((target) => target === state);
+
+/**
+ * True when the connection machine handles the event that enters `to` from
+ * `from`.
+ *
+ * `isUnhandled` rather than a value comparison: re-activating an `active`
+ * connection is a real event whose value does not change, and a comparison
+ * would report it as rejected.
+ */
+const connectionHandles = (
+  from: IntegrationConnectionLifecycleStatus,
+  to: TConnectionTarget
+): boolean => {
+  const before = integrationConnectionMachine.resolveState({
+    context: {},
+    value: from,
   });
-
-/** The state `event` produces, for a guarded `UPDATE`'s `SET`. */
-export const deliveryTargetStateFor = (
-  event: TIntegrationDeliveryEvent
-): IntegrationDeliveryState => {
-  const targets = new Set<IntegrationDeliveryState>();
-  for (const state of deliverySourceStatesFor(event)) {
-    const before = deliverySnapshot(state);
-    const [next] = transition(integrationDeliveryMachine, before, {
-      type: event,
-    });
-    // SAFETY: the delivery machine is flat and every target is one of the five
-    // delivery states, which the test walks.
-    targets.add(next.value as IntegrationDeliveryState);
-  }
-  const [target, ...rest] = [...targets];
-
-  if (target === undefined || rest.length > 0) {
-    throw new Error(
-      `Integration delivery event "${event}" must have exactly one target, found ${targets.size}`
-    );
-  }
-
-  return target;
+  return !isUnhandled(
+    before,
+    transition(integrationConnectionMachine, before, { type: to })
+  );
 };
+
+/** The same, for the delivery graph. */
+const deliveryHandles = (
+  from: IntegrationDeliveryState,
+  to: IntegrationDeliveryState
+): boolean => {
+  const before = integrationDeliveryMachine.resolveState({
+    context: {},
+    value: from,
+  });
+  return !isUnhandled(
+    before,
+    transition(integrationDeliveryMachine, before, { type: to })
+  );
+};
+
+/** The states from which `to` moves or re-affirms the connection. */
+export const connectionSourceStatesFor = (
+  to: IntegrationConnectionLifecycleStatus
+): readonly IntegrationConnectionLifecycleStatus[] =>
+  isConnectionTarget(to)
+    ? INTEGRATION_CONNECTION_STATES.filter((from) =>
+        connectionHandles(from, to)
+      )
+    : [];
+
+/**
+ * The states a connection list shows: every state except the tombstone.
+ *
+ * Each of Slack, Discord and Webhook wrote this out as the same seven names.
+ * It is exactly the set that may still be archived, which is the point — a
+ * listed connection is one that can still be archived.
+ */
+export const LISTED_CONNECTION_LIFECYCLES: readonly IntegrationConnectionLifecycleStatus[] =
+  connectionSourceStatesFor("archived");
+
+/** The states from which `to` moves a delivery. */
+export const deliverySourceStatesFor = (
+  to: IntegrationDeliveryState
+): readonly IntegrationDeliveryState[] =>
+  INTEGRATION_DELIVERY_STATES.filter(
+    (from) => from !== to && deliveryHandles(from, to)
+  );
 
 /** Tests whether a connection lifecycle transition is legal before persistence. */
 export const canTransitionIntegrationConnectionLifecycle = ({
@@ -321,12 +282,7 @@ export const canTransitionIntegrationConnectionLifecycle = ({
 }: {
   readonly from: IntegrationConnectionLifecycleStatus;
   readonly to: IntegrationConnectionLifecycleStatus;
-}): boolean =>
-  INTEGRATION_CONNECTION_EVENTS.some(
-    (event) =>
-      connectionSourceStatesFor(event).includes(from) &&
-      connectionTargetStateFor(event) === to
-  );
+}): boolean => isConnectionTarget(to) && connectionHandles(from, to);
 
 /** Tests whether a delivery state change preserves lease and retry semantics. */
 export const canTransitionIntegrationDeliveryState = ({
@@ -335,9 +291,4 @@ export const canTransitionIntegrationDeliveryState = ({
 }: {
   readonly from: IntegrationDeliveryState;
   readonly to: IntegrationDeliveryState;
-}): boolean =>
-  INTEGRATION_DELIVERY_EVENTS.some(
-    (event) =>
-      deliverySourceStatesFor(event).includes(from) &&
-      deliveryTargetStateFor(event) === to
-  );
+}): boolean => from !== to && deliveryHandles(from, to);

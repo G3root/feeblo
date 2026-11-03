@@ -656,7 +656,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                       input.organizationId
                     ),
                     inArray(schema.integrationConnectionTable.lifecycle, [
-                      ...connectionSourceStatesFor("archive"),
+                      ...connectionSourceStatesFor("archived"),
                     ])
                   )
                 );
