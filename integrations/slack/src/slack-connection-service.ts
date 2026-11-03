@@ -13,6 +13,10 @@ import {
   IntegrationRouteId,
 } from "@feeblo/id";
 import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
+import {
   makeSlackApiClient,
   SLACK_OAUTH_AUTHORIZE_URL,
   type SlackApiClient,
@@ -208,30 +212,36 @@ export const makeSlackConnectionServiceLive = (
             })
             .pipe(mapSlackApiError("OAuth handshake"));
           const botToken = Redacted.make(oauth.access_token);
-          const authTest = yield* apiClient
-            .authTest({ botToken })
-            .pipe(mapSlackApiError("workspace verification"));
-          const teamInfo = yield* apiClient
-            .teamInfo({ botToken })
-            .pipe(mapSlackApiError("workspace lookup"));
-          const ciphertext = yield* encryptSlackCredentialMaterial(
-            config.encryptionKey,
-            {
-              botToken: oauth.access_token,
-              ...(oauth.authed_user?.access_token !== undefined && {
-                userToken: oauth.authed_user.access_token,
-              }),
-              ...(oauth.incoming_webhook?.url !== undefined && {
-                incomingWebhookUrl: oauth.incoming_webhook.url,
-              }),
-            }
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Slack credentials could not be encrypted",
-                })
-            )
+          // The two Slack calls share only the token and the encryption is a
+          // local operation over the token material, so all three run
+          // together: one Slack round trip instead of two. `Effect.all` is
+          // sequential unless told otherwise.
+          const [authTest, teamInfo, ciphertext] = yield* Effect.all(
+            [
+              apiClient
+                .authTest({ botToken })
+                .pipe(mapSlackApiError("workspace verification")),
+              apiClient
+                .teamInfo({ botToken })
+                .pipe(mapSlackApiError("workspace lookup")),
+              encryptSlackCredentialMaterial(config.encryptionKey, {
+                botToken: oauth.access_token,
+                ...(oauth.authed_user?.access_token !== undefined && {
+                  userToken: oauth.authed_user.access_token,
+                }),
+                ...(oauth.incoming_webhook?.url !== undefined && {
+                  incomingWebhookUrl: oauth.incoming_webhook.url,
+                }),
+              }).pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Slack credentials could not be encrypted",
+                    })
+                )
+              ),
+            ],
+            { concurrency: "unbounded" }
           );
           return yield* db.transaction(() =>
             Effect.gen(function* () {
@@ -346,7 +356,14 @@ export const makeSlackConnectionServiceLive = (
       const listConnections = Effect.fn("SlackConnection.listConnections")(
         function* ({ organizationId }: { readonly organizationId: string }) {
           const rows = yield* db
-            .select()
+            .select({
+              createdAt: schema.integrationConnectionTable.createdAt,
+              id: schema.integrationConnectionTable.id,
+              lifecycle: schema.integrationConnectionTable.lifecycle,
+              name: schema.integrationConnectionTable.name,
+              safeDisplayMetadata:
+                schema.integrationConnectionTable.safeDisplayMetadata,
+            })
             .from(schema.integrationConnectionTable)
             .where(
               and(
@@ -359,13 +376,7 @@ export const makeSlackConnectionServiceLive = (
                   slackProviderKey
                 ),
                 inArray(schema.integrationConnectionTable.lifecycle, [
-                  "connecting",
-                  "active",
-                  "paused",
-                  "reauth_required",
-                  "disconnecting",
-                  "disconnected",
-                  "revocation_unconfirmed",
+                  ...LISTED_CONNECTION_LIFECYCLES,
                 ])
               )
             )
@@ -403,13 +414,40 @@ export const makeSlackConnectionServiceLive = (
                 });
               }
               if (connection.lifecycle === "archived") {
+                // The graph refuses to move an archived row, and a tombstone
+                // still holds whatever credentials it kept at archive time.
+                // Scrubbing them is the one part of a disconnect an archived
+                // connection still owes; it stays inside the transaction
+                // because it is database work only.
+                yield* db
+                  .update(schema.integrationConnectionTable)
+                  .set({
+                    credentialsCiphertext: null,
+                    updatedAt: yield* DateTime.nowAsDate,
+                  })
+                  .where(
+                    and(
+                      eq(schema.integrationConnectionTable.id, connectionId),
+                      eq(
+                        schema.integrationConnectionTable.lifecycle,
+                        "archived"
+                      )
+                    )
+                  );
                 return;
               }
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
-                .where(eq(schema.integrationConnectionTable.id, connectionId));
+                .where(
+                  and(
+                    eq(schema.integrationConnectionTable.id, connectionId),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
+                  )
+                );
               yield* db
                 .update(schema.integrationRouteTable)
                 .set({ enabled: false, updatedAt: now })
@@ -489,7 +527,12 @@ export const makeSlackConnectionServiceLive = (
                     updatedAt: now,
                   })
                   .where(
-                    eq(schema.integrationConnectionTable.id, connectionId)
+                    and(
+                      eq(schema.integrationConnectionTable.id, connectionId),
+                      inArray(schema.integrationConnectionTable.lifecycle, [
+                        ...connectionSourceStatesFor("archived"),
+                      ])
+                    )
                   );
               })
             ),

@@ -177,60 +177,71 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
         return empty;
       }
 
-      const categoryRows = yield* db
-        .select({
-          changelogId: schema.changelogCategoryLinkTable.changelogId,
-          id: schema.changelogCategoryTable.id,
-          name: schema.changelogCategoryTable.name,
-          iconType: schema.changelogCategoryTable.iconType,
-          icon: schema.changelogCategoryTable.icon,
-        })
-        .from(schema.changelogCategoryLinkTable)
-        .innerJoin(
-          schema.changelogCategoryTable,
-          eq(
-            schema.changelogCategoryTable.id,
-            schema.changelogCategoryLinkTable.categoryId
-          )
-        )
-        .where(
-          and(
-            eq(
-              schema.changelogCategoryLinkTable.organizationId,
-              organizationId
+      // Two independent reads keyed by the same ids: both enforce their own
+      // workspace scope, and neither can use the other's rows, so they run
+      // together. `Effect.all` is sequential unless told otherwise, and this
+      // enrichment is on every changelog list and detail read.
+      const [categoryRows, postRows] = yield* Effect.all(
+        [
+          db
+            .select({
+              changelogId: schema.changelogCategoryLinkTable.changelogId,
+              id: schema.changelogCategoryTable.id,
+              name: schema.changelogCategoryTable.name,
+              iconType: schema.changelogCategoryTable.iconType,
+              icon: schema.changelogCategoryTable.icon,
+            })
+            .from(schema.changelogCategoryLinkTable)
+            .innerJoin(
+              schema.changelogCategoryTable,
+              eq(
+                schema.changelogCategoryTable.id,
+                schema.changelogCategoryLinkTable.categoryId
+              )
+            )
+            .where(
+              and(
+                eq(
+                  schema.changelogCategoryLinkTable.organizationId,
+                  organizationId
+                ),
+                inArray(
+                  schema.changelogCategoryLinkTable.changelogId,
+                  changelogIds
+                )
+              )
+            )
+            .orderBy(
+              asc(schema.changelogCategoryLinkTable.createdAt),
+              asc(schema.changelogCategoryLinkTable.id)
             ),
-            inArray(schema.changelogCategoryLinkTable.changelogId, changelogIds)
-          )
-        )
-        .orderBy(
-          asc(schema.changelogCategoryLinkTable.createdAt),
-          asc(schema.changelogCategoryLinkTable.id)
-        );
-
-      const postRows = yield* db
-        .select({
-          changelogId: schema.changelogPostTable.changelogId,
-          id: schema.postTable.id,
-          title: schema.postTable.title,
-          slug: schema.postTable.slug,
-        })
-        .from(schema.changelogPostTable)
-        .innerJoin(
-          schema.postTable,
-          eq(schema.postTable.id, schema.changelogPostTable.postId)
-        )
-        .where(
-          and(
-            eq(schema.changelogPostTable.organizationId, organizationId),
-            inArray(schema.changelogPostTable.changelogId, changelogIds)
-          )
-        )
-        .orderBy(
-          asc(schema.changelogPostTable.createdAt),
-          // The table's key is `(changelogId, postId)`, so the post id is the
-          // unique tiebreaker a link created in the same instant needs.
-          asc(schema.changelogPostTable.postId)
-        );
+          db
+            .select({
+              changelogId: schema.changelogPostTable.changelogId,
+              id: schema.postTable.id,
+              title: schema.postTable.title,
+              slug: schema.postTable.slug,
+            })
+            .from(schema.changelogPostTable)
+            .innerJoin(
+              schema.postTable,
+              eq(schema.postTable.id, schema.changelogPostTable.postId)
+            )
+            .where(
+              and(
+                eq(schema.changelogPostTable.organizationId, organizationId),
+                inArray(schema.changelogPostTable.changelogId, changelogIds)
+              )
+            )
+            .orderBy(
+              asc(schema.changelogPostTable.createdAt),
+              // The table's key is `(changelogId, postId)`, so the post id is
+              // the unique tiebreaker a link created in the same instant needs.
+              asc(schema.changelogPostTable.postId)
+            ),
+        ],
+        { concurrency: "unbounded" }
+      );
 
       const categories = new Map<string, PublicApiChangelogCategoryEntry[]>();
       for (const row of categoryRows) {

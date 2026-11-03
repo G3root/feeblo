@@ -86,7 +86,7 @@ const makeJwtSecretRepository = Effect.gen(function* () {
             );
 
             const existing = yield* tx
-              .select()
+              .select({ revokedAt: schema.jwtSecretTable.revokedAt })
               .from(schema.jwtSecretTable)
               .where(
                 and(

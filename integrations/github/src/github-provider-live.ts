@@ -213,7 +213,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
               )
             );
             const [connection] = yield* db
-              .select()
+              .select({
+                credentialsCiphertext:
+                  schema.integrationConnectionTable.credentialsCiphertext,
+                id: schema.integrationConnectionTable.id,
+                organizationId:
+                  schema.integrationConnectionTable.organizationId,
+              })
               .from(schema.integrationConnectionTable)
               .where(
                 and(
@@ -333,7 +339,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                       : existingInstallation.connectionId;
                   if (reusedConnectionId !== undefined) {
                     const [reusedConnection] = yield* db
-                      .select()
+                      .select({
+                        id: schema.integrationConnectionTable.id,
+                        lifecycle: schema.integrationConnectionTable.lifecycle,
+                      })
                       .from(schema.integrationConnectionTable)
                       .where(
                         and(
@@ -602,43 +611,61 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
           installationTokenForConnection(input.connectionId).pipe(
             Effect.flatMap((accessToken) =>
               Effect.gen(function* () {
-                const issue = yield* api.getIssue({
-                  accessToken,
-                  repositoryOwner: input.repositoryOwner,
-                  repositoryName: input.repositoryName,
-                  issueNumber: input.issueNumber,
-                });
-                const existingLink = yield* db
-                  .select({ id: schema.postExternalResourceLinkTable.id })
-                  .from(schema.postExternalResourceLinkTable)
-                  .innerJoin(
-                    schema.integrationExternalResourceTable,
-                    eq(
-                      schema.integrationExternalResourceTable.id,
-                      schema.postExternalResourceLinkTable.externalResourceId
-                    )
-                  )
-                  .where(
-                    and(
-                      eq(
-                        schema.postExternalResourceLinkTable.postId,
-                        input.postId
-                      ),
-                      eq(
-                        schema.integrationExternalResourceTable.connectionId,
-                        input.connectionId
-                      ),
-                      ...gitHubIssueSafeMetadataConditions({
-                        issueNumber: input.issueNumber,
-                        repositoryName: input.repositoryName,
-                        repositoryOwner: input.repositoryOwner,
+                // The GitHub issue fetch and the link lookup share only the
+                // input — the lookup reads the connection, post and safe
+                // metadata columns, nothing from the fetched issue — so they
+                // run together and the API round trip hides the database
+                // read. `Effect.all` is sequential unless told otherwise.
+                // Failures surface as the first one to reject, the same
+                // mapped error either effects carried alone.
+                const [issue, existingLink] = yield* Effect.all(
+                  [
+                    api.getIssue({
+                      accessToken,
+                      repositoryOwner: input.repositoryOwner,
+                      repositoryName: input.repositoryName,
+                      issueNumber: input.issueNumber,
+                    }),
+                    db
+                      .select({
+                        id: schema.postExternalResourceLinkTable.id,
                       })
-                    )
-                  )
-                  .limit(1)
-                  .pipe(
-                    Effect.mapError(() => providerFailure("issue link lookup"))
-                  );
+                      .from(schema.postExternalResourceLinkTable)
+                      .innerJoin(
+                        schema.integrationExternalResourceTable,
+                        eq(
+                          schema.integrationExternalResourceTable.id,
+                          schema.postExternalResourceLinkTable
+                            .externalResourceId
+                        )
+                      )
+                      .where(
+                        and(
+                          eq(
+                            schema.postExternalResourceLinkTable.postId,
+                            input.postId
+                          ),
+                          eq(
+                            schema.integrationExternalResourceTable
+                              .connectionId,
+                            input.connectionId
+                          ),
+                          ...gitHubIssueSafeMetadataConditions({
+                            issueNumber: input.issueNumber,
+                            repositoryName: input.repositoryName,
+                            repositoryOwner: input.repositoryOwner,
+                          })
+                        )
+                      )
+                      .limit(1)
+                      .pipe(
+                        Effect.mapError(() =>
+                          providerFailure("issue link lookup")
+                        )
+                      ),
+                  ],
+                  { concurrency: "unbounded" }
+                );
                 if (existingLink.length === 0) {
                   yield* api.createIssueBacklinkComment({
                     accessToken,

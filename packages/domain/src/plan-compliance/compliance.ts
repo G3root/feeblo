@@ -101,6 +101,10 @@ const makePlanCompliance = Effect.gen(function* () {
     const entitlements: PlanEntitlements = PLAN_ENTITLEMENTS[plan];
     const { capabilities, limits } = entitlements;
 
+    // Seven independent counts over the same workspace. `Effect.all` is
+    // sequential unless told otherwise, so without the concurrency hint this
+    // snapshot paid seven round trips for a page the dashboard loads on every
+    // cold start.
     const [
       boardCount,
       privateBoardCount,
@@ -109,23 +113,26 @@ const makePlanCompliance = Effect.gen(function* () {
       memberCount,
       pendingInvitationCount,
       crmEntryCount,
-    ] = yield* Effect.all([
-      boardRepository.countByOrganizationId({ organizationId }),
-      boardRepository.countByVisibility({
-        organizationId,
-        visibility: "PRIVATE",
-      }),
-      roadmapRepository.countByVisibility({
-        organizationId,
-        visibility: "private",
-      }),
-      changelogCategoryRepository.countByOrganizationId({ organizationId }),
-      membershipRepository.countMembers({ organizationId }),
-      membershipRepository.countPendingInvitations({
-        organizationId,
-      }),
-      countCrmEntries(organizationId),
-    ]);
+    ] = yield* Effect.all(
+      [
+        boardRepository.countByOrganizationId({ organizationId }),
+        boardRepository.countByVisibility({
+          organizationId,
+          visibility: "PRIVATE",
+        }),
+        roadmapRepository.countByVisibility({
+          organizationId,
+          visibility: "private",
+        }),
+        changelogCategoryRepository.countByOrganizationId({ organizationId }),
+        membershipRepository.countMembers({ organizationId }),
+        membershipRepository.countPendingInvitations({
+          organizationId,
+        }),
+        countCrmEntries(organizationId),
+      ],
+      { concurrency: "unbounded" }
+    );
 
     const violations: TPlanComplianceViolation[] = [];
 
@@ -214,12 +221,15 @@ const makePlanCompliance = Effect.gen(function* () {
 
     if (limits.members !== null && totalMembers > limits.members) {
       const [members, invitations] = args.includeResources
-        ? yield* Effect.all([
-            membershipRepository.findOrganizationMembers({ organizationId }),
-            membershipRepository.findOrganizationInvitations({
-              organizationId,
-            }),
-          ])
+        ? yield* Effect.all(
+            [
+              membershipRepository.findOrganizationMembers({ organizationId }),
+              membershipRepository.findOrganizationInvitations({
+                organizationId,
+              }),
+            ],
+            { concurrency: "unbounded" }
+          )
         : [[], []];
 
       const resources: TPlanComplianceResource[] = [

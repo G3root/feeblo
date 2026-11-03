@@ -42,7 +42,23 @@ const decodeScopeStatements = Schema.decodeUnknownOption(
 
 type ApiKeyRow = typeof schema.apiKeyTable.$inferSelect;
 
-const toSummary = (row: ApiKeyRow): TApiKeySummary => ({
+/** The columns a dashboard summary renders; the key hash and limits stay in the table. */
+const SUMMARY_COLUMNS = {
+  createdAt: schema.apiKeyTable.createdAt,
+  creatorId: schema.apiKeyTable.creatorId,
+  enabled: schema.apiKeyTable.enabled,
+  expiresAt: schema.apiKeyTable.expiresAt,
+  id: schema.apiKeyTable.id,
+  lastRequest: schema.apiKeyTable.lastRequest,
+  name: schema.apiKeyTable.name,
+  permissions: schema.apiKeyTable.permissions,
+  prefix: schema.apiKeyTable.prefix,
+  start: schema.apiKeyTable.start,
+} as const;
+
+const toSummary = (
+  row: Pick<ApiKeyRow, keyof typeof SUMMARY_COLUMNS>
+): TApiKeySummary => ({
   id: row.id,
   name: row.name,
   start: row.start,
@@ -75,7 +91,7 @@ const makeApiKeyRepository = Effect.gen(function* () {
     /** Keys owned by one workspace, newest first. Never returns key material. */
     listForOrganization: ({ organizationId }: TListForOrganization) =>
       db
-        .select()
+        .select(SUMMARY_COLUMNS)
         .from(schema.apiKeyTable)
         .where(eq(schema.apiKeyTable.referenceId, organizationId))
         .orderBy(desc(schema.apiKeyTable.createdAt))

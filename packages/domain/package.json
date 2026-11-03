@@ -133,6 +133,9 @@
     "./data-transfer/limits": {
       "default": "./src/data-transfer/limits.ts"
     },
+    "./data-transfer/machine": {
+      "default": "./src/data-transfer/machine.ts"
+    },
     "./data-transfer/repository": {
       "default": "./src/data-transfer/repository.ts"
     },
@@ -544,6 +547,7 @@
     "@feeblo/utils": "workspace:*",
     "@isaacs/ttlcache": "catalog:",
     "@polar-sh/sdk": "catalog:",
+    "@xstate/effect": "catalog:",
     "cookie-es": "^3.1.1",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
@@ -552,6 +556,7 @@
     "leo-profanity": "^1.9.0",
     "react": "catalog:",
     "takumi-js": "^2.4.0",
+    "xstate": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

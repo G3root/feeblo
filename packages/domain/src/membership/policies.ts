@@ -78,9 +78,16 @@ const makeMembershipPolicy = Effect.gen(function* () {
     entitlementPolicy.canAddMember({
       organizationId,
       memberCount: Effect.gen(function* () {
-        const memberCount = yield* repository.countMembers({ organizationId });
-        const pendingInvitationsCount =
-          yield* repository.countPendingInvitations({ organizationId });
+        // Both halves of the allowance are counts over different tables, so
+        // they are read together: the seat check is on the invite path and
+        // should cost one round trip, not two.
+        const [memberCount, pendingInvitationsCount] = yield* Effect.all(
+          [
+            repository.countMembers({ organizationId }),
+            repository.countPendingInvitations({ organizationId }),
+          ],
+          { concurrency: "unbounded" }
+        );
 
         return memberCount + pendingInvitationsCount;
       }),

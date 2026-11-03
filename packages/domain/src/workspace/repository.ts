@@ -12,7 +12,8 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { slugify } from "@feeblo/utils/url";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as EffectArray from "effect/Array";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -20,6 +21,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import type { OrganizationPlan } from "../plan-entitlements";
 import { lockUserRow } from "../row-locks";
 import { FailedToCreateWorkspaceError } from "./errors";
 
@@ -32,6 +34,17 @@ interface CreateWorkspaceArgs {
 interface FindPlanByOrganizationIdArgs {
   organizationId: string;
 }
+
+/**
+ * The plan a subscription's product declares, or `free` when its Polar
+ * metadata names none.
+ *
+ * Shared by the single-workspace and batched plan lookups so the two cannot
+ * disagree about what a plan-less product means.
+ */
+const planFromProductMetadata = (
+  metadata: { readonly plan: "starter" | "professional" } | null
+): OrganizationPlan => metadata?.plan ?? "free";
 
 const makeWorkspaceRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -311,7 +324,8 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             Effect.map(
               Option.match({
                 onNone: () => "free" as const,
-                onSome: (subscription) => subscription.plan?.plan ?? "free",
+                onSome: (subscription) =>
+                  planFromProductMetadata(subscription.plan),
               })
             ),
             Effect.map((plan) => ({
@@ -320,6 +334,73 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             }))
           );
       }),
+
+    /**
+     * The plan of every named workspace, in one statement.
+     *
+     * Same resolution rule as {@link findPlanByOrganizationId} — the entitled
+     * subscription with the latest paid period, `free` when there is none —
+     * but batched. The workspace-creation policy needs the plan of every
+     * workspace the owner holds, and that policy also runs inside the create
+     * transaction, where a per-workspace fan-out would just queue N statements
+     * on the transaction's one reserved connection. A workspace missing from
+     * the result has no entitled subscription and is `free` by the same rule,
+     * so callers read it with `?? "free"`.
+     */
+    findPlansByOrganizationIds: (
+      organizationIds: readonly string[]
+    ): Effect.Effect<
+      ReadonlyMap<string, OrganizationPlan>,
+      EffectDrizzleQueryError,
+      never
+    > => {
+      if (organizationIds.length === 0) {
+        return Effect.succeed(new Map());
+      }
+      return Effect.gen(function* () {
+        const now = yield* DateTime.nowAsDate;
+        // `row_number()` rather than `distinct on`: the tie-break is two
+        // columns, and ranking per organization states it once in the window's
+        // ordering instead of relying on `distinct on` reading the same order.
+        const ranked = db
+          .select({
+            organizationId: schema.subscriptionTable.organizationId,
+            plan: schema.productTable.metadata,
+            rank: sql<number>`row_number() over (partition by ${schema.subscriptionTable.organizationId} order by ${schema.subscriptionTable.currentPeriodEnd} desc, ${schema.subscriptionTable.createdAt} desc)`.as(
+              "rank"
+            ),
+          })
+          .from(schema.subscriptionTable)
+          .innerJoin(
+            schema.productTable,
+            eq(schema.productTable.id, schema.subscriptionTable.productId)
+          )
+          .where(
+            and(
+              inArray(schema.subscriptionTable.organizationId, [
+                ...organizationIds,
+              ]),
+              entitledSubscriptionCondition(now)
+            )
+          )
+          .as("ranked_plan");
+
+        const rows = yield* db
+          .select({
+            organizationId: ranked.organizationId,
+            plan: ranked.plan,
+          })
+          .from(ranked)
+          .where(eq(ranked.rank, 1));
+
+        return new Map(
+          rows.map((row) => [
+            row.organizationId,
+            planFromProductMetadata(row.plan),
+          ])
+        );
+      });
+    },
   };
 });
 

@@ -90,7 +90,12 @@ export const makeSlackInboundServiceLive = (
 
       const findActiveConnection = (teamId: string) =>
         db
-          .select()
+          .select({
+            credentialsCiphertext:
+              schema.integrationConnectionTable.credentialsCiphertext,
+            id: schema.integrationConnectionTable.id,
+            organizationId: schema.integrationConnectionTable.organizationId,
+          })
           .from(schema.integrationConnectionTable)
           .where(
             and(

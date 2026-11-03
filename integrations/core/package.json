@@ -22,8 +22,10 @@
     "@feeblo/db": "workspace:*",
     "@feeblo/id": "workspace:*",
     "@feeblo/utils": "workspace:*",
+    "@xstate/effect": "catalog:",
     "drizzle-orm": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "xstate": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

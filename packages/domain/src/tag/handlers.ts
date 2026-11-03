@@ -156,14 +156,26 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
         const tagIds = normalizeTagIds(args.tagIds);
-        yield* validatePost({
-          postId: args.postId,
-          organizationId: args.organizationId,
-        });
-        yield* validateTagIds({
-          organizationId: args.organizationId,
-          tagIds,
-        });
+        // The post and the tags are validated by the same repository and
+        // neither check needs the other's answer, so they run together: one
+        // round trip instead of two. The verdicts are collected rather than
+        // raced, so a request naming a foreign post *and* foreign tags is still
+        // reported against the post, as it was when the checks ran in sequence.
+        const [postCheck, tagCheck] = yield* Effect.all(
+          [
+            validatePost({
+              postId: args.postId,
+              organizationId: args.organizationId,
+            }),
+            validateTagIds({
+              organizationId: args.organizationId,
+              tagIds,
+            }),
+          ],
+          { concurrency: "unbounded", mode: "result" }
+        );
+        yield* Effect.fromResult(postCheck);
+        yield* Effect.fromResult(tagCheck);
 
         const actor = {
           actorId: session.session.userId,
