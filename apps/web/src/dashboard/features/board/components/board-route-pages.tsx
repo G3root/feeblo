@@ -24,6 +24,7 @@ import type {
   BoardOrdering,
   BoardView,
 } from "~/features/board/state/board-store-context";
+import { useCurrentMemberId } from "~/hooks/use-current-member-id";
 import { savedViewCollectionFor } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -297,9 +298,10 @@ function SavedViewSurface({
   variant?: "board" | "feedback";
   viewId: string;
 }) {
+  const memberId = useCurrentMemberId(organizationId);
   const collection = useMemo(
-    () => savedViewCollectionFor(organizationId, boardId),
-    [organizationId, boardId]
+    () => savedViewCollectionFor(organizationId, boardId, memberId),
+    [organizationId, boardId, memberId]
   );
 
   const { data: view, isLoading } = useLiveQuery({

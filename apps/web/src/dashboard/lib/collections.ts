@@ -2150,15 +2150,21 @@ const indexedCollectionIds = new Set<string>();
  * one board must not appear on another, and the two lists must not share a
  * cache entry. `null` is the feedback list, spelled out in the id so it cannot
  * collide with a board id.
+ *
+ * `memberId` is part of the identity for the same reason: visibility is read
+ * for the signed-in member, and a collection keyed only by workspace and board
+ * could serve one member's private views from a cache entry the previous
+ * session filled.
  */
 export function savedViewCollection(
   scope: DashboardCollectionScope,
-  boardId: string | null
+  boardId: string | null,
+  memberId: string | undefined
 ) {
   const id = `${organizationScopedCollectionId(
     "savedViewCollection",
     scope
-  )}:${boardId ?? "all-feedback"}`;
+  )}:${memberId ?? "anonymous"}:${boardId ?? "all-feedback"}`;
 
   return collectionOptions(id, (client) =>
     queryCollectionOptions({
@@ -2168,6 +2174,7 @@ export function savedViewCollection(
         organizationScopedQueryKey(
           scope,
           "saved-view",
+          memberId ?? "anonymous",
           boardId ?? "all-feedback"
         ),
       queryFn: async (ctx) => {
@@ -2243,11 +2250,16 @@ export function savedViewCollection(
  */
 export const savedViewCollectionFor = (
   organizationId: string,
-  boardId: string | null
+  boardId: string | null,
+  memberId: string | undefined
 ) =>
   materialize(
     getBrowserDbClient(),
-    savedViewCollection({ organizationId, postSlug: undefined }, boardId)
+    savedViewCollection(
+      { organizationId, postSlug: undefined },
+      boardId,
+      memberId
+    )
   );
 
 /**

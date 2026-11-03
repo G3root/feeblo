@@ -8,6 +8,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Predicate from "effect/Predicate";
 
+import { BoardRepository } from "../board/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SavedViewRpcHandlersEffect } from "./handlers";
 import { SavedViewRepository } from "./repository";
@@ -113,8 +114,9 @@ describe("SavedViewRpcHandlers", () => {
   ): Effect.Effect<A, E, Exclude<R, CurrentSession>> =>
     effect.pipe(Effect.provideService(CurrentSession, member.session));
 
-  const TestLayer = Layer.merge(
+  const TestLayer = Layer.mergeAll(
     SavedViewRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+    BoardRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
@@ -561,6 +563,59 @@ describe("SavedViewRpcHandlers", () => {
           })
         );
         expect(aliceViews.map((view) => view.name)).toEqual(["Mine"]);
+      })
+    );
+
+    it.effect("refuses a board that belongs to another workspace", () =>
+      Effect.gen(function* () {
+        const handlers = yield* SavedViewRpcHandlersEffect;
+        const f = yield* fixture();
+        const db = yield* currentDb;
+        const otherOrganizationId = yield* WorkspaceId.generate;
+        const otherBoardId = `brd_${otherOrganizationId}`;
+        const now = yield* DateTime.nowAsDate;
+
+        yield* db.insert(schema.organizationTable).values({
+          id: otherOrganizationId,
+          name: "Other organization",
+          slug: otherOrganizationId,
+          createdAt: now,
+        });
+        yield* db.insert(schema.boardTable).values({
+          id: otherBoardId,
+          name: "Other board",
+          slug: otherBoardId,
+          visibility: "PUBLIC",
+          creatorId: f.alice.userId,
+          creatorMemberId: f.alice.membershipId,
+          organizationId: otherOrganizationId,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        const error = yield* as(
+          f.alice,
+          handlers.CreateSavedView({
+            boardId: otherBoardId,
+            description: null,
+            id: yield* SavedViewId.generate,
+            isPrivate: true,
+            name: "Wrong workspace",
+            organizationId: f.organizationId,
+            query: emptyBoardQuery,
+          })
+        ).pipe(Effect.flip);
+
+        expect(Predicate.isTagged(error, "BadRequestError")).toBe(true);
+        expect(
+          yield* as(
+            f.alice,
+            handlers.ListSavedViews({
+              boardId: otherBoardId,
+              organizationId: f.organizationId,
+            })
+          )
+        ).toEqual([]);
       })
     );
 

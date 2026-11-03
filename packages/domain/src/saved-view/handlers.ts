@@ -1,7 +1,9 @@
 import { normalizeBoardQuery } from "@feeblo/domain-contracts/board-query";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
+import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
 import {
   BadRequestError,
@@ -54,6 +56,7 @@ const normalizeDescription = (description: string | null): string | null => {
 
 export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* SavedViewRepository;
+  const boardRepository = yield* BoardRepository;
 
   const list = ({ boardId, organizationId }: TSavedViewList) =>
     Effect.gen(function* () {
@@ -69,6 +72,21 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const memberId = yield* currentMemberId(session, args.organizationId);
+
+      // A board-scoped view names a board by id, so the pair has to belong to
+      // the same workspace as the view. A board from another workspace is not
+      // found rather than forbidden, so the id cannot be used to probe one.
+      if (args.boardId !== null) {
+        const board = yield* boardRepository.findByIdInOrganization({
+          id: args.boardId,
+          organizationId: args.organizationId,
+        });
+
+        if (Option.isNone(board)) {
+          return yield* new BadRequestError({ message: "Board not found" });
+        }
+      }
+
       yield* repository.create({
         ...args,
         description: normalizeDescription(args.description),
@@ -187,4 +205,7 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
 
 export const SavedViewRpcHandlers = SavedViewRpcs.toLayer(
   SavedViewRpcHandlersEffect
-).pipe(Layer.provide(SavedViewRepository.layer));
+).pipe(
+  Layer.provide(SavedViewRepository.layer),
+  Layer.provide(BoardRepository.layer)
+);

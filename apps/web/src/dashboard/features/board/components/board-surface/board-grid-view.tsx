@@ -118,6 +118,13 @@ export function BoardGridView({
   const [visibleCounts, setVisibleCounts] = useState<
     Readonly<Record<string, number>>
   >({});
+  // `none` is a single lane whose id is the fixed `"all"` from
+  // `groupBoardPosts`, so it pages through the same map as the grouped lanes.
+  const flatLaneId = items[0]?.id ?? "all";
+  const flatRows = items[0]?.posts ?? [];
+  const flatVisibleCount = visibleCounts[flatLaneId] ?? GRID_PAGE_SIZE;
+  const flatVisibleRows = flatRows.slice(0, flatVisibleCount);
+  const flatRemainingCount = flatRows.length - flatVisibleRows.length;
   const [initialSnapshot] = useState(() => items);
   const snapshot = useRef(initialSnapshot);
   const activeDrag = useRef<{
@@ -245,7 +252,7 @@ export function BoardGridView({
       {groupBy === "none" ? (
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
           <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
-            {(items[0]?.posts ?? []).map((post, postIndex) => (
+            {flatVisibleRows.map((post, postIndex) => (
               <BoardGridPostCard
                 groupId="all"
                 index={postIndex}
@@ -256,6 +263,22 @@ export function BoardGridView({
               />
             ))}
           </div>
+          {flatRemainingCount > 0 ? (
+            <Button
+              className="mt-3"
+              onClick={() =>
+                setVisibleCounts((current) => ({
+                  ...current,
+                  [flatLaneId]:
+                    (current[flatLaneId] ?? GRID_PAGE_SIZE) + GRID_PAGE_SIZE,
+                }))
+              }
+              size="sm"
+              variant="ghost"
+            >
+              Show {Math.min(flatRemainingCount, GRID_PAGE_SIZE)} more
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3 pb-[max(calc(var(--spacing)*3),env(safe-area-inset-bottom))]">

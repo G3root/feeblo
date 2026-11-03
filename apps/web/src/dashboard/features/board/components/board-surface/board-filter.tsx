@@ -1,4 +1,5 @@
 import {
+  BOARD_VIEW_FILTER_IDS_MAX,
   BOARD_VIEW_SEARCH_MAX_LENGTH,
   emptyBoardQuery,
   hasActiveBoardFilters,
@@ -237,6 +238,10 @@ function useBoardFilterActions(
       list.includes(value)
         ? list.filter((item) => item !== value)
         : [...list, value];
+    // A checked id can still be removed at the cap: the limit bounds what a
+    // saved view stores, not what the member is allowed to deselect.
+    const atFilterLimit = (ids: readonly string[], id: string) =>
+      ids.length >= BOARD_VIEW_FILTER_IDS_MAX && !ids.includes(id);
 
     return {
       clearAllFilters: () =>
@@ -255,7 +260,13 @@ function useBoardFilterActions(
           tag: filters.tag === null ? null : { ...filters.tag, operator },
         }),
       toggleAssignee: (memberId) => {
-        const next = toggle(filters.assigneeMemberIds ?? [], memberId);
+        const current = filters.assigneeMemberIds ?? [];
+
+        if (atFilterLimit(current, memberId)) {
+          return;
+        }
+
+        const next = toggle(current, memberId);
 
         update({ assigneeMemberIds: next.length === 0 ? null : next });
       },
@@ -272,7 +283,13 @@ function useBoardFilterActions(
       },
       toggleTag: (tagId) => {
         const current = filters.tag;
-        const next = toggle(current?.tagIds ?? [], tagId);
+        const currentIds = current?.tagIds ?? [];
+
+        if (atFilterLimit(currentIds, tagId)) {
+          return;
+        }
+
+        const next = toggle(currentIds, tagId);
 
         update({
           tag:

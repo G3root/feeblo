@@ -38,7 +38,8 @@ export function PostAssigneeField({
 }) {
   const { post, isLocked, isMerged, organizationId } = usePostCollectionData();
   const { postCollection, postActivityCollection } = useDashboardCollections();
-  const { data: organizationMembers } = useOrgMembers(organizationId);
+  const { data: organizationMembers, isLoading: isMembersLoading } =
+    useOrgMembers(organizationId);
   const currentMemberId = useCurrentMemberId(organizationId);
   const { allowed: canAssign } = usePolicy(
     hasPermission(organizationId, "posts.status")
@@ -49,9 +50,15 @@ export function PostAssigneeField({
     (member) => member.id === post.assigneeMemberId
   );
   const isDisabled = disabled || isLocked || isMerged || !canAssign;
-  const assigneeLabel = assignee
-    ? assignee.user.name || assignee.user.email
-    : "Assign";
+  const isAssigneeLoading =
+    isMembersLoading &&
+    post.assigneeMemberId !== null &&
+    assignee === undefined;
+  const assigneeLabel = isAssigneeLoading
+    ? "Loading…"
+    : assignee
+      ? assignee.user.name || assignee.user.email
+      : "Assign";
 
   const updatePostAssignee = createOptimisticAction<{
     assigneeMemberId: string | null;
@@ -128,7 +135,7 @@ export function PostAssigneeField({
           />
         )}
         <span className={cn("truncate", !assignee && "text-muted-foreground")}>
-          {assignee ? assigneeLabel : "Assign"}
+          {assigneeLabel}
         </span>
         {assignee?.id === currentMemberId ? (
           <span className="text-muted-foreground text-xs">(you)</span>

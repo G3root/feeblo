@@ -55,11 +55,11 @@ export function BoardViewTabs({
   organizationId: string;
   variant: "board" | "feedback";
 }) {
-  const collection = useMemo(
-    () => savedViewCollectionFor(organizationId, boardId),
-    [organizationId, boardId]
-  );
   const memberId = useCurrentMemberId(organizationId);
+  const collection = useMemo(
+    () => savedViewCollectionFor(organizationId, boardId, memberId),
+    [organizationId, boardId, memberId]
+  );
   const store = useBoardStore();
 
   const { data } = useLiveQuery({

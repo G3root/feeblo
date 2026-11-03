@@ -94,8 +94,8 @@ const sensors = [
  *    can read their widths) but sit past the cap, which is what stops them
  *    leaving a gap between the last visible pill and the "more" button.
  *
- * On a phone the strip is `display: none`, which reports a zero width, so every
- * tab counts as clipped and the popover carries the whole set.
+ * On a narrow toolbar the strip can be left with no measurable width, which
+ * makes every tab count as clipped; the popover then carries the whole set.
  */
 export function ViewTabStrip({
   activeViewId,
@@ -145,12 +145,20 @@ export function ViewTabStrip({
       return ownedRows;
     }
     const byId = new Map(ownedRows.map((view) => [view.id, view]));
-
-    return pendingOrder.flatMap((id) => {
+    const pendingIds = new Set(pendingOrder);
+    const pendingRows = pendingOrder.flatMap((id) => {
       const row = byId.get(id);
 
       return row === undefined ? [] : [row];
     });
+
+    // A row created or refetched while a drop is in flight is not in the
+    // pending list yet, so append it rather than dropping it from the strip
+    // until the next collection update.
+    return [
+      ...pendingRows,
+      ...ownedRows.filter((view) => !pendingIds.has(view.id)),
+    ];
   }, [ownedRows, pendingOrder]);
   const ordered = useMemo(
     () => [...orderedOwned, ...sharedRows],
@@ -351,12 +359,11 @@ export function ViewTabStrip({
         />
       ) : null}
 
-      {/* Icon-only, and hidden on a phone: the popover header carries the same
-          action there, because the strip it would sit beside is `display: none`
-          at that width. */}
+      {/* Icon-only; the popover header carries the same action when the strip
+          is too narrow to show its own controls. */}
       <Button
         aria-label="New view"
-        className="hidden shrink-0 rounded-full sm:inline-flex"
+        className="shrink-0 rounded-full"
         data-view-tabs-create=""
         onClick={onCreate}
         size="icon-sm"
@@ -386,8 +393,9 @@ const measureTabs = (
 ): number => {
   const areaWidth = area.clientWidth;
 
-  // `display: none` — a phone — reports no client rects. Every tab counts as
-  // clipped there, so the popover carries the whole set.
+  // A zero-width area, or a strip with no laid-out children, reports no
+  // geometry. Every tab counts as clipped there, so the popover carries the
+  // whole set.
   if (areaWidth === 0 || strip.getClientRects().length === 0) {
     return 0;
   }
@@ -563,8 +571,8 @@ function FixedViewLink({
  * The label is the count of entries inside, or the active tab's name when the
  * tab you are on is one of the hidden ones — a stripped toolbar that hides where
  * you are is worse than one that hides where you could go. Built-in presets are
- * listed too: on a narrow toolbar, or on a phone (where the strip is hidden and
- * everything overflows), this popover is the only way to reach them.
+ * listed too: on a narrow toolbar, or when the strip has no room and
+ * everything overflows, this popover is the only way to reach them.
  */
 function ViewsPopover({
   activeTabIsHidden,

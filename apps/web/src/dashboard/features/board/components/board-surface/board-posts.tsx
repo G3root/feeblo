@@ -56,8 +56,12 @@ export function BoardPosts({
     }),
     [activeView.filters, grouping, ordering]
   );
-  const { members, postTagsByPostId, tags } =
-    useBoardGroupingData(organizationId);
+  const {
+    hasError: hasGroupingError,
+    members,
+    postTagsByPostId,
+    tags,
+  } = useBoardGroupingData(organizationId);
   const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
     boardId,
     myFeedbackScope,
@@ -81,7 +85,7 @@ export function BoardPosts({
     [grouping.field, members, postStatuses, postTagsByPostId, posts, tags]
   );
 
-  if (hasError) {
+  if (hasError || hasGroupingError) {
     throw new Error("Failed to load board posts");
   }
 

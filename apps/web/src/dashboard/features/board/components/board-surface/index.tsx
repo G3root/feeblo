@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import { useCurrentMemberId } from "~/hooks/use-current-member-id";
 
 import type {
@@ -9,6 +11,7 @@ import {
   type BoardOrdering,
   BoardStoreProvider,
   type BoardView,
+  useBoardStore,
 } from "../../state/board-store-context";
 import { BoardPosts } from "./board-posts";
 import { BoardPostsLoading } from "./board-posts-loading";
@@ -66,6 +69,11 @@ export function BoardSurface({
       }}
       key={surfaceKey}
     >
+      <BoardViewSync
+        initialGrouping={initialGrouping}
+        initialOrdering={initialOrdering}
+        initialView={initialView}
+      />
       <div className="mx-auto flex h-full min-h-0 w-full flex-col">
         <div className="shrink-0">
           <BoardToolbar
@@ -90,4 +98,55 @@ export function BoardSurface({
       </div>
     </BoardStoreProvider>
   );
+}
+
+/**
+ * Applies a saved view's stored query when the row is refetched in place.
+ *
+ * `BoardStoreProvider` seeds its store once per surface key, which is what keeps
+ * a local filter, grouping or ordering edit from being overwritten on every
+ * render. The saved-view row can still change under a mounted surface — an edit
+ * landing, or a shared view another member updated — and the screen has to
+ * follow the row rather than keep the query it was first mounted with. The key
+ * above deliberately stays on the view id, so this is the path that applies a
+ * refetch without remounting the surface and losing local state.
+ *
+ * The signature is structural rather than an identity check because the route
+ * rebuilds `initialView` on every render. That also means a refetch that returns
+ * the same query does not write to the store and cannot clobber a local edit.
+ */
+function BoardViewSync({
+  initialGrouping,
+  initialOrdering,
+  initialView,
+}: {
+  initialGrouping?: BoardGrouping;
+  initialOrdering?: BoardOrdering;
+  initialView: BoardView;
+}) {
+  const store = useBoardStore();
+  const signature = JSON.stringify([
+    initialView.id,
+    initialView.name,
+    initialView.filters,
+    initialGrouping ?? null,
+    initialOrdering ?? null,
+  ]);
+  const appliedSignature = useRef(signature);
+
+  useEffect(() => {
+    if (signature === appliedSignature.current) {
+      return;
+    }
+
+    appliedSignature.current = signature;
+    store.send({
+      type: "setActiveView",
+      view: initialView,
+      ...(initialGrouping !== undefined && { grouping: initialGrouping }),
+      ...(initialOrdering !== undefined && { ordering: initialOrdering }),
+    });
+  }, [initialGrouping, initialOrdering, initialView, signature, store]);
+
+  return null;
 }

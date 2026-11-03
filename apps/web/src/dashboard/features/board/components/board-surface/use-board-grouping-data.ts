@@ -1,3 +1,4 @@
+import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useMemo } from "react";
 
@@ -22,7 +23,7 @@ export function useBoardGroupingData(organizationId: string) {
   const { data: organizationMembers } = useOrgMembers(organizationId);
   const { data: tags } = useOrgTags(organizationId);
 
-  const { data: postTags } = useLiveQuery({
+  const postTagsQuery = useLiveQuery({
     queryKey: ["board-post-tags", postTagCollection.id, organizationId],
     query: (q) =>
       q
@@ -33,6 +34,7 @@ export function useBoardGroupingData(organizationId: string) {
           tagId: postTag.tagId,
         })),
   });
+  const postTags = postTagsQuery.data;
 
   const members = useMemo<BoardGroupingMember[]>(
     () =>
@@ -62,10 +64,12 @@ export function useBoardGroupingData(organizationId: string) {
   }, [postTags]);
 
   return {
+    hasError: isLiveQueryFailed(postTagsQuery),
     members,
     postTagsByPostId,
     tags: tags ?? [],
   } satisfies {
+    hasError: boolean;
     members: BoardGroupingMember[];
     postTagsByPostId: ReadonlyMap<string, string[]>;
     tags: BoardGroupingTag[];
