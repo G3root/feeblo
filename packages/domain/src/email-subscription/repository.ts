@@ -610,13 +610,23 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           unsubscribedAt: input.now,
           updatedAt: input.now,
         })
-        .where(eq(schema.emailSubscriptionTable.id, subscription.id))
+        // The machine reads the sources, same as the authenticated path: no
+        // state the graph forbids subscribing out of can be written past this
+        // `WHERE` if one ever appears.
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.id, subscription.id),
+            inArray(schema.emailSubscriptionTable.state, [
+              ...sourceStatesFor("unsubscribe"),
+            ])
+          )
+        )
         .returning();
       if (updated === undefined) {
-        return yield* dataError(
-          "unsubscribe",
-          "Email subscription unsubscribe did not return a row"
-        );
+        // The pre-write read above lost a race: the row reached `unsubscribed`,
+        // the only state that cannot take this event, between the read and
+        // this write — the caller's outcome, reached twice.
+        return { _tag: "AlreadyUnsubscribed" as const };
       }
       return { _tag: "Unsubscribed" as const };
     }

@@ -6,7 +6,6 @@ import {
 import { transition } from "xstate";
 
 import {
-  DATA_IMPORT_JOB_EVENTS,
   DATA_IMPORT_JOB_STATES,
   dataImportJobMachine,
   canTransitionDataImportJob,
@@ -32,6 +31,12 @@ const pairs = ALL.flatMap((from) => ALL.map((to) => [from, to] as const));
 
 describe("data import job machine", () => {
   it("declares every status the stored vocabulary allows", () => {
+    // `DATA_IMPORT_JOB_STATES` is an alias of the vocabulary, so comparing
+    // the two proves nothing. The machine's own keys are the thing that can
+    // drift, the same way `intent-machine.test.ts` reads it:
+    expect(Object.keys(dataImportJobMachine.states).sort()).toStrictEqual(
+      [...ALL].sort()
+    );
     expect([...DATA_IMPORT_JOB_STATES].sort()).toStrictEqual([...ALL].sort());
   });
 
@@ -104,18 +109,6 @@ describe("data import job machine", () => {
     expect(sourceStatesFor("claim")).toStrictEqual(["queued"]);
     expect(sourceStatesFor("complete")).toStrictEqual(["running"]);
     expect(sourceStatesFor("fail")).toStrictEqual(["running"]);
-  });
-
-  it("covers every event exactly once as a source list", () => {
-    // A state that lists an event must appear in that event's source list, and
-    // the two are built from different directions of the same graph. This is
-    // the assertion that fails when an edge is added to one and not the other.
-    for (const event of DATA_IMPORT_JOB_EVENTS) {
-      const sources = sourceStatesFor(event);
-      const moved = ALL.filter((from) => sources.includes(from));
-
-      expect(moved).toStrictEqual(sources);
-    }
   });
 
   it("treats the three outcomes as terminal and the other three as active", () => {

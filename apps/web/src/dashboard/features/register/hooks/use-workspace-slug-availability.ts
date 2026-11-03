@@ -6,10 +6,7 @@ import {
   slugAvailabilityMachine,
   toSlugAvailability,
 } from "../lib/slug-availability-machine";
-import { toWorkspaceSlug } from "../utils";
-
-/** The field's shortest allowed subdomain. Below it there is nothing to ask. */
-const MIN_SLUG_LENGTH = 4;
+import { MIN_SLUG_LENGTH, toWorkspaceSlug } from "../utils";
 
 /** What the slug field needs from this hook. */
 export type WorkspaceSlugAvailability = {
@@ -23,8 +20,8 @@ export type WorkspaceSlugAvailability = {
  *
  * The lifecycle lives in `slug-availability-machine.ts`; this hook is the
  * adapter between React's render cycle and the machine's events. Calling it
- * **is** not an effect: the machine is seeded with the name already in the
- * form, and every later change is reported by whoever made it
+ * is not an effect: the machine is seeded with the name already in the form,
+ * and every later change is reported by whoever made it
  * (`reportWorkspaceName`), which is an event handler — not a subscription to a
  * value that has already changed by the time an effect runs.
  *

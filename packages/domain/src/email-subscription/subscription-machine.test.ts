@@ -6,6 +6,7 @@ import {
 
 import {
   EMAIL_SUBSCRIPTION_EVENTS,
+  EMAIL_SUBSCRIPTION_NODES,
   canTransitionSubscription,
   emailSubscriptionMachine,
   nextStateForRequest,
@@ -31,6 +32,16 @@ const deferred = { alreadyVerified: false, deferredNoAccess: true };
 const plain = { alreadyVerified: false, deferredNoAccess: false };
 
 describe("email subscription machine", () => {
+  it("declares every state the stored vocabulary allows, plus `none`", () => {
+    // The vocabulary and the machine's keys are different lists that can
+    // drift apart; `none` is the one machine-only state, and it exists so a
+    // first request is a normal transition rather than a special case.
+    expect(EMAIL_SUBSCRIPTION_NODES).toStrictEqual(["none", ...ALL]);
+    expect(Object.keys(emailSubscriptionMachine.states)).toStrictEqual(
+      EMAIL_SUBSCRIPTION_NODES
+    );
+  });
+
   it("allows exactly the documented transitions", () => {
     const allowed = pairs.filter(([from, to]) =>
       canTransitionSubscription(from, to)

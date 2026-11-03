@@ -7,9 +7,11 @@ plain: "XState owns the named states of a lifecycle; Effect owns the work; the d
 # Add a lifecycle machine
 
 A lifecycle machine declares named states and the events that move between them.
-This repo already had the pattern before XState: `email-outbox/delivery-state.ts`
-and `integrations/core/src/integration-lifecycle.ts` are transition tables. The
-machine generalises that into something a test can walk and a UI can read.
+This repo already had the pattern before XState: two hand-written transition
+predicates (`email-outbox/delivery-state.ts` and
+`integrations/core/src/integration-lifecycle.ts`) held the graphs as code that
+only their own tests consulted. Both are now machines, and the machine
+generalises the pattern into something a test can walk and a UI can read.
 
 Read this file before writing one, then copy the nearest of the two worked
 examples below rather than starting from a blank file.
@@ -79,14 +81,25 @@ a state takes the event and stays put, `sourceStatesFor` will not see it.
 `subscription-machine.test.ts` asserts "no source is also the target" for every
 transition event, which is the assertion that keeps that true.
 
-### Legacy states
+### Retired states
 
-A state that nothing writes any more but rows still hold is not dead code —
-deleting it breaks reading old data. Declare it with outgoing edges only,
-name it (`LEGACY_EMAIL_INTENT_STATES`), and assert it has **no inbound edge**.
+A state that nothing writes any more is a decision, not just an observation.
+If durable rows may still hold it — data that outlives this deployment — keep
+it: declare it with outgoing edges only, and assert it has **no inbound edge**.
 That turns "do not re-introduce a pause" into a failing test instead of a
-comment, and it keeps the reachability check honest by naming its one
-exception rather than dropping the check.
+comment, and keeps the reachability check honest by naming its one exception.
+The machine may only be allowed the reachability exception because the state
+is genuinely drain-only.
+
+If no stored row can hold it, delete the state outright. Leaving a
+nothing-writes state in the vocabulary pins a hole in the graph: its absence
+of inbound edges is a permanent exception to an otherwise checkable rule, and
+every writer after it must keep refusing to write it. This repo's machines
+hold no legacy states — the app had no stored rows for `paused_by_plan` (email
+intents and deliveries) or `reauth_required`/`disconnected` (integration
+connections), so all four were retired outright in the PR that modelled this
+batch. Check the newest tables' 0-row case before choosing, and say the
+choice out loud.
 
 ## 3. Derive the guards instead of restating them
 
@@ -209,21 +222,25 @@ show as an unused package.
 | Machine | Kind | Read it for |
 | --- | --- | --- |
 | `packages/domain/src/data-transfer/machine.ts` | pure, durable, `setupEffect` | deriving SQL guards, replacing three drifted predicates |
-| `packages/domain/src/email-outbox/intent-machine.ts` | pure, `setupEffect` | a legacy state with no inbound edge; one `transitionIntent` replacing five guarded writes |
+| `packages/domain/src/email-outbox/intent-machine.ts` | pure, `setupEffect` | one `transitionIntent` replacing five guarded writes; the retirement of a nothing-writes state |
 | `packages/domain/src/email-subscription/subscription-machine.ts` | pure, `setupEffect` | transition events next to a decision event; the `none` state |
 | `apps/web/src/dashboard/features/register/lib/slug-availability-machine.ts` | client, `setup` + `@xstate/react` | debounce-as-state, abort-on-exit, actor `input` instead of a mount effect |
-| `packages/domain/src/email-outbox/delivery-state.ts` | table, pre-XState | the derived-guard pattern the machines follow |
-| `integrations/core/src/integration-lifecycle.ts` | pure, `setupEffect` | two graphs in one file; a deliberate self-transition; legacy states |
+| `packages/domain/src/email-outbox/delivery-state.ts` | pure, `setupEffect` | the exact rewrite of a hand table into a machine; every write asks `deliverySourceStatesFor` |
+| `integrations/core/src/integration-lifecycle.ts` | pure, `setupEffect` | two graphs in one file; a deliberate self-transition; retired states |
 
 `integration-lifecycle.ts` is also the cautionary example. It declared both
 graphs and tested them for months while **nothing consulted either one**, and
 when the graphs were finally wired to real call sites they turned out to have
 drifted from the code: two states nobody persisted, and a disconnect flow the
-predicate had no name for. The connection list filters and the
-archive-transition writes now read `LISTED_CONNECTION_LIFECYCLES` and
-`connectionSourceStatesFor`, but the other connection writes in `integrations/*`
-still carry hand-written `eq(lifecycle, …)` guards, so the two can still
-disagree. A graph is only a source of truth once every write asks it.
+predicate had no name for. The list filters, the archive writes and the
+`disconnecting`/`revocation_unconfirmed` writes now read
+`LISTED_CONNECTION_LIFECYCLES` and `connectionSourceStatesFor`. The remaining
+hand-written guards hold a row lock or are set-equal to the graph today (Slack
+and Discord `connectComplete` writing `active` under a locked read; the
+webhook pause/resume pair, whose `eq(lifecycle, …)` matches the machine's
+sources exactly), so those two agree by construction — but nothing asserts
+it. A graph is only a source of truth once every write asks it, or once the
+write that does not is provably serialized against one that did.
 
 ## Do not
 

@@ -17,25 +17,23 @@ import { useStore } from "@tanstack/react-store";
 
 import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
 import { registerFormOpts } from "../shared-form";
-import { toWorkspaceSlug } from "../utils";
+import { MIN_SLUG_LENGTH, toWorkspaceSlug } from "../utils";
 
 const appRootDomain = getRuntimePublicEnv().appRootDomain;
-
-interface SlugCheckForm {
-  setFieldValue: (name: "workspaceName", value: string) => void;
-}
 
 function renderSlugFooter(
   slug: string,
   slugStatus: "idle" | "checking" | "available" | "taken" | "error",
   suggestion: string | null,
   reason: string | null,
-  form: SlugCheckForm
+  /** Accepts the suggested name; every path that changes the name goes through it. */
+  onUseSuggestion: (suggestion: string) => void
 ) {
-  if (slug.length < 4) {
+  if (slug.length < MIN_SLUG_LENGTH) {
     return (
       <FieldDescription>
-        Workspace name must produce a slug of at least 4 characters.
+        Workspace name must produce a slug of at least {MIN_SLUG_LENGTH}{" "}
+        characters.
       </FieldDescription>
     );
   }
@@ -56,12 +54,7 @@ function renderSlugFooter(
         {suggestion ? (
           <div className="flex items-center gap-2">
             <Button
-              onClick={() =>
-                form.setFieldValue(
-                  "workspaceName",
-                  suggestion.replace(/-/g, " ")
-                )
-              }
+              onClick={() => onUseSuggestion(suggestion.replace(/-/g, " "))}
               size="sm"
               type="button"
               variant="outline"
@@ -146,9 +139,7 @@ export const RegisterWorkspaceStep = withForm({
               <InputGroupText>.{appRootDomain}</InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-          {renderSlugFooter(slug, slugStatus, suggestion, reason, {
-            setFieldValue: (_name, value) => chooseName(value),
-          })}
+          {renderSlugFooter(slug, slugStatus, suggestion, reason, chooseName)}
         </Field>
       </div>
     );

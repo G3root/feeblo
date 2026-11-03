@@ -26,6 +26,10 @@ import {
   InvalidBoardPostCsvError,
 } from "./errors";
 import { DATA_IMPORT_MAX_BYTES, DATA_IMPORT_WATCH_MS } from "./limits";
+import {
+  canConfirmDataImportStatus,
+  isActiveDataImportStatus,
+} from "./machine";
 import { planImportRows } from "./plan";
 import { canImportPosts } from "./policies";
 import {
@@ -189,16 +193,6 @@ const clampReportWindow = (
   ),
   offset: Math.max(offset ?? 0, 0),
 });
-
-/**
- * A job still moves through these statuses on its own; everything else is
- * final. A detail watch writes its last snapshot and ends on the transition
- * out.
- */
-const statusIsActive = (status: DataImportJobRecord["status"]): boolean =>
-  status === "awaiting_confirmation" ||
-  status === "queued" ||
-  status === "running";
 
 /**
  * A cheap key over the fields of a job a viewer sees change while it runs.
@@ -500,7 +494,7 @@ const makeDataImportService = Effect.gen(function* () {
           // A staged file may name boards that do not exist yet, and the
           // confirmation names them. Once the job runs, the worker creates
           // them, so an unchanged list would only be stale.
-          job.value.status === "awaiting_confirmation"
+          canConfirmDataImportStatus(job.value.status)
             ? fromStore(
                 "listNewBoardNames",
                 repository.listNewBoardNames({ jobId: input.id })
@@ -541,7 +535,13 @@ const makeDataImportService = Effect.gen(function* () {
           (option: Option.Option<DataImportJobDetail>) => option
         )
       ),
-      Stream.takeUntil((detail) => !statusIsActive(detail.job.status)),
+      // A job still moves through the active statuses on its own; everything
+      // else is final. This watch writes its last snapshot and ends on the
+      // transition out — the predicate is the machine's, the same graph every
+      // guarded `UPDATE` in the repository asks.
+      Stream.takeUntil(
+        (detail) => !isActiveDataImportStatus(detail.job.status)
+      ),
       excludeUnchanged(reportChangeKey)
     );
 
