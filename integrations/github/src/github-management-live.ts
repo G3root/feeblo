@@ -219,6 +219,35 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 });
               }
               if (connection.lifecycle === "archived") {
+                // A GitHub deletion webhook archives the row without touching
+                // its credentials, and this early return used to leave them
+                // there for good. Scrubbing is the one part of a disconnect an
+                // archived connection still owes.
+                yield* db
+                  .update(schema.integrationConnectionTable)
+                  .set({
+                    credentialsCiphertext: null,
+                    updatedAt: yield* DateTime.nowAsDate,
+                  })
+                  .where(
+                    and(
+                      eq(
+                        schema.integrationConnectionTable.id,
+                        input.connectionId
+                      ),
+                      eq(
+                        schema.integrationConnectionTable.organizationId,
+                        input.organizationId
+                      ),
+                      eq(
+                        schema.integrationConnectionTable.provider,
+                        IntegrationProviderKey.make("github")
+                      )
+                    )
+                  )
+                  .pipe(
+                    Effect.mapError(databaseError("archived credential scrub"))
+                  );
                 return undefined;
               }
               if (connection.lifecycle === "connecting") {

@@ -240,7 +240,19 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
       },
       available: {},
       taken: {},
-      error: {},
+      // The one state where the unchanged-input shortcut is wrong.
+      // Re-reporting the slug that failed is how the field retries: the user
+      // cannot ask again without editing the name, and an error nobody can
+      // clear is a dead end. The root handler still covers every other state.
+      error: {
+        on: {
+          INPUT: ({ event }: { event: SlugInputEvent }) => ({
+            context: inputContext(event),
+            target:
+              event.enabled && event.slug.length > 0 ? "debouncing" : "idle",
+          }),
+        },
+      },
     },
   });
 

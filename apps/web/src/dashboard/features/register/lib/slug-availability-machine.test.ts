@@ -174,6 +174,17 @@ describe("slug availability machine", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(availabilityOf(actor).status).toBe("error");
+
+    // Re-reporting the same slug is the retry. Without it the error sticks
+    // until the user edits the name, which they have no reason to do.
+    actor.send({ type: "INPUT", enabled: true, slug: "acme-corp" });
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(checks.map((entry) => entry.slug)).toStrictEqual([
+      "acme-corp",
+      "acme-corp",
+    ]);
+    expect(availabilityOf(actor).status).toBe("checking");
   });
 
   it("aborts a request whose slug changed under it, and never shows its answer", async () => {

@@ -561,6 +561,11 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       if (reread?.state === "active" || reread?.state === "paused_by_plan") {
         return { _tag: "AlreadyVerified" as const };
       }
+      // Consent withdrawn under the request: the sequential path answers
+      // `Expired` for exactly this state, and the raced path must agree.
+      if (reread?.state === "unsubscribed") {
+        return { _tag: "Expired" as const };
+      }
       return yield* dataError(
         "verifySubscription",
         "Email subscription verification did not return a row"
