@@ -1,4 +1,4 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { attachCause, currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
 import { and, eq, inArray, lt, notExists, or } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
@@ -15,6 +15,17 @@ const EDITOR_ASSET_KINDS = ["editor_image", "editor_video"] as const;
 // Cleanup can still win the lock race against a concurrent reference insert
 // after this grace period, causing that save to fail its foreign-key check.
 const ORPHANED_EDITOR_ASSET_GRACE_PERIOD = Duration.hours(1);
+/**
+ * How many editor-asset objects one request moves at once.
+ *
+ * Promotion and cleanup are one S3 request per object, so a post saved with
+ * six pasted screenshots serialized six round trips before its write could
+ * even start. Four at a time removes the serialization without filling the
+ * SDK's connection pool, and matches the bound the importer's embedding
+ * fan-out already uses. Order is completion order, which nothing downstream
+ * depends on: the promotions are matched by asset id and URL.
+ */
+const EDITOR_ASSET_IO_CONCURRENCY = 4;
 
 interface UploadedAsset {
   readonly bucket: string;
@@ -266,30 +277,51 @@ export const prepareEditorAssetContent = ({
 
     const s3 = yield* S3UploadService;
     const completedPromotions: PromotedEditorAsset[] = [];
-    const promotions = yield* Effect.forEach(temporaryAssets, (asset) =>
-      s3.promoteEditorMedia({ bucket: asset.bucket, key: asset.key }).pipe(
-        Effect.map((permanentObject) => ({
-          asset,
-          temporaryObject: { bucket: asset.bucket, key: asset.key },
-          permanentObject,
-        })),
-        Effect.tap((promotion) =>
-          Effect.sync(() => {
-            completedPromotions.push(promotion);
-          })
-        )
-      )
+    const promotionFailures: Array<unknown> = [];
+    yield* Effect.forEach(
+      temporaryAssets,
+      (asset) =>
+        s3.promoteEditorMedia({ bucket: asset.bucket, key: asset.key }).pipe(
+          Effect.map((permanentObject) => ({
+            asset,
+            temporaryObject: { bucket: asset.bucket, key: asset.key },
+            permanentObject,
+          })),
+          Effect.tap((promotion) =>
+            Effect.sync(() => {
+              completedPromotions.push(promotion);
+            })
+          ),
+          // The typed failure is recorded rather than propagated, because the
+          // default fail-fast would interrupt the copies running beside it and
+          // an abandoned `CopyObject` can still land in the bucket — a
+          // permanent object the rollback below cannot see and no sweep finds.
+          // A defect is deliberately not caught here: `onError` rolls the
+          // completed copies back and the defect still reaches the caller.
+          Effect.catch((error) =>
+            Effect.sync(() => {
+              promotionFailures.push(error);
+            })
+          )
+        ),
+      { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
     ).pipe(
-      Effect.onError(() => rollbackPreparedEditorAssets(completedPromotions)),
-      Effect.mapError(
-        () =>
-          new InternalServerError({
-            message: "Failed to promote temporary editor asset",
-          })
-      )
+      Effect.onError(() => rollbackPreparedEditorAssets(completedPromotions))
     );
+
+    const [promotionFailure] = promotionFailures;
+    if (promotionFailure !== undefined) {
+      yield* rollbackPreparedEditorAssets(completedPromotions);
+      return yield* attachCause(
+        new InternalServerError({
+          message: "Failed to promote temporary editor asset",
+        }),
+        promotionFailure
+      );
+    }
+
     const rewriteUrls = (value: string) =>
-      promotions.reduce(
+      completedPromotions.reduce(
         (result, { asset, permanentObject }) =>
           result.split(asset.url).join(permanentObject.url),
         value
@@ -301,7 +333,7 @@ export const prepareEditorAssetContent = ({
         coverImageUrl === undefined || coverImageUrl === null
           ? null
           : rewriteUrls(coverImageUrl),
-      promotions,
+      promotions: completedPromotions,
     };
   });
 
@@ -314,6 +346,9 @@ const commitEditorAssetPromotions = (
     }
 
     const db = yield* currentDb;
+    // Sequential on purpose: this runs inside the caller's transaction, so
+    // every statement shares its one reserved connection and concurrency buys
+    // nothing but interleaving.
     yield* Effect.forEach(
       promotions,
       ({ asset, permanentObject }) =>
@@ -339,7 +374,7 @@ export const cleanupPreparedEditorAssets = (
         temporaryObject,
         "Failed to remove a promoted temporary editor asset"
       ),
-    { discard: true }
+    { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
   );
 
 const syncReferences = <E1, R1, E2, R2, E3, R3>({
@@ -669,7 +704,7 @@ export const cleanupOrphanedEditorAssets = ({
           asset,
           "Failed to remove an orphaned editor asset"
         ),
-      { discard: true }
+      { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
     );
   });
 
@@ -687,5 +722,5 @@ export const rollbackPreparedEditorAssets = (
         permanentObject,
         "Failed to remove a failed editor asset promotion"
       ),
-    { discard: true }
+    { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
   );

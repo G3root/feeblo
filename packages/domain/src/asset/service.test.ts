@@ -1,13 +1,17 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
+import * as Schema from "effect/Schema";
 
+import { InternalServerError } from "../rpc-errors";
 import { S3UploadService } from "../services/s3";
 import { AssetRepository } from "./repository";
 import {
@@ -341,6 +345,83 @@ describe("registerUploadedAsset", () => {
           "editor-media/user/image/first.png",
         ]);
       })
+    );
+
+    it.effect(
+      "rolls back the copies that landed when a promotion fails with a typed error",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const organizationId = "org_timed_out_asset_promotion";
+          const deletedKeys = yield* Ref.make<string[]>([]);
+
+          yield* db.insert(schema.organizationTable).values({
+            id: organizationId,
+            name: "Timed Out Asset Promotion",
+            slug: organizationId,
+            createdAt: yield* DateTime.nowAsDate,
+          });
+          yield* db.insert(schema.assetTable).values([
+            {
+              id: "asset_promoted_before_timeout",
+              bucket: "test-bucket",
+              key: "tmp/editor-media/user/image/typed-first.png",
+              url: "https://assets.example/tmp/typed-first.png",
+              kind: "editor_image",
+              organizationId,
+            },
+            {
+              id: "asset_timed_out_promotion",
+              bucket: "test-bucket",
+              key: "tmp/editor-media/user/image/typed-second.png",
+              url: "https://assets.example/tmp/typed-second.png",
+              kind: "editor_image",
+              organizationId,
+            },
+          ]);
+
+          // A typed failure is caught per copy so the copies beside it finish
+          // rather than being interrupted mid-`CopyObject`; the ones that
+          // landed are rolled back, and the failure that stopped the save
+          // stays attached to the error for the logs.
+          const failure = yield* prepareEditorAssetContent({
+            organizationId,
+            content:
+              "![first](https://assets.example/tmp/typed-first.png) ![second](https://assets.example/tmp/typed-second.png)",
+            assetIds: [
+              "asset_promoted_before_timeout",
+              "asset_timed_out_promotion",
+            ],
+          }).pipe(
+            Effect.provideService(S3UploadService, {
+              uploadProfileImage: () => Effect.die("not used in this test"),
+              uploadOrganizationLogo: () => Effect.die("not used in this test"),
+              uploadEditorMedia: () => Effect.die("not used in this test"),
+              promoteEditorMedia: ({ key }) =>
+                key.endsWith("typed-second.png")
+                  ? Effect.fail(new Cause.TimeoutError("copy timed out"))
+                  : Effect.succeed({
+                      bucket: "test-bucket",
+                      key: "editor-media/user/image/typed-first.png",
+                      url: "https://assets.example/typed-first.png",
+                    }),
+              deleteObject: (_bucket, key) =>
+                Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
+                  Effect.as({ $metadata: { httpStatusCode: 204 } })
+                ),
+            }),
+            Effect.flip
+          );
+
+          expect(Schema.is(InternalServerError)(failure)).toBe(true);
+          const hasCause = Predicate.hasProperty("cause");
+          expect(hasCause(failure) && Cause.isTimeoutError(failure.cause)).toBe(
+            true
+          );
+          expect(yield* Ref.get(deletedKeys)).toEqual([
+            "editor-media/user/image/typed-first.png",
+          ]);
+        })
     );
 
     it.effect("removes only aged editor assets with no references", () =>

@@ -56,22 +56,18 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
           );
 
           const company = yield* repository.create(args);
+          // The definitions were just read for this workspace, so the id map is
+          // the existence check: looking each attribute id up again (twice —
+          // once as a policy check, once for the row) cost this create two extra
+          // round trips per value, inside the transaction holding the lock.
+          const definitionsById = new Map(
+            definitions.map((definition) => [definition.id, definition])
+          );
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
             Effect.gen(function* () {
-              yield* Policy.policy(() =>
-                attributeDefinitionRepository.companyAttributeDefinitionExists({
-                  id: attributeValue.attributeId,
-                  organizationId: args.organizationId,
-                })
+              const definition = definitionsById.get(
+                attributeValue.attributeId
               );
-
-              const definition =
-                yield* attributeDefinitionRepository.findCompanyAttributeDefinitionById(
-                  {
-                    id: attributeValue.attributeId,
-                    organizationId: args.organizationId,
-                  }
-                );
               if (definition === undefined) {
                 return yield* new Policy.PolicyDeniedError();
               }

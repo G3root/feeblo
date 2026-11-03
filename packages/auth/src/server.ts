@@ -45,7 +45,7 @@ import {
   type GenericOAuthUserInfo,
   genericOAuth,
 } from "better-auth/plugins/generic-oauth";
-import { asc, eq } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -417,16 +417,31 @@ export const initAuthHandler = (
       }
 
       // Checked before anything is revoked or deleted: a refusal must not
-      // touch the billing of a workspace that is staying.
+      // touch the billing of a workspace that is staying. One grouped count for
+      // every owned workspace rather than a query per workspace, because this
+      // pre-check only needs each total and an account may own several.
       const blockingWorkspaceNames = await callbackRuntime.runPromise(
         Effect.gen(function* () {
-          const blocking: string[] = [];
-          for (const workspace of ownedWorkspaces) {
-            if ((yield* countMembers(workspace.id)) > 1) {
-              blocking.push(workspace.name);
-            }
-          }
-          return blocking;
+          const counts = yield* db
+            .select({
+              organizationId: schema.memberTable.organizationId,
+              total: count(),
+            })
+            .from(schema.memberTable)
+            .where(
+              inArray(
+                schema.memberTable.organizationId,
+                ownedWorkspaces.map((workspace) => workspace.id)
+              )
+            )
+            .groupBy(schema.memberTable.organizationId);
+          const memberCounts = new Map(
+            counts.map((row) => [row.organizationId, row.total])
+          );
+
+          return ownedWorkspaces
+            .filter((workspace) => (memberCounts.get(workspace.id) ?? 0) > 1)
+            .map((workspace) => workspace.name);
         })
       );
       if (blockingWorkspaceNames.length > 0) {
@@ -498,10 +513,14 @@ export const initAuthHandler = (
       // Revoked after the commit: an external call must not hold the
       // transaction's row locks, a workspace the re-check spared keeps the
       // subscription it still needs, and anything Polar refuses stays queued
-      // for `subscriptionRevocationMaintenance`.
-      for (const workspaceId of deletedWorkspaceIds) {
-        await revokePendingOrganizationSubscriptions(workspaceId);
-      }
+      // for `subscriptionRevocationMaintenance`. The workspaces do not depend on
+      // each other and each call already logs its own failure, so the Polar
+      // round trips overlap instead of queueing one behind the next.
+      await Promise.all(
+        deletedWorkspaceIds.map((workspaceId) =>
+          revokePendingOrganizationSubscriptions(workspaceId)
+        )
+      );
     };
 
     // Local OAuth emulator (vercel-labs/emulate) support.
