@@ -63,7 +63,13 @@ import {
   type DataImportDetailArgs,
   dataImportDetailAtom,
 } from "../atoms";
-import { isActiveStatus, plannedRowCount, statusLabel } from "../format";
+import {
+  canCancelStatus,
+  canConfirmStatus,
+  isActiveStatus,
+  plannedRowCount,
+  statusLabel,
+} from "../format";
 import {
   DEFAULT_REVIEW_PAGE_SIZE,
   DEFAULT_REVIEW_SORT,
@@ -309,8 +315,8 @@ export function ImportReviewPage({
   const from = total === 0 ? 0 : page * size + 1;
   const to = Math.min(total, (page + 1) * size);
   const problemCount = counts.failed + counts.warned;
-  const awaiting = job.status === "awaiting_confirmation";
-  const active = isActiveStatus(job.status);
+  const awaiting = canConfirmStatus(job.status);
+  const cancelable = canCancelStatus(job.status);
 
   const filters = [
     { count: counts.total, filter: undefined, label: m.fresh_calm_auk() },
@@ -463,7 +469,7 @@ export function ImportReviewPage({
                 {m.zesty_fresh_mole()}
               </Button>
             ) : null}
-            {active ? (
+            {cancelable ? (
               <Button
                 onClick={() => setCancelOpen(true)}
                 size="sm"

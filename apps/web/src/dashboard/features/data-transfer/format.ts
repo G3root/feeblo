@@ -33,13 +33,16 @@ export const statusBadgeVariant = (
 ): "default" | "secondary" | "destructive" | "outline" =>
   STATUS_VARIANTS[status];
 
-/** The states in which a staged import still occupies its workspace. */
-export const isActiveStatus = (
-  status: TDataImportJobSummary["status"]
-): boolean =>
-  status === "awaiting_confirmation" ||
-  status === "queued" ||
-  status === "running";
+/**
+ * Status predicates are asked of the lifecycle machine, not restated here: a
+ * component that decides whether to offer "Confirm" is asking the same
+ * question the guarded `UPDATE` asks, so it must read the same graph.
+ */
+export {
+  canCancelDataImportStatus as canCancelStatus,
+  canConfirmDataImportStatus as canConfirmStatus,
+  isActiveDataImportStatus as isActiveStatus,
+} from "@feeblo/domain/data-transfer/machine";
 
 /** Rows that will become posts when the staged job is confirmed. */
 export const plannedRowCount = (job: TDataImportJobSummary): number =>
