@@ -96,14 +96,18 @@ function RouteComponent() {
     hasPermission(organizationId, "integrations.manage")
   );
   // Banning a comment or post author is a manager action behind the paid plan
-  // gate; the server enforces both, and the actions are hidden otherwise.
+  // gate; the server enforces both, and the actions are hidden otherwise. The
+  // action waits for the entitlements read: while it is loading the capability
+  // is unknown, and showing a ban button that the plan may not support is worse
+  // than a frame of nothing.
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
   const { allowed: canManageUserBans } = usePolicy(
     hasPermission(organizationId, "userBans.manage")
   );
   const canBanAuthors =
     canManageUserBans &&
-    (isEntitlementsLoading || entitlements.capabilities.userBans);
+    !isEntitlementsLoading &&
+    entitlements.capabilities.userBans;
   // Ban and unban go through the ban atoms rather than a bare RPC: the atoms
   // bump the reactivity key the security settings list is cached under, so
   // writing from here cannot leave that list — or the badges it agrees with —

@@ -334,6 +334,19 @@ function BanUserDialog({
   const [deleteContent, setDeleteContent] = React.useState(false);
   const [isBanning, setIsBanning] = React.useState(false);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    // Closing the dialog drops what was typed for the previous person: the
+    // form is reopened for whoever the operator picks next, and a note written
+    // about one address must not be attached to another. Opening only forwards
+    // the request, so the form starts empty either way.
+    if (!nextOpen) {
+      setEmail("");
+      setReason("");
+      setDeleteContent(false);
+    }
+    onOpenChange(nextOpen);
+  };
+
   const handleBan = async () => {
     setIsBanning(true);
     try {
@@ -362,7 +375,7 @@ function BanUserDialog({
   };
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
+    <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogPopup>
         <DialogHeader>
           <DialogTitle>Ban user</DialogTitle>

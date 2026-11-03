@@ -69,7 +69,7 @@ Deleting the content is the one explicit option, offered as a checkbox on the ba
 
 - The person's comments in the workspace are deleted. A comment delete cascades to its replies, so a reply by anyone else is first re-anchored to the nearest surviving ancestor — only the banned person's own words are removed.
 - The person's posts in the workspace are deleted. A post merged into one of theirs is unmerged first, so no post is left pointing at a row that no longer exists.
-- No post-timeline entries are written: a purge is one operator decision and the ban row is its audit record. The person's votes and reactions on other people's posts are left alone — they are not content the person authored.
+- No post-timeline entries are written: a purge is one operator decision and the ban row is its audit record. The purge deletes no engagement as authored content: votes and reactions the person left on other people's posts are not touched here. Deleting their votes is the ban's own work, not the purge's — see [Votes and subscriptions](#votes-and-subscriptions) above.
 
 An address-only ban has no account, so the checkbox is a no-op there.
 
@@ -79,4 +79,4 @@ An address-only ban has no account, so the checkbox is a no-op there.
 - `userBans.manage` is granted to manager and above. The portal can ask `GetUserBanStatus` for the caller’s own state and disable its composers without ever seeing the operator’s reason.
 - The ban list lives on Settings → Security, next to widget SSO, because both answer “who is allowed to interact here”. The old `settings/blocked-users` route is gone.
 - A ban by address can be evaded by changing the address, and an anonymous widget submission can be evaded by clearing the browser. Identity verification and the moderation queue are the answers to those, not an IP block.
-- The tests pin the policy directly, pin the purge (the reply re-anchor, the post revert), and pin one public write (a comment) as the end-to-end refusal; the remaining public writes are covered by the same policy composition and the compile-time surface pairing.
+- The tests pin the policy directly, pin the purge (the reply re-anchor, the post revert), and pin a banned refusal on each public write that composes the participation check on its own: post create and its three updates, comment update, both reaction toggles, and post subscription. A dropped composition fails a test, not just a review.
