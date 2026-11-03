@@ -165,6 +165,29 @@ describe("PostRpcHandlers", () => {
     content,
   });
 
+  /**
+   * Bans the fixture's non-member session user.
+   *
+   * The fixture creates the member row its board references, and the database
+   * membership check below the policy would exempt the session, so the row goes
+   * first. What remains is a plain portal account that is banned here.
+   */
+  const banNonMember = (fixture: Fixture) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      yield* db
+        .delete(schema.memberTable)
+        .where(eq(schema.memberTable.id, fixture.membershipId));
+      yield* db.insert(schema.userBanTable).values({
+        createdAt: now,
+        id: `ban_${fixture.userId}`,
+        organizationId: fixture.organizationId,
+        updatedAt: now,
+        userId: fixture.userId,
+      });
+    });
+
   const addBoard = (fixture: Fixture, visibility: "PUBLIC" | "PRIVATE") =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -4570,5 +4593,127 @@ describe("PostRpcHandlers", () => {
           expect(error).toBeInstanceOf(Policy.PolicyDeniedError);
         })
     );
+
+    // Each public write composes `participation.canParticipate` on its own, so
+    // one banned case per operation is what stops a dropped composition from
+    // passing CI.
+    describe("banned non-members", () => {
+      /** Creates a post as the non-member the fixture's session names. */
+      const seedOwnPost = (fixture: Fixture) =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const postId = yield* PostId.generate;
+          yield* handlers
+            .CreatePostPublic(postCreateInput(fixture, postId, "Own post"))
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+          return postId;
+        });
+
+      it.effect("refuses CreatePostPublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreatePostPublic(postCreateInput(fixture, postId, "Banned post"))
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("refuses UpdatePostPublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostPublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: fixture.statusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("refuses UpdatePostContentPublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostContentPublic({
+                assetIds: [],
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                content: "Edited while banned",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("refuses UpdatePostTitlePublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostTitlePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                title: "Renamed while banned",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+    });
   });
 });

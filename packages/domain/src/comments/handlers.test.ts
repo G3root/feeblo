@@ -1588,6 +1588,58 @@ describe("CommentRpcHandlers", () => {
         })
       );
 
+      it.effect("rejects a banned owner updating their own comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* handlers
+            .CreateCommentPublic(
+              commentCreateInput(fixture, commentId, "Own comment")
+            )
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          // The update path composes the participation check on its own, so a
+          // ban has to be proven to stop an edit the owner is otherwise
+          // allowed to make. The fixture's member row would exempt the session
+          // from the database membership check.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.id, fixture.membershipId));
+          yield* db.insert(schema.userBanTable).values({
+            createdAt: now,
+            id: `ban_${fixture.userId}`,
+            organizationId: fixture.organizationId,
+            updatedAt: now,
+            userId: fixture.userId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdateCommentPublic({
+                id: commentId,
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+                content: "Edited while banned",
+                visibility: "PUBLIC" as const,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
       it.effect("rejects non-owners updating via public endpoint", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;

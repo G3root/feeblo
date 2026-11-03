@@ -7,6 +7,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -314,6 +315,38 @@ describe("PostSubscriptionRpcHandlers", () => {
         })
     );
 
+    it.effect("refuses a public subscription from a banned non-member", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* PostSubscriptionRpcHandlersEffect;
+        const f = yield* fixture();
+        const now = yield* DateTime.nowAsDate;
+
+        // The fixture's member row would exempt the session from the database
+        // membership check, so this case removes it first.
+        yield* db
+          .delete(schema.memberTable)
+          .where(eq(schema.memberTable.id, f.membershipId));
+        yield* db.insert(schema.userBanTable).values({
+          createdAt: now,
+          id: `ban_${f.organizationId}`,
+          organizationId: f.organizationId,
+          updatedAt: now,
+          userId: f.userId,
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .CreatePostSubscriptionPublic({
+              organizationId: f.organizationId,
+              postId: f.postId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        );
+
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
     it.effect("allows a restricted session inside its own organization", () =>
       Effect.gen(function* () {
         const handlers = yield* PostSubscriptionRpcHandlersEffect;

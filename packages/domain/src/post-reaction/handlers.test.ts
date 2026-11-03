@@ -261,6 +261,40 @@ describe("PostReactionRpcHandlers", () => {
         expect(privateError._tag).toBe("PolicyDenied");
       })
     );
+
+    it.effect("refuses a public reaction from a banned non-member", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* PostReactionRpcHandlersEffect;
+        const f = yield* fixture("PUBLIC");
+        const now = yield* DateTime.nowAsDate;
+
+        // The fixture's member row would exempt the session from the database
+        // membership check, so this case removes it first.
+        yield* db
+          .delete(schema.memberTable)
+          .where(eq(schema.memberTable.id, f.membershipId));
+        yield* db.insert(schema.userBanTable).values({
+          createdAt: now,
+          id: `ban_${f.organizationId}`,
+          organizationId: f.organizationId,
+          updatedAt: now,
+          userId: f.userId,
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .TogglePostReactionPublic({
+              organizationId: f.organizationId,
+              postId: f.postId,
+              emoji: "fire",
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        );
+
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
     it.effect("hides reactions on an archived post", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;

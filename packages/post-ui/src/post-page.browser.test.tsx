@@ -1,14 +1,33 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
-import type { TPost } from "@feeblo/domain/post/schema";
+import type { TCommentReaction } from "@feeblo/domain/comment-reaction/schema";
+import type { TComment } from "@feeblo/domain/comments/schema";
+import type { TPostReaction } from "@feeblo/domain/post-reaction/schema";
+import type { TPostStatus } from "@feeblo/domain/post-status/schema";
+import type { TPostSubscription } from "@feeblo/domain/post-subscription/schema";
+import type { TPost, TPostListItem } from "@feeblo/domain/post/schema";
+import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
+import { CommentDisplayDropdown } from "./comment-display/dropdown";
+import { CommentDisplayProvider } from "./comment-display/provider";
+import {
+  BanAuthorDialogProvider,
+  CommentDeleteDialogProvider,
+  CommentVisibilityDialogProvider,
+  PostDeleteDialogProvider,
+} from "./dialog-stores";
 import { PostPage } from "./post-page";
 import {
   createPostCollectionState,
   PostCollectionStateProvider,
   usePostCollectionData,
 } from "./post-page-context";
+import {
+  PostCollectionsProvider,
+  type PostCollections,
+} from "./providers/post-collections-provider";
+import { createMockCollection } from "./testing/in-memory-collections";
 
 // This browser test renders the PostPage in isolation, stubbing its child
 // surfaces (auth, policy, comments, editor, reactions, toggles) with faithful,
@@ -142,18 +161,99 @@ function renderState(options?: Parameters<typeof state>[0]) {
       <PostPage.Locked>locked</PostPage.Locked>
       <PostPage.Unlocked>unlocked</PostPage.Unlocked>
       <AdminControls />
-      <BanAuthorControl />
     </PostCollectionStateProvider>
   );
 }
 
+/** Every collection the comment menu can reach, backed by in-memory syncs. */
+const stubCollections = {
+  boardCollection: createMockCollection<TBoard>({
+    id: "board",
+    getKey: (row) => row.id,
+  }),
+  commentCollection: createMockCollection<TComment>({
+    id: "comment",
+    getKey: (row) => row.id,
+  }),
+  commentReactionCollection: createMockCollection<TCommentReaction>({
+    id: "comment-reaction",
+    getKey: (row) => row.id,
+  }),
+  postCollection: createMockCollection<TPostListItem>({
+    id: "post",
+    getKey: (row) => row.id,
+  }),
+  postDetailCollection: createMockCollection<TPost>({
+    id: "post-detail",
+    getKey: (row) => row.id,
+  }),
+  postReactionCollection: createMockCollection<TPostReaction>({
+    id: "post-reaction",
+    getKey: (row) => row.id,
+  }),
+  postStatusCollection: createMockCollection<TPostStatus>({
+    id: "post-status",
+    getKey: (row) => row.id,
+  }),
+  postSubscriptionCollection: createMockCollection<TPostSubscription>({
+    id: "post-subscription",
+    getKey: (row) => row.id,
+  }),
+  upvoteCollection: createMockCollection<TUpvote>({
+    id: "upvote",
+    getKey: (row) => row.id,
+  }),
+} satisfies PostCollections;
+
 /**
- * Mirrors the comment menu's ban gate: the action exists only when the host
- * offers it, and the public surfaces never do.
+ * The production comment menu under the providers it reads.
+ *
+ * The ban action is gated inside `CommentDisplayDropdown`, not in the state, so
+ * the test renders that component rather than a copy of its condition.
  */
-function BanAuthorControl() {
-  const { canBanAuthors } = usePostCollectionData();
-  return canBanAuthors ? <span>Ban user</span> : null;
+function renderBanMenu({
+  authorIsBanned = false,
+  authorIsMember = false,
+  canBanAuthor = true,
+}: {
+  authorIsBanned?: boolean;
+  authorIsMember?: boolean;
+  canBanAuthor?: boolean;
+} = {}) {
+  return render(
+    <PostCollectionStateProvider
+      value={state({ authenticated: true, canBanAuthor, canModerate: true })}
+    >
+      <PostCollectionsProvider
+        collections={stubCollections}
+        organizationId="organization-id"
+        persistPost={() => Promise.resolve("post-id")}
+      >
+        <PostDeleteDialogProvider>
+          <CommentDeleteDialogProvider>
+            <CommentVisibilityDialogProvider>
+              <BanAuthorDialogProvider>
+                <CommentDisplayProvider
+                  authorIsBanned={authorIsBanned}
+                  authorIsMember={authorIsMember}
+                  authorName="Ada"
+                  commentId="comment-id"
+                  content="Comment"
+                  createdAt={new Date(0)}
+                  onDelete={vi.fn()}
+                  onReply={() => true}
+                  postId="post-id"
+                  postSlug="post-slug"
+                >
+                  <CommentDisplayDropdown />
+                </CommentDisplayProvider>
+              </BanAuthorDialogProvider>
+            </CommentVisibilityDialogProvider>
+          </CommentDeleteDialogProvider>
+        </PostDeleteDialogProvider>
+      </PostCollectionsProvider>
+    </PostCollectionStateProvider>
+  );
 }
 
 /**
@@ -193,17 +293,42 @@ describe("PostPage composition", () => {
     await expect.element(screen.getByText("guest")).not.toBeInTheDocument();
   });
 
-  it("offers the ban action only when the host enables it", async () => {
-    const withoutBan = await renderState({ authenticated: true });
+  it("hides the ban action when the host does not offer one", async () => {
+    const screen = await renderBanMenu({ canBanAuthor: false });
+    await screen.getByRole("button", { name: "Comment menu" }).click();
     await expect
-      .element(withoutBan.getByText("Ban user"))
+      .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
       .not.toBeInTheDocument();
+  });
 
-    const withBan = await renderState({
-      authenticated: true,
-      canBanAuthor: true,
-    });
-    await expect.element(withBan.getByText("Ban user")).toBeVisible();
+  it("offers the ban action for a customer", async () => {
+    const screen = await renderBanMenu();
+    await screen.getByRole("button", { name: "Comment menu" }).click();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
+      .toBeVisible();
+  });
+
+  it("offers neither ban nor unban for a member", async () => {
+    const screen = await renderBanMenu({ authorIsMember: true });
+    await screen.getByRole("button", { name: "Comment menu" }).click();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
+      .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Unban user$/ }))
+      .not.toBeInTheDocument();
+  });
+
+  it("offers unban instead of ban for a banned author", async () => {
+    const screen = await renderBanMenu({ authorIsBanned: true });
+    await screen.getByRole("button", { name: "Comment menu" }).click();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
+      .not.toBeInTheDocument();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Unban user$/ }))
+      .toBeVisible();
   });
 
   it("shows locked content instead of unlocked content", async () => {
