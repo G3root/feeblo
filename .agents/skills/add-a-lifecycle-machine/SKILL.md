@@ -56,7 +56,37 @@ List every state and every terminal state before writing code. Then check:
 - Is a self-transition actually a lifecycle event? It usually is not. The import
   job's lease re-claim keeps the row `running`, so it belongs in SQL, not in the
   graph — a self-transition would make "handled" indistinguishable from
-  "rejected".
+  "rejected". The same is true of a *stale* reservation: `createdAt < now - t`
+  is a lease predicate on an unchanged state, not an edge.
+
+### Two shapes of event
+
+Most machines mix them, and naming which is which keeps the derived SQL honest.
+
+A **transition** has one target. `sourceStatesFor(event)` generates its `WHERE`
+and `targetStateFor(event)` generates its `SET`; a state that is not a source
+cannot be moved by it.
+
+A **decision** has several targets and is asked before any row exists. The
+subscription's `request` is one: what a consent request means depends on the
+subject, and the answer may be any of three states. Do not try to generate SQL
+from a decision — it never writes. Give the machine a `none` state for "no row
+at all" so a first request is a normal transition rather than a special case,
+and export it separately (`nextStateForRequest`).
+
+A decision event must not be a self-transition in the *derived* set either: if
+a state takes the event and stays put, `sourceStatesFor` will not see it.
+`subscription-machine.test.ts` asserts "no source is also the target" for every
+transition event, which is the assertion that keeps that true.
+
+### Legacy states
+
+A state that nothing writes any more but rows still hold is not dead code —
+deleting it breaks reading old data. Declare it with outgoing edges only,
+name it (`LEGACY_EMAIL_INTENT_STATES`), and assert it has **no inbound edge**.
+That turns "do not re-introduce a pause" into a failing test instead of a
+comment, and it keeps the reachability check honest by naming its one
+exception rather than dropping the check.
 
 ## 3. Derive the guards instead of restating them
 
@@ -178,10 +208,17 @@ show as an unused package.
 
 | Machine | Kind | Read it for |
 | --- | --- | --- |
-| `packages/domain/src/data-transfer/machine.ts` | pure, durable, `setupEffect` | deriving SQL guards, replacing three drifted predicates, `setupEffect` with Effect Schema |
-| `apps/web/src/dashboard/features/register/lib/slug-availability-machine.ts` | client, `setup` + `@xstate/react` | debounce-as-state, abort-on-exit, transition functions replacing guards |
+| `packages/domain/src/data-transfer/machine.ts` | pure, durable, `setupEffect` | deriving SQL guards, replacing three drifted predicates |
+| `packages/domain/src/email-outbox/intent-machine.ts` | pure, `setupEffect` | a legacy state with no inbound edge; one `transitionIntent` replacing five guarded writes |
+| `packages/domain/src/email-subscription/subscription-machine.ts` | pure, `setupEffect` | transition events next to a decision event; the `none` state |
+| `apps/web/src/dashboard/features/register/lib/slug-availability-machine.ts` | client, `setup` + `@xstate/react` | debounce-as-state, abort-on-exit, actor `input` instead of a mount effect |
 | `packages/domain/src/email-outbox/delivery-state.ts` | table, pre-XState | the derived-guard pattern the machines follow |
-| `integrations/core/src/integration-lifecycle.ts` | table, pre-XState | two graphs in one file, with a test pinning both |
+| `integrations/core/src/integration-lifecycle.ts` | table, pre-XState | see the warning below |
+
+`integration-lifecycle.ts` is the cautionary example, not the model: it declares
+two graphs, tests them, and **nothing consults either one**. Every connection
+lifecycle write in `integrations/*` is still guarded by a hand-written
+`eq(lifecycle, …)`. A table nobody reads is documentation that rots.
 
 ## Do not
 
