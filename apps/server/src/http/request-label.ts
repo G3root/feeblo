@@ -8,6 +8,8 @@ import type * as HttpServerRequest from "effect/http/HttpServerRequest";
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const legidPattern = /^[a-z]{2,}_[a-z0-9]{6,}$/i;
+/** The SES feedback webhook embeds its signing token as the last segment. */
+const sesFeedbackTokenPattern = /^(\/email-provider\/ses\/).+$/;
 
 const redactIdentifierSegment = (segment: string): string =>
   uuidPattern.test(segment) || legidPattern.test(segment) ? ":id" : segment;
@@ -18,7 +20,7 @@ const redactedRequestPath = (
 ): string => {
   const path = request.url.split("?")[0] ?? "";
   return path
-    .replace(/^(\/email-provider\/ses\/).+$/, "$1:token")
+    .replace(sesFeedbackTokenPattern, "$1:token")
     .split("/")
     .map(redactIdentifierSegment)
     .join("/");

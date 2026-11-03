@@ -10,6 +10,11 @@ import { fetchRpcServer } from "~/lib/runtime-server";
 import { getServerRuntimePublicEnv } from "~/lib/server-runtime-public-env";
 import { resolveSite } from "~/lib/site";
 
+/** `/p/<slug>`, the board's feedback detail path. */
+const postDetailPathPattern = /^\/p\/([^/]+)$/;
+/** `/changelog/<slug>`, the board's changelog detail path. */
+const changelogDetailPathPattern = /^\/changelog\/([^/]+)$/;
+
 /**
  * The public board's server-resolved page metadata.
  *
@@ -72,8 +77,8 @@ async function resolvePageContent(
   publicPath: string,
   site: TSite
 ): Promise<DetailContent> {
-  const postMatch = /^\/p\/([^/]+)$/.exec(publicPath);
-  const changelogMatch = /^\/changelog\/([^/]+)$/.exec(publicPath);
+  const postMatch = postDetailPathPattern.exec(publicPath);
+  const changelogMatch = changelogDetailPathPattern.exec(publicPath);
 
   if (!postMatch && !changelogMatch) {
     return { kind: "found", post: null, changelog: null };

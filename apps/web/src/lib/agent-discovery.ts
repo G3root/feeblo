@@ -22,6 +22,9 @@ const REFERENCE_PATH = `${PUBLIC_API_PATH}/docs`;
 const PUBLIC_API_MCP_PATH = "/mcp";
 const PUBLIC_API_KEY_HEADER = "x-api-key";
 
+/** Leading slashes, which the splat a route captures never carries. */
+const leadingSlashPattern = /^\/+/u;
+
 export const DASHBOARD_AUTH_PATH = "/auth.md";
 export const DASHBOARD_API_CATALOG_PATH = "/.well-known/api-catalog";
 export const DASHBOARD_MCP_SERVER_CARD_PATH =
@@ -286,7 +289,7 @@ export const DASHBOARD_DISCOVERY_LINK = [
  * restored before the document switch can match a path constant.
  */
 export const wellKnownPath = (splat: string | undefined) =>
-  `/.well-known/${(splat ?? "").replace(/^\/+/u, "")}`;
+  `/.well-known/${(splat ?? "").replace(leadingSlashPattern, "")}`;
 
 /**
  * Whether the request asks for Markdown.

@@ -31,6 +31,8 @@ import { m } from "../paraglide/messages.js";
 const SEARCH_DEBOUNCE_MS = 200;
 /** Minimum query length before the picker hits ContactSearch. */
 const MIN_QUERY_LENGTH = 2;
+/** The separators an address or display name splits an initial out of. */
+const initialsSeparatorPattern = /[\s@._-]+/;
 
 /**
  * Zod mirror of {@link ContactComboboxSelection} for forms that keep the
@@ -149,7 +151,7 @@ type ContactOption =
 
 function initialsOf(name: string | null, email: string | null) {
   const source = name ?? email ?? "";
-  const parts = source.split(/[\s@._-]+/).filter(Boolean);
+  const parts = source.split(initialsSeparatorPattern).filter(Boolean);
 
   if (parts.length === 0) {
     return "?";

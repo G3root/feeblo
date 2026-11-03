@@ -10,6 +10,9 @@ import {
   changelogCategoryFormOpts,
 } from "../shared-form";
 
+/** The lightness channel of an `oklch(<L> <C> <H>)` color. */
+const oklchLightnessPattern = /^oklch\(([\d.]+)/;
+
 export const ChangelogCategoryColorField = withForm({
   ...changelogCategoryFormOpts,
   render: ({ form }) => {
@@ -62,7 +65,7 @@ export const ChangelogCategoryColorField = withForm({
  */
 function isLightOklch(color: string) {
   const lightness = Number.parseFloat(
-    color.match(/^oklch\(([\d.]+)/)?.[1] ?? "0"
+    color.match(oklchLightnessPattern)?.[1] ?? "0"
   );
   return lightness > 0.7;
 }

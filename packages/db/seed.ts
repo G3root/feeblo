@@ -68,6 +68,11 @@ const TEST_USER = {
   name: "Test User",
 };
 
+/** Anything that cannot survive in a slug. */
+const nonSlugCharacterPattern = /[^a-z0-9\s-]/g;
+/** Runs of whitespace, which become the slug's hyphens. */
+const whitespaceRunPattern = /\s+/g;
+
 /**
  * A second account whose workspace is deliberately over the Free plan, so the
  * over-plan gate (and every remediation action) can be exercised locally
@@ -403,9 +408,9 @@ class SeedDataError extends Data.TaggedError("SeedDataError")<{
 const slugify = (value: string) =>
   value
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(nonSlugCharacterPattern, "")
     .trim()
-    .replace(/\s+/g, "-");
+    .replace(whitespaceRunPattern, "-");
 
 /**
  * The address digest `provisionShadowUser` and `upsertSsoUser` store. The seed

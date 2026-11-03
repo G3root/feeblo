@@ -98,6 +98,9 @@ import {
 /** The export picker's sentinel for "every board"; never a real board id. */
 const ALL_BOARDS = "__all_boards__";
 
+/** Imports and exports are CSV only; the picker checks the name, not the type. */
+const csvFileNamePattern = /\.csv$/iu;
+
 /**
  * Writes the download the importer accepts. The template comes from the same
  * contract the server parses, so a column the parser stops reading cannot
@@ -242,7 +245,7 @@ function ImportDropzone({
     }
     // The server holds the same limits; checking here turns a round trip into
     // an immediate sentence about the file the person just picked.
-    if (!/\.csv$/iu.test(candidate.name)) {
+    if (!csvFileNamePattern.test(candidate.name)) {
       reject(m.quiet_fresh_moth());
       return;
     }

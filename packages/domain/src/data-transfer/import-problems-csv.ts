@@ -24,6 +24,12 @@ import {
 const PROBLEM_PAGE_SIZE = 500;
 
 const CSV_DELIMITER = ",";
+
+/** The upload's CSV extension, which the download name does not repeat. */
+const csvFileNamePattern = /\.csv$/iu;
+/** Anything that is not safe in a `Content-Disposition` name or on disk. */
+const unsafeFileNameCharacterPattern = /[^\p{L}\p{N}._-]+/gu;
+
 const textEncoder = new TextEncoder();
 
 const encodeText = (text: string): Uint8Array => textEncoder.encode(text);
@@ -140,8 +146,8 @@ export const streamImportProblemsCsv = (input: {
     // reduced to characters safe in both the header and a file system.
     const stem =
       job.value.fileName
-        .replace(/\.csv$/iu, "")
-        .replaceAll(/[^\p{L}\p{N}._-]+/gu, "-")
+        .replace(csvFileNamePattern, "")
+        .replaceAll(unsafeFileNameCharacterPattern, "-")
         .slice(0, 60) || input.id.slice(0, 8);
     return {
       fileName: `${stem}-import-problems-${now.toISOString().slice(0, 10)}.csv`,

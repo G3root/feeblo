@@ -73,6 +73,9 @@ import type { ServerConfigValue } from "../config";
 import { redisOptions } from "../infra/redis";
 import type { IntegrationRuntime } from "../integrations";
 
+/** Provider URLs are joined with a path, so one trailing slash is dropped. */
+const trailingSlashPattern = /\/$/;
+
 export const makeGitHubConfigLayer = (
   config: ServerConfigValue
 ): Layer.Layer<GitHubIntegrationConfig> =>
@@ -92,7 +95,6 @@ export const makeGitHubConfigLayer = (
 
 /** Builds the Slack integration configuration values from the server environment. */
 export const makeSlackIntegrationConfig = (config: ServerConfigValue) => {
-  const trailingSlashPattern = /\/$/;
   const appUrlValue = config.appUrl.replace(trailingSlashPattern, "");
   const apiUrlValue = config.apiUrl.replace(trailingSlashPattern, "");
   const clientId = config.slackClientId ?? "";
@@ -119,7 +121,6 @@ export const makeSlackIntegrationConfig = (config: ServerConfigValue) => {
 
 /** Builds the Discord integration configuration values from the server environment. */
 export const makeDiscordIntegrationConfig = (config: ServerConfigValue) => {
-  const trailingSlashPattern = /\/$/;
   const apiUrlValue = config.apiUrl.replace(trailingSlashPattern, "");
   const clientId = config.discordClientId ?? "";
   const clientSecret = config.discordClientSecret;
