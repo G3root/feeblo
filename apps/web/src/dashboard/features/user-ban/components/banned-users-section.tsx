@@ -57,6 +57,25 @@ import {
 } from "../atoms";
 
 /**
+ * Refreshes the rows the author badges are derived from.
+ *
+ * The ban list is cached in an atom and refreshes through a reactivity key. The
+ * badges are collection rows, so they need saying separately: without this, a
+ * post page opened afterwards still reports the previous answer.
+ */
+const refreshBanBadges = ({
+  commentCollection,
+  postCollection,
+}: Pick<
+  ReturnType<typeof useDashboardCollections>,
+  "commentCollection" | "postCollection"
+>) =>
+  refetchInBackground(
+    postCollection.utils.refetch(),
+    commentCollection.utils.refetch()
+  );
+
+/**
  * The workspace's banned end users.
  *
  * A ban stops the person writing on the portal or through the widget; it does
@@ -148,10 +167,7 @@ export function BannedUsersSection({
       // reactivity key. The badges are collection rows, so they need saying
       // separately: without this, a post page opened afterwards still reports
       // the author as banned.
-      refetchInBackground(
-        postCollection.utils.refetch(),
-        commentCollection.utils.refetch()
-      );
+      refreshBanBadges({ commentCollection, postCollection });
       toastManager.add({ title: "User unbanned", type: "success" });
     } catch (failure) {
       toastManager.add({
@@ -329,10 +345,14 @@ function BanUserDialog({
   organizationId: string;
 }) {
   const ban = useAtomSet(banUserAtom, { mode: "promise" });
+  const collections = useDashboardCollections();
   const [email, setEmail] = React.useState("");
   const [reason, setReason] = React.useState("");
   const [deleteContent, setDeleteContent] = React.useState(false);
   const [isBanning, setIsBanning] = React.useState(false);
+  // Which draft the fields belong to. Dismissing the dialog starts a new one,
+  // so a request still in flight cannot clear or close the next person's form.
+  const draftRef = React.useRef(0);
 
   const handleOpenChange = (nextOpen: boolean) => {
     // Closing the dialog drops what was typed for the previous person: the
@@ -340,6 +360,7 @@ function BanUserDialog({
     // about one address must not be attached to another. Opening only forwards
     // the request, so the form starts empty either way.
     if (!nextOpen) {
+      draftRef.current += 1;
       setEmail("");
       setReason("");
       setDeleteContent(false);
@@ -348,6 +369,7 @@ function BanUserDialog({
   };
 
   const handleBan = async () => {
+    const draft = draftRef.current;
     setIsBanning(true);
     try {
       await ban({
@@ -359,11 +381,17 @@ function BanUserDialog({
         },
         reactivityKeys: userBanReactivityKeys(organizationId),
       });
+      toastManager.add({ title: "User banned", type: "success" });
+      refreshBanBadges(collections);
+      // A dismissal and reopen while this ran means the fields on screen
+      // belong to somebody else; the ban still lands, the form stays.
+      if (draft !== draftRef.current) {
+        return;
+      }
       setEmail("");
       setReason("");
       setDeleteContent(false);
       onOpenChange(false);
-      toastManager.add({ title: "User banned", type: "success" });
     } catch (failure) {
       toastManager.add({
         title: parseRpcError(failure).message,
