@@ -587,19 +587,25 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       const tokenHash = yield* hashEmailSubscriptionToken(
         redactEmailSubscriptionToken(input.unsubscribeToken)
       );
-      const [subscription] = yield* db
-        .select({
-          id: schema.emailSubscriptionTable.id,
-          state: schema.emailSubscriptionTable.state,
-        })
+      // A full-row read with its decoder, not the column projection the
+      // neighbouring reads got: this method is the one seam where projecting
+      // the columns collapses inference across the handler layer with
+      // tsrs 0.20.0-ts7.1.0-beta — the guarded write below and its outcome
+      // union resolve to `unknown` at three call sites, and no local shape of
+      // the projection stops it. The cost is one row's extra columns on a
+      // single-row lookup by unique index, so the projection buys nothing
+      // here anyway. Revisit with the next compiler-train bump.
+      const [row] = yield* db
+        .select()
         .from(schema.emailSubscriptionTable)
         .where(
           eq(schema.emailSubscriptionTable.unsubscribeTokenHash, tokenHash)
         )
         .limit(1);
-      if (subscription === undefined) {
+      if (row === undefined) {
         return { _tag: "Invalid" as const };
       }
+      const subscription = yield* decodeSubscription(row, "unsubscribe");
       if (subscription.state === "unsubscribed") {
         return { _tag: "AlreadyUnsubscribed" as const };
       }
