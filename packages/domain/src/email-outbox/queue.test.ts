@@ -2160,10 +2160,10 @@ describe("EmailOutbox workflows", () => {
           const failingRepository = EmailOutboxRepository.of({
             ...repository,
             createDelivery: () => Effect.fail(persistenceError),
-            markIntentState: (input) =>
-              input.state === "failed"
+            transitionIntent: (input) =>
+              input.event === "fail"
                 ? Effect.fail(persistenceError)
-                : repository.markIntentState(input),
+                : repository.transitionIntent(input),
           });
 
           const fiber = yield* dispatchEmailOutboxIntent({

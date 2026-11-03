@@ -338,7 +338,7 @@ export const materializeEmailIntent = (outboxId: string) =>
       return [] as readonly string[];
     }
     if (isIntentExpired(intent.expiresAt, now)) {
-      yield* repository.markIntentState({ id: intent.id, state: "expired" });
+      yield* repository.transitionIntent({ id: intent.id, event: "expire" });
       yield* recordEmailIntentTransition(intent.kind, "expired");
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
@@ -348,7 +348,12 @@ export const materializeEmailIntent = (outboxId: string) =>
       // longer plan-gated, and subscriber deliveries are filtered per
       // recipient at materialization, so the pause no longer applies. A lost
       // race with another worker resumes nothing and this attempt stops.
-      if (!(yield* repository.resumePausedIntent({ id: intent.id }))) {
+      if (
+        !(yield* repository.transitionIntent({
+          id: intent.id,
+          event: "resume",
+        }))
+      ) {
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         return [] as readonly string[];
       }
@@ -387,7 +392,7 @@ export const materializeEmailIntent = (outboxId: string) =>
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       if (recipient === undefined) {
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        yield* repository.markIntentState({ id: intent.id, state: "expired" });
+        yield* repository.transitionIntent({ id: intent.id, event: "expire" });
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         yield* recordEmailIntentTransition(intent.kind, "expired");
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
@@ -403,9 +408,9 @@ export const materializeEmailIntent = (outboxId: string) =>
             templatePayload: { subscriptionId: recipient.subscriptionId },
             templateVersion: 1,
           });
-          yield* repository.markIntentState({
+          yield* repository.transitionIntent({
             id: intent.id,
-            state: "materialized",
+            event: "materialize",
           });
           yield* recordEmailIntentTransition(intent.kind, "materialized");
           return created._tag === "Inserted" ? [created.delivery.id] : [];
@@ -500,9 +505,9 @@ export const materializeEmailIntent = (outboxId: string) =>
           // window whose stored posts were all deleted still has submissions
           // to report, and must not go silent about them.
           if (submissionCount <= 0) {
-            yield* repository.markIntentState({
+            yield* repository.transitionIntent({
               id: window.id,
-              state: "expired",
+              event: "expire",
             });
             yield* recordEmailIntentTransition(window.kind, "expired");
             return noDeliveryIds;
@@ -556,9 +561,9 @@ export const materializeEmailIntent = (outboxId: string) =>
               },
             })
           );
-          yield* repository.markIntentState({
+          yield* repository.transitionIntent({
             id: window.id,
-            state: "materialized",
+            event: "materialize",
           });
           yield* recordEmailIntentTransition(window.kind, "materialized");
           return created.flatMap((result) =>
@@ -579,7 +584,7 @@ export const materializeEmailIntent = (outboxId: string) =>
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     if (!content) {
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      yield* repository.markIntentState({ id: intent.id, state: "expired" });
+      yield* repository.transitionIntent({ id: intent.id, event: "expire" });
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       yield* recordEmailIntentTransition(intent.kind, "expired");
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
@@ -734,9 +739,9 @@ export const materializeEmailIntent = (outboxId: string) =>
           });
         });
         if (recipients.length < materializationBatchSize) {
-          yield* repository.markIntentState({
+          yield* repository.transitionIntent({
             id: intent.id,
-            state: "materialized",
+            event: "materialize",
           });
           yield* recordEmailIntentTransition(intent.kind, "materialized");
         }
@@ -1538,9 +1543,9 @@ const failIntentAfterInfrastructureExhaustion = (outboxId: string) =>
     if (intent === undefined) {
       return;
     }
-    const failed = yield* repository.markIntentState({
+    const failed = yield* repository.transitionIntent({
       id: outboxId,
-      state: "failed",
+      event: "fail",
     });
     if (failed) {
       yield* recordEmailIntentTransition(intent.kind, "failed");

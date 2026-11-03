@@ -22,6 +22,11 @@ import {
 } from "./config";
 import { deliverySourceStatesFor } from "./delivery-state";
 import {
+  sourceStatesFor as intentSourceStatesFor,
+  targetStateFor as intentTargetStateFor,
+  type TEmailIntentEvent,
+} from "./intent-machine";
+import {
   type EmailDeliveryRecord as EmailDelivery,
   EmailDeliveryRecord,
   type EmailOutboxRecord as EmailIntent,
@@ -723,53 +728,42 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
   );
 
-  const markIntentState = Effect.fn("EmailOutboxRepository.markIntentState")(
+  /**
+   * Moves one intent along its lifecycle, or does nothing.
+   *
+   * The `SET` and the `WHERE` are both generated from `intent-machine.ts`: the
+   * target is the single state the event produces, and the sources are the
+   * states that accept it. Before this, the sources were a ternary inside this
+   * `WHERE` and the resume had its own copy of the same idea.
+   *
+   * Returns whether a row moved. `false` is not an error — a concurrent worker
+   * may have taken the transition, or a job may have been canceled underneath
+   * this one — so every caller decides what a lost race means.
+   */
+  const transitionIntent = Effect.fn("EmailOutboxRepository.transitionIntent")(
     function* ({
       id,
-      state,
+      event,
     }: {
       readonly id: string;
-      readonly state: "materialized" | "paused_by_plan" | "failed" | "expired";
+      readonly event: TEmailIntentEvent;
     }) {
       const updatedAt = yield* DateTime.nowAsDate;
       const rows = yield* db
         .update(schema.emailOutboxTable)
-        .set({ state, updatedAt })
+        .set({ state: intentTargetStateFor(event), updatedAt })
         .where(
           and(
             eq(schema.emailOutboxTable.id, id),
-            state === "expired" || state === "failed"
-              ? inArray(schema.emailOutboxTable.state, [
-                  "pending",
-                  "paused_by_plan",
-                ])
-              : eq(schema.emailOutboxTable.state, "pending")
+            inArray(schema.emailOutboxTable.state, [
+              ...intentSourceStatesFor(event),
+            ])
           )
         )
         .returning({ id: schema.emailOutboxTable.id });
       return rows.length === 1;
     }
   );
-
-  const resumePausedIntent = Effect.fn(
-    "EmailOutboxRepository.resumePausedIntent"
-  )(function* ({ id }: { readonly id: string }) {
-    const updatedAt = yield* DateTime.nowAsDate;
-    const rows = yield* db
-      .update(schema.emailOutboxTable)
-      .set({
-        state: "pending",
-        updatedAt,
-      })
-      .where(
-        and(
-          eq(schema.emailOutboxTable.id, id),
-          eq(schema.emailOutboxTable.state, "paused_by_plan")
-        )
-      )
-      .returning({ id: schema.emailOutboxTable.id });
-    return rows.length === 1;
-  });
 
   const resumePausedDeliveries = Effect.fn(
     "EmailOutboxRepository.resumePausedDeliveries"
@@ -1204,8 +1198,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     findById,
     findByIdForUpdate,
     findDeliveryById,
-    markIntentState,
-    resumePausedIntent,
+    transitionIntent,
     resumePausedDeliveries,
     expirePausedDeliveries,
     createDelivery,

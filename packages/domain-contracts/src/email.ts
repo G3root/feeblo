@@ -47,13 +47,15 @@ export const EmailIntentKind = S.Literals([
 export type TEmailIntentKind = S.Schema.Type<typeof EmailIntentKind>;
 
 /** Canonical `email_outbox.state` vocabulary. */
-export const EmailOutboxState = S.Literals([
+export const EMAIL_OUTBOX_STATES = [
   "pending",
   "materialized",
   "paused_by_plan",
   "failed",
   "expired",
-]);
+] as const;
+
+export const EmailOutboxState = S.Literals(EMAIL_OUTBOX_STATES);
 
 export type TEmailOutboxState = S.Schema.Type<typeof EmailOutboxState>;
 
