@@ -487,6 +487,82 @@ describe("UserBanRpcHandlers", () => {
       })
     );
 
+    it.effect("lifts the address-only ban its post badge reports", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* UserBanRpcHandlersEffect;
+        const posts = yield* PostRepository;
+        const fixture = yield* makeFixture();
+        const author = yield* createEndUser({
+          organizationId: fixture.organizationId,
+          restricted: false,
+          suffix: "linked",
+        });
+        const contactEmail = "linked-contact@example.com";
+        const now = yield* DateTime.nowAsDate;
+
+        // A post may name its author's contact as well as the account, so the
+        // badge predicate tests that address too.
+        yield* db.insert(schema.contactTable).values({
+          createdAt: now,
+          email: contactEmail,
+          id: `contact_${author.id}`,
+          name: "Linked customer",
+          organizationId: fixture.organizationId,
+          updatedAt: now,
+          userId: author.id,
+        });
+        const postId = yield* createPost(fixture, author.id);
+        const slug = `slug-${postId}`;
+        // An on-behalf attribution stores the account and the contact on the
+        // same row; the helper only sets the account.
+        yield* db
+          .update(schema.postTable)
+          .set({ contactId: `contact_${author.id}` })
+          .where(eq(schema.postTable.id, postId));
+
+        // The ban names only the address, as one written before the account
+        // existed would. No `userId` is stored to match the post against.
+        yield* db.insert(schema.userBanTable).values({
+          createdAt: now,
+          email: contactEmail,
+          id: `ban_${author.id}`,
+          organizationId: fixture.organizationId,
+          updatedAt: now,
+          userId: null,
+        });
+
+        const before = yield* posts.findBySlug({
+          organizationId: fixture.organizationId,
+          slug,
+        });
+        expect(before?.authorIsBanned).toBe(true);
+
+        yield* handlers
+          .UnbanUser({
+            _tag: "author",
+            organizationId: fixture.organizationId,
+            target: { _tag: "post", postId },
+          })
+          .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
+        const after = yield* posts.findBySlug({
+          organizationId: fixture.organizationId,
+          slug,
+        });
+        expect(after?.authorIsBanned).toBe(false);
+
+        const listed = yield* handlers
+          .ListUserBans({
+            limit: 20,
+            offset: 0,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session(fixture)));
+        expect(listed.total).toBe(0);
+      })
+    );
+
     it.effect("bans a post's author through the post", () =>
       Effect.gen(function* () {
         const handlers = yield* UserBanRpcHandlersEffect;

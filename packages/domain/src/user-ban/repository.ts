@@ -911,13 +911,17 @@ const makeUserBanRepository = Effect.gen(function* () {
   });
 
   /**
-   * Removes the ban covering an author, named by the identities a ban can
+   * Removes the bans covering an author, named by the identities a ban can
    * store.
    *
    * The caller has a participation row rather than a ban id, so it resolved
-   * the author first. Both facets are tested because a ban recorded against an
-   * address before the person had an account carries no `user_id` and would
-   * survive an account-only delete.
+   * the author first. Every facet is tested because a ban recorded against an
+   * address carries no `user_id` and would survive an account-only delete.
+   *
+   * The addresses include the account's linked contacts. The author badge a
+   * post row draws tests the post's contact address too, so lifting the ban
+   * that badge reports has to reach an address-only row for that contact, or
+   * the badge stays after a successful unban.
    */
   const removeByFacets = Effect.fn("UserBanRepository.removeByFacets")(
     function* (input: {
@@ -925,9 +929,32 @@ const makeUserBanRepository = Effect.gen(function* () {
       readonly organizationId: string;
       readonly userId: string | null;
     }) {
+      const contactEmails =
+        input.userId === null
+          ? []
+          : yield* db
+              .select({ email: schema.contactTable.email })
+              .from(schema.contactTable)
+              .where(
+                and(
+                  eq(schema.contactTable.organizationId, input.organizationId),
+                  eq(schema.contactTable.userId, input.userId)
+                )
+              )
+              .pipe(
+                Effect.map((rows) =>
+                  rows.flatMap((row) =>
+                    row.email === null ? [] : [normalizeEmailAddress(row.email)]
+                  )
+                )
+              );
+      const emails = [
+        ...(input.email === null ? [] : [input.email]),
+        ...contactEmails,
+      ];
       const facets = [
         ...(input.userId === null ? [] : [eq(table.userId, input.userId)]),
-        ...(input.email === null ? [] : [eq(table.email, input.email)]),
+        ...(emails.length === 0 ? [] : [inArray(table.email, emails)]),
       ];
       if (facets.length === 0) {
         return { removed: false };
