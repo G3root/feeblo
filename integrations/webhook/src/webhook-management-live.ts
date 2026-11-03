@@ -24,6 +24,10 @@ import {
   PostId,
   PostStatusId,
 } from "@feeblo/id";
+import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -96,10 +100,6 @@ const endpointHealth = (connection: {
   }
   return "healthy" as const;
 };
-
-const visibleWebhookLifecycle = (
-  lifecycle: typeof schema.integrationConnectionTable.$inferSelect.lifecycle
-) => (lifecycle === "archived" ? ("disconnected" as const) : lifecycle);
 
 /** Composite keyset cursor: `{createdAtISO}~{deliveryId}`; the ID disambiguates equal timestamps. */
 const encodeHistoryCursor = (delivery: {
@@ -200,13 +200,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 webhookProviderKey
               ),
               inArray(schema.integrationConnectionTable.lifecycle, [
-                "connecting",
-                "active",
-                "paused",
-                "reauth_required",
-                "disconnecting",
-                "disconnected",
-                "revocation_unconfirmed",
+                ...LISTED_CONNECTION_LIFECYCLES,
               ])
             )
           )
@@ -229,7 +223,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               id: asLegid(IntegrationConnectionId)(connection.id),
               lastFailedAt: connection.lastFailedAt,
               lastSucceededAt: connection.lastSucceededAt,
-              lifecycle: visibleWebhookLifecycle(connection.lifecycle),
+              lifecycle: connection.lifecycle,
               name: connection.name,
             }))
           )
@@ -656,7 +650,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                     eq(
                       schema.integrationConnectionTable.organizationId,
                       input.organizationId
-                    )
+                    ),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("archived"),
+                    ])
                   )
                 );
               yield* db

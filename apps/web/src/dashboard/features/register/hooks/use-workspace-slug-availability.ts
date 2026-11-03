@@ -1,71 +1,57 @@
-import { useEffect, useState } from "react";
+import { useMachine } from "@xstate/react";
+import { useCallback } from "react";
 
-import { fetchRpc } from "~/lib/runtime";
+import {
+  type SlugAvailability,
+  slugAvailabilityMachine,
+  toSlugAvailability,
+} from "../lib/slug-availability-machine";
+import { MIN_SLUG_LENGTH, toWorkspaceSlug } from "../utils";
 
-type SlugStatus = "idle" | "checking" | "available" | "taken" | "error";
+/** What the slug field needs from this hook. */
+export type WorkspaceSlugAvailability = {
+  readonly availability: SlugAvailability;
+  /** Called by whoever changes the name; the lifecycle's only input event. */
+  readonly reportWorkspaceName: (workspaceName: string) => void;
+};
 
-interface SlugAvailabilityState {
-  status: SlugStatus;
-  suggestion: string | null;
-  /** Why the slug is unavailable, when the server named a reason. */
-  reason: string | null;
-}
-
-export function useWorkspaceSlugAvailability(slug: string, enabled: boolean) {
-  const [state, setState] = useState<SlugAvailabilityState>({
-    status: "idle",
-    suggestion: null,
-    reason: null,
+/**
+ * Reports whether a workspace slug is available, debounced.
+ *
+ * The lifecycle lives in `slug-availability-machine.ts`; this hook is the
+ * adapter between React's render cycle and the machine's events. Calling it
+ * is not an effect: the machine is seeded with the name already in the form,
+ * and every later change is reported by whoever made it
+ * (`reportWorkspaceName`), which is an event handler — not a subscription to a
+ * value that has already changed by the time an effect runs.
+ *
+ * That distinction is the whole point. An effect that mirrors a derived value
+ * into an actor runs after paint, so it can report a slug the field no longer
+ * shows, and it must be written carefully enough not to loop. A handler cannot
+ * do either.
+ */
+export function useWorkspaceSlugAvailability(
+  workspaceName: string
+): WorkspaceSlugAvailability {
+  const slug = toWorkspaceSlug(workspaceName);
+  const [snapshot, send] = useMachine(slugAvailabilityMachine, {
+    input: { enabled: slug.length >= MIN_SLUG_LENGTH, slug },
   });
 
-  useEffect(() => {
-    if (!(enabled && slug)) {
-      setState({ status: "idle", suggestion: null, reason: null });
-      return;
-    }
+  const reportWorkspaceName = useCallback(
+    (nextWorkspaceName: string) => {
+      const nextSlug = toWorkspaceSlug(nextWorkspaceName);
+      send({
+        type: "INPUT",
+        enabled: nextSlug.length >= MIN_SLUG_LENGTH,
+        slug: nextSlug,
+      });
+    },
+    [send]
+  );
 
-    let cancelled = false;
-    const controller = new AbortController();
-
-    const timeoutId = window.setTimeout(async () => {
-      setState({ status: "checking", suggestion: null, reason: null });
-
-      try {
-        const response = await fetchRpc(
-          (rpc) => rpc.CheckWorkspaceSlug({ slug }),
-          { signal: controller.signal }
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        if (response.available) {
-          setState({ status: "available", suggestion: null, reason: null });
-        } else {
-          setState({
-            status: "taken",
-            suggestion: response.suggestion,
-            // The server distinguishes "already taken" (no reason) from a
-            // slug that is not a valid subdomain, so the field can say which.
-            reason: response.reason,
-          });
-        }
-      } catch {
-        // Aborted superseded checks stay silent; only genuine failures
-        // surface, and never after unmount.
-        if (!cancelled && !controller.signal.aborted) {
-          setState({ status: "error", suggestion: null, reason: null });
-        }
-      }
-    }, 350);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [slug, enabled]);
-
-  return state;
+  return {
+    availability: toSlugAvailability(snapshot),
+    reportWorkspaceName,
+  };
 }

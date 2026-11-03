@@ -14,6 +14,10 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
+import {
   DISCORD_GUILD_COMMANDS,
   DISCORD_OAUTH_AUTHORIZE_URL,
   type DiscordApiClient,
@@ -431,13 +435,7 @@ export const makeDiscordConnectionServiceLive = (
                   discordProviderKey
                 ),
                 inArray(schema.integrationConnectionTable.lifecycle, [
-                  "connecting",
-                  "active",
-                  "paused",
-                  "reauth_required",
-                  "disconnecting",
-                  "disconnected",
-                  "revocation_unconfirmed",
+                  ...LISTED_CONNECTION_LIFECYCLES,
                 ])
               )
             )
@@ -481,7 +479,14 @@ export const makeDiscordConnectionServiceLive = (
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
-                .where(eq(schema.integrationConnectionTable.id, connectionId));
+                .where(
+                  and(
+                    eq(schema.integrationConnectionTable.id, connectionId),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
+                  )
+                );
               yield* db
                 .update(schema.integrationRouteTable)
                 .set({ enabled: false, updatedAt: now })
@@ -535,7 +540,14 @@ export const makeDiscordConnectionServiceLive = (
                 lifecycle: "revocation_unconfirmed",
                 updatedAt: yield* DateTime.nowAsDate,
               })
-              .where(eq(schema.integrationConnectionTable.id, connectionId))
+              .where(
+                and(
+                  eq(schema.integrationConnectionTable.id, connectionId),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("revocation_unconfirmed"),
+                  ])
+                )
+              )
               .pipe(mapManagementError("disconnect state update"));
             return yield* Effect.failCause(leftGuild.cause).pipe(
               mapDiscordApiError("guild disconnect")
@@ -584,7 +596,14 @@ export const makeDiscordConnectionServiceLive = (
             ),
             updatedAt: now,
           })
-          .where(eq(schema.integrationConnectionTable.id, connectionId))
+          .where(
+            and(
+              eq(schema.integrationConnectionTable.id, connectionId),
+              inArray(schema.integrationConnectionTable.lifecycle, [
+                ...connectionSourceStatesFor("archived"),
+              ])
+            )
+          )
           .pipe(mapManagementError("disconnect archive"));
       });
 

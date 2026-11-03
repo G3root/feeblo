@@ -13,7 +13,7 @@ import { Button } from "@feeblo/ui/button";
 
 import { m } from "@/paraglide/messages.js";
 
-import { plannedRowCount } from "../format";
+import { canConfirmStatus, plannedRowCount } from "../format";
 
 /** One figure of the confirmation, laid out so the numbers line up. */
 function DialogFigure({
@@ -120,7 +120,7 @@ export function CancelImportDialog({
   readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
 }) {
-  const staged = job.status === "awaiting_confirmation";
+  const staged = canConfirmStatus(job.status);
   return (
     <AlertDialog onOpenChange={onOpenChange} open={open}>
       <AlertDialogPopup>

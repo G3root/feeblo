@@ -36,14 +36,27 @@ import {
   DataTransferRepositoryError,
 } from "./errors";
 import { DATA_IMPORT_RETENTION_MS } from "./limits";
+import {
+  DATA_IMPORT_JOB_STATES,
+  isActiveDataImportStatus,
+  sourceStatesFor,
+} from "./machine";
 import type { TDataImportRowFilter, TDataImportRowSort } from "./schema";
 
-/** The active states; a job in one of these owns its workspace's transfer slot. */
-const ACTIVE_STATUSES = [
-  "awaiting_confirmation",
-  "queued",
-  "running",
-] as const satisfies readonly TDataImportStatus[];
+/**
+ * The states a job may be canceled from, and the states that own a workspace's
+ * import slot, both read off `machine.ts` rather than restated here. The slot
+ * set is "every non-terminal state", which is the same three names today but
+ * for a different reason: a terminal job no longer holds the slot.
+ */
+const CANCELABLE_STATUSES = sourceStatesFor("cancel");
+const ACTIVE_STATUSES = DATA_IMPORT_JOB_STATES.filter(isActiveDataImportStatus);
+/**
+ * The state a pass runs in, and therefore the only one its endings may leave.
+ * `complete` and `fail` share their sources by construction; `machine.test.ts`
+ * pins that, which is what makes reusing one list here honest.
+ */
+const RUNNING_STATUSES = sourceStatesFor("complete");
 
 const JOB_FIELDS = {
   confirmedAt: schema.dataImportJobTable.confirmedAt,
@@ -285,7 +298,7 @@ export interface DataTransferRepositoryContract {
     readonly after: { readonly createdAt: Date; readonly id: string } | null;
   }) => Effect.Effect<readonly PostCsvSourceRow[], DataTransferRepositoryError>;
 
-  /** Moves an `awaiting_confirmation` job to `queued`; None when it is not one. */
+  /** Answers `confirm` on the job; None when the machine would not move it. */
   readonly markQueued: (input: {
     readonly id: string;
     readonly organizationId: string;
@@ -949,7 +962,9 @@ const makeDataTransferRepository = Effect.gen(function* () {
               and(
                 eq(schema.dataImportJobTable.id, id),
                 eq(schema.dataImportJobTable.organizationId, organizationId),
-                eq(schema.dataImportJobTable.status, "awaiting_confirmation")
+                inArray(schema.dataImportJobTable.status, [
+                  ...sourceStatesFor("confirm"),
+                ])
               )
             )
             .returning(JOB_FIELDS);
@@ -978,7 +993,9 @@ const makeDataTransferRepository = Effect.gen(function* () {
               and(
                 eq(schema.dataImportJobTable.id, id),
                 eq(schema.dataImportJobTable.organizationId, organizationId),
-                inArray(schema.dataImportJobTable.status, [...ACTIVE_STATUSES])
+                inArray(schema.dataImportJobTable.status, [
+                  ...CANCELABLE_STATUSES,
+                ])
               )
             )
             .returning({ id: schema.dataImportJobTable.id });
@@ -997,7 +1014,9 @@ const makeDataTransferRepository = Effect.gen(function* () {
               .from(schema.dataImportJobTable)
               .where(
                 or(
-                  eq(schema.dataImportJobTable.status, "queued"),
+                  inArray(schema.dataImportJobTable.status, [
+                    ...sourceStatesFor("claim"),
+                  ]),
                   and(
                     eq(schema.dataImportJobTable.status, "running"),
                     lte(schema.dataImportJobTable.leaseExpiresAt, now)
@@ -1180,7 +1199,9 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .where(
               and(
                 eq(schema.dataImportJobTable.id, jobId),
-                eq(schema.dataImportJobTable.status, "running"),
+                inArray(schema.dataImportJobTable.status, [
+                  ...RUNNING_STATUSES,
+                ]),
                 eq(schema.dataImportJobTable.leaseOwner, leaseOwner)
               )
             );

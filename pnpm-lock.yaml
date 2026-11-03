@@ -102,6 +102,12 @@ catalogs:
     '@vitejs/plugin-react':
       specifier: ^6.1.1
       version: 6.1.2
+    '@xstate/effect':
+      specifier: 1.0.0-alpha.12
+      version: 1.0.0-alpha.12
+    '@xstate/react':
+      specifier: 7.0.0-alpha.7
+      version: 7.0.0-alpha.7
     better-auth:
       specifier: 1.7.2
       version: 1.7.2
@@ -177,6 +183,9 @@ catalogs:
     vitest:
       specifier: ^5.0.2
       version: 5.0.5
+    xstate:
+      specifier: 6.0.0-alpha.73
+      version: 6.0.0-alpha.73
     zod:
       specifier: ^4.4.3
       version: 4.6.7
@@ -479,12 +488,15 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 6.1.2(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      '@xstate/react':
+        specifier: 'catalog:'
+        version: 7.0.0-alpha.7(@types/react@19.3.0)(react@19.2.8)(xstate@6.0.0-alpha.73)
       '@xstate/store':
         specifier: ^4.3.0
-        version: 4.3.0
+        version: 4.3.0(xstate@6.0.0-alpha.73)
       '@xstate/store-react':
         specifier: ^2.1.0
-        version: 2.1.0(react@19.2.8)
+        version: 2.1.0(react@19.2.8)(xstate@6.0.0-alpha.73)
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -506,6 +518,9 @@ importers:
       wrangler:
         specifier: ^4.131.2
         version: 4.152.0(@cloudflare/workers-types@5.20261023.1)(@types/node@26.6.5)
+      xstate:
+        specifier: 'catalog:'
+        version: 6.0.0-alpha.73
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -576,12 +591,18 @@ importers:
       '@feeblo/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@xstate/effect':
+        specifier: 'catalog:'
+        version: 1.0.0-alpha.12(@oxlint/plugins@1.89.0)(effect@4.0.5)(xstate@6.0.0-alpha.73)
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.5(@cloudflare/workers-types@5.20261023.1)(@effect/sql-pg@4.0.5(effect@4.0.5))(@effect/sql-pglite@4.0.5(effect@4.0.5))(@electric-sql/pglite@0.5.11)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(effect@4.0.5)(postgres@3.4.9)(valibot@1.5.0(typescript@7.0.2))(zod@4.6.7)
       effect:
         specifier: 'catalog:'
         version: 4.0.5
+      xstate:
+        specifier: 'catalog:'
+        version: 6.0.0-alpha.73
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
@@ -981,6 +1002,9 @@ importers:
       '@polar-sh/sdk':
         specifier: 'catalog:'
         version: 1.0.2
+      '@xstate/effect':
+        specifier: 'catalog:'
+        version: 1.0.0-alpha.12(@oxlint/plugins@1.89.0)(effect@4.0.5)(xstate@6.0.0-alpha.73)
       cookie-es:
         specifier: ^3.1.1
         version: 3.1.1
@@ -1005,6 +1029,9 @@ importers:
       takumi-js:
         specifier: ^2.4.0
         version: 2.17.1(csstype@3.2.3)(preact@10.29.8)(react@19.2.8)
+      xstate:
+        specifier: 'catalog:'
+        version: 6.0.0-alpha.73
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -4945,6 +4972,22 @@ packages:
   '@vitest/utils@5.0.5':
     resolution: {integrity: sha512-/rBu7gzLDQI/SC79Tn98b5DwOgaHU/Gt4I9OVeP3YofzNaYtbImRCOJQmT1S6vOJg9gEIlWC+r3QxKkjuSa1nQ==}
 
+  '@xstate/effect@1.0.0-alpha.12':
+    resolution: {integrity: sha512-D72whH2VWGnvMefc3CrylVwgqu2Ph2jfA861RG3gbLOk0mkXH8ZUn9h+IZO//xRKaCPFfKMXkXnqy4aIED1THg==}
+    peerDependencies:
+      '@oxlint/plugins': ^1.76.0
+      effect: ^4.0.0
+      xstate: ^6.0.0-alpha.73
+    peerDependenciesMeta:
+      '@oxlint/plugins':
+        optional: true
+
+  '@xstate/react@7.0.0-alpha.7':
+    resolution: {integrity: sha512-Pg3d75LrRn+UnY12LT8n6UQYvIOTw1xe9h5o6O6yG+0GQR0dCU06yD/0+9FR/vu7Zyvgs6ATK5wQBYAmATTw7w==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      xstate: ^6.0.0-alpha.73
+
   '@xstate/store-react@2.1.0':
     resolution: {integrity: sha512-pKuPpgSvWF7BWJ6U2/sJC5/CpmcDQ9W8sQgZr/kgZ6zpjmTCoqvfStN/Q99wWnAcx2aDUZMf08aCMyZI7GmQHQ==}
     peerDependencies:
@@ -7930,6 +7973,15 @@ packages:
   urlpattern-polyfill@10.1.0:
     resolution: {integrity: sha512-IGjKp/o0NL3Bso1PymYURCJxMPNAf/ILOpendP9f5B6e1rTJgdgiOvgfoT8VxCAdY+Wisb9uhGaJJf3yZ2V9nw==}
 
+  use-isomorphic-layout-effect@1.2.1:
+    resolution: {integrity: sha512-tpZZ+EX0gaghDAiFR37hj5MgY6ZN55kLiPkJsKxBMZ6GZdOSPJXiOzPM984oPYZ5AnehYx5WQp1+ME8I/P/pRA==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
   use-sync-external-store@1.7.0:
     resolution: {integrity: sha512-6L+EeigHMQhdaIPNIFUKwfWJSwWFQ8gJbJ2DLOs5sDIegTwR9fRxvnM3uciHKjIZhFz+KAv2emhWMRvDmMcY8A==}
     peerDependencies:
@@ -8209,6 +8261,10 @@ packages:
   xmlbuilder2@4.0.3:
     resolution: {integrity: sha512-bx8Q1STctnNaaDymWnkfQLKofs0mGNN7rLLapJlGuV3VlvegD7Ls4ggMjE3aUSWItCCzU0PEv45lI87iSigiCA==}
     engines: {node: '>=20.0'}
+
+  xstate@6.0.0-alpha.73:
+    resolution: {integrity: sha512-Ru3g082hzyn2h1TspciGFgHplK35jZl6Sl808cspInc0xx/RsALM8sc3AoQpg2KusApD2HPlX7liaVnSxlMyHw==}
+    hasBin: true
 
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
@@ -11435,14 +11491,32 @@ snapshots:
       convert-source-map: 2.0.0
       tinyrainbow: 3.2.0
 
-  '@xstate/store-react@2.1.0(react@19.2.8)':
+  '@xstate/effect@1.0.0-alpha.12(@oxlint/plugins@1.89.0)(effect@4.0.5)(xstate@6.0.0-alpha.73)':
     dependencies:
-      '@xstate/store': 4.3.0
+      effect: 4.0.5
+      xstate: 6.0.0-alpha.73
+    optionalDependencies:
+      '@oxlint/plugins': 1.89.0
+
+  '@xstate/react@7.0.0-alpha.7(@types/react@19.3.0)(react@19.2.8)(xstate@6.0.0-alpha.73)':
+    dependencies:
+      react: 19.2.8
+      use-isomorphic-layout-effect: 1.2.1(@types/react@19.3.0)(react@19.2.8)
+      use-sync-external-store: 1.7.0(react@19.2.8)
+      xstate: 6.0.0-alpha.73
+    transitivePeerDependencies:
+      - '@types/react'
+
+  '@xstate/store-react@2.1.0(react@19.2.8)(xstate@6.0.0-alpha.73)':
+    dependencies:
+      '@xstate/store': 4.3.0(xstate@6.0.0-alpha.73)
       react: 19.2.8
     transitivePeerDependencies:
       - xstate
 
-  '@xstate/store@4.3.0': {}
+  '@xstate/store@4.3.0(xstate@6.0.0-alpha.73)':
+    optionalDependencies:
+      xstate: 6.0.0-alpha.73
 
   '@zag-js/dismissable@1.46.0':
     dependencies:
@@ -14592,6 +14666,12 @@ snapshots:
 
   urlpattern-polyfill@10.1.0: {}
 
+  use-isomorphic-layout-effect@1.2.1(@types/react@19.3.0)(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+    optionalDependencies:
+      '@types/react': 19.3.0
+
   use-sync-external-store@1.7.0(react@19.2.8):
     dependencies:
       react: 19.2.8
@@ -14794,6 +14874,8 @@ snapshots:
       '@oozcitak/infra': 2.0.2
       '@oozcitak/util': 10.0.0
       js-yaml: 4.3.2
+
+  xstate@6.0.0-alpha.73: {}
 
   xtend@4.0.2: {}
 
