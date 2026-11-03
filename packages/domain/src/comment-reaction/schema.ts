@@ -19,13 +19,6 @@ export const CommentReaction = S.Struct({
 
 export type TCommentReaction = S.Schema.Type<typeof CommentReaction>;
 
-export const CommentReactionList = S.Struct({
-  organizationId: S.String,
-  slug: S.String,
-});
-
-export type TCommentReactionList = S.Schema.Type<typeof CommentReactionList>;
-
 export const CommentReactionToggle = S.Struct({
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,

@@ -26,6 +26,81 @@ interface TCommentReactionToggle {
 const makeCommentReactionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
+  /**
+   * The toggle both audiences share.
+   *
+   * `toggle` and `togglePublic` differ in one thing only: the query that proves
+   * the caller may see the comment — the dashboard's is organization- and
+   * post-scoped, the portal's also requires the comment and its board to be
+   * public. Everything after that proof is the same decision, and writing it
+   * twice is how the two would drift on what a second identical toggle means.
+   * The proof is the argument; the body is written once.
+   */
+  const toggleWith =
+    <E>(
+      proveVisible: (
+        args: TCommentReactionToggle
+      ) => Effect.Effect<Option.Option<{ id: string }>, E>
+    ) =>
+    (args: TCommentReactionToggle) =>
+      Effect.gen(function* () {
+        const comment = yield* proveVisible(args);
+
+        if (Option.isNone(comment)) {
+          return { emoji: null, reacted: false };
+        }
+
+        const existingReaction = yield* db
+          .select({ id: schema.commentReactionTable.id })
+          .from(schema.commentReactionTable)
+          .where(
+            and(
+              eq(schema.commentReactionTable.commentId, args.commentId),
+              eq(schema.commentReactionTable.userId, args.userId),
+              eq(schema.commentReactionTable.emoji, args.emoji)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        if (Option.isSome(existingReaction)) {
+          yield* db
+            .delete(schema.commentReactionTable)
+            .where(
+              eq(schema.commentReactionTable.id, existingReaction.value.id)
+            );
+
+          return { emoji: null, reacted: false };
+        }
+
+        const member = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, args.organizationId),
+              eq(schema.memberTable.userId, args.userId)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        const commentReactionId = yield* CommentReactionId.generate;
+
+        yield* db
+          .insert(schema.commentReactionTable)
+          .values({
+            commentId: args.commentId,
+            emoji: args.emoji,
+            id: commentReactionId,
+            memberId: Option.isSome(member) ? member.value.id : null,
+            userId: args.userId,
+          })
+          .onConflictDoNothing();
+
+        return { emoji: args.emoji, reacted: true };
+      });
+
   return {
     list: ({ organizationId, slug }: TCommentReactionList) =>
       Effect.gen(function* () {
@@ -131,152 +206,45 @@ const makeCommentReactionRepository = Effect.gen(function* () {
           )
         ),
 
-    toggle: (args: TCommentReactionToggle) =>
-      Effect.gen(function* () {
-        const comment = yield* db
-          .select({ id: schema.commentTable.id })
-          .from(schema.commentTable)
-          .where(
-            and(
-              eq(schema.commentTable.id, args.commentId),
-              eq(schema.commentTable.organizationId, args.organizationId),
-              eq(schema.commentTable.postId, args.postId)
-            )
+    toggle: toggleWith((args: TCommentReactionToggle) =>
+      db
+        .select({ id: schema.commentTable.id })
+        .from(schema.commentTable)
+        .where(
+          and(
+            eq(schema.commentTable.id, args.commentId),
+            eq(schema.commentTable.organizationId, args.organizationId),
+            eq(schema.commentTable.postId, args.postId)
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0)))
+    ),
 
-        if (Option.isNone(comment)) {
-          return { reacted: false, emoji: null };
-        }
-
-        const existingReaction = yield* db
-          .select({ id: schema.commentReactionTable.id })
-          .from(schema.commentReactionTable)
-          .where(
-            and(
-              eq(schema.commentReactionTable.commentId, args.commentId),
-              eq(schema.commentReactionTable.userId, args.userId),
-              eq(schema.commentReactionTable.emoji, args.emoji)
-            )
+    togglePublic: toggleWith((args: TCommentReactionToggle) =>
+      db
+        .select({ id: schema.commentTable.id })
+        .from(schema.commentTable)
+        .innerJoin(
+          schema.postTable,
+          eq(schema.postTable.id, schema.commentTable.postId)
+        )
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .where(
+          and(
+            eq(schema.commentTable.id, args.commentId),
+            eq(schema.commentTable.organizationId, args.organizationId),
+            eq(schema.commentTable.postId, args.postId),
+            eq(schema.commentTable.visibility, "PUBLIC"),
+            eq(schema.boardTable.visibility, "PUBLIC")
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isSome(existingReaction)) {
-          yield* db
-            .delete(schema.commentReactionTable)
-            .where(
-              eq(schema.commentReactionTable.id, existingReaction.value.id)
-            );
-          return { reacted: false, emoji: null };
-        }
-
-        const member = yield* db
-          .select({ id: schema.memberTable.id })
-          .from(schema.memberTable)
-          .where(
-            and(
-              eq(schema.memberTable.organizationId, args.organizationId),
-              eq(schema.memberTable.userId, args.userId)
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        const commentReactionId = yield* CommentReactionId.generate;
-
-        yield* db
-          .insert(schema.commentReactionTable)
-          .values({
-            id: commentReactionId,
-            commentId: args.commentId,
-            userId: args.userId,
-            memberId: Option.isSome(member) ? member.value.id : null,
-            emoji: args.emoji,
-          })
-          .onConflictDoNothing();
-
-        return { reacted: true, emoji: args.emoji };
-      }),
-
-    togglePublic: (args: TCommentReactionToggle) =>
-      Effect.gen(function* () {
-        const comment = yield* db
-          .select({ id: schema.commentTable.id })
-          .from(schema.commentTable)
-          .innerJoin(
-            schema.postTable,
-            eq(schema.postTable.id, schema.commentTable.postId)
-          )
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .where(
-            and(
-              eq(schema.commentTable.id, args.commentId),
-              eq(schema.commentTable.organizationId, args.organizationId),
-              eq(schema.commentTable.postId, args.postId),
-              eq(schema.commentTable.visibility, "PUBLIC"),
-              eq(schema.boardTable.visibility, "PUBLIC")
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isNone(comment)) {
-          return { reacted: false, emoji: null };
-        }
-
-        const existingReaction = yield* db
-          .select({ id: schema.commentReactionTable.id })
-          .from(schema.commentReactionTable)
-          .where(
-            and(
-              eq(schema.commentReactionTable.commentId, args.commentId),
-              eq(schema.commentReactionTable.userId, args.userId),
-              eq(schema.commentReactionTable.emoji, args.emoji)
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isSome(existingReaction)) {
-          yield* db
-            .delete(schema.commentReactionTable)
-            .where(
-              eq(schema.commentReactionTable.id, existingReaction.value.id)
-            );
-          return { reacted: false, emoji: null };
-        }
-
-        const member = yield* db
-          .select({ id: schema.memberTable.id })
-          .from(schema.memberTable)
-          .where(
-            and(
-              eq(schema.memberTable.organizationId, args.organizationId),
-              eq(schema.memberTable.userId, args.userId)
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        const commentReactionId = yield* CommentReactionId.generate;
-        yield* db
-          .insert(schema.commentReactionTable)
-          .values({
-            id: commentReactionId,
-            commentId: args.commentId,
-            userId: args.userId,
-            memberId: Option.isSome(member) ? member.value.id : null,
-            emoji: args.emoji,
-          })
-          .onConflictDoNothing();
-
-        return { reacted: true, emoji: args.emoji };
-      }),
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0)))
+    ),
   };
 });
 

@@ -25,6 +25,87 @@ interface TPostReactionToggle {
 const makePostReactionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
+  /**
+   * The toggle both audiences share.
+   *
+   * `toggle` and `togglePublic` differ in one thing only: the query that proves
+   * the caller may see the post — the dashboard's is organization-scoped, the
+   * portal's also joins board visibility. Everything after that proof is the
+   * same decision, and writing it twice is how the two would drift on what a
+   * second identical toggle means. The proof is the argument; the body is
+   * written once.
+   */
+  const toggleWith =
+    <E>(
+      proveVisible: (
+        args: TPostReactionToggle
+      ) => Effect.Effect<Option.Option<{ id: string }>, E>
+    ) =>
+    ({ organizationId, postId, userId, emoji }: TPostReactionToggle) =>
+      Effect.gen(function* () {
+        const post = yield* proveVisible({
+          organizationId,
+          postId,
+          userId,
+          emoji,
+        });
+
+        if (Option.isNone(post)) {
+          return { emoji: null, reacted: false };
+        }
+
+        const existingReaction = yield* db
+          .select({ id: schema.postReactionTable.id })
+          .from(schema.postReactionTable)
+          .where(
+            and(
+              eq(schema.postReactionTable.postId, postId),
+              eq(schema.postReactionTable.userId, userId),
+              eq(schema.postReactionTable.emoji, emoji)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        if (Option.isSome(existingReaction)) {
+          yield* db
+            .delete(schema.postReactionTable)
+            .where(eq(schema.postReactionTable.id, existingReaction.value.id));
+
+          return { emoji: null, reacted: false };
+        }
+
+        const member = yield* db
+          .select({ id: schema.memberTable.id })
+          .from(schema.memberTable)
+          .where(
+            and(
+              eq(schema.memberTable.organizationId, organizationId),
+              eq(schema.memberTable.userId, userId)
+            )
+          )
+          .limit(1)
+          .pipe(Effect.map(EffectArray.get(0)));
+
+        const postReactionId = yield* PostReactionId.generate;
+
+        yield* db
+          .insert(schema.postReactionTable)
+          .values({
+            emoji,
+            id: postReactionId,
+            memberId: Option.match(member, {
+              onNone: () => null,
+              onSome: (value) => value.id,
+            }),
+            postId,
+            userId,
+          })
+          .onConflictDoNothing();
+
+        return { emoji, reacted: true };
+      });
+
   return {
     list: ({ slug, organizationId }: TPostReactionList) =>
       Effect.gen(function* () {
@@ -136,154 +217,38 @@ const makePostReactionRepository = Effect.gen(function* () {
         }));
       }),
 
-    toggle: ({ organizationId, postId, userId, emoji }: TPostReactionToggle) =>
-      Effect.gen(function* () {
-        const post = yield* db
-          .select({ id: schema.postTable.id })
-          .from(schema.postTable)
-          .where(
-            and(
-              eq(schema.postTable.id, postId),
-              eq(schema.postTable.organizationId, organizationId)
-            )
+    toggle: toggleWith(({ organizationId, postId }) =>
+      db
+        .select({ id: schema.postTable.id })
+        .from(schema.postTable)
+        .where(
+          and(
+            eq(schema.postTable.id, postId),
+            eq(schema.postTable.organizationId, organizationId)
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0)))
+    ),
 
-        if (Option.isNone(post)) {
-          return { reacted: false, emoji: null };
-        }
-
-        const existingReaction = yield* db
-          .select({ id: schema.postReactionTable.id })
-          .from(schema.postReactionTable)
-          .where(
-            and(
-              eq(schema.postReactionTable.postId, postId),
-              eq(schema.postReactionTable.userId, userId),
-              eq(schema.postReactionTable.emoji, emoji)
-            )
+    togglePublic: toggleWith(({ organizationId, postId }) =>
+      db
+        .select({ id: schema.postTable.id })
+        .from(schema.postTable)
+        .innerJoin(
+          schema.boardTable,
+          eq(schema.boardTable.id, schema.postTable.boardId)
+        )
+        .where(
+          and(
+            eq(schema.postTable.id, postId),
+            eq(schema.postTable.organizationId, organizationId),
+            eq(schema.boardTable.visibility, "PUBLIC")
           )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isSome(existingReaction)) {
-          yield* db
-            .delete(schema.postReactionTable)
-            .where(eq(schema.postReactionTable.id, existingReaction.value.id));
-
-          return { reacted: false, emoji: null };
-        }
-
-        const member = yield* db
-          .select({ id: schema.memberTable.id })
-          .from(schema.memberTable)
-          .where(
-            and(
-              eq(schema.memberTable.organizationId, organizationId),
-              eq(schema.memberTable.userId, userId)
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        const postReactionId = yield* PostReactionId.generate;
-
-        yield* db
-          .insert(schema.postReactionTable)
-          .values({
-            id: postReactionId,
-            postId,
-            userId,
-            memberId: Option.match(member, {
-              onNone: () => null,
-              onSome: (value) => value.id,
-            }),
-            emoji,
-          })
-          .onConflictDoNothing();
-
-        return { reacted: true, emoji };
-      }),
-
-    togglePublic: ({
-      organizationId,
-      postId,
-      userId,
-      emoji,
-    }: TPostReactionToggle) =>
-      Effect.gen(function* () {
-        const post = yield* db
-          .select({ id: schema.postTable.id })
-          .from(schema.postTable)
-          .innerJoin(
-            schema.boardTable,
-            eq(schema.boardTable.id, schema.postTable.boardId)
-          )
-          .where(
-            and(
-              eq(schema.postTable.id, postId),
-              eq(schema.postTable.organizationId, organizationId),
-              eq(schema.boardTable.visibility, "PUBLIC")
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isNone(post)) {
-          return { reacted: false, emoji: null };
-        }
-
-        const existingReaction = yield* db
-          .select({ id: schema.postReactionTable.id })
-          .from(schema.postReactionTable)
-          .where(
-            and(
-              eq(schema.postReactionTable.postId, postId),
-              eq(schema.postReactionTable.userId, userId),
-              eq(schema.postReactionTable.emoji, emoji)
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        if (Option.isSome(existingReaction)) {
-          yield* db
-            .delete(schema.postReactionTable)
-            .where(eq(schema.postReactionTable.id, existingReaction.value.id));
-
-          return { reacted: false, emoji: null };
-        }
-
-        const member = yield* db
-          .select({ id: schema.memberTable.id })
-          .from(schema.memberTable)
-          .where(
-            and(
-              eq(schema.memberTable.organizationId, organizationId),
-              eq(schema.memberTable.userId, userId)
-            )
-          )
-          .limit(1)
-          .pipe(Effect.map(EffectArray.get(0)));
-
-        const postReactionId = yield* PostReactionId.generate;
-        yield* db
-          .insert(schema.postReactionTable)
-          .values({
-            id: postReactionId,
-            postId,
-            userId,
-            memberId: Option.match(member, {
-              onNone: () => null,
-              onSome: (value) => value.id,
-            }),
-            emoji,
-          })
-          .onConflictDoNothing();
-
-        return { reacted: true, emoji };
-      }),
+        )
+        .limit(1)
+        .pipe(Effect.map(EffectArray.get(0)))
+    ),
   };
 });
 
