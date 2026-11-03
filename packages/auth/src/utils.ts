@@ -2,6 +2,11 @@ import * as Effect from "effect/Effect";
 
 import { AuthConfig } from "./config";
 
+/** The characters that carry meaning in a `RegExp` source. */
+const regExpSyntaxPattern = /[.+?^${}()|[\]\\]/g;
+/** A `*` in an allow-list entry is a wildcard, as it is in `trustedOrigins`. */
+const wildcardPattern = /[*]/g;
+
 const makeTrustedOrigins = Effect.fnUntraced(function* () {
   const { appRootDomain, trustedOrigins, apiUrl, appUrl, nodeEnv } =
     yield* AuthConfig;
@@ -120,8 +125,8 @@ export const isEmailBlocked = (
       const isAllowed = allowedEmailsList.some((allowedEmail) => {
         const regex = new RegExp(
           `^${allowedEmail
-            .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-            .replaceAll(/[*]/g, ".*")}$`,
+            .replace(regExpSyntaxPattern, "\\$&")
+            .replaceAll(wildcardPattern, ".*")}$`,
           "i"
         );
         return regex.test(email);

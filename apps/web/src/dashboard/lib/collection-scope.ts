@@ -11,6 +11,9 @@ import {
   organizationScopedKey,
 } from "@feeblo/web-shared/collections";
 
+/** Leading slashes, which a dashboard pathname may carry. */
+const leadingSlashPattern = /^\/+/;
+
 /**
  * Everything a dashboard collection's identity depends on.
  *
@@ -34,7 +37,7 @@ export interface DashboardCollectionScope {
  * say) read it from here rather than re-deriving the prefix test.
  */
 export function workspaceIdFromPathname(pathname: string): string | undefined {
-  const [segment] = pathname.replace(/^\/+/, "").split("/");
+  const [segment] = pathname.replace(leadingSlashPattern, "").split("/");
 
   return segment?.startsWith("org_") ? segment : undefined;
 }

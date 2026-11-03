@@ -25,6 +25,11 @@ import { resolveSite } from "~/lib/site";
 
 const XML_CACHE_CONTROL = "public, max-age=300, s-maxage=300";
 
+/** A complete decimal integer; `parseInt` alone would accept trailing junk. */
+const decimalIntegerPattern = /^\d+$/;
+/** The five characters XML escaping replaces. */
+const xmlEscapePattern = /["&'<>]/g;
+
 function resolveSubdomain(request: Request) {
   return extractSubdomain({
     url: request.url,
@@ -220,7 +225,7 @@ export async function handleBoardSitemap(request: Request) {
   const page =
     pageParam === null
       ? null
-      : /^\d+$/.test(pageParam)
+      : decimalIntegerPattern.test(pageParam)
         ? Number.parseInt(pageParam, 10)
         : Number.NaN;
   const xml = renderSitemap(urls, origin, page);
@@ -352,7 +357,7 @@ export async function handleBoardLlmsTxt(request: Request) {
 // Single pass: the chained `replaceAll` version re-scanned the whole
 // string (including its own `&amp;` insertions) five times per value.
 const escapeXml = (value: string): string =>
-  value.replace(/["&'<>]/g, (char) => {
+  value.replace(xmlEscapePattern, (char) => {
     switch (char) {
       case "&":
         return "&amp;";

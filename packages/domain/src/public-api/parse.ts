@@ -8,6 +8,9 @@ import {
 } from "./common";
 import { invalidRequestError } from "./errors";
 
+/** A complete decimal integer, which is the only shape a limit may take. */
+const decimalIntegerPattern = /^\d+$/;
+
 /**
  * Input normalization shared by the endpoint projections and the operations.
  *
@@ -24,14 +27,13 @@ import { invalidRequestError } from "./errors";
  * post title reaches `parseTitle` already trimmed by the operation input's own
  * `PostTitle`, and the handler is what rejects one that trimmed to nothing.
  */
-
 export const parseLimit = (raw: string | undefined) =>
   Effect.gen(function* () {
     if (raw === undefined || raw.length === 0) {
       return PUBLIC_API_PAGE_DEFAULT_LIMIT;
     }
 
-    if (!/^\d+$/.test(raw)) {
+    if (!decimalIntegerPattern.test(raw)) {
       return yield* invalidRequestError("limit must be a positive integer.");
     }
 

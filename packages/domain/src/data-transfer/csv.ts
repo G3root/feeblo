@@ -32,6 +32,13 @@ export {
  * 0002); this module is the reader and writer for it.
  */
 
+/** Leading apostrophes a spreadsheet uses to mark a value as literal text. */
+const leadingApostrophePattern = /^'+/;
+/** Trailing zeros in a fixed-precision rendering of a small decimal. */
+const trailingZeroPattern = /0+$/u;
+/** The decimal point left behind once the trailing zeros are gone. */
+const trailingDecimalPointPattern = /\.$/u;
+
 /** One row of an export, already resolved from the database. */
 export type BoardPostCsvRow = {
   readonly title: string;
@@ -126,7 +133,7 @@ const isFormulaLike = (value: string): boolean =>
  * and the round trip drops the typed one.
  */
 const looksEscaped = (value: string): boolean =>
-  isFormulaLike(value.replace(/^'+/, ""));
+  isFormulaLike(value.replace(leadingApostrophePattern, ""));
 
 /** Prefix a value with an apostrophe when a spreadsheet would evaluate it. */
 const escapeFormula = (value: string): string =>
@@ -233,7 +240,10 @@ const formatNumber = (value: number): string => {
     }
   }
   if (magnitude > 0 && magnitude < 1e-6) {
-    const plain = value.toFixed(20).replace(/0+$/u, "").replace(/\.$/u, ".0");
+    const plain = value
+      .toFixed(20)
+      .replace(trailingZeroPattern, "")
+      .replace(trailingDecimalPointPattern, ".0");
     if (Number(plain) === value) {
       return plain;
     }

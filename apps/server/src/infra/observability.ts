@@ -26,6 +26,16 @@ import { startProcessMetrics } from "./telemetry/process";
 /** Longest failure summary written to the startup log. */
 const failureSummaryLimit = 500;
 
+/** `Bearer <token>` and `Basic <credentials>`, kept for the scheme name. */
+const authSchemePattern = /\b(bearer|basic)\s+\S+/gi;
+/** `authorization=…`, `api-key: …`, and the other header names that hold a token. */
+const credentialAssignmentPattern =
+  /(\b(?:authorization|token|secret|password|passwd|credential|api[-_]?key)[\w.-]*["']?\s*[=:]\s*["']?)(?:(?:basic|bearer)\s+)?\S+/gi;
+/** `https://user:password@host`, where only the password is secret. */
+const urlCredentialPattern = /(\bhttps?:\/\/[^/\s:@]+:)[^@\s/]+@/gi;
+/** Collapses newlines so one failure stays on one log line. */
+const whitespaceRunPattern = /\s+/g;
+
 /**
  * Credential shapes a config or exporter error can quote back.
  *
@@ -36,12 +46,9 @@ const failureSummaryLimit = 500;
  */
 const redactedCredentials = (message: string): string =>
   message
-    .replace(/\b(bearer|basic)\s+\S+/gi, "$1 [redacted]")
-    .replace(
-      /(\b(?:authorization|token|secret|password|passwd|credential|api[-_]?key)[\w.-]*["']?\s*[=:]\s*["']?)(?:(?:basic|bearer)\s+)?\S+/gi,
-      "$1[redacted]"
-    )
-    .replace(/(\bhttps?:\/\/[^/\s:@]+:)[^@\s/]+@/gi, "$1[redacted]@");
+    .replace(authSchemePattern, "$1 [redacted]")
+    .replace(credentialAssignmentPattern, "$1[redacted]")
+    .replace(urlCredentialPattern, "$1[redacted]@");
 
 /** The message, prefixed with the error tag unless it is a plain `Error`. */
 const failureMessage = (error: Error): string =>
@@ -60,7 +67,7 @@ export const failureSummary = (cause: Cause.Cause<unknown>): string =>
     redactedCredentials(
       Cause.prettyErrors(cause).map(failureMessage).join("; ")
     )
-      .replaceAll(/\s+/g, " ")
+      .replaceAll(whitespaceRunPattern, " ")
       .trim(),
     failureSummaryLimit
   );

@@ -11,6 +11,11 @@ import type {
   NotificationTemplatePayload,
 } from "./schema";
 
+/** A custom domain is stored as a bare host, but a person may paste a URL. */
+const urlSchemePattern = /^https?:\/\//;
+/** The trailing slash the same paste may carry. */
+const trailingSlashPattern = /\/$/;
+
 type ChangelogNotificationContent = {
   readonly template: "changelog";
   readonly templatePayload: Omit<ChangelogTemplatePayload, "unsubscribe">;
@@ -200,8 +205,8 @@ const buildPublicSiteUrl = (
 ): string => {
   if (site.customDomain) {
     const host = site.customDomain
-      .replace(/^https?:\/\//, "")
-      .replace(/\/$/, "");
+      .replace(urlSchemePattern, "")
+      .replace(trailingSlashPattern, "");
     return `https://${host}`;
   }
   return `https://${site.subdomain}.${appRootDomain}`;
