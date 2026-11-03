@@ -81,14 +81,21 @@ export const IntegrationEventType = S.Literals([
 ]);
 export type TIntegrationEventType = S.Schema.Type<typeof IntegrationEventType>;
 
-/** Canonical connection lifecycle stored in `integration_connection.lifecycle`. */
+/**
+ * Canonical connection lifecycle stored in `integration_connection.lifecycle`.
+ *
+ * `reauth_required` and `disconnected` were retired outright rather than kept
+ * as legacy states nothing writes: no service has stored them for a long time,
+ * and this deployment has no rows holding either value, so keeping them would
+ * have preserved only reachable-shaped holes in the graph and a display alias
+ * in the webhook projection. An unhealthy connection is paused or archived
+ * directly.
+ */
 export const IntegrationConnectionLifecycleStatus = S.Literals([
   "connecting",
   "active",
   "paused",
-  "reauth_required",
   "disconnecting",
-  "disconnected",
   "revocation_unconfirmed",
   "archived",
 ]);

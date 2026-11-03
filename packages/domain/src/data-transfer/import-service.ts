@@ -26,6 +26,10 @@ import {
   InvalidBoardPostCsvError,
 } from "./errors";
 import { DATA_IMPORT_MAX_BYTES, DATA_IMPORT_WATCH_MS } from "./limits";
+import {
+  canConfirmDataImportStatus,
+  isActiveDataImportStatus,
+} from "./machine";
 import { planImportRows } from "./plan";
 import { canImportPosts } from "./policies";
 import {
@@ -191,16 +195,6 @@ const clampReportWindow = (
 });
 
 /**
- * A job still moves through these statuses on its own; everything else is
- * final. A detail watch writes its last snapshot and ends on the transition
- * out.
- */
-const statusIsActive = (status: DataImportJobRecord["status"]): boolean =>
-  status === "awaiting_confirmation" ||
-  status === "queued" ||
-  status === "running";
-
-/**
  * A cheap key over the fields of a job a viewer sees change while it runs.
  * Two snapshots with the same key are the same picture, so a watch tick that
  * finds nothing new stays silent instead of waking every subscriber.
@@ -297,9 +291,22 @@ const makeDataImportService = Effect.gen(function* () {
       // row. The oldest board is the fallback for a row with an empty cell,
       // and is null only when the workspace has no boards at all. The read
       // and the sort happen here so the plan stays a pure function of them.
-      const existingBoards = yield* boards
-        .findMany({ organizationId: input.organizationId })
-        .pipe(withRemapDbErrors("Board", "select"));
+      // The two workspace reads (boards and statuses) and the two file
+      // computations (decode and hash) each need nothing the other produces,
+      // so the pairs run together: two round trips for the reads and a
+      // concurrent decode instead of four steps in sequence. `Effect.all` is
+      // sequential unless told otherwise.
+      const [existingBoards, statusRows] = yield* Effect.all(
+        [
+          boards
+            .findMany({ organizationId: input.organizationId })
+            .pipe(withRemapDbErrors("Board", "select")),
+          statuses
+            .findMany({ organizationId: input.organizationId })
+            .pipe(withRemapDbErrors("PostStatus", "select")),
+        ],
+        { concurrency: "unbounded" }
+      );
       const sortedBoards = [...existingBoards].sort(
         (left, right) =>
           left.createdAt.getTime() - right.createdAt.getTime() ||
@@ -307,12 +314,11 @@ const makeDataImportService = Effect.gen(function* () {
       );
       const [defaultBoard = null] = sortedBoards;
 
-      const text = yield* decodeBoardPostCsv(input.bytes);
-      const fileHash = yield* hashBytes(crypto, input.bytes);
+      const [text, fileHash] = yield* Effect.all(
+        [decodeBoardPostCsv(input.bytes), hashBytes(crypto, input.bytes)],
+        { concurrency: "unbounded" }
+      );
 
-      const statusRows = yield* statuses
-        .findMany({ organizationId: input.organizationId })
-        .pipe(withRemapDbErrors("PostStatus", "select"));
       // The workspace's stored default, not the `PENDING` type: a workspace may
       // repoint which status is the default, and several statuses may share a
       // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several).
@@ -463,32 +469,40 @@ const makeDataImportService = Effect.gen(function* () {
         });
       }
       const window = clampReportWindow(input.limit, input.offset);
-      const report = yield* fromStore(
-        "listRows",
-        repository.listRows({
-          board: input.board,
-          filter: input.filter,
-          jobId: input.id,
-          limit: window.limit,
-          message: input.message,
-          offset: window.offset,
-          sort: input.sort,
-        })
+      // The row window, its summary, and the pending board names are three
+      // reads of the same staged job and none needs another's answer, so they
+      // resolve together; the report is polled while an import runs, which is
+      // exactly when it should not cost three round trips.
+      const [report, summary, newBoards] = yield* Effect.all(
+        [
+          fromStore(
+            "listRows",
+            repository.listRows({
+              board: input.board,
+              filter: input.filter,
+              jobId: input.id,
+              limit: window.limit,
+              message: input.message,
+              offset: window.offset,
+              sort: input.sort,
+            })
+          ),
+          fromStore(
+            "summarizeReport",
+            repository.summarizeReport({ jobId: input.id })
+          ),
+          // A staged file may name boards that do not exist yet, and the
+          // confirmation names them. Once the job runs, the worker creates
+          // them, so an unchanged list would only be stale.
+          canConfirmDataImportStatus(job.value.status)
+            ? fromStore(
+                "listNewBoardNames",
+                repository.listNewBoardNames({ jobId: input.id })
+              )
+            : Effect.succeed([]),
+        ],
+        { concurrency: "unbounded" }
       );
-      const summary = yield* fromStore(
-        "summarizeReport",
-        repository.summarizeReport({ jobId: input.id })
-      );
-      // A staged file may name boards that do not exist yet, and the
-      // confirmation names them. Once the job runs, the worker creates them,
-      // so an unchanged list would only be stale.
-      const newBoards =
-        job.value.status === "awaiting_confirmation"
-          ? yield* fromStore(
-              "listNewBoardNames",
-              repository.listNewBoardNames({ jobId: input.id })
-            )
-          : [];
       return {
         job: job.value,
         newBoards: [...newBoards],
@@ -521,7 +535,13 @@ const makeDataImportService = Effect.gen(function* () {
           (option: Option.Option<DataImportJobDetail>) => option
         )
       ),
-      Stream.takeUntil((detail) => !statusIsActive(detail.job.status)),
+      // A job still moves through the active statuses on its own; everything
+      // else is final. This watch writes its last snapshot and ends on the
+      // transition out — the predicate is the machine's, the same graph every
+      // guarded `UPDATE` in the repository asks.
+      Stream.takeUntil(
+        (detail) => !isActiveDataImportStatus(detail.job.status)
+      ),
       excludeUnchanged(reportChangeKey)
     );
 

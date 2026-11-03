@@ -24,6 +24,10 @@ import {
   PostId,
   PostStatusId,
 } from "@feeblo/id";
+import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -97,10 +101,6 @@ const endpointHealth = (connection: {
   return "healthy" as const;
 };
 
-const visibleWebhookLifecycle = (
-  lifecycle: typeof schema.integrationConnectionTable.$inferSelect.lifecycle
-) => (lifecycle === "archived" ? ("disconnected" as const) : lifecycle);
-
 /** Composite keyset cursor: `{createdAtISO}~{deliveryId}`; the ID disambiguates equal timestamps. */
 const encodeHistoryCursor = (delivery: {
   readonly createdAt: Date;
@@ -167,8 +167,19 @@ export const WebhookManagementServiceLive = Layer.effect(
       function* ({ organizationId }: { readonly organizationId: string }) {
         const rows = yield* db
           .select({
-            connection: schema.integrationConnectionTable,
-            route: schema.integrationRouteTable,
+            connection: {
+              id: schema.integrationConnectionTable.id,
+              lastFailedAt: schema.integrationConnectionTable.lastFailedAt,
+              lastSucceededAt:
+                schema.integrationConnectionTable.lastSucceededAt,
+              lifecycle: schema.integrationConnectionTable.lifecycle,
+              name: schema.integrationConnectionTable.name,
+              safeDisplayMetadata:
+                schema.integrationConnectionTable.safeDisplayMetadata,
+            },
+            route: {
+              eventTypes: schema.integrationRouteTable.eventTypes,
+            },
           })
           .from(schema.integrationConnectionTable)
           .innerJoin(
@@ -189,13 +200,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 webhookProviderKey
               ),
               inArray(schema.integrationConnectionTable.lifecycle, [
-                "connecting",
-                "active",
-                "paused",
-                "reauth_required",
-                "disconnecting",
-                "disconnected",
-                "revocation_unconfirmed",
+                ...LISTED_CONNECTION_LIFECYCLES,
               ])
             )
           )
@@ -218,7 +223,7 @@ export const WebhookManagementServiceLive = Layer.effect(
               id: asLegid(IntegrationConnectionId)(connection.id),
               lastFailedAt: connection.lastFailedAt,
               lastSucceededAt: connection.lastSucceededAt,
-              lifecycle: visibleWebhookLifecycle(connection.lifecycle),
+              lifecycle: connection.lifecycle,
               name: connection.name,
             }))
           )
@@ -427,7 +432,9 @@ export const WebhookManagementServiceLive = Layer.effect(
                 );
             }
             const [route] = yield* db
-              .select()
+              .select({
+                eventTypes: schema.integrationRouteTable.eventTypes,
+              })
               .from(schema.integrationRouteTable)
               .where(
                 and(
@@ -643,7 +650,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                     eq(
                       schema.integrationConnectionTable.organizationId,
                       input.organizationId
-                    )
+                    ),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("archived"),
+                    ])
                   )
                 );
               yield* db
@@ -790,7 +800,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 });
               }
               const [route] = yield* db
-                .select()
+                .select({
+                  enabled: schema.integrationRouteTable.enabled,
+                  id: schema.integrationRouteTable.id,
+                })
                 .from(schema.integrationRouteTable)
                 .where(
                   and(
@@ -885,8 +898,15 @@ export const WebhookManagementServiceLive = Layer.effect(
         const pageSize = Math.min(Math.max(input.limit ?? 20, 1), 100);
         const rows = yield* db
           .select({
-            delivery: schema.integrationDeliveryTable,
-            event: schema.integrationEventTable,
+            delivery: {
+              attemptCount: schema.integrationDeliveryTable.attemptCount,
+              createdAt: schema.integrationDeliveryTable.createdAt,
+              id: schema.integrationDeliveryTable.id,
+              nextAttemptAt: schema.integrationDeliveryTable.nextAttemptAt,
+              routeId: schema.integrationDeliveryTable.routeId,
+              state: schema.integrationDeliveryTable.state,
+            },
+            event: { type: schema.integrationEventTable.type },
           })
           .from(schema.integrationDeliveryTable)
           .innerJoin(
@@ -943,7 +963,17 @@ export const WebhookManagementServiceLive = Layer.effect(
           pageRows.length === 0
             ? []
             : yield* db
-                .select()
+                .select({
+                  deliveryId: schema.integrationDeliveryAttemptTable.deliveryId,
+                  durationMs: schema.integrationDeliveryAttemptTable.durationMs,
+                  errorTag: schema.integrationDeliveryAttemptTable.errorTag,
+                  finishedAt: schema.integrationDeliveryAttemptTable.finishedAt,
+                  httpStatus: schema.integrationDeliveryAttemptTable.httpStatus,
+                  id: schema.integrationDeliveryAttemptTable.id,
+                  retryDecision:
+                    schema.integrationDeliveryAttemptTable.retryDecision,
+                  startedAt: schema.integrationDeliveryAttemptTable.startedAt,
+                })
                 .from(schema.integrationDeliveryAttemptTable)
                 .where(
                   inArray(

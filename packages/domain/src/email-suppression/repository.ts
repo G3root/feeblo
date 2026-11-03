@@ -269,16 +269,21 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
       searchCondition
     );
 
-    const [items, [total]] = yield* Effect.all([
-      db
-        .select()
-        .from(table)
-        .where(condition)
-        .orderBy(desc(table.createdAt), asc(table.email))
-        .limit(input.limit)
-        .offset(input.offset),
-      db.select({ total: count() }).from(table).where(condition),
-    ]);
+    // The page and its total are two independent reads over the same filter,
+    // so the listing is one round trip rather than two.
+    const [items, [total]] = yield* Effect.all(
+      [
+        db
+          .select()
+          .from(table)
+          .where(condition)
+          .orderBy(desc(table.createdAt), asc(table.email))
+          .limit(input.limit)
+          .offset(input.offset),
+        db.select({ total: count() }).from(table).where(condition),
+      ],
+      { concurrency: "unbounded" }
+    );
 
     const records = yield* Effect.forEach(items, (item) =>
       decodeRecord(item, "list")

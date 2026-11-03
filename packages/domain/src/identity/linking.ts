@@ -3,6 +3,10 @@ import { and, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 
+import {
+  sourceStatesFor,
+  targetStateFor,
+} from "../email-subscription/subscription-machine";
 import { hashEmail } from "../user/repository";
 import { isShadowUserEmail, isSyntheticEmail } from "./emails";
 import { SubjectNotFoundError } from "./errors";
@@ -105,7 +109,13 @@ export const linkShadowUser = ({
         const now = yield* DateTime.nowAsDate;
 
         const realUsers = yield* db
-          .select()
+          .select({
+            email: schema.userTable.email,
+            emailVerified: schema.userTable.emailVerified,
+            id: schema.userTable.id,
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
           .from(schema.userTable)
           .where(eq(schema.userTable.id, realUserId))
           .limit(1);
@@ -315,7 +325,10 @@ const activateDeferredSubscriptionsForContact = (args: {
   readonly contactEmail: string;
   readonly now: Date;
   readonly organizationId: string;
-  readonly realUser: typeof schema.userTable.$inferSelect;
+  readonly realUser: Pick<
+    typeof schema.userTable.$inferSelect,
+    "email" | "emailVerified" | "id" | "restrictedToOrganizationId"
+  >;
 }) =>
   Effect.gen(function* () {
     // No proof, no activation: every eligibility branch below requires it.
@@ -353,12 +366,18 @@ const activateDeferredSubscriptionsForContact = (args: {
     if (eligibleDirect) {
       const activated = yield* db
         .update(schema.emailSubscriptionTable)
-        .set({ state: "active", updatedAt: now, verifiedAt: now })
+        .set({
+          state: targetStateFor("activate"),
+          updatedAt: now,
+          verifiedAt: now,
+        })
         .where(
           and(
             eq(schema.emailSubscriptionTable.contactId, emailContact.id),
             eq(schema.emailSubscriptionTable.organizationId, organizationId),
-            eq(schema.emailSubscriptionTable.state, "deferred_no_access")
+            inArray(schema.emailSubscriptionTable.state, [
+              ...sourceStatesFor("activate"),
+            ])
           )
         )
         .returning({ id: schema.emailSubscriptionTable.id });
@@ -434,12 +453,18 @@ const activateDeferredSubscriptionsForContact = (args: {
     }
     const activated = yield* db
       .update(schema.emailSubscriptionTable)
-      .set({ state: "active", updatedAt: now, verifiedAt: now })
+      .set({
+        state: targetStateFor("activate"),
+        updatedAt: now,
+        verifiedAt: now,
+      })
       .where(
         and(
           eq(schema.emailSubscriptionTable.contactId, emailContact.id),
           eq(schema.emailSubscriptionTable.organizationId, organizationId),
-          eq(schema.emailSubscriptionTable.state, "deferred_no_access"),
+          inArray(schema.emailSubscriptionTable.state, [
+            ...sourceStatesFor("activate"),
+          ]),
           inArray(schema.emailSubscriptionTable.id, activatable)
         )
       )
@@ -478,7 +503,10 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
     const db = yield* currentDb;
 
     const users = yield* db
-      .select()
+      .select({
+        email: schema.userTable.email,
+        emailVerified: schema.userTable.emailVerified,
+      })
       .from(schema.userTable)
       .where(eq(schema.userTable.id, userId))
       .limit(1);
@@ -631,7 +659,12 @@ export const activateDeferredSubscriptionsForVerifiedUser = ({
     const db = yield* currentDb;
 
     const users = yield* db
-      .select()
+      .select({
+        email: schema.userTable.email,
+        emailVerified: schema.userTable.emailVerified,
+        id: schema.userTable.id,
+        restrictedToOrganizationId: schema.userTable.restrictedToOrganizationId,
+      })
       .from(schema.userTable)
       .where(eq(schema.userTable.id, userId))
       .limit(1);

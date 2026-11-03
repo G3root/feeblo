@@ -146,9 +146,13 @@ const testConfig = (configured = true) =>
 
 const makeTestLayer = (
   channelPages?: readonly (readonly SlackConversation[])[],
-  configured = true
+  configured = true,
+  /** Pre-built so a suite can reach `calls` after invoking the service. */
+  givenClient?: SlackApiClient & {
+    readonly calls: { readonly method: string }[];
+  }
 ) => {
-  const apiClient = makeFakeSlackApiClient(channelPages);
+  const apiClient = givenClient ?? makeFakeSlackApiClient(channelPages);
   const serviceLayer = makeSlackManagementServiceLive(apiClient).pipe(
     Layer.provide(testConfig(configured)),
     Layer.provide(Database.PgliteDatabaseLive),
@@ -494,6 +498,81 @@ describe("slack management service", () => {
         })
     );
   });
+  // The archive transition and the credential scrub are guards the graph does
+  // and does not express: moving into `archived` must go through the sources,
+  // but scrubbing a tombstone must not be blocked by that same rule. A
+  // disconnect on a credentials-bearing tombstone is the one thread that holds
+  // both — a second call after the first archived (or a row archived without
+  // the owner calling first). The guard must not strand the ciphertext.
+  const tombstoneClient = makeFakeSlackApiClient();
+  layer(makeTestLayer(undefined, true, tombstoneClient).layer)(
+    "disconnect on a tombstone",
+    (it) => {
+      it.effect(
+        "scrubs credentials an already-archived connection still holds and does not revokence more",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const organizationId = yield* seedOrganization;
+            const service = yield* SlackManagementService;
+            const { authorizeUrl } = yield* service.connectStart({
+              organizationId,
+            });
+            yield* service.connectComplete({
+              code: "code",
+              state: urlState(new URL(authorizeUrl)),
+            });
+            const [connection] = yield* db
+              .select()
+              .from(schema.integrationConnectionTable)
+              .where(
+                and(
+                  eq(
+                    schema.integrationConnectionTable.organizationId,
+                    organizationId
+                  ),
+                  eq(
+                    schema.integrationConnectionTable.provider,
+                    slackProviderKey
+                  )
+                )
+              )
+              .limit(1);
+            if (connection === undefined) {
+              throw new Error("expected connection");
+            }
+            const connectionId = asLegid(IntegrationConnectionId)(
+              connection.id
+            );
+
+            yield* service.disconnect({ connectionId, organizationId });
+
+            // Simulate the residue this fix exists for: a tombstone that kept
+            // its credentials the first disconnect did not scrub.
+            yield* db
+              .update(schema.integrationConnectionTable)
+              .set({ credentialsCiphertext: "residual-ciphertext" })
+              .where(eq(schema.integrationConnectionTable.id, connection.id));
+
+            yield* service.disconnect({ connectionId, organizationId });
+
+            const [afterRetry] = yield* db
+              .select()
+              .from(schema.integrationConnectionTable)
+              .where(eq(schema.integrationConnectionTable.id, connection.id));
+            expect(afterRetry?.lifecycle).toBe("archived");
+            expect(afterRetry?.credentialsCiphertext).toBeNull();
+            // The tombstone's missing credentials make the second flow skip
+            // the token revocation: one revoke in total, from the first call.
+            expect(
+              tombstoneClient.calls.filter(
+                (call) => call.method === "auth.revoke"
+              )
+            ).toHaveLength(1);
+          })
+      );
+    }
+  );
   layer(makeTestLayer(undefined, false).layer)(
     "unconfigured deployment",
     (it) => {

@@ -28,9 +28,10 @@ import {
   IntegrationRouteId,
   PostStatusId,
 } from "@feeblo/id";
+import { connectionSourceStatesFor } from "@feeblo/integration-core/lifecycle";
 import { makeGitHubIssueExternalResourceDraft } from "@feeblo/integration-github";
 import { githubIssueCreateCapabilityKey } from "@feeblo/integration-github/manifest";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -68,7 +69,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
   const externalResources = yield* ExternalResourceService;
   const requireConnection = (organizationId: string, connectionId: string) =>
     db
-      .select()
+      .select({ id: schema.integrationConnectionTable.id })
       .from(schema.integrationConnectionTable)
       .where(
         and(
@@ -94,7 +95,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
       );
   const lockConnection = (organizationId: string, connectionId: string) =>
     db
-      .select()
+      .select({ lifecycle: schema.integrationConnectionTable.lifecycle })
       .from(schema.integrationConnectionTable)
       .where(
         and(
@@ -218,6 +219,35 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 });
               }
               if (connection.lifecycle === "archived") {
+                // A GitHub deletion webhook archives the row without touching
+                // its credentials, and this early return used to leave them
+                // there for good. Scrubbing is the one part of a disconnect an
+                // archived connection still owes.
+                yield* db
+                  .update(schema.integrationConnectionTable)
+                  .set({
+                    credentialsCiphertext: null,
+                    updatedAt: yield* DateTime.nowAsDate,
+                  })
+                  .where(
+                    and(
+                      eq(
+                        schema.integrationConnectionTable.id,
+                        input.connectionId
+                      ),
+                      eq(
+                        schema.integrationConnectionTable.organizationId,
+                        input.organizationId
+                      ),
+                      eq(
+                        schema.integrationConnectionTable.provider,
+                        IntegrationProviderKey.make("github")
+                      )
+                    )
+                  )
+                  .pipe(
+                    Effect.mapError(databaseError("archived credential scrub"))
+                  );
                 return undefined;
               }
               if (connection.lifecycle === "connecting") {
@@ -242,7 +272,10 @@ const makeGitHubManagementService = Effect.gen(function* () {
                     eq(
                       schema.integrationConnectionTable.provider,
                       IntegrationProviderKey.make("github")
-                    )
+                    ),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
                   )
                 )
                 .pipe(
@@ -304,7 +337,14 @@ const makeGitHubManagementService = Effect.gen(function* () {
               lifecycle: "revocation_unconfirmed",
               updatedAt: yield* DateTime.nowAsDate,
             })
-            .where(eq(schema.integrationConnectionTable.id, input.connectionId))
+            .where(
+              and(
+                eq(schema.integrationConnectionTable.id, input.connectionId),
+                inArray(schema.integrationConnectionTable.lifecycle, [
+                  ...connectionSourceStatesFor("revocation_unconfirmed"),
+                ])
+              )
+            )
             .pipe(Effect.mapError(databaseError("disconnect state update")));
           return yield* Effect.failCause(uninstall.cause);
         }
@@ -328,7 +368,15 @@ const makeGitHubManagementService = Effect.gen(function* () {
               eq(
                 schema.integrationConnectionTable.provider,
                 IntegrationProviderKey.make("github")
-              )
+              ),
+              inArray(schema.integrationConnectionTable.lifecycle, [
+                // `archived` is included on purpose, which the graph alone
+                // would not: a deletion webhook can archive this row first,
+                // and the update is also the one that scrubs the credentials.
+                // Blocking it would leave them on a tombstone.
+                ...connectionSourceStatesFor("archived"),
+                "archived",
+              ])
             )
           )
           .pipe(Effect.mapError(databaseError("connection removal")));

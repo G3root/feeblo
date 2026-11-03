@@ -111,7 +111,9 @@ export const DiscordInboundServiceLive: Layer.Layer<
 
     const findActiveConnection = (guildId: string) =>
       db
-        .select()
+        .select({
+          organizationId: schema.integrationConnectionTable.organizationId,
+        })
         .from(schema.integrationConnectionTable)
         .where(
           and(

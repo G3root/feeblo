@@ -454,24 +454,29 @@ export const linkAnonymousAccount = ({
     }
 
     const db = yield* currentDb;
-    const [anonymousUser, newUser] = yield* Effect.all([
-      db
-        .select({
-          restrictedToOrganizationId:
-            schema.userTable.restrictedToOrganizationId,
-        })
-        .from(schema.userTable)
-        .where(eq(schema.userTable.id, anonymousUserId))
-        .limit(1),
-      db
-        .select({
-          restrictedToOrganizationId:
-            schema.userTable.restrictedToOrganizationId,
-        })
-        .from(schema.userTable)
-        .where(eq(schema.userTable.id, newUserId))
-        .limit(1),
-    ]);
+    // Two lookups by id; the transfer below compares them, so they resolve
+    // together instead of one after the other.
+    const [anonymousUser, newUser] = yield* Effect.all(
+      [
+        db
+          .select({
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, anonymousUserId))
+          .limit(1),
+        db
+          .select({
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, newUserId))
+          .limit(1),
+      ],
+      { concurrency: "unbounded" }
+    );
     const anonymous = anonymousUser[0];
     const target = newUser[0];
 

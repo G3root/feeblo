@@ -94,10 +94,16 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           key: `contact-search:${args.organizationId}:${session.session.userId}`,
           name: "contact-search",
         });
-        const [contacts, companies] = yield* Effect.all([
-          repository.countByOrganizationId(args.organizationId),
-          companyRepository.countByOrganizationId(args.organizationId),
-        ]);
+        // Same count the write path reads: contacts and companies are two
+        // independent aggregates, so they resolve together rather than one
+        // after the other.
+        const [contacts, companies] = yield* Effect.all(
+          [
+            repository.countByOrganizationId(args.organizationId),
+            companyRepository.countByOrganizationId(args.organizationId),
+          ],
+          { concurrency: "unbounded" }
+        );
         const canCreate = yield* entitlementPolicy
           .canCreateCrmEntry({
             organizationId: args.organizationId,
