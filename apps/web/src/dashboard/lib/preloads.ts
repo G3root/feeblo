@@ -106,6 +106,7 @@ export async function preloadBoardPosts(): Promise<void> {
   await Promise.all([
     dashboardCollections.boardCollection.preload(),
     dashboardCollections.deleteEligibilityCollection.preload(),
+    dashboardCollections.membersCollection.preload(),
     dashboardCollections.postCollection.preload(),
     dashboardCollections.postStatusCollection.preload(),
     dashboardCollections.tagCollection.preload(),

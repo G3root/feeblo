@@ -106,6 +106,10 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
         ...context,
         selectedPosts: [],
       }),
+      renameActiveView: (context, event: { name: string }) => ({
+        ...context,
+        activeView: { ...context.activeView, name: event.name },
+      }),
       setActiveView: (
         context,
         event: {

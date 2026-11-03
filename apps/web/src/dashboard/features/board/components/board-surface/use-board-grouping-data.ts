@@ -20,8 +20,10 @@ import type { BoardGroupingMember, BoardGroupingTag } from "./types";
  */
 export function useBoardGroupingData(organizationId: string) {
   const { postTagCollection } = useDashboardCollections();
-  const { data: organizationMembers } = useOrgMembers(organizationId);
-  const { data: tags } = useOrgTags(organizationId);
+  const membersQuery = useOrgMembers(organizationId);
+  const tagsQuery = useOrgTags(organizationId);
+  const organizationMembers = membersQuery.data;
+  const tags = tagsQuery.data;
 
   const postTagsQuery = useLiveQuery({
     queryKey: ["board-post-tags", postTagCollection.id, organizationId],
@@ -64,7 +66,10 @@ export function useBoardGroupingData(organizationId: string) {
   }, [postTags]);
 
   return {
-    hasError: isLiveQueryFailed(postTagsQuery),
+    hasError:
+      isLiveQueryFailed(membersQuery) ||
+      isLiveQueryFailed(postTagsQuery) ||
+      isLiveQueryFailed(tagsQuery),
     members,
     postTagsByPostId,
     tags: tags ?? [],

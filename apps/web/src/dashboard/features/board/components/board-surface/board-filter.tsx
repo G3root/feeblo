@@ -112,10 +112,14 @@ type BoardFilterContextValue = BoardFilterActions & {
   filters: TBoardFilters;
   grouping: TBoardGrouping;
   members: FilterMember[];
+  /** Whether the member list has loaded; before that a selected id is not stale. */
+  membersLoaded: boolean;
   organizationId: string;
   postStatuses: FilterStatus[];
   setGroupBy: (field: TBoardGroupBy) => void;
   tags: FilterTag[];
+  /** Whether the label list has loaded; before that a selected id is not stale. */
+  tagsLoaded: boolean;
 };
 
 const BoardFilterContext = createContext<BoardFilterContextValue | null>(null);
@@ -156,6 +160,28 @@ function useBoardFilterContext() {
 }
 
 /**
+ * The selected ids that no loaded row resolves.
+ *
+ * A saved view can name a member or label that has since been removed from the
+ * workspace. The id is still stored, so it still filters the board; the menu has
+ * to render it or the member can never take it out of the filter.
+ */
+const unknownSelectedIds = (
+  selectedIds: ReadonlySet<string>,
+  knownIds: ReadonlySet<string>
+) => [...selectedIds].filter((id) => !knownIds.has(id));
+
+/**
+ * The menu label for a selected id whose row is gone.
+ *
+ * A legid's last characters are the only part a person can tell apart; the
+ * full id is too long for a menu row, and two removed labels would otherwise
+ * be indistinguishable.
+ */
+const unavailableLabel = (kind: "label" | "member", id: string) =>
+  `Unavailable ${kind} (${id.slice(-6)})`;
+
+/**
  * The statuses, labels and members a filter menu may offer.
  *
  * Shared by the store-connected toolbar filter and the controlled editor, so
@@ -163,9 +189,12 @@ function useBoardFilterContext() {
  * assignee list is shown.
  */
 function useBoardFilterReferenceData(organizationId: string) {
-  const { data: postStatusRows } = useOrgPostStatuses(organizationId);
-  const { data: tags } = useOrgTags(organizationId);
-  const { data: organizationMembers } = useOrgMembers(organizationId);
+  const postStatusesQuery = useOrgPostStatuses(organizationId);
+  const tagsQuery = useOrgTags(organizationId);
+  const membersQuery = useOrgMembers(organizationId);
+  const postStatusRows = postStatusesQuery.data;
+  const tags = tagsQuery.data;
+  const organizationMembers = membersQuery.data;
   const currentMemberId = useCurrentMemberId(organizationId);
 
   // The status filter stores a *type*, so the menu offers one row per type even
@@ -209,10 +238,19 @@ function useBoardFilterReferenceData(organizationId: string) {
     () => ({
       currentMemberId,
       members,
+      membersLoaded: membersQuery.isReady,
       postStatuses,
       tags,
+      tagsLoaded: tagsQuery.isReady,
     }),
-    [currentMemberId, members, postStatuses, tags]
+    [
+      currentMemberId,
+      members,
+      membersQuery.isReady,
+      postStatuses,
+      tags,
+      tagsQuery.isReady,
+    ]
   );
 }
 
@@ -225,7 +263,8 @@ function useBoardFilterReferenceData(organizationId: string) {
  */
 function useBoardFilterActions(
   filters: TBoardFilters,
-  onChange: (filters: TBoardFilters) => void
+  onChange: (filters: TBoardFilters) => void,
+  knownMembers: FilterMember[] | null
 ): BoardFilterActions {
   return useMemo<BoardFilterActions>(() => {
     // Every event is normalized: ids are sorted and de-duplicated, and an
@@ -238,6 +277,12 @@ function useBoardFilterActions(
       list.includes(value)
         ? list.filter((item) => item !== value)
         : [...list, value];
+    // `null` means the member list has not loaded yet: an id cannot be called
+    // stale until there is a list that failed to resolve it.
+    const knownMemberIds =
+      knownMembers === null
+        ? null
+        : new Set(knownMembers.map((member) => member.id));
     // A checked id can still be removed at the cap: the limit bounds what a
     // saved view stores, not what the member is allowed to deselect.
     const atFilterLimit = (ids: readonly string[], id: string) =>
@@ -262,11 +307,35 @@ function useBoardFilterActions(
       toggleAssignee: (memberId) => {
         const current = filters.assigneeMemberIds ?? [];
 
-        if (atFilterLimit(current, memberId)) {
+        // Removing an id the member list no longer resolves is always allowed.
+        // It is rendered precisely so a saved view that names a member who
+        // left the workspace can be cleaned up, and the cap must not trap it.
+        if (
+          knownMemberIds !== null &&
+          !knownMemberIds.has(memberId) &&
+          current.includes(memberId)
+        ) {
+          const next = current.filter((id) => id !== memberId);
+
+          update({ assigneeMemberIds: next.length === 0 ? null : next });
           return;
         }
 
-        const next = toggle(current, memberId);
+        // Stale ids do not count toward the cap once the member list is known:
+        // they cannot be selected from it, and keeping them would block adding
+        // a valid member while still writing a filter that matches nothing.
+        // Adding a valid member drops them, which also keeps the stored list
+        // within the cap.
+        const selectable =
+          knownMemberIds === null
+            ? current
+            : current.filter((id) => knownMemberIds.has(id));
+
+        if (atFilterLimit(selectable, memberId)) {
+          return;
+        }
+
+        const next = toggle(selectable, memberId);
 
         update({ assigneeMemberIds: next.length === 0 ? null : next });
       },
@@ -302,7 +371,7 @@ function useBoardFilterActions(
         });
       },
     };
-  }, [filters, onChange]);
+  }, [filters, knownMembers, onChange]);
 }
 
 /**
@@ -329,7 +398,11 @@ function BoardFilterProvider({
   organizationId: string;
 }) {
   const reference = useBoardFilterReferenceData(organizationId);
-  const actions = useBoardFilterActions(filters, onChange);
+  const actions = useBoardFilterActions(
+    filters,
+    onChange,
+    reference.membersLoaded ? reference.members : null
+  );
 
   const value = useMemo<BoardFilterContextValue>(
     () => ({
@@ -488,9 +561,11 @@ function BoardFilterTrigger() {
     filters,
     grouping,
     members,
+    membersLoaded,
     postStatuses,
     setGroupBy,
     tags,
+    tagsLoaded,
     toggleAssignee,
     toggleStatus,
     toggleTag,
@@ -501,6 +576,15 @@ function BoardFilterTrigger() {
   const otherMembers = members.filter(
     (member) => member.id !== currentMemberId
   );
+  const unknownAssigneeIds = membersLoaded
+    ? unknownSelectedIds(
+        selectedAssigneeIds,
+        new Set(members.map((member) => member.id))
+      )
+    : [];
+  const unknownTagIds = tagsLoaded
+    ? unknownSelectedIds(selectedTagIds, new Set(tags.map((tag) => tag.id)))
+    : [];
 
   return (
     <Menu>
@@ -557,6 +641,17 @@ function BoardFilterTrigger() {
                     {tag.name}
                   </MenuCheckboxItem>
                 ))}
+                {unknownTagIds.map((tagId) => (
+                  <MenuCheckboxItem
+                    checked
+                    key={tagId}
+                    onCheckedChange={() => {
+                      toggleTag(tagId);
+                    }}
+                  >
+                    {unavailableLabel("label", tagId)}
+                  </MenuCheckboxItem>
+                ))}
               </MenuSubPopup>
             </MenuPortal>
           </MenuSub>
@@ -584,20 +679,34 @@ function BoardFilterTrigger() {
                     <MenuSeparator />
                   </>
                 ) : null}
-                {otherMembers.length === 0 ? (
+                {otherMembers.length === 0 &&
+                unknownAssigneeIds.length === 0 ? (
                   <MenuItem disabled>No other members</MenuItem>
                 ) : (
-                  otherMembers.map((member) => (
-                    <MenuCheckboxItem
-                      checked={selectedAssigneeIds.has(member.id)}
-                      key={member.id}
-                      onCheckedChange={() => {
-                        toggleAssignee(member.id);
-                      }}
-                    >
-                      {member.name}
-                    </MenuCheckboxItem>
-                  ))
+                  <>
+                    {otherMembers.map((member) => (
+                      <MenuCheckboxItem
+                        checked={selectedAssigneeIds.has(member.id)}
+                        key={member.id}
+                        onCheckedChange={() => {
+                          toggleAssignee(member.id);
+                        }}
+                      >
+                        {member.name}
+                      </MenuCheckboxItem>
+                    ))}
+                    {unknownAssigneeIds.map((memberId) => (
+                      <MenuCheckboxItem
+                        checked
+                        key={memberId}
+                        onCheckedChange={() => {
+                          toggleAssignee(memberId);
+                        }}
+                      >
+                        {unavailableLabel("member", memberId)}
+                      </MenuCheckboxItem>
+                    ))}
+                  </>
                 )}
               </MenuSubPopup>
             </MenuPortal>
@@ -752,9 +861,20 @@ function BoardFilterStatusGroup() {
  * what you see when the filter is cleared, not a category to select.
  */
 function BoardFilterAssigneeGroup() {
-  const { clearAssigneeFilter, filters, members, toggleAssignee } =
-    useBoardFilterContext();
+  const {
+    clearAssigneeFilter,
+    filters,
+    members,
+    membersLoaded,
+    toggleAssignee,
+  } = useBoardFilterContext();
   const selectedIds = new Set(filters.assigneeMemberIds ?? []);
+  const unknownIds = membersLoaded
+    ? unknownSelectedIds(
+        selectedIds,
+        new Set(members.map((member) => member.id))
+      )
+    : [];
 
   return (
     <BoardFilterActiveGroup>
@@ -762,11 +882,18 @@ function BoardFilterAssigneeGroup() {
         Assigned
       </BoardFilterReadonlySegment>
       <BoardFilterValueMenu
-        items={members.map((member) => ({
-          checked: selectedIds.has(member.id),
-          key: member.id,
-          label: member.isCurrentUser ? `${member.name} (you)` : member.name,
-        }))}
+        items={[
+          ...members.map((member) => ({
+            checked: selectedIds.has(member.id),
+            key: member.id,
+            label: member.isCurrentUser ? `${member.name} (you)` : member.name,
+          })),
+          ...unknownIds.map((id) => ({
+            checked: true,
+            key: id,
+            label: unavailableLabel("member", id),
+          })),
+        ]}
         label={getAssigneeSummary(filters.assigneeMemberIds ?? [], members)}
         onToggle={toggleAssignee}
       />
@@ -781,9 +908,18 @@ function BoardFilterAssigneeGroup() {
 }
 
 function BoardFilterLabelsGroup() {
-  const { clearTagFilter, filters, setTagOperator, tags, toggleTag } =
-    useBoardFilterContext();
+  const {
+    clearTagFilter,
+    filters,
+    setTagOperator,
+    tags,
+    tagsLoaded,
+    toggleTag,
+  } = useBoardFilterContext();
   const selectedTagIds = new Set(filters.tag?.tagIds ?? []);
+  const unknownIds = tagsLoaded
+    ? unknownSelectedIds(selectedTagIds, new Set(tags.map((tag) => tag.id)))
+    : [];
 
   return (
     <BoardFilterActiveGroup>
@@ -798,11 +934,18 @@ function BoardFilterLabelsGroup() {
         />
       ) : null}
       <BoardFilterValueMenu
-        items={tags.map((tag) => ({
-          checked: selectedTagIds.has(tag.id),
-          key: tag.id,
-          label: tag.name,
-        }))}
+        items={[
+          ...tags.map((tag) => ({
+            checked: selectedTagIds.has(tag.id),
+            key: tag.id,
+            label: tag.name,
+          })),
+          ...unknownIds.map((id) => ({
+            checked: true,
+            key: id,
+            label: unavailableLabel("label", id),
+          })),
+        ]}
         label={getTagSummary(filters.tag?.tagIds ?? [], tags)}
         onToggle={toggleTag}
       />

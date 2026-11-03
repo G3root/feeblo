@@ -57,6 +57,12 @@ export type SavedViewSaved = {
   id: string;
   name: string;
   ordering: TBoardOrdering;
+  /**
+   * Whether the save changed the stored query. A rename or a description edit
+   * leaves the board's filters, grouping and ordering alone; only a query
+   * change moves the surface the member is looking at.
+   */
+  queryChanged: boolean;
 };
 
 const savedViewFormSchema = z.object({
@@ -176,6 +182,14 @@ export function SavedViewSheet({
         ordering: { ...normalized.ordering },
         version: normalized.version,
       };
+      // The sheet's starting query is the stored one, so a comparison against
+      // it separates a real query edit from a rename or description change.
+      // Both sides are normalized because a stored row and a live board query
+      // spell the same selection in different orders.
+      const queryChanged =
+        target !== undefined &&
+        JSON.stringify(normalizeBoardQuery(query)) !==
+          JSON.stringify(normalized);
 
       try {
         if (target) {
@@ -194,6 +208,7 @@ export function SavedViewSheet({
             id: target.id,
             name: value.name,
             ordering: writableQuery.ordering,
+            queryChanged,
           });
           onOpenChange(false);
           toastManager.add({
@@ -226,6 +241,7 @@ export function SavedViewSheet({
           id: viewId,
           name: value.name,
           ordering: writableQuery.ordering,
+          queryChanged,
         });
         onOpenChange(false);
         toastManager.add({ title: `Saved "${value.name}"`, type: "success" });

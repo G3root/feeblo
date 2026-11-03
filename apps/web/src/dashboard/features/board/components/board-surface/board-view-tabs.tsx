@@ -62,7 +62,7 @@ export function BoardViewTabs({
   );
   const store = useBoardStore();
 
-  const { data } = useLiveQuery({
+  const { data, isLoadingError } = useLiveQuery({
     queryKey: ["saved-views", collection.id, organizationId],
     query: (q) =>
       q
@@ -92,6 +92,12 @@ export function BoardViewTabs({
 
   const [sheet, setSheet] = useState<SheetState>({ kind: "closed" });
   const closeSheet = useCallback(() => setSheet({ kind: "closed" }), []);
+
+  // `reload()` retries the source that failed while keeping the rows already on
+  // screen, which is the recovery a failed first load has.
+  const retrySavedViews = useCallback(() => {
+    void collection.reload().catch(() => undefined);
+  }, [collection]);
 
   const openCreate = useCallback(() => {
     const { activeView, grouping, ordering } = store.getSnapshot().context;
@@ -126,6 +132,14 @@ export function BoardViewTabs({
   const applySavedView = useCallback(
     (saved: SavedViewSaved) => {
       if (saved.id !== activeViewId) {
+        return;
+      }
+
+      if (!saved.queryChanged) {
+        // A rename or a description change does not change the result set, so
+        // the board keeps its live query — including any local edit made after
+        // the sheet opened.
+        store.send({ type: "renameActiveView", name: saved.name });
         return;
       }
 
@@ -182,8 +196,9 @@ export function BoardViewTabs({
         onDuplicate={copyView}
         onEdit={editView}
         onReorder={reorder}
+        onRetrySavedViews={isLoadingError ? retrySavedViews : undefined}
         organizationId={organizationId}
-        rows={rows}
+        rows={isLoadingError ? [] : rows}
         variant={variant}
       />
 

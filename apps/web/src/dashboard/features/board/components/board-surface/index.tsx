@@ -114,6 +114,8 @@ export function BoardSurface({
  * The signature is structural rather than an identity check because the route
  * rebuilds `initialView` on every render. That also means a refetch that returns
  * the same query does not write to the store and cannot clobber a local edit.
+ * The name is deliberately not part of it: renaming a view does not change the
+ * result set, so it must not reapply the row's query over a local board edit.
  */
 function BoardViewSync({
   initialGrouping,
@@ -127,7 +129,6 @@ function BoardViewSync({
   const store = useBoardStore();
   const signature = JSON.stringify([
     initialView.id,
-    initialView.name,
     initialView.filters,
     initialGrouping ?? null,
     initialOrdering ?? null,

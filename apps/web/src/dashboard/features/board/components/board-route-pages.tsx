@@ -4,10 +4,10 @@ import {
   type TBoardFilters,
   type TBoardGrouping,
 } from "@feeblo/domain-contracts/board-query";
-import { buttonVariants } from "@feeblo/ui/button";
+import { Button, buttonVariants } from "@feeblo/ui/button";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { BoardNotFound } from "~/features/board/components/board-not-found";
 import { BoardSurface } from "~/features/board/components/board-surface";
@@ -304,7 +304,11 @@ function SavedViewSurface({
     [organizationId, boardId, memberId]
   );
 
-  const { data: view, isLoading } = useLiveQuery({
+  const {
+    data: view,
+    isLoading,
+    isLoadingError,
+  } = useLiveQuery({
     queryKey: ["saved-view-route", collection.id, viewId],
     query: (q) =>
       q
@@ -313,8 +317,18 @@ function SavedViewSurface({
         .findOne(),
   });
 
+  // `reload()` keeps the rows that are already visible and retries the source
+  // that failed, which is the only recovery a failed first load has.
+  const retry = useCallback(() => {
+    void collection.reload().catch(() => undefined);
+  }, [collection]);
+
   if (isLoading) {
     return <BoardPostsLoading />;
+  }
+
+  if (isLoadingError) {
+    return <SavedViewLoadError onRetry={retry} />;
   }
 
   if (!view || view.boardId !== boardId) {
@@ -340,6 +354,20 @@ function SavedViewSurface({
       organizationId={organizationId}
       variant={variant}
     />
+  );
+}
+
+function SavedViewLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-4 py-20 text-center">
+      <p className="text-sm font-medium">This view couldn’t be loaded</p>
+      <p className="text-muted-foreground max-w-sm text-sm">
+        The saved view may be temporarily unavailable. Try loading it again.
+      </p>
+      <Button onClick={onRetry} size="sm" type="button" variant="outline">
+        Try again
+      </Button>
+    </div>
   );
 }
 

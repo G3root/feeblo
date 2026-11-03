@@ -106,6 +106,7 @@ export function ViewTabStrip({
   onDuplicate,
   onEdit,
   onReorder,
+  onRetrySavedViews,
   organizationId,
   rows,
   variant,
@@ -115,6 +116,9 @@ export function ViewTabStrip({
   currentMemberId: string | undefined;
   onCreate: () => void;
   onReorder: (orderedIds: string[]) => Promise<void>;
+  /** Set when the saved-view read failed: the strip offers a retry beside the
+   * built-in presets instead of pretending the member has no saved views. */
+  onRetrySavedViews?: () => void;
   organizationId: string;
   rows: readonly TSavedView[];
   variant: "board" | "feedback";
@@ -132,6 +136,9 @@ export function ViewTabStrip({
    * position does not take part in the drop.
    */
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
+  // Two drops can overlap while the first request is still in flight, and they
+  // can settle out of order. Only the latest one owns `pendingOrder`.
+  const latestReorder = useRef(0);
   const ownedRows = useMemo(
     () => rows.filter((view) => view.memberId === currentMemberId),
     [currentMemberId, rows]
@@ -240,6 +247,8 @@ export function ViewTabStrip({
   }, [measure]);
 
   const commitOrder = async (orderedIds: string[]) => {
+    const request = latestReorder.current + 1;
+    latestReorder.current = request;
     setPendingOrder(orderedIds);
 
     try {
@@ -247,7 +256,12 @@ export function ViewTabStrip({
     } catch {
       toastManager.add({ title: "Failed to reorder views", type: "error" });
     } finally {
-      setPendingOrder(null);
+      // An earlier request finishing must leave the newer pending order alone;
+      // clearing it there would snap the strip back to the server's order while
+      // the latest drop is still being written.
+      if (latestReorder.current === request) {
+        setPendingOrder(null);
+      }
     }
   };
 
@@ -359,6 +373,21 @@ export function ViewTabStrip({
         />
       ) : null}
 
+      {/* The built-in presets stay usable when the saved-view read fails; the
+          retry sits beside them rather than replacing the strip with an error
+          screen. `measureTabs` reserves its width like the create button. */}
+      {onRetrySavedViews === undefined ? null : (
+        <Button
+          data-view-tabs-retry=""
+          onClick={onRetrySavedViews}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Retry views
+        </Button>
+      )}
+
       {/* Icon-only; the popover header carries the same action when the strip
           is too narrow to show its own controls. */}
       <Button
@@ -405,6 +434,12 @@ const measureTabs = (
     area
       .querySelector<HTMLElement>("[data-view-tabs-create]")
       ?.getBoundingClientRect().width ?? 0;
+  // The retry control only exists while the saved-view read is failed, and its
+  // label is fixed, so measuring it here cannot feed back into `visibleCount`.
+  const retryWidth =
+    area
+      .querySelector<HTMLElement>("[data-view-tabs-retry]")
+      ?.getBoundingClientRect().width ?? 0;
   // The "more" button is reserved at its *maximum* width rather than at its
   // measured width: its label is the active tab's name when that tab is the one
   // clipped, so measuring the label would make the count depend on its own
@@ -412,6 +447,7 @@ const measureTabs = (
   // keeps the long name on the button. Reserving a constant removes the loop.
   const reserved =
     (createWidth > 0 ? createWidth + gap : 0) +
+    (retryWidth > 0 ? retryWidth + gap : 0) +
     (hasOverflow ? OVERFLOW_TAB_BUTTON_MAX_PX + gap : 0);
   return countFittingTabs({
     available: areaWidth - reserved,
