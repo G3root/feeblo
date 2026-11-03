@@ -24,6 +24,7 @@ import {
   PostId,
   PostStatusId,
 } from "@feeblo/id";
+import { LISTED_CONNECTION_LIFECYCLES } from "@feeblo/integration-core/lifecycle";
 import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
@@ -200,13 +201,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 webhookProviderKey
               ),
               inArray(schema.integrationConnectionTable.lifecycle, [
-                "connecting",
-                "active",
-                "paused",
-                "reauth_required",
-                "disconnecting",
-                "disconnected",
-                "revocation_unconfirmed",
+                ...LISTED_CONNECTION_LIFECYCLES,
               ])
             )
           )

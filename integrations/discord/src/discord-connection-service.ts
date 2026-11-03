@@ -13,6 +13,7 @@ import {
   IntegrationRouteId,
   WorkspaceId,
 } from "@feeblo/id";
+import { LISTED_CONNECTION_LIFECYCLES } from "@feeblo/integration-core/lifecycle";
 import {
   DISCORD_GUILD_COMMANDS,
   DISCORD_OAUTH_AUTHORIZE_URL,
@@ -431,13 +432,7 @@ export const makeDiscordConnectionServiceLive = (
                   discordProviderKey
                 ),
                 inArray(schema.integrationConnectionTable.lifecycle, [
-                  "connecting",
-                  "active",
-                  "paused",
-                  "reauth_required",
-                  "disconnecting",
-                  "disconnected",
-                  "revocation_unconfirmed",
+                  ...LISTED_CONNECTION_LIFECYCLES,
                 ])
               )
             )

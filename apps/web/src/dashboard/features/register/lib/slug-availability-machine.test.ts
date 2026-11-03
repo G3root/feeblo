@@ -84,7 +84,7 @@ describe("slug availability machine", () => {
   });
 
   it("does not check a name too short to be a slug", async () => {
-    const actor = start({ enabled: false, slug: "ac" });
+    start({ enabled: false, slug: "ac" });
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(checks).toHaveLength(0);
