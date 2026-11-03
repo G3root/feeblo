@@ -1,3 +1,4 @@
+import { useAtomSet, useAtomValue, useAtomRefresh } from "@effect/atom-react";
 import { asLegid, UserBanId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { Checkbox } from "@feeblo/ui/checkbox";
@@ -38,15 +39,20 @@ import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { Add01Icon, BanIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Option from "effect/Option";
+import * as Result from "effect/reactivity/AsyncResult";
 import * as React from "react";
 
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { fetchRpc } from "~/lib/runtime";
 
-const bansQueryKey = (organizationId: string, search: string) =>
-  ["user-bans", organizationId, search] as const;
+import {
+  banUserAtom,
+  unbanUserAtom,
+  type UserBan,
+  userBanReactivityKeys,
+  userBansAtom,
+} from "../atoms";
 
 /**
  * The workspace's banned end users.
@@ -64,51 +70,83 @@ export function BannedUsersSection({
   userBansAvailable: boolean;
 }) {
   const organizationId = useOrganizationId();
-  const queryClient = useQueryClient();
   const [search, setSearch] = React.useState("");
   const [banOpen, setBanOpen] = React.useState(false);
+  const [unbanningId, setUnbanningId] = React.useState<string | null>(null);
 
-  const queryKey = bansQueryKey(organizationId, search);
-  const bansQuery = useQuery({
-    queryKey,
-    queryFn: ({ signal }) =>
-      fetchRpc(
-        (rpc) =>
-          rpc.ListUserBans({
-            limit: 100,
-            offset: 0,
-            organizationId,
-            ...(search.trim() !== "" && { search: search.trim() }),
-          }),
-        { signal }
-      ),
-  });
+  const trimmedSearch = search.trim();
+  const listArgs = React.useMemo(
+    () => ({ organizationId, search: trimmedSearch }),
+    [organizationId, trimmedSearch]
+  );
+  const bansResult = useAtomValue(userBansAtom(listArgs));
+  const refreshBans = useAtomRefresh(userBansAtom(listArgs));
+  const unban = useAtomSet(unbanUserAtom, { mode: "promise" });
 
-  const unban = useMutation({
-    mutationFn: (id: string) =>
-      fetchRpc((rpc) =>
-        rpc.UnbanUser({
-          id: asLegid(UserBanId)(id),
-          organizationId,
-        })
-      ),
-    onError: (error) => {
-      toastManager.add({
-        title: parseRpcError(error).message,
-        type: "error",
-      });
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["user-bans", organizationId],
+  const {
+    items: bans,
+    error,
+    isLoading,
+    loadFailed,
+    total,
+  } = Result.builder(bansResult)
+    .onInitial(() => ({
+      // SAFETY: Empty-state placeholder: an empty page is valid until the read resolves.
+      items: [] as readonly UserBan[],
+      error: undefined,
+      isLoading: true,
+      loadFailed: false,
+      total: 0,
+    }))
+    .onFailure((failure, { previousSuccess }) =>
+      Option.match(previousSuccess, {
+        onNone: () => ({
+          // SAFETY: Empty-state placeholder: an empty page is valid until the read resolves.
+          items: [] as readonly UserBan[],
+          error: failure,
+          isLoading: false,
+          loadFailed: true,
+          total: 0,
+        }),
+        // A failed refetch keeps the rows on screen: the last good page is
+        // still more useful than an error where the list used to be.
+        onSome: ({ value }) => ({
+          items: value.items,
+          error: failure,
+          isLoading: false,
+          loadFailed: false,
+          total: value.total,
+        }),
+      })
+    )
+    .onSuccess((value) => ({
+      items: value.items,
+      error: undefined,
+      isLoading: false,
+      loadFailed: false,
+      total: value.total,
+    }))
+    .exhaustive();
+
+  const hasFilter = trimmedSearch !== "";
+
+  const handleUnban = async (id: string) => {
+    setUnbanningId(id);
+    try {
+      await unban({
+        payload: { id: asLegid(UserBanId)(id), organizationId },
+        reactivityKeys: userBanReactivityKeys(organizationId),
       });
       toastManager.add({ title: "User unbanned", type: "success" });
-    },
-  });
-
-  const bans = bansQuery.data?.items ?? [];
-  const total = bansQuery.data?.total ?? 0;
-  const hasFilter = search.trim() !== "";
+    } catch (failure) {
+      toastManager.add({
+        title: parseRpcError(failure).message,
+        type: "error",
+      });
+    } finally {
+      setUnbanningId(null);
+    }
+  };
 
   return (
     <SettingsItem.Root>
@@ -161,7 +199,7 @@ export function BannedUsersSection({
           </PolicyGuard>
         </div>
 
-        {bansQuery.isPending ? (
+        {isLoading ? (
           <SkeletonLoader isLoading>
             <div className="flex flex-col gap-2">
               {[0, 1, 2].map((key) => (
@@ -174,7 +212,7 @@ export function BannedUsersSection({
               ))}
             </div>
           </SkeletonLoader>
-        ) : bansQuery.isError ? (
+        ) : loadFailed ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -182,7 +220,10 @@ export function BannedUsersSection({
               </EmptyMedia>
               <EmptyTitle>Unable to load banned users</EmptyTitle>
               <EmptyDescription>
-                {parseRpcError(bansQuery.error).message}
+                {parseRpcError(error).message}{" "}
+                <Button onClick={refreshBans} size="sm" variant="outline">
+                  Try again
+                </Button>
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -231,8 +272,10 @@ export function BannedUsersSection({
                 </ItemContent>
                 <ItemActions>
                   <Button
-                    disabled={unban.isPending}
-                    onClick={() => unban.mutate(ban.id)}
+                    disabled={unbanningId !== null}
+                    onClick={() => {
+                      void handleUnban(ban.id);
+                    }}
                     size="sm"
                     variant="outline"
                   >
@@ -253,11 +296,6 @@ export function BannedUsersSection({
       </SettingsItem.Content>
 
       <BanUserDialog
-        onBanned={() => {
-          void queryClient.invalidateQueries({
-            queryKey: ["user-bans", organizationId],
-          });
-        }}
         onOpenChange={setBanOpen}
         open={banOpen}
         organizationId={organizationId}
@@ -267,45 +305,46 @@ export function BannedUsersSection({
 }
 
 function BanUserDialog({
-  onBanned,
   onOpenChange,
   open,
   organizationId,
 }: {
-  onBanned: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organizationId: string;
 }) {
+  const ban = useAtomSet(banUserAtom, { mode: "promise" });
   const [email, setEmail] = React.useState("");
   const [reason, setReason] = React.useState("");
   const [deleteContent, setDeleteContent] = React.useState(false);
+  const [isBanning, setIsBanning] = React.useState(false);
 
-  const ban = useMutation({
-    mutationFn: () =>
-      fetchRpc((rpc) =>
-        rpc.BanUser({
+  const handleBan = async () => {
+    setIsBanning(true);
+    try {
+      await ban({
+        payload: {
           organizationId,
           target: { _tag: "email", email: email.trim() },
           deleteContent,
-          ...(reason.trim() !== "" && { reason: reason.trim() }),
-        })
-      ),
-    onError: (error) => {
-      toastManager.add({
-        title: parseRpcError(error).message,
-        type: "error",
+          ...(reason.trim() === "" ? undefined : { reason: reason.trim() }),
+        },
+        reactivityKeys: userBanReactivityKeys(organizationId),
       });
-    },
-    onSuccess: () => {
-      onBanned();
       setEmail("");
       setReason("");
       setDeleteContent(false);
       onOpenChange(false);
       toastManager.add({ title: "User banned", type: "success" });
-    },
-  });
+    } catch (failure) {
+      toastManager.add({
+        title: parseRpcError(failure).message,
+        type: "error",
+      });
+    } finally {
+      setIsBanning(false);
+    }
+  };
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
@@ -325,7 +364,7 @@ function BanUserDialog({
           onSubmit={(event) => {
             event.preventDefault();
             event.stopPropagation();
-            ban.mutate();
+            void handleBan();
           }}
         >
           <DialogPanel className="grid gap-4">
@@ -369,11 +408,8 @@ function BanUserDialog({
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>
-            <Button
-              disabled={ban.isPending || email.trim() === ""}
-              type="submit"
-            >
-              {ban.isPending ? "Banning..." : "Ban user"}
+            <Button disabled={isBanning || email.trim() === ""} type="submit">
+              {isBanning ? "Banning..." : "Ban user"}
             </Button>
           </DialogFooter>
         </form>
