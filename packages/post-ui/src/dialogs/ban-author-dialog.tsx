@@ -82,6 +82,12 @@ export function BanAuthorDialog() {
   return (
     <AlertDialog
       onOpenChange={(nextOpen) => {
+        // Escape or a backdrop click must not close the dialog while the ban is
+        // in flight: the answer would arrive against a form nobody can see.
+        // The success path closes through the store, which does not come here.
+        if (isPending) {
+          return;
+        }
         // A dismissed dialog must not carry the delete choice, or a note
         // written for one comment, into the next one it is opened for.
         if (!nextOpen) {
