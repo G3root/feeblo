@@ -9,6 +9,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNull,
   or,
   sql,
 } from "drizzle-orm";
@@ -948,13 +949,17 @@ const makeUserBanRepository = Effect.gen(function* () {
                   )
                 )
               );
-      const emails = [
-        ...(input.email === null ? [] : [input.email]),
-        ...contactEmails,
-      ];
       const facets = [
         ...(input.userId === null ? [] : [eq(table.userId, input.userId)]),
-        ...(emails.length === 0 ? [] : [inArray(table.email, emails)]),
+        // The address the caller named is the person being unbanned, so it
+        // keeps matching whether the row carries an account or not.
+        ...(input.email === null ? [] : [eq(table.email, input.email)]),
+        // A linked contact's address only stands for the author when the row
+        // has no account of its own. Another account may be banned under the
+        // same address, and lifting this author's ban must not lift that one.
+        ...(contactEmails.length === 0
+          ? []
+          : [and(inArray(table.email, contactEmails), isNull(table.userId))]),
       ];
       if (facets.length === 0) {
         return { removed: false };

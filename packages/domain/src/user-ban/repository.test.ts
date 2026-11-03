@@ -416,6 +416,57 @@ describe("UserBanRepository", () => {
       })
     );
 
+    it.effect(
+      "does not lift another account's ban on a linked contact's address",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* UserBanRepository;
+          const organizationId = yield* createOrganization();
+          const account = yield* createUser("facet-owner");
+          const other = yield* createUser("facet-other");
+          const contactEmail = "facet-shared-contact@example.com";
+          yield* createContact({
+            email: contactEmail,
+            organizationId,
+            userId: account.id,
+          });
+          const now = yield* DateTime.nowAsDate;
+
+          yield* repository.upsert({
+            createdByMemberId: null,
+            email: account.email,
+            now,
+            organizationId,
+            reason: null,
+            userId: account.id,
+          });
+          // This row names the same address as the author's linked contact,
+          // but belongs to another account; unlinking the contact below must
+          // not lift it.
+          yield* repository.upsert({
+            createdByMemberId: null,
+            email: contactEmail,
+            now,
+            organizationId,
+            reason: null,
+            userId: other.id,
+          });
+
+          yield* repository.removeByFacets({
+            email: account.email,
+            organizationId,
+            userId: account.id,
+          });
+
+          expect(
+            yield* repository.isBanned({ organizationId, userId: account.id })
+          ).toBe(false);
+          expect(
+            yield* repository.isBanned({ organizationId, userId: other.id })
+          ).toBe(true);
+        })
+    );
+
     it.effect("removes a ban only inside its workspace", () =>
       Effect.gen(function* () {
         const repository = yield* UserBanRepository;

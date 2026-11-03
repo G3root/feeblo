@@ -2056,6 +2056,55 @@ describe("PostRpcHandlers", () => {
         })
       );
 
+      it.effect(
+        "refuses a non-member deleting another user's post, banned or not",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+            const otherUserId = `other_${fixture.organizationId}`;
+            const otherEmail = `${otherUserId}@example.com`;
+            const db = yield* currentDb;
+            const session = makeSession(fixture, null);
+
+            yield* db.insert(schema.userTable).values({
+              id: otherUserId,
+              email: otherEmail,
+              name: "Other author",
+            });
+
+            const otherSession: Session = {
+              ...session,
+              user: { ...session.user, id: otherUserId, email: otherEmail },
+              session: { userId: otherUserId, token: "other-token" },
+            };
+            yield* handlers
+              .CreatePostPublic(
+                postCreateInput(fixture, postId, "Someone else's post")
+              )
+              .pipe(Effect.provideService(CurrentSession, otherSession));
+
+            const deleteAsSession = () =>
+              handlers
+                .DeletePostPublic({
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                })
+                .pipe(Effect.provideService(CurrentSession, session));
+
+            const unbanned = yield* Effect.flip(deleteAsSession());
+            expect(unbanned._tag).toBe("PolicyDenied");
+
+            // A ban does not change the answer: the delete is refused because
+            // the post belongs to somebody else, not because of participation.
+            yield* banNonMember(fixture);
+            const banned = yield* Effect.flip(deleteAsSession());
+            expect(banned._tag).toBe("PolicyDenied");
+          })
+      );
+
       it.effect("rejects creator deletion after another user votes", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;

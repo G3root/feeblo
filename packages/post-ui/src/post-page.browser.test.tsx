@@ -6,7 +6,7 @@ import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import type { TPostSubscription } from "@feeblo/domain/post-subscription/schema";
 import type { TPost, TPostListItem } from "@feeblo/domain/post/schema";
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { CommentDisplayDropdown } from "./comment-display/dropdown";
@@ -304,6 +304,10 @@ function AdminControls() {
 }
 
 describe("PostPage composition", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("shows guest and unlocked content for an anonymous reader", async () => {
     const screen = await renderState();
 
@@ -361,6 +365,17 @@ describe("PostPage composition", () => {
       .toBeVisible();
   });
 
+  it("offers unban when the host can unban but not ban", async () => {
+    const { screen } = await renderBanMenu({
+      authorIsBanned: true,
+      canBanAuthor: false,
+    });
+    await screen.getByRole("button", { name: "Comment menu" }).click();
+    await expect
+      .element(screen.getByRole("menuitem", { name: /^Unban user$/ }))
+      .toBeVisible();
+  });
+
   it("offers neither action to a member who also carries a ban", async () => {
     const { screen } = await renderBanMenu({
       authorIsBanned: true,
@@ -376,6 +391,14 @@ describe("PostPage composition", () => {
   });
 
   it("lifts the ban on the comment the action was opened from", async () => {
+    const commentRefetch = vi.spyOn(
+      stubCollections.commentCollection.utils,
+      "refetch"
+    );
+    const postRefetch = vi.spyOn(
+      stubCollections.postCollection.utils,
+      "refetch"
+    );
     const { screen, userBanActions } = await renderBanMenu({
       authorIsBanned: true,
     });
@@ -388,6 +411,13 @@ describe("PostPage composition", () => {
       expect(userBanActions.unban).toHaveBeenCalledWith({
         target: { _tag: "comment", commentId: "comment-id" },
       });
+    });
+
+    // The badge and the ban menu item both derive from these rows, so a
+    // successful unban has to refresh both collections.
+    await vi.waitFor(() => {
+      expect(commentRefetch).toHaveBeenCalledOnce();
+      expect(postRefetch).toHaveBeenCalledOnce();
     });
   });
 

@@ -57,22 +57,31 @@ import {
 } from "../atoms";
 
 /**
- * Refreshes the rows the author badges are derived from.
+ * Refreshes the rows a ban changes.
  *
- * The ban list is cached in an atom and refreshes through a reactivity key. The
- * badges are collection rows, so they need saying separately: without this, a
- * post page opened afterwards still reports the previous answer.
+ * The ban list is cached in an atom and refreshes through a reactivity key. A
+ * ban also flips the author badges and strips the person's votes and
+ * subscriptions, which are collection rows, so they need saying separately:
+ * without this, a post page opened afterwards still reports the previous
+ * answer.
  */
 const refreshBanBadges = ({
   commentCollection,
   postCollection,
+  postSubscriptionCollection,
+  upvoteCollection,
 }: Pick<
   ReturnType<typeof useDashboardCollections>,
-  "commentCollection" | "postCollection"
+  | "commentCollection"
+  | "postCollection"
+  | "postSubscriptionCollection"
+  | "upvoteCollection"
 >) =>
   refetchInBackground(
     postCollection.utils.refetch(),
-    commentCollection.utils.refetch()
+    commentCollection.utils.refetch(),
+    upvoteCollection.utils.refetch(),
+    postSubscriptionCollection.utils.refetch()
   );
 
 /**
@@ -91,7 +100,12 @@ export function BannedUsersSection({
   userBansAvailable: boolean;
 }) {
   const organizationId = useOrganizationId();
-  const { commentCollection, postCollection } = useDashboardCollections();
+  const {
+    commentCollection,
+    postCollection,
+    postSubscriptionCollection,
+    upvoteCollection,
+  } = useDashboardCollections();
   const [search, setSearch] = React.useState("");
   const [banOpen, setBanOpen] = React.useState(false);
   const [unbanningId, setUnbanningId] = React.useState<string | null>(null);
@@ -164,10 +178,15 @@ export function BannedUsersSection({
         reactivityKeys: userBanReactivityKeys(organizationId),
       });
       // The settings list is cached in an atom and refreshes through the
-      // reactivity key. The badges are collection rows, so they need saying
-      // separately: without this, a post page opened afterwards still reports
-      // the author as banned.
-      refreshBanBadges({ commentCollection, postCollection });
+      // reactivity key. The rows the ban changed are collection rows, so they
+      // need saying separately: without this, a post page opened afterwards
+      // still reports the previous answer.
+      refreshBanBadges({
+        commentCollection,
+        postCollection,
+        postSubscriptionCollection,
+        upvoteCollection,
+      });
       toastManager.add({ title: "User unbanned", type: "success" });
     } catch (failure) {
       toastManager.add({
@@ -349,10 +368,14 @@ function BanUserDialog({
   const [email, setEmail] = React.useState("");
   const [reason, setReason] = React.useState("");
   const [deleteContent, setDeleteContent] = React.useState(false);
-  const [isBanning, setIsBanning] = React.useState(false);
+  // Pending belongs to a draft, not to the dialog: dismissing the form starts
+  // the next one, and that one has to stay submittable while the previous
+  // request is still running.
+  const [pendingDraft, setPendingDraft] = React.useState<number | null>(null);
   // Which draft the fields belong to. Dismissing the dialog starts a new one,
   // so a request still in flight cannot clear or close the next person's form.
   const draftRef = React.useRef(0);
+  const isBanning = pendingDraft === draftRef.current;
 
   const handleOpenChange = (nextOpen: boolean) => {
     // Closing the dialog drops what was typed for the previous person: the
@@ -370,7 +393,7 @@ function BanUserDialog({
 
   const handleBan = async () => {
     const draft = draftRef.current;
-    setIsBanning(true);
+    setPendingDraft(draft);
     try {
       await ban({
         payload: {
@@ -398,7 +421,9 @@ function BanUserDialog({
         type: "error",
       });
     } finally {
-      setIsBanning(false);
+      // A later draft may already have its own request in flight; only clear
+      // the flag this request set.
+      setPendingDraft((current) => (current === draft ? null : current));
     }
   };
 
