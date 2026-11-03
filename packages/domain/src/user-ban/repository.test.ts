@@ -102,6 +102,74 @@ describe("UserBanRepository", () => {
       })
     );
 
+    it.effect("keeps the address a merging ban names", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBanRepository;
+        const organizationId = yield* createOrganization();
+        const account = yield* createUser("facet");
+        // The contact is how the same person is named with a second address.
+        const contactEmail = "facet-contact@example.com";
+        yield* createContact({
+          email: contactEmail,
+          organizationId,
+          userId: account.id,
+        });
+        const now = yield* DateTime.nowAsDate;
+        // The account row is created first so it is the survivor of the merge
+        // below; ids are generated, so the ordering has to come from the date.
+        const earlier = DateTime.toDateUtc(
+          DateTime.makeUnsafe(now.getTime() - 60_000)
+        );
+
+        // Two rows for one person: the account, and the address the widget
+        // uses. The third ban names both facets at once, so one row has to
+        // carry the contact's address after the merge.
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: account.email,
+          now: earlier,
+          organizationId,
+          reason: null,
+          userId: account.id,
+        });
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: contactEmail,
+          now,
+          organizationId,
+          reason: null,
+          userId: null,
+        });
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: contactEmail,
+          now,
+          organizationId,
+          reason: null,
+          userId: account.id,
+        });
+
+        const listed = yield* repository.list({
+          limit: 10,
+          offset: 0,
+          organizationId,
+        });
+        expect(listed.total).toBe(1);
+
+        // The identity the operator just banned is still banned, with no
+        // account needed to match it, and so is the account.
+        expect(
+          yield* repository.isBanned({ email: contactEmail, organizationId })
+        ).toBe(true);
+        expect(
+          yield* repository.isBanned({
+            organizationId,
+            userId: account.id,
+          })
+        ).toBe(true);
+      })
+    );
+
     it.effect("merges an address ban with the account it later matches", () =>
       Effect.gen(function* () {
         const repository = yield* UserBanRepository;

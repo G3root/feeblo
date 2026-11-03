@@ -602,10 +602,17 @@ const makeUserBanRepository = Effect.gen(function* () {
         const [updated] = yield* db
           .update(table)
           .set({
-            email: keeper.email ?? email,
+            // The facets on the row being written win. A ban named by a
+            // contact carries that contact's address, and the duplicate this
+            // merge deletes may be the only row holding it; keeping the
+            // survivor's older address would silently unban the address the
+            // operator just named. Nothing is lost from the other side: an
+            // identity with the older address resolves to the account, and
+            // the account facet is kept.
+            email: email ?? keeper.email,
             reason: input.reason ?? keeper.reason,
             updatedAt: input.now,
-            userId: keeper.userId ?? input.userId,
+            userId: input.userId ?? keeper.userId,
           })
           .where(eq(table.id, keeper.id))
           .returning();
