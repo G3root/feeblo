@@ -1640,6 +1640,55 @@ describe("CommentRpcHandlers", () => {
         })
       );
 
+      it.effect("lets a banned owner delete their own comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* handlers
+            .CreateCommentPublic(
+              commentCreateInput(fixture, commentId, "Own comment")
+            )
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          // Withdrawing your own words is not participation, so the delete
+          // path must not carry the participation check the update path has.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.id, fixture.membershipId));
+          yield* db.insert(schema.userBanTable).values({
+            createdAt: now,
+            id: `ban_${fixture.userId}`,
+            organizationId: fixture.organizationId,
+            updatedAt: now,
+            userId: fixture.userId,
+          });
+
+          yield* handlers
+            .DeleteCommentPublic({
+              id: commentId,
+              organizationId: fixture.organizationId,
+              postId: fixture.postId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          const comments = yield* handlers
+            .ListCommentsPublic({
+              organizationId: fixture.organizationId,
+              slug: fixture.postSlug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(comments).toHaveLength(0);
+        })
+      );
+
       it.effect("rejects non-owners updating via public endpoint", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;

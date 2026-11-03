@@ -4633,6 +4633,35 @@ describe("PostRpcHandlers", () => {
         })
       );
 
+      it.effect("still lets a banned author delete their own post", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          // Withdrawing your own post is not participation, so the delete path
+          // must not carry the participation check the writes have.
+          yield* handlers
+            .DeletePostPublic({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          const posts = yield* handlers
+            .ListPostsPublic({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(posts).toHaveLength(0);
+        })
+      );
+
       it.effect("refuses UpdatePostPublic", () =>
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
