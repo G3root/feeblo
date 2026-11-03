@@ -523,15 +523,20 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const tokenHash = yield* hashEmailSubscriptionToken(
       redactEmailSubscriptionToken(input.verificationToken)
     );
-    const [row] = yield* db
-      .select()
+    const [subscription] = yield* db
+      .select({
+        contactId: schema.emailSubscriptionTable.contactId,
+        id: schema.emailSubscriptionTable.id,
+        state: schema.emailSubscriptionTable.state,
+        verificationExpiresAt:
+          schema.emailSubscriptionTable.verificationExpiresAt,
+      })
       .from(schema.emailSubscriptionTable)
       .where(eq(schema.emailSubscriptionTable.verificationTokenHash, tokenHash))
       .limit(1);
-    if (row === undefined) {
+    if (subscription === undefined) {
       return { _tag: "Invalid" as const };
     }
-    const subscription = yield* decodeSubscription(row, "verifySubscription");
     if (
       subscription.state === "active" ||
       subscription.state === "paused_by_plan"
@@ -579,17 +584,19 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       const tokenHash = yield* hashEmailSubscriptionToken(
         redactEmailSubscriptionToken(input.unsubscribeToken)
       );
-      const [row] = yield* db
-        .select()
+      const [subscription] = yield* db
+        .select({
+          id: schema.emailSubscriptionTable.id,
+          state: schema.emailSubscriptionTable.state,
+        })
         .from(schema.emailSubscriptionTable)
         .where(
           eq(schema.emailSubscriptionTable.unsubscribeTokenHash, tokenHash)
         )
         .limit(1);
-      if (row === undefined) {
+      if (subscription === undefined) {
         return { _tag: "Invalid" as const };
       }
-      const subscription = yield* decodeSubscription(row, "unsubscribe");
       if (subscription.state === "unsubscribed") {
         return { _tag: "AlreadyUnsubscribed" as const };
       }

@@ -167,8 +167,19 @@ export const WebhookManagementServiceLive = Layer.effect(
       function* ({ organizationId }: { readonly organizationId: string }) {
         const rows = yield* db
           .select({
-            connection: schema.integrationConnectionTable,
-            route: schema.integrationRouteTable,
+            connection: {
+              id: schema.integrationConnectionTable.id,
+              lastFailedAt: schema.integrationConnectionTable.lastFailedAt,
+              lastSucceededAt:
+                schema.integrationConnectionTable.lastSucceededAt,
+              lifecycle: schema.integrationConnectionTable.lifecycle,
+              name: schema.integrationConnectionTable.name,
+              safeDisplayMetadata:
+                schema.integrationConnectionTable.safeDisplayMetadata,
+            },
+            route: {
+              eventTypes: schema.integrationRouteTable.eventTypes,
+            },
           })
           .from(schema.integrationConnectionTable)
           .innerJoin(
@@ -427,7 +438,9 @@ export const WebhookManagementServiceLive = Layer.effect(
                 );
             }
             const [route] = yield* db
-              .select()
+              .select({
+                eventTypes: schema.integrationRouteTable.eventTypes,
+              })
               .from(schema.integrationRouteTable)
               .where(
                 and(
@@ -790,7 +803,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 });
               }
               const [route] = yield* db
-                .select()
+                .select({
+                  enabled: schema.integrationRouteTable.enabled,
+                  id: schema.integrationRouteTable.id,
+                })
                 .from(schema.integrationRouteTable)
                 .where(
                   and(
@@ -885,8 +901,15 @@ export const WebhookManagementServiceLive = Layer.effect(
         const pageSize = Math.min(Math.max(input.limit ?? 20, 1), 100);
         const rows = yield* db
           .select({
-            delivery: schema.integrationDeliveryTable,
-            event: schema.integrationEventTable,
+            delivery: {
+              attemptCount: schema.integrationDeliveryTable.attemptCount,
+              createdAt: schema.integrationDeliveryTable.createdAt,
+              id: schema.integrationDeliveryTable.id,
+              nextAttemptAt: schema.integrationDeliveryTable.nextAttemptAt,
+              routeId: schema.integrationDeliveryTable.routeId,
+              state: schema.integrationDeliveryTable.state,
+            },
+            event: { type: schema.integrationEventTable.type },
           })
           .from(schema.integrationDeliveryTable)
           .innerJoin(
@@ -943,7 +966,17 @@ export const WebhookManagementServiceLive = Layer.effect(
           pageRows.length === 0
             ? []
             : yield* db
-                .select()
+                .select({
+                  deliveryId: schema.integrationDeliveryAttemptTable.deliveryId,
+                  durationMs: schema.integrationDeliveryAttemptTable.durationMs,
+                  errorTag: schema.integrationDeliveryAttemptTable.errorTag,
+                  finishedAt: schema.integrationDeliveryAttemptTable.finishedAt,
+                  httpStatus: schema.integrationDeliveryAttemptTable.httpStatus,
+                  id: schema.integrationDeliveryAttemptTable.id,
+                  retryDecision:
+                    schema.integrationDeliveryAttemptTable.retryDecision,
+                  startedAt: schema.integrationDeliveryAttemptTable.startedAt,
+                })
                 .from(schema.integrationDeliveryAttemptTable)
                 .where(
                   inArray(

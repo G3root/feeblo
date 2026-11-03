@@ -105,7 +105,13 @@ export const linkShadowUser = ({
         const now = yield* DateTime.nowAsDate;
 
         const realUsers = yield* db
-          .select()
+          .select({
+            email: schema.userTable.email,
+            emailVerified: schema.userTable.emailVerified,
+            id: schema.userTable.id,
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
           .from(schema.userTable)
           .where(eq(schema.userTable.id, realUserId))
           .limit(1);
@@ -315,7 +321,10 @@ const activateDeferredSubscriptionsForContact = (args: {
   readonly contactEmail: string;
   readonly now: Date;
   readonly organizationId: string;
-  readonly realUser: typeof schema.userTable.$inferSelect;
+  readonly realUser: Pick<
+    typeof schema.userTable.$inferSelect,
+    "email" | "emailVerified" | "id" | "restrictedToOrganizationId"
+  >;
 }) =>
   Effect.gen(function* () {
     // No proof, no activation: every eligibility branch below requires it.
@@ -478,7 +487,10 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
     const db = yield* currentDb;
 
     const users = yield* db
-      .select()
+      .select({
+        email: schema.userTable.email,
+        emailVerified: schema.userTable.emailVerified,
+      })
       .from(schema.userTable)
       .where(eq(schema.userTable.id, userId))
       .limit(1);
@@ -631,7 +643,12 @@ export const activateDeferredSubscriptionsForVerifiedUser = ({
     const db = yield* currentDb;
 
     const users = yield* db
-      .select()
+      .select({
+        email: schema.userTable.email,
+        emailVerified: schema.userTable.emailVerified,
+        id: schema.userTable.id,
+        restrictedToOrganizationId: schema.userTable.restrictedToOrganizationId,
+      })
       .from(schema.userTable)
       .where(eq(schema.userTable.id, userId))
       .limit(1);

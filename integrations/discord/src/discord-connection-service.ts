@@ -411,7 +411,14 @@ export const makeDiscordConnectionServiceLive = (
       const listConnections = Effect.fn("DiscordConnection.listConnections")(
         function* ({ organizationId }: { readonly organizationId: string }) {
           const rows = yield* db
-            .select()
+            .select({
+              createdAt: schema.integrationConnectionTable.createdAt,
+              id: schema.integrationConnectionTable.id,
+              lifecycle: schema.integrationConnectionTable.lifecycle,
+              name: schema.integrationConnectionTable.name,
+              safeDisplayMetadata:
+                schema.integrationConnectionTable.safeDisplayMetadata,
+            })
             .from(schema.integrationConnectionTable)
             .where(
               and(

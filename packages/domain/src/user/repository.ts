@@ -152,7 +152,10 @@ const makeUserRepository = Effect.gen(function* () {
 
         // Match an existing SSO-only user by its email hash and organization.
         const existingByHash = yield* db
-          .select()
+          .select({
+            email: schema.userTable.email,
+            id: schema.userTable.id,
+          })
           .from(schema.userTable)
           .where(
             and(
@@ -229,7 +232,10 @@ const makeUserRepository = Effect.gen(function* () {
           return created;
         }
         const [winner] = yield* db
-          .select()
+          .select({
+            email: schema.userTable.email,
+            id: schema.userTable.id,
+          })
           .from(schema.userTable)
           .where(
             and(
@@ -351,7 +357,7 @@ const makeUserRepository = Effect.gen(function* () {
           return created;
         }
         const [winner] = yield* db
-          .select()
+          .select({ id: schema.userTable.id })
           .from(schema.userTable)
           .where(
             and(

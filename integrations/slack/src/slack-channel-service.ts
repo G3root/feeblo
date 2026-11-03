@@ -88,7 +88,9 @@ export const makeSlackChannelServiceLive = (
             });
           }
           const routeRows = yield* db
-            .select()
+            .select({
+              providerConfig: schema.integrationRouteTable.providerConfig,
+            })
             .from(schema.integrationRouteTable)
             .where(
               and(
@@ -170,7 +172,10 @@ export const makeSlackChannelServiceLive = (
               // its routeKey (the channel id) instead of decoding every
               // channel.notifications route's providerConfig.
               const [route] = yield* db
-                .select()
+                .select({
+                  enabled: schema.integrationRouteTable.enabled,
+                  id: schema.integrationRouteTable.id,
+                })
                 .from(schema.integrationRouteTable)
                 .where(
                   and(

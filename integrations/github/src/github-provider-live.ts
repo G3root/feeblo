@@ -213,7 +213,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
               )
             );
             const [connection] = yield* db
-              .select()
+              .select({
+                credentialsCiphertext:
+                  schema.integrationConnectionTable.credentialsCiphertext,
+                id: schema.integrationConnectionTable.id,
+                organizationId:
+                  schema.integrationConnectionTable.organizationId,
+              })
               .from(schema.integrationConnectionTable)
               .where(
                 and(
@@ -333,7 +339,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                       : existingInstallation.connectionId;
                   if (reusedConnectionId !== undefined) {
                     const [reusedConnection] = yield* db
-                      .select()
+                      .select({
+                        id: schema.integrationConnectionTable.id,
+                        lifecycle: schema.integrationConnectionTable.lifecycle,
+                      })
                       .from(schema.integrationConnectionTable)
                       .where(
                         and(

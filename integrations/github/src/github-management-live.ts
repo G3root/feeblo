@@ -68,7 +68,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
   const externalResources = yield* ExternalResourceService;
   const requireConnection = (organizationId: string, connectionId: string) =>
     db
-      .select()
+      .select({ id: schema.integrationConnectionTable.id })
       .from(schema.integrationConnectionTable)
       .where(
         and(
@@ -94,7 +94,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
       );
   const lockConnection = (organizationId: string, connectionId: string) =>
     db
-      .select()
+      .select({ lifecycle: schema.integrationConnectionTable.lifecycle })
       .from(schema.integrationConnectionTable)
       .where(
         and(

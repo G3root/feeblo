@@ -340,10 +340,10 @@ const makeContactRepository = Effect.gen(function* () {
         return contact !== undefined;
       }),
 
-    /** The full row, for callers that need more than the id. */
+    /** The unsubscribe target's address, and nothing else. */
     findById: ({ id, organizationId }: TContactDelete) =>
       db
-        .select()
+        .select({ email: schema.contactTable.email })
         .from(schema.contactTable)
         .where(
           and(
