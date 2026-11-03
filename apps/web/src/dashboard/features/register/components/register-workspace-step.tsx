@@ -90,11 +90,18 @@ export const RegisterWorkspaceStep = withForm({
     );
 
     const slug = toWorkspaceSlug(workspaceName);
-    const {
-      status: slugStatus,
-      suggestion,
-      reason,
-    } = useWorkspaceSlugAvailability(slug, slug.length >= 4);
+    const { availability, reportWorkspaceName } =
+      useWorkspaceSlugAvailability(workspaceName);
+    const { status: slugStatus, suggestion, reason } = availability;
+
+    /**
+     * Every path that changes the name reports it to the machine, so the
+     * suggestion button and the input are the same event to the lifecycle.
+     */
+    const chooseName = (nextWorkspaceName: string) => {
+      form.setFieldValue("workspaceName", nextWorkspaceName);
+      reportWorkspaceName(nextWorkspaceName);
+    };
 
     return (
       <div className="flex flex-col gap-4">
@@ -109,7 +116,10 @@ export const RegisterWorkspaceStep = withForm({
                   <InputGroupInput
                     id={field.name}
                     onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
+                    onChange={(e) => {
+                      field.handleChange(e.target.value);
+                      reportWorkspaceName(e.target.value);
+                    }}
                     placeholder="Acme Labs"
                     value={field.state.value ?? ""}
                   />
@@ -136,7 +146,9 @@ export const RegisterWorkspaceStep = withForm({
               <InputGroupText>.{appRootDomain}</InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-          {renderSlugFooter(slug, slugStatus, suggestion, reason, form)}
+          {renderSlugFooter(slug, slugStatus, suggestion, reason, {
+            setFieldValue: (_name, value) => chooseName(value),
+          })}
         </Field>
       </div>
     );

@@ -39,6 +39,8 @@ const answered = (
   reason: string | null = null
 ): SlugCheckAnswer => ({ available, reason, suggestion });
 
+const EMPTY_INPUT = { enabled: false, slug: "" };
+
 describe("slug availability machine", () => {
   let checks: PendingCheck[] = [];
   let machine: ReturnType<typeof createSlugAvailabilityMachine>;
@@ -48,7 +50,8 @@ describe("slug availability machine", () => {
       checks.push({ abandon, settle, signal, slug });
     });
 
-  const start = () => createActor(machine).start();
+  const start = (input: { slug: string; enabled: boolean } = EMPTY_INPUT) =>
+    createActor(machine, { input }).start();
 
   const availabilityOf = (actor: ReturnType<typeof start>) =>
     toSlugAvailability(
@@ -66,6 +69,25 @@ describe("slug availability machine", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("checks a name the form already held when the machine started", async () => {
+    // Stepping back through the registration form remounts this step with the
+    // name still filled in. Nothing fires `onChange`, so the mount has to seed
+    // the lifecycle the same way typing would.
+    const actor = start({ enabled: true, slug: "acme-corp" });
+    expect(availabilityOf(actor).status).toBe("idle");
+
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(checks.map((entry) => entry.slug)).toStrictEqual(["acme-corp"]);
+  });
+
+  it("does not check a name too short to be a slug", async () => {
+    const actor = start({ enabled: false, slug: "ac" });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(checks).toHaveLength(0);
   });
 
   it("stays idle when the field is empty or disabled", async () => {

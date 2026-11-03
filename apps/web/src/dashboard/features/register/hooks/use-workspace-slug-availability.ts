@@ -1,31 +1,54 @@
 import { useMachine } from "@xstate/react";
-import { useEffect } from "react";
+import { useCallback } from "react";
 
 import {
   type SlugAvailability,
   slugAvailabilityMachine,
   toSlugAvailability,
 } from "../lib/slug-availability-machine";
+import { toWorkspaceSlug } from "../utils";
+
+/** The field's shortest allowed subdomain. Below it there is nothing to ask. */
+const MIN_SLUG_LENGTH = 4;
 
 /**
  * Reports whether a workspace slug is available, debounced.
  *
  * The lifecycle lives in `slug-availability-machine.ts`; this hook is the
- * adapter between React's render cycle and the machine's events. Sending
- * `INPUT` is all it does on a render, and the machine decides whether that
- * means "arm a check", "cancel the one in flight", or "there is nothing to
- * ask" — the three branches the previous implementation interleaved into one
- * effect.
+ * adapter between React's render cycle and the machine's events. Calling it
+ * **is** not an effect: the machine is seeded with the name already in the
+ * form, and every later change is reported by whoever made it
+ * (`reportWorkspaceName`), which is an event handler — not a subscription to a
+ * value that has already changed by the time an effect runs.
+ *
+ * That distinction is the whole point. An effect that mirrors a derived value
+ * into an actor runs after paint, so it can report a slug the field no longer
+ * shows, and it must be written carefully enough not to loop. A handler cannot
+ * do either.
  */
-export function useWorkspaceSlugAvailability(
-  slug: string,
-  enabled: boolean
-): SlugAvailability {
-  const [snapshot, send] = useMachine(slugAvailabilityMachine);
+export function useWorkspaceSlugAvailability(workspaceName: string): {
+  readonly availability: SlugAvailability;
+  readonly reportWorkspaceName: (workspaceName: string) => void;
+} {
+  const slug = toWorkspaceSlug(workspaceName);
+  const [snapshot, send] = useMachine(slugAvailabilityMachine, {
+    input: { enabled: slug.length >= MIN_SLUG_LENGTH, slug },
+  });
 
-  useEffect(() => {
-    send({ type: "INPUT", enabled, slug });
-  }, [enabled, send, slug]);
+  const reportWorkspaceName = useCallback(
+    (nextWorkspaceName: string) => {
+      const nextSlug = toWorkspaceSlug(nextWorkspaceName);
+      send({
+        type: "INPUT",
+        enabled: nextSlug.length >= MIN_SLUG_LENGTH,
+        slug: nextSlug,
+      });
+    },
+    [send]
+  );
 
-  return toSlugAvailability(snapshot);
+  return {
+    availability: toSlugAvailability(snapshot),
+    reportWorkspaceName,
+  };
 }

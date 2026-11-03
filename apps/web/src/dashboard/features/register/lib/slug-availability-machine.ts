@@ -98,6 +98,21 @@ const InputEventSchema = Schema.toStandardSchemaV1(
 );
 
 /**
+ * The value the field already holds when the machine starts — a prefilled name
+ * when the user steps back to this form. It is actor `input` rather than a
+ * `send()` on mount because `useMachine` seeds the actor once: rendering is not
+ * an event, and an effect whose whole job is to hand React's current value to
+ * an actor is the pattern this removes.
+ */
+const SlugInputSchema = Schema.toStandardSchemaV1(
+  Schema.Struct({ enabled: Schema.Boolean, slug: Schema.String })
+);
+
+/** True when there is something to ask about. */
+const hasQuery = ({ enabled, slug }: SlugAvailabilityContext): boolean =>
+  enabled && slug.length > 0;
+
+/**
  * The one request this lifecycle makes, as a plain function so a test can
  * supply its own: the machine takes the checker as a constructor argument
  * rather than reaching into a module.
@@ -151,14 +166,15 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
     schemas: {
       context: AvailabilityContextSchema,
       events: { INPUT: InputEventSchema },
+      input: SlugInputSchema,
     },
   }).createMachine({
-    context: {
-      enabled: false,
+    context: ({ input }: { input: SlugAvailabilityContext }) => ({
+      enabled: input.enabled,
       reason: null,
-      slug: "",
+      slug: input.slug,
       suggestion: null,
-    },
+    }),
     id: "workspaceSlugAvailability",
     initial: "idle",
     // At the root so a slug change is handled identically in every state: arm
@@ -171,7 +187,12 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
       }),
     },
     states: {
-      idle: {},
+      idle: {
+        // A machine that starts holding a name already typed owes the field a
+        // check, so mounting mid-form behaves exactly like typing does.
+        always: ({ context }: { context: SlugAvailabilityContext }) =>
+          hasQuery(context) ? { target: "debouncing" } : undefined,
+      },
       // Re-entering restarts the timer, so this state's own duration is the
       // debounce, and `checking` is the only way out of it.
       debouncing: {
