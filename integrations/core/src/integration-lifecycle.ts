@@ -232,8 +232,14 @@ const connectionHandles = (
   );
 };
 
-/** The same, for the delivery graph. */
-const deliveryHandles = (
+/**
+ * The same, for the delivery graph.
+ *
+ * Exported because it is the only way to observe a self-edge: every state
+ * derivation here filters `from === to` out, so a test built on them cannot
+ * tell "no edge" from "an edge that stays put".
+ */
+export const deliveryHandles = (
   from: IntegrationDeliveryState,
   to: IntegrationDeliveryState
 ): boolean => {

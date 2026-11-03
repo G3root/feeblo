@@ -3,6 +3,7 @@ import {
   DATA_IMPORT_STATUSES,
   type TDataImportStatus,
 } from "@feeblo/domain-contracts/data-import";
+import { transition } from "xstate";
 
 import {
   DATA_IMPORT_JOB_EVENTS,
@@ -54,6 +55,30 @@ describe("data import job machine", () => {
       ["running", "failed"],
       ["running", "canceled"],
     ]);
+  });
+
+  it("ends a running job as completed or failed, never the other way", () => {
+    const running = dataImportJobMachine.resolveState({
+      context: {},
+      value: "running",
+    });
+
+    expect(
+      transition(dataImportJobMachine, running, { type: "complete" })[0].value
+    ).toBe("completed");
+    expect(
+      transition(dataImportJobMachine, running, { type: "fail" })[0].value
+    ).toBe("failed");
+    // A terminal job is never moved again by the worker.
+    for (const ending of ["completed", "failed"] as const) {
+      const snapshot = dataImportJobMachine.resolveState({
+        context: {},
+        value: ending,
+      });
+      expect(
+        transition(dataImportJobMachine, snapshot, { type: "fail" })[0].value
+      ).toBe(ending);
+    }
   });
 
   it("keeps the happy path intact", () => {

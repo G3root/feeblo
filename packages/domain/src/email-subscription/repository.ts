@@ -544,6 +544,23 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       )
       .returning();
     if (updated === undefined) {
+      // The guarded `UPDATE` matched nothing, which has two causes worth
+      // telling apart: another request verified this subscription between the
+      // read above and this write — that is the same success, reached twice —
+      // or the row moved somewhere this token may not take it, which is a real
+      // inconsistency. Re-read to find out which.
+      const [current] = yield* db
+        .select()
+        .from(schema.emailSubscriptionTable)
+        .where(eq(schema.emailSubscriptionTable.id, subscription.id))
+        .limit(1);
+      const reread =
+        current === undefined
+          ? undefined
+          : yield* decodeSubscription(current, "verifySubscription.reread");
+      if (reread?.state === "active" || reread?.state === "paused_by_plan") {
+        return { _tag: "AlreadyVerified" as const };
+      }
       return yield* dataError(
         "verifySubscription",
         "Email subscription verification did not return a row"

@@ -123,8 +123,11 @@ const hasQuery = ({ enabled, slug }: SlugAvailabilityContext): boolean =>
  * rather than reaching into a module.
  *
  * It runs as an `invoke` child, so the actor's lifetime is the request's: the
- * signal aborts when `checking` is left, which is how a superseded check stops
- * instead of being ignored after it has already landed.
+ * signal aborts when `checking` is left, which ends the *caller's* wait — the
+ * response can no longer arrive, so it can never be rendered. It does not undo
+ * a request the client already posted: `CheckWorkspaceSlug` is batched, and a
+ * batch that has been sent may still be processed server-side. Cancellation
+ * here is about what the field may show, not about sparing the server work.
  */
 export type SlugAvailabilityCheck = (
   input: SlugCheckInput,
@@ -185,11 +188,26 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
     // At the root so a slug change is handled identically in every state: arm
     // the debounce, or drop to `idle` and abort whatever was in flight.
     on: {
-      INPUT: ({ event }: { event: SlugInputEvent }) => ({
-        context: inputContext(event),
-        target:
-          event.enabled && event.slug.length > 0 ? ".debouncing" : ".idle",
-      }),
+      INPUT: ({
+        context,
+        event,
+      }: {
+        context: SlugAvailabilityContext;
+        event: SlugInputEvent;
+      }) => {
+        // The field is reported on every keystroke, but only the normalized
+        // slug matters. Capitalizing a name it has already checked would
+        // otherwise throw away a settled answer and ask again for the same
+        // string.
+        if (event.enabled === context.enabled && event.slug === context.slug) {
+          return undefined;
+        }
+        return {
+          context: inputContext(event),
+          target:
+            event.enabled && event.slug.length > 0 ? ".debouncing" : ".idle",
+        };
+      },
     },
     states: {
       idle: {

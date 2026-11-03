@@ -331,7 +331,12 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 IntegrationProviderKey.make("github")
               ),
               inArray(schema.integrationConnectionTable.lifecycle, [
+                // `archived` is included on purpose, which the graph alone
+                // would not: a deletion webhook can archive this row first,
+                // and the update is also the one that scrubs the credentials.
+                // Blocking it would leave them on a tombstone.
                 ...connectionSourceStatesFor("archived"),
+                "archived",
               ])
             )
           )

@@ -213,12 +213,17 @@ show as an unused package.
 | `packages/domain/src/email-subscription/subscription-machine.ts` | pure, `setupEffect` | transition events next to a decision event; the `none` state |
 | `apps/web/src/dashboard/features/register/lib/slug-availability-machine.ts` | client, `setup` + `@xstate/react` | debounce-as-state, abort-on-exit, actor `input` instead of a mount effect |
 | `packages/domain/src/email-outbox/delivery-state.ts` | table, pre-XState | the derived-guard pattern the machines follow |
-| `integrations/core/src/integration-lifecycle.ts` | table, pre-XState | see the warning below |
+| `integrations/core/src/integration-lifecycle.ts` | pure, `setupEffect` | two graphs in one file; a deliberate self-transition; legacy states |
 
-`integration-lifecycle.ts` is the cautionary example, not the model: it declares
-two graphs, tests them, and **nothing consults either one**. Every connection
-lifecycle write in `integrations/*` is still guarded by a hand-written
-`eq(lifecycle, …)`. A table nobody reads is documentation that rots.
+`integration-lifecycle.ts` is also the cautionary example. It declared both
+graphs and tested them for months while **nothing consulted either one**, and
+when the graphs were finally wired to real call sites they turned out to have
+drifted from the code: two states nobody persisted, and a disconnect flow the
+predicate had no name for. The connection list filters and the
+archive-transition writes now read `LISTED_CONNECTION_LIFECYCLES` and
+`connectionSourceStatesFor`, but the other connection writes in `integrations/*`
+still carry hand-written `eq(lifecycle, …)` guards, so the two can still
+disagree. A graph is only a source of truth once every write asks it.
 
 ## Do not
 

@@ -41,6 +41,10 @@ describe("email delivery state", () => {
       expect(canTransitionDelivery("sending", "expired")).toBe(true);
       expect(canTransitionDelivery("sending", "paused_by_plan")).toBe(true);
       expect(canTransitionDelivery("delivered", "sending")).toBe(false);
+      // `queued` never goes straight to `delivered`: the provider reports that
+      // only after the message was handed over, which means `sending` (or
+      // `accepted`) came first.
+      expect(canTransitionDelivery("queued", "delivered")).toBe(false);
       expect(isTerminalDeliveryState("delivered")).toBe(true);
       expect(isTerminalDeliveryState("deferred")).toBe(false);
     });

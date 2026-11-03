@@ -136,6 +136,12 @@ describe("email subscription machine", () => {
     expect(nextStateForRequest("pending_verification", plain)).toBe(
       "pending_verification"
     );
+    // A deferred request says "no account with access", not "unverified". For
+    // a row already pending verification the flag changes nothing, so the
+    // stored pending token and its expiry survive.
+    expect(nextStateForRequest("pending_verification", deferred)).toBe(
+      "pending_verification"
+    );
   });
 
   it("re-arms verification for a deferred row once access is no longer the problem", () => {

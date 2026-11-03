@@ -7,8 +7,8 @@ import {
 import {
   EMAIL_INTENT_EVENTS,
   EMAIL_INTENT_STATES,
-  LEGACY_EMAIL_INTENT_STATES,
   emailIntentMachine,
+  LEGACY_EMAIL_INTENT_STATES,
   sourceStatesFor,
   targetStateFor,
 } from "./intent-machine";
@@ -34,6 +34,11 @@ const canMove = (from: TEmailOutboxState, to: TEmailOutboxState): boolean =>
 
 describe("email intent machine", () => {
   it("declares every state the stored vocabulary allows", () => {
+    // `EMAIL_INTENT_STATES` is an alias of the vocabulary, so comparing the
+    // two proves nothing. The machine's own keys are the thing that can drift.
+    expect(Object.keys(emailIntentMachine.states).sort()).toStrictEqual(
+      [...ALL].sort()
+    );
     expect([...EMAIL_INTENT_STATES].sort()).toStrictEqual([...ALL].sort());
   });
 

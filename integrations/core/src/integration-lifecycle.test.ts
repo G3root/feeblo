@@ -8,6 +8,7 @@ import {
   canTransitionIntegrationConnectionLifecycle,
   canTransitionIntegrationDeliveryState,
   connectionSourceStatesFor,
+  deliveryHandles,
   deliverySourceStatesFor,
   integrationConnectionMachine,
 } from "./integration-lifecycle";
@@ -214,11 +215,21 @@ describe("integration delivery state", () => {
   });
 
   it("has no self-transition", () => {
-    // A self-transition would be invisible to `sourceStatesFor`, which filters
-    // the state it targets. The connection graph has one on purpose; this one
-    // must not.
-    for (const to of deliveries) {
-      expect(deliverySourceStatesFor(to)).not.toContain(to);
+    // `deliverySourceStatesFor` filters `from === to` out, so asserting it
+    // does not contain the target would pass whether or not a self-edge
+    // exists. The predicate itself is the only witness.
+    for (const state of deliveries) {
+      expect(deliveryHandles(state, state)).toBe(false);
     }
+  });
+
+  it("declares every delivery state", () => {
+    expect([...deliveries].sort()).toStrictEqual([
+      "canceled",
+      "exhausted",
+      "leased",
+      "pending",
+      "succeeded",
+    ]);
   });
 });

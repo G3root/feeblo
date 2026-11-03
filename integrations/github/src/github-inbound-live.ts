@@ -397,9 +397,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .update(schema.integrationConnectionTable)
               .set({ lifecycle: "paused" })
               .where(
-                eq(
-                  schema.integrationConnectionTable.id,
-                  installation.connectionId
+                and(
+                  eq(
+                    schema.integrationConnectionTable.id,
+                    installation.connectionId
+                  ),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("paused"),
+                  ])
                 )
               )
               .pipe(Effect.mapError(inboundDatabaseError("connection pause")));
@@ -428,9 +433,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .update(schema.integrationConnectionTable)
               .set({ lifecycle: "active" })
               .where(
-                eq(
-                  schema.integrationConnectionTable.id,
-                  installation.connectionId
+                and(
+                  eq(
+                    schema.integrationConnectionTable.id,
+                    installation.connectionId
+                  ),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("active"),
+                  ])
                 )
               )
               .pipe(

@@ -123,8 +123,13 @@ describe("slug availability machine", () => {
       actor.send({ type: "INPUT", enabled: true, slug });
       await vi.advanceTimersByTimeAsync(100);
     }
-    await vi.advanceTimersByTimeAsync(400);
 
+    // Each keystroke restarts the timer, so 349 ms after the last one is still
+    // inside the window and nothing has been asked yet.
+    await vi.advanceTimersByTimeAsync(249);
+    expect(checks).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(1);
     expect(checks.map((entry) => entry.slug)).toStrictEqual(["acme"]);
   });
 
@@ -192,6 +197,36 @@ describe("slug availability machine", () => {
       "acme-corp",
       "acme-labs",
     ]);
+
+    // Settling the superseded request is the point of the test: its promise
+    // still resolves, and the field must not move because of it.
+    superseded?.settle(answered(true));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(availabilityOf(actor)).toStrictEqual({
+      status: "checking",
+      suggestion: null,
+      reason: null,
+    });
+  });
+
+  it("keeps a settled answer when the slug normalizes to the same string", async () => {
+    const actor = start();
+
+    actor.send({ type: "INPUT", enabled: true, slug: "acme-corp" });
+    await vi.advanceTimersByTimeAsync(400);
+    checks[0]?.settle(answered(true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(availabilityOf(actor).status).toBe("available");
+
+    // Capitalizing the name changes what the field shows but not the slug, and
+    // the hook reports the slug. Throwing away a settled answer to ask the same
+    // question again would flash the footer for no reason.
+    actor.send({ type: "INPUT", enabled: true, slug: "acme-corp" });
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(checks).toHaveLength(1);
+    expect(availabilityOf(actor).status).toBe("available");
   });
 
   it("drops a settled answer as soon as the slug changes again", async () => {
