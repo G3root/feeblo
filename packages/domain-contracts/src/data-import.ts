@@ -15,22 +15,25 @@ import * as S from "effect/Schema";
  * pass cannot continue at all. A completed job may still carry per-row errors;
  * that is the row report's job, not a different state.
  */
-export const DataImportStatus = S.Literals([
+export const DATA_IMPORT_STATUSES = [
   "awaiting_confirmation",
   "queued",
   "running",
   "completed",
   "failed",
   "canceled",
-]);
+] as const;
+
+export const DataImportStatus = S.Literals(DATA_IMPORT_STATUSES);
 
 export type TDataImportStatus = S.Schema.Type<typeof DataImportStatus>;
 
-/** True for the states in which a staged import still occupies its workspace. */
-export const isActiveDataImportStatus = (status: TDataImportStatus): boolean =>
-  status === "awaiting_confirmation" ||
-  status === "queued" ||
-  status === "running";
+/**
+ * The state graph itself lives in `@feeblo/domain` (`data-transfer/machine.ts`),
+ * where the guarded SQL that enforces it also lives. This module keeps the
+ * vocabulary because the database column and the browser labels both read it,
+ * and neither may import the other (see `docs/adr/0002`).
+ */
 
 /**
  * Canonical per-row outcome of an import.
