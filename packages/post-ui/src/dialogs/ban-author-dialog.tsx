@@ -10,6 +10,7 @@ import {
 import { Button } from "@feeblo/ui/button";
 import { Checkbox } from "@feeblo/ui/checkbox";
 import { Label } from "@feeblo/ui/label";
+import { Textarea } from "@feeblo/ui/textarea";
 import { toastManager } from "@feeblo/ui/toast";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
@@ -37,6 +38,7 @@ export function BanAuthorDialog() {
     collections: { commentCollection, postCollection },
   } = usePostCollections();
   const [deleteContent, setDeleteContent] = useState(false);
+  const [reason, setReason] = useState("");
   const [isPending, setIsPending] = useState(false);
 
   const close = () => store.send({ type: "setOpen", open: false });
@@ -49,10 +51,13 @@ export function BanAuthorDialog() {
           deleteContent,
           organizationId,
           target: data.target,
+          // Optional on the server; an empty box must not store "".
+          ...(reason.trim() === "" ? undefined : { reason: reason.trim() }),
         })
       );
       close();
       setDeleteContent(false);
+      setReason("");
       toastManager.add({
         title:
           result.deletedComments + result.deletedPosts > 0
@@ -75,10 +80,11 @@ export function BanAuthorDialog() {
   return (
     <AlertDialog
       onOpenChange={(nextOpen) => {
-        // A dismissed dialog must not carry the delete choice into the next
-        // comment it is opened for.
+        // A dismissed dialog must not carry the delete choice, or a note
+        // written for one comment, into the next one it is opened for.
         if (!nextOpen) {
           setDeleteContent(false);
+          setReason("");
         }
         store.send({ type: "setOpen", open: nextOpen });
       }}
@@ -95,6 +101,24 @@ export function BanAuthorDialog() {
             visible unless you delete them below.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="grid gap-2 px-6 pb-4">
+          <Label className="text-sm font-normal" htmlFor="ban-author-reason">
+            Reason (optional)
+          </Label>
+          <Textarea
+            id="ban-author-reason"
+            maxLength={500}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Spam, abuse, or a note for your team"
+            value={reason}
+          />
+          {/* The reason is operator context, not a notice: the server never
+              returns it on the banned person's own status read. Saying so here
+              is what keeps somebody from writing a reply into the box. */}
+          <p className="text-muted-foreground text-xs">
+            Only your team sees this. The banned person is not told why.
+          </p>
+        </div>
         <div className="flex items-start gap-2 px-6 pb-4">
           <Checkbox
             checked={deleteContent}
