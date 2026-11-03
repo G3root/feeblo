@@ -2,7 +2,7 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "622e120c-65f4-4d87-85ab-423f6cc1166f",
+  "id": "5d66442d-c0ea-4ac1-9d10-bfe7b43915ce",
   "prevIds": [
     "f59c1f8c-14d5-4e72-a7c6-3a726cf1a4a3"
   ],
@@ -20,8 +20,7 @@
         "e|tbl|public.saved_view",
         "n|rel|public.saved_view",
         "n|type|public.saved_view",
-        "n|rel|public.saved_view_pkey",
-        "n|rel|public.saved_view_memberId_boardId_name_uq"
+        "n|rel|public.saved_view_pkey"
       ],
       "reads": [
         "n|sch|public"
@@ -291,6 +290,54 @@
       "row": {
         "schema": "public",
         "table": "saved_view",
+        "name": "is_private",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "saved_view",
+        "name": "description",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "saved_view",
+        "name": "order_index",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "saved_view",
         "name": "query",
         "type": "jsonb",
         "typeSchema": null,
@@ -487,22 +534,6 @@
         ],
         "nameExplicit": false,
         "entityType": "pks"
-      }
-    },
-    {
-      "op": "create",
-      "row": {
-        "schema": "public",
-        "table": "saved_view",
-        "name": "saved_view_memberId_boardId_name_uq",
-        "nameExplicit": true,
-        "columns": [
-          "member_id",
-          "board_id",
-          "name"
-        ],
-        "nullsNotDistinct": true,
-        "entityType": "uniques"
       }
     }
   ]

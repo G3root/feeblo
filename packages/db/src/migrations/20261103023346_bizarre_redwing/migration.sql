@@ -1,1 +1,0 @@
-ALTER TABLE "saved_view" ADD COLUMN "is_private" boolean DEFAULT true NOT NULL;

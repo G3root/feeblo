@@ -4,10 +4,12 @@ CREATE TABLE "saved_view" (
 	"member_id" text NOT NULL,
 	"board_id" text,
 	"name" text NOT NULL,
+	"is_private" boolean DEFAULT true NOT NULL,
+	"description" text,
+	"order_index" integer DEFAULT 0 NOT NULL,
 	"query" jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "saved_view_memberId_boardId_name_uq" UNIQUE NULLS NOT DISTINCT("member_id","board_id","name")
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 ALTER TABLE "post" ADD COLUMN "assignee_member_id" text;--> statement-breakpoint
