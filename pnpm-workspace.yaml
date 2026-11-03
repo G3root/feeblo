@@ -40,6 +40,13 @@ minimumReleaseAgeExclude:
   # name. Drop these once the RC is a day old.
   - "@tanstack/react-db@1.0.0-rc.1"
   - "@tanstack/query-db-collection@1.5.0"
+  # The XState 6 alpha track. `xstate`, `@xstate/effect` and `@xstate/react`
+  # publish on one cadence and peer on each other by exact alpha range, so the
+  # three land in the same release window and the age gate would otherwise
+  # refuse all of them. Same rule as above: a version, never a bare name.
+  - "xstate@6.0.0-alpha.73"
+  - "@xstate/effect@1.0.0-alpha.12"
+  - "@xstate/react@7.0.0-alpha.7"
 
 allowBuilds:
   "@parcel/watcher": true
@@ -94,6 +101,14 @@ catalog:
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.4
   "@vitejs/plugin-react": ^6.1.1
+  # XState 6 is still alpha and its dist-tags disagree: `@xstate/effect@alpha`
+  # resolves to 0.1.0-alpha.4 (peer `effect ^4.0.0-rc.115`, `xstate
+  # ^6.0.0-alpha.61`), while the newest build published under `latest` is
+  # 1.0.0-alpha.12 (peer `effect ^4.0.0`, `xstate ^6.0.0-alpha.73`). The three
+  # are pinned to exact versions, not `@alpha`, so a later tag move cannot
+  # change what the lockfile resolves.
+  "@xstate/effect": 1.0.0-alpha.12
+  "@xstate/react": 7.0.0-alpha.7
   better-auth: 1.7.2
   class-variance-authority: ^0.7.1
   cn: ^0.5.0
@@ -129,6 +144,7 @@ catalog:
   vite: ^8.3.5
   "vite-plugin-icons-spritesheet": ^3.1.0
   vite-plugin-solid: ^2.11.12
+  xstate: 6.0.0-alpha.73
   # `@effect/vitest` 4.0.5 peers on vitest >=5.0.0 <6.0.0; keep the
   # two on the same major so the helper package is not running against an
   # unsupported vitest API.
