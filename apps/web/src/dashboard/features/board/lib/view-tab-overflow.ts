@@ -24,21 +24,11 @@ export const OVERFLOW_TAB_BUTTON_MAX_PX = 160;
 /** The floor the button keeps, so "3 more" and a clipped name look deliberate. */
 export const OVERFLOW_TAB_BUTTON_MIN_PX = 96;
 
-export type TabFit = {
-  /** Tabs that are fully inside the visible box. */
-  count: number;
-  /** Right edge of the last visible tab, relative to the strip's left edge. */
-  width: number;
-};
-
 /**
  * Walks the tabs in order and stops at the first one that does not fit.
  *
  * A tab that is only partly inside the box is *not* counted: the strip would
- * otherwise show a half-clipped pill at its edge. `width` is therefore the
- * right edge of the last whole tab, which is what the strip is capped to — so
- * the clipped tabs sit past the cap instead of leaving a gap before the "more"
- * button.
+ * otherwise show a half-clipped pill at its edge.
  */
 export const countFittingTabs = ({
   available,
@@ -48,9 +38,9 @@ export const countFittingTabs = ({
   available: number;
   gap: number;
   widths: readonly number[];
-}): TabFit => {
+}): number => {
   if (available <= 0) {
-    return { count: 0, width: 0 };
+    return 0;
   }
 
   let count = 0;
@@ -58,7 +48,7 @@ export const countFittingTabs = ({
 
   for (const [index, width] of widths.entries()) {
     // `edge` is the right edge *after* this tab, gaps included: the tab itself,
-    // plus the gap that preceded it (except for the first).
+    // plus the gap that precedes it (except for the first).
     const right = edge + (index === 0 ? 0 : gap) + width;
 
     if (right > available + 0.5) {
@@ -68,5 +58,5 @@ export const countFittingTabs = ({
     edge = right;
   }
 
-  return { count, width: edge };
+  return count;
 };

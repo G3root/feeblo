@@ -132,14 +132,20 @@ export const SavedViewPill = memo(function SavedViewPill({
   organizationId: string;
   view: TSavedView;
 }) {
-  const { isDragging, ref } = useSortable({ id: view.id, index });
+  const { isDragging, ref } = useSortable({
+    // A clipped pill is invisible and out of flow; leaving it droppable would
+    // let a drop land on a tab nobody can see.
+    disabled: isClipped,
+    id: view.id,
+    index,
+  });
 
   const pillClassName = cn(
     "flex shrink-0",
-    // `invisible` keeps the pill's layout, so the next measurement still sees
-    // its width — the strip is capped to the visible tabs, so the clipped ones
-    // do not leave a gap where they would have been.
-    isClipped && "invisible",
+    // Out of the row's flow but still measurable at its intrinsic width, so the
+    // strip hugs the pills it shows instead of leaving a gap where the clipped
+    // ones would have been, and the next measurement can still read them.
+    isClipped && "invisible absolute w-max",
     isDragging && "z-10 opacity-80"
   );
 
@@ -169,7 +175,8 @@ export const SavedViewPill = memo(function SavedViewPill({
                 organizationId={organizationId}
                 viewId={view.id}
               >
-                <span className="max-w-40 truncate">{view.name}</span>
+                {/* Linear caps a tab at 200px; the tooltip carries the rest. */}
+                <span className="max-w-50 truncate">{view.name}</span>
               </SavedViewLink>
             </ContextMenuTrigger>
           )}

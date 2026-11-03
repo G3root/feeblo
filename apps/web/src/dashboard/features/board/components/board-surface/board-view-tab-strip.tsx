@@ -16,6 +16,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import {
   type ReactNode,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -75,13 +76,6 @@ const sensors = [
   }),
   KeyboardSensor,
 ];
-
-type Layout = {
-  /** Tabs fully inside the visible box. */
-  count: number;
-  /** Right edge of the last visible tab, in px; the strip is capped to it. */
-  width: number | undefined;
-};
 
 /**
  * The board's tabs: the built-in presets and the member's saved views, as one
@@ -161,61 +155,59 @@ export function ViewTabStrip({
   /**
    * Measured geometry.
    *
-   * `count` starts at "everything fits" so the first paint shows the whole
-   * strip; the layout effect corrects it before the browser paints.
+   * Starts at "everything fits" so the first paint shows the whole strip; the
+   * layout effect corrects it before the browser paints.
    */
-  const [layout, setLayout] = useState<Layout>({
-    count: tabs.length,
-    width: undefined,
-  });
+  const [visibleCount, setVisibleCount] = useState(tabs.length);
   const areaRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const hiddenTabs = useMemo(
-    () => tabs.slice(layout.count),
-    [tabs, layout.count]
+    () => tabs.slice(visibleCount),
+    [tabs, visibleCount]
   );
   // Whether the popover is rendered changes the space the strip may use, so a
-  // measurement has to follow the flip. Adding a reserved button can only hide
-  // more tabs, never all of them, so the two states cannot oscillate.
+  // measurement has to follow the flip. Reserving a button can only hide more
+  // tabs, never all of them, so the two states cannot oscillate.
   const hasOverflow = hiddenTabs.length > 0;
 
-  /**
-   * Re-measure whenever the strip's contents change shape, not just on resize:
-   * a rename changes a pill's width without changing the area's box, and
-   * `ResizeObserver` reports boxes only.
-   */
-  const measurementKey = useMemo(
-    () => tabs.map((tab) => `${tab.id}:${tab.name}`).join("\u0000"),
-    [tabs]
-  );
-
-  useLayoutEffect(() => {
+  const measure = useCallback(() => {
     const area = areaRef.current;
     const strip = stripRef.current;
 
     if (!area || !strip) {
+      return;
+    }
+    // Returning the previous count on an unchanged measurement keeps React from
+    // re-rendering on every observed notification.
+    const next = measureTabs(area, strip, hasOverflow);
+    setVisibleCount((previous) => (previous === next ? previous : next));
+  }, [hasOverflow]);
+
+  /**
+   * Measure on **every** commit, not only when the tabs or the viewport change.
+   *
+   * The strip is sized by what it renders, so anything that changes a pill's
+   * width, its order, or its presence changes which tabs fit — and a rename, a
+   * duplicate, a drag or a refetch all reach the DOM through paths that share no
+   * dependency. Measuring after each commit is a handful of reads against a
+   * row of buttons; a stale count is a pill the member cannot see.
+   */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- runs after every commit by design; see above
+  useLayoutEffect(measure);
+
+  useLayoutEffect(() => {
+    const area = areaRef.current;
+
+    if (!area) {
       return undefined;
     }
-
-    const measure = () => {
-      const next = measureTabs(area, strip, hasOverflow);
-      // Returning the previous object on an unchanged measurement keeps React
-      // from re-rendering the strip on every observed notification.
-      setLayout((previous) =>
-        previous.count === next.count && previous.width === next.width
-          ? previous
-          : next
-      );
-    };
-
-    measure();
-    const observer = new ResizeObserver(measure);
     // The area, not the strip: the strip's own box is what the measurement
     // changes, and observing it would re-enter this effect's own output.
+    const observer = new ResizeObserver(measure);
     observer.observe(area);
 
     return () => observer.disconnect();
-  }, [measurementKey, hasOverflow]);
+  }, [measure]);
 
   const commitOrder = async (orderedIds: string[]) => {
     setPendingOrder(orderedIds);
@@ -280,16 +272,15 @@ export function ViewTabStrip({
     <div className="flex min-w-0 flex-1 items-center gap-2" ref={areaRef}>
       <DragDropProvider onDragEnd={handleDragEnd} sensors={sensors}>
         <div
-          className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+          className="relative flex min-w-0 items-center gap-2 overflow-hidden"
           ref={stripRef}
-          style={{ maxWidth: layout.width }}
         >
           {tabs.map((tab, index) =>
             isSavedTab(tab) ? (
               <SavedViewPill
                 boardSlug={boardSlug}
                 index={index - fixedCount}
-                isClipped={index >= layout.count}
+                isClipped={index >= visibleCount}
                 key={tab.id}
                 onDelete={onDelete}
                 onDuplicate={onDuplicate}
@@ -298,7 +289,7 @@ export function ViewTabStrip({
                 view={tab.view}
               />
             ) : (
-              <TabSlot isClipped={index >= layout.count} key={tab.id}>
+              <TabSlot isClipped={index >= visibleCount} key={tab.id}>
                 <FixedViewLink
                   boardSlug={boardSlug}
                   className={toggleVariants({ size: "sm", variant: "outline" })}
@@ -365,12 +356,13 @@ const measureTabs = (
   area: HTMLElement,
   strip: HTMLElement,
   hasOverflow: boolean
-): Layout => {
+): number => {
   const areaWidth = area.clientWidth;
-  const stripRect = strip.getBoundingClientRect();
 
-  if (areaWidth === 0 || stripRect.width === 0) {
-    return { count: 0, width: 0 };
+  // `display: none` — a phone — reports no client rects. Every tab counts as
+  // clipped there, so the popover carries the whole set.
+  if (areaWidth === 0 || strip.getClientRects().length === 0) {
+    return 0;
   }
 
   const gap = Number.parseFloat(getComputedStyle(area).columnGap) || 0;
@@ -386,14 +378,8 @@ const measureTabs = (
   const reserved =
     (createWidth > 0 ? createWidth + gap : 0) +
     (hasOverflow ? OVERFLOW_TAB_BUTTON_MAX_PX + gap : 0);
-  const available = areaWidth - reserved;
-
-  if (available <= 0) {
-    return { count: 0, width: 0 };
-  }
-
   return countFittingTabs({
-    available,
+    available: areaWidth - reserved,
     gap,
     widths: Array.from(strip.children).map(
       (child) => child.getBoundingClientRect().width
@@ -402,13 +388,18 @@ const measureTabs = (
 };
 
 /**
- * A wrapper that keeps a clipped tab out of sight without removing it.
+ * A wrapper that keeps a clipped tab out of sight *and* out of the row's flow,
+ * while still being measurable.
  *
- * `visibility: hidden` preserves layout, so the tab still reports a width on the
- * next measurement; `display: none` would take it out of the measurement and the
- * strip could never grow back. `flex`, not a bare div, because an inline-flex
- * anchor inside a block box sits on a line box whose strut adds leading under it
- * — which made the saved pills a couple of pixels taller than the fixed presets.
+ * `absolute w-max` is the part that matters: the tab takes no space, so the strip
+ * is exactly as wide as the tabs it shows and the "more" button sits next to the
+ * last of them, but the element still reports its full intrinsic width to the
+ * next measurement — `display: none` would report zero and the strip could never
+ * grow back. `visibility: hidden` keeps it out of hit-testing and the a11y tree.
+ *
+ * `flex`, not a bare div, because an inline-flex anchor inside a block box sits
+ * on a line box whose strut adds leading under it — which made the saved pills a
+ * couple of pixels taller than the fixed presets.
  */
 function TabSlot({
   children,
@@ -418,7 +409,9 @@ function TabSlot({
   isClipped: boolean;
 }) {
   return (
-    <div className={cn("flex shrink-0", isClipped && "invisible")}>
+    <div
+      className={cn("flex shrink-0", isClipped && "invisible absolute w-max")}
+    >
       {children}
     </div>
   );

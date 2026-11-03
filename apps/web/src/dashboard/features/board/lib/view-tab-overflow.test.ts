@@ -26,19 +26,14 @@ describe("countFittingTabs", () => {
         gap: GAP,
         widths: [100, 100, 100, 100],
       })
-    ).toEqual({ count: 3, width: 316 });
+    ).toBe(3);
   });
 
   it("excludes a tab that is only partly inside the box", () => {
     // 100 + 8 + 100 = 208 fits; the third would end at 316, and 316 > 300.
-    const fit = countFittingTabs({
-      available: 300,
-      gap: GAP,
-      widths: [100, 100, 100],
-    });
-
-    expect(fit.count).toBe(2);
-    expect(fit.width).toBe(208);
+    expect(
+      countFittingTabs({ available: 300, gap: GAP, widths: [100, 100, 100] })
+    ).toBe(2);
   });
 
   it("fits everything when the strip is wide enough", () => {
@@ -48,20 +43,18 @@ describe("countFittingTabs", () => {
         gap: GAP,
         widths: [120, 96, 160, 140],
       })
-    ).toEqual({ count: 4, width: 120 + 8 + 96 + 8 + 160 + 8 + 140 });
+    ).toBe(4);
   });
 
   it("counts nothing when there is no room for even one tab", () => {
-    expect(countFittingTabs({ available: 0, gap: GAP, widths: [100] })).toEqual(
-      { count: 0, width: 0 }
-    );
+    expect(countFittingTabs({ available: 0, gap: GAP, widths: [100] })).toBe(0);
     expect(
       countFittingTabs({
         available: -OVERFLOW_TAB_BUTTON_MAX_PX,
         gap: GAP,
         widths: [100],
       })
-    ).toEqual({ count: 0, width: 0 });
+    ).toBe(0);
   });
 
   it("never shows more tabs when the button's space is reserved", () => {
@@ -79,7 +72,7 @@ describe("countFittingTabs", () => {
         widths,
       });
 
-      expect(reserved.count).toBeLessThanOrEqual(unreserved.count);
+      expect(reserved).toBeLessThanOrEqual(unreserved);
     }
   });
 
@@ -98,7 +91,7 @@ describe("countFittingTabs", () => {
       widths,
     });
 
-    expect(unreserved.count).toBe(6);
-    expect(reserved.count).toBeLessThan(6);
+    expect(unreserved).toBe(6);
+    expect(reserved).toBeLessThan(6);
   });
 });
