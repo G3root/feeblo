@@ -16,9 +16,9 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Assignee**: The workspace member currently working on a post. Every post has at most one, and an unassigned post is the default rather than an error state. The assignee is not the author: authorship is who wrote the post, assignment is who owns it. _Avoid_: owner, lead, responsible person
 
-**View**: What the board is showing — its filters and its ordering. `All feedbacks`, `Active`, and `Backlog` are built-in views, one route each. _Avoid_: filter, tab
+**View**: What the board is showing — its filters, its grouping, and its ordering. `All feedbacks`, `Active`, and `Backlog` are built-in views, one route each. `Created` and `Assigned`, on the member's own feedback page, are scopes rather than filters: the page pins them to the session's member, the filter menu cannot clear them, and no saved view can store them. _Avoid_: filter, tab
 
-**Saved view**: A view a member stored under a name, with an optional description and a position, per surface (one board, or the organization-wide feedback list). It is visible only to that member, and it has its own path (`/…/feedback/view/{id}`), so a link to one is a link to a result set rather than to a filter mode. _Avoid_: preset, filter set, segment
+**Saved view**: A view a member stored under a name, with an optional description and a position, per surface (one board, or the organization-wide feedback list). It is visible to every member of the workspace unless its owner marked it private, and it has its own path (`/…/feedback/view/{id}`), so a link to one is a link to a result set rather than to a filter mode. _Avoid_: preset, filter set, segment
 
 ### Data transfer
 

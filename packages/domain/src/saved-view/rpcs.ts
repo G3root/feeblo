@@ -16,10 +16,11 @@ import {
 /**
  * A member's own saved board queries.
  *
- * Every RPC requires a dashboard session: a saved view is personal, so there is
- * no public-portal or Public API counterpart, and a machine key has no member
- * to own one. Ownership is never taken from the payload — the handler scopes on
- * the session's member for the requested workspace.
+ * Every RPC requires a dashboard session: a saved view belongs to a member, so
+ * there is no public-portal or Public API counterpart, and a machine key has no
+ * member to own one. Ownership is never taken from the payload — the handler
+ * scopes writes on the session's member for the requested workspace, while the
+ * list includes views other members have shared with the workspace.
  */
 export class SavedViewRpcs extends RpcGroup.make(
   Rpc.make("ListSavedViews", {

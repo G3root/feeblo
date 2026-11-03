@@ -21,8 +21,27 @@ export type BoardPostRow = {
 };
 
 export type BoardPostLane = {
+  /** Stable across regroupings: a status id, member id, board id, tag id, or "all". */
+  id: string;
   label: string;
   posts: BoardPostRow[];
-  statusId: string;
-  status: BoardPostStatus;
+  /**
+   * Present only on status lanes. The list's add-post button and the grid's
+   * drop target both write a status, so a lane grouped by anything else has no
+   * status to write.
+   */
+  status?: BoardPostStatus;
+  statusId?: string;
+};
+
+/** The names behind an assignee lane. */
+export type BoardGroupingMember = {
+  id: string;
+  name: string;
+};
+
+/** The names behind a label lane. */
+export type BoardGroupingTag = {
+  id: string;
+  name: string;
 };

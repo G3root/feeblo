@@ -22,14 +22,10 @@ import {
 } from "~/features/github/components/post-github-actions";
 import type { GitHubPostIssueAction } from "~/features/github/shared-form";
 import { PostExternalResources } from "~/features/integrations/components/post-external-resources";
-import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
 import {
   createPostActivityQuery,
   PostActivityList,
 } from "~/features/post/components/post-activity-list";
-import { PostAssigneeField } from "~/features/post/components/post-assignee-field";
-import { PostBoardField } from "~/features/post/components/post-board-field";
-import { PostEtaField } from "~/features/post/components/post-eta-field";
 import { PostMergedAlert } from "~/features/post/components/post-merged-alert";
 import { PostMergedPosts } from "~/features/post/components/post-merged-posts";
 import {
@@ -278,32 +274,9 @@ function RouteComponent() {
 
             {/* Each field self-gates with the permission the backend enforces
                 (PostPolicy.canUpdateProperties): status → posts.status,
-                board → posts.move, ETA → posts.status. */}
-            <div>
-              <PostStatusSelect />
-            </div>
-
-            <PostBoardField />
-
-            <PostAssigneeField />
-
-            <PostEtaField />
-
-            <div>
-              <Separator />
-            </div>
-
-            <PostTagField />
-
-            <div>
-              <Separator />
-            </div>
-
+                board → posts.move, ETA → posts.status, assignee →
+                posts.status. */}
             <PostDetails createdAt={post.createdAt} />
-
-            <div>
-              <Separator />
-            </div>
 
             {/* Voter management: add/remove on behalf of customers.
                 Controls self-gate with `votes.onBehalf` (contributor+).
@@ -311,6 +284,12 @@ function RouteComponent() {
                 only the ones that collided with the survivor's, so the panel
                 would misrepresent who backed it. */}
             {isMerged ? null : <PostPage.Voters />}
+
+            <div>
+              <Separator />
+            </div>
+
+            <PostTagField />
 
             <div>
               <Separator />

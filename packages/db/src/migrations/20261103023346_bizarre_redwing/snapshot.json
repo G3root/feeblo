@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e6cb8e75-58dc-4233-90ec-46e5c8e6835c",
+  "prevIds": [
+    "b09ef585-870a-4faa-866a-94f70162f016"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "saved_view",
+        "is_private"
+      ],
+      "writes": [
+        "s|col|public.saved_view.is_private",
+        "n|col|public.saved_view.is_private",
+        "e|col|public.saved_view.is_private"
+      ],
+      "reads": [
+        "n|tbl|public.saved_view",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "saved_view",
+        "name": "is_private",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "true",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

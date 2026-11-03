@@ -1,3 +1,7 @@
+import type {
+  TBoardQuery,
+  TBoardStatusFilter,
+} from "@feeblo/domain-contracts/board-query";
 import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import {
@@ -19,64 +23,64 @@ import { useDeferredValue, useMemo } from "react";
 import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-import type {
-  BoardOrdering,
-  BoardPostStatusFilter,
-  BoardStatusOperator,
-  BoardTagOperator,
-} from "../../state/board-store-context";
+import type { MyFeedbackScope } from "../../lib/my-feedback-views";
 import type { BoardPostRow } from "./types";
 
-const STATUSES_BY_PRESET = {
-  active: ["PLANNED", "IN_PROGRESS"],
-  backlog: ["PENDING", "REVIEW"],
-} satisfies Record<Exclude<BoardPostStatusFilter, "all">, BoardPostStatus[]>;
+type UseBoardPostsDataOptions = {
+  boardId?: string;
+  /**
+   * The member's own feedback page. Applied as a predicate here rather than as
+   * one of `BoardFilters` because it is the page, not a filter: the filter menu
+   * cannot clear it and no saved view can store it.
+   */
+  myFeedbackScope?: MyFeedbackScope;
+  organizationId: string;
+  /**
+   * The saved-view document, as the store holds it.
+   *
+   * The whole query is the live query's input: filters, ordering and version
+   * are one value, so the hook does not restate the filter vocabulary in its
+   * parameter list and the `queryKey` does not list each filter field
+   * separately. A filter added to `BoardFilters` reaches this query through the
+   * shared struct rather than through a new prop somebody has to remember to
+   * thread.
+   */
+  query: TBoardQuery;
+};
 
-function filterPostStatusesByPreset(
-  statuses: ReadonlyArray<{
+/**
+ * The status lanes to render, in the order the workspace defines.
+ *
+ * The lanes follow the status filter: "is any of" keeps the selected types,
+ * "is not" removes them, and no filter keeps every status. That is the same
+ * rule the posts predicate applies, so a lane can never name a status the
+ * result set excludes, and a post can never land in an unnamed lane because
+ * its status was filtered out of the lane list.
+ */
+function visiblePostStatuses(
+  postStatuses: ReadonlyArray<{
     id: string;
     type: BoardPostStatus;
     label: string;
   }>,
-  filter: BoardPostStatusFilter
+  filter: TBoardStatusFilter | null
 ) {
-  if (filter === "all") {
-    return statuses.slice();
+  if (filter === null) {
+    return postStatuses.slice();
   }
-  const allowed = new Set<BoardPostStatus>(STATUSES_BY_PRESET[filter]);
-  return statuses.filter((s) => allowed.has(s.type));
+
+  const selected = new Set<BoardPostStatus>(filter.types);
+
+  return filter.operator === "isNot"
+    ? postStatuses.filter((status) => !selected.has(status.type))
+    : postStatuses.filter((status) => selected.has(status.type));
 }
 
-type UseBoardPostsDataOptions = {
-  /**
-   * Filter arrays are `readonly` because they come from the persisted
-   * `BoardFilters` schema, whose decoded arrays the board reads directly. The
-   * live query only reads them, so widening here is the whole change rather
-   * than copying every filter into a mutable array on each render.
-   */
-  assigneeMemberIds: readonly string[];
-  boardId?: string;
-  ordering: BoardOrdering;
-  organizationId: string;
-  postStatusFilter: BoardPostStatusFilter;
-  search: string;
-  statusOperator: BoardStatusOperator;
-  statuses: readonly BoardPostStatus[];
-  tagIds: readonly string[];
-  tagOperator: BoardTagOperator;
-};
-
 export function useBoardPostsData({
-  assigneeMemberIds,
   boardId,
-  ordering,
+  myFeedbackScope,
   organizationId,
-  postStatusFilter,
-  search,
-  statusOperator,
-  statuses,
-  tagIds,
-  tagOperator,
+  query,
 }: UseBoardPostsDataOptions) {
   const {
     boardCollection,
@@ -85,11 +89,27 @@ export function useBoardPostsData({
     postTagCollection,
     upvoteCollection,
   } = useDashboardCollections();
-  const normalizedSearch = search.trim();
-  // Defer the title filter off the urgent keystroke path (same pattern as
-  // the public board): the input stays responsive while the live query
-  // re-runs over the overfetched collection at lower priority.
-  const deferredSearch = useDeferredValue(normalizedSearch);
+  const { filters, ordering } = query;
+  const statusFilter = filters.status;
+  const tagFilter = filters.tag;
+  const assigneeMemberIds = filters.assigneeMemberIds ?? [];
+  const tagIds = tagFilter?.tagIds ?? [];
+  const tagOperator = tagFilter?.operator;
+  // The persisted document stores a trimmed term; this trims again so a raw
+  // store value (the input updates before the view is saved) still hashes and
+  // matches as the word the member is typing rather than its trailing space.
+  const deferredSearch = useDeferredValue((filters.search ?? "").trim());
+
+  // The live query reads the deferred term, so the key names what the query
+  // actually executes. `version` is folded into the key because a future
+  // version may change how a filter is read even when its fields are equal.
+  const queryKeyFilters = useMemo(
+    () => ({
+      ...filters,
+      search: deferredSearch === "" ? null : deferredSearch,
+    }),
+    [deferredSearch, filters]
+  );
 
   const postStatusesQuery = useOrgPostStatuses(organizationId);
 
@@ -107,8 +127,10 @@ export function useBoardPostsData({
   //   JS id-list bridge and no giant dep key.
   const postsQuery = useLiveQuery({
     // The board surface's main query: the largest IR in the dashboard and the
-    // board re-renders on every keystroke/filter change. Every value the
-    // callback reads is listed, plus each collection it queries.
+    // board re-renders on every keystroke/filter change. The key is the
+    // persisted document rather than one entry per filter field, so a filter
+    // added to `BoardFilters` cannot be forgotten here and leave the query
+    // answering an older shape.
     queryKey: [
       "board-posts",
       postCollection.id,
@@ -118,15 +140,10 @@ export function useBoardPostsData({
       postTagCollection.id,
       organizationId,
       boardId ?? null,
-      postStatusFilter,
-      deferredSearch,
-      statusOperator,
-      statuses,
-      tagOperator,
-      tagIds,
-      assigneeMemberIds,
-      ordering.field,
-      ordering.direction,
+      myFeedbackScope ?? null,
+      query.version,
+      queryKeyFilters,
+      ordering,
     ],
     query: (q) => {
       if (!organizationId) {
@@ -196,20 +213,6 @@ export function useBoardPostsData({
             condition = and(condition, eq(post.boardId, boardId));
           }
 
-          if (postStatusFilter === "backlog") {
-            condition = and(
-              condition,
-              inArray(postStatus.type, ["PENDING", "REVIEW"])
-            );
-          }
-
-          if (postStatusFilter === "active") {
-            condition = and(
-              condition,
-              inArray(postStatus.type, ["PLANNED", "IN_PROGRESS"])
-            );
-          }
-
           if (deferredSearch) {
             condition = and(
               condition,
@@ -217,12 +220,15 @@ export function useBoardPostsData({
             );
           }
 
-          if (statuses.length > 0) {
+          if (statusFilter) {
+            // One status dimension: the checklist and the operator apply to the
+            // same set. A built-in "Active" tab is this filter with the active
+            // types, not a preset that could contradict a checklist.
             condition = and(
               condition,
-              statusOperator === "isNot"
-                ? not(inArray(postStatus.type, [...statuses]))
-                : inArray(postStatus.type, [...statuses])
+              statusFilter.operator === "isNot"
+                ? not(inArray(postStatus.type, [...statusFilter.types]))
+                : inArray(postStatus.type, [...statusFilter.types])
             );
           }
 
@@ -237,7 +243,20 @@ export function useBoardPostsData({
             );
           }
 
-          if (tagIds.length > 0) {
+          if (myFeedbackScope) {
+            // The page's own scope, anded with whatever the member filtered
+            // down to on top of it. `eq` against a string excludes the null
+            // `assigneeMemberId` an unassigned post carries, which is what
+            // "assigned to me" means.
+            condition = and(
+              condition,
+              myFeedbackScope.kind === "created"
+                ? eq(post.creatorMemberId, myFeedbackScope.memberId)
+                : eq(post.assigneeMemberId, myFeedbackScope.memberId)
+            );
+          }
+
+          if (tagFilter) {
             // A missed left join reads as null/undefined (same guard as the
             // changelog completed-posts query).
             const unmatched = or(
@@ -245,10 +264,10 @@ export function useBoardPostsData({
               isUndefined(matchingTags.postId)
             );
             if (
-              tagOperator === "excludeIfAnyOf" ||
-              tagOperator === "excludeIfAllOf"
+              tagFilter.operator === "excludeIfAnyOf" ||
+              tagFilter.operator === "excludeIfAllOf"
             ) {
-              if (tagOperator === "excludeIfAllOf") {
+              if (tagFilter.operator === "excludeIfAllOf") {
                 condition = and(
                   condition,
                   or(
@@ -311,12 +330,8 @@ export function useBoardPostsData({
   const posts: BoardPostRow[] = postsQuery.data ?? [];
 
   const postStatuses = useMemo(
-    () =>
-      filterPostStatusesByPreset(
-        postStatusesQuery.data ?? [],
-        postStatusFilter
-      ),
-    [postStatusesQuery.data, postStatusFilter]
+    () => visiblePostStatuses(postStatusesQuery.data ?? [], statusFilter),
+    [postStatusesQuery.data, statusFilter]
   );
 
   return {

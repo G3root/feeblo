@@ -55,6 +55,8 @@ export const SavedView = S.Struct({
   name: S.String,
   /** Null when the member left it blank. */
   description: S.NullOr(S.String),
+  /** When true, only the owner can see the view. */
+  isPrivate: S.Boolean,
   /** Position among this member's views on this surface, ascending. */
   orderIndex: S.Int,
   query: BoardQuery,
@@ -87,6 +89,8 @@ export const SavedViewCreate = S.Struct({
   boardId: S.NullOr(S.String),
   name: SavedViewName,
   description: SavedViewDescription,
+  /** Omitted by clients that predate sharing; those views stay private. */
+  isPrivate: S.optionalKey(S.Boolean),
   query: BoardQuery,
 });
 
@@ -101,6 +105,8 @@ export const SavedViewUpdate = S.Struct({
   organizationId: WorkspaceId.schema,
   name: SavedViewName,
   description: SavedViewDescription,
+  /** Omitted keeps the row's current visibility. */
+  isPrivate: S.optionalKey(S.Boolean),
   query: BoardQuery,
 });
 

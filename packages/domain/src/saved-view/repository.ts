@@ -1,6 +1,6 @@
 import { currentDb, schema } from "@feeblo/db";
 import type { TBoardQuery } from "@feeblo/domain-contracts/board-query";
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -14,6 +14,7 @@ const SAVED_VIEW_FIELDS = {
   createdAt: schema.savedViewTable.createdAt,
   description: schema.savedViewTable.description,
   id: schema.savedViewTable.id,
+  isPrivate: schema.savedViewTable.isPrivate,
   memberId: schema.savedViewTable.memberId,
   name: schema.savedViewTable.name,
   orderIndex: schema.savedViewTable.orderIndex,
@@ -37,12 +38,14 @@ interface TSavedViewListInput {
 interface TSavedViewCreateInput extends TSavedViewListInput {
   readonly description: string | null;
   readonly id: string;
+  readonly isPrivate: boolean;
   readonly name: string;
   readonly query: TBoardQuery;
 }
 
 interface TSavedViewUpdateInput extends TSavedViewOwner {
   readonly description: string | null;
+  readonly isPrivate: boolean;
   readonly name: string;
   readonly query: TBoardQuery;
 }
@@ -55,11 +58,23 @@ export const makeSavedViewRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   /**
-   * A null `boardId` means the organization-wide feedback list, which is a
-   * different surface from any board's list — `eq(column, null)` would compile
-   * to `= null` and match nothing, so the two cases are separate predicates
-   * rather than one helper pretending they are the same comparison.
+   * Everything this member may see: their own views on the surface, plus the
+   * views other members have shared with the workspace. A private view is
+   * visible only to its owner, which is the one predicate the whole module
+   * turns on.
    */
+  const visibleScope = (args: TSavedViewListInput) =>
+    and(
+      eq(schema.savedViewTable.organizationId, args.organizationId),
+      args.boardId === null
+        ? isNull(schema.savedViewTable.boardId)
+        : eq(schema.savedViewTable.boardId, args.boardId),
+      or(
+        eq(schema.savedViewTable.memberId, args.memberId),
+        eq(schema.savedViewTable.isPrivate, false)
+      )
+    );
+
   const ownedScope = (args: TSavedViewListInput) =>
     and(
       eq(schema.savedViewTable.organizationId, args.organizationId),
@@ -74,10 +89,27 @@ export const makeSavedViewRepository = Effect.gen(function* () {
       db
         .select(SAVED_VIEW_FIELDS)
         .from(schema.savedViewTable)
-        .where(ownedScope(args))
+        .where(visibleScope(args))
         // Position first, creation second: `orderIndex` is what the drag
         // rewrites, and `createdAt` breaks the tie two rows can share when a
         // create raced another on the same surface.
+        .orderBy(
+          asc(schema.savedViewTable.orderIndex),
+          asc(schema.savedViewTable.createdAt)
+        ),
+
+    /**
+     * The member's own views only.
+     *
+     * Reordering is the one list operation that writes rows, so it is checked
+     * against the owned list rather than the visible one: a member may see a
+     * colleague's shared view, but may not move it.
+     */
+    listOwned: (args: TSavedViewListInput) =>
+      db
+        .select(SAVED_VIEW_FIELDS)
+        .from(schema.savedViewTable)
+        .where(ownedScope(args))
         .orderBy(
           asc(schema.savedViewTable.orderIndex),
           asc(schema.savedViewTable.createdAt)
@@ -110,6 +142,7 @@ export const makeSavedViewRepository = Effect.gen(function* () {
       boardId,
       description,
       id,
+      isPrivate,
       memberId,
       name,
       organizationId,
@@ -121,6 +154,7 @@ export const makeSavedViewRepository = Effect.gen(function* () {
           boardId,
           description,
           id,
+          isPrivate,
           memberId,
           name,
           organizationId,
@@ -137,6 +171,7 @@ export const makeSavedViewRepository = Effect.gen(function* () {
     update: ({
       description,
       id,
+      isPrivate,
       memberId,
       name,
       organizationId,
@@ -144,7 +179,7 @@ export const makeSavedViewRepository = Effect.gen(function* () {
     }: TSavedViewUpdateInput) =>
       db
         .update(schema.savedViewTable)
-        .set({ description, name, query })
+        .set({ description, isPrivate, name, query })
         .where(
           and(
             eq(schema.savedViewTable.id, id),

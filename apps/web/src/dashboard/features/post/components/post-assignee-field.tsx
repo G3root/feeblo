@@ -106,10 +106,10 @@ export function PostAssigneeField({
         render={
           <Button
             aria-label={`Assignee: ${assigneeLabel}`}
-            className="w-full justify-start"
+            className="max-w-full justify-start"
             disabled={isDisabled}
             size="sm"
-            variant="outline"
+            variant="ghost"
           />
         }
       >

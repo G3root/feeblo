@@ -1656,13 +1656,13 @@ export const notificationPreferenceTable = pgTable(
 /**
  * A member's saved board query.
  *
- * The board's filter and ordering state lives in the client store
+ * The board's filter, grouping and ordering state lives in the client store
  * (`board-store-context.tsx`) and is otherwise lost on navigation. A row here
  * is that same query, stored so the toolbar can offer it back by name.
  *
  * `query` is one jsonb document rather than a column per filter for two
  * reasons: the filter vocabulary is the board's, not the database's (a
- * `statuses` array has no natural relational home), and `BoardQuery` in
+ * status-type checklist has no natural relational home), and `BoardQuery` in
  * `@feeblo/domain-contracts` validates it on write, so a stored view can never
  * describe a query the board cannot run. Ids inside it are not foreign keys:
  * a deleted tag or member makes a saved view stale, not invalid, and the board
@@ -1680,9 +1680,9 @@ export const savedViewTable = pgTable(
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
     /**
-     * The owning member. Views are personal today: a member sees and edits only
-     * their own, which the handler enforces by always scoping on this column
-     * rather than by trusting a payload.
+     * The owning member. A shared view is visible to the rest of the workspace
+     * but still only editable by this member, which the handler enforces by
+     * always scoping writes on this column rather than by trusting a payload.
      */
     memberId: text("member_id")
       .notNull()
@@ -1691,6 +1691,14 @@ export const savedViewTable = pgTable(
       onDelete: "cascade",
     }),
     name: text("name").notNull(),
+    /**
+     * Whether only the owner may see this view.
+     *
+     * Existing rows default to private so adding sharing does not publish the
+     * views members saved while every view was personal. New rows carry the
+     * member's choice explicitly.
+     */
+    isPrivate: boolean("is_private").default(true).notNull(),
     /**
      * Free text the member wrote to explain what the view is for. Null when
      * they left it blank — an empty string is not a state the write path

@@ -1,14 +1,18 @@
-import { emptyBoardQuery } from "@feeblo/domain-contracts/board-query";
+import {
+  DEFAULT_BOARD_GROUPING,
+  emptyBoardQuery,
+  normalizeBoardFilters,
+} from "@feeblo/domain-contracts/board-query";
 import type {
   TBoardFilters,
+  TBoardGroupBy,
+  TBoardGrouping,
   TBoardOrderDirection,
   TBoardOrderField,
   TBoardOrdering,
-  TBoardPostStatusFilter,
   TBoardStatusOperator,
   TBoardTagOperator,
 } from "@feeblo/domain-contracts/board-query";
-import { type BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { createStoreContext } from "@feeblo/web-shared/xstate";
 import { createStore } from "@xstate/store";
 import { useSelector } from "@xstate/store-react";
@@ -22,20 +26,21 @@ import { useSelector } from "@xstate/store-react";
  * `setActiveView` accepts a stored query with no translation.
  */
 export type BoardDisplayMode = "list" | "grid";
+export type BoardGroupBy = TBoardGroupBy;
+export type BoardGrouping = TBoardGrouping;
 export type BoardOrderDirection = TBoardOrderDirection;
 export type BoardOrderField = TBoardOrderField;
 export type BoardOrdering = TBoardOrdering;
-export type BoardPostStatusFilter = TBoardPostStatusFilter;
 export type BoardStatusOperator = TBoardStatusOperator;
 export type BoardTagOperator = TBoardTagOperator;
 export type BoardFilters = TBoardFilters;
 
-const DEFAULT_STATUS_OPERATOR: BoardStatusOperator = "isAnyOf";
-const DEFAULT_TAG_OPERATOR: BoardTagOperator = "includeAllOf";
 const DEFAULT_ORDERING: BoardOrdering = {
   direction: "desc",
   field: "createdAt",
 };
+
+const DEFAULT_GROUPING: BoardGrouping = { ...DEFAULT_BOARD_GROUPING };
 
 export type BoardView = {
   filters: BoardFilters;
@@ -53,6 +58,7 @@ type BoardStoreContext = {
   boardId?: string;
   bulkDeleteOpen: boolean;
   displayMode: BoardDisplayMode;
+  grouping: BoardGrouping;
   ordering: BoardOrdering;
   selectedPosts: SelectedBoardPost[];
 };
@@ -61,25 +67,19 @@ export type BoardStoreDefaultValue = {
   activeView: BoardView;
   boardId?: string;
   displayMode?: BoardDisplayMode;
+  grouping?: BoardGrouping;
   ordering?: BoardOrdering;
 };
 
 /**
- * The filter set a board starts with: nothing selected, both operators at their
- * neutral value, and the "all statuses" preset.
+ * The filter set a board starts with: every dimension off.
  *
  * A function rather than a shared constant so two boards mounted at once never
  * hold the same filter objects — every event replaces them rather than mutating
  * them, but a future event that did mutate would silently reach across boards.
  */
-const defaultBoardFilters = (): BoardFilters => ({
-  ...emptyBoardQuery.filters,
-  // Copied rather than shared: the constants on `emptyBoardQuery` are
-  // module-level, and two mounted boards must not be able to reach one array.
-  assigneeMemberIds: [...emptyBoardQuery.filters.assigneeMemberIds],
-  statuses: [...emptyBoardQuery.filters.statuses],
-  tagIds: [...emptyBoardQuery.filters.tagIds],
-});
+const defaultBoardFilters = (): BoardFilters =>
+  normalizeBoardFilters(emptyBoardQuery.filters);
 
 const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
   createStore({
@@ -97,6 +97,7 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       boardId: defaultValue?.boardId ?? "",
       bulkDeleteOpen: false,
       displayMode: defaultValue?.displayMode ?? "list",
+      grouping: defaultValue?.grouping ?? DEFAULT_GROUPING,
       ordering: defaultValue?.ordering ?? DEFAULT_ORDERING,
       selectedPosts: [],
     } as BoardStoreContext,
@@ -107,10 +108,18 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       }),
       setActiveView: (
         context,
-        event: { ordering?: BoardOrdering; view: BoardView }
+        event: {
+          grouping?: BoardGrouping;
+          ordering?: BoardOrdering;
+          view: BoardView;
+        }
       ) => ({
         ...context,
-        activeView: event.view,
+        activeView: {
+          ...event.view,
+          filters: normalizeBoardFilters(event.view.filters),
+        },
+        ...(event.grouping !== undefined && { grouping: event.grouping }),
         ...(event.ordering !== undefined && { ordering: event.ordering }),
         selectedPosts: [],
       }),
@@ -121,6 +130,17 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       setDisplayMode: (context, event: { mode: BoardDisplayMode }) => ({
         ...context,
         displayMode: event.mode,
+      }),
+      setFilters: (context, event: { filters: BoardFilters }) => ({
+        ...context,
+        activeView: {
+          ...context.activeView,
+          filters: normalizeBoardFilters(event.filters),
+        },
+      }),
+      setGroupBy: (context, event: { field: BoardGroupBy }) => ({
+        ...context,
+        grouping: { field: event.field },
       }),
       setOrderField: (context, event: { field: BoardOrderField }) => ({
         ...context,
@@ -141,126 +161,6 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
           },
         };
       },
-      clearFilters: (context) => ({
-        ...context,
-        activeView: {
-          ...context.activeView,
-          filters: {
-            ...context.activeView.filters,
-            assigneeMemberIds: [],
-            search: "",
-            statusOperator: DEFAULT_STATUS_OPERATOR,
-            statuses: [],
-            tagIds: [],
-            tagOperator: DEFAULT_TAG_OPERATOR,
-          },
-        },
-      }),
-      setSearch: (context, event: { value: string }) => ({
-        ...context,
-        activeView: {
-          ...context.activeView,
-          filters: {
-            ...context.activeView.filters,
-            search: event.value,
-          },
-        },
-      }),
-      setTagOperator: (context, event: { operator: BoardTagOperator }) => ({
-        ...context,
-        activeView: {
-          ...context.activeView,
-          filters: {
-            ...context.activeView.filters,
-            tagOperator: event.operator,
-          },
-        },
-      }),
-      setStatusOperator: (
-        context,
-        event: { operator: BoardStatusOperator }
-      ) => ({
-        ...context,
-        activeView: {
-          ...context.activeView,
-          filters: {
-            ...context.activeView.filters,
-            statusOperator: event.operator,
-          },
-        },
-      }),
-      toggleTagFilter: (context, event: { tagId: string }) => {
-        const tagIds = new Set(context.activeView.filters.tagIds);
-
-        if (tagIds.has(event.tagId)) {
-          tagIds.delete(event.tagId);
-        } else {
-          tagIds.add(event.tagId);
-        }
-
-        return {
-          ...context,
-          activeView: {
-            ...context.activeView,
-            filters: {
-              ...context.activeView.filters,
-              tagIds: [...tagIds],
-            },
-          },
-        };
-      },
-      toggleStatusFilter: (context, event: { status: BoardPostStatus }) => {
-        const statuses = new Set(context.activeView.filters.statuses);
-
-        if (statuses.has(event.status)) {
-          statuses.delete(event.status);
-        } else {
-          statuses.add(event.status);
-        }
-
-        return {
-          ...context,
-          activeView: {
-            ...context.activeView,
-            filters: {
-              ...context.activeView.filters,
-              statuses: [...statuses],
-            },
-          },
-        };
-      },
-      toggleAssigneeFilter: (context, event: { memberId: string }) => {
-        const assigneeMemberIds = new Set(
-          context.activeView.filters.assigneeMemberIds
-        );
-
-        if (assigneeMemberIds.has(event.memberId)) {
-          assigneeMemberIds.delete(event.memberId);
-        } else {
-          assigneeMemberIds.add(event.memberId);
-        }
-
-        return {
-          ...context,
-          activeView: {
-            ...context.activeView,
-            filters: {
-              ...context.activeView.filters,
-              assigneeMemberIds: [...assigneeMemberIds],
-            },
-          },
-        };
-      },
-      clearAssigneeFilter: (context) => ({
-        ...context,
-        activeView: {
-          ...context.activeView,
-          filters: {
-            ...context.activeView.filters,
-            assigneeMemberIds: [],
-          },
-        },
-      }),
       syncAvailablePostIds: (context, event: { postIds: string[] }) => {
         const available = new Set(event.postIds);
         return {
@@ -348,6 +248,11 @@ export function useBoardDisplayMode() {
 export function useBoardOrdering() {
   const store = useBoardStore();
   return useSelector(store, (state) => state.context.ordering);
+}
+
+export function useBoardGrouping() {
+  const store = useBoardStore();
+  return useSelector(store, (state) => state.context.grouping);
 }
 
 export function useActiveBoardView() {

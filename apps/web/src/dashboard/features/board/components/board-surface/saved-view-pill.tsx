@@ -118,6 +118,7 @@ export function SavedViewLink({
  */
 export const SavedViewPill = memo(function SavedViewPill({
   boardSlug,
+  canManage,
   index,
   isClipped,
   onDelete,
@@ -127,6 +128,8 @@ export const SavedViewPill = memo(function SavedViewPill({
   view,
 }: SavedViewActions & {
   boardSlug: string | undefined;
+  /** False for a view another member shared with the workspace. */
+  canManage: boolean;
   index: number;
   isClipped: boolean;
   organizationId: string;
@@ -134,8 +137,9 @@ export const SavedViewPill = memo(function SavedViewPill({
 }) {
   const { isDragging, ref } = useSortable({
     // A clipped pill is invisible and out of flow; leaving it droppable would
-    // let a drop land on a tab nobody can see.
-    disabled: isClipped,
+    // let a drop land on a tab nobody can see. A shared view is not the
+    // member's to move, so it is not a drag source either.
+    disabled: isClipped || !canManage,
     id: view.id,
     index,
   });
@@ -170,7 +174,7 @@ export const SavedViewPill = memo(function SavedViewPill({
                 boardSlug={boardSlug}
                 className={cn(
                   toggleVariants({ size: "sm", variant: "outline" }),
-                  "cursor-grab active:cursor-grabbing"
+                  canManage && "cursor-grab active:cursor-grabbing"
                 )}
                 organizationId={organizationId}
                 viewId={view.id}
@@ -191,22 +195,34 @@ export const SavedViewPill = memo(function SavedViewPill({
               {view.description}
             </p>
           ) : null}
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            {view.isPrivate ? "Private view" : "Shared with the workspace"}
+          </p>
         </TooltipPopup>
       </Tooltip>
       <ContextMenuPopup align="start">
-        <ContextMenuItem onClick={() => onEdit(view)}>
-          <HugeiconsIcon icon={Edit01Icon} />
-          Edit
-        </ContextMenuItem>
+        {canManage ? (
+          <ContextMenuItem onClick={() => onEdit(view)}>
+            <HugeiconsIcon icon={Edit01Icon} />
+            Edit
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuItem onClick={() => onDuplicate(view)}>
           <HugeiconsIcon icon={Copy01Icon} />
           Duplicate
         </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={() => onDelete(view)} variant="destructive">
-          <HugeiconsIcon icon={Delete02Icon} />
-          Delete
-        </ContextMenuItem>
+        {canManage ? (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={() => onDelete(view)}
+              variant="destructive"
+            >
+              <HugeiconsIcon icon={Delete02Icon} />
+              Delete
+            </ContextMenuItem>
+          </>
+        ) : null}
       </ContextMenuPopup>
     </ContextMenu>
   );
@@ -221,11 +237,12 @@ export const SavedViewPill = memo(function SavedViewPill({
  * worth.
  */
 export function SavedViewRowMenu({
+  canManage,
   onDelete,
   onDuplicate,
   onEdit,
   view,
-}: SavedViewActions & { view: TSavedView }) {
+}: SavedViewActions & { canManage: boolean; view: TSavedView }) {
   return (
     <Menu>
       <MenuTrigger
@@ -241,19 +258,25 @@ export function SavedViewRowMenu({
         <HugeiconsIcon icon={MoreHorizontalIcon} />
       </MenuTrigger>
       <MenuPopup align="end">
-        <MenuItem onClick={() => onEdit(view)}>
-          <HugeiconsIcon icon={Edit01Icon} />
-          Edit
-        </MenuItem>
+        {canManage ? (
+          <MenuItem onClick={() => onEdit(view)}>
+            <HugeiconsIcon icon={Edit01Icon} />
+            Edit
+          </MenuItem>
+        ) : null}
         <MenuItem onClick={() => onDuplicate(view)}>
           <HugeiconsIcon icon={Copy01Icon} />
           Duplicate
         </MenuItem>
-        <MenuSeparator />
-        <MenuItem onClick={() => onDelete(view)} variant="destructive">
-          <HugeiconsIcon icon={Delete02Icon} />
-          Delete
-        </MenuItem>
+        {canManage ? (
+          <>
+            <MenuSeparator />
+            <MenuItem onClick={() => onDelete(view)} variant="destructive">
+              <HugeiconsIcon icon={Delete02Icon} />
+              Delete
+            </MenuItem>
+          </>
+        ) : null}
       </MenuPopup>
     </Menu>
   );

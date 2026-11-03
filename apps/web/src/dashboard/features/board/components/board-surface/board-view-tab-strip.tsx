@@ -40,7 +40,7 @@ import {
   SavedViewLink,
 } from "./saved-view-pill";
 
-/** One tab of the strip: a built-in preset, or the member's saved view. */
+/** One tab of the strip: a built-in preset, or a saved view. */
 type ViewTab =
   | { fixed: BuiltInView; id: string; name: string }
   | { id: string; name: string; view: TSavedView };
@@ -78,8 +78,9 @@ const sensors = [
 ];
 
 /**
- * The board's tabs: the built-in presets and the member's saved views, as one
- * strip that clips what does not fit.
+ * The board's tabs: the built-in presets and the saved views, as one strip that
+ * clips what does not fit. Owned views come before views other members shared,
+ * because only the owned ones can be dragged.
  *
  * Modelled on Linear's view tabs, for the reasons measurement alone cannot
  * solve:
@@ -99,6 +100,7 @@ const sensors = [
 export function ViewTabStrip({
   activeViewId,
   boardSlug,
+  currentMemberId,
   onCreate,
   onDelete,
   onDuplicate,
@@ -110,6 +112,7 @@ export function ViewTabStrip({
 }: SavedViewActions & {
   activeViewId: string;
   boardSlug: string | undefined;
+  currentMemberId: string | undefined;
   onCreate: () => void;
   onReorder: (orderedIds: string[]) => Promise<void>;
   organizationId: string;
@@ -123,20 +126,36 @@ export function ViewTabStrip({
    * view's name, description and query, not its position — so the drop is sent
    * as one `ReorderSavedViews` call and the strip keeps the dropped order until
    * the write lands.
+   *
+   * Only the member's own views are reorderable. A shared view is visible here
+   * but belongs to somebody else, so it sits after the owned pills and its
+   * position does not take part in the drop.
    */
   const [pendingOrder, setPendingOrder] = useState<string[] | null>(null);
-  const ordered = useMemo(() => {
+  const ownedRows = useMemo(
+    () => rows.filter((view) => view.memberId === currentMemberId),
+    [currentMemberId, rows]
+  );
+  const sharedRows = useMemo(
+    () => rows.filter((view) => view.memberId !== currentMemberId),
+    [currentMemberId, rows]
+  );
+  const orderedOwned = useMemo(() => {
     if (pendingOrder === null) {
-      return rows;
+      return ownedRows;
     }
-    const byId = new Map(rows.map((view) => [view.id, view]));
+    const byId = new Map(ownedRows.map((view) => [view.id, view]));
 
     return pendingOrder.flatMap((id) => {
       const row = byId.get(id);
 
       return row === undefined ? [] : [row];
     });
-  }, [pendingOrder, rows]);
+  }, [ownedRows, pendingOrder]);
+  const ordered = useMemo(
+    () => [...orderedOwned, ...sharedRows],
+    [orderedOwned, sharedRows]
+  );
 
   const tabs = useMemo<ViewTab[]>(
     () => [
@@ -150,7 +169,10 @@ export function ViewTabStrip({
     [ordered]
   );
 
-  const fixedCount = BUILT_IN_VIEW_KEYS.length;
+  const sortableIndexById = useMemo(
+    () => new Map(ordered.map((view, index) => [view.id, index] as const)),
+    [ordered]
+  );
 
   /**
    * Measured geometry.
@@ -240,13 +262,16 @@ export function ViewTabStrip({
       return;
     }
 
-    const ids = ordered.map((view) => view.id);
+    const ids = orderedOwned.map((view) => view.id);
     const [moved] = ids.splice(source.initialIndex, 1);
 
     if (moved === undefined) {
       return;
     }
-    ids.splice(source.index, 0, moved);
+    // Shared pills are disabled drop sources, but the pointer can still end on
+    // one; that means "the end of my own list" rather than an index past it.
+    const targetIndex = Math.min(source.index, ids.length);
+    ids.splice(targetIndex, 0, moved);
     void commitOrder(ids);
   }) satisfies DragDropEventHandlers["onDragEnd"];
 
@@ -279,7 +304,8 @@ export function ViewTabStrip({
             isSavedTab(tab) ? (
               <SavedViewPill
                 boardSlug={boardSlug}
-                index={index - fixedCount}
+                canManage={tab.view.memberId === currentMemberId}
+                index={sortableIndexById.get(tab.id) ?? 0}
                 isClipped={index >= visibleCount}
                 key={tab.id}
                 onDelete={onDelete}
@@ -309,6 +335,7 @@ export function ViewTabStrip({
         <ViewsPopover
           activeTabIsHidden={activeTabIsHidden}
           boardSlug={boardSlug}
+          currentMemberId={currentMemberId}
           onCreate={onCreate}
           onDelete={onDelete}
           onDuplicate={onDuplicate}
@@ -542,6 +569,7 @@ function FixedViewLink({
 function ViewsPopover({
   activeTabIsHidden,
   boardSlug,
+  currentMemberId,
   onCreate,
   onDelete,
   onDuplicate,
@@ -553,6 +581,7 @@ function ViewsPopover({
 }: SavedViewActions & {
   activeTabIsHidden: boolean;
   boardSlug: string | undefined;
+  currentMemberId: string | undefined;
   onCreate: () => void;
   organizationId: string;
   tabs: readonly ViewTab[];
@@ -625,6 +654,7 @@ function ViewsPopover({
                   ) : null}
                 </SavedViewLink>
                 <SavedViewRowMenu
+                  canManage={tab.view.memberId === currentMemberId}
                   onDelete={onDelete}
                   onDuplicate={onDuplicate}
                   onEdit={onEdit}

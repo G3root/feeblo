@@ -2194,6 +2194,7 @@ export function savedViewCollection(
             boardId: view.boardId,
             description: view.description,
             id: view.id,
+            isPrivate: view.isPrivate,
             name: view.name,
             organizationId: view.organizationId,
             query: view.query,
@@ -2209,6 +2210,7 @@ export function savedViewCollection(
           rpc.UpdateSavedView({
             description: view.description,
             id: view.id,
+            isPrivate: view.isPrivate,
             name: view.name,
             organizationId: view.organizationId,
             query: view.query,

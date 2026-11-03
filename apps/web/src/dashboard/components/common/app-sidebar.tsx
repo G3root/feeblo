@@ -32,6 +32,7 @@ import {
   Edit,
   Ellipsis,
   Home,
+  InboxIcon,
   InternetIcon,
   LayoutThreeColumnIcon,
   Megaphone03Icon,
@@ -91,6 +92,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 )}
               />
             </SidebarMenuItem>
+            <MyFeedbackLink pathname={pathname} />
             <MyBoardLink />
 
             <SidebarMenuItem>
@@ -419,6 +421,28 @@ function RoadmapNav({ pathname }: { pathname: string }) {
           >
             <HugeiconsIcon icon={LayoutThreeColumnIcon} />
             <span>Roadmap</span>
+          </Link>
+        )}
+      />
+    </SidebarMenuItem>
+  );
+}
+
+function MyFeedbackLink({ pathname }: { pathname: string }) {
+  const organizationId = useOrganizationId();
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={pathname.startsWith(`/${organizationId}/my-feedback`)}
+        render={(props) => (
+          <Link
+            {...props}
+            params={{ organizationId }}
+            to="/$organizationId/my-feedback"
+          >
+            <HugeiconsIcon icon={InboxIcon} />
+            <span>My feedback</span>
           </Link>
         )}
       />

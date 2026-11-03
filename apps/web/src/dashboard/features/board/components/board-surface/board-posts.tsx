@@ -1,16 +1,24 @@
+import {
+  BOARD_QUERY_VERSION,
+  hasActiveBoardFilters,
+  type TBoardQuery,
+} from "@feeblo/domain-contracts/board-query";
 import { Suspense, lazy, useMemo } from "react";
 
+import type { MyFeedbackScope } from "../../lib/my-feedback-views";
 import {
   useActiveBoardView,
   useBoardDisplayMode,
+  useBoardGrouping,
   useBoardOrdering,
 } from "../../state/board-store-context";
 import { BoardListView } from "./board-list-view";
 import { BoardPostBulkActions } from "./board-post-bulk-actions";
 import { BoardPostsEmpty } from "./board-posts-empty";
 import { BoardPostsLoading } from "./board-posts-loading";
+import { useBoardGroupingData } from "./use-board-grouping-data";
 import { useBoardPostsData } from "./use-board-posts-data";
-import { groupPostsByStatus } from "./utils";
+import { groupBoardPosts } from "./utils";
 
 // The grid view pulls in @dnd-kit (drag-and-drop) plus its lane/card
 // modules. List is the default mode, so split the grid off the initial
@@ -23,34 +31,38 @@ const BoardGridView = lazy(() =>
 
 export function BoardPosts({
   boardId,
+  myFeedbackScope,
   organizationId,
 }: {
   boardId?: string;
+  /** Set on the member's own feedback page: "created" or "assigned" to them. */
+  myFeedbackScope?: MyFeedbackScope;
   organizationId: string;
 }) {
   const mode = useBoardDisplayMode();
   const ordering = useBoardOrdering();
+  const grouping = useBoardGrouping();
   const activeView = useActiveBoardView();
-  const {
-    assigneeMemberIds,
-    postStatus: postStatusFilter,
-    search,
-    statusOperator,
-    statuses,
-    tagIds,
-    tagOperator,
-  } = activeView.filters;
+  // The store holds the pieces; the live query takes the document. Rebuilding
+  // it here is what keeps the hook's input the same shape the row stores, so
+  // the filters, the grouping and the ordering cannot be threaded through
+  // three different parameter lists that drift.
+  const query = useMemo<TBoardQuery>(
+    () => ({
+      version: BOARD_QUERY_VERSION,
+      filters: activeView.filters,
+      grouping,
+      ordering,
+    }),
+    [activeView.filters, grouping, ordering]
+  );
+  const { members, postTagsByPostId, tags } =
+    useBoardGroupingData(organizationId);
   const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
-    assigneeMemberIds,
     boardId,
-    ordering,
+    myFeedbackScope,
     organizationId,
-    postStatusFilter,
-    search,
-    statusOperator,
-    statuses,
-    tagIds,
-    tagOperator,
+    query,
   });
 
   // `posts`/`postStatuses` are referentially stable (memoized in the hook),
@@ -58,15 +70,15 @@ export function BoardPosts({
   // the memoized lane components below actually skip work.
   const lanes = useMemo(
     () =>
-      groupPostsByStatus(
+      groupBoardPosts({
+        groupBy: grouping.field,
+        members,
+        postStatuses,
+        postTagsByPostId,
         posts,
-        postStatuses.map((postStatus) => ({
-          id: postStatus.id,
-          type: postStatus.type,
-          label: postStatus.label,
-        }))
-      ),
-    [posts, postStatuses]
+        tags,
+      }),
+    [grouping.field, members, postStatuses, postTagsByPostId, posts, tags]
   );
 
   if (hasError) {
@@ -81,12 +93,8 @@ export function BoardPosts({
     return (
       <BoardPostsEmpty
         boardId={boardId}
-        hasFilters={
-          search.trim().length > 0 ||
-          statuses.length > 0 ||
-          tagIds.length > 0 ||
-          assigneeMemberIds.length > 0
-        }
+        hasFilters={hasActiveBoardFilters(activeView.filters)}
+        myFeedbackView={myFeedbackScope?.kind}
         organizationId={organizationId}
       />
     );
@@ -98,6 +106,7 @@ export function BoardPosts({
         <Suspense fallback={<BoardPostsLoading />}>
           <BoardGridView
             boardId={boardId}
+            groupBy={grouping.field}
             groupedPosts={lanes}
             organizationId={organizationId}
           />
@@ -105,6 +114,7 @@ export function BoardPosts({
       ) : (
         <BoardListView
           boardId={boardId}
+          groupBy={grouping.field}
           groupedPosts={lanes}
           organizationId={organizationId}
         />

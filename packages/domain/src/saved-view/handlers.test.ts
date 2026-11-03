@@ -13,11 +13,11 @@ import { SavedViewRpcHandlersEffect } from "./handlers";
 import { SavedViewRepository } from "./repository";
 
 /**
- * Saved views are personal, and the RPC surface has to prove it rather than
- * trust the client: every case below drives two members of the *same* workspace
- * and checks the second cannot see, overwrite, or delete the first's rows. That
- * is the whole authorization story for this module — there is no role check to
- * fall back on, because every member may save their own views.
+ * Saved views are private by default and shared only when their owner says so.
+ * The RPC surface has to prove that rather than trust the client: every case
+ * below drives two members of the *same* workspace and checks the second cannot
+ * see a private row, and cannot overwrite or delete even a shared one. Sharing
+ * changes visibility, not ownership.
  */
 describe("SavedViewRpcHandlers", () => {
   type Member = {
@@ -131,11 +131,12 @@ describe("SavedViewRpcHandlers", () => {
             boardId: null,
             id,
             description: null,
+            isPrivate: true,
             name: "My triage",
             organizationId: f.organizationId,
             query: {
+              ...emptyBoardQuery,
               filters: { ...emptyBoardQuery.filters, search: "billing" },
-              ordering: emptyBoardQuery.ordering,
             },
           })
         );
@@ -161,6 +162,55 @@ describe("SavedViewRpcHandlers", () => {
       })
     );
 
+    it.effect(
+      "shares a public view and keeps a private view to its owner",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* SavedViewRpcHandlersEffect;
+          const f = yield* fixture();
+
+          for (const [name, isPrivate] of [
+            ["Shared triage", false],
+            ["Private triage", true],
+          ] as const) {
+            yield* as(
+              f.alice,
+              handlers.CreateSavedView({
+                boardId: null,
+                description: null,
+                id: yield* SavedViewId.generate,
+                isPrivate,
+                name,
+                organizationId: f.organizationId,
+                query: emptyBoardQuery,
+              })
+            );
+          }
+
+          const aliceViews = yield* as(
+            f.alice,
+            handlers.ListSavedViews({
+              boardId: null,
+              organizationId: f.organizationId,
+            })
+          );
+          const bobViews = yield* as(
+            f.bob,
+            handlers.ListSavedViews({
+              boardId: null,
+              organizationId: f.organizationId,
+            })
+          );
+
+          expect(aliceViews.map((view) => view.name)).toEqual([
+            "Shared triage",
+            "Private triage",
+          ]);
+          expect(bobViews.map((view) => view.name)).toEqual(["Shared triage"]);
+          expect(bobViews[0]?.memberId).toBe(f.alice.membershipId);
+        })
+    );
+
     it.effect("separates the feedback list from one board's views", () =>
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;
@@ -173,6 +223,7 @@ describe("SavedViewRpcHandlers", () => {
             boardId: f.boardId,
             id,
             description: null,
+            isPrivate: true,
             name: "Checkout bugs",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -211,6 +262,7 @@ describe("SavedViewRpcHandlers", () => {
             boardId: null,
             id,
             description: null,
+            isPrivate: true,
             name: "Mine",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -222,9 +274,11 @@ describe("SavedViewRpcHandlers", () => {
           handlers.UpdateSavedView({
             id,
             description: null,
+            isPrivate: true,
             name: "Renamed",
             organizationId: f.organizationId,
             query: {
+              ...emptyBoardQuery,
               filters: { ...emptyBoardQuery.filters, search: "checkout" },
               ordering: { direction: "asc", field: "title" },
             },
@@ -262,6 +316,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: null,
             description: "  Checkout regressions  ",
+            isPrivate: true,
             id: yield* SavedViewId.generate,
             name: "Checkout",
             organizationId: f.organizationId,
@@ -273,6 +328,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.CreateSavedView({
             boardId: null,
             description: "   ",
+            isPrivate: true,
             id: yield* SavedViewId.generate,
             name: "Blank note",
             organizationId: f.organizationId,
@@ -293,6 +349,55 @@ describe("SavedViewRpcHandlers", () => {
           // Not `""`: one spelling of "no description" in the row.
           null,
         ]);
+      })
+    );
+
+    it.effect("stores the query in canonical form", () =>
+      Effect.gen(function* () {
+        const handlers = yield* SavedViewRpcHandlersEffect;
+        const f = yield* fixture();
+
+        yield* as(
+          f.alice,
+          handlers.CreateSavedView({
+            boardId: null,
+            description: null,
+            isPrivate: true,
+            id: yield* SavedViewId.generate,
+            name: "Canonical",
+            organizationId: f.organizationId,
+            query: {
+              ...emptyBoardQuery,
+              filters: {
+                assigneeMemberIds: ["mem_b", "mem_a"],
+                search: "  checkout  ",
+                status: {
+                  operator: "isAnyOf",
+                  types: ["IN_PROGRESS", "PLANNED"],
+                },
+                tag: { operator: "includeAnyOf", tagIds: ["tag_b", "tag_a"] },
+              },
+            },
+          })
+        );
+
+        const [view] = yield* as(
+          f.alice,
+          handlers.ListSavedViews({
+            boardId: null,
+            organizationId: f.organizationId,
+          })
+        );
+
+        // Ids sorted, statuses in display order, the search term trimmed, so
+        // two clients that picked the same filters in a different sequence
+        // store the same row.
+        expect(view?.query.filters).toEqual({
+          assigneeMemberIds: ["mem_a", "mem_b"],
+          search: "checkout",
+          status: { operator: "isAnyOf", types: ["PLANNED", "IN_PROGRESS"] },
+          tag: { operator: "includeAnyOf", tagIds: ["tag_a", "tag_b"] },
+        });
       })
     );
 
@@ -323,6 +428,7 @@ describe("SavedViewRpcHandlers", () => {
             handlers.CreateSavedView({
               boardId: null,
               description: null,
+              isPrivate: true,
               id,
               name,
               organizationId: f.organizationId,
@@ -375,6 +481,7 @@ describe("SavedViewRpcHandlers", () => {
             handlers.CreateSavedView({
               boardId: null,
               description: null,
+              isPrivate: true,
               id,
               name,
               organizationId: f.organizationId,
@@ -407,7 +514,7 @@ describe("SavedViewRpcHandlers", () => {
       })
     );
 
-    it.effect("refuses to update or delete another member's view", () =>
+    it.effect("refuses to update or delete another member's shared view", () =>
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;
         const f = yield* fixture();
@@ -419,6 +526,7 @@ describe("SavedViewRpcHandlers", () => {
             boardId: null,
             id,
             description: null,
+            isPrivate: false,
             name: "Mine",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -430,6 +538,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.UpdateSavedView({
             id,
             description: null,
+            isPrivate: false,
             name: "Stolen",
             organizationId: f.organizationId,
             query: emptyBoardQuery,
@@ -487,6 +596,7 @@ describe("SavedViewRpcHandlers", () => {
             handlers.CreateSavedView({
               boardId: null,
               description: null,
+              isPrivate: true,
               id,
               name,
               organizationId: f.organizationId,

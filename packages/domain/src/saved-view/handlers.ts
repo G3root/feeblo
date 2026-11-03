@@ -1,3 +1,4 @@
+import { normalizeBoardQuery } from "@feeblo/domain-contracts/board-query";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -71,7 +72,14 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       yield* repository.create({
         ...args,
         description: normalizeDescription(args.description),
+        // A payload from before sharing existed omits the flag; those views
+        // were personal, so omitting it keeps them personal.
+        isPrivate: args.isPrivate ?? true,
         memberId,
+        // The row stores the canonical document, not the caller's spelling of
+        // it: two clients that picked the same filters in a different order
+        // write the same bytes, so a later comparison is structural.
+        query: normalizeBoardQuery(args.query),
       });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -96,7 +104,9 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       yield* repository.update({
         ...args,
         description: normalizeDescription(args.description),
+        isPrivate: args.isPrivate ?? existing.isPrivate,
         memberId,
+        query: normalizeBoardQuery(args.query),
       });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -138,7 +148,7 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const memberId = yield* currentMemberId(session, args.organizationId);
-      const existing = yield* repository.list({
+      const existing = yield* repository.listOwned({
         boardId: args.boardId,
         memberId,
         organizationId: args.organizationId,

@@ -1,4 +1,7 @@
-import type { TBoardQuery } from "@feeblo/domain-contracts/board-query";
+import {
+  BOARD_QUERY_VERSION,
+  type TBoardQuery,
+} from "@feeblo/domain-contracts/board-query";
 import type { TSavedView } from "@feeblo/domain/saved-view/schema";
 import { SavedViewId } from "@feeblo/id";
 import { toastManager } from "@feeblo/ui/toast";
@@ -12,11 +15,15 @@ import { fetchRpc } from "~/lib/runtime";
 
 import { useBoardStore } from "../../state/board-store-context";
 import { ViewTabStrip } from "./board-view-tab-strip";
-import { SavedViewDialog, type SavedViewTarget } from "./saved-view-dialog";
+import {
+  SavedViewSheet,
+  type SavedViewSaved,
+  type SavedViewTarget,
+} from "./saved-view-sheet";
 
 export type SavedViewCollection = ReturnType<typeof savedViewCollectionFor>;
 
-type DialogState =
+type SheetState =
   | { kind: "closed" }
   | { kind: "create"; query: TBoardQuery }
   | { kind: "edit"; query: TBoardQuery; view: TSavedView };
@@ -25,16 +32,17 @@ type DialogState =
  * The board's view tabs: data and writes for the strip that renders them.
  *
  * Split from `ViewTabStrip` on purpose. This component owns what changes when a
- * view is created, renamed, deleted or reordered — the collection, the dialog,
+ * view is created, edited, deleted or reordered — the collection, the sheet,
  * the mutations — and the strip owns what changes while the toolbar is being
  * measured (the visible count, the pending drag order). Keeping them in one
- * component meant every measurement or popover toggle re-rendered the dialog's
+ * component meant every measurement or popover toggle re-rendered the sheet's
  * form and every pill's menus with it.
  *
- * The board's filters are read from the store *on open* rather than subscribed
- * to: the tab strip has no business re-rendering while somebody types in the
- * search box, and a view is saved with the query as it was when the member
- * asked for it.
+ * The board's filters are read from the store snapshot when a create sheet
+ * opens, and from the row when an edit sheet opens; neither is a subscription.
+ * The tab strip has no business re-rendering while somebody types in the search
+ * box, and a new view is saved with the query as it was when the member asked
+ * for it.
  */
 export function BoardViewTabs({
   boardId,
@@ -82,25 +90,53 @@ export function BoardViewTabs({
     (state) => state.context.activeView.id
   );
 
-  const [dialog, setDialog] = useState<DialogState>({ kind: "closed" });
-  const closeDialog = useCallback(() => setDialog({ kind: "closed" }), []);
+  const [sheet, setSheet] = useState<SheetState>({ kind: "closed" });
+  const closeSheet = useCallback(() => setSheet({ kind: "closed" }), []);
 
   const openCreate = useCallback(() => {
-    const { activeView, ordering } = store.getSnapshot().context;
+    const { activeView, grouping, ordering } = store.getSnapshot().context;
 
-    setDialog({
+    setSheet({
       kind: "create",
-      query: { filters: activeView.filters, ordering },
+      query: {
+        version: BOARD_QUERY_VERSION,
+        filters: activeView.filters,
+        grouping,
+        ordering,
+      },
     });
   }, [store]);
 
   const editView = useCallback(
     (view: TSavedView) =>
-      // Editing renames and re-describes; it never rewrites the filters, which
-      // is why the dialog is handed the view's own query rather than the
-      // board's current one.
-      setDialog({ kind: "edit", query: view.query, view }),
+      // Editing can rewrite the filters, grouping and ordering, so the sheet
+      // starts from the view's own query rather than from the board's live one.
+      setSheet({ kind: "edit", query: view.query, view }),
     []
+  );
+
+  /**
+   * Applies a saved row to the board when it is the view on screen.
+   *
+   * The board store is seeded once per surface, so editing the active view
+   * would otherwise persist a new query while leaving the result set showing
+   * the old one until a reload. A different view's edit must not move the
+   * board the member is currently looking at.
+   */
+  const applySavedView = useCallback(
+    (saved: SavedViewSaved) => {
+      if (saved.id !== activeViewId) {
+        return;
+      }
+
+      store.send({
+        type: "setActiveView",
+        grouping: saved.grouping,
+        ordering: saved.ordering,
+        view: { filters: saved.filters, id: saved.id, name: saved.name },
+      });
+    },
+    [activeViewId, store]
   );
 
   const removeView = useCallback(
@@ -133,13 +169,14 @@ export function BoardViewTabs({
     [boardId, collection, organizationId]
   );
 
-  const target = dialog.kind === "edit" ? dialog.view : undefined;
+  const target = sheet.kind === "edit" ? sheet.view : undefined;
 
   return (
     <>
       <ViewTabStrip
         activeViewId={activeViewId}
         boardSlug={boardSlug}
+        currentMemberId={memberId}
         onCreate={openCreate}
         onDelete={removeView}
         onDuplicate={copyView}
@@ -152,10 +189,10 @@ export function BoardViewTabs({
 
       {/* Mounted only while open: `useAppForm` reads its defaults at mount, so
           each open starts from the target it was opened for instead of the
-          first one the dialog ever saw — and a closed dialog holds no form
-          state to keep in sync. */}
-      {dialog.kind === "closed" ? null : (
-        <SavedViewDialog
+          first one the sheet ever saw — and a closed sheet holds no form state
+          to keep in sync. */}
+      {sheet.kind === "closed" ? null : (
+        <SavedViewSheet
           boardId={boardId}
           boardSlug={boardSlug}
           collection={collection}
@@ -163,12 +200,13 @@ export function BoardViewTabs({
           nextOrderIndex={rows.length}
           onOpenChange={(open) => {
             if (!open) {
-              closeDialog();
+              closeSheet();
             }
           }}
+          onSaved={applySavedView}
           open
           organizationId={organizationId}
-          query={dialog.query}
+          query={sheet.query}
           target={target === undefined ? undefined : toTarget(target)}
         />
       )}
@@ -179,6 +217,7 @@ export function BoardViewTabs({
 const toTarget = (view: TSavedView): SavedViewTarget => ({
   description: view.description,
   id: view.id,
+  isPrivate: view.isPrivate,
   name: view.name,
 });
 
@@ -218,6 +257,7 @@ const duplicateView = async ({
       createdAt: new Date(),
       description: view.description,
       id,
+      isPrivate: view.isPrivate,
       memberId,
       name,
       orderIndex,
