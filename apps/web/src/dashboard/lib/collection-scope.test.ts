@@ -161,7 +161,9 @@ describe("collections module invariants", () => {
   const blocks = descriptorBlocks();
 
   it("finds every collection descriptor", () => {
-    expect(blocks.length).toBe(33);
+    // A tripwire, not a target: a new descriptor must land on purpose and pass
+    // the two keying invariants below. `savedViewCollection` made it 34.
+    expect(blocks.length).toBe(34);
   });
 
   it("keys every route-slug-scoped collection by slug", () => {

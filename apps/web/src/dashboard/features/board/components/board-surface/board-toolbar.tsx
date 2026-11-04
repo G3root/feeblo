@@ -1,10 +1,4 @@
 import { Button } from "@feeblo/ui/button";
-import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupText,
-} from "@feeblo/ui/input-group";
 import { Popover, PopoverPopup, PopoverTrigger } from "@feeblo/ui/popover";
 import {
   Select,
@@ -13,57 +7,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@feeblo/ui/select";
-import { toggleVariants } from "@feeblo/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
-import { cn } from "@feeblo/ui/utils";
 import {
   ArrowUpNarrowWideIcon,
   Sorting01Icon,
   GridViewIcon,
   ListViewIcon,
-  Search01Icon,
   SlidersHorizontalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Link } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
 
+import type { MyFeedbackView } from "../../lib/my-feedback-views";
 import {
   type BoardOrderField,
   useBoardOrdering,
   useBoardStore,
 } from "../../state/board-store-context";
 import { BoardFilter } from "./board-filter";
-
-const links = [
-  {
-    name: "All feedbacks",
-    to: "/$organizationId/board/$boardSlug" as const,
-  },
-  {
-    name: "Active",
-    to: "/$organizationId/board/$boardSlug/active" as const,
-  },
-  {
-    name: "Backlog",
-    to: "/$organizationId/board/$boardSlug/backlog" as const,
-  },
-];
-
-const feedbackLinks = [
-  {
-    name: "All feedbacks",
-    to: "/$organizationId/feedback" as const,
-  },
-  {
-    name: "Active",
-    to: "/$organizationId/feedback/active" as const,
-  },
-  {
-    name: "Backlog",
-    to: "/$organizationId/feedback/backlog" as const,
-  },
-];
+import { BoardViewTabs } from "./board-view-tabs";
+import { MyFeedbackViewTabs } from "./my-feedback-view-tabs";
 
 const orderFieldOptions: ReadonlyArray<{
   label: string;
@@ -76,11 +39,16 @@ const orderFieldOptions: ReadonlyArray<{
 ];
 
 export function BoardToolbar({
+  boardId,
   boardSlug,
+  myFeedbackView,
   organizationId,
   variant = "board",
 }: {
+  boardId?: string;
   boardSlug?: string;
+  /** Set on the member's own feedback page, which has fixed views only. */
+  myFeedbackView?: MyFeedbackView;
   organizationId: string;
   variant?: "board" | "feedback";
 }) {
@@ -88,54 +56,23 @@ export function BoardToolbar({
     <BoardFilter.Root organizationId={organizationId}>
       <div className="flex flex-col gap-3 p-3">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {variant === "feedback"
-              ? feedbackLinks.map((link) => (
-                  <Link
-                    activeOptions={{
-                      exact: true,
-                    }}
-                    activeProps={{
-                      "data-pressed": "true",
-                    }}
-                    className={cn(
-                      toggleVariants({
-                        variant: "outline",
-                        size: "sm",
-                      })
-                    )}
-                    key={link.to}
-                    params={{ organizationId }}
-                    to={link.to}
-                  >
-                    {link.name}
-                  </Link>
-                ))
-              : links.map((link) => (
-                  <Link
-                    activeOptions={{
-                      exact: true,
-                    }}
-                    activeProps={{
-                      "data-pressed": "true",
-                    }}
-                    className={cn(
-                      toggleVariants({
-                        variant: "outline",
-                        size: "sm",
-                      })
-                    )}
-                    key={link.to}
-                    params={{ boardSlug: boardSlug ?? "", organizationId }}
-                    to={link.to}
-                  >
-                    {link.name}
-                  </Link>
-                ))}
-          </div>
+          {/* One strip: the built-in presets and the member's own views are the
+              same kind of thing (a way to look at this board), so they share a
+              row and clip together instead of sitting on opposite sides of the
+              search box. The strip is `flex-1` and measures itself. */}
+          {myFeedbackView === undefined ? (
+            <BoardViewTabs
+              boardId={boardId ?? null}
+              boardSlug={boardSlug}
+              organizationId={organizationId}
+              variant={variant}
+            />
+          ) : (
+            <MyFeedbackViewTabs organizationId={organizationId} />
+          )}
           <div className="ml-auto flex w-full min-w-0 items-center justify-end gap-2 sm:w-auto">
             <div className="min-w-0 flex-1 sm:w-72 sm:flex-none">
-              <BoardSearchInput />
+              <BoardFilter.SearchInput debounce={300} />
             </div>
             <BoardFilter.Trigger />
             <DisplayPopOver />
@@ -147,38 +84,17 @@ export function BoardToolbar({
   );
 }
 
-function BoardSearchInput() {
-  const store = useBoardStore();
-  const search = useSelector(
-    store,
-    (state) => state.context.activeView.filters.search
-  );
-
-  return (
-    <InputGroup>
-      <InputGroupAddon>
-        <InputGroupText>
-          <HugeiconsIcon icon={Search01Icon} />
-        </InputGroupText>
-      </InputGroupAddon>
-      <DebouncedInputGroupInput
-        aria-label="Search feedback titles"
-        onChange={(value) => {
-          store.send({ type: "setSearch", value });
-        }}
-        placeholder="Search feedback titles"
-        value={search}
-      />
-    </InputGroup>
-  );
-}
-
 function DisplayPopOver() {
   return (
     <Popover>
       <PopoverTrigger
         render={
-          <Button className="rounded-full" size="icon-sm" variant="outline">
+          <Button
+            aria-label="Display options"
+            className="rounded-full"
+            size="icon-sm"
+            variant="outline"
+          >
             <HugeiconsIcon icon={SlidersHorizontalIcon} />
           </Button>
         }

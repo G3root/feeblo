@@ -42,6 +42,7 @@ import type {
   TPostOfficialUpdatePublish,
   TPostSuggestions,
   TPostUpdate,
+  TPostUpdateAssignee,
   TPostUpdateAuthor,
   TPostUpdateContent,
   TPostUpdateEta,
@@ -533,6 +534,26 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       updatePostAuthorEffect(args).pipe(
         Policy.withPolicy(
           postPolicy.canUpdateAuthor({
+            organizationId: args.organizationId,
+            postId: args.id,
+          })
+        ),
+        withRemapDbErrors("Post", "update")
+      ),
+
+    UpdatePostAssignee: (args: TPostUpdateAssignee) =>
+      Effect.flatMap(CurrentSession, (session) =>
+        writes.update(
+          {
+            assigneeMemberId: args.assigneeMemberId,
+            id: args.id,
+            organizationId: args.organizationId,
+          },
+          memberActor(session, args.organizationId)
+        )
+      ).pipe(
+        Policy.withPolicy(
+          postPolicy.canUpdateAssignee({
             organizationId: args.organizationId,
             postId: args.id,
           })

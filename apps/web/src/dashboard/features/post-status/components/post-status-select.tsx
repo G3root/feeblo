@@ -7,7 +7,15 @@ import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
+export function PostStatusSelect({
+  disabled = false,
+  showTrigger = true,
+  triggerClassName,
+}: {
+  disabled?: boolean;
+  showTrigger?: boolean;
+  triggerClassName?: string;
+}) {
   const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
   const { allowed: canChangeStatus } = usePolicy(
     hasPermission(organizationId, "posts.status")
@@ -48,7 +56,9 @@ export function PostStatusSelect({ disabled = false }: { disabled?: boolean }) {
           });
         }
       }}
+      showTrigger={showTrigger}
       statuses={postStatuses}
+      triggerClassName={triggerClassName}
     />
   );
 }

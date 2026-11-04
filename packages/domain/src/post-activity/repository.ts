@@ -69,6 +69,11 @@ export type PostActivityInput = PostActivityActor &
         readonly previousEta: string | null;
         readonly nextEta: string | null;
       }
+    | {
+        readonly kind: "ASSIGNEE_CHANGED";
+        readonly previousAssigneeMemberId: string | null;
+        readonly nextAssigneeMemberId: string | null;
+      }
     | { readonly kind: "POST_LOCKED" }
     | { readonly kind: "POST_UNLOCKED" }
     | { readonly kind: "POST_ARCHIVED" }
@@ -161,6 +166,13 @@ const toRow = (input: PostActivityInput): PostActivityRow => {
         kind: input.kind,
         previousValue: input.previousEta,
         nextValue: input.nextEta,
+        commentId: null,
+      };
+    case "ASSIGNEE_CHANGED":
+      return {
+        kind: input.kind,
+        previousValue: input.previousAssigneeMemberId,
+        nextValue: input.nextAssigneeMemberId,
         commentId: null,
       };
     case "TAG_ADDED":

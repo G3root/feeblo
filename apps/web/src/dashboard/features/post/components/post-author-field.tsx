@@ -14,6 +14,8 @@ import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+import { GHOST_PROPERTY_TRIGGER } from "../lib/property-trigger";
+
 /**
  * Dashboard author picker for a post, shown in the details sidebar. Wraps
  * the shared {@link AuthorPicker} with the dashboard's permission gate and
@@ -82,6 +84,8 @@ export function PostAuthorField() {
       organizationId={organizationId}
       postId={post.id}
       searchPlaceholder="Search users..."
+      showTrigger={false}
+      triggerClassName={GHOST_PROPERTY_TRIGGER}
       value={null}
     />
   );

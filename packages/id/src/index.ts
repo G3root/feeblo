@@ -112,6 +112,10 @@ export const TagId = makeId("tag", "tag", {
   approximateLength,
 });
 
+export const SavedViewId = makeId("saved_view", "svw", {
+  approximateLength,
+});
+
 export const PostTagId = makeId("post_tag", "ptg", {
   approximateLength,
 });

@@ -1,4 +1,5 @@
 import { Accordion as AccordionPrimitive } from "@base-ui/react/accordion";
+import type { TBoardGroupBy } from "@feeblo/domain-contracts/board-query";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import {
   Accordion,
@@ -30,34 +31,61 @@ import {
 } from "~/features/board/state/board-store-context";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 
+import { BoardLaneIcon } from "./board-lane-icon";
 import { BoardPostRowItem } from "./board-post-row-item";
-import { StatusIcon } from "./status-icon";
 import type { BoardPostLane, BoardPostRow } from "./types";
 
 export function BoardListView({
   organizationId,
   boardId,
+  groupBy,
   groupedPosts,
 }: {
   organizationId: string;
   boardId?: string;
+  groupBy: TBoardGroupBy;
   groupedPosts: BoardPostLane[];
 }) {
   // One membership subscription per board instead of one per lane: every
   // lane header only needs this boolean for its add-post button.
   const { allowed: canAddPost } = usePolicy(hasMembership(organizationId));
+
+  // "No grouping" is one flat list, not a single accordion lane with a fake
+  // "All posts" header: the header is what grouping adds, and the option is
+  // the way to remove it.
+  if (groupBy === "none") {
+    const posts = groupedPosts[0]?.posts ?? [];
+
+    return (
+      <section className="p-3">
+        {posts.map((post) => (
+          <BoardPostRowItem
+            key={post.id}
+            organizationId={organizationId}
+            post={post}
+          />
+        ))}
+      </section>
+    );
+  }
+
   return (
     <section>
       <Accordion
         className="w-full gap-2 rounded-none border-none p-3"
-        defaultValue={groupedPosts.map((lane) => lane.statusId)}
+        defaultValue={groupedPosts.map((lane) => lane.id)}
+        // A new grouping is a new set of lanes; remounting lets every lane
+        // start open instead of inheriting the previous grouping's collapsed
+        // state under coincidentally equal ids.
+        key={groupBy}
         multiple
       >
         {groupedPosts.map((lane) => (
           <BoardListLane
             boardId={boardId}
             canAddPost={canAddPost}
-            key={lane.statusId}
+            groupBy={groupBy}
+            key={lane.id}
             lane={lane}
             organizationId={organizationId}
           />
@@ -70,19 +98,22 @@ export function BoardListView({
 const BoardListLane = memo(function BoardListLane({
   boardId,
   canAddPost,
+  groupBy,
   lane,
   organizationId,
 }: {
   boardId?: string;
   canAddPost: boolean;
+  groupBy: TBoardGroupBy;
   lane: BoardPostLane;
   organizationId: string;
 }) {
   return (
-    <AccordionPrimitive.Item value={lane.statusId}>
+    <AccordionPrimitive.Item value={lane.id}>
       <BoardListLaneHeader
         boardId={boardId}
         canAddPost={canAddPost}
+        groupBy={groupBy}
         lane={lane}
       />
       <AccordionPanel className="h-auto px-0 pb-0">
@@ -101,13 +132,17 @@ const BoardListLane = memo(function BoardListLane({
 function BoardListLaneHeader({
   boardId,
   canAddPost,
+  groupBy,
   lane,
 }: {
   boardId?: string;
   canAddPost: boolean;
+  groupBy: TBoardGroupBy;
   lane: BoardPostLane;
 }) {
   const store = useBoardStore();
+  const laneLabel =
+    lane.label || (lane.status ? formatPostStatus(lane.status) : "Posts");
 
   return (
     <ContextMenu>
@@ -125,10 +160,8 @@ function BoardListLaneHeader({
                 icon={ArrowUp01Icon}
                 strokeWidth={2}
               />
-              <StatusIcon status={lane.status} />
-              <h3 className="text-sm font-medium">
-                {lane.label || formatPostStatus(lane.status)}
-              </h3>
+              <BoardLaneIcon groupBy={groupBy} status={lane.status} />
+              <h3 className="text-sm font-medium">{laneLabel}</h3>
               <span className="text-muted-foreground text-xs">
                 {lane.posts.length}
               </span>
@@ -136,13 +169,15 @@ function BoardListLaneHeader({
             </div>
           </AccordionTrigger>
 
-          <AddPostButton
-            boardId={boardId}
-            disabled={!canAddPost}
-            label={lane.label || formatPostStatus(lane.status)}
-            status={lane.status}
-            statusId={lane.statusId}
-          />
+          {lane.status !== undefined && lane.statusId !== undefined ? (
+            <AddPostButton
+              boardId={boardId}
+              disabled={!canAddPost}
+              label={laneLabel}
+              status={lane.status}
+              statusId={lane.statusId}
+            />
+          ) : null}
         </div>
       </ContextMenuTrigger>
 

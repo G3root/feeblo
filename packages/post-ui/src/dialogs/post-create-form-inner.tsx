@@ -356,6 +356,9 @@ export function PostCreateForm() {
             id: postId,
             assetIds,
             archivedAt: null,
+            // A freshly created post is unassigned; triage is a separate write
+            // through `UpdatePostAssignee` once the row exists.
+            assigneeMemberId: null,
             boardId: value.boardId,
             title,
             slug: slugify(title) || "untitled",

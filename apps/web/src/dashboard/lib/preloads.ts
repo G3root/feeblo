@@ -102,10 +102,25 @@ export async function preloadDashboardHome(): Promise<void> {
  * way — do not "optimize" this into paginated server queries without
  * replacing the whole board data model.
  */
-export async function preloadBoardPosts(): Promise<void> {
+export async function preloadBoardPosts({
+  needsMembers = false,
+}: {
+  /**
+   * Whether the surface may start on a query that names an assignee. Only a
+   * saved view can: the built-in presets filter and group by status. An
+   * assignee-grouped board needs the member names, so it still fails when the
+   * members read fails; the rejection handler only keeps that failure from
+   * rejecting this preload and blocking the route gate. Other groupings do not
+   * read the member collection, so they can render without it.
+   */
+  readonly needsMembers?: boolean;
+} = {}): Promise<void> {
   await Promise.all([
     dashboardCollections.boardCollection.preload(),
     dashboardCollections.deleteEligibilityCollection.preload(),
+    needsMembers
+      ? dashboardCollections.membersCollection.preload().catch(() => undefined)
+      : Promise.resolve(),
     dashboardCollections.postCollection.preload(),
     dashboardCollections.postStatusCollection.preload(),
     dashboardCollections.tagCollection.preload(),

@@ -115,10 +115,10 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
         render={
           <Button
             aria-label={`ETA: ${formatEtaQuarter(post.etaQuarter)}`}
-            className="w-full justify-start"
+            className="max-w-full justify-start"
             disabled={isDisabled}
             size="sm"
-            variant="outline"
+            variant="ghost"
           />
         }
       >

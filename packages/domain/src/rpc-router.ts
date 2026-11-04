@@ -33,6 +33,7 @@ import { PublicRpcRateLimitMiddlewareLive } from "./rate-limit";
 import { RoadmapColumnRpcHandlers } from "./roadmap-column/handlers";
 import { RoadmapRpcHandlers } from "./roadmap/handlers";
 import { AllRpcs, type RpcGroupName } from "./rpc-group";
+import { SavedViewRpcHandlers } from "./saved-view/handlers";
 import { S3UploadServiceLive } from "./services/s3";
 import {
   AuthMiddlewareLive,
@@ -87,6 +88,7 @@ export const RpcHandlerRegistrations = {
   PostReaction: PostReactionRpcHandlers,
   PostStatus: PostStatusRpcHandlers,
   PostSubscription: PostSubscriptionRpcHandlers,
+  SavedView: SavedViewRpcHandlers,
   Roadmap: RoadmapRpcHandlers,
   RoadmapColumn: RoadmapColumnRpcHandlers,
   Workspace: WorkspaceRpcHandlers,

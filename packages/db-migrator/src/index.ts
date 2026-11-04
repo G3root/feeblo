@@ -209,6 +209,11 @@ const concurrentIndexes = [
      ON "post" ("board_id")`,
   ],
   [
+    "post_organizationId_assigneeMemberId_idx",
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS "post_organizationId_assigneeMemberId_idx"
+     ON "post" ("organization_id", "assignee_member_id")`,
+  ],
+  [
     "post_creatorId_idx",
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS "post_creatorId_idx"
      ON "post" ("creator_id")`,
@@ -314,6 +319,13 @@ const runMigrate = async () => {
     await connection.unsafe(`
       ALTER TABLE "post"
       VALIDATE CONSTRAINT "post_embedding_metadata_chk"
+    `);
+    // The assignee foreign key was added `NOT VALID` so adding the column did
+    // not scan `post` inside the migration transaction. Validating it after the
+    // batch commits checks the existing rows without extending that lock.
+    await connection.unsafe(`
+      ALTER TABLE "post"
+      VALIDATE CONSTRAINT "post_assignee_member_id_member_id_fkey"
     `);
 
     const end = Date.now();
