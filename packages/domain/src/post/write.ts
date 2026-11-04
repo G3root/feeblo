@@ -5,7 +5,7 @@ import { htmlToExcerpt } from "@feeblo/utils/html";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { eq } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest, SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -247,7 +247,8 @@ export type PostUnmergeWrite = {
  */
 const makePostWriteService = Effect.gen(function* () {
   const boardRepository = yield* BoardRepository;
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
+  const secureRandom = yield* SecureRandom.SecureRandom;
   const db = yield* Database.Database;
   const emailOutbox = yield* EmailOutboxRepository;
   const emailOutboxConfig = yield* EmailOutboxConfig;
@@ -274,7 +275,8 @@ const makePostWriteService = Effect.gen(function* () {
    */
   const environment = Context.empty().pipe(
     Context.add(BoardRepository, boardRepository),
-    Context.add(Crypto.Crypto, crypto),
+    Context.add(SecureRandom.SecureRandom, secureRandom),
+    Context.add(Digest.Digest, digest),
     Context.add(Database.Database, db),
     Context.add(EmailOutboxConfig, emailOutboxConfig),
     Context.add(EmailOutboxRepository, emailOutbox),

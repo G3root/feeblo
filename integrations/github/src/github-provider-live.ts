@@ -20,7 +20,7 @@ import {
   IntegrationProviderPermanentRejection,
 } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -62,7 +62,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const domainConfig = yield* GitHubIntegrationConfig;
-      const crypto = yield* Crypto.Crypto;
+      const secureRandom = yield* SecureRandom.SecureRandom;
       const api = makeGitHubApiClient();
       const installationTokens = yield* makeGitHubInstallationTokenResolver({
         apiClient: api,
@@ -147,16 +147,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             const id = yield* IntegrationConnectionId.generate.pipe(
               Effect.mapError(() => providerFailure("connection id generation"))
             );
-            // Through the `Crypto` service, not the global: the OAuth state
-            // must be reproducible under `TestCrypto` in tests, and Workers
-            // forbid random value generation in global scope.
-            const nonce = yield* crypto
-              .randomUUIDv4()
-              .pipe(
-                Effect.mapError(() =>
-                  providerFailure("installation state generation")
-                )
-              );
+            // Through the `SecureRandom` service, not the global: the OAuth
+            // state must be substitutable in tests, and Workers forbid random
+            // value generation in global scope.
+            const nonce = yield* secureRandom.uuidV4();
             const state = yield* Schema.encodeEffect(
               Schema.fromJsonString(IntegrationOAuthState)
             )({ connectionId: id, organizationId, nonce }).pipe(

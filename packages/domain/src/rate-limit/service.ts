@@ -73,9 +73,31 @@ export class RateLimitService extends Context.Service<RateLimitService>()(
   }
 ) {
   static readonly layer = Layer.effect(this, this.make);
+  /**
+   * The in-memory store with its janitor fiber already stopped.
+   *
+   * `RateLimiter.layerStoreMemory` forks a sweep on `Schedule.spaced("1
+   * minute")` into the scope it is built in. Under `TestClock` that fiber is a
+   * hazard rather than housekeeping: `TestClock.setTime` wakes each sleep due
+   * before the target instant one at a time and waits for the woken fiber to
+   * suspend again, so the sweep's next sleep is due again, 60 seconds further
+   * on. A test that pins the clock to a real date — `setTime(2026-08-11)` from
+   * the epoch — therefore pumps ~29 million wake-ups and never returns. The
+   * store answers an expired entry exactly like a missing one on read (the
+   * window state is recomputed per `consume`), so nothing a test can observe
+   * depends on the sweep. Building the store in a scope that closes
+   * immediately keeps the store value and drops the fiber.
+   */
   static readonly layerMemory: Layer.Layer<RateLimitService> =
     RateLimitService.layer.pipe(
       Layer.provide(RateLimiter.layer),
-      Layer.provide(RateLimiter.layerStoreMemory)
+      Layer.provide(
+        Layer.unwrap(
+          Effect.map(
+            Effect.scoped(Layer.build(RateLimiter.layerStoreMemory)),
+            Layer.succeedContext
+          )
+        )
+      )
     );
 }

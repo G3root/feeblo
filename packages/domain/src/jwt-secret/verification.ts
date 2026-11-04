@@ -120,21 +120,18 @@ export const verifyJwt = (
       // jose's exp/nbf checks to the same instant as the post-signature
       // time-claim rules below — the wall clock by default, the test seam's
       // instant when `options.nowSeconds` is provided.
-      const result = yield* Effect.orElseSucceed(
-        Effect.map(
-          Effect.tryPromise(() =>
-            jose.jwtVerify(token, key, {
-              algorithms: ["HS256"],
-              clockTolerance: CLOCK_SKEW_LEEWAY_SECONDS,
-              currentDate: DateTime.toDate(
-                DateTime.makeUnsafe(nowSeconds * 1000)
-              ),
-            })
-          ),
-          (r) => r.payload
+      const result = yield* Effect.map(
+        Effect.promise(() =>
+          jose.jwtVerify(token, key, {
+            algorithms: ["HS256"],
+            clockTolerance: CLOCK_SKEW_LEEWAY_SECONDS,
+            currentDate: DateTime.toDate(
+              DateTime.makeUnsafe(nowSeconds * 1000)
+            ),
+          })
         ),
-        () => null
-      );
+        (r) => r.payload
+      ).pipe(Effect.catchCause(() => Effect.succeed(null)));
 
       if (result !== null && result.aud === expectedOrganizationId) {
         yield* enforceTimeClaims(result, nowSeconds);

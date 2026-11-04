@@ -2,7 +2,7 @@ import { currentDb, schema } from "@feeblo/db";
 import { JwtSecretId } from "@feeblo/id";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -25,9 +25,9 @@ interface TJwtSecretRotate {
 
 const generateSecret = () =>
   Effect.gen(function* () {
-    const crypto = yield* Crypto.Crypto;
-    return Buffer.from(yield* crypto.randomBytes(32)).toString("hex");
-  }).pipe(Effect.orDie);
+    const secureRandom = yield* SecureRandom.SecureRandom;
+    return Buffer.from(yield* secureRandom.randomBytes(32)).toString("hex");
+  });
 
 const makeJwtSecretRepository = Effect.gen(function* () {
   const db = yield* currentDb;
