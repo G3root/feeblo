@@ -129,6 +129,7 @@ const makeCommentRepository = Effect.gen(function* () {
             // person.
             authorIsBanned: bannedAuthorPredicate({
               emails: [schema.userTable.email],
+              memberUserId: schema.commentTable.userId,
               organizationId: schema.commentTable.organizationId,
               userId: schema.commentTable.userId,
             }),

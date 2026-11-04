@@ -14,6 +14,13 @@ export type AuthorBanFacets = {
   /** The author's account id; null for a contact-only or anonymous author. */
   readonly userId: AnyColumn | SQL;
   /**
+   * The identity to test workspace membership against: the creator's account
+   * id, or the linked contact's owner when the creator is null (`COALESCE` at
+   * the caller). It is separate from `userId` because ban matching still uses
+   * the creator alone.
+   */
+  readonly memberUserId: AnyColumn | SQL;
+  /**
    * Every address the ban may name instead of the account: the author's own
    * account address, and on a dashboard read the linked contact's, because an
    * on-behalf post has no `creatorId` for a ban to match on.
@@ -34,8 +41,8 @@ export type AuthorBanFacets = {
  * A current member is never reported as banned: membership is what the
  * participation policy checks before it consults a ban, so an address ban
  * written before the person joined the workspace must not badge their posts.
- * The check is by `user_id`, not `creator_member_id`, because a portal author
- * who later joins has a post whose `creator_member_id` is still null.
+ * The check is by the resolved member account id, not by an address, because
+ * an address can belong to a member without naming them.
  *
  * Both facets are covered by partial unique indexes on
  * `(organization_id, user_id)` and `(organization_id, email)`, so this is an
@@ -45,6 +52,7 @@ export type AuthorBanFacets = {
  */
 export const bannedAuthorPredicate = ({
   emails,
+  memberUserId,
   organizationId,
   userId,
 }: AuthorBanFacets): SQL<boolean> => sql`exists (
@@ -74,5 +82,5 @@ export const bannedAuthorPredicate = ({
   select 1
   from ${schema.memberTable} as author_member
   where author_member.organization_id = ${organizationId}
-    and author_member.user_id = ${userId}
+    and author_member.user_id = ${memberUserId}
 )`;

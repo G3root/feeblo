@@ -115,19 +115,14 @@ describe("UserBanRepository", () => {
           userId: account.id,
         });
         const now = yield* DateTime.nowAsDate;
-        // The account row is created first so it is the survivor of the merge
-        // below; ids are generated, so the ordering has to come from the date.
-        const earlier = DateTime.toDateUtc(
-          DateTime.makeUnsafe(now.getTime() - 60_000)
-        );
 
         // Two rows for one person: the account, and the address the widget
-        // uses. The third ban names both facets at once, so one row has to
-        // carry the contact's address after the merge.
+        // uses. The third ban names both facets at once, so the address-only
+        // duplicate is folded into the account row.
         yield* repository.upsert({
           createdByMemberId: null,
           email: account.email,
-          now: earlier,
+          now,
           organizationId,
           reason: null,
           userId: account.id,
@@ -215,61 +210,117 @@ describe("UserBanRepository", () => {
     );
 
     it.effect(
-      "keeps a ban matchable after the linked contact is recreated unlinked",
+      "stores the account address when a ban names only the account",
       () =>
         Effect.gen(function* () {
           const repository = yield* UserBanRepository;
-          const db = yield* currentDb;
           const organizationId = yield* createOrganization();
-          const account = yield* createUser("durable-contact");
-          const contactEmail = "durable-contact-address@example.com";
-          const contactId = yield* createContact({
-            email: contactEmail,
-            organizationId,
-            userId: account.id,
-          });
+          const account = yield* createUser("email-required");
           const now = yield* DateTime.nowAsDate;
 
-          // The widget presents the contact's address, so that is the address
-          // the ban has to store; the account facet covers everything that
-          // still resolves the account.
-          const resolved = yield* repository.resolveTarget({
-            organizationId,
-            target: { _tag: "user", userId: account.id },
-          });
-          expect(resolved).toMatchObject({
-            email: contactEmail,
-            status: "ok",
-            userId: account.id,
-          });
-          if (resolved.status !== "ok") {
-            return;
-          }
-          yield* repository.upsert({
+          // An account-only request still writes an address. That is what keeps
+          // `SET NULL` from leaving a row with no subject when the user goes.
+          const row = yield* repository.upsert({
             createdByMemberId: null,
-            email: resolved.email,
+            email: null,
             now,
             organizationId,
             reason: null,
-            userId: resolved.userId,
+            userId: account.id,
           });
 
-          yield* db
-            .delete(schema.contactTable)
-            .where(eq(schema.contactTable.id, contactId));
-          const recreatedContactId = yield* createContact({
-            email: contactEmail,
-            organizationId,
-            userId: null,
+          expect(row).toMatchObject({
+            email: account.email,
+            userId: account.id,
           });
-
-          expect(
-            yield* repository.isBanned({
-              contactId: recreatedContactId,
-              organizationId,
-            })
-          ).toBe(true);
         })
+    );
+
+    it.effect("keeps an account ban after the account is deleted", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBanRepository;
+        const db = yield* currentDb;
+        const organizationId = yield* createOrganization();
+        const account = yield* createUser("deleted-account");
+        const now = yield* DateTime.nowAsDate;
+
+        // A contact row is the workspace relationship the user target checks.
+        yield* createContact({
+          email: "deleted-account-contact@example.com",
+          organizationId,
+          userId: account.id,
+        });
+
+        const resolved = yield* repository.resolveTarget({
+          organizationId,
+          target: { _tag: "user", userId: account.id },
+        });
+        expect(resolved).toMatchObject({
+          email: account.email,
+          status: "ok",
+          userId: account.id,
+        });
+        if (resolved.status !== "ok") {
+          return;
+        }
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: resolved.email,
+          now,
+          organizationId,
+          reason: null,
+          userId: resolved.userId,
+        });
+
+        // `user_ban.user_id` is `SET NULL`; the stored address keeps the row
+        // a valid subject after the account is gone.
+        yield* db
+          .delete(schema.userTable)
+          .where(eq(schema.userTable.id, account.id));
+
+        const [row] = (yield* repository.list({
+          limit: 10,
+          offset: 0,
+          organizationId,
+        })).items;
+        expect(row).toMatchObject({ email: account.email, userId: null });
+        expect(
+          yield* repository.isBanned({ email: account.email, organizationId })
+        ).toBe(true);
+      })
+    );
+
+    it.effect("stores the account address even when contacts are linked", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBanRepository;
+        const organizationId = yield* createOrganization();
+        const account = yield* createUser("multi-contact");
+
+        yield* createContact({
+          email: "first-contact@example.com",
+          organizationId,
+          userId: account.id,
+        });
+        yield* createContact({
+          email: "second-contact@example.com",
+          organizationId,
+          userId: account.id,
+        });
+
+        // The contact address is not a durable identity: the person can have
+        // several, and the account facet already covers the relationship.
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "user", userId: account.id },
+          })
+        ).toEqual({
+          email: account.email,
+          name: "Customer",
+          status: "ok",
+          userId: account.id,
+        });
+      })
     );
 
     it.effect("keeps both accounts when two bans share an address", () =>
@@ -301,8 +352,8 @@ describe("UserBanRepository", () => {
           userId: second.id,
         });
 
-        // One row per account, because a row carries one `user_id`; only one
-        // of them can hold the shared address under its unique index.
+        // One row per account. The address stays on the first account's row;
+        // the second account is banned under its own account address.
         expect(
           yield* repository.isBanned({ organizationId, userId: first.id })
         ).toBe(true);
@@ -325,9 +376,11 @@ describe("UserBanRepository", () => {
         expect(
           listed.items.filter((row) => row.email === sharedEmail)
         ).toHaveLength(1);
+        expect(
+          listed.items.find((row) => row.userId === second.id)?.email
+        ).toBe(second.email);
 
-        // Lifting the first account's ban must not lift the second's, even
-        // though the address named with the first is still the second's row.
+        // Lifting the first account's ban must not lift the second's.
         expect(
           yield* repository.removeByFacets({
             email: sharedEmail,
@@ -542,7 +595,7 @@ describe("UserBanRepository", () => {
         // The contact's account is not a member, but the address it carries
         // belongs to one. The membership check has to follow the address, not
         // just the linked account.
-        yield* createContact({
+        const contactId = yield* createContact({
           email: member.email,
           organizationId,
           userId: linkedAccount.id,
@@ -554,7 +607,60 @@ describe("UserBanRepository", () => {
             target: { _tag: "email", email: member.email },
           })
         ).toEqual({ status: "member" });
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "contact", contactId },
+          })
+        ).toEqual({ status: "member" });
       })
+    );
+
+    it.effect(
+      "rejects an address when any case-variant account is a member",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* UserBanRepository;
+          const organizationId = yield* createOrganization();
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+          const memberEmail = "case-member@example.com";
+          const nonMemberId = `nonmember_${organizationId}`;
+          const memberId = `member_user_${organizationId}`;
+
+          // `user.email` is uniquely indexed case-sensitively while every
+          // lookup here is case-insensitive, so both rows can exist. The first
+          // match is not necessarily the one that belongs to a member.
+          yield* db.insert(schema.userTable).values({
+            email: memberEmail.toUpperCase(),
+            id: nonMemberId,
+            name: "Non-member",
+          });
+          yield* db.insert(schema.userTable).values({
+            email: memberEmail,
+            id: memberId,
+            name: "Member",
+          });
+          yield* db.insert(schema.memberTable).values({
+            createdAt: now,
+            id: `member_${memberId}`,
+            organizationId,
+            role: "manager",
+            userId: memberId,
+          });
+          yield* createContact({
+            email: memberEmail,
+            organizationId,
+            userId: null,
+          });
+
+          expect(
+            yield* repository.resolveTarget({
+              organizationId,
+              target: { _tag: "email", email: memberEmail },
+            })
+          ).toEqual({ status: "member" });
+        })
     );
 
     it.effect("prefers a linked contact over a case-variant unlinked row", () =>

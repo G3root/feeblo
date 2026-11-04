@@ -938,12 +938,31 @@ describe("UserBanRpcHandlers", () => {
           .set({ creatorMemberId: fixture.memberId })
           .where(eq(schema.postTable.id, attributedPostId));
 
+        // An on-behalf post has no creator account, so the contact's owner is
+        // the only identity that can prove its author is a member.
+        const contactId = `contact_${fixture.userId}`;
+        yield* db.insert(schema.contactTable).values({
+          createdAt: now,
+          email: `manager-${fixture.userId}@example.com`.toLowerCase(),
+          id: contactId,
+          name: "Manager contact",
+          organizationId: fixture.organizationId,
+          updatedAt: now,
+          userId: fixture.userId,
+        });
+        const contactOnlyPostId = yield* createPost(fixture, fixture.userId);
+        yield* db
+          .update(schema.postTable)
+          .set({ contactId, creatorId: null, creatorMemberId: null })
+          .where(eq(schema.postTable.id, contactOnlyPostId));
+
         const rows = yield* posts.findMany({
           organizationId: fixture.organizationId,
         });
         const byId = new Map(rows.map((row) => [row.id, row]));
         expect(byId.get(portalPostId)?.authorIsBanned).toBe(false);
         expect(byId.get(attributedPostId)?.authorIsBanned).toBe(false);
+        expect(byId.get(contactOnlyPostId)?.authorIsBanned).toBe(false);
       })
     );
   });

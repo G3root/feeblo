@@ -96,6 +96,14 @@ export type UpsertUserBanInput = {
   readonly now: Date;
 };
 
+/** The columns an upsert may fill on an existing ban row. */
+type UserBanRowUpdate = {
+  email?: string;
+  reason: string | null;
+  updatedAt: Date;
+  userId?: string;
+};
+
 const dataError = (operation: string, reason: string): UserBanDataError =>
   new UserBanDataError({ operation, reason });
 
@@ -126,27 +134,32 @@ const makeUserBanRepository = Effect.gen(function* () {
       return row !== undefined;
     });
 
-  /** A contact row that links this account to the workspace, if one exists. */
+  /** The oldest contact row linking this account to the workspace, if any. */
   const findContactByUserId = (input: {
     readonly organizationId: string;
     readonly userId: string;
   }) =>
-    Effect.gen(function* () {
-      const [contact] = yield* db
-        .select({
-          email: schema.contactTable.email,
-          name: schema.contactTable.name,
-        })
-        .from(schema.contactTable)
-        .where(
-          and(
-            eq(schema.contactTable.organizationId, input.organizationId),
-            eq(schema.contactTable.userId, input.userId)
-          )
+    db
+      .select({ name: schema.contactTable.name })
+      .from(schema.contactTable)
+      .where(
+        and(
+          eq(schema.contactTable.organizationId, input.organizationId),
+          eq(schema.contactTable.userId, input.userId)
         )
-        .limit(1);
-      return contact;
-    });
+      )
+      .orderBy(asc(schema.contactTable.createdAt), asc(schema.contactTable.id))
+      .limit(1)
+      .pipe(Effect.map((rows) => rows[0]));
+
+  /** An account's address, for a ban that names only the account. */
+  const findUserEmail = (userId: string) =>
+    db
+      .select({ email: schema.userTable.email })
+      .from(schema.userTable)
+      .where(eq(schema.userTable.id, userId))
+      .limit(1)
+      .pipe(Effect.map((rows) => rows[0]));
 
   /** An account by normalized address, with the tenancy field its callers need. */
   const findUserByEmail = (email: string) =>
@@ -161,21 +174,30 @@ const makeUserBanRepository = Effect.gen(function* () {
       .limit(1)
       .pipe(Effect.map((rows) => rows[0]));
 
-  /** Whether a normalized address belongs to a member of the workspace. */
+  /**
+   * Whether any account at a normalized address is a workspace member.
+   *
+   * The address lookup is case-insensitive while `user.email` is uniquely
+   * indexed case-sensitively, so more than one account can match. Checking
+   * only the first would let a mixed-case duplicate bypass the refusal.
+   */
   const emailBelongsToMember = (input: {
     readonly email: string;
     readonly organizationId: string;
   }) =>
-    Effect.gen(function* () {
-      const user = yield* findUserByEmail(input.email);
-      if (user === undefined) {
-        return false;
-      }
-      return yield* isWorkspaceMember({
-        organizationId: input.organizationId,
-        userId: user.id,
-      });
-    });
+    db
+      .select({ id: schema.memberTable.id })
+      .from(schema.userTable)
+      .innerJoin(
+        schema.memberTable,
+        and(
+          eq(schema.memberTable.userId, schema.userTable.id),
+          eq(schema.memberTable.organizationId, input.organizationId)
+        )
+      )
+      .where(sql`lower(${schema.userTable.email}) = ${input.email}`)
+      .limit(1)
+      .pipe(Effect.map((rows) => rows.length > 0));
 
   /** Resolves a lookup's contact facet into the account and address it names. */
   const resolveLookup = (input: UserBanLookup) =>
@@ -316,13 +338,12 @@ const makeUserBanRepository = Effect.gen(function* () {
         return { status: "not_found" } as const;
       }
 
-      // A ban stores one address, so it has to be the one the widget can
-      // present: a linked contact's, when there is one. The account facet
-      // (`userId`) still covers the account address, and keeping the contact
-      // address means the widget still matches after that contact is deleted
-      // and recreated unlinked, when it can no longer resolve the userId.
+      // The account address is the durable identity stored on the ban. The
+      // contact address is deliberately not used: it can change, a person can
+      // have several contacts, and the account facet (`userId`) already covers
+      // the relationship while the account exists.
       return {
-        email: normalizedEmail(contact?.email ?? user.email),
+        email: normalizedEmail(user.email),
         name: contact?.name ?? user.name,
         status: "ok",
         userId: user.id,
@@ -552,11 +573,10 @@ const makeUserBanRepository = Effect.gen(function* () {
       if (email === null && userId === null) {
         return { status: "unresolvable" } as const;
       }
-      // An unlinked contact has no account to check, but its address may still
-      // belong to a member. The email target refuses that case for the same
-      // reason; naming the contact must not be a way around it.
+      // The contact's address may belong to a member even when the contact is
+      // linked to somebody else. The email target refuses that case for the
+      // same reason; naming the contact must not be a way around it.
       if (
-        userId === null &&
         email !== null &&
         (yield* emailBelongsToMember({
           email,
@@ -575,27 +595,39 @@ const makeUserBanRepository = Effect.gen(function* () {
   );
 
   /**
-   * Writes one ban, merging the account and address facets onto one row.
+   * Writes one ban, keeping every row anchored to its own identity.
    *
-   * The insert is the common path. A conflict means another facet of the same
-   * person is already banned; the transaction then deletes the duplicate rows
-   * before filling the missing facet on the survivor, so both unique indexes
-   * stay satisfied. A row carries one `user_id`, so when the conflict also
-   * covers a different account (two people whose bans share an address) the
-   * other account keeps its own account-only row instead of being folded into
-   * the named one, and the named account takes the address. The whole thing is
-   * database work, so the transaction retry (ADR 0020) can replay it.
+   * Every row carries an email: an account ban stores the account address,
+   * and a contact or address target stores the address it names. That makes
+   * the address the durable subject and `user_id` an optional association, so
+   * deleting an account only clears the association (`SET NULL`) and never
+   * leaves a row with no subject.
+   *
+   * A conflict is resolved on the same identity only. An address-only row is
+   * upgraded when the account it belongs to is named, and a duplicate address
+   * row for the same account is folded into the account row. An address held
+   * by a different account is left alone: that address is already banned, and
+   * the named account gets its own account-address row instead. No row is ever
+   * cleared or moved, so a later removal cannot strand an address. The whole
+   * thing is database work, so the transaction retry (ADR 0020) can replay it.
    */
   const upsert = Effect.fn("UserBanRepository.upsert")(function* (
     input: UpsertUserBanInput
   ) {
-    const email = normalizedEmail(input.email);
-    if (input.userId === null && email === null) {
+    let resolvedEmail = normalizedEmail(input.email);
+    if (resolvedEmail === null && input.userId !== null) {
+      const user = yield* findUserEmail(input.userId);
+      resolvedEmail = normalizedEmail(user?.email);
+    }
+    if (resolvedEmail === null) {
       return yield* dataError(
         "upsert",
-        "A ban needs an account or an email address"
+        input.userId === null
+          ? "A ban needs an account or an email address"
+          : "The banned account does not exist"
       );
     }
+    const email = resolvedEmail;
 
     return yield* transaction(
       Effect.gen(function* () {
@@ -617,101 +649,66 @@ const makeUserBanRepository = Effect.gen(function* () {
           return inserted;
         }
 
-        const facets = [
-          ...(input.userId === null ? [] : [eq(table.userId, input.userId)]),
-          ...(email === null ? [] : [eq(table.email, email)]),
-        ];
-        const rows = yield* db
+        const ownRows =
+          input.userId === null
+            ? []
+            : yield* db
+                .select()
+                .from(table)
+                .where(
+                  and(
+                    eq(table.organizationId, input.organizationId),
+                    eq(table.userId, input.userId)
+                  )
+                )
+                .limit(1)
+                .for("update");
+        const [ownRow] = ownRows;
+        const [emailRow] = yield* db
           .select()
           .from(table)
           .where(
-            and(eq(table.organizationId, input.organizationId), or(...facets))
+            and(
+              eq(table.organizationId, input.organizationId),
+              eq(table.email, email)
+            )
           )
-          .orderBy(asc(table.createdAt), asc(table.id))
+          .limit(1)
           .for("update");
-        const [keeper, ...duplicates] = rows;
-        if (keeper === undefined) {
+
+        if (ownRow === undefined && emailRow === undefined) {
           return yield* dataError(
             "upsert",
             "A ban conflict did not resolve to a stored row"
           );
         }
 
-        // A row has at most one `user_id`, so merging a row for a different
-        // account into the row being written would silently unban that
-        // account. Keep each account on its own row; only the account the
-        // operator named can carry the address, because the partial unique
-        // index allows it on one row only.
-        const conflictingAccounts =
-          input.userId !== null &&
-          rows.some(
-            (row) => row.userId !== null && row.userId !== input.userId
-          );
-        if (conflictingAccounts) {
-          const own = rows.find((row) => row.userId === input.userId);
-          // Free the named address from the other account's row before giving
-          // it to the named account; that row keeps its account facet and
-          // therefore its ban.
-          const addressHolder = rows.find(
-            (row) =>
-              email !== null &&
-              row.email === email &&
-              row.userId !== input.userId
-          );
-          if (addressHolder !== undefined) {
-            yield* db
-              .update(table)
-              .set({ email: null })
-              .where(eq(table.id, addressHolder.id));
+        if (ownRow !== undefined) {
+          // An address-only row for the same person is redundant once the
+          // account row holds the address. A row for a different account is
+          // not: it keeps its address and the named account keeps its own.
+          const addressOnlyDuplicate =
+            emailRow !== undefined &&
+            emailRow.id !== ownRow.id &&
+            emailRow.userId === null;
+          if (addressOnlyDuplicate) {
+            yield* db.delete(table).where(eq(table.id, emailRow.id));
           }
-
-          // Rows with no account, or that repeat the named account, add no
-          // identity the survivors do not already carry.
-          const redundant = rows.filter(
-            (row) =>
-              row !== own &&
-              (row.userId === null || row.userId === input.userId)
-          );
-          if (redundant.length > 0) {
-            yield* db.delete(table).where(
-              inArray(
-                table.id,
-                redundant.map((row) => row.id)
-              )
-            );
+          const takesAddress =
+            emailRow === undefined ||
+            addressOnlyDuplicate ||
+            emailRow.id === ownRow.id;
+          const updateValues: UserBanRowUpdate = {
+            reason: input.reason ?? ownRow.reason,
+            updatedAt: input.now,
+          };
+          if (takesAddress) {
+            updateValues.email = email;
           }
-
-          if (own === undefined) {
-            const [created] = yield* db
-              .insert(table)
-              .values({
-                id: yield* UserBanId.generate,
-                createdByMemberId: input.createdByMemberId,
-                createdAt: input.now,
-                email,
-                organizationId: input.organizationId,
-                reason: input.reason,
-                updatedAt: input.now,
-                userId: input.userId,
-              })
-              .returning();
-            if (created === undefined) {
-              return yield* dataError(
-                "upsert",
-                "A ban insert did not resolve to a stored row"
-              );
-            }
-            return created;
-          }
-
           const [updated] = yield* db
             .update(table)
-            .set({
-              email: email ?? own.email,
-              reason: input.reason ?? own.reason,
-              updatedAt: input.now,
-            })
-            .where(eq(table.id, own.id))
+            .set(updateValues)
+            .where(eq(table.id, ownRow.id))
             .returning();
           if (updated === undefined) {
             return yield* dataError(
@@ -722,39 +719,106 @@ const makeUserBanRepository = Effect.gen(function* () {
           return updated;
         }
 
-        if (duplicates.length > 0) {
-          yield* db.delete(table).where(
-            inArray(
-              table.id,
-              duplicates.map((row) => row.id)
-            )
+        if (emailRow === undefined) {
+          return yield* dataError(
+            "upsert",
+            "A ban conflict did not resolve to a stored row"
           );
         }
 
-        const [updated] = yield* db
-          .update(table)
-          .set({
-            // The facets on the row being written win. A ban named by a
-            // contact carries that contact's address, and the duplicate this
-            // merge deletes may be the only row holding it; keeping the
-            // survivor's older address would silently unban the address the
-            // operator just named. Nothing is lost from the other side: an
-            // identity with the older address resolves to the account, and
-            // the account facet is kept.
-            email: email ?? keeper.email,
-            reason: input.reason ?? keeper.reason,
+        // No account row yet. An address-only row becomes this account's ban;
+        // an address ban already attached to another account stays as it is,
+        // including when the request itself was address-only.
+        if (input.userId === null || emailRow.userId === null) {
+          const updateValues: UserBanRowUpdate = {
+            reason: input.reason ?? emailRow.reason,
             updatedAt: input.now,
-            userId: input.userId ?? keeper.userId,
-          })
-          .where(eq(table.id, keeper.id))
-          .returning();
-        if (updated === undefined) {
+          };
+          if (input.userId !== null) {
+            updateValues.userId = input.userId;
+          }
+          const [updated] = yield* db
+            .update(table)
+            .set(updateValues)
+            .where(eq(table.id, emailRow.id))
+            .returning();
+          if (updated === undefined) {
+            return yield* dataError(
+              "upsert",
+              "A ban update did not resolve to a stored row"
+            );
+          }
+          return updated;
+        }
+
+        // The address belongs to another account. Leave that ban alone and
+        // give the named account its own address row.
+        const accountEmail = normalizedEmail(
+          (yield* findUserEmail(input.userId))?.email
+        );
+        if (accountEmail === null) {
           return yield* dataError(
             "upsert",
-            "A ban update did not resolve to a stored row"
+            "The banned account does not exist"
           );
         }
-        return updated;
+        const [accountEmailRow] = yield* db
+          .select()
+          .from(table)
+          .where(
+            and(
+              eq(table.organizationId, input.organizationId),
+              eq(table.email, accountEmail)
+            )
+          )
+          .limit(1)
+          .for("update");
+        if (accountEmailRow !== undefined) {
+          if (accountEmailRow.userId !== null) {
+            return yield* dataError(
+              "upsert",
+              "The address is already banned for another account"
+            );
+          }
+          const [updated] = yield* db
+            .update(table)
+            .set({
+              reason: input.reason ?? accountEmailRow.reason,
+              updatedAt: input.now,
+              userId: input.userId,
+            })
+            .where(eq(table.id, accountEmailRow.id))
+            .returning();
+          if (updated === undefined) {
+            return yield* dataError(
+              "upsert",
+              "A ban update did not resolve to a stored row"
+            );
+          }
+          return updated;
+        }
+
+        const [created] = yield* db
+          .insert(table)
+          .values({
+            id: yield* UserBanId.generate,
+            createdByMemberId: input.createdByMemberId,
+            createdAt: input.now,
+            email: accountEmail,
+            organizationId: input.organizationId,
+            reason: input.reason,
+            updatedAt: input.now,
+            userId: input.userId,
+          })
+          .onConflictDoNothing()
+          .returning();
+        if (created === undefined) {
+          return yield* dataError(
+            "upsert",
+            "A ban insert did not resolve to a stored row"
+          );
+        }
+        return created;
       })
     );
   });
