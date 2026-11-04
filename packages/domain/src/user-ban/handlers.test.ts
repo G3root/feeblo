@@ -956,6 +956,42 @@ describe("UserBanRpcHandlers", () => {
           .set({ contactId, creatorId: null, creatorMemberId: null })
           .where(eq(schema.postTable.id, contactOnlyPostId));
 
+        // The control: the same shape attributed to a non-member still draws
+        // the badge when the contact's address is banned.
+        const nonmember = yield* createEndUser({
+          organizationId: fixture.organizationId,
+          restricted: false,
+          suffix: "badged-contact",
+        });
+        const nonmemberContactEmail = "badged-contact@example.com";
+        const nonmemberContactId = `contact_nonmember_${nonmember.id}`;
+        yield* db.insert(schema.contactTable).values({
+          createdAt: now,
+          email: nonmemberContactEmail,
+          id: nonmemberContactId,
+          name: "Non-member contact",
+          organizationId: fixture.organizationId,
+          updatedAt: now,
+          userId: nonmember.id,
+        });
+        yield* db.insert(schema.userBanTable).values({
+          createdAt: now,
+          email: nonmemberContactEmail,
+          id: `ban_nonmember_${nonmember.id}`,
+          organizationId: fixture.organizationId,
+          updatedAt: now,
+          userId: null,
+        });
+        const badgedContactPostId = yield* createPost(fixture, fixture.userId);
+        yield* db
+          .update(schema.postTable)
+          .set({
+            contactId: nonmemberContactId,
+            creatorId: null,
+            creatorMemberId: null,
+          })
+          .where(eq(schema.postTable.id, badgedContactPostId));
+
         const rows = yield* posts.findMany({
           organizationId: fixture.organizationId,
         });
@@ -963,7 +999,54 @@ describe("UserBanRpcHandlers", () => {
         expect(byId.get(portalPostId)?.authorIsBanned).toBe(false);
         expect(byId.get(attributedPostId)?.authorIsBanned).toBe(false);
         expect(byId.get(contactOnlyPostId)?.authorIsBanned).toBe(false);
+        expect(byId.get(badgedContactPostId)?.authorIsBanned).toBe(true);
       })
+    );
+
+    it.effect(
+      "badges a contact-only post when its owner's account is banned",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const posts = yield* PostRepository;
+          const fixture = yield* makeFixture();
+          const now = yield* DateTime.nowAsDate;
+          const owner = yield* createEndUser({
+            organizationId: fixture.organizationId,
+            restricted: false,
+            suffix: "badged-owner",
+          });
+          const contactId = `contact_owner_${owner.id}`;
+          yield* db.insert(schema.contactTable).values({
+            createdAt: now,
+            email: "badged-owner-contact@example.com",
+            id: contactId,
+            name: "Owner contact",
+            organizationId: fixture.organizationId,
+            updatedAt: now,
+            userId: owner.id,
+          });
+          // The account ban names an unrelated address, so only the contact
+          // owner resolved from the post can make the badge true.
+          yield* db.insert(schema.userBanTable).values({
+            createdAt: now,
+            email: `unrelated-${owner.id}@example.com`.toLowerCase(),
+            id: `ban_owner_${owner.id}`,
+            organizationId: fixture.organizationId,
+            updatedAt: now,
+            userId: owner.id,
+          });
+          const postId = yield* createPost(fixture, fixture.userId);
+          yield* db
+            .update(schema.postTable)
+            .set({ contactId, creatorId: null, creatorMemberId: null })
+            .where(eq(schema.postTable.id, postId));
+
+          const [row] = yield* posts.findMany({
+            organizationId: fixture.organizationId,
+          });
+          expect(row?.authorIsBanned).toBe(true);
+        })
     );
   });
 });

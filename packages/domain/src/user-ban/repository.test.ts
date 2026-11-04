@@ -397,6 +397,64 @@ describe("UserBanRepository", () => {
       })
     );
 
+    it.effect("keeps a shared address with the account that owns it", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBanRepository;
+        const organizationId = yield* createOrganization();
+        const owner = yield* createUser("address-owner");
+        const named = yield* createUser("address-named");
+        const sharedEmail = "owned-shared@example.com";
+        const now = yield* DateTime.nowAsDate;
+
+        // The named account already has a row under its own address.
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: named.email,
+          now,
+          organizationId,
+          reason: null,
+          userId: named.id,
+        });
+        // Another account owns the address being requested below.
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: sharedEmail,
+          now,
+          organizationId,
+          reason: null,
+          userId: owner.id,
+        });
+
+        const stored = yield* repository.upsert({
+          createdByMemberId: null,
+          email: sharedEmail,
+          now,
+          organizationId,
+          reason: null,
+          userId: named.id,
+        });
+
+        // The named account keeps its own address; the requested address is
+        // still covered by the row that owns it.
+        expect(stored).toMatchObject({
+          email: named.email,
+          userId: named.id,
+        });
+        const listed = yield* repository.list({
+          limit: 10,
+          offset: 0,
+          organizationId,
+        });
+        expect(listed.total).toBe(2);
+        expect(listed.items.find((row) => row.userId === owner.id)?.email).toBe(
+          sharedEmail
+        );
+        expect(
+          yield* repository.isBanned({ email: sharedEmail, organizationId })
+        ).toBe(true);
+      })
+    );
+
     it.effect("resolves a contact and rejects a member target", () =>
       Effect.gen(function* () {
         const repository = yield* UserBanRepository;
@@ -660,6 +718,12 @@ describe("UserBanRepository", () => {
               target: { _tag: "email", email: memberEmail },
             })
           ).toEqual({ status: "member" });
+          expect(
+            yield* repository.isMember({
+              email: memberEmail,
+              organizationId,
+            })
+          ).toBe(true);
         })
     );
 

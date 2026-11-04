@@ -276,13 +276,9 @@ const makeUserBanRepository = Effect.gen(function* () {
     if (email === null) {
       return false;
     }
-    const user = yield* findUserByEmail(email);
-    if (user === undefined) {
-      return false;
-    }
-    return yield* isWorkspaceMember({
+    return yield* emailBelongsToMember({
+      email,
       organizationId: input.organizationId,
-      userId: user.id,
     });
   });
 
@@ -694,6 +690,9 @@ const makeUserBanRepository = Effect.gen(function* () {
           if (addressOnlyDuplicate) {
             yield* db.delete(table).where(eq(table.id, emailRow.id));
           }
+          // An address owned by another account is already banned for the
+          // workspace. That row keeps it: the unique index allows one row per
+          // address, and moving it here would leave the other account unowned.
           const takesAddress =
             emailRow === undefined ||
             addressOnlyDuplicate ||

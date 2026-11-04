@@ -245,13 +245,15 @@ const selectPostFields = (opts?: {
         emails: opts.contactFallback
           ? [schema.userTable.email, schema.contactTable.email]
           : [schema.userTable.email],
-        // A contact-only post has no creator, so the contact's owner is the
-        // only identity that can prove the attributed author is a member.
+        // A contact-only post has no creator, so the contact's owner is both
+        // the account a ban matches and the identity that proves membership.
         memberUserId: opts.contactFallback
           ? sql`COALESCE(${schema.postTable.creatorId}, ${schema.contactTable.userId})`
           : schema.postTable.creatorId,
         organizationId: schema.postTable.organizationId,
-        userId: schema.postTable.creatorId,
+        userId: opts.contactFallback
+          ? sql`COALESCE(${schema.postTable.creatorId}, ${schema.contactTable.userId})`
+          : schema.postTable.creatorId,
       })
     : sql<boolean | null>`null`,
   metadata: schema.postTable.metadata,
