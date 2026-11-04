@@ -88,6 +88,9 @@ const PAGE_SIZE_OPTIONS = [25, 100, 250, 500] as const;
 /** The board picker's sentinel for "every board"; never a real board name. */
 const ALL_BOARDS = "__all_boards__";
 
+/** The imported file's own name, with its CSV extension dropped. */
+const csvFileNamePattern = /\.csv$/iu;
+
 const OUTCOME_LABELS = {
   created: m.plain_brave_crab,
   failed: m.rustic_young_stork,
@@ -390,7 +393,7 @@ export function ImportReviewPage({
       }
       await downloadResponse(
         response,
-        `${job.fileName.replace(/\.csv$/iu, "")}-import-problems.csv`
+        `${job.fileName.replace(csvFileNamePattern, "")}-import-problems.csv`
       );
     } catch {
       toastManager.add({ title: m.sunny_kind_gecko(), type: "error" });

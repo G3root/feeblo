@@ -183,6 +183,11 @@ export const MAX_ATTRIBUTE_PATTERN_LENGTH = 200;
 
 const MAX_ATTRIBUTE_PATTERN_REPETITION = 100;
 
+/** A single decimal digit, the only backreference number a pattern may carry. */
+const singleDigitPattern = /^[0-9]$/;
+/** A repetition bound, which must be a plain decimal integer. */
+const decimalIntegerPattern = /^\d+$/;
+
 /**
  * Rejects regular expressions that are prone to catastrophic backtracking
  * (ReDoS). Attribute patterns are compiled and executed against values that
@@ -207,7 +212,7 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
     if (ch === "\\") {
       // Backreferences make matching non-regular and can introduce expensive
       // retry paths. Escaped literals and character classes remain safe.
-      if (/^[0-9]$/.test(pattern[i + 1] ?? "")) {
+      if (singleDigitPattern.test(pattern[i + 1] ?? "")) {
         return true;
       }
       i += 2;
@@ -232,7 +237,7 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
       if (
         end === -1 ||
         repetitionParts.length > 2 ||
-        repetitionParts.some((part) => !/^\d+$/.test(part)) ||
+        repetitionParts.some((part) => !decimalIntegerPattern.test(part)) ||
         repetitionParts.some(
           (part) => Number(part) > MAX_ATTRIBUTE_PATTERN_REPETITION
         )

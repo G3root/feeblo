@@ -31,6 +31,7 @@ import { PostSubscriptionRpcs } from "./post-subscription/rpcs";
 import { PostRpcs } from "./post/rpcs";
 import { RoadmapColumnRpcs } from "./roadmap-column/rpcs";
 import { RoadmapRpcs } from "./roadmap/rpcs";
+import { SavedViewRpcs } from "./saved-view/rpcs";
 import { SiteRpcs } from "./site/rpcs";
 import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
@@ -84,6 +85,7 @@ export const RpcGroups = [
   ["PostReaction", PostReactionRpcs],
   ["PostStatus", PostStatusRpcs],
   ["PostSubscription", PostSubscriptionRpcs],
+  ["SavedView", SavedViewRpcs],
   ["Roadmap", RoadmapRpcs],
   ["RoadmapColumn", RoadmapColumnRpcs],
   ["Workspace", WorkspaceRpcs],

@@ -12,8 +12,11 @@ export const MIN_SUGGESTION_SIMILARITY = 0.3;
 
 export const SUGGESTION_MAX_DISTANCE = 1 - MIN_SUGGESTION_SIMILARITY;
 
+/** A run of letters or digits; everything else separates words. */
+const wordPattern = /[\p{L}\p{N}]+/gu;
+
 const words = (value: string): ReadonlySet<string> =>
-  new Set(value.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+  new Set(value.toLowerCase().match(wordPattern) ?? []);
 
 export const lexicalSimilarity = (left: string, right: string): number => {
   const leftWords = words(left);

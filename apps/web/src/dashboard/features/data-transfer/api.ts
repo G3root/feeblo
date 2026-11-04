@@ -2,6 +2,11 @@ import { hasWindow, isPlainObject, isString } from "@feeblo/utils/runtime-kind";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import * as Predicate from "effect/Predicate";
 
+/** `filename*=UTF-8''<percent-encoded>`, the RFC 5987 form. */
+const encodedFileNamePattern = /filename\*=UTF-8''([^;]+)/iu;
+/** `filename="<name>"`, the form every browser actually sends. */
+const quotedFileNamePattern = /filename="([^"]+)"/iu;
+
 /**
  * The base the data-transfer file endpoints hang off. In dev the injected
  * API_URL is the proxy base ("/api") and must become the page origin before
@@ -42,7 +47,7 @@ export const fileNameFromContentDisposition = (
   if (header === null) {
     return null;
   }
-  const encoded = /filename\*=UTF-8''([^;]+)/iu.exec(header)?.[1];
+  const encoded = encodedFileNamePattern.exec(header)?.[1];
   if (encoded !== undefined) {
     try {
       return decodeURIComponent(encoded);
@@ -50,7 +55,7 @@ export const fileNameFromContentDisposition = (
       return null;
     }
   }
-  return /filename="([^"]+)"/iu.exec(header)?.[1] ?? null;
+  return quotedFileNamePattern.exec(header)?.[1] ?? null;
 };
 
 /** Writes one in-memory blob to a download, then releases the object URL. */

@@ -16,6 +16,7 @@ import {
   toPublicApiChangelogSummary,
   toPublicApiCompany,
   toPublicApiPost,
+  toPublicApiPostActivity,
   toPublicApiPostSummary,
   toPublicApiTag,
   toPublicApiTagDetail,
@@ -25,6 +26,7 @@ import {
   PublicApiChangelogSummary,
   PublicApiCompany,
   PublicApiPost,
+  PublicApiPostActivity,
   PublicApiPostSummary,
   PublicApiTag,
   PublicApiTagDetail,
@@ -193,6 +195,54 @@ describe("public API mappers", () => {
     ]) {
       expect(encoded).not.toContain(forbidden);
     }
+  });
+
+  /**
+   * `ASSIGNEE_CHANGED` is the one kind whose values are person identifiers, so
+   * it is the one kind whose values the public payload drops. The other kinds
+   * are asserted in the same test because a redaction that widened to them
+   * would silently remove information integrations rely on.
+   */
+  it("redacts the member ids an assignment entry moved between", () => {
+    const activitySource = {
+      actor: { avatarUrl: null, displayName: "Sam", type: "member" as const },
+      commentId: null,
+      createdAt: new Date("2026-08-12T09:30:00.000Z"),
+      id: "act_1",
+      kind: "ASSIGNEE_CHANGED" as const,
+      nextValue: "mem_new_assignee",
+      previousValue: "mem_old_assignee",
+    };
+
+    const assignment = Schema.encodeSync(PublicApiPostActivity)(
+      toPublicApiPostActivity(activitySource)
+    );
+
+    expect(assignment).toEqual({
+      actor: { avatarUrl: null, displayName: "Sam", type: "member" },
+      commentId: null,
+      createdAt: "2026-08-12T09:30:00.000Z",
+      id: "act_1",
+      kind: "ASSIGNEE_CHANGED",
+      nextValue: null,
+      previousValue: null,
+    });
+    const encoded = JSON.stringify(assignment);
+    expect(encoded).not.toContain("mem_old_assignee");
+    expect(encoded).not.toContain("mem_new_assignee");
+
+    // A resource-named kind keeps its values.
+    const statusChange = Schema.encodeSync(PublicApiPostActivity)(
+      toPublicApiPostActivity({
+        ...activitySource,
+        kind: "STATUS_CHANGED",
+        nextValue: "pss_planned",
+        previousValue: "pss_open",
+      })
+    );
+
+    expect(statusChange.previousValue).toBe("pss_open");
+    expect(statusChange.nextValue).toBe("pss_planned");
   });
 
   it("emits exactly the documented tag fields", () => {

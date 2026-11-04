@@ -49,6 +49,9 @@ export interface BrowserErrorReportingSettings {
 
 const operationFailedEvent = "feeblo:operation-failed";
 
+/** An error name or tag Sentry will accept as a grouping fingerprint. */
+const errorTypePattern = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/;
+
 /** Tie every event in this document to the same page load when one exists. */
 const pageTag = (): { page_id?: string } => {
   const id = browserPageId();
@@ -101,7 +104,7 @@ export const errorType = <T>(error: T): string => {
       : isPlainObject(error) && "_tag" in error && isString(error._tag)
         ? error._tag
         : "UnknownError";
-  return isString(candidate) && /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(candidate)
+  return isString(candidate) && errorTypePattern.test(candidate)
     ? candidate
     : "UnknownError";
 };

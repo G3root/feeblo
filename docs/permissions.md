@@ -57,7 +57,7 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Posts | Change post tags | Yes | Yes | Yes |
 | Posts | Move posts between boards | Yes | Yes | Yes |
 | Posts | Manage tags | No | Yes | Yes |
-| Posts | Change ETA, owner, or status | No | Yes | Yes |
+| Posts | Change ETA, assignee, or status | No | Yes | Yes |
 | Posts | Manage categories | No | Yes | Yes |
 | Posts | Merge or unmerge posts | No | Yes | Yes |
 | Posts | Delete another user's post | No | Yes | Yes |

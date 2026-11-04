@@ -15,6 +15,9 @@ import { isPlainObject, isString } from "@feeblo/utils/runtime-kind";
 /** The largest envelope the tunnel will forward. */
 export const maxEnvelopeBytes = 256 * 1024;
 
+/** The Sentry project id is the DSN's only path segment. */
+const projectIdPathPattern = /^\/\d+$/;
+
 /**
  * The Sentry ingestion URL for an envelope, or `undefined` when the envelope
  * is malformed or addressed to a different project.
@@ -45,7 +48,7 @@ export const envelopeTarget = (
   } catch {
     return undefined;
   }
-  if (dsn.protocol !== "https:" || !/^\/\d+$/.test(dsn.pathname))
+  if (dsn.protocol !== "https:" || !projectIdPathPattern.test(dsn.pathname))
     return undefined;
   return `${dsn.origin}/api${dsn.pathname}/envelope/?sentry_version=7&sentry_key=${encodeURIComponent(dsn.username)}`;
 };

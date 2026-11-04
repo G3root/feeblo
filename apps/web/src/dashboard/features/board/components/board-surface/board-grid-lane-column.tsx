@@ -1,5 +1,6 @@
 import { CollisionPriority } from "@dnd-kit/abstract";
 import { useSortable } from "@dnd-kit/react/sortable";
+import type { TBoardGroupBy } from "@feeblo/domain-contracts/board-query";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { RoadmapLaneColumn } from "@feeblo/post-ui/roadmap/roadmap-lane-column";
 import { Button } from "@feeblo/ui/button";
@@ -10,14 +11,18 @@ import { memo } from "react";
 
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 
+import { BoardLaneIcon } from "./board-lane-icon";
+
 interface BoardGridLaneColumnProps {
   boardId?: string;
   children?: React.ReactNode;
+  groupBy: TBoardGroupBy;
   id: string;
   index: number;
   label: string;
-  status: BoardPostStatus;
-  statusId: string;
+  /** Present only for a status lane. */
+  status?: BoardPostStatus;
+  statusId?: string;
   totalPosts: number;
 }
 
@@ -29,10 +34,11 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
   status,
   statusId,
   boardId,
+  groupBy,
   label,
 }: BoardGridLaneColumnProps) {
   const store = usePostCreateDialogContext();
-  const effectiveLabel = label || formatPostStatus(status);
+  const effectiveLabel = label || (status ? formatPostStatus(status) : "Posts");
   const { ref, isDropTarget } = useSortable({
     id,
     accept: "item",
@@ -45,26 +51,29 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
   return (
     <RoadmapLaneColumn
       action={
-        <Button
-          aria-label={`Add post to ${effectiveLabel}`}
-          onClick={() => {
-            store.send({
-              type: "toggle",
-              data: {
-                boardId,
-                source: "board_column",
-                status,
-                statusId,
-              },
-            });
-          }}
-          size="icon-xs"
-          variant="ghost"
-        >
-          <HugeiconsIcon icon={PlusSignIcon} />
-        </Button>
+        status !== undefined && statusId !== undefined ? (
+          <Button
+            aria-label={`Add post to ${effectiveLabel}`}
+            onClick={() => {
+              store.send({
+                type: "toggle",
+                data: {
+                  boardId,
+                  source: "board_column",
+                  status,
+                  statusId,
+                },
+              });
+            }}
+            size="icon-xs"
+            variant="ghost"
+          >
+            <HugeiconsIcon icon={PlusSignIcon} />
+          </Button>
+        ) : undefined
       }
       contentRef={ref}
+      icon={<BoardLaneIcon groupBy={groupBy} status={status} />}
       isHighlighted={isDropTarget}
       label={effectiveLabel}
       status={status}

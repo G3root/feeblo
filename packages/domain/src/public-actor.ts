@@ -47,8 +47,14 @@ export const redactActorIdentities = <T extends ActorRow>(
  * identifiers are named `creatorId`/`creatorMemberId`. The session user's own
  * posts keep their identifiers so the client can compute "did I create this"
  * state; every other row has them nulled.
+ *
+ * `assigneeMemberId` is nulled on every row, including the viewer's own: the
+ * assignee is a different person from the author, so "the viewer wrote this"
+ * says nothing about whether they may learn who is working on it. The public
+ * board has no assignment UI, so nothing on a public surface needs the value.
  */
 export type CreatorRow = {
+  assigneeMemberId?: string | null;
   creatorId: string | null;
   creatorMemberId: string | null;
 };
@@ -57,10 +63,15 @@ export const redactCreatorIdentity = <T extends CreatorRow>(
   row: T,
   sessionUserId: string | undefined
 ): T => {
+  const withoutAssignee =
+    "assigneeMemberId" in row && row.assigneeMemberId !== null
+      ? { ...row, assigneeMemberId: null }
+      : row;
+
   if (sessionUserId && row.creatorId === sessionUserId) {
-    return row;
+    return withoutAssignee;
   }
-  return { ...row, creatorId: null, creatorMemberId: null };
+  return { ...withoutAssignee, creatorId: null, creatorMemberId: null };
 };
 
 /** `redactCreatorIdentity` over a list; post reads return arrays. */

@@ -177,6 +177,12 @@ export type PostUpdateWrite = {
    * is not a value the resolver accepts.
    */
   readonly author?: PostWriteAuthor | undefined;
+  /**
+   * The member the post is assigned to; `null` unassigns. Checked against the
+   * workspace's membership before the write, and recorded on the timeline as
+   * `ASSIGNEE_CHANGED`.
+   */
+  readonly assigneeMemberId?: string | null | undefined;
   readonly boardId?: string | undefined;
   /** Raw Markdown; the shared path sanitizes it before it is stored. */
   readonly content?: string | undefined;
@@ -453,6 +459,34 @@ const makePostWriteService = Effect.gen(function* () {
       }
       return status;
     });
+
+  /**
+   * Rejects an assignee who is not a member of this workspace.
+   *
+   * The column's foreign key cannot express "same workspace" without also
+   * nulling `organization_id` on delete, so this is where that invariant is
+   * held. `null` is unassignment and needs no lookup.
+   */
+  const requireAssignee = (args: {
+    assigneeMemberId: string | null;
+    organizationId: string;
+  }) =>
+    args.assigneeMemberId === null
+      ? Effect.void
+      : Effect.flatMap(
+          repository.findMember({
+            id: args.assigneeMemberId,
+            organizationId: args.organizationId,
+          }),
+          (member) =>
+            member === undefined
+              ? Effect.fail(
+                  new BadRequestError({
+                    message: "Assignee is not a member of this workspace",
+                  })
+                )
+              : Effect.void
+        );
 
   const create = (
     args: PostCreateWrite,
@@ -761,6 +795,12 @@ const makePostWriteService = Effect.gen(function* () {
           organizationId: args.organizationId,
         });
       }
+      if (args.assigneeMemberId !== undefined) {
+        yield* requireAssignee({
+          assigneeMemberId: args.assigneeMemberId,
+          organizationId: args.organizationId,
+        });
+      }
       // Fetched once and reused below, so the status-change branch does not
       // read it again inside the transaction. A status's type is fixed when the
       // workspace is created — there is no RPC that changes it — so the value
@@ -822,6 +862,9 @@ const makePostWriteService = Effect.gen(function* () {
         const etaChanged =
           args.etaQuarter !== undefined &&
           previous.etaQuarter !== args.etaQuarter;
+        const assigneeChanged =
+          args.assigneeMemberId !== undefined &&
+          previous.assigneeMemberId !== args.assigneeMemberId;
 
         finalTitle = args.title ?? previous.title;
         finalContent = prepared?.content ?? previous.content;
@@ -875,11 +918,22 @@ const makePostWriteService = Effect.gen(function* () {
             nextEta: args.etaQuarter,
           });
         }
+        if (assigneeChanged) {
+          activities.push({
+            ...columns,
+            kind: "ASSIGNEE_CHANGED",
+            organizationId: args.organizationId,
+            postId: args.id,
+            previousAssigneeMemberId: previous.assigneeMemberId,
+            nextAssigneeMemberId: args.assigneeMemberId,
+          });
+        }
 
         const writesRow =
           titleChanged ||
           contentChanged ||
           etaChanged ||
+          assigneeChanged ||
           args.statusId !== undefined ||
           args.boardId !== undefined;
         if (writesRow) {
@@ -895,6 +949,9 @@ const makePostWriteService = Effect.gen(function* () {
             }),
             ...(args.etaQuarter !== undefined && {
               etaQuarter: args.etaQuarter,
+            }),
+            ...(args.assigneeMemberId !== undefined && {
+              assigneeMemberId: args.assigneeMemberId,
             }),
           });
         }

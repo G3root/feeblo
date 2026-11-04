@@ -14,6 +14,9 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as SchemaGetter from "effect/SchemaGetter";
 
+/** The OTLP path is appended to the configured base, which may end in `/`. */
+const trailingSlashPattern = /\/+$/;
+
 /** Bound each collector request, including its acknowledgement. */
 export const telemetryRequestTimeout = "5 seconds" as const;
 
@@ -197,7 +200,7 @@ export const telemetryConfig = (options: {
         let url = Option.getOrUndefined(endpoint)?.href;
         if (url === undefined && Option.isSome(base)) {
           const resolved = new URL(base.value.href);
-          resolved.pathname = `${resolved.pathname.replace(/\/+$/, "")}/v1/${signal.toLowerCase()}`;
+          resolved.pathname = `${resolved.pathname.replace(trailingSlashPattern, "")}/v1/${signal.toLowerCase()}`;
           url = resolved.href;
         }
         if (url === undefined) {

@@ -21,6 +21,9 @@ import { MIN_SLUG_LENGTH, toWorkspaceSlug } from "../utils";
 
 const appRootDomain = getRuntimePublicEnv().appRootDomain;
 
+/** A slug suggestion is hyphenated; the label reads as words. */
+const slugSeparatorPattern = /-/g;
+
 function renderSlugFooter(
   slug: string,
   slugStatus: "idle" | "checking" | "available" | "taken" | "error",
@@ -54,7 +57,9 @@ function renderSlugFooter(
         {suggestion ? (
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => onUseSuggestion(suggestion.replace(/-/g, " "))}
+              onClick={() =>
+                onUseSuggestion(suggestion.replace(slugSeparatorPattern, " "))
+              }
               size="sm"
               type="button"
               variant="outline"

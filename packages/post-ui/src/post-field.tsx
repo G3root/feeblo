@@ -45,6 +45,8 @@ export function StatusField({
   onValueChange,
   disabled = false,
   placeholder = m.safe_jolly_shell(),
+  showTrigger = true,
+  triggerClassName = "w-full",
 }: {
   /** Null renders the placeholder: the field supports "nothing selected". */
   currentStatusId: string | null;
@@ -54,6 +56,10 @@ export function StatusField({
   ) => void;
   disabled?: boolean;
   placeholder?: string;
+  /** Hide the chevron for a row that renders the control as plain text. */
+  showTrigger?: boolean;
+  /** The trigger is full-width in forms and content-sized in the details list. */
+  triggerClassName?: string;
 }) {
   const items = statuses.map((postStatus) => ({
     label: postStatus.label || formatPostStatus(postStatus.type),
@@ -91,7 +97,15 @@ export function StatusField({
         )
       }
     >
-      <ComboboxTrigger render={<SelectButton className="w-full" size="sm" />}>
+      <ComboboxTrigger
+        render={
+          <SelectButton
+            className={triggerClassName}
+            showTrigger={showTrigger}
+            size="sm"
+          />
+        }
+      >
         <ComboboxValue placeholder={placeholder}>
           {(value) => (
             <span className="flex items-center gap-2">
@@ -155,6 +169,8 @@ type PostBoardSelectProps = {
   currentBoardId: string;
   onValueChange: (boardId: string | null) => void;
   disabled?: boolean;
+  showTrigger?: boolean;
+  triggerClassName?: string;
 };
 
 export function PostBoardSelect({
@@ -162,6 +178,8 @@ export function PostBoardSelect({
   currentBoardId,
   onValueChange,
   disabled = false,
+  showTrigger = true,
+  triggerClassName = "w-full",
 }: PostBoardSelectProps) {
   const currentBoard = boards.find((b) => b.id === currentBoardId);
   const items = boards.map((board) => ({
@@ -180,7 +198,15 @@ export function PostBoardSelect({
           : null
       }
     >
-      <ComboboxTrigger render={<SelectButton className="w-full" size="sm" />}>
+      <ComboboxTrigger
+        render={
+          <SelectButton
+            className={triggerClassName}
+            showTrigger={showTrigger}
+            size="sm"
+          />
+        }
+      >
         <ComboboxValue placeholder={m.upper_tangy_monkey()}>
           {(value) => (
             <span className="flex items-center gap-2">

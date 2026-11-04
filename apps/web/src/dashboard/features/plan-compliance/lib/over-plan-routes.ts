@@ -14,6 +14,9 @@ const PERSONAL_SETTINGS_PATHS = new Set([
   "settings/security",
 ]);
 
+/** One or more trailing slashes, which a dashboard URL may carry. */
+const trailingSlashPattern = /\/+$/;
+
 /**
  * The path below the workspace segment, or null when this is not that
  * workspace's URL. Trailing slashes are ignored; the organization id is the
@@ -33,7 +36,7 @@ const workspacePath = (
     return null;
   }
 
-  return pathname.slice(prefix.length + 1).replace(/\/+$/, "");
+  return pathname.slice(prefix.length + 1).replace(trailingSlashPattern, "");
 };
 
 const hasViolation = (

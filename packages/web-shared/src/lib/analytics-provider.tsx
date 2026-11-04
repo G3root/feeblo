@@ -112,7 +112,14 @@ export interface AnalyticsEvents {
   post_merged: { direction: "into-existing" | "into-this"; success: boolean };
   post_unmerged: { success: boolean };
   post_updated: {
-    field: "author" | "board" | "content" | "eta" | "status" | "title";
+    field:
+      | "assignee"
+      | "author"
+      | "board"
+      | "content"
+      | "eta"
+      | "status"
+      | "title";
     success: boolean;
   };
 
