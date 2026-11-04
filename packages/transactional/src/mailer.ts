@@ -1,5 +1,5 @@
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -104,7 +104,7 @@ export interface MailerService {
     | MailTemplateRenderError
     | MailTemporaryDeliveryError
     | MailUncertainDeliveryError,
-    Crypto.Crypto
+    SecureRandom.SecureRandom
   >;
 }
 
@@ -387,7 +387,7 @@ const findEntityRefIdHeaderName = (
 
 const makeMailerService = (transport: MailerTransport): MailerService => ({
   send: Effect.fn("Mailer.send")(function* (message: MailMessage) {
-    const crypto = yield* Crypto.Crypto;
+    const secureRandom = yield* SecureRandom.SecureRandom;
     const html = yield* Effect.tryPromise({
       try: () => render(message.react),
       catch: (cause) =>
@@ -413,7 +413,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
     // id; direct sends (verification, password reset, onboarding) get this one.
     const messageId =
       message.messageId ??
-      `<${yield* crypto.randomUUIDv7().pipe(Effect.orDie)}@${MESSAGE_ID_DOMAIN}>`;
+      `<${yield* secureRandom.uuidV7()}@${MESSAGE_ID_DOMAIN}>`;
 
     // The transport contract returns an already-validated MailTransportReceipt
     // (the concrete transport decodes provider output at its own boundary), so
@@ -426,7 +426,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
       // emails separate. Caller-supplied headers take precedence in any casing.
       headers: {
         ...(findEntityRefIdHeaderName(message.headers) === undefined && {
-          "X-Entity-Ref-ID": yield* crypto.randomUUIDv7().pipe(Effect.orDie),
+          "X-Entity-Ref-ID": yield* secureRandom.uuidV7(),
         }),
         ...message.headers,
       },

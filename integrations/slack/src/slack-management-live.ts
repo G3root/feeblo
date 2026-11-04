@@ -9,7 +9,7 @@ import {
   makeSlackApiClient,
   type SlackApiClient,
 } from "@feeblo/integration-slack";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -33,7 +33,7 @@ export const makeSlackManagementServiceLive = (
 ): Layer.Layer<
   SlackManagementService,
   never,
-  Database.Database | SlackIntegrationConfig | Crypto.Crypto
+  Database.Database | SlackIntegrationConfig | SecureRandom.SecureRandom
 > =>
   Layer.effect(
     SlackManagementService,

@@ -33,7 +33,7 @@
   "dependencies": {
     "@effect/sql-pg": "catalog:",
     "@effect/sql-pglite": "catalog:",
-    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite": "catalog:",
     "@electric-sql/pglite-pgvector": "^0.0.9",
     "@feeblo/domain-contracts": "workspace:*",
     "@feeblo/permissions": "workspace:*",

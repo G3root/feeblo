@@ -11,7 +11,7 @@ import {
 } from "drizzle-orm";
 import { alias, type AnyPgColumn } from "drizzle-orm/pg-core";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest, SecureRandom } from "effect/crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -172,7 +172,8 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
   // rather than from a value it holds, so the repository keeps a handle on
   // each of them and provides them to the two write adapters below. The same
   // shape `PublicApiPostRepository` uses for the shared post write path.
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
+  const secureRandom = yield* SecureRandom.SecureRandom;
   const emailSubscriptions = yield* EmailSubscriptionRepository;
   const activities = yield* PostActivityRepository;
   const resolvePrincipal = yield* ResolvePrincipalService;
@@ -195,7 +196,8 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
   ) =>
     effect.pipe(
       Effect.provideService(Database.Database, db),
-      Effect.provideService(Crypto.Crypto, crypto),
+      Effect.provideService(SecureRandom.SecureRandom, secureRandom),
+      Effect.provideService(Digest.Digest, digest),
       Effect.provideService(EmailSubscriptionRepository, emailSubscriptions),
       Effect.provideService(PostActivityRepository, activities),
       Effect.provideService(ResolvePrincipalService, resolvePrincipal),

@@ -9,7 +9,7 @@ import {
   makeDiscordApiClient,
   type DiscordApiClient,
 } from "@feeblo/integration-discord";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -33,7 +33,7 @@ export const makeDiscordManagementServiceLive = (
 ): Layer.Layer<
   DiscordManagementService,
   never,
-  Database.Database | DiscordIntegrationConfig | Crypto.Crypto
+  Database.Database | DiscordIntegrationConfig | SecureRandom.SecureRandom
 > =>
   Layer.effect(
     DiscordManagementService,

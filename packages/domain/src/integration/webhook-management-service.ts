@@ -1,5 +1,5 @@
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import type { SecureRandom } from "effect/crypto";
 import type * as Effect from "effect/Effect";
 
 import type { WebhookManagementError } from "./errors";
@@ -12,7 +12,7 @@ export interface WebhookManagementServiceContract {
   ) => Effect.Effect<
     S.TWebhookEndpointCreated,
     WebhookManagementError,
-    Crypto.Crypto
+    SecureRandom.SecureRandom
   >;
   readonly getDeliveryHistory: (
     input: S.TWebhookDeliveryHistory
@@ -37,7 +37,7 @@ export interface WebhookManagementServiceContract {
   ) => Effect.Effect<
     S.TWebhookSecretRotated,
     WebhookManagementError,
-    Crypto.Crypto
+    SecureRandom.SecureRandom
   >;
   readonly sendTestDelivery: (
     input: S.TWebhookTestDelivery

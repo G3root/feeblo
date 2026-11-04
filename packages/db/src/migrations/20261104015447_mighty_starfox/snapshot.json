@@ -1,0 +1,66 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "4bd8d985-05f4-442f-923c-f3422cf3007a",
+  "prevIds": [
+    "5d66442d-c0ea-4ac1-9d10-bfe7b43915ce"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "account",
+        "account_issuer_account_id_uidx"
+      ],
+      "writes": [
+        "s|idx|public.account_issuer_account_id_uidx",
+        "n|idx|public.account_issuer_account_id_uidx",
+        "e|idx|public.account_issuer_account_id_uidx",
+        "n|rel|public.account_issuer_account_id_uidx"
+      ],
+      "reads": [
+        "n|tbl|public.account",
+        "n|sch|public",
+        "e|col|public.account.issuer",
+        "e|col|public.account.account_id"
+      ],
+      "sharedWrites": [
+        "e|uniqueness|public.account.account_id.issuer"
+      ]
+    },
+    {
+      "statementType": "alter_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "account",
+        "issuer"
+      ],
+      "writes": [
+        "s|colprop|public.account.issuer.notNull"
+      ],
+      "reads": [
+        "n|tbl|public.account",
+        "n|sch|public",
+        "n|col|public.account.issuer"
+      ],
+      "sqlHash": "6086debd96250d9a"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"account_issuer_account_id_uidx\"]"
+    },
+    {
+      "op": "alter",
+      "key": "columns\u0000[\"public\",\"account\",\"issuer\"]",
+      "set": {
+        "notNull": false
+      }
+    }
+  ]
+}
