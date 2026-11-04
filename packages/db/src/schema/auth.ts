@@ -93,10 +93,15 @@ export const accountTable = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
-    // better-auth >= 1.7 identifies OAuth identities by issuer (RFC 9207).
-    // Synthetic issuers: "local:credential" (email/password),
-    // "local:oauth:<providerId>" (social).
-    issuer: text("issuer").notNull(),
+    // Better Auth 1.7.0 through 1.7.2 made this column required and keyed
+    // accounts by (issuer, accountId); 1.7.3 withdrew that, and 1.7.16 writes
+    // no issuer at all, identifying an account by (providerId, accountId) as
+    // 1.6 did. The column stays nullable so the rows written while it was
+    // required keep their value, and the unique index is gone with it. The
+    // 1.7 upgrade guide's steps are exactly this: relax the constraint, drop
+    // the index, drop the column whenever. A `NOT NULL` column here rejects
+    // every sign-up and account link.
+    issuer: text("issuer"),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -120,13 +125,7 @@ export const accountTable = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [
-    index("account_userId_idx").on(table.userId),
-    uniqueIndex("account_issuer_account_id_uidx").on(
-      table.issuer,
-      table.accountId
-    ),
-  ]
+  (table) => [index("account_userId_idx").on(table.userId)]
 );
 
 export const verificationTable = pgTable(

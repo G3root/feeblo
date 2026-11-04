@@ -1497,7 +1497,17 @@ describe("EmailOutbox workflows", () => {
             (delivery) => delivery.state === "accepted"
           );
           const mailbox = yield* testMailerState;
-          expect(mailbox.renderedMessages[0]?.html).toContain(
+          // The mailbox is shared with the delivery worker, which also renders
+          // deliveries left queued by earlier tests in this file — the
+          // database is shared, and a reset only clears the mailbox, not the
+          // outbox. Scope the assertion to this test's recipient instead of
+          // assuming it is the first message rendered since the reset.
+          const rendered = mailbox.renderedMessages.find(
+            (message) =>
+              message.to ===
+              `verify-${organizationId}@example.test`.toLowerCase()
+          );
+          expect(rendered?.html).toContain(
             "https://test.feeblo.example/api/email-subscriptions/verify?token="
           );
           const db = yield* Database.Database;

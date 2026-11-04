@@ -455,15 +455,20 @@ const ensureUser = (
       .limit(1);
 
     if (!existingUser) {
-      const result = yield* Effect.tryPromise(() =>
-        auth.api.signUpEmail({
-          body: {
-            email,
-            password,
-            name,
-          },
-        })
-      );
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          auth.api.signUpEmail({
+            body: {
+              email,
+              password,
+              name,
+            },
+          }),
+        catch: () =>
+          new SeedDataError({
+            message: `Failed to create user ${email}`,
+          }),
+      });
 
       if (!result || !isObject(result) || !("user" in result) || !result.user) {
         return yield* new SeedDataError({
@@ -2133,7 +2138,10 @@ const seedHandle = createSeedAuth({
 
 Effect.runPromise(
   seed(seedHandle.auth).pipe(
-    Effect.ensuring(Effect.tryPromise(seedHandle.close).pipe(Effect.ignore)),
+    // Closing the seed's database handle is best effort: a run that already
+    // wrote its rows must not fail on a shutdown error, and the process exit
+    // below would drop the failure anyway.
+    Effect.ensuring(Effect.promise(seedHandle.close).pipe(Effect.ignoreCause)),
     // eslint-disable-next-line effecttsgo/strict-effect-provide -- script entry point
     Effect.provide(SeedLayer)
   )

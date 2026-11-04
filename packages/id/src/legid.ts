@@ -245,7 +245,10 @@ export const makeId = <
     return yield* Effect.gen(function* () {
       const idPart = yield* splitPrefix(input);
       yield* validateLegidFormat(idPart);
-      return yield* Effect.tryPromise(() => verifyId(idPart, legidOptions));
+      // A rejected verification is the answer `false`, not a typed failure, so
+      // the rejection enters as a defect and `catchCause` turns every outcome
+      // into a boolean.
+      return yield* Effect.promise(() => verifyId(idPart, legidOptions));
     }).pipe(Effect.catchCause(() => Effect.succeed(false)));
   });
 
@@ -253,7 +256,7 @@ export const makeId = <
     const idPart = yield* splitPrefix(input);
     yield* validateLegidFormat(idPart);
 
-    const isValid = yield* Effect.tryPromise(() =>
+    const isValid = yield* Effect.promise(() =>
       verifyId(idPart, legidOptions)
     ).pipe(
       Effect.catchCause(() =>

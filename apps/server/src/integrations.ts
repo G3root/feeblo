@@ -42,7 +42,7 @@ import {
 } from "@feeblo/integration-webhook";
 import { WebhookManagementServiceLive } from "@feeblo/integration-webhook/management-live";
 import { eq } from "drizzle-orm";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -79,7 +79,7 @@ export const makeIntegrationLayers: Effect.Effect<
   | WebhookIntegrationConfig
   | SlackIntegrationConfig
   | DiscordIntegrationConfig
-  | Crypto.Crypto
+  | SecureRandom.SecureRandom
 > = Effect.gen(function* () {
   const config = yield* ServerConfig;
   const db = yield* currentDb;
@@ -280,16 +280,8 @@ export const makeIntegrationLayers: Effect.Effect<
     }
   );
   const lifecycleRepository = yield* makeIntegrationManagementRepository;
-  const crypto = yield* Crypto.Crypto;
-  const leaseOwner = yield* crypto.randomUUIDv4().pipe(
-    Effect.map((uuid) => `server-${uuid}`),
-    Effect.mapError(
-      () =>
-        new InternalServerError({
-          message: "Integration worker identity could not be generated",
-        })
-    )
-  );
+  const secureRandom = yield* SecureRandom.SecureRandom;
+  const leaseOwner = `server-${yield* secureRandom.uuidV4()}`;
   const worker = runIntegrationDeliveryWorker({
     connectionConcurrency: config.integrationConnectionConcurrency,
     globalConcurrency: config.integrationGlobalConcurrency,

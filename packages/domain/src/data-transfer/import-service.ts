@@ -1,7 +1,7 @@
 import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { DataImportJobId, type LegidError } from "@feeblo/id";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest } from "effect/crypto";
 import * as Effect from "effect/Effect";
 import * as Filter from "effect/Filter";
 import * as Layer from "effect/Layer";
@@ -151,23 +151,6 @@ export type DataImportServiceContract = {
 /** The most recent jobs a workspace sees, newest first. */
 const IMPORT_JOB_LIST_LIMIT = 20;
 
-const toHex = (bytes: Uint8Array): string =>
-  Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-
-const hashBytes = (
-  crypto: Crypto.Crypto,
-  bytes: Uint8Array
-): Effect.Effect<string, InternalServerError> =>
-  crypto.digest("SHA-256", bytes).pipe(
-    Effect.mapError(
-      () =>
-        new InternalServerError({
-          message: "Could not fingerprint the uploaded file.",
-        })
-    ),
-    Effect.map(toHex)
-  );
-
 /** Normalizes a store failure to one stable internal failure. */
 const fromStore = <A, R>(
   operation: string,
@@ -262,7 +245,11 @@ const makeDataImportService = Effect.gen(function* () {
   const repository = yield* DataTransferRepository;
   const boards = yield* BoardRepository;
   const statuses = yield* PostStatusRepository;
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
+
+  /** SHA-256 of the uploaded file, hex encoded; the import's idempotency key. */
+  const hashBytes = (bytes: Uint8Array) =>
+    digest.digestHex(Digest.sha256, bytes);
 
   const stageBoardImport: DataImportServiceContract["stageBoardImport"] = (
     input
@@ -315,7 +302,7 @@ const makeDataImportService = Effect.gen(function* () {
       const [defaultBoard = null] = sortedBoards;
 
       const [text, fileHash] = yield* Effect.all(
-        [decodeBoardPostCsv(input.bytes), hashBytes(crypto, input.bytes)],
+        [decodeBoardPostCsv(input.bytes), hashBytes(input.bytes)],
         { concurrency: "unbounded" }
       );
 

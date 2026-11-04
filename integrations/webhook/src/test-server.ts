@@ -23,7 +23,7 @@ afterEach(async () => {
  * `/hook` URL. The server is registered for automatic teardown after the test.
  */
 export const startTestServer = (handler: http.RequestListener) =>
-  Effect.tryPromise(
+  Effect.promise(
     () =>
       new Promise<URL>((resolve, reject) => {
         const server = http.createServer(handler);

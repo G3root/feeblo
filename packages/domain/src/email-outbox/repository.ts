@@ -3,7 +3,7 @@ import { EmailDeliveryId, EmailOutboxId } from "@feeblo/id";
 import { MESSAGE_ID_DOMAIN } from "@feeblo/transactional/config";
 import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -207,15 +207,13 @@ export const emailDeliveryMessageId = (
   recipientEmail: string
 ) =>
   Effect.gen(function* () {
-    const crypto = yield* Crypto.Crypto;
-    const recipientHash = Buffer.from(
-      yield* crypto.digest(
-        "SHA-256",
-        new TextEncoder().encode(`${outboxId}:${recipientEmail}`)
-      )
-    ).toString("hex");
+    const digest = yield* Digest.Digest;
+    const recipientHash = yield* digest.digestHex(
+      Digest.sha256,
+      new TextEncoder().encode(`${outboxId}:${recipientEmail}`)
+    );
     return `<email.${recipientHash}@${MESSAGE_ID_DOMAIN}>`;
-  }).pipe(Effect.orDie);
+  });
 
 const makeEmailOutboxRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
