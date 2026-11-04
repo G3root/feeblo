@@ -2102,6 +2102,18 @@ describe("PostRpcHandlers", () => {
             yield* banNonMember(fixture);
             const banned = yield* Effect.flip(deleteAsSession());
             expect(banned._tag).toBe("PolicyDenied");
+
+            // Both denials are refusals, not a delete that ran and failed
+            // afterwards, so the post is still on the public board.
+            const posts = yield* handlers
+              .ListPostsPublic({
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+            expect(posts.map((post) => post.id)).toContain(postId);
           })
       );
 

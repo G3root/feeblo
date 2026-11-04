@@ -94,8 +94,11 @@ const refreshBanBadges = ({
  * explicitly instead of doing it silently.
  */
 export function BannedUsersSection({
+  entitlementsLoading,
   userBansAvailable,
 }: {
+  /** The entitlement read is still in flight, so the capability is unknown. */
+  entitlementsLoading: boolean;
   /** The plan capability; the list stays readable when it lapses. */
   userBansAvailable: boolean;
 }) {
@@ -165,6 +168,9 @@ export function BannedUsersSection({
     .exhaustive();
 
   const hasFilter = trimmedSearch !== "";
+  // While the entitlement read is in flight the capability is optimistic, so
+  // neither the add action nor an already-open dialog may write on that guess.
+  const canBanUser = userBansAvailable && !entitlementsLoading;
 
   const handleUnban = async (id: string) => {
     setUnbanningId(id);
@@ -239,7 +245,7 @@ export function BannedUsersSection({
             policy={hasPermission(organizationId, "userBans.manage")}
           >
             <Button
-              disabled={!userBansAvailable}
+              disabled={!canBanUser}
               onClick={() => setBanOpen(true)}
               variant="outline"
             >
@@ -248,6 +254,19 @@ export function BannedUsersSection({
             </Button>
           </PolicyGuard>
         </div>
+
+        {/* A failed refetch keeps the last good page on screen. The rows are
+            still useful, but the operator has to know they are not current. */}
+        {error !== undefined && !loadFailed ? (
+          <div className="flex items-center gap-2 text-sm" role="alert">
+            <span className="text-destructive">
+              Could not refresh banned users: {parseRpcError(error).message}
+            </span>
+            <Button onClick={refreshBans} size="sm" variant="outline">
+              Try again
+            </Button>
+          </div>
+        ) : null}
 
         {isLoading ? (
           <SkeletonLoader isLoading>
@@ -321,16 +340,20 @@ export function BannedUsersSection({
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions>
-                  <Button
-                    disabled={unbanningId !== null}
-                    onClick={() => {
-                      void handleUnban(ban.id);
-                    }}
-                    size="sm"
-                    variant="outline"
+                  <PolicyGuard
+                    policy={hasPermission(organizationId, "userBans.manage")}
                   >
-                    Unban
-                  </Button>
+                    <Button
+                      disabled={unbanningId !== null}
+                      onClick={() => {
+                        void handleUnban(ban.id);
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Unban
+                    </Button>
+                  </PolicyGuard>
                 </ItemActions>
               </SettingsItem.Item>
             ))}
@@ -346,6 +369,7 @@ export function BannedUsersSection({
       </SettingsItem.Content>
 
       <BanUserDialog
+        canBan={canBanUser}
         onOpenChange={setBanOpen}
         open={banOpen}
         organizationId={organizationId}
@@ -355,10 +379,13 @@ export function BannedUsersSection({
 }
 
 function BanUserDialog({
+  canBan,
   onOpenChange,
   open,
   organizationId,
 }: {
+  /** False while the capability is unknown or the plan no longer covers bans. */
+  canBan: boolean;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organizationId: string;
@@ -392,6 +419,11 @@ function BanUserDialog({
   };
 
   const handleBan = async () => {
+    // The dialog may have been opened before the entitlement read settled. A
+    // submit now must not reach a plan that no longer covers banning.
+    if (!canBan) {
+      return;
+    }
     const draft = draftRef.current;
     setPendingDraft(draft);
     try {
@@ -489,7 +521,10 @@ function BanUserDialog({
             <DialogClose render={<Button type="button" variant="ghost" />}>
               Cancel
             </DialogClose>
-            <Button disabled={isBanning || email.trim() === ""} type="submit">
+            <Button
+              disabled={!canBan || isBanning || email.trim() === ""}
+              type="submit"
+            >
               {isBanning ? "Banning..." : "Ban user"}
             </Button>
           </DialogFooter>

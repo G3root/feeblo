@@ -909,5 +909,42 @@ describe("UserBanRpcHandlers", () => {
         expect(publicComment?.authorIsBanned).toBeNull();
       })
     );
+
+    it.effect("does not badge an address once its owner is a member", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const posts = yield* PostRepository;
+        const fixture = yield* makeFixture();
+        const now = yield* DateTime.nowAsDate;
+
+        // A ban written by address before the person joined the workspace.
+        // Membership now takes precedence, exactly as it does when the
+        // participation policy checks a ban.
+        yield* db.insert(schema.userBanTable).values({
+          createdAt: now,
+          email: `manager-${fixture.userId}@example.com`.toLowerCase(),
+          id: `ban_${fixture.userId}`,
+          organizationId: fixture.organizationId,
+          updatedAt: now,
+          userId: null,
+        });
+
+        // The portal-shaped post has no `creator_member_id`; the dashboard
+        // one was attributed to the member. Neither may draw the badge.
+        const portalPostId = yield* createPost(fixture, fixture.userId);
+        const attributedPostId = yield* createPost(fixture, fixture.userId);
+        yield* db
+          .update(schema.postTable)
+          .set({ creatorMemberId: fixture.memberId })
+          .where(eq(schema.postTable.id, attributedPostId));
+
+        const rows = yield* posts.findMany({
+          organizationId: fixture.organizationId,
+        });
+        const byId = new Map(rows.map((row) => [row.id, row]));
+        expect(byId.get(portalPostId)?.authorIsBanned).toBe(false);
+        expect(byId.get(attributedPostId)?.authorIsBanned).toBe(false);
+      })
+    );
   });
 });

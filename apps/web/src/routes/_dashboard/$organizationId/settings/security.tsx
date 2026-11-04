@@ -90,6 +90,7 @@ function RouteComponent() {
           />
         ) : null}
         <BannedUsersSection
+          entitlementsLoading={isEntitlementsLoading}
           userBansAvailable={
             isEntitlementsLoading || entitlements.capabilities.userBans
           }

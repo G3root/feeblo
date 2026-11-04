@@ -214,6 +214,136 @@ describe("UserBanRepository", () => {
       })
     );
 
+    it.effect(
+      "keeps a ban matchable after the linked contact is recreated unlinked",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* UserBanRepository;
+          const db = yield* currentDb;
+          const organizationId = yield* createOrganization();
+          const account = yield* createUser("durable-contact");
+          const contactEmail = "durable-contact-address@example.com";
+          const contactId = yield* createContact({
+            email: contactEmail,
+            organizationId,
+            userId: account.id,
+          });
+          const now = yield* DateTime.nowAsDate;
+
+          // The widget presents the contact's address, so that is the address
+          // the ban has to store; the account facet covers everything that
+          // still resolves the account.
+          const resolved = yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "user", userId: account.id },
+          });
+          expect(resolved).toMatchObject({
+            email: contactEmail,
+            status: "ok",
+            userId: account.id,
+          });
+          if (resolved.status !== "ok") {
+            return;
+          }
+          yield* repository.upsert({
+            createdByMemberId: null,
+            email: resolved.email,
+            now,
+            organizationId,
+            reason: null,
+            userId: resolved.userId,
+          });
+
+          yield* db
+            .delete(schema.contactTable)
+            .where(eq(schema.contactTable.id, contactId));
+          const recreatedContactId = yield* createContact({
+            email: contactEmail,
+            organizationId,
+            userId: null,
+          });
+
+          expect(
+            yield* repository.isBanned({
+              contactId: recreatedContactId,
+              organizationId,
+            })
+          ).toBe(true);
+        })
+    );
+
+    it.effect("keeps both accounts when two bans share an address", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBanRepository;
+        const organizationId = yield* createOrganization();
+        const first = yield* createUser("shared-first");
+        const second = yield* createUser("shared-second");
+        const sharedEmail = "shared-address@example.com";
+        const now = yield* DateTime.nowAsDate;
+        const earlier = DateTime.toDateUtc(
+          DateTime.makeUnsafe(now.getTime() - 60_000)
+        );
+
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: sharedEmail,
+          now: earlier,
+          organizationId,
+          reason: null,
+          userId: first.id,
+        });
+        yield* repository.upsert({
+          createdByMemberId: null,
+          email: sharedEmail,
+          now,
+          organizationId,
+          reason: null,
+          userId: second.id,
+        });
+
+        // One row per account, because a row carries one `user_id`; only one
+        // of them can hold the shared address under its unique index.
+        expect(
+          yield* repository.isBanned({ organizationId, userId: first.id })
+        ).toBe(true);
+        expect(
+          yield* repository.isBanned({ organizationId, userId: second.id })
+        ).toBe(true);
+        expect(
+          yield* repository.isBanned({ email: sharedEmail, organizationId })
+        ).toBe(true);
+
+        const listed = yield* repository.list({
+          limit: 10,
+          offset: 0,
+          organizationId,
+        });
+        expect(listed.total).toBe(2);
+        const listedUserIds = listed.items.map((row) => row.userId);
+        expect(listedUserIds).toContain(first.id);
+        expect(listedUserIds).toContain(second.id);
+        expect(
+          listed.items.filter((row) => row.email === sharedEmail)
+        ).toHaveLength(1);
+
+        // Lifting the first account's ban must not lift the second's, even
+        // though the address named with the first is still the second's row.
+        expect(
+          yield* repository.removeByFacets({
+            email: sharedEmail,
+            organizationId,
+            userId: first.id,
+          })
+        ).toEqual({ removed: true });
+        expect(
+          yield* repository.isBanned({ organizationId, userId: first.id })
+        ).toBe(false);
+        expect(
+          yield* repository.isBanned({ organizationId, userId: second.id })
+        ).toBe(true);
+      })
+    );
+
     it.effect("resolves a contact and rejects a member target", () =>
       Effect.gen(function* () {
         const repository = yield* UserBanRepository;
@@ -371,7 +501,7 @@ describe("UserBanRepository", () => {
             role: "manager",
             userId: member.id,
           });
-          yield* createContact({
+          const contactId = yield* createContact({
             email: member.email,
             organizationId,
             userId: null,
@@ -383,7 +513,48 @@ describe("UserBanRepository", () => {
               target: { _tag: "email", email: member.email },
             })
           ).toEqual({ status: "member" });
+          // Naming the contact directly must not be a way around the refusal.
+          expect(
+            yield* repository.resolveTarget({
+              organizationId,
+              target: { _tag: "contact", contactId },
+            })
+          ).toEqual({ status: "member" });
         })
+    );
+
+    it.effect("rejects a linked contact carrying a member's address", () =>
+      Effect.gen(function* () {
+        const repository = yield* UserBanRepository;
+        const organizationId = yield* createOrganization();
+        const member = yield* createUser("linked-address-member");
+        const linkedAccount = yield* createUser("linked-address-owner");
+        const db = yield* currentDb;
+        const now = yield* DateTime.nowAsDate;
+
+        yield* db.insert(schema.memberTable).values({
+          createdAt: now,
+          id: `member_${member.id}`,
+          organizationId,
+          role: "manager",
+          userId: member.id,
+        });
+        // The contact's account is not a member, but the address it carries
+        // belongs to one. The membership check has to follow the address, not
+        // just the linked account.
+        yield* createContact({
+          email: member.email,
+          organizationId,
+          userId: linkedAccount.id,
+        });
+
+        expect(
+          yield* repository.resolveTarget({
+            organizationId,
+            target: { _tag: "email", email: member.email },
+          })
+        ).toEqual({ status: "member" });
+      })
     );
 
     it.effect("prefers a linked contact over a case-variant unlinked row", () =>

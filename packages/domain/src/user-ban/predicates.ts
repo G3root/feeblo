@@ -31,6 +31,12 @@ export type AuthorBanFacets = {
  * table stores it (`user_ban_email_normalized_chk` keeps every stored address
  * lowercased and trimmed), so a mixed-case account address still matches.
  *
+ * A current member is never reported as banned: membership is what the
+ * participation policy checks before it consults a ban, so an address ban
+ * written before the person joined the workspace must not badge their posts.
+ * The check is by `user_id`, not `creator_member_id`, because a portal author
+ * who later joins has a post whose `creator_member_id` is still null.
+ *
  * Both facets are covered by partial unique indexes on
  * `(organization_id, user_id)` and `(organization_id, email)`, so this is an
  * index probe per row on the dashboard surfaces that ask for it. They are the
@@ -64,4 +70,9 @@ export const bannedAuthorPredicate = ({
             )
       }
     )
+) and not exists (
+  select 1
+  from ${schema.memberTable} as author_member
+  where author_member.organization_id = ${organizationId}
+    and author_member.user_id = ${userId}
 )`;
