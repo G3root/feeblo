@@ -45,13 +45,13 @@ interface TSavedViewCreateInput extends TSavedViewListInput {
 
 interface TSavedViewUpdateInput extends TSavedViewOwner {
   readonly description: string | null;
-  readonly isPrivate: boolean;
-  readonly name: string;
   /**
-   * Omitted for a rename or description edit. The column is then left out of
-   * the `set` clause, so a query written after this update's ownership read is
-   * not replaced by the stale row that read returned.
+   * The fields the caller chose to write. An omitted field is left out of the
+   * `set` clause rather than filled from the row read before the update, so a
+   * concurrent change to it is not overwritten by stale data.
    */
+  readonly isPrivate?: boolean;
+  readonly name?: string;
   readonly query?: TBoardQuery;
 }
 
@@ -182,15 +182,20 @@ export const makeSavedViewRepository = Effect.gen(function* () {
       organizationId,
       query,
     }: TSavedViewUpdateInput) => {
-      const set = { description, isPrivate, name };
+      const set = { description };
+      const withVisibility =
+        isPrivate === undefined ? set : { ...set, isPrivate };
+      const withName =
+        name === undefined ? withVisibility : { ...withVisibility, name };
+      const withQuery = query === undefined ? withName : { ...withName, query };
 
       return (
         db
           .update(schema.savedViewTable)
-          // An omitted query must not be written back from the row read before
-          // this statement: that would overwrite a query another request saved
-          // in between. Leaving the column out keeps the stored value.
-          .set(query === undefined ? set : { ...set, query })
+          // A field the caller omitted is absent from this statement, so a
+          // value another request wrote after this update's ownership read is
+          // kept instead of being replaced by the stale row.
+          .set(withQuery)
           .where(
             and(
               eq(schema.savedViewTable.id, id),

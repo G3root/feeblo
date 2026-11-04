@@ -2213,22 +2213,23 @@ export function savedViewCollection(
         const mutation = transaction.mutations[0];
         const { modified: view, original } = mutation;
         // Unchanged fields are omitted so the handler keeps the stored value.
-        // The sheet leaves `query` untouched for a rename or description edit,
-        // and `isPrivate` untouched unless the member toggled it, but the row
-        // itself may be stale; letting the server decide is what stops that
-        // stale copy from overwriting a newer query or visibility.
+        // The sheet leaves `name`, `query`, and `isPrivate` untouched unless
+        // the member changed them, but the row itself may be stale; letting
+        // the server decide is what stops that stale copy from overwriting a
+        // newer field.
         const queryChanged =
           JSON.stringify(original.query) !== JSON.stringify(view.query);
+        const nameChanged = original.name !== view.name;
         const isPrivateChanged = original.isPrivate !== view.isPrivate;
         const update = {
           description: view.description,
           id: view.id,
-          name: view.name,
           organizationId: view.organizationId,
         };
+        const withName = nameChanged ? { ...update, name: view.name } : update;
         const withVisibility = isPrivateChanged
-          ? { ...update, isPrivate: view.isPrivate }
-          : update;
+          ? { ...withName, isPrivate: view.isPrivate }
+          : withName;
         const payload = queryChanged
           ? { ...withVisibility, query: view.query }
           : withVisibility;

@@ -122,21 +122,26 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
       const update = {
         description: normalizeDescription(args.description),
         id: args.id,
-        isPrivate: args.isPrivate ?? existing.isPrivate,
         memberId,
-        name: args.name,
         organizationId: args.organizationId,
       };
+      // Every field except the description is omitted when the caller did not
+      // send it. The repository leaves those columns out of the statement, so
+      // a value written after the ownership read above is not replaced by this
+      // stale `existing` row.
+      const withVisibility =
+        args.isPrivate === undefined
+          ? update
+          : { ...update, isPrivate: args.isPrivate };
+      const withName =
+        args.name === undefined
+          ? withVisibility
+          : { ...withVisibility, name: args.name };
 
       yield* repository.update(
-        // An omitted query is a rename or description edit: the stored row is
-        // the source of truth, so a stale client cannot overwrite filters that
-        // another member has saved since it read the view. The repository also
-        // leaves the column out of the statement, so a query written after the
-        // ownership read above is not replaced by this stale `existing` row.
         args.query === undefined
-          ? update
-          : { ...update, query: normalizeBoardQuery(args.query) }
+          ? withName
+          : { ...withName, query: normalizeBoardQuery(args.query) }
       );
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(args.organizationId)),

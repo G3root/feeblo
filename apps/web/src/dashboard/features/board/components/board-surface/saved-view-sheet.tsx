@@ -190,9 +190,10 @@ export function SavedViewSheet({
         target !== undefined &&
         JSON.stringify(normalizeBoardQuery(query)) !==
           JSON.stringify(normalized);
-      // The form starts at the target's mount-time visibility. Only a toggle
-      // the member actually changed should be written; an untouched checkbox
-      // must not send that starting value over a newer row.
+      // The form starts at the target's mount-time values. Only fields the
+      // member actually changed should be written; an untouched field must not
+      // send that starting value over a newer row.
+      const nameChanged = target !== undefined && target.name !== value.name;
       const isPrivateChanged =
         target !== undefined && target.isPrivate !== value.isPrivate;
 
@@ -200,10 +201,12 @@ export function SavedViewSheet({
         if (target) {
           const transaction = collection.update(target.id, (draft) => {
             draft.description = value.description;
+            if (nameChanged) {
+              draft.name = value.name;
+            }
             if (isPrivateChanged) {
               draft.isPrivate = value.isPrivate;
             }
-            draft.name = value.name;
             // Only a real query edit writes the query. A rename or description
             // change leaves the row's current query alone, so a row refetched
             // while the sheet was open is not overwritten by the sheet's

@@ -98,12 +98,18 @@ export type TSavedViewCreate = S.Schema.Type<typeof SavedViewCreate>;
 
 /**
  * Renaming and re-saving are the same write: "Save current view" over an
- * existing view sends its id, its name, and the query the board holds now.
+ * existing view sends its id, the fields it changed, and the query the board
+ * holds now.
  */
 export const SavedViewUpdate = S.Struct({
   id: S.String,
   organizationId: WorkspaceId.schema,
-  name: SavedViewName,
+  /**
+   * Omitted keeps the stored name. A description, visibility, or query edit
+   * sends no name, so a stale client cannot overwrite a rename saved since it
+   * read the view.
+   */
+  name: S.optionalKey(SavedViewName),
   description: SavedViewDescription,
   /** Omitted keeps the row's current visibility. */
   isPrivate: S.optionalKey(S.Boolean),

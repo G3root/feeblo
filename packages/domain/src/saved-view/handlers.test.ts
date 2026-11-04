@@ -338,7 +338,7 @@ describe("SavedViewRpcHandlers", () => {
           handlers.UpdateSavedView({
             id,
             description: "Renamed only",
-            isPrivate: true,
+            isPrivate: false,
             name: "Renamed",
             organizationId: f.organizationId,
           })
@@ -355,12 +355,13 @@ describe("SavedViewRpcHandlers", () => {
         expect(renamed[0]?.name).toBe("Renamed");
         expect(renamed[0]?.description).toBe("Renamed only");
         expect(renamed[0]?.query.filters.search).toBe("checkout");
+        expect(renamed[0]?.isPrivate).toBe(false);
 
-        // The metadata-only write leaves `query` out of its `set` clause. This
-        // gate pauses such an update after its ownership read, so a query
-        // update can commit while the metadata update still holds the stale
-        // row that read returned. The resumed metadata write must not put that
-        // stale query back.
+        // The metadata-only write leaves omitted fields out of its `set`
+        // clause. This gate pauses such an update after its ownership read, so
+        // name, privacy, and query updates can commit while the metadata update
+        // still holds the stale row that read returned. The resumed metadata
+        // write must not put any of those stale values back.
         const read = yield* Deferred.make<void>();
         const resume = yield* Deferred.make<void>();
         const gatedHandlers = yield* SavedViewRpcHandlersEffect.pipe(
@@ -387,8 +388,6 @@ describe("SavedViewRpcHandlers", () => {
           gatedHandlers.UpdateSavedView({
             id,
             description: "Renamed concurrently",
-            isPrivate: true,
-            name: "Renamed concurrently",
             organizationId: f.organizationId,
           })
         ).pipe(Effect.forkChild);
@@ -421,9 +420,10 @@ describe("SavedViewRpcHandlers", () => {
           })
         );
 
-        expect(concurrent?.name).toBe("Renamed concurrently");
+        expect(concurrent?.name).toBe("Query edit");
         expect(concurrent?.description).toBe("Renamed concurrently");
         expect(concurrent?.query.filters.search).toBe("refund");
+        expect(concurrent?.isPrivate).toBe(true);
       })
     );
 
