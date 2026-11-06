@@ -7,7 +7,11 @@ import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { BillingRepository } from "./repository";
 import { BillingRpcs } from "./rpcs";
-import type { TBillingCheckoutInput, TBillingPortalInput } from "./schema";
+import type {
+  TBillingCheckoutConfirmationInput,
+  TBillingCheckoutInput,
+  TBillingPortalInput,
+} from "./schema";
 import { PolarService } from "./service";
 
 export const BillingRpcHandlersEffect = Effect.gen(function* () {
@@ -82,6 +86,40 @@ export const BillingRpcHandlersEffect = Effect.gen(function* () {
           )
         ),
         withRemapDbErrors("Billing", "select")
+      ),
+    /**
+     * Applies the subscription a completed checkout created, without waiting
+     * for Polar's webhook. The webhook remains the authoritative sync; this is
+     * the success-page fast path for a delivery that is delayed or lost, and
+     * the repository's `lastEventAt` guard keeps it from replaying an older
+     * snapshot over a newer event.
+     */
+    ConfirmBillingCheckout: ({
+      organizationId,
+      checkoutId,
+    }: TBillingCheckoutConfirmationInput) =>
+      Effect.gen(function* () {
+        const confirmation = yield* polarService.findSubscriptionForCheckout({
+          organizationId,
+          checkoutId,
+        });
+
+        if (Option.isNone(confirmation)) {
+          return;
+        }
+
+        yield* repository.upsertSubscription(
+          confirmation.value.subscription,
+          confirmation.value.eventTimestamp
+        );
+      }).pipe(
+        Policy.withPolicy(
+          Policy.all(
+            Policy.hasMembership(organizationId),
+            Policy.canPermission(organizationId, "billing.*")
+          )
+        ),
+        withRemapDbErrors("Billing", "update")
       ),
   };
 });

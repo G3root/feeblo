@@ -24,6 +24,20 @@ export class FailedToCreatePortalError extends Schema.TaggedError<FailedToCreate
 ) {}
 
 /**
+ * Raised when the checkout-success confirmation cannot read the checkout or
+ * its subscription from Polar. It is deliberately a 500: the local webhook is
+ * still the authoritative sync, so a caller treats this as "the fast path is
+ * unavailable, keep waiting" rather than as a failed payment.
+ */
+export class FailedToConfirmBillingCheckoutError extends Schema.TaggedError<FailedToConfirmBillingCheckoutError>()(
+  "FailedToConfirmBillingCheckoutError",
+  {
+    message: Schema.optional(Schema.String),
+  },
+  { httpApiStatus: 500, identifier: "FailedToConfirmBillingCheckoutError" }
+) {}
+
+/**
  * Raised (and handled by the caller) when a deleted organization's Polar
  * subscription cannot be revoked — the subscription would otherwise keep
  * billing after the tenant is gone.
@@ -56,4 +70,5 @@ export const BillingServiceErrors = Schema.Union([
   PolicyDeniedError,
   FailedToCreateCheckoutError,
   FailedToCreatePortalError,
+  FailedToConfirmBillingCheckoutError,
 ]);

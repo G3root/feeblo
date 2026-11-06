@@ -3,12 +3,134 @@ import { PolarClientError, PolarServerError } from "@polar-sh/sdk";
 import { errors } from "@polar-sh/sdk/2026-10";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 
 import {
   classifyPolarRevokeFailure,
   describeRevokeFailure,
+  metadataBelongsToOrganization,
+  readCheckoutSubscription,
   readOrganizationSubscriptionSettings,
 } from "./service";
+import { makeSubscriptionPayload } from "./test-support";
+
+describe("metadataBelongsToOrganization", () => {
+  it("matches only the workspace id this deployment stamped", () => {
+    expect(
+      metadataBelongsToOrganization({ org: "org_workspace" }, "org_workspace")
+    ).toBe(true);
+    expect(
+      metadataBelongsToOrganization({ org: "org_other" }, "org_workspace")
+    ).toBe(false);
+  });
+
+  it("rejects missing or non-string metadata", () => {
+    expect(metadataBelongsToOrganization({}, "org_workspace")).toBe(false);
+    expect(metadataBelongsToOrganization({ org: 42 }, "org_workspace")).toBe(
+      false
+    );
+    expect(metadataBelongsToOrganization(null, "org_workspace")).toBe(false);
+  });
+});
+
+describe("readCheckoutSubscription", () => {
+  const subscription = (organizationId: string) =>
+    makeSubscriptionPayload({
+      externalSubscriptionId: "sub_checkout",
+      organizationId,
+      productId: "prod_checkout",
+      metadata: { org: organizationId },
+    });
+
+  it.effect("refuses a checkout stamped for another workspace", () =>
+    Effect.gen(function* () {
+      let subscriptionReads = 0;
+      const error = yield* Effect.flip(
+        readCheckoutSubscription(
+          {
+            getCheckout: async () => ({
+              subscription_id: "sub_checkout",
+              metadata: { org: "org_other" },
+            }),
+            getSubscription: async () => {
+              subscriptionReads += 1;
+              return subscription("org_workspace");
+            },
+          },
+          { organizationId: "org_workspace", checkoutId: "checkout_1" }
+        )
+      );
+
+      expect(Predicate.isTagged(error, "BadRequestError")).toBe(true);
+      expect(subscriptionReads).toBe(0);
+    })
+  );
+
+  it.effect("refuses a subscription stamped for another workspace", () =>
+    Effect.gen(function* () {
+      const error = yield* Effect.flip(
+        readCheckoutSubscription(
+          {
+            getCheckout: async () => ({
+              subscription_id: "sub_checkout",
+              metadata: { org: "org_workspace" },
+            }),
+            getSubscription: async () => subscription("org_other"),
+          },
+          { organizationId: "org_workspace", checkoutId: "checkout_1" }
+        )
+      );
+
+      expect(
+        Predicate.isTagged(error, "FailedToConfirmBillingCheckoutError")
+      ).toBe(true);
+    })
+  );
+
+  it.effect("returns no subscription while the checkout has none", () =>
+    Effect.gen(function* () {
+      let subscriptionReads = 0;
+      const confirmation = yield* readCheckoutSubscription(
+        {
+          getCheckout: async () => ({
+            subscription_id: null,
+            metadata: { org: "org_workspace" },
+          }),
+          getSubscription: async () => {
+            subscriptionReads += 1;
+            return subscription("org_workspace");
+          },
+        },
+        { organizationId: "org_workspace", checkoutId: "checkout_1" }
+      );
+
+      expect(Option.isNone(confirmation)).toBe(true);
+      expect(subscriptionReads).toBe(0);
+    })
+  );
+
+  it.effect("stamps the confirmation with Polar's modification time", () =>
+    Effect.gen(function* () {
+      const confirmation = yield* readCheckoutSubscription(
+        {
+          getCheckout: async () => ({
+            subscription_id: "sub_checkout",
+            metadata: { org: "org_workspace" },
+          }),
+          getSubscription: async () => ({
+            ...subscription("org_workspace"),
+            modified_at: "2026-01-02T00:00:00.000Z",
+          }),
+        },
+        { organizationId: "org_workspace", checkoutId: "checkout_1" }
+      );
+
+      expect(Option.getOrThrow(confirmation).eventTimestamp.toISOString()).toBe(
+        "2026-01-02T00:00:00.000Z"
+      );
+    })
+  );
+});
 
 describe("classifyPolarRevokeFailure", () => {
   it("treats Polar's already-canceled and missing-subscription answers as achieved", () => {
