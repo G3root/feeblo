@@ -76,6 +76,9 @@
     "./changelog-subscription/schema": {
       "default": "./src/changelog-subscription/schema.ts"
     },
+    "./changelog/machine": {
+      "default": "./src/changelog/machine.ts"
+    },
     "./changelog/schema": {
       "default": "./src/changelog/schema.ts"
     },
@@ -247,6 +250,9 @@
     "./integration/external-resource/live": {
       "default": "./src/integration/external-resource/live.ts"
     },
+    "./integration/external-resource/machine": {
+      "default": "./src/integration/external-resource/machine.ts"
+    },
     "./integration/external-resource/rpcs": {
       "default": "./src/integration/external-resource/rpcs.ts"
     },
@@ -402,6 +408,9 @@
     },
     "./post/embedding-service": {
       "default": "./src/post/embedding-service.ts"
+    },
+    "./post/machine": {
+      "default": "./src/post/machine.ts"
     },
     "./post/repository": {
       "default": "./src/post/repository.ts"

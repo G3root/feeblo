@@ -2,6 +2,7 @@ import { Database, schema, transaction } from "@feeblo/db";
 import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
+import { PUBLISHED_CHANGELOG_STATUS } from "../changelog/machine";
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
 import type { PostBoardVisibility } from "./access";
 import type {
@@ -195,7 +196,7 @@ export const isChangelogPubliclyVisible = (
           )
         )
         .limit(1);
-      return entry?.status === "published";
+      return entry?.status === PUBLISHED_CHANGELOG_STATUS;
     })
   );
 
@@ -245,8 +246,10 @@ export const resolveSubscriptionNotificationContent = (
                 id: changelogId,
                 organizationId: intent.organizationId,
                 // Unpublishing (or a still-scheduled entry) closes delivery
-                // for intents recorded before the transition.
-                status: "published",
+                // for intents recorded before the transition. The status is
+                // the one a publish enters, read from the lifecycle machine so
+                // this check cannot outlive a rename of that state.
+                status: PUBLISHED_CHANGELOG_STATUS,
               },
               columns: {
                 coverImage: true,

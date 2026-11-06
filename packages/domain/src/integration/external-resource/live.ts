@@ -6,13 +6,20 @@ import {
   PostExternalResourceLinkId,
 } from "@feeblo/id";
 import { isHttpUrl } from "@feeblo/utils/http-url";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import { InternalServerError } from "../../rpc-errors";
+import {
+  RESERVED_CREATE_REQUEST_STATE,
+  canReclaimCreateRequestState,
+  isReservedCreateRequestState,
+  sourceStatesFor,
+  targetStateFor,
+} from "./machine";
 import {
   PostExternalResourceLink,
   type RecordPostExternalResourceLink,
@@ -213,7 +220,7 @@ const makeExternalResourceService = Effect.gen(function* () {
             connectionId: input.connectionId,
             postId: input.postId,
             idempotencyKey: input.idempotencyKey,
-            state: "pending",
+            state: RESERVED_CREATE_REQUEST_STATE,
           })
           .onConflictDoNothing()
           .returning({ id: schema.externalResourceCreateRequestTable.id })
@@ -261,16 +268,20 @@ const makeExternalResourceService = Effect.gen(function* () {
           });
         }
         const now = yield* DateTime.nowAsDate;
+        // A `pending` reservation that outlived its lease is re-claimed in
+        // place: the row does not move, so the lease is a predicate on the
+        // unchanged state rather than an edge in the graph. A `failed` one
+        // moves back to `pending`, which is the `reclaim` event.
         const stale =
-          existing.state === "pending" &&
+          isReservedCreateRequestState(existing.state) &&
           existing.createdAt.getTime() <
             now.getTime() - creationReservationStaleMs;
-        if (existing.state === "failed" || stale) {
+        if (canReclaimCreateRequestState(existing.state) || stale) {
           const reclaimedAt = now;
           yield* db
             .update(schema.externalResourceCreateRequestTable)
             .set({
-              state: "pending",
+              state: targetStateFor("reclaim"),
               externalResourceId: null,
               postExternalResourceLinkId: null,
               createdAt: reclaimedAt,
@@ -308,11 +319,13 @@ const makeExternalResourceService = Effect.gen(function* () {
     failCreation: (input) =>
       db
         .update(schema.externalResourceCreateRequestTable)
-        .set({ state: "failed", updatedAt: new Date() })
+        .set({ state: targetStateFor("fail"), updatedAt: new Date() })
         .where(
           and(
             eq(schema.externalResourceCreateRequestTable.id, input.requestId),
-            eq(schema.externalResourceCreateRequestTable.state, "pending")
+            inArray(schema.externalResourceCreateRequestTable.state, [
+              ...sourceStatesFor("fail"),
+            ])
           )
         )
         .pipe(
@@ -323,14 +336,16 @@ const makeExternalResourceService = Effect.gen(function* () {
       db
         .update(schema.externalResourceCreateRequestTable)
         .set({
-          state: "succeeded",
+          state: targetStateFor("succeed"),
           externalResourceId: input.externalResourceId,
           postExternalResourceLinkId: input.postExternalResourceLinkId,
         })
         .where(
           and(
             eq(schema.externalResourceCreateRequestTable.id, input.requestId),
-            eq(schema.externalResourceCreateRequestTable.state, "pending")
+            inArray(schema.externalResourceCreateRequestTable.state, [
+              ...sourceStatesFor("succeed"),
+            ])
           )
         )
         .pipe(

@@ -30,8 +30,15 @@ import { getUniqueViolationConstraint, isUniqueViolation } from "../rpc-errors";
 import { bannedAuthorPredicate } from "../user-ban/predicates";
 import { FailedToMergePostError, PostAlreadyExistsError } from "./errors";
 import {
+  isArchivedPostPresence,
+  isMergedPostPresence,
+  isMergedPostRow,
+  presenceOf,
+} from "./machine";
+import {
   activePostVisibility,
   publicPostVisibility,
+  unlockedPostCondition,
 } from "./public-visibility";
 import type { TPostAdminUpdate } from "./schema";
 
@@ -889,11 +896,12 @@ const makePostRepository = Effect.gen(function* () {
             and(
               eq(schema.postTable.id, id),
               eq(schema.postTable.organizationId, organizationId),
-              isNull(schema.postTable.lockedAt),
               // Merged posts are read-only until they are unmerged: every
               // interaction gate (comments, votes, reactions, subscriptions)
-              // flows through this check.
-              isNull(schema.postTable.mergedIntoPostId)
+              // flows through this check. `unlockedPostCondition` is the two
+              // graphs' answer — not merged, not locked — rather than a second
+              // pair of `isNull` clauses beside them.
+              unlockedPostCondition
             )
           );
         return rows.length > 0;
@@ -913,9 +921,8 @@ const makePostRepository = Effect.gen(function* () {
               eq(schema.postTable.id, id),
               eq(schema.postTable.organizationId, organizationId),
               eq(schema.boardTable.visibility, "PUBLIC"),
-              isNull(schema.postTable.lockedAt),
               // Same rule as `isUnlocked`, applied to the public surfaces.
-              isNull(schema.postTable.mergedIntoPostId)
+              unlockedPostCondition
             )
           );
         return rows.length > 0;
@@ -1106,6 +1113,7 @@ const makePostRepository = Effect.gen(function* () {
         // child list even if an unmerge raced the scan above.
         const lockedPosts = yield* db
           .select({
+            archivedAt: schema.postTable.archivedAt,
             boardId: schema.postTable.boardId,
             id: schema.postTable.id,
             mergedIntoPostId: schema.postTable.mergedIntoPostId,
@@ -1133,7 +1141,7 @@ const makePostRepository = Effect.gen(function* () {
           (post) =>
             survivorIdSet.has(post.id) &&
             post.boardId === boardId &&
-            post.mergedIntoPostId === null
+            !isMergedPostPresence(presenceOf(post))
         );
         if (posts.length !== survivorIds.length) {
           return { deleted: false, restoredChildren: [] };
@@ -1382,25 +1390,31 @@ const makePostRepository = Effect.gen(function* () {
               reason: "same_post",
             });
           }
-          if (sourcePost.mergedIntoPostId) {
+          // A merge endpoint must be `listed`: an archived post and an
+          // already-merged post are both refused, and the graph says which
+          // state each one is in rather than the guard re-testing the two
+          // columns.
+          const sourcePresence = presenceOf(sourcePost);
+          const targetPresence = presenceOf(targetPost);
+          if (isMergedPostPresence(sourcePresence)) {
             return yield* new FailedToMergePostError({
               message: "Source post is already merged into another post",
               reason: "source_merged",
             });
           }
-          if (sourcePost.archivedAt) {
+          if (isArchivedPostPresence(sourcePresence)) {
             return yield* new FailedToMergePostError({
               message: "Source post is archived and cannot be merged",
               reason: "source_archived",
             });
           }
-          if (targetPost.mergedIntoPostId) {
+          if (isMergedPostPresence(targetPresence)) {
             return yield* new FailedToMergePostError({
               message: "Target post is already merged into another post",
               reason: "target_merged",
             });
           }
-          if (targetPost.archivedAt) {
+          if (isArchivedPostPresence(targetPresence)) {
             return yield* new FailedToMergePostError({
               message: "Target post is archived and cannot be a merge target",
               reason: "target_archived",
@@ -1723,6 +1737,7 @@ const makePostRepository = Effect.gen(function* () {
           // same rows.
           const [preSource] = yield* db
             .select({
+              archivedAt: schema.postTable.archivedAt,
               mergedIntoPostId: schema.postTable.mergedIntoPostId,
             })
             .from(schema.postTable)
@@ -1740,7 +1755,7 @@ const makePostRepository = Effect.gen(function* () {
               reason: "post_not_found",
             });
           }
-          if (!preSource.mergedIntoPostId) {
+          if (!isMergedPostRow(preSource)) {
             return yield* new FailedToMergePostError({
               message: "Post is not merged",
               reason: "post_not_merged",

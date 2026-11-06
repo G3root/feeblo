@@ -1,3 +1,4 @@
+import { writableChangelogStatus } from "@feeblo/domain/changelog/machine";
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
@@ -356,17 +357,6 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
   );
 }
 
-/**
- * The changelog write endpoints accept only the statuses a write may set:
- * `scheduled` is a future feature (the scheduler does not exist), so a row
- * read back as scheduled — filed before scheduling was disabled — is saved as
- * the draft it effectively is. The wire type is the source of truth; this
- * keeps an old row editable without a second request.
- */
-const toWritableChangelogStatus = (
-  status: "draft" | "published" | "scheduled"
-): "draft" | "published" => (status === "scheduled" ? "draft" : status);
-
 export function changelogCollection(scope: DashboardCollectionScope) {
   const id = organizationScopedCollectionId("changelogCollection", scope);
 
@@ -404,7 +394,11 @@ export function changelogCollection(scope: DashboardCollectionScope) {
             content: updatedChangelog.content,
             assetIds: updatedChangelog.assetIds ?? [],
             coverImage: updatedChangelog.coverImage ?? null,
-            status: toWritableChangelogStatus(updatedChangelog.status),
+            // A row read back as `scheduled` — filed before scheduling was
+            // disabled — is saved as the draft it effectively is.
+            // `writableChangelogStatus` is the machine's answer rather than a
+            // cast, so a real scheduling event would change it here.
+            status: writableChangelogStatus(updatedChangelog.status),
             scheduledAt: updatedChangelog.scheduledAt,
             publishedAt: updatedChangelog.publishedAt,
             organizationId: updatedChangelog.organizationId,
@@ -436,7 +430,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
             content: newChangelog.content,
             assetIds: newChangelog.assetIds ?? [],
             coverImage: newChangelog.coverImage ?? null,
-            status: toWritableChangelogStatus(newChangelog.status),
+            status: writableChangelogStatus(newChangelog.status),
             scheduledAt: newChangelog.scheduledAt,
             publishedAt: newChangelog.publishedAt,
             organizationId: newChangelog.organizationId,

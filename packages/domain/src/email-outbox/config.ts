@@ -31,6 +31,17 @@ export const submissionWindowCeiling = Duration.hours(1);
 export const submissionWindowMaxPosts = 200;
 
 /**
+ * Coalescing window for `post.status_changed` intents.
+ *
+ * A move into a closed status records its own `post.closed` intent immediately;
+ * every other status move joins the post's pending window, so a burst of moves
+ * sends one email this long after the last. A module constant rather than
+ * environment, like the submission window: the two surfaces that record these
+ * intents must not be able to configure different windows.
+ */
+export const postStatusCoalescingWindow = Duration.minutes(5);
+
+/**
  * Monthly delivery attempts one workspace may spend before its own email is
  * deferred (`EMAIL_OUTBOX_WORKSPACE_MONTHLY_SEND_LIMIT`). Shared by the config
  * default and the test controls so the breaker's resting point has one name.

@@ -23,6 +23,7 @@ import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogNotFoundError } from "./errors";
+import { isPublishedChangelogStatus, publishesNow } from "./machine";
 import { ChangelogPolicy } from "./policies";
 import { makeChangelogPublication } from "./publication";
 import { ChangelogRepository } from "./repository";
@@ -115,15 +116,14 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               ...(isMember && { creatorMemberId: isMember.membershipId }),
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
-            const createdOutboxId =
-              args.status === "published"
-                ? yield* publication.recordPublishedIntent({
-                    actorUserId: session.session.userId,
-                    changelogId: args.id,
-                    organizationId: args.organizationId,
-                  })
-                : undefined;
-            if (args.status === "published") {
+            const createdOutboxId = isPublishedChangelogStatus(args.status)
+              ? yield* publication.recordPublishedIntent({
+                  actorUserId: session.session.userId,
+                  changelogId: args.id,
+                  organizationId: args.organizationId,
+                })
+              : undefined;
+            if (isPublishedChangelogStatus(args.status)) {
               yield* publication.notifyPublished({
                 ...(isMember && { actorUserId: session.session.userId }),
                 changelogId: args.id,
@@ -225,8 +225,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 message: "Changelog entry not found",
               });
             }
-            const publishedNow =
-              previousStatus !== "published" && args.status === "published";
+            // The publication intent and the subscriber fan-out belong to the
+            // transition, not to the value: a save that leaves a live entry
+            // live changes nothing and must not announce itself twice.
+            const publishedNow = publishesNow(previousStatus, args.status);
             const createdOutboxId = publishedNow
               ? yield* publication.recordPublishedIntent({
                   actorUserId: session.session.userId,

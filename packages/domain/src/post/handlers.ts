@@ -28,6 +28,13 @@ import {
   PostAlreadyExistsError,
   PostNotFoundError,
 } from "./errors";
+import {
+  engagementForLock,
+  engagementOf,
+  isArchivedPostPresence,
+  isMergedPostRow,
+  presenceOf,
+} from "./machine";
 import { PostPolicy } from "./policies";
 import { PostRepository } from "./repository";
 import { PostRpcs } from "./rpcs";
@@ -103,7 +110,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         () => new FailedToUpdatePostError()
       ),
       Effect.filterOrFail(
-        (post) => post.mergedIntoPostId === null,
+        (post) => !isMergedPostRow(post),
         () =>
           new Policy.PolicyDeniedError({
             reason: "This post has been merged into another post",
@@ -593,9 +600,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               postId: args.id,
             };
             const activities: PostActivityInput[] = [];
+            // The activity is emitted on a real move, which is a question for
+            // the engagement and presence graphs rather than for the two
+            // timestamp columns: `adminUpdate` is an idempotent set, so asking
+            // the machine is what keeps "archived twice" from announcing
+            // itself twice.
             if (
               args.locked !== undefined &&
-              Boolean(previous.lockedAt) !== args.locked
+              engagementOf(previous) !== engagementForLock(args.locked)
             ) {
               activities.push({
                 ...actor,
@@ -604,7 +616,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             }
             if (
               args.archived !== undefined &&
-              Boolean(previous.archivedAt) !== args.archived
+              isArchivedPostPresence(presenceOf(previous)) !== args.archived
             ) {
               activities.push({
                 ...actor,
