@@ -10,6 +10,7 @@ import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { definePublicEntry, defineSurfacePair } from "../surface";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { PostReactionRepository } from "./repository";
 import { PostReactionRpcs } from "./rpcs";
 import type { TPostReactionList, TPostReactionToggle } from "./schema";
@@ -20,6 +21,7 @@ type PostReactionRpcTag = RpcTagsOf<typeof PostReactionRpcs>;
 export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostReactionRepository;
   const postPolicy = yield* PostPolicy;
+  const participation = yield* ParticipationPolicy;
   // const sitePolicy = yield* SitePolicy;
 
   // -- Surface-parameterized writes --
@@ -54,7 +56,8 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
           postPolicy.isUnlockedPublic({
             organizationId: args.organizationId,
             postId: args.postId,
-          })
+          }),
+          participation.canParticipate(args.organizationId)
         ),
     },
   });
@@ -119,5 +122,6 @@ export const PostReactionRpcHandlers = PostReactionRpcs.toLayer(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
   Layer.provide(PostRepository.layer),
-  Layer.provide(PostReactionRepository.layer)
+  Layer.provide(PostReactionRepository.layer),
+  Layer.provide(ParticipationPolicy.layer)
 );

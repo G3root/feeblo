@@ -94,7 +94,8 @@ const settingsItems = [
       {
         label: "Security",
         icon: LockIcon,
-        permission: "workspace.update" as const,
+        // Admins manage widget SSO there; managers manage the ban list.
+        permissions: ["workspace.update", "userBans.manage"] as const,
         to: "/$organizationId/settings/security" as const,
       },
       {

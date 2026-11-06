@@ -10,6 +10,7 @@ import { withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
 import { CurrentSession } from "../session-middleware";
 import { definePublicEntry, defineSurfacePair } from "../surface";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { CommentReactionRepository } from "./repository";
 import { CommentReactionRpcs } from "./rpcs";
 import type { TCommentReactionList, TCommentReactionToggle } from "./schema";
@@ -20,6 +21,7 @@ type CommentReactionRpcTag = RpcTagsOf<typeof CommentReactionRpcs>;
 export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* CommentReactionRepository;
   const postPolicy = yield* PostPolicy;
+  const participation = yield* ParticipationPolicy;
   // const sitePolicy = yield* SitePolicy;
 
   // -- Surface-parameterized writes --
@@ -54,7 +56,8 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
           postPolicy.isUnlockedPublic({
             organizationId: args.organizationId,
             postId: args.postId,
-          })
+          }),
+          participation.canParticipate(args.organizationId)
         ),
     },
   });
@@ -120,5 +123,6 @@ export const CommentReactionRpcHandlers = CommentReactionRpcs.toLayer(
   // Layer.provide(SitePolicy.layer),
   Layer.provide(PostPolicy.layer),
   Layer.provide(PostRepository.layer),
-  Layer.provide(CommentReactionRepository.layer)
+  Layer.provide(CommentReactionRepository.layer),
+  Layer.provide(ParticipationPolicy.layer)
 );

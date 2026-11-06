@@ -161,6 +161,24 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     });
 
   /**
+   * Banning is a paid moderation capability.
+   *
+   * The check is on the write only: a workspace that drops back to the free
+   * plan keeps the bans it already has, so somebody it banned yesterday does
+   * not get a fresh voice because the subscription lapsed.
+   */
+  const canManageUserBans = (organizationId: string) =>
+    Effect.gen(function* () {
+      const { entitlements } = yield* findEntitlements(organizationId);
+
+      if (!entitlements.capabilities.userBans) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Banning users requires the Starter plan or higher.",
+        });
+      }
+    });
+
+  /**
    * The plan's member allowance. Every member counts, whatever the role: the
    * limit is on how many people have access to the workspace, not on how many
    * of them are privileged. `memberCount` includes the owner and any pending
@@ -286,6 +304,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canHidePoweredByBranding,
     canUseWidgetSso,
     canUsePublicApi,
+    canManageUserBans,
     canAddMember,
     canCreateRoadmap,
     canUpdateRoadmapVisibility,

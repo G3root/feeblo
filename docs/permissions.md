@@ -68,6 +68,7 @@ Admin and owner are intentionally equivalent for authorization. `owner` is kept 
 | Comments | Delete own comments | Yes | Yes | Yes |
 | Comments | Delete another user's comments | No | Yes | Yes |
 | Users | Delete users | No | Yes | Yes |
+| Users | Ban an end user (`userBans.manage`) | No | Yes | Yes |
 | Users | View user details | Yes | Yes | Yes |
 | Roadmaps | Prioritize the roadmap | No | Yes | Yes |
 | Changelog | Manage the changelog | No | Yes | Yes |
@@ -93,6 +94,7 @@ members.assign       site.*              roadmap.*
 statuses.*           billing.*           contacts.*
 companies.*          webhooks.manage     integrations.manage
 apiKeys.manage       emailSuppressions.manage
+userBans.manage
 ```
 
 `packages/permissions/src/permissions.ts` is the catalog (id + label + description, anchored to the backend policy it maps to). Its `createPermissions(resource, actions)` utility creates the action permissions and the matching `{resource}.*` wildcard. `roleGrants` resolves a wildcard grant for action checks. `src/role-permissions.ts` is the role → permission table. Roles inherit permissions from lower ranks automatically (`permissionsForRole`).

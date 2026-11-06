@@ -64,6 +64,10 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Admin role**: A member holding `owner` or `admin`. It grants workspace management permissions; it is no longer a plan unit, so promoting a member does not change what the plan counts. _Avoid_: privileged member, seat, admin seat
 
+### Moderation
+
+**Ban**: A workspace-scoped instruction that stops one end user from participating — posting, commenting, voting, reacting, or subscribing — on that workspace's public portal and widget. A ban does not stop them reading, does not stop email delivery (that is a suppression), and does not lock their account from signing in. A ban does remove their votes and their post, changelog, and email subscriptions in that workspace; deleting their existing posts and comments is an explicit option on the ban, never part of it. Requires the `userBans` plan capability to create. _Avoid_: block, blocklist, suspension, suppression
+
 ### Plans
 
 **Plan**: The subscription tier a workspace belongs to — Free, Starter, or Professional. _Avoid_: tier, package, subscription

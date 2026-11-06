@@ -51,6 +51,21 @@ export const Post = S.Struct({
    * boolean is not an identifier, so it survives the redaction.
    */
   authorIsMember: S.Boolean,
+  /**
+   * Whether the author is banned from participating in this workspace.
+   *
+   * `true`/`false` on the dashboard reads that ask for it (`GetPost`,
+   * `ListPosts`) and `null` everywhere else, including every public
+   * projection: a ban is a moderation decision, and a public reader has no
+   * business learning it. `null` means "not disclosed" rather than "not
+   * banned", so a consumer compares against `true` instead of branching on a
+   * falsy value.
+   *
+   * Derived in SQL for the same reason {@link Post.authorIsMember} is: an
+   * address-only ban has no account id for a client-side join, and the
+   * identifiers a public read redacts are exactly the ones such a join needs.
+   */
+  authorIsBanned: S.NullOr(S.Boolean),
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),
@@ -90,6 +105,8 @@ export const PostListItem = S.Struct({
   assigneeMemberId: S.NullOr(S.String),
   /** See {@link Post.authorIsMember}. */
   authorIsMember: S.Boolean,
+  /** See {@link Post.authorIsBanned}. */
+  authorIsBanned: S.NullOr(S.Boolean),
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),

@@ -115,6 +115,12 @@
     "db:generate": {
       "cache": false
     },
+    "db:seed": {
+      "cache": false
+    },
+    "db:nuke": {
+      "cache": false
+    },
     "db:migrate": {
       "cache": false,
       "persistent": true

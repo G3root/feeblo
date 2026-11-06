@@ -43,6 +43,15 @@ export const Comment = S.Struct({
    * boolean is not an identifier and survives redaction.
    */
   authorIsMember: S.Boolean,
+  /**
+   * Whether the author is banned from participating in this workspace.
+   *
+   * `true`/`false` on the dashboard's `ListComments`, `null` on the public
+   * list: a ban is a moderation decision, not something a reader of the board
+   * is told about the person they are replying to. `null` means "not
+   * disclosed", so a consumer compares against `true`.
+   */
+  authorIsBanned: S.NullOr(S.Boolean),
   /** Post status (org-scoped FK) this comment moved the post to, when posted as a status update. */
   statusUpdateId: S.NullOr(S.String),
   pinnedAt: S.NullOr(S.DateFromString),

@@ -22,6 +22,7 @@ import { ResolvePrincipalService } from "../identity/service";
 import { PostActivityRepository } from "../post-activity/repository";
 import { PostRepository } from "../post/repository";
 import { CurrentSession, type Session } from "../session-middleware";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { UpvoteRpcHandlersEffect } from "./handlers";
 import { UpvotePolicy } from "./policies";
@@ -193,7 +194,8 @@ describe("UpvoteRpcHandlers on-behalf", () => {
   const TestLayer = Layer.mergeAll(
     HandlerTest,
     Database.PgliteDatabaseLive,
-    NodeCrypto.layer
+    NodeCrypto.layer,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
   );
 
   layer(TestLayer)("handlers", (it) => {

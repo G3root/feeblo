@@ -73,6 +73,9 @@ export function createMockCollection<T extends object>({
       }
       handle();
     },
+    // Query-backed collections expose a refetch; the in-memory sync has no
+    // remote source, but callers that refresh after a write still need it.
+    refetch: async () => undefined,
   };
 
   return createCollection<T, string, typeof utils>({

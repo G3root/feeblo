@@ -31,6 +31,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { CommentRpcHandlersEffect } from "./handlers";
@@ -229,6 +230,7 @@ describe("CommentRpcHandlers", () => {
     HandlerTest,
     Database.PgliteDatabaseLive,
     NodeCrypto.layer,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Layer.succeed(
@@ -892,6 +894,51 @@ describe("CommentRpcHandlers", () => {
           })
       );
 
+      it.effect("rejects a banned non-member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          // The fixture creates the member row its board and post reference.
+          // This case is a non-member, so remove it before the ban check;
+          // the database membership check would otherwise exempt it.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.id, fixture.membershipId));
+
+          yield* db.insert(schema.userBanTable).values({
+            createdAt: now,
+            email: "user@example.com",
+            id: `ban_${fixture.userId}`,
+            organizationId: fixture.organizationId,
+            reason: "Abuse report",
+            updatedAt: now,
+            userId: fixture.userId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateCommentPublic(
+                commentCreateInput(fixture, commentId, "Banned comment")
+              )
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+          expect(error).toMatchObject({
+            reason: "You are banned from participating in this workspace.",
+          });
+        })
+      );
+
       it.effect("rejects status updates from non-members", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
@@ -1538,6 +1585,107 @@ describe("CommentRpcHandlers", () => {
             id: commentId,
           });
           expect(comments[0]?.content).toContain("Updated public comment");
+        })
+      );
+
+      it.effect("rejects a banned owner updating their own comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* handlers
+            .CreateCommentPublic(
+              commentCreateInput(fixture, commentId, "Own comment")
+            )
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          // The update path composes the participation check on its own, so a
+          // ban has to be proven to stop an edit the owner is otherwise
+          // allowed to make. The fixture's member row would exempt the session
+          // from the database membership check.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.id, fixture.membershipId));
+          yield* db.insert(schema.userBanTable).values({
+            createdAt: now,
+            id: `ban_${fixture.userId}`,
+            organizationId: fixture.organizationId,
+            updatedAt: now,
+            userId: fixture.userId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdateCommentPublic({
+                id: commentId,
+                organizationId: fixture.organizationId,
+                postId: fixture.postId,
+                content: "Edited while banned",
+                visibility: "PUBLIC" as const,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("lets a banned owner delete their own comment", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const commentId = yield* CommentId.generate;
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* handlers
+            .CreateCommentPublic(
+              commentCreateInput(fixture, commentId, "Own comment")
+            )
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          // Withdrawing your own words is not participation, so the delete
+          // path must not carry the participation check the update path has.
+          yield* db
+            .delete(schema.memberTable)
+            .where(eq(schema.memberTable.id, fixture.membershipId));
+          yield* db.insert(schema.userBanTable).values({
+            createdAt: now,
+            id: `ban_${fixture.userId}`,
+            organizationId: fixture.organizationId,
+            updatedAt: now,
+            userId: fixture.userId,
+          });
+
+          yield* handlers
+            .DeleteCommentPublic({
+              id: commentId,
+              organizationId: fixture.organizationId,
+              postId: fixture.postId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          const comments = yield* handlers
+            .ListCommentsPublic({
+              organizationId: fixture.organizationId,
+              slug: fixture.postSlug,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(comments).toHaveLength(0);
         })
       );
 

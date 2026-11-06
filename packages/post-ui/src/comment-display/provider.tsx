@@ -11,6 +11,7 @@ export type CommentDisplayProviderProps = {
   children?: ReactNode;
   authorName: string;
   authorIsMember?: boolean;
+  authorIsBanned?: boolean;
   commentId: string;
   postId: string;
   postSlug: string;
@@ -62,6 +63,7 @@ export function CommentDisplayProvider({
   children,
   authorName,
   authorIsMember = false,
+  authorIsBanned = false,
   commentId,
   postId,
   postSlug,
@@ -115,6 +117,7 @@ export function CommentDisplayProvider({
       state: {
         authorName,
         authorIsMember,
+        authorIsBanned,
         commentId,
         content,
         createdAt,
@@ -135,6 +138,7 @@ export function CommentDisplayProvider({
     [
       authorName,
       authorIsMember,
+      authorIsBanned,
       commentId,
       content,
       createdAt,

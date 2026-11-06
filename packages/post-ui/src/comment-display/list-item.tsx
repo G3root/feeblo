@@ -136,6 +136,7 @@ export function CommentDisplayItem({
   return (
     <CommentDisplayComponent
       authorName={data.user.name}
+      authorIsBanned={data.authorIsBanned === true}
       authorIsMember={data.authorIsMember}
       commentId={data.id}
       content={data.content}

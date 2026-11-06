@@ -237,3 +237,8 @@ export const DataImportJobId = makeId("data_import_job", "dij", {
 export const DataImportRowId = makeId("data_import_row", "dir", {
   approximateLength,
 });
+
+/** Identifies one workspace-scoped ban of an end user. */
+export const UserBanId = makeId("user_ban", "ubn", {
+  approximateLength,
+});
