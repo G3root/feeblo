@@ -12,7 +12,9 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -210,6 +212,83 @@ describe("external resource service", () => {
           });
           expect(retried.reserved).toBe(true);
         })
+    );
+
+    /**
+     * The reservation is the idempotency key's mutex: exactly one caller may
+     * hold it and run the provider call.
+     *
+     * These are contract tests, not race tests. The re-claim used to read the
+     * row and then guard an `UPDATE` on it, and the guarded `UPDATE` never read
+     * its row count, so the loser of a race went on to create the resource
+     * anyway. The fix is structural — taking the reservation over is now a
+     * single statement, so the row the first caller moves cannot satisfy the
+     * predicate the second one evaluates. PGlite runs one connection and does
+     * not interleave the two fibers here, so a test cannot reproduce the race
+     * that motivated it; what these two pin is the contract the fix preserves:
+     * one holder, and a loser that reports "already pending" rather than
+     * running the provider call.
+     */
+    const reservationRace = (suffix: string) =>
+      Effect.gen(function* () {
+        const post = yield* seedPost(suffix);
+        const connection = yield* seedConnection(post.organizationId, "github");
+        return {
+          connectionId: connection,
+          idempotencyKey: `create-issue-${suffix}`,
+          organizationId: post.organizationId,
+          postId: post.postId,
+        };
+      });
+
+    it.effect("lets exactly one caller re-claim a failed reservation", () =>
+      Effect.gen(function* () {
+        const service = yield* ExternalResourceService;
+        const input = yield* reservationRace("failed-race");
+
+        const held = yield* service.reserveCreation(input);
+        expect(held.reserved).toBe(true);
+        yield* service.failCreation({ requestId: held.id });
+
+        const raced = yield* Effect.all(
+          [service.reserveCreation(input), service.reserveCreation(input)],
+          { concurrency: "unbounded" }
+        );
+
+        expect(raced.filter((result) => result.reserved)).toHaveLength(1);
+      })
+    );
+
+    it.effect("lets exactly one caller take a stale reservation", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const service = yield* ExternalResourceService;
+        const input = yield* reservationRace("stale-race");
+
+        const held = yield* service.reserveCreation(input);
+        expect(held.reserved).toBe(true);
+        // Push the reservation past its lease, which is the only thing making
+        // a `pending` row re-claimable.
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.externalResourceCreateRequestTable)
+          .set({
+            createdAt: DateTime.toDateUtc(
+              DateTime.subtractDuration(
+                DateTime.fromDateUnsafe(now),
+                Duration.hours(2)
+              )
+            ),
+          })
+          .where(eq(schema.externalResourceCreateRequestTable.id, held.id));
+
+        const raced = yield* Effect.all(
+          [service.reserveCreation(input), service.reserveCreation(input)],
+          { concurrency: "unbounded" }
+        );
+
+        expect(raced.filter((result) => result.reserved)).toHaveLength(1);
+      })
     );
 
     it.effect("rejects a provider URL that is not http(s) at write time", () =>

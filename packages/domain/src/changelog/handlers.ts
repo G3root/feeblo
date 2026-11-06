@@ -17,13 +17,17 @@ import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
-import { withRemapDbErrors } from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogNotFoundError } from "./errors";
-import { isPublishedChangelogStatus, publishesNow } from "./machine";
+import {
+  isPublishedChangelogStatus,
+  publishesNow,
+  publishesWithoutTimestamp,
+} from "./machine";
 import { ChangelogPolicy } from "./policies";
 import { makeChangelogPublication } from "./publication";
 import { ChangelogRepository } from "./repository";
@@ -96,6 +100,15 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         args.content
       );
       return Effect.gen(function* () {
+        // A live entry needs its publication date. The Public API has always
+        // refused a publish without one; the dashboard relied on its publish
+        // dialog, so a direct RPC call could file a published entry with no
+        // date and the list would order it by `createdAt` instead.
+        if (publishesWithoutTimestamp(args)) {
+          return yield* new BadRequestError({
+            message: "A published changelog entry needs a publication date.",
+          });
+        }
         const session = yield* CurrentSession;
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
@@ -187,6 +200,11 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         args.content
       );
       return Effect.gen(function* () {
+        if (publishesWithoutTimestamp(args)) {
+          return yield* new BadRequestError({
+            message: "A published changelog entry needs a publication date.",
+          });
+        }
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
         const prepared = yield* prepareEditorAssetContent({

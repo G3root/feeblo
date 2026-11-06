@@ -7,10 +7,8 @@ import {
 import {
   EXTERNAL_RESOURCE_CREATE_REQUEST_EVENTS,
   RESERVED_CREATE_REQUEST_STATE,
-  canReclaimCreateRequestState,
   canTransitionCreateRequest,
   externalResourceCreateRequestMachine,
-  isReservedCreateRequestState,
   sourceStatesFor,
   targetStateFor,
 } from "./machine";
@@ -70,15 +68,16 @@ describe("external resource create request machine", () => {
     // The stale-lease re-claim is not here: a `pending` row that outlived its
     // reservation stays `pending`, so it is a SQL predicate on an unchanged
     // state rather than an edge. A self-transition would make "handled" and
-    // "rejected" indistinguishable.
-    expect(canReclaimCreateRequestState("pending")).toBe(false);
+    // "rejected" indistinguishable — which is why the reservation's single
+    // `UPDATE` composes this source set with a `createdAt < lease` predicate.
+    expect(sourceStatesFor("reclaim")).toStrictEqual(["failed"]);
   });
 
   it("reserves only a pending row for the provider call", () => {
-    expect(ALL.filter(isReservedCreateRequestState)).toStrictEqual(["pending"]);
-    for (const state of ["succeeded", "failed"] as const) {
-      expect(isReservedCreateRequestState(state)).toBe(false);
-    }
+    // The one guarded `UPDATE` that ends a creation asks both events, which is
+    // what makes `pending` the only state the provider call may run from.
+    expect(sourceStatesFor("succeed")).toStrictEqual(["pending"]);
+    expect(sourceStatesFor("fail")).toStrictEqual(["pending"]);
   });
 
   it("lets nothing leave succeeded", () => {

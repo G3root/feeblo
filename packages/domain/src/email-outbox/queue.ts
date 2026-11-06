@@ -50,6 +50,7 @@ import {
   makeSubmissionNotificationPayload,
   resolveSubscriptionNotificationContent,
 } from "./content";
+import { deliveryInFlightStates } from "./delivery-state";
 import {
   maximumDeliveryAttempts,
   maximumInfrastructureFailures,
@@ -771,9 +772,7 @@ const sendDeliveryAttempt = (
       });
     const now = yield* DateTime.now;
     const delivery = yield* repository.findDeliveryById(deliveryId);
-    if (
-      !(delivery && ["queued", "deferred", "sending"].includes(delivery.state))
-    ) {
+    if (!(delivery && deliveryInFlightStates.includes(delivery.state))) {
       return { _tag: "terminal" as const };
     }
     // Remember the version this attempt observed so the infrastructure catch

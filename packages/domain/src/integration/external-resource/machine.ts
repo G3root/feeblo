@@ -174,16 +174,6 @@ export const targetStateFor = (
 };
 
 /**
- * True when the request still holds a reservation the provider call may end.
- *
- * `succeed` and `fail` have the same sources, so this one predicate answers
- * both guarded updates instead of each writing its own `eq(state, "pending")`.
- */
-export const isReservedCreateRequestState = (
-  state: TExternalResourceCreateRequestState
-): boolean => sourceStatesFor("succeed").includes(state);
-
-/**
  * The state a reservation starts in.
  *
  * A fresh reservation and a re-claimed failure land in the same state, so this
@@ -193,8 +183,3 @@ export const isReservedCreateRequestState = (
  */
 export const RESERVED_CREATE_REQUEST_STATE: TExternalResourceCreateRequestState =
   targetStateFor("reclaim");
-
-/** True when a previous failure may be re-claimed as a fresh reservation. */
-export const canReclaimCreateRequestState = (
-  state: TExternalResourceCreateRequestState
-): boolean => sourceStatesFor("reclaim").includes(state);

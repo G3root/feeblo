@@ -255,3 +255,19 @@ export const publishesNow = (
   to: TChangelogState
 ): boolean =>
   isPublishedChangelogStatus(to) && canTransitionChangelog(from, to);
+
+/**
+ * True when a write names `published` without a publication date.
+ *
+ * Entering `published` means the entry goes live now, so a live entry with no
+ * `publishedAt` is a state the vocabulary should not admit. The Public API
+ * refused it (`changelog/public-api/operations.ts`) while the dashboard RPC
+ * accepted it, and the dashboard's publish dialog was the only thing preventing
+ * it in practice; this is the one rule both surfaces now ask.
+ */
+export const publishesWithoutTimestamp = (write: {
+  readonly status: TChangelogState;
+  readonly publishedAt?: Date | null | undefined;
+}): boolean =>
+  isPublishedChangelogStatus(write.status) &&
+  (write.publishedAt === null || write.publishedAt === undefined);

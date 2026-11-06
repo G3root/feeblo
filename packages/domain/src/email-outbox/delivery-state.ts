@@ -43,6 +43,11 @@ export const emailDeliveryMachine = setupEffect({
   states: {
     queued: {
       on: {
+        // A deferral can arrive before the claim is visible (an untyped read
+        // failure), and both deferral writers accept a queued row. Without
+        // this edge `canTransitionDelivery("queued", "deferred")` answered
+        // false while the SQL performed the move.
+        deferred: { target: "deferred" },
         expired: { target: "expired" },
         failed: { target: "failed" },
         no_organization_access: { target: "no_organization_access" },
@@ -139,6 +144,25 @@ export const deliverySourceStatesFor = (
   to: TEmailDeliveryState
 ): readonly TEmailDeliveryState[] =>
   deliveryStates.filter((from) => from !== to && handles(from, to));
+
+/**
+ * The states in which an attempt may still own the delivery: not yet claimed,
+ * being attempted, or waiting to be attempted again.
+ *
+ * Derived rather than written out. `deliverySourceStatesFor("sending")` is the
+ * claimable pair, and the claim's own target — the event is named after the
+ * state it enters, so `"sending"` is both — is the third. `accepted` is
+ * deliberately absent: once the provider has the message only provider feedback
+ * moves the delivery, and a terminal state is not work.
+ *
+ * Three writers used to spell this trio out by hand: the failed-attempt deferral
+ * in `repository.ts`, the "oldest queued delivery" inspection in
+ * `operations.ts`, and the "is this still workable" guard in `queue.ts`.
+ */
+export const deliveryInFlightStates: readonly TEmailDeliveryState[] = [
+  ...deliverySourceStatesFor("sending"),
+  "sending",
+];
 
 /** Terminal delivery states are safe no-ops when a workflow is replayed. */
 export const isTerminalDeliveryState = (state: TEmailDeliveryState): boolean =>
