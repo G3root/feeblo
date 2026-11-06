@@ -1,5 +1,7 @@
 import { createPolar, createPolarCore } from "@polar-sh/sdk/2026-10";
+import type { webhooks } from "@polar-sh/sdk/2026-10";
 import * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -10,6 +12,7 @@ import * as Schema from "effect/Schema";
 import { BadRequestError } from "../rpc-errors";
 import { PolarConfig } from "./config";
 import {
+  FailedToConfirmBillingCheckoutError,
   FailedToCreateCheckoutError,
   FailedToCreatePortalError,
   FailedToRevokeSubscriptionError,
@@ -117,6 +120,31 @@ type OrganizationsWithSettings = {
     };
   }>;
 };
+
+/** The subscription snapshot a completed checkout confirms. */
+type SubscriptionConfirmation = {
+  readonly subscription: webhooks.WebhookSubscriptionCreatedPayload["data"];
+  /** Polar's own modification time, used as the webhook-ordering stamp. */
+  readonly eventTimestamp: Date;
+};
+
+/** The `org` key this deployment stamps on a checkout. */
+const OrgMetadata = Schema.Struct({ org: Schema.String });
+
+/**
+ * Whether a Polar metadata object names this workspace. The caller supplies a
+ * checkout id, so both the checkout and the subscription it points at have to
+ * carry the workspace id this deployment minted before either is applied.
+ */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any Polar metadata value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
+export const metadataBelongsToOrganization = <T>(
+  metadata: T,
+  organizationId: string
+): boolean =>
+  Option.match(Schema.decodeUnknownOption(OrgMetadata)(metadata), {
+    onNone: () => false,
+    onSome: (decoded) => decoded.org === organizationId,
+  });
 
 /**
  * The settings read is best-effort: it drives a startup warning, so this error
@@ -290,6 +318,77 @@ const makePolarService = Effect.gen(function* () {
       return {
         url: portalSession.customer_portal_url,
       };
+    }),
+    /**
+     * Reads the subscription a completed checkout created, so the success page
+     * can apply it without waiting for the webhook (the only other sync path).
+     *
+     * `None` means the checkout exists but has no subscription yet: payment is
+     * still processing. The workspace check runs on the checkout's metadata and
+     * again on the subscription's, because the caller supplies the checkout id:
+     * without it, a billing member of one workspace could ask this deployment
+     * to record another workspace's subscription. The stamp is the
+     * subscription's `modified_at`/`created_at` rather than the current time,
+     * so a snapshot the webhook already superseded cannot displace the newer
+     * event through `lastEventAt`.
+     */
+    findSubscriptionForCheckout: Effect.fn(
+      "PolarService.findSubscriptionForCheckout"
+    )(function* ({
+      organizationId,
+      checkoutId,
+    }: {
+      organizationId: string;
+      checkoutId: string;
+    }) {
+      if (!client) {
+        return Option.none<SubscriptionConfirmation>();
+      }
+
+      const checkout = yield* Effect.tryPromise({
+        try: () => client.checkouts.get(checkoutId),
+        catch: () =>
+          new FailedToConfirmBillingCheckoutError({
+            message: "Failed to read the Polar checkout",
+          }),
+      });
+
+      const subscriptionId = checkout.subscription_id;
+      if (subscriptionId === null) {
+        return Option.none<SubscriptionConfirmation>();
+      }
+
+      if (!metadataBelongsToOrganization(checkout.metadata, organizationId)) {
+        return yield* new BadRequestError({
+          message: "This checkout does not belong to the workspace",
+        });
+      }
+
+      const subscription = yield* Effect.tryPromise({
+        try: () => client.subscriptions.get(subscriptionId),
+        catch: () =>
+          new FailedToConfirmBillingCheckoutError({
+            message: "Failed to read the Polar subscription",
+          }),
+      });
+
+      if (
+        !metadataBelongsToOrganization(subscription.metadata, organizationId)
+      ) {
+        return yield* new FailedToConfirmBillingCheckoutError({
+          message:
+            "The Polar subscription does not carry this workspace's metadata",
+        });
+      }
+
+      return Option.some<SubscriptionConfirmation>({
+        subscription,
+        eventTimestamp: DateTime.toDateUtc(
+          DateTime.makeUnsafe(
+            subscription.modified_at ?? subscription.created_at
+          )
+        ),
+      });
     }),
     /**
      * Immediately cancels a subscription. Used when an organization is deleted

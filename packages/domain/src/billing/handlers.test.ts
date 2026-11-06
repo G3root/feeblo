@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -11,10 +12,25 @@ import { CurrentSession, type Session } from "../session-middleware";
 import { BillingRpcHandlersEffect } from "./handlers";
 import { BillingRepository } from "./repository";
 import { PolarService } from "./service";
+import {
+  makeSubscriptionPayload,
+  type SubscriptionPayload,
+} from "./test-support";
 
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
   DateTime.toDateUtc(DateTime.makeUnsafe(instant));
+
+/**
+ * What the fake Polar service answers for the checkout-confirmation read.
+ * Effect-free on purpose, like the revocation fake: a test sets it before the
+ * single call under test.
+ */
+let confirmedSubscription: Option.Option<{
+  subscription: SubscriptionPayload;
+  eventTimestamp: Date;
+}> = Option.none();
+
 describe("BillingRpcHandlers", () => {
   type Fixture = {
     membershipId: string;
@@ -81,6 +97,7 @@ describe("BillingRpcHandlers", () => {
     createPortal: ({ customerId }: { customerId: string }) =>
       Effect.succeed({ url: `https://sandbox.polar.sh/portal/${customerId}` }),
     revokeSubscription: () => Effect.void,
+    findSubscriptionForCheckout: () => Effect.sync(() => confirmedSubscription),
   });
   const TestLayer = Layer.mergeAll(
     BillingRepository.layer.pipe(Layer.provide(PolarServiceTest)),
@@ -308,6 +325,91 @@ describe("BillingRpcHandlers", () => {
 
         expect(result.url).toBe("https://sandbox.polar.sh/portal/cus_current");
       })
+    );
+
+    it.effect("applies the subscription a completed checkout confirms", () =>
+      Effect.gen(function* () {
+        const handlers = yield* BillingRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        yield* db.insert(schema.productTable).values({
+          id: "prod_checkout_confirm",
+          name: "Starter monthly",
+          isRecurring: true,
+          isArchived: false,
+          externalOrganizationId: "polar_org",
+          visibility: "PUBLIC",
+          recurringInterval: "month",
+          metadata: { plan: "starter", variant: "monthly" },
+        });
+
+        confirmedSubscription = Option.some({
+          subscription: makeSubscriptionPayload({
+            externalSubscriptionId: "sub_checkout_confirmed",
+            organizationId: fixture.organizationId,
+            productId: "prod_checkout_confirm",
+          }),
+          eventTimestamp: dateAt("2026-01-02T00:00:00.000Z"),
+        });
+
+        yield* handlers
+          .ConfirmBillingCheckout({
+            organizationId: fixture.organizationId,
+            checkoutId: "checkout_confirmed",
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
+          );
+
+        const [row] = yield* db
+          .select()
+          .from(schema.subscriptionTable)
+          .where(
+            eq(schema.subscriptionTable.externalId, "sub_checkout_confirmed")
+          );
+
+        expect(row?.organizationId).toBe(fixture.organizationId);
+        expect(row?.status).toBe("active");
+        expect(row?.lastEventAt?.toISOString()).toBe(
+          "2026-01-02T00:00:00.000Z"
+        );
+      })
+    );
+
+    it.effect(
+      "leaves the subscription alone when a checkout has none yet",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* BillingRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+
+          confirmedSubscription = Option.none();
+
+          yield* handlers
+            .ConfirmBillingCheckout({
+              organizationId: fixture.organizationId,
+              checkoutId: "checkout_pending",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "owner")
+              )
+            );
+
+          const rows = yield* db
+            .select({ id: schema.subscriptionTable.id })
+            .from(schema.subscriptionTable)
+            .where(
+              eq(
+                schema.subscriptionTable.organizationId,
+                fixture.organizationId
+              )
+            );
+          expect(rows).toHaveLength(0);
+        })
     );
   });
 });

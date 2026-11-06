@@ -7,8 +7,28 @@ import * as Option from "effect/Option";
 import {
   classifyPolarRevokeFailure,
   describeRevokeFailure,
+  metadataBelongsToOrganization,
   readOrganizationSubscriptionSettings,
 } from "./service";
+
+describe("metadataBelongsToOrganization", () => {
+  it("matches only the workspace id this deployment stamped", () => {
+    expect(
+      metadataBelongsToOrganization({ org: "org_workspace" }, "org_workspace")
+    ).toBe(true);
+    expect(
+      metadataBelongsToOrganization({ org: "org_other" }, "org_workspace")
+    ).toBe(false);
+  });
+
+  it("rejects missing or non-string metadata", () => {
+    expect(metadataBelongsToOrganization({}, "org_workspace")).toBe(false);
+    expect(metadataBelongsToOrganization({ org: 42 }, "org_workspace")).toBe(
+      false
+    );
+    expect(metadataBelongsToOrganization(null, "org_workspace")).toBe(false);
+  });
+});
 
 describe("classifyPolarRevokeFailure", () => {
   it("treats Polar's already-canceled and missing-subscription answers as achieved", () => {

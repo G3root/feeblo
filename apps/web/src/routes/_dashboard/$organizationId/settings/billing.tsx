@@ -13,7 +13,8 @@ import { Separator } from "@feeblo/ui/separator";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useMachine } from "@xstate/react";
+import { useState } from "react";
 import { z } from "zod";
 
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
@@ -25,6 +26,10 @@ import {
   startBillingCheckout,
   startBillingPortal,
 } from "~/features/billing/lib/checkout";
+import {
+  checkoutConfirmationMachine,
+  toCheckoutConfirmationStatus,
+} from "~/features/billing/lib/checkout-confirmation-machine";
 import {
   type BillingInterval,
   buildPlanCards,
@@ -86,9 +91,6 @@ function BillingSettingsContent({
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
   const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);
-  const [confirmationStatus, setConfirmationStatus] = useState<
-    "pending" | "delayed" | "error"
-  >("pending");
 
   const catalog = usePlanCatalog();
 
@@ -98,43 +100,17 @@ function BillingSettingsContent({
   const currentPlan = plans.find((plan) => plan.planType === currentPlanType);
   const hasPaidPlan = currentPlanType !== "free";
 
-  useEffect(() => {
-    if (!(search.checkout_id && !hasPaidPlan)) {
-      return;
+  const [confirmationSnapshot, sendConfirmation] = useMachine(
+    checkoutConfirmationMachine,
+    {
+      input: {
+        checkoutId: search.checkout_id ?? null,
+        organizationId,
+        plan: currentSubscribedPlan.data?.plan,
+      },
     }
-
-    setConfirmationStatus("pending");
-    let attempts = 0;
-    const timer = window.setInterval(() => {
-      attempts += 1;
-      dashboardCollections.workspacePlanCollection.utils
-        // `throwOnError` is what makes the catch reachable: without it the
-        // refetch resolves with the error in the result and the alert would
-        // stay on "pending" through a network failure.
-        .refetch({ throwOnError: true })
-        .catch(() => setConfirmationStatus("error"));
-      if (attempts >= 10) {
-        window.clearInterval(timer);
-        setConfirmationStatus("delayed");
-      }
-    }, 3000);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [hasPaidPlan, search.checkout_id]);
-
-  const refreshCheckoutConfirmation = async () => {
-    setConfirmationStatus("pending");
-    try {
-      await dashboardCollections.workspacePlanCollection.utils.refetch({
-        throwOnError: true,
-      });
-      setConfirmationStatus("delayed");
-    } catch {
-      setConfirmationStatus("error");
-    }
-  };
+  );
+  const confirmationStatus = toCheckoutConfirmationStatus(confirmationSnapshot);
 
   return (
     <SettingsLayout.Root size="large">
@@ -146,10 +122,10 @@ function BillingSettingsContent({
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <div className="space-y-6">
-          {search.checkout_id ? (
+          {confirmationStatus !== "hidden" ? (
             <Alert
               variant={
-                hasPaidPlan
+                confirmationStatus === "confirmed"
                   ? "success"
                   : confirmationStatus === "error"
                     ? "error"
@@ -157,7 +133,7 @@ function BillingSettingsContent({
               }
             >
               <AlertTitle>
-                {hasPaidPlan
+                {confirmationStatus === "confirmed"
                   ? "Subscription activated"
                   : confirmationStatus === "delayed"
                     ? "Subscription confirmation is taking longer than expected"
@@ -166,16 +142,17 @@ function BillingSettingsContent({
                       : "Checkout completed — confirming your subscription"}
               </AlertTitle>
               <AlertDescription>
-                {hasPaidPlan
-                  ? `This workspace now has the ${PLAN_COPY[currentPlanType].name} plan.`
+                {confirmationStatus === "confirmed"
+                  ? `This workspace now has the ${PLAN_COPY[confirmationSnapshot.context.plan ?? currentPlanType].name} plan.`
                   : confirmationStatus === "pending"
                     ? "Polar is confirming the subscription. This page will update automatically; it can take a few seconds."
                     : "Your checkout may still be processing. Refresh the subscription status to try again."}
               </AlertDescription>
-              {!hasPaidPlan && confirmationStatus !== "pending" ? (
+              {confirmationStatus === "delayed" ||
+              confirmationStatus === "error" ? (
                 <Button
                   className="mt-3"
-                  onClick={refreshCheckoutConfirmation}
+                  onClick={() => sendConfirmation({ type: "RETRY" })}
                   size="sm"
                   type="button"
                   variant="outline"
