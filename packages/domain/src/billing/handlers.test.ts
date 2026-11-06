@@ -11,7 +11,7 @@ import * as Option from "effect/Option";
 import { CurrentSession, type Session } from "../session-middleware";
 import { BillingRpcHandlersEffect } from "./handlers";
 import { BillingRepository } from "./repository";
-import { PolarService } from "./service";
+import { PolarService, readCheckoutSubscription } from "./service";
 import {
   makeSubscriptionPayload,
   type SubscriptionPayload,
@@ -22,14 +22,22 @@ const dateAt = (instant: string | number | Date): Date =>
   DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 /**
- * What the fake Polar service answers for the checkout-confirmation read.
- * Effect-free on purpose, like the revocation fake: a test sets it before the
+ * The Polar answers the fake service feeds the real
+ * `readCheckoutSubscription` — the same ownership checks production runs.
+ * Effect-free on purpose, like the revocation fake: a test sets them before the
  * single call under test.
  */
-let confirmedSubscription: Option.Option<{
-  subscription: SubscriptionPayload;
-  eventTimestamp: Date;
-}> = Option.none();
+type CheckoutConfirmationFixture = {
+  checkoutMetadata: unknown;
+  subscription: SubscriptionPayload | null;
+  subscriptionId: string | null;
+};
+
+let checkoutConfirmation: CheckoutConfirmationFixture = {
+  checkoutMetadata: {},
+  subscription: null,
+  subscriptionId: null,
+};
 
 describe("BillingRpcHandlers", () => {
   type Fixture = {
@@ -97,7 +105,22 @@ describe("BillingRpcHandlers", () => {
     createPortal: ({ customerId }: { customerId: string }) =>
       Effect.succeed({ url: `https://sandbox.polar.sh/portal/${customerId}` }),
     revokeSubscription: () => Effect.void,
-    findSubscriptionForCheckout: () => Effect.sync(() => confirmedSubscription),
+    findSubscriptionForCheckout: (args) =>
+      readCheckoutSubscription(
+        {
+          getCheckout: async () => ({
+            subscription_id: checkoutConfirmation.subscriptionId,
+            metadata: checkoutConfirmation.checkoutMetadata,
+          }),
+          getSubscription: async () => {
+            if (checkoutConfirmation.subscription === null) {
+              throw new Error("The test did not provide a subscription");
+            }
+            return checkoutConfirmation.subscription;
+          },
+        },
+        args
+      ),
   });
   const TestLayer = Layer.mergeAll(
     BillingRepository.layer.pipe(Layer.provide(PolarServiceTest)),
@@ -344,14 +367,18 @@ describe("BillingRpcHandlers", () => {
           metadata: { plan: "starter", variant: "monthly" },
         });
 
-        confirmedSubscription = Option.some({
-          subscription: makeSubscriptionPayload({
-            externalSubscriptionId: "sub_checkout_confirmed",
-            organizationId: fixture.organizationId,
-            productId: "prod_checkout_confirm",
-          }),
-          eventTimestamp: dateAt("2026-01-02T00:00:00.000Z"),
-        });
+        checkoutConfirmation = {
+          checkoutMetadata: { org: fixture.organizationId },
+          subscription: {
+            ...makeSubscriptionPayload({
+              externalSubscriptionId: "sub_checkout_confirmed",
+              organizationId: fixture.organizationId,
+              productId: "prod_checkout_confirm",
+            }),
+            modified_at: "2026-01-02T00:00:00.000Z",
+          },
+          subscriptionId: "sub_checkout_confirmed",
+        };
 
         yield* handlers
           .ConfirmBillingCheckout({
@@ -377,6 +404,96 @@ describe("BillingRpcHandlers", () => {
       })
     );
 
+    it.effect("does not persist a checkout stamped for another workspace", () =>
+      Effect.gen(function* () {
+        const handlers = yield* BillingRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        checkoutConfirmation = {
+          checkoutMetadata: { org: "org_other" },
+          subscription: makeSubscriptionPayload({
+            externalSubscriptionId: "sub_checkout_foreign",
+            organizationId: fixture.organizationId,
+            productId: "prod_checkout_confirm",
+          }),
+          subscriptionId: "sub_checkout_foreign",
+        };
+
+        const error = yield* Effect.flip(
+          handlers
+            .ConfirmBillingCheckout({
+              organizationId: fixture.organizationId,
+              checkoutId: "checkout_foreign",
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                makeSession(fixture, "owner")
+              )
+            )
+        );
+
+        expect(error._tag).toBe("BadRequestError");
+
+        const rows = yield* db
+          .select({ id: schema.subscriptionTable.id })
+          .from(schema.subscriptionTable)
+          .where(
+            eq(schema.subscriptionTable.organizationId, fixture.organizationId)
+          );
+        expect(rows).toHaveLength(0);
+      })
+    );
+
+    it.effect(
+      "does not persist a subscription stamped for another workspace",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* BillingRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+
+          checkoutConfirmation = {
+            checkoutMetadata: { org: fixture.organizationId },
+            subscription: makeSubscriptionPayload({
+              externalSubscriptionId: "sub_checkout_foreign_metadata",
+              organizationId: fixture.organizationId,
+              metadata: { org: "org_other" },
+              productId: "prod_checkout_confirm",
+            }),
+            subscriptionId: "sub_checkout_foreign_metadata",
+          };
+
+          const error = yield* Effect.flip(
+            handlers
+              .ConfirmBillingCheckout({
+                organizationId: fixture.organizationId,
+                checkoutId: "checkout_foreign_metadata",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, "owner")
+                )
+              )
+          );
+
+          expect(error._tag).toBe("FailedToConfirmBillingCheckoutError");
+
+          const rows = yield* db
+            .select({ id: schema.subscriptionTable.id })
+            .from(schema.subscriptionTable)
+            .where(
+              eq(
+                schema.subscriptionTable.organizationId,
+                fixture.organizationId
+              )
+            );
+          expect(rows).toHaveLength(0);
+        })
+    );
+
     it.effect(
       "leaves the subscription alone when a checkout has none yet",
       () =>
@@ -385,7 +502,11 @@ describe("BillingRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const db = yield* currentDb;
 
-          confirmedSubscription = Option.none();
+          checkoutConfirmation = {
+            checkoutMetadata: { org: fixture.organizationId },
+            subscription: null,
+            subscriptionId: null,
+          };
 
           yield* handlers
             .ConfirmBillingCheckout({

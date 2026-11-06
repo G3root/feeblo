@@ -13,16 +13,19 @@ import { isPaidPlan, type PlanType } from "./plans";
  * The page used to hold this in one `useState` and a `setInterval`: a status of
  * `pending | delayed | error`, an immediate `ConfirmBillingCheckout` call, and
  * ten 3-second refetches before giving up. That encoded a real state graph —
- * a confirmation request, a bounded poll, and two ways to stop early (the plan
- * becomes paid, or a refetch fails) — but nothing said so, and the interval
- * kept firing after an error even though the UI already offered a retry.
+ * a confirmation request, a bounded poll, and the ways the poll can settle —
+ * but nothing said so, and the interval kept firing after an error even though
+ * the UI already offered a retry.
  *
  * Declaring it buys the same three things the slug machine gets:
  *
- * - Leaving `active` stops both invoked actors, so a plan read that the
- *   machine already superseded cannot land and flip the page back.
- * - The poll interval is `waiting`'s `after`, and the attempt bound is the
- *   edge out of `refetching`; there is no separate counter to clear.
+ * - Reaching `confirmed` leaves `active` and stops both invoked actors, so a
+ *   plan read that the machine already superseded cannot land. A failed or
+ *   timed-out read stays inside `active`: the confirmation RPC keeps running,
+ *   because that is the call that persists the subscription.
+ * - The poll interval is `waiting`'s `after`, the read deadline is the
+ *   invoke's `timeout`, and the attempt bound is the edge out of
+ *   `refetching`; there is no separate counter to clear.
  * - `RETRY` is one transition back to `active`, which both re-confirms with
  *   Polar and restarts the poll. The button and the automatic flow cannot
  *   drift apart.
@@ -71,6 +74,13 @@ const CHECKOUT_POLL_INTERVAL_MS = 3000;
 const CHECKOUT_POLL_ATTEMPTS = 10;
 
 /**
+ * How long one read may take before it counts as an empty read. A stalled
+ * `refetch` has no deadline of its own, and without this the machine would sit
+ * on `pending` forever instead of reaching the delayed state the page shows.
+ */
+const CHECKOUT_READ_TIMEOUT_MS = 10_000;
+
+/**
  * The two browser calls this lifecycle makes, injected so a test can drive the
  * real interpreter without a module mock.
  */
@@ -81,6 +91,19 @@ type CheckoutConfirmationDependencies = {
   ) => Promise<void>;
   readonly readPlan: (organizationId: string) => PlanType | undefined;
   readonly refetchPlan: () => Promise<void>;
+};
+
+/**
+ * The transition an empty or timed-out plan read takes. Both are "no plan
+ * yet": count the attempt, wait, and stop at the bound rather than reporting
+ * an error the buyer cannot act on. A read that actually rejects still goes to
+ * `#checkoutError`.
+ */
+const emptyPlanRead = (context: CheckoutConfirmationContext) => {
+  const attempts = context.attempts + 1;
+  const target =
+    attempts >= CHECKOUT_POLL_ATTEMPTS ? "#checkoutDelayed" : "waiting";
+  return { context: { attempts }, target };
 };
 
 /**
@@ -177,6 +200,7 @@ export const createCheckoutConfirmationMachine = ({
               : { target: "active" },
       },
       active: {
+        id: "active",
         type: "parallel",
         states: {
           // Polar is asked once, in parallel with the poll. Its failure is
@@ -216,29 +240,28 @@ export const createCheckoutConfirmationMachine = ({
                   }) => ({
                     organizationId: context.organizationId,
                   }),
+                  timeout: CHECKOUT_READ_TIMEOUT_MS,
                   onDone: ({
                     context,
                     event,
                   }: {
                     context: CheckoutConfirmationContext;
                     event: PlanCheckSettledEvent;
-                  }) => {
-                    if (isPaidPlan(event.output.plan)) {
-                      return {
-                        context: { plan: event.output.plan },
-                        target: "#confirmed",
-                      };
-                    }
-                    const attempts = context.attempts + 1;
-                    return {
-                      context: { attempts },
-                      target:
-                        attempts >= CHECKOUT_POLL_ATTEMPTS
-                          ? "#delayed"
-                          : "waiting",
-                    };
-                  },
-                  onError: { target: "#error" },
+                  }) =>
+                    isPaidPlan(event.output.plan)
+                      ? {
+                          context: { plan: event.output.plan },
+                          target: "#confirmed",
+                        }
+                      : emptyPlanRead(context),
+                  // A stalled read is a poll attempt that produced no answer,
+                  // not a page-level error: count it and try again.
+                  onTimeout: ({
+                    context,
+                  }: {
+                    context: CheckoutConfirmationContext;
+                  }) => emptyPlanRead(context),
+                  onError: { target: "#checkoutError" },
                 },
               },
               waiting: {
@@ -246,23 +269,26 @@ export const createCheckoutConfirmationMachine = ({
                   [CHECKOUT_POLL_INTERVAL_MS]: { target: "refetching" },
                 },
               },
+              // Both terminal poll outcomes stay inside `active`, so the
+              // confirmation RPC is never aborted just because a read failed.
+              // `RETRY` re-enters `active`, which re-runs both regions.
+              delayed: {
+                id: "checkoutDelayed",
+                on: {
+                  RETRY: { context: { attempts: 0 }, target: "#active" },
+                },
+              },
+              error: {
+                id: "checkoutError",
+                on: {
+                  RETRY: { context: { attempts: 0 }, target: "#active" },
+                },
+              },
             },
           },
         },
       },
       confirmed: { id: "confirmed" },
-      delayed: {
-        id: "delayed",
-        on: {
-          RETRY: { context: { attempts: 0 }, target: "active" },
-        },
-      },
-      error: {
-        id: "error",
-        on: {
-          RETRY: { context: { attempts: 0 }, target: "active" },
-        },
-      },
     },
   });
 
@@ -318,8 +344,8 @@ export const toCheckoutConfirmationStatus = (
   snapshot: CheckoutConfirmationSnapshot
 ): CheckoutConfirmationStatus => {
   if (snapshot.matches("confirmed")) return "confirmed";
-  if (snapshot.matches("delayed")) return "delayed";
-  if (snapshot.matches("error")) return "error";
+  if (snapshot.matches("#checkoutDelayed")) return "delayed";
+  if (snapshot.matches("#checkoutError")) return "error";
   if (snapshot.matches("active")) return "pending";
   if (snapshot.context.checkoutId === null) return "hidden";
   // `useMachine` starts the actor in an effect, so the first paint still holds

@@ -1,4 +1,3 @@
-import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -13,7 +12,6 @@ import { Separator } from "@feeblo/ui/separator";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMachine } from "@xstate/react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -22,14 +20,11 @@ import {
   CurrentPlanStat,
   PlanGridSkeleton,
 } from "~/features/billing/components/billing-plan-summary";
+import { CheckoutConfirmationAlert } from "~/features/billing/components/checkout-confirmation-alert";
 import {
   startBillingCheckout,
   startBillingPortal,
 } from "~/features/billing/lib/checkout";
-import {
-  checkoutConfirmationMachine,
-  toCheckoutConfirmationStatus,
-} from "~/features/billing/lib/checkout-confirmation-machine";
 import {
   type BillingInterval,
   buildPlanCards,
@@ -100,18 +95,6 @@ function BillingSettingsContent({
   const currentPlan = plans.find((plan) => plan.planType === currentPlanType);
   const hasPaidPlan = currentPlanType !== "free";
 
-  const [confirmationSnapshot, sendConfirmation] = useMachine(
-    checkoutConfirmationMachine,
-    {
-      input: {
-        checkoutId: search.checkout_id ?? null,
-        organizationId,
-        plan: currentSubscribedPlan.data?.plan,
-      },
-    }
-  );
-  const confirmationStatus = toCheckoutConfirmationStatus(confirmationSnapshot);
-
   return (
     <SettingsLayout.Root size="large">
       <SettingsLayout.Header>
@@ -122,45 +105,16 @@ function BillingSettingsContent({
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <div className="space-y-6">
-          {confirmationStatus !== "hidden" ? (
-            <Alert
-              variant={
-                confirmationStatus === "confirmed"
-                  ? "success"
-                  : confirmationStatus === "error"
-                    ? "error"
-                    : "info"
-              }
-            >
-              <AlertTitle>
-                {confirmationStatus === "confirmed"
-                  ? "Subscription activated"
-                  : confirmationStatus === "delayed"
-                    ? "Subscription confirmation is taking longer than expected"
-                    : confirmationStatus === "error"
-                      ? "Could not refresh subscription status"
-                      : "Checkout completed — confirming your subscription"}
-              </AlertTitle>
-              <AlertDescription>
-                {confirmationStatus === "confirmed"
-                  ? `This workspace now has the ${PLAN_COPY[confirmationSnapshot.context.plan ?? currentPlanType].name} plan.`
-                  : confirmationStatus === "pending"
-                    ? "Polar is confirming the subscription. This page will update automatically; it can take a few seconds."
-                    : "Your checkout may still be processing. Refresh the subscription status to try again."}
-              </AlertDescription>
-              {confirmationStatus === "delayed" ||
-              confirmationStatus === "error" ? (
-                <Button
-                  className="mt-3"
-                  onClick={() => sendConfirmation({ type: "RETRY" })}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  Refresh status
-                </Button>
-              ) : null}
-            </Alert>
+          {/* Keyed so a changed checkout id or workspace remounts the machine
+              instead of reusing the previous id in the retry path; removing
+              the id unmounts the alert entirely. */}
+          {search.checkout_id ? (
+            <CheckoutConfirmationAlert
+              key={`${organizationId}:${search.checkout_id}`}
+              checkoutId={search.checkout_id}
+              organizationId={organizationId}
+              plan={currentSubscribedPlan.data?.plan}
+            />
           ) : null}
           <Card className="border-border border shadow-none ring-0">
             <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">

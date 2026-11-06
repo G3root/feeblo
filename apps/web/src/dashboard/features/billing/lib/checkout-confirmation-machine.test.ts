@@ -15,9 +15,10 @@ import type { PlanType } from "./plans";
  * interpreter, the `after` scheduling and the actor cancellation are all real.
  *
  * The behaviours worth pinning are the ones the old `setInterval` arranged by
- * hand: the first read is immediate, ten empty reads mean "delayed", a failed
- * read is a retryable error, and a confirmation failure does not stop the
- * webhook from being picked up by the poll.
+ * hand: the first read is immediate, ten empty reads mean "delayed", a stalled
+ * read has a deadline instead of hanging the page, a failed read is a retryable
+ * error that does not abort an in-flight confirmation, and a confirmation
+ * failure does not stop the webhook from being picked up by the poll.
  */
 
 type Actor = ReturnType<typeof createActor>;
@@ -32,28 +33,48 @@ const statusOf = (actor: Actor) =>
 
 describe("checkout confirmation machine", () => {
   let confirmCalls: { checkoutId: string | null; organizationId: string }[];
+  let confirmSignals: AbortSignal[];
+  let confirmCompleted: number;
+  let holdConfirm: boolean;
+  let pendingConfirms: (() => void)[];
   let plan: PlanType | undefined;
   let confirmError: Error | null;
   let refetchError: Error | null;
   let refetchCount: number;
+  let stalledRefetch: boolean;
   let machine: ReturnType<typeof createCheckoutConfirmationMachine>;
 
   beforeEach(() => {
     confirmCalls = [];
+    confirmSignals = [];
+    confirmCompleted = 0;
+    holdConfirm = false;
+    pendingConfirms = [];
     plan = undefined;
     confirmError = null;
     refetchError = null;
     refetchCount = 0;
+    stalledRefetch = false;
     machine = createCheckoutConfirmationMachine({
-      confirmCheckout: async (input) => {
+      confirmCheckout: async (input, signal) => {
         confirmCalls.push(input);
+        confirmSignals.push(signal);
+        if (holdConfirm) {
+          await new Promise<void>((resolve) => pendingConfirms.push(resolve));
+        }
         if (confirmError) {
           throw confirmError;
         }
+        confirmCompleted += 1;
       },
       readPlan: () => plan,
       refetchPlan: async () => {
         refetchCount += 1;
+        if (stalledRefetch) {
+          // Never settles: the invoke's `timeout` is the only way out.
+          await new Promise<void>(() => undefined);
+          return;
+        }
         if (refetchError) {
           const error = refetchError;
           refetchError = null;
@@ -149,6 +170,36 @@ describe("checkout confirmation machine", () => {
 
     await vi.advanceTimersByTimeAsync(10_000);
     expect(refetchCount).toBe(10);
+  });
+
+  it("counts a stalled read as an attempt and still settles as delayed", async () => {
+    stalledRefetch = true;
+    const actor = start();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Ten attempts, each ending in the 10s deadline, with a 3s wait between
+    // nine of them. The tenth settles delayed instead of waiting again.
+    await vi.advanceTimersByTimeAsync(10 * 10_000 + 9 * 3000 + 1000);
+
+    expect(refetchCount).toBe(10);
+    expect(statusOf(actor)).toBe("delayed");
+  });
+
+  it("keeps an in-flight confirmation alive when a read fails", async () => {
+    refetchError = new Error("network");
+    holdConfirm = true;
+    const actor = start();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The poll error is a page-level error, but it stays inside `active`: the
+    // confirmation actor is not stopped, so its upsert can still land.
+    expect(statusOf(actor)).toBe("error");
+    expect(confirmSignals[0]?.aborted).toBe(false);
+
+    pendingConfirms[0]?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(confirmCompleted).toBe(1);
+    expect(confirmSignals[0]?.aborted).toBe(false);
   });
 
   it("surfaces a failed read as an error the page can retry", async () => {
