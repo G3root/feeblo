@@ -44,6 +44,7 @@ import { Route as SPSlugRouteImport } from "./routes/s/p/$slug"
 import { Route as SRoadmapIndexRouteImport } from "./routes/s/roadmap/index"
 import { Route as SRoadmapSlugRouteImport } from "./routes/s/roadmap/$slug"
 import { Route as DashboardOrganizationIdDashboardLayoutIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/index"
+import { Route as DashboardOrganizationIdDashboardLayoutInsightsRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/insights"
 import { Route as DashboardOrganizationIdSettingsIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/index"
 import { Route as DashboardOrganizationIdSettingsBillingRouteImport } from "./routes/_dashboard/$organizationId/settings/billing"
 import { Route as DashboardOrganizationIdSettingsChangelogCategoriesRouteImport } from "./routes/_dashboard/$organizationId/settings/changelog-categories"
@@ -265,6 +266,12 @@ const DashboardOrganizationIdDashboardLayoutIndexRoute =
   DashboardOrganizationIdDashboardLayoutIndexRouteImport.update({
     id: "/",
     path: "/",
+    getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
+  } as any)
+const DashboardOrganizationIdDashboardLayoutInsightsRoute =
+  DashboardOrganizationIdDashboardLayoutInsightsRouteImport.update({
+    id: "/insights",
+    path: "/insights",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
 const DashboardOrganizationIdSettingsIndexRoute =
@@ -573,6 +580,7 @@ export interface FileRoutesByFullPath {
   "/s/roadmap/$slug": typeof SRoadmapSlugRoute
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
+  "/$organizationId/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -650,6 +658,7 @@ export interface FileRoutesByTo {
   "/s/roadmap/$slug": typeof SRoadmapSlugRoute
   "/s/changelog": typeof SChangelogIndexRoute
   "/s/roadmap": typeof SRoadmapIndexRoute
+  "/$organizationId/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -731,6 +740,7 @@ export interface FileRoutesById {
   "/s/roadmap/$slug": typeof SRoadmapSlugRoute
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
+  "/_dashboard/$organizationId/_dashboard-layout/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/_dashboard/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/_dashboard/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/_dashboard/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -812,6 +822,7 @@ export interface FileRouteTypes {
     | "/s/roadmap/$slug"
     | "/s/changelog/"
     | "/s/roadmap/"
+    | "/$organizationId/insights"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -889,6 +900,7 @@ export interface FileRouteTypes {
     | "/s/roadmap/$slug"
     | "/s/changelog"
     | "/s/roadmap"
+    | "/$organizationId/insights"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -969,6 +981,7 @@ export interface FileRouteTypes {
     | "/s/roadmap/$slug"
     | "/s/changelog/"
     | "/s/roadmap/"
+    | "/_dashboard/$organizationId/_dashboard-layout/insights"
     | "/_dashboard/$organizationId/settings/billing"
     | "/_dashboard/$organizationId/settings/changelog-categories"
     | "/_dashboard/$organizationId/settings/changelog-privacy"
@@ -1274,6 +1287,13 @@ declare module "@tanstack/react-router" {
       path: "/"
       fullPath: "/$organizationId/"
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRouteImport
+      parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
+    }
+    "/_dashboard/$organizationId/_dashboard-layout/insights": {
+      id: "/_dashboard/$organizationId/_dashboard-layout/insights"
+      path: "/insights"
+      fullPath: "/$organizationId/insights"
+      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
     "/_dashboard/$organizationId/settings/": {
@@ -1635,6 +1655,7 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface DashboardOrganizationIdDashboardLayoutRouteChildren {
+  DashboardOrganizationIdDashboardLayoutInsightsRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   DashboardOrganizationIdDashboardLayoutIndexRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   DashboardOrganizationIdDashboardLayoutChangelogDraftRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogDraftRoute
   DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute
@@ -1659,6 +1680,8 @@ interface DashboardOrganizationIdDashboardLayoutRouteChildren {
 
 const DashboardOrganizationIdDashboardLayoutRouteChildren: DashboardOrganizationIdDashboardLayoutRouteChildren =
   {
+    DashboardOrganizationIdDashboardLayoutInsightsRoute:
+      DashboardOrganizationIdDashboardLayoutInsightsRoute,
     DashboardOrganizationIdDashboardLayoutIndexRoute:
       DashboardOrganizationIdDashboardLayoutIndexRoute,
     DashboardOrganizationIdDashboardLayoutChangelogDraftRoute:

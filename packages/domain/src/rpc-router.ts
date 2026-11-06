@@ -17,6 +17,7 @@ import { ContactRpcHandlers } from "./contact/handlers";
 import { DataTransferRpcHandlers } from "./data-transfer/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { EmailSuppressionRpcHandlers } from "./email-suppression/handlers";
+import { InsightsRpcHandlers } from "./insights/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
@@ -72,6 +73,7 @@ export const RpcHandlerRegistrations = {
   ChangelogPost: ChangelogPostRpcHandlers,
   ChangelogCategory: ChangelogCategoryRpcHandlers,
   ChangelogSubscription: ChangelogSubscriptionRpcHandlers,
+  Insights: InsightsRpcHandlers,
   JwtSecret: JwtSecretRpcHandlers,
   ApiKey: ApiKeyRpcHandlers,
   Membership: MembershipRpcHandlers,

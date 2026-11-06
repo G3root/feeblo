@@ -27,6 +27,7 @@ import {
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
 import {
+  Analytics01Icon,
   Building06Icon,
   Delete02Icon,
   Edit,
@@ -88,6 +89,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   >
                     <HugeiconsIcon icon={Home} />
                     <span>Dashboard</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/insights`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/insights"
+                  >
+                    <HugeiconsIcon icon={Analytics01Icon} />
+                    <span>Insights</span>
                   </Link>
                 )}
               />
