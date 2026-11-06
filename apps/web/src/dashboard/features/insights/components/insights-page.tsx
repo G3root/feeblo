@@ -159,7 +159,19 @@ function InsightsContent({
   const days = INSIGHTS_RANGE_DAYS[range];
   const rangeLabel = RANGE_LABELS[range];
 
-  if (summary.activePosts === 0 && summary.posts === 0) {
+  // A workspace can have no active posts and nothing new in the window and
+  // still have real data: votes on posts that were later archived, merges, or
+  // changelog followers. Only the completely empty workspace gets the
+  // first-run state.
+  const hasActivity =
+    summary.activePosts > 0 ||
+    summary.posts > 0 ||
+    summary.votes > 0 ||
+    summary.mergedPosts > 0 ||
+    subscriptions.posts > 0 ||
+    subscriptions.changelog > 0;
+
+  if (!hasActivity) {
     return (
       <Empty className="border">
         <EmptyHeader>
@@ -241,10 +253,13 @@ function InsightsSummaryCards({
     summary.respondedPosts === 0
       ? "No post has been answered yet"
       : `median over ${plural(summary.respondedPosts, "answered post")}`;
+  // Two separate quantities: a post merged in the window may have been
+  // created before it, so "N of M new posts" would describe a rate the data
+  // does not support.
   const mergeDetail =
-    summary.posts === 0
+    summary.posts === 0 && summary.mergedPosts === 0
       ? "No posts in this window"
-      : `${summary.mergedPosts} of ${plural(summary.posts, "new post")} merged into another`;
+      : `${plural(summary.mergedPosts, "merged post")} · ${plural(summary.posts, "new post")}`;
 
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

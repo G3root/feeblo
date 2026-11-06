@@ -31,77 +31,40 @@ export const InsightsRpcHandlersEffect = Effect.gen(function* () {
         const sinceDate = DateTime.toDate(since);
         const untilDate = DateTime.toDate(now);
 
-        const [
-          summary,
-          firstResponse,
-          volume,
-          statusMix,
-          untouchedPosts,
-          topBoards,
-          topTags,
-          topVoters,
-          subscriptions,
-        ] = yield* Effect.all(
-          [
-            repository.summary({
-              organizationId: args.organizationId,
-              since: sinceDate,
-            }),
-            repository.firstResponse({
-              organizationId: args.organizationId,
-              since: sinceDate,
-            }),
-            repository.volume({
-              organizationId: args.organizationId,
-              since: sinceDate,
-              until: untilDate,
-            }),
-            repository.statusMix({ organizationId: args.organizationId }),
-            repository.untouchedPosts({
-              organizationId: args.organizationId,
-              limit: UNTOUCHED_POST_LIMIT,
-            }),
-            repository.topBoards({
-              organizationId: args.organizationId,
-              since: sinceDate,
-            }),
-            repository.topTags({
-              organizationId: args.organizationId,
-              since: sinceDate,
-            }),
-            repository.topVoters({
-              organizationId: args.organizationId,
-              since: sinceDate,
-            }),
-            repository.subscriptions({ organizationId: args.organizationId }),
-          ],
-          { concurrency: "unbounded" }
-        );
+        // One snapshot, not nine reads that can disagree with each other.
+        const reads = yield* repository.readWindow({
+          organizationId: args.organizationId,
+          since: sinceDate,
+          until: untilDate,
+          limit: UNTOUCHED_POST_LIMIT,
+        });
 
         return {
           range: args.range,
           since: sinceDate,
           until: untilDate,
           summary: {
-            ...summary,
-            respondedPosts: firstResponse.respondedPosts,
+            ...reads.summary,
+            respondedPosts: reads.firstResponse.respondedPosts,
             medianFirstResponseSeconds:
-              firstResponse.medianFirstResponseSeconds,
+              reads.firstResponse.medianFirstResponseSeconds,
             // A rate over zero posts has no value; zero would read as "nothing
             // was merged", which is a claim this window cannot make.
             mergeRate:
-              summary.posts === 0 ? null : summary.mergedPosts / summary.posts,
+              reads.summary.posts === 0
+                ? null
+                : reads.summary.mergedPosts / reads.summary.posts,
           },
           // The sql client types a result's rows as readonly; the response
           // schema's arrays are mutable, and the extra copy is a page's worth
           // of a few dozen rows.
-          volume: [...volume.rows],
-          statusMix,
-          untouchedPosts: [...untouchedPosts.rows],
-          topBoards: [...topBoards.rows],
-          topTags: [...topTags.rows],
-          topVoters: [...topVoters.rows],
-          subscriptions,
+          volume: [...reads.volume.rows],
+          statusMix: reads.statusMix,
+          untouchedPosts: [...reads.untouchedPosts.rows],
+          topBoards: [...reads.topBoards.rows],
+          topTags: [...reads.topTags.rows],
+          topVoters: [...reads.topVoters.rows],
+          subscriptions: reads.subscriptions,
         };
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),

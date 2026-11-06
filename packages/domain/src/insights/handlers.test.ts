@@ -159,11 +159,16 @@ describe("InsightsRpcHandlers", () => {
       return id;
     });
 
-  const addStatusChange = (fixture: Fixture, postId: string, at: Date) =>
+  const addStatusChange = (
+    fixture: Fixture,
+    postId: string,
+    at: Date,
+    suffix: string
+  ) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       yield* db.insert(schema.postActivityTable).values({
-        id: `activity_status_${postId}`,
+        id: `activity_status_${postId}_${suffix}`,
         organizationId: fixture.organizationId,
         postId,
         actorId: fixture.userId,
@@ -235,6 +240,13 @@ describe("InsightsRpcHandlers", () => {
             createdAt: tenDaysAgo,
             updatedAt: tenDaysAgo,
           });
+          // Dated after the request's `until`: the window ends now, so a row
+          // from the future is not part of it.
+          const tomorrow = DateTime.toDate(DateTime.add({ days: 1 })(now));
+          yield* addPost(fixture, "future", {
+            createdAt: tomorrow,
+            updatedAt: tomorrow,
+          });
           yield* addVote(fixture, recentPost, "recent");
           yield* addVote(fixture, oldPost, "old");
 
@@ -258,8 +270,10 @@ describe("InsightsRpcHandlers", () => {
           // not when its post was written.
           expect(week.summary.votes).toBe(2);
           expect(month.summary.votes).toBe(2);
-          expect(month.summary.activePosts).toBe(2);
-          expect(month.summary.unassignedPosts).toBe(2);
+          // Current state has no window: the future-dated post exists now,
+          // even though it is outside the window's counts.
+          expect(month.summary.activePosts).toBe(3);
+          expect(month.summary.unassignedPosts).toBe(3);
         })
       );
 
@@ -283,15 +297,31 @@ describe("InsightsRpcHandlers", () => {
             createdAt,
             updatedAt: createdAt,
           });
+          // Each post gets a later change too, so a median built from the
+          // latest (or the maximum) would report 5h instead of 1.5h.
           yield* addStatusChange(
             fixture,
             slow,
-            DateTime.toDate(DateTime.add({ hours: 4 })(created))
+            DateTime.toDate(DateTime.add({ hours: 4 })(created)),
+            "later"
+          );
+          yield* addStatusChange(
+            fixture,
+            slow,
+            DateTime.toDate(DateTime.add({ hours: 1 })(created)),
+            "earlier"
           );
           yield* addStatusChange(
             fixture,
             fast,
-            DateTime.toDate(DateTime.add({ hours: 2 })(created))
+            DateTime.toDate(DateTime.add({ hours: 2 })(created)),
+            "first"
+          );
+          yield* addStatusChange(
+            fixture,
+            fast,
+            DateTime.toDate(DateTime.add({ hours: 6 })(created)),
+            "later"
           );
 
           const insights = yield* handlers
@@ -302,7 +332,8 @@ describe("InsightsRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(insights.summary.respondedPosts).toBe(2);
-          expect(insights.summary.medianFirstResponseSeconds).toBe(3 * 60 * 60);
+          // Median of the first responses: 1h and 2h.
+          expect(insights.summary.medianFirstResponseSeconds).toBe(90 * 60);
         })
       );
 
@@ -374,9 +405,11 @@ describe("InsightsRpcHandlers", () => {
           const older = DateTime.toDate(DateTime.subtract({ days: 8 })(now));
           const newest = DateTime.toDate(DateTime.subtract({ days: 2 })(now));
 
+          // Edited recently but still has no assignee, status change, or
+          // comment: `updated_at` is not the measure of attention.
           const oldest = yield* addPost(fixture, "oldest", {
             createdAt: older,
-            updatedAt: older,
+            updatedAt: newest,
           });
           const touchedByStatus = yield* addPost(fixture, "status", {
             createdAt: older,
@@ -396,7 +429,12 @@ describe("InsightsRpcHandlers", () => {
             updatedAt: newest,
           });
 
-          yield* addStatusChange(fixture, touchedByStatus, daysBefore(now, 7));
+          yield* addStatusChange(
+            fixture,
+            touchedByStatus,
+            daysBefore(now, 7),
+            "first"
+          );
           const db = yield* currentDb;
           yield* db.insert(schema.commentTable).values({
             id: `comment_${touchedByComment}`,
@@ -461,7 +499,8 @@ describe("InsightsRpcHandlers", () => {
           const handlers = yield* InsightsRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const db = yield* currentDb;
-          const now = yield* DateTime.nowAsDate;
+          const clock = yield* DateTime.now;
+          const now = DateTime.toDate(clock);
 
           const secondBoardId = `board_second_${fixture.organizationId}`;
           yield* db.insert(schema.boardTable).values({
@@ -479,6 +518,13 @@ describe("InsightsRpcHandlers", () => {
             boardId: secondBoardId,
           });
           yield* addPost(fixture, "third", { boardId: secondBoardId });
+          // Past `until`, so it must not move the board's window totals.
+          const tomorrow = DateTime.toDate(DateTime.add({ days: 1 })(clock));
+          yield* addPost(fixture, "future", {
+            boardId: secondBoardId,
+            createdAt: tomorrow,
+            updatedAt: tomorrow,
+          });
 
           const tagId = `tag_${fixture.organizationId}`;
           yield* db.insert(schema.tagTable).values({

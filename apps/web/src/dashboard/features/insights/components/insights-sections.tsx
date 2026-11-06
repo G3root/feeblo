@@ -101,7 +101,11 @@ export function InsightsVolumeChart({
   readonly points: readonly InsightsPoint[];
   readonly title: string;
 }) {
-  const peak = Math.max(1, ...points.map((point) => point[metric]));
+  // The caption reports the actual maximum; the bar scale keeps a nonzero
+  // denominator so an inactive series renders as zeros instead of dividing by
+  // zero.
+  const peak = Math.max(0, ...points.map((point) => point[metric]));
+  const scale = Math.max(1, peak);
   const firstDay = points[0]?.date;
   const lastDay = points.at(-1)?.date;
 
@@ -125,7 +129,7 @@ export function InsightsVolumeChart({
                 className="bg-primary/30 hover:bg-primary/60 min-w-0 flex-1 rounded-t-[2px] transition-colors duration-150"
                 key={point.date}
                 style={{
-                  height: `${(value / peak) * 100}%`,
+                  height: `${(value / scale) * 100}%`,
                   minHeight: value > 0 ? 2 : 0,
                 }}
                 title={`${point.date}: ${value}`}
@@ -138,6 +142,44 @@ export function InsightsVolumeChart({
           <span>peak {numberFormatter.format(peak)}</span>
           <span>{lastDay}</span>
         </div>
+        {/*
+          The bars are a picture: their values live only in hover titles, which
+          neither a keyboard nor a screen reader reaches. The disclosure is the
+          same data as a real table, without changing the chart above it.
+        */}
+        <details className="mt-3">
+          <summary className="text-muted-foreground hover:text-foreground w-fit cursor-pointer text-xs underline-offset-4 transition-colors duration-150 hover:underline">
+            Daily values
+          </summary>
+          <table className="mt-2 w-full text-xs">
+            <caption className="sr-only">{title} by day, UTC</caption>
+            <thead>
+              <tr className="border-border text-muted-foreground border-b">
+                <th className="py-1 text-left font-medium" scope="col">
+                  Date
+                </th>
+                <th className="py-1 text-right font-medium" scope="col">
+                  {metric === "posts" ? "Posts" : "Votes"}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {points.map((point) => (
+                <tr key={point.date}>
+                  <th
+                    className="py-1 text-left font-normal tabular-nums"
+                    scope="row"
+                  >
+                    {point.date}
+                  </th>
+                  <td className="py-1 text-right tabular-nums">
+                    {numberFormatter.format(point[metric])}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       </CardPanel>
     </Card>
   );
