@@ -22,10 +22,15 @@ import {
   redirect,
   useNavigate,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMachine } from "@xstate/react";
+import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
 import { AuthShell } from "~/features/auth/components/auth-shell";
+import {
+  passwordResetMachine,
+  toPasswordResetStep,
+} from "~/features/auth/lib/password-reset-machine";
 
 const SearchSchema = z.object({
   redirectTo: z.string().optional(),
@@ -64,15 +69,17 @@ function RouteComponent() {
   const navigate = useNavigate({ from: "/reset-password" });
   const search = Route.useSearch();
   const { email } = Route.useLoaderData();
-  const [step, setStep] = useState<"otp" | "password">("otp");
-  const [otp, setOtp] = useState("");
+  // The step and the code it verified are one value, so the password form
+  // cannot render holding a code the previous step never produced.
+  const [snapshot, send] = useMachine(passwordResetMachine);
+  const reset = toPasswordResetStep(snapshot);
   const passwordHeadingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (step === "password") {
+    if (reset.step === "password") {
       passwordHeadingRef.current?.focus();
     }
-  }, [step]);
+  }, [reset.step]);
 
   const resendResetCode = useCallback(async () => {
     const response = await authClient.emailOtp.requestPasswordReset({
@@ -89,10 +96,7 @@ function RouteComponent() {
   const checkResetOtp = useCheckResetPasswordOtp({
     email,
     onUserNotFound: () => navigate({ to: "/forgot-password" }),
-    onVerified: (nextOtp) => {
-      setOtp(nextOtp);
-      setStep("password");
-    },
+    onVerified: (nextOtp) => send({ type: "VERIFIED", otp: nextOtp }),
   });
 
   const otpForm = useAppForm({
@@ -115,13 +119,20 @@ function RouteComponent() {
         onSubmit: undefined,
       });
 
+      // The form only renders in the `password` step, but this is what makes
+      // the code's presence a type-level guarantee rather than a render-time
+      // one: there is no way to submit without the code the first step verified.
+      if (reset.step !== "password") {
+        return;
+      }
+
       let response: Awaited<
         ReturnType<typeof authClient.emailOtp.resetPassword>
       >;
       try {
         response = await authClient.emailOtp.resetPassword({
           email,
-          otp,
+          otp: reset.otp,
           password: value.password,
         });
       } catch (error) {
@@ -150,7 +161,7 @@ function RouteComponent() {
             title: "This reset code is no longer valid. Request a new one.",
             type: "error",
           });
-          setStep("otp");
+          send({ type: "CODE_REJECTED" });
           return;
         }
 
@@ -189,7 +200,7 @@ function RouteComponent() {
     },
   });
 
-  if (step === "password") {
+  if (reset.step === "password") {
     return (
       <AuthShell
         description={`Choose a new password for ${email}.`}
