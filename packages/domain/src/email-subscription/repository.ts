@@ -590,7 +590,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       // A full-row read with its decoder, not the column projection the
       // neighbouring reads got: this method is the one seam where projecting
       // the columns collapses inference across the handler layer with
-      // tsrs 0.21.0-ts7.1.0-beta — the guarded write below and its outcome
+      // tsrs 0.22.0-ts7.1.0-beta — the guarded write below and its outcome
       // union resolve to `unknown` at three call sites, and no local shape of
       // the projection stops it. The cost is one row's extra columns on a
       // single-row lookup by unique index, so the projection buys nothing

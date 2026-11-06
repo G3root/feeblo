@@ -53,7 +53,9 @@ const staticCacheControl = async (request, next) => {
 };
 
 serve({
-  fetch: handler.fetch,
+  // Called as a method rather than handed over as a bare reference, so the
+  // handler keeps whatever receiver it expects.
+  fetch: (request) => handler.fetch(request),
   middleware: [
     staticCacheControl,
     staticMiddleware({
