@@ -72,9 +72,19 @@ export function createSuggestionSearch(
       send({ type: "DEBOUNCED" });
       fetch(query, request.signal)
         .then((suggestions) => {
+          // The reducer drops a late answer only while it is still
+          // `debouncing`; by the time a superseded request settles, the next
+          // one can already be `loading`, so the abort check is what keeps an
+          // old outcome from landing on the new query.
+          if (request.signal.aborted) {
+            return;
+          }
           send({ type: "LOADED", suggestions });
         })
         .catch(() => {
+          if (request.signal.aborted) {
+            return;
+          }
           send({ type: "FAILED" });
         });
     }, SUGGESTIONS_DEBOUNCE_MS);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { transition } from "xstate";
+import { createActor, transition } from "xstate";
 
 import {
   type PostEditorSnapshot,
@@ -10,7 +10,10 @@ import {
 /**
  * The graph has no timers and no invoked children, so these tests read it
  * through `transition()` against a resolved snapshot — the same view the
- * component has, without an interpreter.
+ * component has, without an interpreter. The one test that pins the configured
+ * initial state starts a real actor, because `resolveState` would only assert a
+ * snapshot the test built rather than the machine's own `initial` and
+ * `context`.
  *
  * `RELOAD_LATEST` and `KEEP_DRAFT` are the two buttons on the conflict panel.
  * They differ by exactly one thing — whether the editor remounts — and that is
@@ -41,11 +44,16 @@ const step = (
 
 describe("post editor machine", () => {
   it("starts loading with no version to save against", () => {
-    expect(stateOf(at("loading", undefined))).toStrictEqual({
-      editorKey: 0,
-      status: "loading",
-      version: undefined,
-    });
+    const actor = createActor(postEditorMachine).start();
+    try {
+      expect(stateOf(actor.getSnapshot())).toStrictEqual({
+        editorKey: 0,
+        status: "loading",
+        version: undefined,
+      });
+    } finally {
+      actor.stop();
+    }
   });
 
   it("pins the version the editor was opened with", () => {

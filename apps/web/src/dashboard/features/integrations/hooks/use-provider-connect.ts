@@ -1,6 +1,6 @@
 import { toastManager } from "@feeblo/ui/toast";
 import { useMachine } from "@xstate/react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import {
   providerConnectMachine,
@@ -38,6 +38,18 @@ export function useProviderConnect({
 }): ProviderConnect {
   const [snapshot, send] = useMachine(providerConnectMachine);
 
+  // A response that arrives after the settings page unmounted must not
+  // navigate: the actor is stopped with the component, and `location.assign`
+  // would leave from wherever the user went instead. The cleanup clears this
+  // so the pending request learns it has no page left to act on.
+  const isActive = useRef(true);
+  useEffect(() => {
+    isActive.current = true;
+    return () => {
+      isActive.current = false;
+    };
+  }, []);
+
   const connect = useCallback(() => {
     send({ type: "REQUEST" });
     void (async () => {
@@ -47,6 +59,11 @@ export function useProviderConnect({
       } catch {
         toastManager.add({ title: failureTitle, type: "error" });
         send({ type: "FAILED" });
+        return;
+      }
+      // Checked after the await, because the request can outlive the page that
+      // started it.
+      if (!isActive.current) {
         return;
       }
       // Announced before the navigation so the actor is already in
