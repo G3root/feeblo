@@ -34,10 +34,15 @@ export const submissionWindowMaxPosts = 200;
  * Coalescing window for `post.status_changed` intents.
  *
  * A move into a closed status records its own `post.closed` intent immediately;
- * every other status move joins the post's pending window, so a burst of moves
- * sends one email this long after the last. A module constant rather than
- * environment, like the submission window: the two surfaces that record these
- * intents must not be able to configure different windows.
+ * every other status move joins the post's pending window. Unlike the
+ * submission window this one does not slide: the window is opened by the first
+ * move and sends this long after *it*, with later moves replacing the payload
+ * inside it. That keeps a post that keeps changing from deferring its email
+ * indefinitely, which is why `repository.test.ts` pins the first deadline.
+ *
+ * A module constant rather than environment, like the submission window: the
+ * two surfaces that record these intents must not be able to configure
+ * different windows.
  */
 export const postStatusCoalescingWindow = Duration.minutes(5);
 

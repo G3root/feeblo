@@ -1654,15 +1654,73 @@ describe("EmailOutbox workflows", () => {
         })
     );
 
+    /**
+     * A closure notification asserts a fact rather than rendering the state it
+     * reads, so it is re-checked at send time the way a changelog publication
+     * is. Without this, a post reopened between the intent and the send still
+     * emails its subscribers "closed".
+     */
+    it.effect(
+      "suppresses a closure notification once the post has reopened",
+      () =>
+        Effect.gen(function* () {
+          const { organizationId, postId, statusId } = yield* fixture;
+          const db = yield* Database.Database;
+          const recorded = yield* (yield* EmailOutboxRepository).recordIntent({
+            aggregateId: postId,
+            aggregateType: "post",
+            deduplicationKey: `post.closed:${organizationId}:${postId}:reopened`,
+            expiresAt: null,
+            kind: "post.closed",
+            organizationId,
+            payload: { kind: "post.closed", postId },
+            scheduledAt: fixtureNow,
+          });
+          if (recorded._tag !== "Inserted") {
+            return yield* Effect.die("Expected a closure intent");
+          }
+
+          // The fixture's post is `PENDING`: the closure was reversed before the
+          // send, so there is nothing to announce.
+          expect(
+            yield* resolveSubscriptionNotificationContent(
+              "https://app.feeblo.com",
+              recorded.intent,
+              ""
+            )
+          ).toBeUndefined();
+
+          yield* db
+            .update(schema.postStatusTable)
+            .set({ type: "CLOSED" })
+            .where(eq(schema.postStatusTable.id, statusId));
+          const content = yield* resolveSubscriptionNotificationContent(
+            "https://app.feeblo.com",
+            recorded.intent,
+            ""
+          );
+
+          expect(content?.templatePayload.title).toContain("closed");
+        })
+    );
+
     it.effect(
       "rechecks unsubscribe consent after materialization and before provider send",
       () =>
         Effect.gen(function* () {
           yield* resetTestMailer();
-          const { organizationId } = yield* fixture;
+          const { organizationId, statusId } = yield* fixture;
           const db = yield* Database.Database;
           yield* enableSubscriberEmails(organizationId);
           const postId = `post_${organizationId}`;
+          // A `post.closed` notification is re-checked at send time and
+          // suppressed when the post is no longer closed, so the fixture's post
+          // has to actually be closed for this test to reach the consent check
+          // it is about.
+          yield* db
+            .update(schema.postStatusTable)
+            .set({ type: "CLOSED" })
+            .where(eq(schema.postStatusTable.id, statusId));
           const subscriber = yield* addSubscriptionContact({
             email: `consent-${organizationId}@example.test`,
             organizationId,
