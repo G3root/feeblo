@@ -21,8 +21,9 @@ import {
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import { useProviderConnect } from "~/features/integrations/hooks/use-provider-connect";
 import { useAsyncList } from "~/hooks/use-async-list";
 
 import {
@@ -50,7 +51,6 @@ function SlackSettingsContent({
 }: {
   readonly organizationId: string;
 }) {
-  const [connecting, setConnecting] = useState(false);
   const startConnect = useAtomSet(startSlackConnectAtom, { mode: "promise" });
   const connectionsResult = useAtomValue(connectionsAtom(organizationId));
   const refreshConnections = useAtomRefresh(connectionsAtom(organizationId));
@@ -69,22 +69,17 @@ function SlackSettingsContent({
     .onSuccess((value) => value)
     .exhaustive();
 
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const { authorizeUrl } = await startConnect({
-        payload: { organizationId },
-        reactivityKeys: slackReactivityKeys(organizationId),
-      });
-      window.location.assign(authorizeUrl.toString());
-    } catch {
-      setConnecting(false);
-      toastManager.add({
-        title: "Could not start Slack connection",
-        type: "error",
-      });
-    }
-  };
+  const connect = useProviderConnect({
+    authorize: useCallback(
+      () =>
+        startConnect({
+          payload: { organizationId },
+          reactivityKeys: slackReactivityKeys(organizationId),
+        }),
+      [organizationId, startConnect]
+    ),
+    failureTitle: "Could not start Slack connection",
+  });
 
   const handleDisconnected = () => {
     toastManager.add({
@@ -157,8 +152,13 @@ function SlackSettingsContent({
             “Send to Feeblo”, and post new requests to your channels.
           </p>
           <div className="mt-4">
-            <Button disabled={connecting} onClick={handleConnect}>
-              {connecting ? "Redirecting to Slack…" : "Connect to Slack"}
+            <Button
+              disabled={connect.status !== "idle"}
+              onClick={connect.connect}
+            >
+              {connect.status === "idle"
+                ? "Connect to Slack"
+                : "Redirecting to Slack…"}
             </Button>
           </div>
         </FramePanel>
