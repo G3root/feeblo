@@ -21,8 +21,9 @@ import {
 import { Switch } from "@feeblo/ui/switch";
 import { toastManager } from "@feeblo/ui/toast";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import { useProviderConnect } from "~/features/integrations/hooks/use-provider-connect";
 import { useAsyncList } from "~/hooks/use-async-list";
 
 import {
@@ -50,7 +51,6 @@ function DiscordSettingsContent({
 }: {
   readonly organizationId: string;
 }) {
-  const [connecting, setConnecting] = useState(false);
   const startConnect = useAtomSet(startDiscordConnectAtom, { mode: "promise" });
   const connectionsResult = useAtomValue(connectionsAtom(organizationId));
   const refreshConnections = useAtomRefresh(connectionsAtom(organizationId));
@@ -70,22 +70,17 @@ function DiscordSettingsContent({
     .onSuccess((value) => value)
     .exhaustive();
 
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const { authorizeUrl } = await startConnect({
-        payload: { organizationId },
-        reactivityKeys: discordReactivityKeys(organizationId),
-      });
-      window.location.assign(authorizeUrl.toString());
-    } catch {
-      setConnecting(false);
-      toastManager.add({
-        title: "Could not start Discord connection",
-        type: "error",
-      });
-    }
-  };
+  const connect = useProviderConnect({
+    authorize: useCallback(
+      () =>
+        startConnect({
+          payload: { organizationId },
+          reactivityKeys: discordReactivityKeys(organizationId),
+        }),
+      [organizationId, startConnect]
+    ),
+    failureTitle: "Could not start Discord connection",
+  });
 
   const handleDisconnected = () => {
     toastManager.add({
@@ -173,8 +168,13 @@ function DiscordSettingsContent({
             “Send to Feeblo”, and post new requests to your channels.
           </p>
           <div className="mt-4">
-            <Button disabled={connecting} onClick={handleConnect}>
-              {connecting ? "Redirecting to Discord…" : "Connect to Discord"}
+            <Button
+              disabled={connect.status !== "idle"}
+              onClick={connect.connect}
+            >
+              {connect.status === "idle"
+                ? "Connect to Discord"
+                : "Redirecting to Discord…"}
             </Button>
           </div>
         </FramePanel>
