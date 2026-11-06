@@ -26,6 +26,7 @@ import * as Result from "effect/reactivity/AsyncResult";
 import * as React from "react";
 
 import {
+  DEFAULT_INSIGHTS_RANGE,
   type InsightsAtomArgs,
   type InsightsSummary,
   type WorkspaceInsights,
@@ -90,7 +91,9 @@ export function InsightsPage({
 }: {
   readonly organizationId: string;
 }) {
-  const [range, setRange] = React.useState<TInsightsRange>("30d");
+  const [range, setRange] = React.useState<TInsightsRange>(
+    DEFAULT_INSIGHTS_RANGE
+  );
   const args = React.useMemo<InsightsAtomArgs>(
     () => ({ organizationId, range }),
     [organizationId, range]
