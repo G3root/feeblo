@@ -737,6 +737,17 @@ describe("UserBanRpcHandlers", () => {
               mergedIntoPostId: ownPostId,
             })
             .where(eq(schema.postTable.id, mergedPostId));
+          // A merged post owned by somebody else and merged into another
+          // survivor must survive the purge untouched.
+          const controlPostId = yield* createPost(fixture, fixture.userId);
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: now,
+              mergedAt: now,
+              mergedIntoPostId: otherPostId,
+            })
+            .where(eq(schema.postTable.id, controlPostId));
           const bannedCommentId = yield* createComment({
             authorId: banned.id,
             fixture,
@@ -772,9 +783,9 @@ describe("UserBanRpcHandlers", () => {
             .from(schema.postTable)
             .where(eq(schema.postTable.organizationId, fixture.organizationId));
           const remainingPostIds = remainingPosts.map((row) => row.id);
-          expect(remainingPostIds).toHaveLength(2);
+          expect(remainingPostIds).toHaveLength(3);
           expect(remainingPostIds).toEqual(
-            expect.arrayContaining([otherPostId, mergedPostId])
+            expect.arrayContaining([otherPostId, mergedPostId, controlPostId])
           );
           expect(remainingPostIds).not.toContain(ownPostId);
 
@@ -790,6 +801,14 @@ describe("UserBanRpcHandlers", () => {
             mergedAt: null,
             mergedIntoPostId: null,
           });
+
+          // The control child hangs off another post, so the purge's unmerge
+          // must not reach it.
+          const [controlPost] = yield* db
+            .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, controlPostId));
+          expect(controlPost?.mergedIntoPostId).toBe(otherPostId);
 
           const remainingComments = yield* db
             .select({
