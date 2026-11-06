@@ -128,10 +128,21 @@ export const makeSentryObservability = (options: {
           dsn: dsn.value,
           environment,
           release,
-          // Trace data is OTLP's job; Sentry is error reporting only.
+          // Trace data is OTLP's job; Sentry is error reporting only. Sentry 11
+          // replaced `sendDefaultPii` with a switch per data source, and every
+          // source the SDK would collect on its own is off: this layer reports a
+          // cause and its fiber context, never a request.
           tracesSampleRate: 0,
-          sendDefaultPii: false,
-          enableLogs: false,
+          dataCollection: {
+            userInfo: false,
+            cookies: false,
+            httpHeaders: false,
+            httpBodies: [],
+            urlQueryParams: false,
+          },
+          // `enableLogs` is gone in Sentry 11 and has no replacement switch:
+          // console capture is an explicit `consoleIntegration` that this
+          // composition root never registers, so nothing is logged by default.
         })
       );
       const reporter = ErrorReporter.make(({ cause, fiber }) =>

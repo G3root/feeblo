@@ -55,14 +55,14 @@ catalog:
   # Error reporting only. Tracing stays on the Effect OTLP exporters
   # (`docs/telemetry.md`); Sentry is initialized with `tracesSampleRate: 0`,
   # matching `UsefulSoftwareCo/executor`'s split between the two systems.
-  "@sentry/node": 10.75.0
-  "@sentry/react": 10.75.0
-  "@sentry/vite-plugin": 5.4.0
+  "@sentry/node": 11.11.0
+  "@sentry/react": 11.11.0
+  "@sentry/vite-plugin": 11.11.0
   "@solidjs/router": ^1.0.1
   "@tailwindcss/vite": ^4.3.4
   # The TanStack DB track is pinned to exact versions, not carets: `1.0.0-rc.1`
   # is a release candidate, and a caret would let `1.0.0` and later RCs in
-  # without review. `query-db-collection` 1.5.0 peers on the RC core, so the
+  # without review. `query-db-collection` 1.5.1 peers on the RC core, so the
   # two bump together.
   "@tanstack/query-db-collection": 1.5.1
   "@tanstack/react-db": 1.0.0-rc.1.3
@@ -98,14 +98,15 @@ catalog:
   effect: 4.1.2
   jose: ^6.2.15
   knip: ^6.44.1
-  postgres: ^3.4.7
+  postgres: ^4.0.0
   posthog-js: ^1.446.3
   rangi: ^2.2.0
-  # React 19.3 breaks two comment flows the e2e suite pins: the
-  # Comments/Activity tab click stops switching panels and a replied-to thread
-  # stays collapsed (`--grep "comment as status update|comment replies"` fails
-  # on 19.3.1, passes on 19.2.8). Stay on the 19.2 line until that is
-  # diagnosed; 19.3 carries no advisory.
+  # React 19.3 breaks two comment flows the e2e suite pins, reproduced on this
+  # tree with every other bump in the batch applied: the Comments/Activity tab
+  # click leaves the panel on Comments, and a reply to a reply stays collapsed
+  # (`playwright test --grep "comment as status update|comment replies"` — 2
+  # failed on 19.3.1, both @critical). Stay on the 19.2 line until those two
+  # specs pass on 19.3; the upgrade needs an app-side fix, not a wider range.
   react: ~19.2.8
   react-dom: ~19.2.8
   rolldown: ^1.3.0

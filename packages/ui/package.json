@@ -30,7 +30,7 @@
     "@tanstack/react-store": "^0.11.0",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
-    "prosekit": "^0.22.4",
+    "prosekit": "^0.23.0",
     "rangi": "catalog:",
     "react": "catalog:",
     "react-day-picker": "^10.0.1",

@@ -93,7 +93,7 @@ beforeAll(async () => {
     }),
   ];
 
-  server.listen({ onUnhandledRequest: "bypass" });
+  server.listen({ onUnhandledFrame: "bypass" });
   server.use(...handlers);
 });
 
