@@ -727,6 +727,48 @@ describe("UserBanRepository", () => {
         })
     );
 
+    it.effect(
+      "rejects a no-contact address when any case-variant account is a member",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* UserBanRepository;
+          const organizationId = yield* createOrganization();
+          const db = yield* currentDb;
+          const now = yield* DateTime.nowAsDate;
+          const memberEmail = "case-no-contact@example.com";
+          const nonMemberId = `nonmember_no_contact_${organizationId}`;
+          const memberId = `member_no_contact_${organizationId}`;
+
+          // Same case-variant pair as above, but no contact row and no other
+          // relationship: the membership refusal has to come from the address
+          // check, not from the first account `findUserByEmail` returns.
+          yield* db.insert(schema.userTable).values({
+            email: memberEmail.toUpperCase(),
+            id: nonMemberId,
+            name: "Non-member",
+          });
+          yield* db.insert(schema.userTable).values({
+            email: memberEmail,
+            id: memberId,
+            name: "Member",
+          });
+          yield* db.insert(schema.memberTable).values({
+            createdAt: now,
+            id: `member_${memberId}`,
+            organizationId,
+            role: "manager",
+            userId: memberId,
+          });
+
+          expect(
+            yield* repository.resolveTarget({
+              organizationId,
+              target: { _tag: "email", email: memberEmail },
+            })
+          ).toEqual({ status: "member" });
+        })
+    );
+
     it.effect("prefers a linked contact over a case-variant unlinked row", () =>
       Effect.gen(function* () {
         const repository = yield* UserBanRepository;

@@ -484,18 +484,22 @@ const makeUserBanRepository = Effect.gen(function* () {
           } as const;
         }
 
-        // No contact: an account may still be banned by address if it is
-        // related to this workspace through a restricted identity or a
-        // membership. An unrelated global account is not adopted by address.
+        // No contact: a matching account may still be a member, even when the
+        // case-insensitive lookup would return a duplicate non-member first.
+        if (
+          yield* emailBelongsToMember({
+            email,
+            organizationId: input.organizationId,
+          })
+        ) {
+          return { status: "member" } as const;
+        }
+
+        // An account may still be banned by address if it is related to this
+        // workspace through a restricted identity or a contact row. An
+        // unrelated global account is not adopted by address.
         const user = yield* findUserByEmail(email);
         if (user !== undefined) {
-          const member = yield* isWorkspaceMember({
-            organizationId: input.organizationId,
-            userId: user.id,
-          });
-          if (member) {
-            return { status: "member" } as const;
-          }
           const contact = yield* findContactByUserId({
             organizationId: input.organizationId,
             userId: user.id,
@@ -990,31 +994,30 @@ const makeUserBanRepository = Effect.gen(function* () {
         .where(ownComments)
         .returning({ id: comments.id });
 
-      const ownPostIds = yield* db
-        .select({ id: posts.id })
-        .from(posts)
+      // A post merged into one of the person's posts becomes a standalone post
+      // again; the FK-less `merged_into_post_id` would otherwise outlive its
+      // target. The subquery keeps the statement independent of how many posts
+      // the person authored, so no parameter list grows with the purge.
+      yield* db
+        .update(posts)
+        .set({ mergedIntoPostId: null, mergedAt: null })
         .where(
           and(
             eq(posts.organizationId, input.organizationId),
-            eq(posts.creatorId, input.userId)
-          )
-        )
-        .pipe(Effect.map((rows) => rows.map((row) => row.id)));
-
-      // A post merged into one of the person's posts becomes a standalone post
-      // again; the FK-less `merged_into_post_id` would otherwise outlive its
-      // target.
-      if (ownPostIds.length > 0) {
-        yield* db
-          .update(posts)
-          .set({ mergedIntoPostId: null, mergedAt: null })
-          .where(
-            and(
-              eq(posts.organizationId, input.organizationId),
-              inArray(posts.mergedIntoPostId, ownPostIds)
+            inArray(
+              posts.mergedIntoPostId,
+              db
+                .select({ id: posts.id })
+                .from(posts)
+                .where(
+                  and(
+                    eq(posts.organizationId, input.organizationId),
+                    eq(posts.creatorId, input.userId)
+                  )
+                )
             )
-          );
-      }
+          )
+        );
 
       const removedPosts = yield* db
         .delete(posts)

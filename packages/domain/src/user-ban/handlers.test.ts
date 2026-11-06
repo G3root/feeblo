@@ -727,6 +727,16 @@ describe("UserBanRpcHandlers", () => {
 
           const ownPostId = yield* createPost(fixture, banned.id);
           const otherPostId = yield* createPost(fixture, other.id);
+          const mergedPostId = yield* createPost(fixture, other.id);
+          const now = yield* DateTime.nowAsDate;
+          yield* db
+            .update(schema.postTable)
+            .set({
+              archivedAt: now,
+              mergedAt: now,
+              mergedIntoPostId: ownPostId,
+            })
+            .where(eq(schema.postTable.id, mergedPostId));
           const bannedCommentId = yield* createComment({
             authorId: banned.id,
             fixture,
@@ -761,8 +771,25 @@ describe("UserBanRpcHandlers", () => {
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.organizationId, fixture.organizationId));
-          expect(remainingPosts.map((row) => row.id)).toEqual([otherPostId]);
-          expect(remainingPosts.map((row) => row.id)).not.toContain(ownPostId);
+          const remainingPostIds = remainingPosts.map((row) => row.id);
+          expect(remainingPostIds).toHaveLength(2);
+          expect(remainingPostIds).toEqual(
+            expect.arrayContaining([otherPostId, mergedPostId])
+          );
+          expect(remainingPostIds).not.toContain(ownPostId);
+
+          // The merged child survives the purge as a standalone post.
+          const [mergedPost] = yield* db
+            .select({
+              mergedAt: schema.postTable.mergedAt,
+              mergedIntoPostId: schema.postTable.mergedIntoPostId,
+            })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, mergedPostId));
+          expect(mergedPost).toEqual({
+            mergedAt: null,
+            mergedIntoPostId: null,
+          });
 
           const remainingComments = yield* db
             .select({
