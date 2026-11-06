@@ -16,7 +16,7 @@ Errors are separate: Sentry reports them in the server and the browser, and is i
 | `apps/server/src/infra/telemetry/transport.ts` | Bounds each export, reads the OTLP acknowledgement, and accounts for failures |
 | `apps/server/src/infra/telemetry/measurements.ts` | Export-failure and rejected-record counters |
 | `apps/server/src/infra/telemetry/process.ts` | Process CPU, memory, and event-loop gauges |
-| `apps/server/src/http/request-rejection.ts` | Records HTTP API schema rejections on the request span |
+| `apps/server/src/http/request-rejection.ts` | Records HTTP API schema rejections on the request span, for a request the framework answers with an empty 400 and for the Public API's `INVALID_REQUEST` |
 | `apps/server/src/http/browser-telemetry.ts` | Forwards the browser's OTLP/JSON batches to the host's configured destination |
 | `apps/server/src/infra/sentry.ts` | Sentry error reporting (`ErrorReporter` integration) and the per-request reporting boundary |
 | `packages/web-shared/src/observability/browser-telemetry.ts` | The dashboard's Effect OTLP layer, navigation spans, and uncaught-error spans |
