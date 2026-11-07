@@ -53,9 +53,9 @@ import {
   PostNotFoundError,
   PostVersionConflictError,
 } from "./errors";
+import { isMergedPostRow } from "./machine";
 import { PostRepository } from "./repository";
-
-const postStatusCoalescingDelayMs = 5 * 60 * 1000;
+import { recordPostStatusChangeIntent } from "./status-intent";
 
 /**
  * The customer a dashboard write is attributed to.
@@ -418,7 +418,7 @@ const makePostWriteService = Effect.gen(function* () {
         () => new FailedToUpdatePostError()
       ),
       Effect.filterOrFail(
-        (post) => post.mergedIntoPostId === null,
+        (post) => !isMergedPostRow(post),
         () =>
           new Policy.PolicyDeniedError({
             reason: "This post has been merged into another post",
@@ -1083,79 +1083,14 @@ const makePostWriteService = Effect.gen(function* () {
           });
 
           const now = yield* DateTime.nowAsDate;
-          if (nextStatus?.type === "CLOSED") {
-            const result = yield* emailOutbox
-              .recordIntent({
-                aggregateId: args.id,
-                aggregateType: "post",
-                // Timestamped like the merge and unmerge intents, so closing
-                // a post, reopening it, and closing it again announces each
-                // closure instead of matching the first attempt forever.
-                deduplicationKey: `post.closed:${args.organizationId}:${args.id}:${args.statusId}:${now.getTime()}`,
-                expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                  DateTime.addDuration(Duration.days(7)),
-                  DateTime.toDate
-                ),
-                kind: "post.closed",
-                organizationId: args.organizationId,
-                payload: {
-                  actorUserId: member?.userId ?? null,
-                  kind: "post.closed",
-                  postId: args.id,
-                },
-                scheduledAt: now,
-              })
-              .pipe(
-                Effect.mapError((error) =>
-                  attachCause(
-                    new InternalServerError({
-                      message: "Could not record post closure email intent.",
-                    }),
-                    error
-                  )
-                )
-              );
-            outboxId =
-              result._tag === "Inserted" ? result.intent.id : undefined;
-          } else {
-            const result = yield* emailOutbox
-              .upsertPendingStatusChange({
-                aggregateId: args.id,
-                aggregateType: "post",
-                deduplicationKey: `post.status_changed:${args.organizationId}:${args.id}:${now.getTime()}`,
-                expiresAt: DateTime.fromDateUnsafe(now).pipe(
-                  DateTime.addDuration(
-                    Duration.millis(postStatusCoalescingDelayMs)
-                  ),
-                  DateTime.addDuration(Duration.days(7)),
-                  DateTime.toDate
-                ),
-                organizationId: args.organizationId,
-                payload: {
-                  actorUserId: member?.userId ?? null,
-                  kind: "post.status_changed",
-                  postId: args.id,
-                  statusId: args.statusId,
-                },
-                scheduledAt: DateTime.fromDateUnsafe(now).pipe(
-                  DateTime.addDuration(
-                    Duration.millis(postStatusCoalescingDelayMs)
-                  ),
-                  DateTime.toDate
-                ),
-              })
-              .pipe(
-                Effect.mapError((error) =>
-                  attachCause(
-                    new InternalServerError({
-                      message: "Could not record post status email intent.",
-                    }),
-                    error
-                  )
-                )
-              );
-            outboxId = result._tag === "Written" ? result.intent.id : undefined;
-          }
+          outboxId = yield* recordPostStatusChangeIntent({
+            actorUserId: member?.userId ?? null,
+            now,
+            organizationId: args.organizationId,
+            postId: args.id,
+            statusId: args.statusId,
+            statusType: nextStatus?.type,
+          });
 
           yield* Option.match(notifications, {
             onNone: () => Effect.void,

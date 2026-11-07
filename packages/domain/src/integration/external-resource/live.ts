@@ -6,13 +6,19 @@ import {
   PostExternalResourceLinkId,
 } from "@feeblo/id";
 import { isHttpUrl } from "@feeblo/utils/http-url";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import { InternalServerError } from "../../rpc-errors";
+import {
+  RESERVED_CREATE_REQUEST_STATE,
+  sourceStatesFor,
+  targetStateFor,
+} from "./machine";
 import {
   PostExternalResourceLink,
   type RecordPostExternalResourceLink,
@@ -205,6 +211,11 @@ const makeExternalResourceService = Effect.gen(function* () {
         const id = yield* ExternalResourceCreateRequestId.generate.pipe(
           Effect.mapError(databaseError("creation identifier generation"))
         );
+        // The claim's fence. Every claim writes `createdAt` itself — the insert
+        // below and the re-claim further down — so the instant handed back to
+        // the caller is exactly the instant stored, and
+        // `completeCreation`/`failCreation` can match it by equality.
+        const claimedAt = yield* DateTime.nowAsDate;
         const created = yield* db
           .insert(schema.externalResourceCreateRequestTable)
           .values({
@@ -213,7 +224,8 @@ const makeExternalResourceService = Effect.gen(function* () {
             connectionId: input.connectionId,
             postId: input.postId,
             idempotencyKey: input.idempotencyKey,
-            state: "pending",
+            state: RESERVED_CREATE_REQUEST_STATE,
+            createdAt: claimedAt,
           })
           .onConflictDoNothing()
           .returning({ id: schema.externalResourceCreateRequestTable.id })
@@ -223,9 +235,93 @@ const makeExternalResourceService = Effect.gen(function* () {
           return {
             id: asLegid(ExternalResourceCreateRequestId)(inserted.id),
             reserved: true,
+            reservedAt: claimedAt,
             postExternalResourceLinkId: null,
           };
         }
+        // The reservation is the idempotency key's mutex, so taking it over is
+        // **one** statement. A read followed by a guarded `UPDATE` lets two
+        // callers read the same reclaimable row and both believe they won;
+        // here the row the first caller moves no longer satisfies the
+        // predicate the second one evaluates.
+        //
+        // Two things are reclaimable, and both come from the graph: a `failed`
+        // reservation (`sourceStatesFor("reclaim")`), and a `pending` one whose
+        // lease expired. The second is re-claimed in place — the row does not
+        // move — so it is a lease predicate on an unchanged state rather than
+        // an edge.
+        const staleBefore = DateTime.toDateUtc(
+          DateTime.subtractDuration(
+            DateTime.fromDateUnsafe(claimedAt),
+            Duration.millis(creationReservationStaleMs)
+          )
+        );
+        const [reclaimed] = yield* db
+          .update(schema.externalResourceCreateRequestTable)
+          .set({
+            state: targetStateFor("reclaim"),
+            externalResourceId: null,
+            postExternalResourceLinkId: null,
+            // Moving `createdAt` is what makes this a new claim generation,
+            // and therefore what stops the previous holder's writes from
+            // matching. `GREATEST` keeps the new stamp strictly ahead of the
+            // old one even when the clock does not advance between the two
+            // claims — re-claiming a `failed` row needs no elapsed time — so
+            // two generations can never share a stamp.
+            createdAt: sql`GREATEST(${claimedAt}, ${schema.externalResourceCreateRequestTable.createdAt} + interval '1 millisecond')`,
+            updatedAt: claimedAt,
+          })
+          .where(
+            and(
+              eq(
+                schema.externalResourceCreateRequestTable.connectionId,
+                input.connectionId
+              ),
+              eq(
+                schema.externalResourceCreateRequestTable.organizationId,
+                input.organizationId
+              ),
+              eq(
+                schema.externalResourceCreateRequestTable.idempotencyKey,
+                input.idempotencyKey
+              ),
+              eq(
+                schema.externalResourceCreateRequestTable.postId,
+                input.postId
+              ),
+              or(
+                inArray(schema.externalResourceCreateRequestTable.state, [
+                  ...sourceStatesFor("reclaim"),
+                ]),
+                and(
+                  inArray(schema.externalResourceCreateRequestTable.state, [
+                    ...sourceStatesFor("succeed"),
+                  ]),
+                  lt(
+                    schema.externalResourceCreateRequestTable.createdAt,
+                    staleBefore
+                  )
+                )
+              )
+            )
+          )
+          .returning({
+            createdAt: schema.externalResourceCreateRequestTable.createdAt,
+            id: schema.externalResourceCreateRequestTable.id,
+          })
+          .pipe(Effect.mapError(databaseError("creation reservation reclaim")));
+        if (reclaimed !== undefined) {
+          return {
+            id: asLegid(ExternalResourceCreateRequestId)(reclaimed.id),
+            reserved: true,
+            reservedAt: reclaimed.createdAt,
+            postExternalResourceLinkId: null,
+          };
+        }
+
+        // Nothing was claimable: the reservation is held by a live attempt,
+        // already succeeded, or belongs to another post. The read below tells
+        // those apart and hands back whatever link already exists.
         const [existing] = yield* db
           .select({
             id: schema.externalResourceCreateRequestTable.id,
@@ -233,8 +329,6 @@ const makeExternalResourceService = Effect.gen(function* () {
             postExternalResourceLinkId:
               schema.externalResourceCreateRequestTable
                 .postExternalResourceLinkId,
-            state: schema.externalResourceCreateRequestTable.state,
-            createdAt: schema.externalResourceCreateRequestTable.createdAt,
           })
           .from(schema.externalResourceCreateRequestTable)
           .where(
@@ -260,40 +354,6 @@ const makeExternalResourceService = Effect.gen(function* () {
             message: "External resource creation reservation was not found.",
           });
         }
-        const now = yield* DateTime.nowAsDate;
-        const stale =
-          existing.state === "pending" &&
-          existing.createdAt.getTime() <
-            now.getTime() - creationReservationStaleMs;
-        if (existing.state === "failed" || stale) {
-          const reclaimedAt = now;
-          yield* db
-            .update(schema.externalResourceCreateRequestTable)
-            .set({
-              state: "pending",
-              externalResourceId: null,
-              postExternalResourceLinkId: null,
-              createdAt: reclaimedAt,
-              updatedAt: reclaimedAt,
-            })
-            .where(
-              and(
-                eq(schema.externalResourceCreateRequestTable.id, existing.id),
-                eq(
-                  schema.externalResourceCreateRequestTable.state,
-                  existing.state
-                )
-              )
-            )
-            .pipe(
-              Effect.mapError(databaseError("creation reservation reclaim"))
-            );
-          return {
-            id: asLegid(ExternalResourceCreateRequestId)(existing.id),
-            reserved: true,
-            postExternalResourceLinkId: null,
-          };
-        }
         return {
           id: asLegid(ExternalResourceCreateRequestId)(existing.id),
           reserved: false,
@@ -306,37 +366,58 @@ const makeExternalResourceService = Effect.gen(function* () {
         };
       }),
     failCreation: (input) =>
-      db
-        .update(schema.externalResourceCreateRequestTable)
-        .set({ state: "failed", updatedAt: new Date() })
-        .where(
-          and(
-            eq(schema.externalResourceCreateRequestTable.id, input.requestId),
-            eq(schema.externalResourceCreateRequestTable.state, "pending")
+      Effect.gen(function* () {
+        // Read through `Clock`, not `new Date()`: a wall-clock read inside an
+        // Effect is what `effecttsgo/global-date-in-effect` reports, and it is
+        // the one thing a `TestClock` test cannot pin.
+        const updatedAt = yield* DateTime.nowAsDate;
+        const released = yield* db
+          .update(schema.externalResourceCreateRequestTable)
+          .set({ state: targetStateFor("fail"), updatedAt })
+          .where(
+            and(
+              eq(schema.externalResourceCreateRequestTable.id, input.requestId),
+              inArray(schema.externalResourceCreateRequestTable.state, [
+                ...sourceStatesFor("fail"),
+              ]),
+              // `state` alone cannot fence this: a re-claimed row is `pending`
+              // again, so the expired holder's release would match it. The
+              // claim instant is what tells the two apart.
+              eq(
+                schema.externalResourceCreateRequestTable.createdAt,
+                input.reservedAt
+              )
+            )
           )
-        )
-        .pipe(
-          Effect.mapError(databaseError("creation release")),
-          Effect.asVoid
-        ),
+          .returning({ id: schema.externalResourceCreateRequestTable.id })
+          .pipe(Effect.mapError(databaseError("creation release")));
+        return released.length === 1;
+      }),
     completeCreation: (input) =>
-      db
-        .update(schema.externalResourceCreateRequestTable)
-        .set({
-          state: "succeeded",
-          externalResourceId: input.externalResourceId,
-          postExternalResourceLinkId: input.postExternalResourceLinkId,
-        })
-        .where(
-          and(
-            eq(schema.externalResourceCreateRequestTable.id, input.requestId),
-            eq(schema.externalResourceCreateRequestTable.state, "pending")
+      Effect.gen(function* () {
+        const completed = yield* db
+          .update(schema.externalResourceCreateRequestTable)
+          .set({
+            state: targetStateFor("succeed"),
+            externalResourceId: input.externalResourceId,
+            postExternalResourceLinkId: input.postExternalResourceLinkId,
+          })
+          .where(
+            and(
+              eq(schema.externalResourceCreateRequestTable.id, input.requestId),
+              inArray(schema.externalResourceCreateRequestTable.state, [
+                ...sourceStatesFor("succeed"),
+              ]),
+              eq(
+                schema.externalResourceCreateRequestTable.createdAt,
+                input.reservedAt
+              )
+            )
           )
-        )
-        .pipe(
-          Effect.mapError(databaseError("creation completion")),
-          Effect.asVoid
-        ),
+          .returning({ id: schema.externalResourceCreateRequestTable.id })
+          .pipe(Effect.mapError(databaseError("creation completion")));
+        return completed.length === 1;
+      }),
   });
 });
 

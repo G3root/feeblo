@@ -20,7 +20,10 @@ import {
   submissionWindowCeiling,
   submissionWindowMaxPosts,
 } from "./config";
-import { deliverySourceStatesFor } from "./delivery-state";
+import {
+  deliveryInFlightStates,
+  deliverySourceStatesFor,
+} from "./delivery-state";
 import {
   sourceStatesFor as intentSourceStatesFor,
   targetStateFor as intentTargetStateFor,
@@ -791,7 +794,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .where(
         or(
           and(
-            inArray(schema.emailDeliveryTable.state, ["queued", "deferred"]),
+            inArray(schema.emailDeliveryTable.state, [
+              ...deliverySourceStatesFor("sending"),
+            ]),
             or(
               lte(schema.emailDeliveryTable.nextAttemptAt, before),
               isNull(schema.emailDeliveryTable.nextAttemptAt)
@@ -905,12 +910,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
             expectedTransitionVersion
           ),
           // A deferral can arrive before the claim (an untyped read failure),
-          // so accept every due state rather than only `sending`.
-          inArray(schema.emailDeliveryTable.state, [
-            "queued",
-            "deferred",
-            "sending",
-          ])
+          // so the row may be claimable, claimed, or already deferred.
+          // `deliveryInFlightStates` is that trio, read from the graph.
+          inArray(schema.emailDeliveryTable.state, [...deliveryInFlightStates])
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
@@ -945,7 +947,11 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .where(
         and(
           eq(schema.emailDeliveryTable.id, id),
-          inArray(schema.emailDeliveryTable.state, ["queued", "deferred"])
+          // A throttle deferral only applies to a delivery no attempt has
+          // claimed yet, which is exactly the set a claim may move.
+          inArray(schema.emailDeliveryTable.state, [
+            ...deliverySourceStatesFor("sending"),
+          ])
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });

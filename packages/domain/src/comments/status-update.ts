@@ -3,20 +3,15 @@ import { BoardId, PostStatusId } from "@feeblo/id";
 import { and, eq } from "drizzle-orm";
 import * as EffectArray from "effect/Array";
 import * as DateTime from "effect/DateTime";
-import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
-import { EmailOutboxRepository } from "../email-outbox/repository";
 import { recordPostIntegrationEvent as recordPostIntegrationEventShared } from "../integration/post-event-recording";
 import { PostActivityRepository } from "../post-activity/repository";
-import { InternalServerError } from "../rpc-errors";
+import { recordPostStatusChangeIntent } from "../post/status-intent";
 import { FailedToCreateCommentError } from "./errors";
 import type { TCommentCreate } from "./schema";
 import type { CommentActor } from "./service";
-
-/** Coalescing window for status-change email intents; mirrors `post/write.ts`. */
-const postStatusCoalescingDelayMs = 5 * 60 * 1000;
 
 /**
  * Moves a post to the org-scoped status a comment request names, records the
@@ -53,7 +48,6 @@ export const applyCommentStatusUpdate = (
     }
     const db = yield* currentDb;
     const activityRepository = yield* PostActivityRepository;
-    const emailOutbox = yield* EmailOutboxRepository;
 
     // Resolve the org-scoped status row (and its type, which the email intent
     // branches on exactly as the editor path does) the request refers to.
@@ -158,77 +152,16 @@ export const applyCommentStatusUpdate = (
       )
     );
 
-    // The subscriber email intent, on the same rules the editor's status
-    // write applies: a closure records its own intent, and any other move
-    // joins the post's pending coalescing window.
-    const outboxId = yield* Effect.gen(function* () {
-      const now = yield* DateTime.nowAsDate;
-      if (statusRow.value.type === "CLOSED") {
-        const result = yield* emailOutbox
-          .recordIntent({
-            aggregateId: args.postId,
-            aggregateType: "post",
-            // Timestamped like the editor path, so a re-closure announces
-            // itself instead of matching the first attempt forever.
-            deduplicationKey: `post.closed:${args.organizationId}:${args.postId}:${statusUpdateId}:${now.getTime()}`,
-            expiresAt: DateTime.fromDateUnsafe(now).pipe(
-              DateTime.addDuration(Duration.days(7)),
-              DateTime.toDate
-            ),
-            kind: "post.closed",
-            organizationId: args.organizationId,
-            payload: {
-              actorUserId: actor.userId,
-              kind: "post.closed",
-              postId: args.postId,
-            },
-            scheduledAt: now,
-          })
-          .pipe(
-            Effect.mapError((error) =>
-              attachCause(
-                new InternalServerError({
-                  message: "Could not record post closure email intent.",
-                }),
-                error
-              )
-            )
-          );
-        return result._tag === "Inserted" ? result.intent.id : undefined;
-      }
-      const result = yield* emailOutbox
-        .upsertPendingStatusChange({
-          aggregateId: args.postId,
-          aggregateType: "post",
-          deduplicationKey: `post.status_changed:${args.organizationId}:${args.postId}:${now.getTime()}`,
-          expiresAt: DateTime.fromDateUnsafe(now).pipe(
-            DateTime.addDuration(Duration.millis(postStatusCoalescingDelayMs)),
-            DateTime.addDuration(Duration.days(7)),
-            DateTime.toDate
-          ),
-          organizationId: args.organizationId,
-          payload: {
-            actorUserId: actor.userId,
-            kind: "post.status_changed",
-            postId: args.postId,
-            statusId: statusUpdateId,
-          },
-          scheduledAt: DateTime.fromDateUnsafe(now).pipe(
-            DateTime.addDuration(Duration.millis(postStatusCoalescingDelayMs)),
-            DateTime.toDate
-          ),
-        })
-        .pipe(
-          Effect.mapError((error) =>
-            attachCause(
-              new InternalServerError({
-                message: "Could not record post status email intent.",
-              }),
-              error
-            )
-          )
-        );
-      return result._tag === "Written" ? result.intent.id : undefined;
+    // The subscriber email intent, on the rules the editor's status write
+    // applies — the same function, so the two surfaces cannot answer
+    // differently.
+    const outboxId = yield* recordPostStatusChangeIntent({
+      actorUserId: actor.userId,
+      now: yield* DateTime.nowAsDate,
+      organizationId: args.organizationId,
+      postId: args.postId,
+      statusId: statusUpdateId,
+      statusType: statusRow.value.type,
     }).pipe(
       Effect.mapError((error) =>
         attachCause(

@@ -17,12 +17,17 @@ import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
-import { withRemapDbErrors } from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { ChangelogNotFoundError } from "./errors";
+import {
+  isPublishedChangelogStatus,
+  publishesNow,
+  publishesWithoutTimestamp,
+} from "./machine";
 import { ChangelogPolicy } from "./policies";
 import { makeChangelogPublication } from "./publication";
 import { ChangelogRepository } from "./repository";
@@ -95,6 +100,15 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         args.content
       );
       return Effect.gen(function* () {
+        // A live entry needs its publication date. The Public API has always
+        // refused a publish without one; the dashboard relied on its publish
+        // dialog, so a direct RPC call could file a published entry with no
+        // date and the list would order it by `createdAt` instead.
+        if (publishesWithoutTimestamp(args)) {
+          return yield* new BadRequestError({
+            message: "A published changelog entry needs a publication date.",
+          });
+        }
         const session = yield* CurrentSession;
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
@@ -115,15 +129,14 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               ...(isMember && { creatorMemberId: isMember.membershipId }),
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
-            const createdOutboxId =
-              args.status === "published"
-                ? yield* publication.recordPublishedIntent({
-                    actorUserId: session.session.userId,
-                    changelogId: args.id,
-                    organizationId: args.organizationId,
-                  })
-                : undefined;
-            if (args.status === "published") {
+            const createdOutboxId = isPublishedChangelogStatus(args.status)
+              ? yield* publication.recordPublishedIntent({
+                  actorUserId: session.session.userId,
+                  changelogId: args.id,
+                  organizationId: args.organizationId,
+                })
+              : undefined;
+            if (isPublishedChangelogStatus(args.status)) {
               yield* publication.notifyPublished({
                 ...(isMember && { actorUserId: session.session.userId }),
                 changelogId: args.id,
@@ -187,6 +200,11 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         args.content
       );
       return Effect.gen(function* () {
+        if (publishesWithoutTimestamp(args)) {
+          return yield* new BadRequestError({
+            message: "A published changelog entry needs a publication date.",
+          });
+        }
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
         const prepared = yield* prepareEditorAssetContent({
@@ -225,8 +243,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 message: "Changelog entry not found",
               });
             }
-            const publishedNow =
-              previousStatus !== "published" && args.status === "published";
+            // The publication intent and the subscriber fan-out belong to the
+            // transition, not to the value: a save that leaves a live entry
+            // live changes nothing and must not announce itself twice.
+            const publishedNow = publishesNow(previousStatus, args.status);
             const createdOutboxId = publishedNow
               ? yield* publication.recordPublishedIntent({
                   actorUserId: session.session.userId,

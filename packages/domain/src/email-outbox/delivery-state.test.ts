@@ -9,6 +9,8 @@ import * as Layer from "effect/Layer";
 
 import {
   canTransitionDelivery,
+  deliveryInFlightStates,
+  deliverySourceStatesFor,
   emailDeliveryMachine,
   isTerminalDeliveryState,
 } from "./delivery-state";
@@ -40,6 +42,38 @@ describe("email delivery state", () => {
     expect(canTransitionDelivery("queued", "delivered")).toBe(false);
     expect(isTerminalDeliveryState("delivered")).toBe(true);
     expect(isTerminalDeliveryState("deferred")).toBe(false);
+  });
+
+  it("declares a pre-claim deferral, which two writers perform", () => {
+    // Both deferral writes accepted a `queued` row while the graph did not, so
+    // `canTransitionDelivery` answered false for a move the SQL made. The edge
+    // is the fix; the sets below are what the writes now ask instead of
+    // spelling the states out.
+    expect(canTransitionDelivery("queued", "deferred")).toBe(true);
+    expect(deliverySourceStatesFor("deferred")).toStrictEqual([
+      "queued",
+      "sending",
+      "accepted",
+    ]);
+  });
+
+  it("derives the claimable and in-flight sets from the same graph", () => {
+    // `deferDeliveryForThrottle` and `findDueDeliveries` ask for the claimable
+    // pair; `deferSendingDelivery`, the inspection rollup and the queue's
+    // "still workable" guard ask for the trio.
+    expect(deliverySourceStatesFor("sending")).toStrictEqual([
+      "queued",
+      "deferred",
+    ]);
+    expect([...deliveryInFlightStates]).toStrictEqual([
+      "queued",
+      "deferred",
+      "sending",
+    ]);
+    // Re-deferring a deferred row is a lease refresh, not an edge: the graph
+    // has no self-transition, which is why the in-flight set names `sending`
+    // itself rather than deriving it.
+    expect(canTransitionDelivery("deferred", "deferred")).toBe(false);
   });
 
   const TestLayer = EmailOutboxRepository.layer.pipe(

@@ -1,7 +1,11 @@
 import * as Schema from "effect/Schema";
 
 import { PolicyDeniedError } from "../policy";
-import { InternalServerError, UnauthorizedError } from "../rpc-errors";
+import {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../rpc-errors";
 
 export class FailedToCreateChangelogError extends Schema.TaggedError<FailedToCreateChangelogError>()(
   "FailedToCreateChangelogError",
@@ -30,6 +34,7 @@ export class ChangelogNotFoundError extends Schema.TaggedError<ChangelogNotFound
 
 export const ChangelogServiceErrors = Schema.Union([
   UnauthorizedError,
+  BadRequestError,
   InternalServerError,
   PolicyDeniedError,
   ChangelogNotFoundError,
