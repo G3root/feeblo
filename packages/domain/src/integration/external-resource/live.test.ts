@@ -209,7 +209,7 @@ describe("external resource service", () => {
           }
           yield* service.failCreation({
             requestId: reserved.id,
-            reservedAt: reserved.reservedAt,
+            claimGeneration: reserved.claimGeneration,
           });
           const retried = yield* service.reserveCreation({
             connectionId: github,
@@ -260,7 +260,7 @@ describe("external resource service", () => {
         }
         yield* service.failCreation({
           requestId: held.id,
-          reservedAt: held.reservedAt,
+          claimGeneration: held.claimGeneration,
         });
 
         const raced = yield* Effect.all(
@@ -347,7 +347,8 @@ describe("external resource service", () => {
           }
 
           expect(current.id).toBe(expired.id);
-          expect(current.reservedAt).not.toStrictEqual(expired.reservedAt);
+          // One row, two claims: the generation is what tells them apart.
+          expect(current.claimGeneration).toBe(expired.claimGeneration + 1);
 
           const recorded = yield* service.recordPostLink({
             postId: post.postId,
@@ -360,13 +361,13 @@ describe("external resource service", () => {
               externalResourceId: recorded.externalResourceId,
               postExternalResourceLinkId: recorded.postExternalResourceLinkId,
               requestId: expired.id,
-              reservedAt: expired.reservedAt,
+              claimGeneration: expired.claimGeneration,
             })
           ).toBe(false);
           expect(
             yield* service.failCreation({
               requestId: expired.id,
-              reservedAt: expired.reservedAt,
+              claimGeneration: expired.claimGeneration,
             })
           ).toBe(false);
 
@@ -390,7 +391,7 @@ describe("external resource service", () => {
               externalResourceId: recorded.externalResourceId,
               postExternalResourceLinkId: recorded.postExternalResourceLinkId,
               requestId: current.id,
-              reservedAt: current.reservedAt,
+              claimGeneration: current.claimGeneration,
             })
           ).toBe(true);
         })

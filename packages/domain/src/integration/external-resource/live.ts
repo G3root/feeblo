@@ -211,10 +211,10 @@ const makeExternalResourceService = Effect.gen(function* () {
         const id = yield* ExternalResourceCreateRequestId.generate.pipe(
           Effect.mapError(databaseError("creation identifier generation"))
         );
-        // The claim's fence. Every claim writes `createdAt` itself — the insert
-        // below and the re-claim further down — so the instant handed back to
-        // the caller is exactly the instant stored, and
-        // `completeCreation`/`failCreation` can match it by equality.
+        // `createdAt` is the lease clock — the insert and the re-claim both
+        // write it, and the staleness check reads it — and `claimGeneration` is
+        // the fence. They are separate on purpose: a claim's generation must be
+        // distinct by construction, which a timestamp cannot guarantee.
         const claimedAt = yield* DateTime.nowAsDate;
         const created = yield* db
           .insert(schema.externalResourceCreateRequestTable)
@@ -228,14 +228,18 @@ const makeExternalResourceService = Effect.gen(function* () {
             createdAt: claimedAt,
           })
           .onConflictDoNothing()
-          .returning({ id: schema.externalResourceCreateRequestTable.id })
+          .returning({
+            claimGeneration:
+              schema.externalResourceCreateRequestTable.claimGeneration,
+            id: schema.externalResourceCreateRequestTable.id,
+          })
           .pipe(Effect.mapError(databaseError("creation reservation")));
         const inserted = created[0];
         if (inserted !== undefined) {
           return {
             id: asLegid(ExternalResourceCreateRequestId)(inserted.id),
             reserved: true,
-            reservedAt: claimedAt,
+            claimGeneration: inserted.claimGeneration,
             postExternalResourceLinkId: null,
           };
         }
@@ -262,13 +266,11 @@ const makeExternalResourceService = Effect.gen(function* () {
             state: targetStateFor("reclaim"),
             externalResourceId: null,
             postExternalResourceLinkId: null,
-            // Moving `createdAt` is what makes this a new claim generation,
-            // and therefore what stops the previous holder's writes from
-            // matching. `GREATEST` keeps the new stamp strictly ahead of the
-            // old one even when the clock does not advance between the two
-            // claims — re-claiming a `failed` row needs no elapsed time — so
-            // two generations can never share a stamp.
-            createdAt: sql`GREATEST(${claimedAt}, ${schema.externalResourceCreateRequestTable.createdAt} + interval '1 millisecond')`,
+            // Bumping the generation is what fences the previous holder out.
+            // `createdAt` still moves, but only as the lease clock: a re-claim
+            // that left it alone would make the new claim immediately stale.
+            claimGeneration: sql`${schema.externalResourceCreateRequestTable.claimGeneration} + 1`,
+            createdAt: claimedAt,
             updatedAt: claimedAt,
           })
           .where(
@@ -306,7 +308,8 @@ const makeExternalResourceService = Effect.gen(function* () {
             )
           )
           .returning({
-            createdAt: schema.externalResourceCreateRequestTable.createdAt,
+            claimGeneration:
+              schema.externalResourceCreateRequestTable.claimGeneration,
             id: schema.externalResourceCreateRequestTable.id,
           })
           .pipe(Effect.mapError(databaseError("creation reservation reclaim")));
@@ -314,7 +317,7 @@ const makeExternalResourceService = Effect.gen(function* () {
           return {
             id: asLegid(ExternalResourceCreateRequestId)(reclaimed.id),
             reserved: true,
-            reservedAt: reclaimed.createdAt,
+            claimGeneration: reclaimed.claimGeneration,
             postExternalResourceLinkId: null,
           };
         }
@@ -382,10 +385,10 @@ const makeExternalResourceService = Effect.gen(function* () {
               ]),
               // `state` alone cannot fence this: a re-claimed row is `pending`
               // again, so the expired holder's release would match it. The
-              // claim instant is what tells the two apart.
+              // claim generation is what tells the two apart.
               eq(
-                schema.externalResourceCreateRequestTable.createdAt,
-                input.reservedAt
+                schema.externalResourceCreateRequestTable.claimGeneration,
+                input.claimGeneration
               )
             )
           )
@@ -409,8 +412,8 @@ const makeExternalResourceService = Effect.gen(function* () {
                 ...sourceStatesFor("succeed"),
               ]),
               eq(
-                schema.externalResourceCreateRequestTable.createdAt,
-                input.reservedAt
+                schema.externalResourceCreateRequestTable.claimGeneration,
+                input.claimGeneration
               )
             )
           )

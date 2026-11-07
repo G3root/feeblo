@@ -731,7 +731,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             externalResourceId: recorded.externalResourceId,
             postExternalResourceLinkId: recorded.link.id,
             requestId: request.id,
-            reservedAt: request.reservedAt,
+            claimGeneration: request.claimGeneration,
           });
           if (!completed) {
             // The lease expired while the provider call was in flight and
@@ -755,7 +755,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             externalResources
               .failCreation({
                 requestId: request.id,
-                reservedAt: request.reservedAt,
+                claimGeneration: request.claimGeneration,
               })
               .pipe(Effect.catch((cause) => Effect.logError(cause)))
           )

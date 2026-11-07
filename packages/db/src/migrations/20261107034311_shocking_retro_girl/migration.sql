@@ -1,0 +1,2 @@
+ALTER TABLE "external_resource_create_request" ADD COLUMN "claim_generation" integer DEFAULT 1 NOT NULL;--> statement-breakpoint
+ALTER TABLE "external_resource_create_request" ADD CONSTRAINT "external_resource_create_request_claim_generation_check" CHECK ("claim_generation" > 0);

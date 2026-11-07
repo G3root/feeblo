@@ -1,0 +1,77 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "64715e6b-12d8-4c0d-a5a0-090b8b228e2f",
+  "prevIds": [
+    "4bd8d985-05f4-442f-923c-f3422cf3007a",
+    "f332849a-bbad-44b9-9097-e503209c3f91"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "external_resource_create_request",
+        "claim_generation"
+      ],
+      "writes": [
+        "s|col|public.external_resource_create_request.claim_generation",
+        "n|col|public.external_resource_create_request.claim_generation",
+        "e|col|public.external_resource_create_request.claim_generation"
+      ],
+      "reads": [
+        "n|tbl|public.external_resource_create_request",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "external_resource_create_request"
+      ],
+      "writes": [
+        "s|ck|public.external_resource_create_request.external_resource_create_request_claim_generation_check",
+        "n|ck|public.external_resource_create_request.external_resource_create_request_claim_generation_check",
+        "e|ck|public.external_resource_create_request.external_resource_create_request_claim_generation_check",
+        "n|con|public.external_resource_create_request.external_resource_create_request_claim_generation_check"
+      ],
+      "reads": [
+        "n|tbl|public.external_resource_create_request",
+        "n|sch|public",
+        "n|col|public.external_resource_create_request.claim_generation"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "external_resource_create_request",
+        "name": "claim_generation",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "1",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "external_resource_create_request",
+        "name": "external_resource_create_request_claim_generation_check",
+        "value": "\"claim_generation\" > 0",
+        "entityType": "checks"
+      }
+    }
+  ]
+}
