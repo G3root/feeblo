@@ -75,8 +75,54 @@ export type AuthHandler = {
       | { readonly valid: true; readonly key: ApiKeyAuthRecord | null }
       | { readonly valid: false; readonly key: null }
     >;
+    /**
+     * Verifies an OAuth access token presented to the MCP resource server.
+     *
+     * Better Auth owns the issuer, audience, JWKS, and the RFC 6750/9728
+     * challenge; the result is the two things this side may act on — the
+     * claims a caller is built from, or the response to refuse with. A
+     * library error never crosses this boundary. See `docs/adr/0024`.
+     */
+    readonly verifyMcpAccessToken: (
+      request: McpAccessTokenRequest
+    ) => Promise<McpAccessTokenVerification>;
   };
 };
+
+/** The request facts OAuth verification needs that are not the token. */
+export type McpAccessTokenRequest = {
+  readonly authorizationHeader: string;
+  readonly method: string;
+  readonly url: string;
+  readonly dpopProof?: string | null | undefined;
+};
+
+/** What a verified MCP access token says. */
+export type McpAccessTokenClaims = {
+  readonly clientId: string;
+  /** The workspace the grant was consented for. */
+  readonly organizationId: string;
+  readonly scopes: readonly string[];
+  /** The member who consented (`sub`). */
+  readonly subject: string;
+};
+
+/**
+ * A verified token, or the refusal to answer it with.
+ *
+ * `Rejected` carries the status and headers already spelled by the provider,
+ * so the MCP middleware sends the same `WWW-Authenticate` challenge Better
+ * Auth's own resource-server helpers would, without this package importing
+ * the provider.
+ */
+export type McpAccessTokenVerification =
+  | { readonly _tag: "Verified"; readonly claims: McpAccessTokenClaims }
+  | {
+      readonly _tag: "Rejected";
+      readonly headers: Readonly<Record<string, string>>;
+      readonly message: string;
+      readonly status: number;
+    };
 
 export class Auth extends Context.Service<Auth, AuthHandler>()(
   "@feeblo/api/Auth"

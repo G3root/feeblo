@@ -20,6 +20,7 @@ import {
 import { onInternalError } from "../../public-api/failure";
 import { PublicApiCaller } from "../../public-api/middleware";
 import { defineOperation } from "../../public-api/operation";
+import { publishesWithoutTimestamp } from "../machine";
 import { toPublicApiChangelog, toPublicApiChangelogSummary } from "./mappers";
 import { PublicApiChangelogRepository } from "./repository";
 import {
@@ -94,7 +95,7 @@ const parseChangelogWrite = (write: {
       );
     }
 
-    if (write.status === "published" && write.publishedAt == null) {
+    if (publishesWithoutTimestamp(write)) {
       return yield* invalidRequestError(
         "publishedAt is required when status is published."
       );

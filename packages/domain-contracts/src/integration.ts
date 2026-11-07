@@ -17,11 +17,15 @@ export type TIntegrationExternalResourceType = S.Schema.Type<
 >;
 
 /** Durable external resource creation lifecycle. */
-export const ExternalResourceCreateRequestState = S.Literals([
+export const EXTERNAL_RESOURCE_CREATE_REQUEST_STATES = [
   "pending",
   "succeeded",
   "failed",
-]);
+] as const;
+
+export const ExternalResourceCreateRequestState = S.Literals(
+  EXTERNAL_RESOURCE_CREATE_REQUEST_STATES
+);
 export type TExternalResourceCreateRequestState = S.Schema.Type<
   typeof ExternalResourceCreateRequestState
 >;

@@ -3,6 +3,7 @@ import * as Schema from "effect/Schema";
 
 import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
 import { paramsOf, payloadOf } from "../../public-api/http-input";
+import { CHANGELOG_WRITE_STATES } from "../machine";
 
 /**
  * The changelog resource: what the changelog endpoints return, and the typed
@@ -33,17 +34,16 @@ export type TPublicApiChangelogStatus = Schema.Schema.Type<
 /**
  * The statuses a write may set.
  *
- * Narrower than the response vocabulary above: scheduled publishing is
- * unimplemented — the status exists in the database and in the response
- * vocabulary, but no worker publishes an entry when its time arrives, so
- * accepting it on a write would file an entry that never goes live and never
- * tells anyone. Writes accept only draft and published until the scheduler
- * ships.
+ * Derived from the lifecycle machine, not restated: a write vocabulary that
+ * disagreed with the graph would accept a status no event enters, and
+ * `scheduled` is exactly that — no worker publishes an entry when its time
+ * arrives, so accepting it would file an entry that never goes live. The
+ * response vocabulary above stays restated on purpose (`docs/adr/0004`); the
+ * writable set is a lifecycle fact both surfaces must share.
  */
-export const PublicApiChangelogWriteStatus = Schema.Literals([
-  "draft",
-  "published",
-]);
+export const PublicApiChangelogWriteStatus = Schema.Literals(
+  CHANGELOG_WRITE_STATES
+);
 
 export type TPublicApiChangelogWriteStatus = Schema.Schema.Type<
   typeof PublicApiChangelogWriteStatus

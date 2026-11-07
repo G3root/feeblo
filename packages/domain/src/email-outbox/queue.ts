@@ -50,6 +50,7 @@ import {
   makeSubmissionNotificationPayload,
   resolveSubscriptionNotificationContent,
 } from "./content";
+import { deliveryInFlightStates } from "./delivery-state";
 import {
   maximumDeliveryAttempts,
   maximumInfrastructureFailures,
@@ -771,9 +772,7 @@ const sendDeliveryAttempt = (
       });
     const now = yield* DateTime.now;
     const delivery = yield* repository.findDeliveryById(deliveryId);
-    if (
-      !(delivery && ["queued", "deferred", "sending"].includes(delivery.state))
-    ) {
+    if (!(delivery && deliveryInFlightStates.includes(delivery.state))) {
       return { _tag: "terminal" as const };
     }
     // Remember the version this attempt observed so the infrastructure catch
@@ -1915,6 +1914,11 @@ export const reconcileEmailOutbox = ({
             )
           )
     );
+    // Sequential on purpose, unlike the delivery fan-out below: a wake is a
+    // read of its intent plus a queue offer, and a bounded `forEach` interrupts
+    // the siblings still running when one of them fails — cancelling a wake
+    // before it offers its intent. One at a time means a failure only stops the
+    // wakes after it, and the ones already offered stand.
     yield* Effect.forEach(pending, (intent) => wakeEmailOutbox(intent.id), {
       discard: true,
     });

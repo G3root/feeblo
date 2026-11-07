@@ -1,5 +1,6 @@
 import type { AuthHandler } from "@feeblo/domain/session-middleware";
 
+import { makeMcpAccessTokenVerifier } from "./mcp-oauth";
 import type { Auth as AuthInstance } from "./server";
 
 /**
@@ -13,9 +14,15 @@ import type { Auth as AuthInstance } from "./server";
  *
  * `verifyApiKey` is normalized to the two facts request-time authorization
  * needs — this key is valid, and here is its record — instead of leaking the
- * plugin's four-way result union across the boundary.
+ * plugin's four-way result union across the boundary. `verifyMcpAccessToken`
+ * does the same for an OAuth access token: claims or a challenge, never a
+ * Better Auth error.
  */
-export const toAuthHandler = (auth: AuthInstance): AuthHandler => ({
+export const toAuthHandler = (
+  auth: AuthInstance,
+  /** `API_URL`, the origin the MCP resource identifier is built from. */
+  apiUrl: string
+): AuthHandler => ({
   handler: (request) => auth.handler(request),
   api: {
     getSession: (args) => auth.api.getSession(args),
@@ -28,5 +35,7 @@ export const toAuthHandler = (auth: AuthInstance): AuthHandler => ({
         ? { valid: true, key: result.key }
         : { valid: false, key: null };
     },
+
+    verifyMcpAccessToken: makeMcpAccessTokenVerifier(auth, apiUrl),
   },
 });

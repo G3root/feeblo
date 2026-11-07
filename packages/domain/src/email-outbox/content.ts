@@ -2,7 +2,9 @@ import { Database, schema, transaction } from "@feeblo/db";
 import { and, eq } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 
+import { PUBLISHED_CHANGELOG_STATUS } from "../changelog/machine";
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
+import { CLOSING_POST_STATUS_TYPE } from "../post/status-intent";
 import type { PostBoardVisibility } from "./access";
 import type {
   ChangelogTemplatePayload,
@@ -195,7 +197,7 @@ export const isChangelogPubliclyVisible = (
           )
         )
         .limit(1);
-      return entry?.status === "published";
+      return entry?.status === PUBLISHED_CHANGELOG_STATUS;
     })
   );
 
@@ -245,8 +247,10 @@ export const resolveSubscriptionNotificationContent = (
                 id: changelogId,
                 organizationId: intent.organizationId,
                 // Unpublishing (or a still-scheduled entry) closes delivery
-                // for intents recorded before the transition.
-                status: "published",
+                // for intents recorded before the transition. The status is
+                // the one a publish enters, read from the lifecycle machine so
+                // this check cannot outlive a rename of that state.
+                status: PUBLISHED_CHANGELOG_STATUS,
               },
               columns: {
                 coverImage: true,
@@ -363,6 +367,17 @@ export const resolveSubscriptionNotificationContent = (
               },
             });
             if (!post) {
+              return undefined;
+            }
+            // A closure notification asserts a fact, so it is re-checked at send
+            // time the way the changelog path re-checks `status = 'published'`:
+            // a post reopened between the intent and the send must not announce
+            // itself as closed. The other kinds in this block render the status
+            // they read, which is why only this branch needs the guard.
+            if (
+              payloadKind === "post.closed" &&
+              post.postStatus?.type !== CLOSING_POST_STATUS_TYPE
+            ) {
               return undefined;
             }
             const counterpart = counterpartPostId

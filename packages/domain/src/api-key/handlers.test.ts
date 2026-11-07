@@ -47,6 +47,12 @@ const AuthTest = Layer.succeed(Auth, {
   handler: () => new Response(),
   api: {
     getSession: async () => null,
+    verifyMcpAccessToken: async () => ({
+      _tag: "Rejected" as const,
+      status: 401,
+      message: "Not available in this composition.",
+      headers: {},
+    }),
     createApiKey: async ({ body }): Promise<ApiKeyAuthCreated> => {
       const createdAt = new Date("2026-09-18T00:00:00.000Z");
       return {

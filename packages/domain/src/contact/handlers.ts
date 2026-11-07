@@ -124,8 +124,12 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         organizationId: args.organizationId,
         insert: Effect.gen(function* () {
           const attributeValues = args.attributeValues ?? [];
+          // Share-locked for this transaction, like the company create: the
+          // required-value check, the per-value validation and the upserts
+          // below all read one snapshot, so a definition that becomes required
+          // while the create runs cannot let a supplied `null` through.
           const definitions =
-            yield* attributeDefinitionRepository.findContactAttributeDefinitions(
+            yield* attributeDefinitionRepository.findContactAttributeDefinitionsForShare(
               args.organizationId
             );
           const definitionsById = new Map(

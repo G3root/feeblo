@@ -1,3 +1,4 @@
+import { writableChangelogStatus } from "@feeblo/domain/changelog/machine";
 import type { CommentReaction } from "@feeblo/domain/comment-reaction/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import type { PostReaction } from "@feeblo/domain/post-reaction/schema";
@@ -356,17 +357,6 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
   );
 }
 
-/**
- * The changelog write endpoints accept only the statuses a write may set:
- * `scheduled` is a future feature (the scheduler does not exist), so a row
- * read back as scheduled — filed before scheduling was disabled — is saved as
- * the draft it effectively is. The wire type is the source of truth; this
- * keeps an old row editable without a second request.
- */
-const toWritableChangelogStatus = (
-  status: "draft" | "published" | "scheduled"
-): "draft" | "published" => (status === "scheduled" ? "draft" : status);
-
 export function changelogCollection(scope: DashboardCollectionScope) {
   const id = organizationScopedCollectionId("changelogCollection", scope);
 
@@ -404,7 +394,11 @@ export function changelogCollection(scope: DashboardCollectionScope) {
             content: updatedChangelog.content,
             assetIds: updatedChangelog.assetIds ?? [],
             coverImage: updatedChangelog.coverImage ?? null,
-            status: toWritableChangelogStatus(updatedChangelog.status),
+            // A row read back as `scheduled` — filed before scheduling was
+            // disabled — is saved as the draft it effectively is.
+            // `writableChangelogStatus` is the machine's answer rather than a
+            // cast, so a real scheduling event would change it here.
+            status: writableChangelogStatus(updatedChangelog.status),
             scheduledAt: updatedChangelog.scheduledAt,
             publishedAt: updatedChangelog.publishedAt,
             organizationId: updatedChangelog.organizationId,
@@ -436,7 +430,7 @@ export function changelogCollection(scope: DashboardCollectionScope) {
             content: newChangelog.content,
             assetIds: newChangelog.assetIds ?? [],
             coverImage: newChangelog.coverImage ?? null,
-            status: toWritableChangelogStatus(newChangelog.status),
+            status: writableChangelogStatus(newChangelog.status),
             scheduledAt: newChangelog.scheduledAt,
             publishedAt: newChangelog.publishedAt,
             organizationId: newChangelog.organizationId,
@@ -2316,10 +2310,12 @@ function withIndexes<TCollection extends { id: string }>(
  * `DbClient` memoizes by descriptor id, so repeated reads within one scope
  * return the same instance and React memo dependencies stay stable.
  */
-export const dashboardCollections = {
+const makeDashboardCollections = (
+  getScope: () => DashboardCollectionScope
+) => ({
   get boardCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), boardCollection(currentScope())),
+      materialize(getBrowserDbClient(), boardCollection(getScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2334,27 +2330,21 @@ export const dashboardCollections = {
   get changelogCategoryCollection() {
     return materialize(
       getBrowserDbClient(),
-      changelogCategoryCollection(currentScope())
+      changelogCategoryCollection(getScope())
     );
   },
   get changelogCategoryLinkCollection() {
     return materialize(
       getBrowserDbClient(),
-      changelogCategoryLinkCollection(currentScope())
+      changelogCategoryLinkCollection(getScope())
     );
   },
   get changelogCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      changelogCollection(currentScope())
-    );
+    return materialize(getBrowserDbClient(), changelogCollection(getScope()));
   },
   get changelogPostCollection() {
     return withIndexes(
-      materialize(
-        getBrowserDbClient(),
-        changelogPostCollection(currentScope())
-      ),
+      materialize(getBrowserDbClient(), changelogPostCollection(getScope())),
       (collection) => {
         // Changelog completed-posts joins entries against posts by post id.
         collection.createIndex((row) => row.postId, {
@@ -2364,22 +2354,22 @@ export const dashboardCollections = {
     );
   },
   get commentCollection() {
-    return materialize(getBrowserDbClient(), commentCollection(currentScope()));
+    return materialize(getBrowserDbClient(), commentCollection(getScope()));
   },
   get commentReactionCollection() {
     return materialize(
       getBrowserDbClient(),
-      commentReactionCollection(currentScope())
+      commentReactionCollection(getScope())
     );
   },
   get companyCollection() {
-    return materialize(getBrowserDbClient(), companyCollection(currentScope()));
+    return materialize(getBrowserDbClient(), companyCollection(getScope()));
   },
   get deleteEligibilityCollection() {
     return withIndexes(
       materialize(
         getBrowserDbClient(),
-        deleteEligibilityCollection(currentScope())
+        deleteEligibilityCollection(getScope())
       ),
       (collection) => {
         collection.createIndex((row) => row.postId, {
@@ -2391,48 +2381,42 @@ export const dashboardCollections = {
   get companyAttributeDefinitionCollection() {
     return materialize(
       getBrowserDbClient(),
-      companyAttributeDefinitionCollection(currentScope())
+      companyAttributeDefinitionCollection(getScope())
     );
   },
   get companyAttributeValueCollection() {
     return materialize(
       getBrowserDbClient(),
-      companyAttributeValueCollection(currentScope())
+      companyAttributeValueCollection(getScope())
     );
   },
   get contactAttributeDefinitionCollection() {
     return materialize(
       getBrowserDbClient(),
-      contactAttributeDefinitionCollection(currentScope())
+      contactAttributeDefinitionCollection(getScope())
     );
   },
   get contactAttributeValueCollection() {
     return materialize(
       getBrowserDbClient(),
-      contactAttributeValueCollection(currentScope())
+      contactAttributeValueCollection(getScope())
     );
   },
   get contactCollection() {
-    return materialize(getBrowserDbClient(), contactCollection(currentScope()));
+    return materialize(getBrowserDbClient(), contactCollection(getScope()));
   },
   get invitationsCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      invitationsCollection(currentScope())
-    );
+    return materialize(getBrowserDbClient(), invitationsCollection(getScope()));
   },
   get jwtSecretCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      jwtSecretCollection(currentScope())
-    );
+    return materialize(getBrowserDbClient(), jwtSecretCollection(getScope()));
   },
   get membersCollection() {
-    return materialize(getBrowserDbClient(), membersCollection(currentScope()));
+    return materialize(getBrowserDbClient(), membersCollection(getScope()));
   },
   get membershipCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), membershipCollection(currentScope())),
+      materialize(getBrowserDbClient(), membershipCollection(getScope())),
       (collection) => {
         // Workspace details joins memberships against organizations by org id.
         collection.createIndex((row) => row.organizationId, {
@@ -2443,7 +2427,7 @@ export const dashboardCollections = {
   },
   get organizationCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), organizationCollection(currentScope())),
+      materialize(getBrowserDbClient(), organizationCollection(getScope())),
       (collection) => {
         // Workspace details joins memberships against organizations by org id.
         collection.createIndex((row) => row.id, {
@@ -2454,7 +2438,7 @@ export const dashboardCollections = {
   },
   get postCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), postCollection(currentScope())),
+      materialize(getBrowserDbClient(), postCollection(getScope())),
       (collection) => {
         collection.createIndex((row) => row.createdAt, {
           indexType: BasicIndex,
@@ -2472,26 +2456,23 @@ export const dashboardCollections = {
     );
   },
   get postDetailCollection() {
-    return materialize(
-      getBrowserDbClient(),
-      postDetailCollection(currentScope())
-    );
+    return materialize(getBrowserDbClient(), postDetailCollection(getScope()));
   },
   get postActivityCollection() {
     return materialize(
       getBrowserDbClient(),
-      postActivityCollection(currentScope())
+      postActivityCollection(getScope())
     );
   },
   get postReactionCollection() {
     return materialize(
       getBrowserDbClient(),
-      postReactionCollection(currentScope())
+      postReactionCollection(getScope())
     );
   },
   get postStatusCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), postStatusCollection(currentScope())),
+      materialize(getBrowserDbClient(), postStatusCollection(getScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2506,18 +2487,15 @@ export const dashboardCollections = {
   get postSubscriptionCollection() {
     return materialize(
       getBrowserDbClient(),
-      postSubscriptionCollection(currentScope())
+      postSubscriptionCollection(getScope())
     );
   },
   get roadmapCollection() {
-    return materialize(getBrowserDbClient(), roadmapCollection(currentScope()));
+    return materialize(getBrowserDbClient(), roadmapCollection(getScope()));
   },
   get roadmapColumnCollection() {
     return withIndexes(
-      materialize(
-        getBrowserDbClient(),
-        roadmapColumnCollection(currentScope())
-      ),
+      materialize(getBrowserDbClient(), roadmapColumnCollection(getScope())),
       (collection) => {
         // Roadmap columns join statuses and roadmaps by their foreign keys.
         collection.createIndex((row) => row.statusId, {
@@ -2531,7 +2509,7 @@ export const dashboardCollections = {
   },
   get postTagCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), postTagCollection(currentScope())),
+      materialize(getBrowserDbClient(), postTagCollection(getScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2546,11 +2524,11 @@ export const dashboardCollections = {
     );
   },
   get siteCollection() {
-    return materialize(getBrowserDbClient(), siteCollection(currentScope()));
+    return materialize(getBrowserDbClient(), siteCollection(getScope()));
   },
   get tagCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), tagCollection(currentScope())),
+      materialize(getBrowserDbClient(), tagCollection(getScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2560,7 +2538,7 @@ export const dashboardCollections = {
   },
   get upvoteCollection() {
     return withIndexes(
-      materialize(getBrowserDbClient(), upvoteCollection(currentScope())),
+      materialize(getBrowserDbClient(), upvoteCollection(getScope())),
       (collection) => {
         collection.createIndex((row) => row.organizationId, {
           indexType: BasicIndex,
@@ -2574,15 +2552,29 @@ export const dashboardCollections = {
   get workspacePlanCollection() {
     return materialize(
       getBrowserDbClient(),
-      workspacePlanCollection(currentScope())
+      workspacePlanCollection(getScope())
     );
   },
   get planComplianceCollection() {
     return materialize(
       getBrowserDbClient(),
-      planComplianceCollection(currentScope())
+      planComplianceCollection(getScope())
     );
   },
-};
+});
+
+export const dashboardCollections = makeDashboardCollections(currentScope);
+
+/**
+ * The same collections, for a scope named by the caller.
+ *
+ * A route `beforeLoad` and the dashboard layout run before the browser history
+ * has committed a client-side navigation, so `currentScope()` can still name
+ * the route being left. Naming the destination scope is what keeps a preload
+ * or a layout provider from materializing source-scoped collections and then
+ * reading them with destination filters.
+ */
+export const dashboardCollectionsFor = (scope: DashboardCollectionScope) =>
+  makeDashboardCollections(() => scope);
 
 export type DashboardCollections = typeof dashboardCollections;

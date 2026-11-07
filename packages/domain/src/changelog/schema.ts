@@ -3,18 +3,21 @@ import { ChangelogId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 
-export const ChangelogStatus = S.Literals(["draft", "scheduled", "published"]);
+import { CHANGELOG_STATES, CHANGELOG_WRITE_STATES } from "./machine";
+
+/** The stored publication vocabulary, read from the lifecycle machine. */
+export const ChangelogStatus = S.Literals(CHANGELOG_STATES);
 
 /**
  * The statuses a write may set.
  *
- * `scheduled` is deliberately absent: scheduled publishing is unimplemented —
- * the status exists in the database and in the response vocabulary, but no
- * worker publishes an entry when its time arrives, so accepting it on a write
- * would file an entry that never goes live and never tells anyone. Writes
- * accept only draft and published until the scheduler ships.
+ * Derived from the machine rather than restated: a status a write may name is a
+ * status some event enters, and `scheduled` is drain-only — no worker publishes
+ * an entry when its time arrives, so accepting it on a write would file an
+ * entry that never goes live and never tells anyone. Writes accept only the
+ * states `publish` and `unpublish` enter.
  */
-export const ChangelogWriteStatus = S.Literals(["draft", "published"]);
+export const ChangelogWriteStatus = S.Literals(CHANGELOG_WRITE_STATES);
 
 export const Changelog = S.Struct({
   assetIds: S.optional(S.Array(S.String)),

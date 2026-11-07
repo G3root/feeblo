@@ -18,6 +18,7 @@ import {
 } from "../../public-api/errors";
 import { InternalServerError, withRemapDbErrors } from "../../rpc-errors";
 import { S3UploadService } from "../../services/s3";
+import { isPublishedChangelogStatus, publishesNow } from "../machine";
 import { makeChangelogPublication } from "../publication";
 import { ChangelogRepository } from "../repository";
 import type { TPublicApiChangelogStatus } from "./schema";
@@ -466,7 +467,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
         // asset service both join it without the callback's handle.
         .transaction(() =>
           Effect.gen(function* () {
-            if (status === "published" && !allowPublish) {
+            if (isPublishedChangelogStatus(status) && !allowPublish) {
               return yield* forbiddenScopeError("changelog.publish");
             }
 
@@ -498,16 +499,15 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
               organizationId,
             });
 
-            const outboxId =
-              status === "published"
-                ? yield* publication.recordPublishedIntent({
-                    actorUserId: null,
-                    changelogId: created.id,
-                    organizationId,
-                  })
-                : undefined;
+            const outboxId = isPublishedChangelogStatus(status)
+              ? yield* publication.recordPublishedIntent({
+                  actorUserId: null,
+                  changelogId: created.id,
+                  organizationId,
+                })
+              : undefined;
 
-            if (status === "published") {
+            if (isPublishedChangelogStatus(status)) {
               yield* publication.notifyPublished({
                 // A machine key is not a member, so there is no actor to
                 // exclude from the fan-out and no name to attribute it to.
@@ -592,8 +592,9 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
               return yield* notFoundError("Changelog entry not found.");
             }
 
-            const publishedNow =
-              previousStatus !== "published" && status === "published";
+            // Only the transition into `published` is a publication; a save
+            // that leaves a live entry live announces nothing.
+            const publishedNow = publishesNow(previousStatus, status);
             if (publishedNow && !allowPublish) {
               return yield* forbiddenScopeError("changelog.publish");
             }

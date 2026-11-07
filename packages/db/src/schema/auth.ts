@@ -125,6 +125,9 @@ export const accountTable = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
+  // `issuer` carries no unique index: the 1.7.0–1.7.2 compound one on
+  // (issuer, accountId) went in 1.7.3, and `accountId` alone is not unique,
+  // because two providers may issue the same account id.
   (table) => [index("account_userId_idx").on(table.userId)]
 );
 

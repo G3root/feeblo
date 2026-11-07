@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from "./routes/__root"
 import { Route as AuthRouteImport } from "./routes/_auth"
 import { Route as DashboardRouteImport } from "./routes/_dashboard"
 import { Route as AuthDotmdRouteImport } from "./routes/auth[.]md"
+import { Route as OauthRouteImport } from "./routes/oauth"
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt"
 import { Route as SRouteRouteImport } from "./routes/s/route"
 import { Route as SentryTunnelRouteImport } from "./routes/sentry-tunnel"
@@ -26,6 +27,8 @@ import { Route as DashboardEmailVerifyRouteImport } from "./routes/_dashboard/em
 import { Route as DashboardRegisterRouteImport } from "./routes/_dashboard/register"
 import { Route as DashboardResetPasswordRouteImport } from "./routes/_dashboard/reset-password"
 import { Route as FeedbackWidgetOrganizationIdRouteImport } from "./routes/feedback-widget/$organizationId"
+import { Route as OauthConsentRouteImport } from "./routes/oauth/consent"
+import { Route as OauthSelectWorkspaceRouteImport } from "./routes/oauth/select-workspace"
 import { Route as SIndexRouteImport } from "./routes/s/index"
 import { Route as SSplatRouteImport } from "./routes/s/$"
 import { Route as SLlmsDottxtRouteImport } from "./routes/s/llms[.]txt"
@@ -44,6 +47,7 @@ import { Route as SPSlugRouteImport } from "./routes/s/p/$slug"
 import { Route as SRoadmapIndexRouteImport } from "./routes/s/roadmap/index"
 import { Route as SRoadmapSlugRouteImport } from "./routes/s/roadmap/$slug"
 import { Route as DashboardOrganizationIdDashboardLayoutIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/index"
+import { Route as DashboardOrganizationIdDashboardLayoutInsightsRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/insights"
 import { Route as DashboardOrganizationIdSettingsIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/index"
 import { Route as DashboardOrganizationIdSettingsBillingRouteImport } from "./routes/_dashboard/$organizationId/settings/billing"
 import { Route as DashboardOrganizationIdSettingsChangelogCategoriesRouteImport } from "./routes/_dashboard/$organizationId/settings/changelog-categories"
@@ -100,6 +104,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const AuthDotmdRoute = AuthDotmdRouteImport.update({
   id: "/auth.md",
   path: "/auth.md",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OauthRoute = OauthRouteImport.update({
+  id: "/oauth",
+  path: "/oauth",
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -173,6 +182,16 @@ const FeedbackWidgetOrganizationIdRoute =
     path: "/feedback-widget/$organizationId",
     getParentRoute: () => rootRouteImport,
   } as any)
+const OauthConsentRoute = OauthConsentRouteImport.update({
+  id: "/consent",
+  path: "/consent",
+  getParentRoute: () => OauthRoute,
+} as any)
+const OauthSelectWorkspaceRoute = OauthSelectWorkspaceRouteImport.update({
+  id: "/select-workspace",
+  path: "/select-workspace",
+  getParentRoute: () => OauthRoute,
+} as any)
 const SIndexRoute = SIndexRouteImport.update({
   id: "/",
   path: "/",
@@ -265,6 +284,12 @@ const DashboardOrganizationIdDashboardLayoutIndexRoute =
   DashboardOrganizationIdDashboardLayoutIndexRouteImport.update({
     id: "/",
     path: "/",
+    getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
+  } as any)
+const DashboardOrganizationIdDashboardLayoutInsightsRoute =
+  DashboardOrganizationIdDashboardLayoutInsightsRouteImport.update({
+    id: "/insights",
+    path: "/insights",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
 const DashboardOrganizationIdSettingsIndexRoute =
@@ -544,6 +569,7 @@ export interface FileRoutesByFullPath {
   "/s": typeof SRouteRouteWithChildren
   "/": typeof DashboardRouteWithChildren
   "/auth.md": typeof AuthDotmdRoute
+  "/oauth": typeof OauthRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/sitemap.xml": typeof SitemapDotxmlRoute
@@ -557,6 +583,8 @@ export interface FileRoutesByFullPath {
   "/register": typeof DashboardRegisterRoute
   "/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
+  "/oauth/consent": typeof OauthConsentRoute
+  "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -573,6 +601,7 @@ export interface FileRoutesByFullPath {
   "/s/roadmap/$slug": typeof SRoadmapSlugRoute
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
+  "/$organizationId/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -622,6 +651,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   "/": typeof DashboardRouteWithChildren
   "/auth.md": typeof AuthDotmdRoute
+  "/oauth": typeof OauthRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/sitemap.xml": typeof SitemapDotxmlRoute
@@ -635,6 +665,8 @@ export interface FileRoutesByTo {
   "/register": typeof DashboardRegisterRoute
   "/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
+  "/oauth/consent": typeof OauthConsentRoute
+  "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -650,6 +682,7 @@ export interface FileRoutesByTo {
   "/s/roadmap/$slug": typeof SRoadmapSlugRoute
   "/s/changelog": typeof SChangelogIndexRoute
   "/s/roadmap": typeof SRoadmapIndexRoute
+  "/$organizationId/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -701,6 +734,7 @@ export interface FileRoutesById {
   "/_auth": typeof AuthRouteWithChildren
   "/_dashboard": typeof DashboardRouteWithChildren
   "/auth.md": typeof AuthDotmdRoute
+  "/oauth": typeof OauthRouteWithChildren
   "/robots.txt": typeof RobotsDottxtRoute
   "/sentry-tunnel": typeof SentryTunnelRoute
   "/sitemap.xml": typeof SitemapDotxmlRoute
@@ -714,6 +748,8 @@ export interface FileRoutesById {
   "/_dashboard/register": typeof DashboardRegisterRoute
   "/_dashboard/reset-password": typeof DashboardResetPasswordRoute
   "/feedback-widget/$organizationId": typeof FeedbackWidgetOrganizationIdRoute
+  "/oauth/consent": typeof OauthConsentRoute
+  "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
@@ -731,6 +767,7 @@ export interface FileRoutesById {
   "/s/roadmap/$slug": typeof SRoadmapSlugRoute
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
+  "/_dashboard/$organizationId/_dashboard-layout/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/_dashboard/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/_dashboard/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/_dashboard/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -783,6 +820,7 @@ export interface FileRouteTypes {
     | "/s"
     | "/"
     | "/auth.md"
+    | "/oauth"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/sitemap.xml"
@@ -796,6 +834,8 @@ export interface FileRouteTypes {
     | "/register"
     | "/reset-password"
     | "/feedback-widget/$organizationId"
+    | "/oauth/consent"
+    | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
     | "/s/robots.txt"
@@ -812,6 +852,7 @@ export interface FileRouteTypes {
     | "/s/roadmap/$slug"
     | "/s/changelog/"
     | "/s/roadmap/"
+    | "/$organizationId/insights"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -861,6 +902,7 @@ export interface FileRouteTypes {
   to:
     | "/"
     | "/auth.md"
+    | "/oauth"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/sitemap.xml"
@@ -874,6 +916,8 @@ export interface FileRouteTypes {
     | "/register"
     | "/reset-password"
     | "/feedback-widget/$organizationId"
+    | "/oauth/consent"
+    | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
     | "/s/robots.txt"
@@ -889,6 +933,7 @@ export interface FileRouteTypes {
     | "/s/roadmap/$slug"
     | "/s/changelog"
     | "/s/roadmap"
+    | "/$organizationId/insights"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -939,6 +984,7 @@ export interface FileRouteTypes {
     | "/_auth"
     | "/_dashboard"
     | "/auth.md"
+    | "/oauth"
     | "/robots.txt"
     | "/sentry-tunnel"
     | "/sitemap.xml"
@@ -952,6 +998,8 @@ export interface FileRouteTypes {
     | "/_dashboard/register"
     | "/_dashboard/reset-password"
     | "/feedback-widget/$organizationId"
+    | "/oauth/consent"
+    | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
     | "/s/robots.txt"
@@ -969,6 +1017,7 @@ export interface FileRouteTypes {
     | "/s/roadmap/$slug"
     | "/s/changelog/"
     | "/s/roadmap/"
+    | "/_dashboard/$organizationId/_dashboard-layout/insights"
     | "/_dashboard/$organizationId/settings/billing"
     | "/_dashboard/$organizationId/settings/changelog-categories"
     | "/_dashboard/$organizationId/settings/changelog-privacy"
@@ -1021,6 +1070,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRouteWithChildren
   AuthDotmdRoute: typeof AuthDotmdRoute
+  OauthRoute: typeof OauthRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SentryTunnelRoute: typeof SentryTunnelRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -1050,6 +1100,13 @@ declare module "@tanstack/react-router" {
       path: "/auth.md"
       fullPath: "/auth.md"
       preLoaderRoute: typeof AuthDotmdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/oauth": {
+      id: "/oauth"
+      path: "/oauth"
+      fullPath: "/oauth"
+      preLoaderRoute: typeof OauthRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/robots.txt": {
@@ -1149,6 +1206,20 @@ declare module "@tanstack/react-router" {
       fullPath: "/feedback-widget/$organizationId"
       preLoaderRoute: typeof FeedbackWidgetOrganizationIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    "/oauth/consent": {
+      id: "/oauth/consent"
+      path: "/consent"
+      fullPath: "/oauth/consent"
+      preLoaderRoute: typeof OauthConsentRouteImport
+      parentRoute: typeof OauthRoute
+    }
+    "/oauth/select-workspace": {
+      id: "/oauth/select-workspace"
+      path: "/select-workspace"
+      fullPath: "/oauth/select-workspace"
+      preLoaderRoute: typeof OauthSelectWorkspaceRouteImport
+      parentRoute: typeof OauthRoute
     }
     "/s/": {
       id: "/s/"
@@ -1274,6 +1345,13 @@ declare module "@tanstack/react-router" {
       path: "/"
       fullPath: "/$organizationId/"
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRouteImport
+      parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
+    }
+    "/_dashboard/$organizationId/_dashboard-layout/insights": {
+      id: "/_dashboard/$organizationId/_dashboard-layout/insights"
+      path: "/insights"
+      fullPath: "/$organizationId/insights"
+      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
     "/_dashboard/$organizationId/settings/": {
@@ -1635,6 +1713,7 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface DashboardOrganizationIdDashboardLayoutRouteChildren {
+  DashboardOrganizationIdDashboardLayoutInsightsRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   DashboardOrganizationIdDashboardLayoutIndexRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   DashboardOrganizationIdDashboardLayoutChangelogDraftRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogDraftRoute
   DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute
@@ -1659,6 +1738,8 @@ interface DashboardOrganizationIdDashboardLayoutRouteChildren {
 
 const DashboardOrganizationIdDashboardLayoutRouteChildren: DashboardOrganizationIdDashboardLayoutRouteChildren =
   {
+    DashboardOrganizationIdDashboardLayoutInsightsRoute:
+      DashboardOrganizationIdDashboardLayoutInsightsRoute,
     DashboardOrganizationIdDashboardLayoutIndexRoute:
       DashboardOrganizationIdDashboardLayoutIndexRoute,
     DashboardOrganizationIdDashboardLayoutChangelogDraftRoute:
@@ -1835,11 +1916,24 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
+interface OauthRouteChildren {
+  OauthConsentRoute: typeof OauthConsentRoute
+  OauthSelectWorkspaceRoute: typeof OauthSelectWorkspaceRoute
+}
+
+const OauthRouteChildren: OauthRouteChildren = {
+  OauthConsentRoute: OauthConsentRoute,
+  OauthSelectWorkspaceRoute: OauthSelectWorkspaceRoute,
+}
+
+const OauthRouteWithChildren = OauthRoute._addFileChildren(OauthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   SRouteRoute: SRouteRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRouteWithChildren,
   AuthDotmdRoute: AuthDotmdRoute,
+  OauthRoute: OauthRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SentryTunnelRoute: SentryTunnelRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
@@ -1850,12 +1944,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from "./router.tsx"
-import type { createStart } from "@tanstack/react-start"
-declare module "@tanstack/react-start" {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

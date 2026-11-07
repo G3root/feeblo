@@ -131,7 +131,7 @@ const seedCrmEntries = (args: {
 const createCompany = (organizationId: string, name: string) =>
   createCompanyOperation.handler({ name }).pipe(
     Effect.provideService(PublicApiCaller, {
-      keyId: "key_crm",
+      credential: { _tag: "ApiKey", keyId: "key_crm" },
       organizationId,
       scopes: { companies: ["create"] },
       rateLimit: {

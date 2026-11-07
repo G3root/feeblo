@@ -59,6 +59,12 @@ const AuthTest = Layer.succeed(Auth, {
         ? testSession
         : null;
     },
+    verifyMcpAccessToken: async () => ({
+      _tag: "Rejected" as const,
+      status: 401,
+      message: "Not available in this composition.",
+      headers: {},
+    }),
     // This composition never administers API keys. Failing loudly keeps a
     // future accidental call visible instead of silently succeeding.
     createApiKey: unusedApiKeyMethod(),

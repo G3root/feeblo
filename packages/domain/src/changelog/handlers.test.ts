@@ -549,6 +549,92 @@ describe("ChangelogRpcHandlers", () => {
       })
     );
 
+    /**
+     * The Public API has always refused a publish with no date
+     * (`changelog/public-api/operations.ts`); the dashboard RPC accepted it, and
+     * its publish dialog was the only thing preventing one. A published entry
+     * with a null `publishedAt` orders by `createdAt` in the dashboard list, so
+     * it is a state the vocabulary should not admit on either surface.
+     */
+    it.effect("rejects a create that publishes without a date", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+
+        const error = yield* Effect.flip(
+          handlers
+            .CreateChangelog({
+              assetIds: [],
+              coverImage: null,
+              id: yield* ChangelogId.generate,
+              organizationId: fixture.organizationId,
+              title: "Undated release",
+              slug: "undated-release",
+              content: "No publication date",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: null,
+            })
+            .pipe(Effect.provideService(CurrentSession, session))
+        );
+
+        expect(error._tag).toBe("BadRequestError");
+        // The rejection is before the transaction, so nothing was written.
+        const entries = yield* handlers
+          .ListChangelogs({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(entries).toHaveLength(0);
+      })
+    );
+
+    it.effect("rejects an update that publishes without a date", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const id = yield* ChangelogId.generate;
+
+        yield* handlers
+          .CreateChangelog({
+            assetIds: [],
+            coverImage: null,
+            id,
+            organizationId: fixture.organizationId,
+            title: "Draft release",
+            slug: "draft-release",
+            content: "Still a draft",
+            status: "draft",
+            scheduledAt: null,
+            publishedAt: null,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const error = yield* Effect.flip(
+          handlers
+            .UpdateChangelog({
+              assetIds: [],
+              coverImage: null,
+              id,
+              organizationId: fixture.organizationId,
+              title: "Draft release",
+              slug: "draft-release",
+              content: "Still a draft",
+              status: "published",
+              scheduledAt: null,
+              publishedAt: null,
+            })
+            .pipe(Effect.provideService(CurrentSession, session))
+        );
+
+        expect(error._tag).toBe("BadRequestError");
+        const entries = yield* handlers
+          .ListChangelogs({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        expect(entries[0]?.status).toBe("draft");
+      })
+    );
+
     it.effect(
       "records one email intent when a changelog is first published",
       () =>

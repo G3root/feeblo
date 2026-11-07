@@ -13,6 +13,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { deliveryInFlightStates } from "./delivery-state";
+
 const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
 export class EmailOutboxInspectionError extends Schema.TaggedError<EmailOutboxInspectionError>()(
@@ -104,7 +106,7 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
       );
       deliveryStates[state] += row.total;
       if (
-        (state === "queued" || state === "deferred" || state === "sending") &&
+        deliveryInFlightStates.includes(state) &&
         row.oldestCreatedAt !== null
       ) {
         const oldestCreatedAt = yield* Schema.decodeEffect(PersistedDate)(
