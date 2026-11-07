@@ -5,3 +5,4 @@ export * from "./feedback";
 export * from "./integration";
 export * from "./media";
 export * from "./moderation";
+export * from "./oauth";

@@ -68,6 +68,9 @@ allowBuilds:
 catalog:
   "@base-ui/react": ^1.7.0
   "@better-auth/api-key": 1.7.16
+  "@better-auth/cimd": 1.7.16
+  "@better-auth/mcp": 1.7.16
+  "@better-auth/oauth-provider": 1.7.16
   "@bufbuild/protobuf": 2.16.0
   "@cloudflare/workers-types": ^5.20261023.1
   "@dotenvx/dotenvx": ^2.38.2

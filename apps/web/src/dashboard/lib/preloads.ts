@@ -3,6 +3,7 @@ import { and, createLiveQueryCollection, eq } from "@tanstack/react-db";
 import { workspaceIdFromPathname } from "./collection-scope";
 import {
   dashboardCollections,
+  dashboardCollectionsFor,
   planComplianceCollectionFor,
 } from "./collections";
 
@@ -215,13 +216,18 @@ export async function preloadPostDetail({
  * preload and the components cannot disagree about their filters.
  */
 function postDetailSubsets(organizationId: string, postSlug: string) {
+  // The route loader runs before the URL reflects the navigation, so the
+  // collections must be materialized for the post being loaded rather than
+  // for whichever post the browser is still showing.
+  const scoped = dashboardCollectionsFor({ organizationId, postSlug });
+
   return {
     // Full-post body for the detail view. The org-scoped list collection
     // carries slim rows (no `content`); this slug-scoped query resolves the
     // body through `GetPost`.
     postDetail: createLiveQueryCollection((query) =>
       query
-        .from({ post: dashboardCollections.postDetailCollection })
+        .from({ post: scoped.postDetailCollection })
         .where(({ post }) =>
           and(eq(post.organizationId, organizationId), eq(post.slug, postSlug))
         )
@@ -229,7 +235,7 @@ function postDetailSubsets(organizationId: string, postSlug: string) {
     commentReactions: createLiveQueryCollection((query) =>
       query
         .from({
-          commentReaction: dashboardCollections.commentReactionCollection,
+          commentReaction: scoped.commentReactionCollection,
         })
         .where(({ commentReaction }) =>
           and(
@@ -240,7 +246,7 @@ function postDetailSubsets(organizationId: string, postSlug: string) {
     ),
     comments: createLiveQueryCollection((query) =>
       query
-        .from({ comment: dashboardCollections.commentCollection })
+        .from({ comment: scoped.commentCollection })
         .where(({ comment }) =>
           and(
             eq(comment.organizationId, organizationId),
@@ -250,7 +256,7 @@ function postDetailSubsets(organizationId: string, postSlug: string) {
     ),
     postReactions: createLiveQueryCollection((query) =>
       query
-        .from({ postReaction: dashboardCollections.postReactionCollection })
+        .from({ postReaction: scoped.postReactionCollection })
         .where(({ postReaction }) =>
           and(
             eq(postReaction.organizationId, organizationId),
@@ -263,7 +269,7 @@ function postDetailSubsets(organizationId: string, postSlug: string) {
     // on too. An org-scoped load is enough to resolve that same slug key.
     postSubscription: createLiveQueryCollection((query) =>
       query
-        .from({ subscription: dashboardCollections.postSubscriptionCollection })
+        .from({ subscription: scoped.postSubscriptionCollection })
         .where(({ subscription }) =>
           eq(subscription.organizationId, organizationId)
         )

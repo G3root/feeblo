@@ -17,7 +17,7 @@ import {
   SidebarTrigger,
 } from "@feeblo/ui/sidebar";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { useCallback, useMemo } from "react";
 
 import { AppSidebar } from "~/components/common/app-sidebar";
@@ -45,38 +45,40 @@ import {
   ToggleRoadmapVisibilityDialogProvider,
 } from "~/features/roadmap/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
-import { dashboardCollections } from "~/lib/collections";
+import {
+  dashboardCollections,
+  dashboardCollectionsFor,
+} from "~/lib/collections";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const organizationId = useOrganizationId();
-  // Each collection is keyed by the scope it was materialized for, read from
-  // the live pathname when the accessor runs. This layout does not re-render
-  // on its own when a child route changes — `useOrganizationId` selects one
-  // param, so navigating between two posts leaves it alone — and a collection
-  // materialized on a slug-less route has no post slug, so a post page would
-  // keep reading the empty subset. Subscribing to the pathname re-materializes
-  // the provider's collections for the route that is actually on screen.
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
+  // Each collection is keyed by the scope it was materialized for. The layout
+  // does not re-render for a child route on its own, and during a client-side
+  // navigation `window.location` can still name the post being left while the
+  // route already names the destination. Name the destination scope explicitly
+  // so the provider never hands a target-filtered live query a source-scoped
+  // collection.
+  const postSlug = useParams({
+    strict: false,
+    select: (params) => params?.postSlug,
   });
-  const collections = useMemo(
-    () => ({
-      boardCollection: dashboardCollections.boardCollection,
-      commentCollection: dashboardCollections.commentCollection,
-      deleteEligibilityCollection:
-        dashboardCollections.deleteEligibilityCollection,
-      membersCollection: dashboardCollections.membersCollection,
-      postCollection: dashboardCollections.postCollection,
-      postDetailCollection: dashboardCollections.postDetailCollection,
-      postStatusCollection: dashboardCollections.postStatusCollection,
-      postSubscriptionCollection:
-        dashboardCollections.postSubscriptionCollection,
-      upvoteCollection: dashboardCollections.upvoteCollection,
-      postReactionCollection: dashboardCollections.postReactionCollection,
-      commentReactionCollection: dashboardCollections.commentReactionCollection,
-    }),
-    [pathname]
-  );
+  const collections = useMemo(() => {
+    const scoped = dashboardCollectionsFor({ organizationId, postSlug });
+
+    return {
+      boardCollection: scoped.boardCollection,
+      commentCollection: scoped.commentCollection,
+      deleteEligibilityCollection: scoped.deleteEligibilityCollection,
+      membersCollection: scoped.membersCollection,
+      postCollection: scoped.postCollection,
+      postDetailCollection: scoped.postDetailCollection,
+      postStatusCollection: scoped.postStatusCollection,
+      postSubscriptionCollection: scoped.postSubscriptionCollection,
+      upvoteCollection: scoped.upvoteCollection,
+      postReactionCollection: scoped.postReactionCollection,
+      commentReactionCollection: scoped.commentReactionCollection,
+    };
+  }, [organizationId, postSlug]);
   const getPostHref = useCallback<
     NonNullable<PostCollectionsValue["getPostHref"]>
   >(

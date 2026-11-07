@@ -272,7 +272,9 @@ export const invalidApiKeyError = (
 
 export const forbiddenScopeError = (scope: string) =>
   new ForbiddenScopeError({
-    message: `This API key is missing the ${scope} scope.`,
+    // Not "API key": an OAuth grant is refused by the same check, and the
+    // text is what a model reads to decide whether to ask for more access.
+    message: `This credential is missing the ${scope} scope.`,
   });
 
 export const planRequiresUpgradeError = (

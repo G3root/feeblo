@@ -1,6 +1,6 @@
 # Public API (v1)
 
-The Public API lets a workspace read and manage its own Feeblo data programmatically. It is versioned, authenticated with an API key, and available on paid plans.
+The Public API lets a workspace read and manage its own Feeblo data programmatically. It is versioned and available on paid plans. The `/api/v1` endpoints are authenticated with an API key; the MCP endpoint also accepts an OAuth access token.
 
 It is **not** the public portal — the feedback board and widget that anyone can read — and **not** the dashboard transport, which is session-authenticated.
 
@@ -19,7 +19,7 @@ The API origin publishes the documents an agent reads before it has a credential
 | Markdown landing | `GET /` and `GET /llms.txt` | What the origin is, the base URL, the key header, and the docs links. |
 | Auth guide | `GET /auth.md` | Create a key, call the API, connect an MCP client, and read the error vocabulary. |
 | API catalog | `GET /.well-known/api-catalog` | RFC 9727 linkset: the OpenAPI document, the reference, and the MCP server card. |
-| MCP server card | `GET /.well-known/mcp.json` | The MCP endpoint, its transport, and its `x-api-key` requirement. |
+| MCP server card | `GET /.well-known/mcp.json` | The MCP endpoint, its transport, and the credentials it accepts. |
 
 Every discovery response carries a `Link` header with the same relations (`api-catalog`, `service-desc`, `service-doc`, `describedby`). Discovery never reads the database: an outage that fails `/api/v1` still answers these documents.
 
@@ -27,12 +27,14 @@ Each public board also serves `/llms.txt`, a Markdown index of the board's publi
 
 ## Authentication
 
-Every request carries an API key:
+Every `/api/v1` request carries an API key:
 
 ```http
 GET /api/v1/boards/brd_example/posts HTTP/1.1
 x-api-key: fbk_...
 ```
+
+The `/mcp` endpoint accepts the same header or an OAuth 2.1 access token in `Authorization: Bearer`; see [Model Context Protocol (MCP)](#model-context-protocol-mcp). The rest of this section describes the key credential.
 
 Keys are **organization-owned machine credentials**. A key reads only the workspace that owns it; no request parameter can change that, and there is no way to reach another workspace's data. Keys are stored hashed — the plaintext value is shown once, when the key is created, and cannot be retrieved again.
 
@@ -94,11 +96,17 @@ The same API is served as an MCP server, so an MCP client can read and manage th
 
 - **Endpoint:** `POST {API_URL}/mcp`, the MCP Streamable HTTP transport.
 - **Protocol revisions:** `2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, and `2024-11-05`.
-- **Authentication:** the same API key, in the `x-api-key` header of every request. There is no separate MCP credential and no OAuth flow.
+- **Authentication:** the same API key, in the `x-api-key` header, or an OAuth 2.1 access token in the `Authorization: Bearer` header. A hosted client that discovers an authorization server uses OAuth: it reads `/.well-known/oauth-protected-resource`, signs the member in, asks them to choose a workspace, and asks for consent. The token is bound to this endpoint and to that workspace, and its scopes are the ones the member approved.
+
+Two credentials, one contract: both resolve to the same workspace and the same scope set, and both are subject to the plan gate, the per-credential budget, and the published `X-RateLimit-*` headers. A key is budgeted per key; an OAuth grant is budgeted per member and workspace, so a client cannot mint tokens to multiply its allowance.
+
+An OAuth grant that names no workspace is refused rather than defaulted to one. A grant whose member has since left the workspace — or lost the owner/admin role the grant required — is refused even before its token expires, and only a member who could create a workspace key can authorize one in the first place.
 
 Every endpoint above is one tool, named after the operation it serves — `listTags`, `createPost`, and so on. A tool's input is the endpoint's input as JSON Schema; its result carries the same published DTO as the HTTP response, as structured content and as text. The hints a client shows in an approval prompt — read-only, destructive, idempotent, open world — are the same annotations the endpoint declares.
 
-Scopes, the plan gate, and the per-key rate limit apply exactly as they do to HTTP requests: the key is resolved once per request, and a refusal answers the envelope and status listed under [Errors](#errors). `tools/list` returns every tool regardless of the key's scopes; calling one the key does not hold answers a tool error whose text names the missing scope — `This API key is missing the … scope.` — so a client learns which scope is missing instead of silently lacking a capability.
+Scopes, the plan gate, and the per-credential rate limit apply exactly as they do to HTTP requests: the credential is resolved once per request. Once it is resolved, a refusal — a missing scope, a plan without the Public API, an exhausted budget — answers the envelope and status listed under [Errors](#errors). `tools/list` returns every tool regardless of the credential's scopes; calling one it does not hold answers a tool error whose text names the missing scope — `This credential is missing the … scope.` — so a client learns which scope is missing instead of silently lacking a capability.
+
+A rejected OAuth token is answered before that point, and not with the envelope: `/mcp` returns a JSON-RPC error and a `WWW-Authenticate` header (RFC 9728) pointing at `/.well-known/oauth-protected-resource`. That header is what tells an MCP client where to send the member to authorize; the key surface's `401` body is unchanged.
 
 Requests carrying an `Origin` header are rejected: the transport does not enable cross-origin access, so a browser-based client must reach it through a same-origin proxy. Clients that send no `Origin` — the desktop and server integrations — are unaffected.
 
@@ -954,7 +962,7 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 ```json
 {
   "_tag": "FORBIDDEN_SCOPE",
-  "message": "This API key is missing the posts.read scope."
+  "message": "This credential is missing the posts.read scope."
 }
 ```
 
@@ -963,11 +971,11 @@ Every error uses one envelope, where `_tag` is the machine-readable code and `me
 | 400 | `INVALID_REQUEST` | Malformed parameter, cursor, limit, `tagIds` list (empty or malformed), or `updatedAfter` instant (not an ISO 8601 date or timestamp naming a real day); a body the endpoint cannot decode; a comment body that is empty or sanitizes to nothing; a name or title that is only whitespace; an update that names no field; an end-user upsert that names neither an `externalId` nor an email; a board, status, or company id that is not in the workspace; a post that has been merged into another; merging a post into itself; a reply whose parent is not a comment on the same post; a reply widened to public beneath an internal parent; an author subject that resolves to no account. |
 | 401 | `MISSING_API_KEY` | No `x-api-key` header was sent, or its value was empty. |
 | 401 | `INVALID_API_KEY` | The key is unknown, revoked, expired, or disabled. |
-| 403 | `FORBIDDEN_SCOPE` | The key lacks the scope the endpoint requires. |
+| 403 | `FORBIDDEN_SCOPE` | The credential lacks the scope the endpoint requires. |
 | 403 | `PLAN_REQUIRES_UPGRADE` | The workspace plan does not include the Public API, or has no room left in a limit it sets — such as CRM entries. |
 | 404 | `NOT_FOUND` | The resource does not exist in this workspace. |
 | 409 | `CONFLICT` | A write collided with something that already exists, such as a tag name or a company name or external id already in use, a changelog slug already taken, a post title whose slug suffixes are all taken, or comments on a post whose conversation is locked; or the resource's state cannot satisfy the request, such as merging an archived or already-merged post, unmerging one that is not merged, or an end-user upsert whose identifiers name two different people. |
-| 429 | `RATE_LIMITED` | Per-key rate limit exceeded. Carries `Retry-After` in seconds, and the `X-RateLimit-*` headers described under [Rate limits](#rate-limits). |
+| 429 | `RATE_LIMITED` | The credential's rate limit is exceeded. Carries `Retry-After` in seconds, and the `X-RateLimit-*` headers described under [Rate limits](#rate-limits). |
 | 500 | `INTERNAL_ERROR` | Unexpected server failure. |
 | 503 | `SERVICE_UNAVAILABLE` | A required dependency is unavailable; requests fail closed. |
 
@@ -975,7 +983,7 @@ Switch on `_tag`. Codes are append-only within v1 — a new one may appear, an e
 
 ## Rate limits
 
-Limits are per key, not per IP, and are shared across server instances: **300 requests per minute**, shared by reads and writes. Limits may increase without notice; decreases are announced in advance.
+Limits are per credential, not per IP, and are shared across server instances: **300 requests per minute**, shared by reads and writes. A key is budgeted per key; an OAuth grant on `/mcp` is budgeted per member and workspace, so a client cannot mint tokens to multiply its allowance. Limits may increase without notice; decreases are announced in advance.
 
 Every successful response, and every `429`, carries the state of the caller's budget:
 
@@ -991,7 +999,7 @@ The per-key bucket means a customer behind a shared NAT is not throttled by thei
 
 ## Plans
 
-The Public API is included in **Starter** and **Professional**. A workspace on the Free plan cannot create keys, and requests made with keys from a workspace that has downgraded return `403 PLAN_REQUIRES_UPGRADE`.
+The Public API is included in **Starter** and **Professional**. A workspace on the Free plan cannot create keys, and requests from a workspace that has downgraded return `403 PLAN_REQUIRES_UPGRADE`.
 
 On downgrade, keys are **kept and not disabled**. They start working again when the workspace upgrades, with no rotation and no reconfiguration in your integrations. Existing keys stay listed and can still be revoked while the workspace is on Free — only creating new ones is blocked.
 

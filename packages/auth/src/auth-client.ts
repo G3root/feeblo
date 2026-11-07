@@ -1,3 +1,4 @@
+import { oauthProviderClient } from "@better-auth/oauth-provider/client";
 import { createAuthClient as createVanillaAuthClientBase } from "better-auth/client";
 import {
   adminClient,
@@ -34,6 +35,9 @@ const buildAuthClientOptions = (
     }),
     twoFactorClient(),
     adminClient(),
+    // The MCP authorization server's endpoints (`oauth2.consent`,
+    // `oauth2.continue`), used by the consent and workspace-choice pages.
+    oauthProviderClient(),
     jwtAutoLoginClient(),
   ],
   baseURL,

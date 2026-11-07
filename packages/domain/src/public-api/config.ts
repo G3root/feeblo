@@ -17,16 +17,29 @@ export class PublicApiConfig extends Context.Service<PublicApiConfig>()(
   {
     make: Effect.gen(function* () {
       const appUrl = yield* Config.schema(Schema.URLFromString, "APP_URL");
-      return { appUrl: appUrl.href.replace(trailingSlashPattern, "") } as const;
+      // The API's own origin. The MCP surface needs it to resolve the relative
+      // request URL Effect exposes into the absolute URL a token verifier
+      // expects (DPoP binds a proof to `htu`, which must be absolute).
+      const apiUrl = yield* Config.schema(Schema.URLFromString, "API_URL");
+      return {
+        appUrl: appUrl.href.replace(trailingSlashPattern, ""),
+        apiUrl: apiUrl.href.replace(trailingSlashPattern, ""),
+      } as const;
     }),
   }
 ) {
   static readonly layer = Layer.effect(this, this.make);
 
-  /** Supplies an already-validated application URL to tests. */
-  static readonly layerTest = (appUrl: URL) =>
+  /** Supplies already-validated URLs to tests. */
+  static readonly layerTest = (
+    appUrl: URL,
+    apiUrl: URL = new URL("https://api.feeblo.test")
+  ) =>
     Layer.succeed(
       this,
-      this.of({ appUrl: appUrl.href.replace(trailingSlashPattern, "") })
+      this.of({
+        appUrl: appUrl.href.replace(trailingSlashPattern, ""),
+        apiUrl: apiUrl.href.replace(trailingSlashPattern, ""),
+      })
     );
 }

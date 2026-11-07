@@ -31,11 +31,28 @@ import {
  * headers, and none of them has to spend a second limiter read to learn them.
  */
 export type PublicApiCall = {
-  readonly keyId: string;
+  /**
+   * The credential the request was made with.
+   *
+   * A key and an OAuth grant are different authorities — one is a workspace's
+   * machine credential, the other is a member acting in a workspace — so the
+   * caller records which one it is rather than hiding both behind one id.
+   */
+  readonly credential: PublicApiCredential;
   readonly organizationId: string;
   readonly scopes: PublicApiScopeStatements | null;
   readonly rateLimit: PublicApiRateLimit;
 };
+
+/** The credential a caller presented, and the identity it resolves to. */
+export type PublicApiCredential =
+  | { readonly _tag: "ApiKey"; readonly keyId: string }
+  | {
+      readonly _tag: "OAuthGrant";
+      readonly clientId: string;
+      /** The member who consented (`sub`). */
+      readonly subject: string;
+    };
 
 /** The budget state after one request, as the published headers report it. */
 export type PublicApiRateLimit = {
@@ -78,6 +95,87 @@ const retryAfterSeconds = (
     : Math.max(1, Math.ceil(Duration.toSeconds(retryAfter)));
 
 /**
+ * Charges one request against a budget bucket, or fails with the refusal the
+ * surface answers with.
+ *
+ * The bucket is the credential's own scope: a key is budgeted per key, and an
+ * OAuth grant per (member, workspace), so a client cannot mint tokens to
+ * multiply its allowance. Both surfaces send the same `X-RateLimit-*` headers,
+ * which is what `now` is read for.
+ */
+export const chargePublicApiBudget = (
+  bucket: string,
+  budget: PublicApiKeyBudget
+) =>
+  Effect.gen(function* () {
+    const rateLimitService = yield* RateLimitService;
+
+    // The clock is read before the consume rather than inside the failure, so
+    // the 429's `X-RateLimit-Reset` is an absolute instant like every other
+    // response's; the read and the charge are microseconds apart, and the
+    // window it names is the one the limiter reports.
+    const now = yield* Clock.currentTimeMillis;
+
+    const rateLimit = yield* rateLimitService
+      .consume({
+        key: bucket,
+        limit: budget.limit,
+        window: budget.window,
+      })
+      .pipe(
+        Effect.catchTag("RateLimiterError", (error) =>
+          Effect.fail(
+            error.reason._tag === "RateLimitExceeded"
+              ? rateLimitedError(
+                  retryAfterSeconds(error.reason.retryAfter),
+                  publicApiRateLimitHeaders(
+                    {
+                      limit: error.reason.limit,
+                      remaining: error.reason.remaining,
+                      resetAfter:
+                        error.reason.retryAfter ?? Duration.seconds(1),
+                    },
+                    now
+                  )
+                )
+              : // Fail closed: admitting unlimited traffic because the
+                // limiter is down would make an outage an abuse window.
+                serviceUnavailableError()
+          )
+        )
+      );
+
+    return {
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetAfter: rateLimit.resetAfter,
+    } satisfies PublicApiRateLimit;
+  });
+
+/**
+ * The plan gate every Public API surface applies on every request.
+ *
+ * Not only at key creation: a workspace that downgraded must stop being
+ * served, and the distinct code tells the caller's logs the difference between
+ * "bad credential" and "billing".
+ */
+export const enforcePublicApiPlan = (organizationId: string) =>
+  Effect.gen(function* () {
+    const entitlementPolicy = yield* EntitlementPolicy;
+    yield* entitlementPolicy.canUsePublicApi(organizationId).pipe(
+      Effect.catchTag("PolicyDenied", () =>
+        Effect.fail(planRequiresUpgradeError())
+      ),
+      // The plan lookup reads the database; a driver failure here is a server
+      // problem, not a plan problem.
+      withRemapDbErrors("PublicApiPlan", "select"),
+      Effect.catchTag("InternalServerError", () =>
+        Effect.fail(internalError("The request could not be completed."))
+      )
+    );
+  });
+
+/**
  * Turns a presented API key into the call it authenticates.
  *
  * This is the whole of the key check — presence, server-side verification, the
@@ -96,8 +194,6 @@ export const authenticatePublicApiKey = (
 ) =>
   Effect.gen(function* () {
     const auth = yield* Auth;
-    const entitlementPolicy = yield* EntitlementPolicy;
-    const rateLimitService = yield* RateLimitService;
 
     // The caller trims at the surface boundary; a padded value still verifies
     // and whitespace alone is still "no key".
@@ -134,67 +230,17 @@ export const authenticatePublicApiKey = (
     // Runs before the plan gate: the gate reads the database, so a verified
     // key must spend budget before it can trigger that lookup, including a
     // downgraded key that the gate will then reject.
-    //
-    // The clock is read before the consume rather than inside the failure, so
-    // the 429's `X-RateLimit-Reset` is an absolute instant like every other
-    // response's; the read and the charge are microseconds apart, and the
-    // window it names is the one the limiter reports.
-    const rateLimit = yield* Effect.gen(function* () {
-      const now = yield* Clock.currentTimeMillis;
-
-      return yield* rateLimitService
-        .consume({
-          key: `public-api:key:${record.id}`,
-          limit: budget.limit,
-          window: budget.window,
-        })
-        .pipe(
-          Effect.catchTag("RateLimiterError", (error) =>
-            Effect.fail(
-              error.reason._tag === "RateLimitExceeded"
-                ? rateLimitedError(
-                    retryAfterSeconds(error.reason.retryAfter),
-                    publicApiRateLimitHeaders(
-                      {
-                        limit: error.reason.limit,
-                        remaining: error.reason.remaining,
-                        resetAfter:
-                          error.reason.retryAfter ?? Duration.seconds(1),
-                      },
-                      now
-                    )
-                  )
-                : // Fail closed: admitting unlimited traffic because the
-                  // limiter is down would make an outage an abuse window.
-                  serviceUnavailableError()
-            )
-          )
-        );
-    });
-
-    // Plan gate on every request, not only at key creation: a workspace that
-    // downgraded must stop being served, and the distinct code tells the
-    // caller's logs the difference between "bad key" and "billing".
-    yield* entitlementPolicy.canUsePublicApi(organizationId).pipe(
-      Effect.catchTag("PolicyDenied", () =>
-        Effect.fail(planRequiresUpgradeError())
-      ),
-      // The plan lookup reads the database; a driver failure here is a server
-      // problem, not a plan problem.
-      withRemapDbErrors("PublicApiPlan", "select"),
-      Effect.catchTag("InternalServerError", () =>
-        Effect.fail(internalError("The request could not be completed."))
-      )
+    const rateLimit = yield* chargePublicApiBudget(
+      `public-api:key:${record.id}`,
+      budget
     );
 
+    yield* enforcePublicApiPlan(organizationId);
+
     return {
-      keyId: record.id,
+      credential: { _tag: "ApiKey" as const, keyId: record.id },
       organizationId,
-      rateLimit: {
-        limit: rateLimit.limit,
-        remaining: rateLimit.remaining,
-        resetAfter: rateLimit.resetAfter,
-      },
+      rateLimit,
       scopes: record.permissions ?? null,
     };
   });

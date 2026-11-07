@@ -21,9 +21,11 @@ import {
 } from "./schema";
 import {
   decodeError,
+  mcpBearer,
   POST_MANAGEMENT_KEY_SCOPES,
   PublicApiDependencies,
   registerKey,
+  registerMcpToken,
   responseBody,
   seedTag,
   seedWorkspace,
@@ -46,6 +48,7 @@ const MCP_ACCEPT = "application/json, text/event-stream";
 
 const executeMcp = (options: {
   readonly apiKey?: string;
+  readonly authorization?: string;
   readonly body: unknown;
   readonly protocolVersion?: string;
   readonly sessionId?: string;
@@ -57,6 +60,9 @@ const executeMcp = (options: {
     });
     if (options.apiKey !== undefined) {
       headers.set("x-api-key", options.apiKey);
+    }
+    if (options.authorization !== undefined) {
+      headers.set("authorization", options.authorization);
     }
     if (options.protocolVersion !== undefined) {
       headers.set("mcp-protocol-version", options.protocolVersion);
@@ -170,6 +176,50 @@ const callTool = (
   Effect.gen(function* () {
     const response = yield* executeMcp({
       apiKey,
+      body: {
+        id: 2,
+        jsonrpc: "2.0",
+        method: "tools/call",
+        params: { arguments: toolArguments, name },
+      },
+      protocolVersion: MCP_PROTOCOL_VERSION,
+      sessionId,
+    });
+    expect(response.status).toBe(200);
+
+    const message = decodeMcpMessage(yield* mcpMessage(response));
+    if (message.result === undefined) {
+      return yield* Effect.die(
+        `the tool call did not return a result: ${JSON.stringify(message.error)}`
+      );
+    }
+    return decodeCallToolResult(message.result);
+  });
+
+/** Opens an MCP session with an OAuth grant instead of a key. */
+const openOAuthSession = (authorization: string) =>
+  Effect.gen(function* () {
+    const initialized = yield* executeMcp({
+      authorization,
+      body: MCP_INITIALIZE,
+    });
+    const sessionId = initialized.headers["mcp-session-id"];
+    if (sessionId === undefined) {
+      return yield* Effect.die("the MCP handshake did not open a session");
+    }
+    return sessionId;
+  });
+
+/** One `tools/call` under an OAuth grant. */
+const callOAuthTool = (
+  sessionId: string,
+  authorization: string,
+  name: string,
+  toolArguments: Schema.JsonObject
+) =>
+  Effect.gen(function* () {
+    const response = yield* executeMcp({
+      authorization,
       body: {
         id: 2,
         jsonrpc: "2.0",
@@ -461,6 +511,76 @@ layer(
       const response = yield* executeMcp({ body: MCP_INITIALIZE });
       expect(response.status).toBe(401);
       expect(decodeError(responseBody(response))._tag).toBe("MISSING_API_KEY");
+      // Additive: the same body a key client already got, plus the RFC 9728
+      // pointer an OAuth-only client follows.
+      expect(response.headers["www-authenticate"]).toContain(
+        "resource_metadata="
+      );
+    })
+  );
+
+  it.effect("accepts an OAuth grant bound to the workspace", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerMcpToken("mcp_token_read", {
+        clientId: "client_mcp_test",
+        organizationId: workspace.organizationId,
+        scopes: ["openid", "profile", "tags.read"],
+        subject: "user_mcp_test",
+      });
+      const authorization = mcpBearer("mcp_token_read");
+
+      const sessionId = yield* openOAuthSession(authorization);
+      const listed = yield* executeMcp({
+        authorization,
+        body: { id: 2, jsonrpc: "2.0", method: "tools/list", params: {} },
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        sessionId,
+      });
+      expect(listed.status).toBe(200);
+      const tools = decodeToolList(
+        decodeMcpMessage(yield* mcpMessage(listed)).result
+      );
+      expect(tools.tools.length).toBeGreaterThan(0);
+    })
+  );
+
+  it.effect("refuses a tool the grant's scopes do not cover", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      // Identity scopes only: none of the Public API vocabulary is granted.
+      registerMcpToken("mcp_token_identity", {
+        clientId: "client_mcp_test",
+        organizationId: workspace.organizationId,
+        scopes: ["openid"],
+        subject: "user_mcp_identity",
+      });
+      const authorization = mcpBearer("mcp_token_identity");
+
+      const sessionId = yield* openOAuthSession(authorization);
+      const result = yield* callOAuthTool(
+        sessionId,
+        authorization,
+        "listTags",
+        {}
+      );
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toContain("tags.read");
+    })
+  );
+
+  it.effect("refuses an unknown OAuth token with a discovery challenge", () =>
+    Effect.gen(function* () {
+      const response = yield* executeMcp({
+        authorization: mcpBearer("mcp_token_unknown"),
+        body: MCP_INITIALIZE,
+      });
+      expect(response.status).toBe(401);
+      // The refusal is not the `/api/v1` envelope: it is the challenge an MCP
+      // client follows to the authorization server.
+      expect(response.headers["www-authenticate"]).toContain(
+        "resource_metadata="
+      );
     })
   );
 

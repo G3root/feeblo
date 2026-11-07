@@ -35,6 +35,9 @@
   },
   "dependencies": {
     "@better-auth/api-key": "catalog:",
+    "@better-auth/cimd": "catalog:",
+    "@better-auth/mcp": "catalog:",
+    "@better-auth/oauth-provider": "catalog:",
     "@effect/platform-node": "catalog:",
     "@feeblo/config": "workspace:*",
     "@feeblo/db": "workspace:*",
