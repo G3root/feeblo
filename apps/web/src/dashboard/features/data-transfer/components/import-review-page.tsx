@@ -63,7 +63,13 @@ import {
   type DataImportDetailArgs,
   dataImportDetailAtom,
 } from "../atoms";
-import { isActiveStatus, plannedRowCount, statusLabel } from "../format";
+import {
+  canCancelStatus,
+  canConfirmStatus,
+  isActiveStatus,
+  plannedRowCount,
+  statusLabel,
+} from "../format";
 import {
   DEFAULT_REVIEW_PAGE_SIZE,
   DEFAULT_REVIEW_SORT,
@@ -81,6 +87,9 @@ const PAGE_SIZE_OPTIONS = [25, 100, 250, 500] as const;
 
 /** The board picker's sentinel for "every board"; never a real board name. */
 const ALL_BOARDS = "__all_boards__";
+
+/** The imported file's own name, with its CSV extension dropped. */
+const csvFileNamePattern = /\.csv$/iu;
 
 const OUTCOME_LABELS = {
   created: m.plain_brave_crab,
@@ -309,8 +318,8 @@ export function ImportReviewPage({
   const from = total === 0 ? 0 : page * size + 1;
   const to = Math.min(total, (page + 1) * size);
   const problemCount = counts.failed + counts.warned;
-  const awaiting = job.status === "awaiting_confirmation";
-  const active = isActiveStatus(job.status);
+  const awaiting = canConfirmStatus(job.status);
+  const cancelable = canCancelStatus(job.status);
 
   const filters = [
     { count: counts.total, filter: undefined, label: m.fresh_calm_auk() },
@@ -384,7 +393,7 @@ export function ImportReviewPage({
       }
       await downloadResponse(
         response,
-        `${job.fileName.replace(/\.csv$/iu, "")}-import-problems.csv`
+        `${job.fileName.replace(csvFileNamePattern, "")}-import-problems.csv`
       );
     } catch {
       toastManager.add({ title: m.sunny_kind_gecko(), type: "error" });
@@ -463,7 +472,7 @@ export function ImportReviewPage({
                 {m.zesty_fresh_mole()}
               </Button>
             ) : null}
-            {active ? (
+            {cancelable ? (
               <Button
                 onClick={() => setCancelOpen(true)}
                 size="sm"

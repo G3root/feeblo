@@ -14,6 +14,10 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
+import {
   DISCORD_GUILD_COMMANDS,
   DISCORD_OAUTH_AUTHORIZE_URL,
   type DiscordApiClient,
@@ -27,7 +31,7 @@ import {
 } from "@feeblo/integration-discord/manifest";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -72,14 +76,14 @@ export const makeDiscordConnectionServiceLive = (
 ): Layer.Layer<
   DiscordConnectionService,
   never,
-  Database.Database | DiscordIntegrationConfig | Crypto.Crypto
+  Database.Database | DiscordIntegrationConfig | SecureRandom.SecureRandom
 > =>
   Layer.effect(
     DiscordConnectionService,
     Effect.gen(function* () {
       const db = yield* currentDb;
       const config = yield* DiscordIntegrationConfig;
-      const crypto = yield* Crypto.Crypto;
+      const secureRandom = yield* SecureRandom.SecureRandom;
 
       const connectStart = Effect.fn("DiscordConnection.connectStart")(
         function* ({ organizationId }: S.TDiscordConnectStart) {
@@ -88,17 +92,10 @@ export const makeDiscordConnectionServiceLive = (
               message: "Discord integration is not configured",
             });
           }
-          // Through the `Crypto` service, not the global: the OAuth state must
-          // be reproducible under `TestCrypto` in tests, and Workers forbid
-          // random value generation in global scope.
-          const nonce = yield* crypto.randomUUIDv4().pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Could not generate a Discord OAuth state.",
-                })
-            )
-          );
+          // Through the `SecureRandom` service, not the global: the OAuth state
+          // must be substitutable in tests, and Workers forbid random value
+          // generation in global scope.
+          const nonce = yield* secureRandom.uuidV4();
           const connectionId = yield* IntegrationConnectionId.generate;
           const ciphertext = yield* encryptDiscordCredentialMaterial(
             config.encryptionKey,
@@ -411,7 +408,14 @@ export const makeDiscordConnectionServiceLive = (
       const listConnections = Effect.fn("DiscordConnection.listConnections")(
         function* ({ organizationId }: { readonly organizationId: string }) {
           const rows = yield* db
-            .select()
+            .select({
+              createdAt: schema.integrationConnectionTable.createdAt,
+              id: schema.integrationConnectionTable.id,
+              lifecycle: schema.integrationConnectionTable.lifecycle,
+              name: schema.integrationConnectionTable.name,
+              safeDisplayMetadata:
+                schema.integrationConnectionTable.safeDisplayMetadata,
+            })
             .from(schema.integrationConnectionTable)
             .where(
               and(
@@ -424,13 +428,7 @@ export const makeDiscordConnectionServiceLive = (
                   discordProviderKey
                 ),
                 inArray(schema.integrationConnectionTable.lifecycle, [
-                  "connecting",
-                  "active",
-                  "paused",
-                  "reauth_required",
-                  "disconnecting",
-                  "disconnected",
-                  "revocation_unconfirmed",
+                  ...LISTED_CONNECTION_LIFECYCLES,
                 ])
               )
             )
@@ -474,7 +472,14 @@ export const makeDiscordConnectionServiceLive = (
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
-                .where(eq(schema.integrationConnectionTable.id, connectionId));
+                .where(
+                  and(
+                    eq(schema.integrationConnectionTable.id, connectionId),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
+                  )
+                );
               yield* db
                 .update(schema.integrationRouteTable)
                 .set({ enabled: false, updatedAt: now })
@@ -528,7 +533,14 @@ export const makeDiscordConnectionServiceLive = (
                 lifecycle: "revocation_unconfirmed",
                 updatedAt: yield* DateTime.nowAsDate,
               })
-              .where(eq(schema.integrationConnectionTable.id, connectionId))
+              .where(
+                and(
+                  eq(schema.integrationConnectionTable.id, connectionId),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("revocation_unconfirmed"),
+                  ])
+                )
+              )
               .pipe(mapManagementError("disconnect state update"));
             return yield* Effect.failCause(leftGuild.cause).pipe(
               mapDiscordApiError("guild disconnect")
@@ -577,7 +589,14 @@ export const makeDiscordConnectionServiceLive = (
             ),
             updatedAt: now,
           })
-          .where(eq(schema.integrationConnectionTable.id, connectionId))
+          .where(
+            and(
+              eq(schema.integrationConnectionTable.id, connectionId),
+              inArray(schema.integrationConnectionTable.lifecycle, [
+                ...connectionSourceStatesFor("archived"),
+              ])
+            )
+          )
           .pipe(mapManagementError("disconnect archive"));
       });
 

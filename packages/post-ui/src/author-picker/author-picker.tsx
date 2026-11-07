@@ -56,6 +56,8 @@ export interface AuthorPickerProps {
   organizationId: string;
   /** Trigger text when no author is displayed. */
   placeholder?: string;
+  /** Hide the chevron when the trigger is rendered as a plain property row. */
+  showTrigger?: boolean;
   /**
    * Post-scoped search for API compatibility. Author picking ignores
    * voting state (`alreadyVoted` neither disables rows nor shows a badge):
@@ -69,6 +71,8 @@ export interface AuthorPickerProps {
   searchPlaceholder?: string;
   /** Submit label of the new-user dialog. */
   submitLabel?: string;
+  /** Extra classes for the trigger, e.g. a ghost property-row treatment. */
+  triggerClassName?: string;
   /** Picker selection; drives the combobox state (clear control, badges). */
   value: ContactComboboxSelection | null;
 }
@@ -91,7 +95,9 @@ export function AuthorPicker({
   postId,
   search,
   searchPlaceholder = m.patient_empty_tiger(),
+  showTrigger = true,
   submitLabel = m.short_proof_bat(),
+  triggerClassName,
   value,
 }: AuthorPickerProps) {
   const [open, setOpen] = useState(false);
@@ -159,7 +165,8 @@ export function AuthorPicker({
               aria-label={displayName ? `${label}: ${displayName}` : label}
               className={cn(
                 selectTriggerVariants({ size: "sm" }),
-                "aria-expanded:bg-muted w-auto min-w-0"
+                "aria-expanded:bg-muted w-auto min-w-0",
+                triggerClassName
               )}
               type="button"
             />
@@ -182,12 +189,14 @@ export function AuthorPicker({
               </span>
             )}
           </span>
-          <HugeiconsIcon
-            aria-hidden="true"
-            className={selectTriggerIconClassName}
-            icon={UnfoldMoreIcon}
-            strokeWidth={2}
-          />
+          {showTrigger ? (
+            <HugeiconsIcon
+              aria-hidden="true"
+              className={selectTriggerIconClassName}
+              icon={UnfoldMoreIcon}
+              strokeWidth={2}
+            />
+          ) : null}
         </PopoverTrigger>
         <PopoverPopup align="end" className="w-60 p-1" initialFocus={false}>
           <ContactCombobox

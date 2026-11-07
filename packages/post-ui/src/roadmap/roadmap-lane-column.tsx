@@ -10,10 +10,12 @@ interface RoadmapLaneColumnProps {
   action?: ReactNode;
   children?: ReactNode;
   contentRef?: Ref<HTMLDivElement>;
+  /** Replaces the status icon when a lane is not a status lane. */
+  icon?: ReactNode;
   isHighlighted?: boolean;
   label?: string;
   name?: string;
-  status: RoadmapStatus;
+  status?: RoadmapStatus;
   totalPosts?: number;
 }
 
@@ -21,13 +23,15 @@ export function RoadmapLaneColumn({
   action,
   children,
   contentRef,
+  icon,
   isHighlighted = false,
   label,
   name,
   status,
   totalPosts,
 }: RoadmapLaneColumnProps) {
-  const readableStatus = name || label || formatPostStatus(status);
+  const readableStatus =
+    name || label || (status ? formatPostStatus(status) : "Posts");
   const resolvedAction =
     action ??
     (totalPosts !== undefined ? (
@@ -41,7 +45,7 @@ export function RoadmapLaneColumn({
       <div className="px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <RoadmapStatusIcon status={status} />
+            {icon ?? (status ? <RoadmapStatusIcon status={status} /> : null)}
             <h3 className="text-sm font-medium">{readableStatus}</h3>
           </div>
           {resolvedAction}

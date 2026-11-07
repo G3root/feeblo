@@ -20,6 +20,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { PostReactionRpcHandlersEffect } from "./handlers";
 import { PostReactionRepository } from "./repository";
 
@@ -126,168 +127,202 @@ describe("PostReactionRpcHandlers", () => {
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
-  layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
-    "handlers",
-    (it) => {
-      it.effect("lists reactions only for members", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostReactionRpcHandlersEffect;
-          const f = yield* fixture();
-          const error = yield* Effect.flip(
-            handlers
-              .ListPostReactions({
-                organizationId: f.organizationId,
-                slug: f.postSlug,
-              })
-              .pipe(Effect.provideService(CurrentSession, session(f, false)))
-          );
-          expect(error._tag).toBe("PolicyDenied");
-        })
-      );
-      it.effect("toggles a member reaction and returns it in the list", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostReactionRpcHandlersEffect;
-          const f = yield* fixture();
-          const input = {
-            organizationId: f.organizationId,
-            postId: f.postId,
-            emoji: "thumbs_up" as const,
-          };
-          expect(
-            yield* handlers
-              .TogglePostReaction(input)
-              .pipe(Effect.provideService(CurrentSession, session(f)))
-          ).toEqual({ reacted: true, emoji: "thumbs_up" });
-          const reactions = yield* handlers
+  const FullTestLayer = Layer.mergeAll(
+    TestLayer,
+    Database.PgliteDatabaseLive,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
+  );
+
+  layer(FullTestLayer)("handlers", (it) => {
+    it.effect("lists reactions only for members", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostReactionRpcHandlersEffect;
+        const f = yield* fixture();
+        const error = yield* Effect.flip(
+          handlers
             .ListPostReactions({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
-            .pipe(Effect.provideService(CurrentSession, session(f)));
-          expect(reactions).toHaveLength(1);
-          expect(reactions[0]).toMatchObject({
-            postId: f.postId,
-            userId: f.userId,
-            memberId: f.membershipId,
-            emoji: "thumbs_up",
-          });
-          expect(
-            yield* handlers
-              .TogglePostReaction(input)
-              .pipe(Effect.provideService(CurrentSession, session(f)))
-          ).toEqual({ reacted: false, emoji: null });
-        })
-      );
-      it.effect("redacts reactor identity on the public list", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostReactionRpcHandlersEffect;
-          const f = yield* fixture();
-          const input = {
-            organizationId: f.organizationId,
-            postId: f.postId,
-            emoji: "rocket" as const,
-          };
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+    it.effect("toggles a member reaction and returns it in the list", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostReactionRpcHandlersEffect;
+        const f = yield* fixture();
+        const input = {
+          organizationId: f.organizationId,
+          postId: f.postId,
+          emoji: "thumbs_up" as const,
+        };
+        expect(
           yield* handlers
             .TogglePostReaction(input)
-            .pipe(Effect.provideService(CurrentSession, session(f)));
+            .pipe(Effect.provideService(CurrentSession, session(f)))
+        ).toEqual({ reacted: true, emoji: "thumbs_up" });
+        const reactions = yield* handlers
+          .ListPostReactions({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(Effect.provideService(CurrentSession, session(f)));
+        expect(reactions).toHaveLength(1);
+        expect(reactions[0]).toMatchObject({
+          postId: f.postId,
+          userId: f.userId,
+          memberId: f.membershipId,
+          emoji: "thumbs_up",
+        });
+        expect(
+          yield* handlers
+            .TogglePostReaction(input)
+            .pipe(Effect.provideService(CurrentSession, session(f)))
+        ).toEqual({ reacted: false, emoji: null });
+      })
+    );
+    it.effect("redacts reactor identity on the public list", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostReactionRpcHandlersEffect;
+        const f = yield* fixture();
+        const input = {
+          organizationId: f.organizationId,
+          postId: f.postId,
+          emoji: "rocket" as const,
+        };
+        yield* handlers
+          .TogglePostReaction(input)
+          .pipe(Effect.provideService(CurrentSession, session(f)));
 
-          const anonymous = yield* handlers
-            .ListPostReactionsPublic({
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            })
-            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
-          expect(anonymous).toHaveLength(1);
-          expect(anonymous[0]).toMatchObject({
-            postId: f.postId,
-            userId: null,
-            memberId: null,
-            emoji: "rocket",
-          });
+        const anonymous = yield* handlers
+          .ListPostReactionsPublic({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+        expect(anonymous).toHaveLength(1);
+        expect(anonymous[0]).toMatchObject({
+          postId: f.postId,
+          userId: null,
+          memberId: null,
+          emoji: "rocket",
+        });
 
-          const own = yield* handlers
-            .ListPostReactionsPublic({
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            })
-            .pipe(
-              Effect.provideService(
-                OptionalCurrentSession,
-                Option.some(session(f))
-              )
-            );
-          expect(own[0]).toMatchObject({
-            postId: f.postId,
-            userId: f.userId,
-            memberId: f.membershipId,
-            emoji: "rocket",
-          });
-        })
-      );
-      it.effect("permits public reactions only on public boards", () =>
-        Effect.gen(function* () {
-          const handlers = yield* PostReactionRpcHandlersEffect;
-          const publicFixture = yield* fixture("PUBLIC");
-          const privateFixture = yield* fixture("PRIVATE");
-          const publicResult = yield* handlers
+        const own = yield* handlers
+          .ListPostReactionsPublic({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(
+            Effect.provideService(
+              OptionalCurrentSession,
+              Option.some(session(f))
+            )
+          );
+        expect(own[0]).toMatchObject({
+          postId: f.postId,
+          userId: f.userId,
+          memberId: f.membershipId,
+          emoji: "rocket",
+        });
+      })
+    );
+    it.effect("permits public reactions only on public boards", () =>
+      Effect.gen(function* () {
+        const handlers = yield* PostReactionRpcHandlersEffect;
+        const publicFixture = yield* fixture("PUBLIC");
+        const privateFixture = yield* fixture("PRIVATE");
+        const publicResult = yield* handlers
+          .TogglePostReactionPublic({
+            organizationId: publicFixture.organizationId,
+            postId: publicFixture.postId,
+            emoji: "fire",
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, session(publicFixture, false))
+          );
+        const privateError = yield* Effect.flip(
+          handlers
             .TogglePostReactionPublic({
-              organizationId: publicFixture.organizationId,
-              postId: publicFixture.postId,
+              organizationId: privateFixture.organizationId,
+              postId: privateFixture.postId,
               emoji: "fire",
             })
             .pipe(
               Effect.provideService(
                 CurrentSession,
-                session(publicFixture, false)
+                session(privateFixture, false)
               )
-            );
-          const privateError = yield* Effect.flip(
-            handlers
-              .TogglePostReactionPublic({
-                organizationId: privateFixture.organizationId,
-                postId: privateFixture.postId,
-                emoji: "fire",
-              })
-              .pipe(
-                Effect.provideService(
-                  CurrentSession,
-                  session(privateFixture, false)
-                )
-              )
-          );
-          expect(publicResult).toEqual({ reacted: true, emoji: "fire" });
-          expect(privateError._tag).toBe("PolicyDenied");
-        })
-      );
-      it.effect("hides reactions on an archived post", () =>
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const handlers = yield* PostReactionRpcHandlersEffect;
-          const f = yield* fixture("PUBLIC");
+            )
+        );
+        expect(publicResult).toEqual({ reacted: true, emoji: "fire" });
+        expect(privateError._tag).toBe("PolicyDenied");
+      })
+    );
 
-          yield* handlers
-            .TogglePostReaction({
+    it.effect("refuses a public reaction from a banned non-member", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* PostReactionRpcHandlersEffect;
+        const f = yield* fixture("PUBLIC");
+        const now = yield* DateTime.nowAsDate;
+
+        // The fixture's member row would exempt the session from the database
+        // membership check, so this case removes it first.
+        yield* db
+          .delete(schema.memberTable)
+          .where(eq(schema.memberTable.id, f.membershipId));
+        yield* db.insert(schema.userBanTable).values({
+          createdAt: now,
+          id: `ban_${f.organizationId}`,
+          organizationId: f.organizationId,
+          updatedAt: now,
+          userId: f.userId,
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .TogglePostReactionPublic({
               organizationId: f.organizationId,
               postId: f.postId,
-              emoji: "rocket",
+              emoji: "fire",
             })
-            .pipe(Effect.provideService(CurrentSession, session(f)));
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        );
 
-          const now = yield* DateTime.nowAsDate;
-          yield* db
-            .update(schema.postTable)
-            .set({ archivedAt: now })
-            .where(eq(schema.postTable.id, f.postId));
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+    it.effect("hides reactions on an archived post", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* PostReactionRpcHandlersEffect;
+        const f = yield* fixture("PUBLIC");
 
-          const publicReactions = yield* handlers
-            .ListPostReactionsPublic({
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            })
-            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
-          expect(publicReactions).toHaveLength(0);
-        })
-      );
-    }
-  );
+        yield* handlers
+          .TogglePostReaction({
+            organizationId: f.organizationId,
+            postId: f.postId,
+            emoji: "rocket",
+          })
+          .pipe(Effect.provideService(CurrentSession, session(f)));
+
+        const now = yield* DateTime.nowAsDate;
+        yield* db
+          .update(schema.postTable)
+          .set({ archivedAt: now })
+          .where(eq(schema.postTable.id, f.postId));
+
+        const publicReactions = yield* handlers
+          .ListPostReactionsPublic({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+        expect(publicReactions).toHaveLength(0);
+      })
+    );
+  });
 });

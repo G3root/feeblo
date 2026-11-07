@@ -17,6 +17,7 @@ import { ContactRpcHandlers } from "./contact/handlers";
 import { DataTransferRpcHandlers } from "./data-transfer/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { EmailSuppressionRpcHandlers } from "./email-suppression/handlers";
+import { InsightsRpcHandlers } from "./insights/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
 import { MembershipRpcHandlers } from "./membership/handlers";
@@ -33,6 +34,7 @@ import { PublicRpcRateLimitMiddlewareLive } from "./rate-limit";
 import { RoadmapColumnRpcHandlers } from "./roadmap-column/handlers";
 import { RoadmapRpcHandlers } from "./roadmap/handlers";
 import { AllRpcs, type RpcGroupName } from "./rpc-group";
+import { SavedViewRpcHandlers } from "./saved-view/handlers";
 import { S3UploadServiceLive } from "./services/s3";
 import {
   AuthMiddlewareLive,
@@ -42,6 +44,7 @@ import {
 import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
+import { UserBanRpcHandlers } from "./user-ban/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
 /**
@@ -70,6 +73,7 @@ export const RpcHandlerRegistrations = {
   ChangelogPost: ChangelogPostRpcHandlers,
   ChangelogCategory: ChangelogCategoryRpcHandlers,
   ChangelogSubscription: ChangelogSubscriptionRpcHandlers,
+  Insights: InsightsRpcHandlers,
   JwtSecret: JwtSecretRpcHandlers,
   ApiKey: ApiKeyRpcHandlers,
   Membership: MembershipRpcHandlers,
@@ -84,9 +88,11 @@ export const RpcHandlerRegistrations = {
   Site: SiteRpcHandlers,
   Tag: TagRpcHandlers,
   Upvote: UpvoteRpcHandlers,
+  UserBan: UserBanRpcHandlers,
   PostReaction: PostReactionRpcHandlers,
   PostStatus: PostStatusRpcHandlers,
   PostSubscription: PostSubscriptionRpcHandlers,
+  SavedView: SavedViewRpcHandlers,
   Roadmap: RoadmapRpcHandlers,
   RoadmapColumn: RoadmapColumnRpcHandlers,
   Workspace: WorkspaceRpcHandlers,

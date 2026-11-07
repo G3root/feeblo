@@ -4,10 +4,15 @@
  * identity graph can import it without cycles.
  */
 
+/** A `behalf-*` synthetic inbox: a shadow user, never a real address. */
+const shadowUserEmailPattern = /^behalf-[0-9a-f]+@feeblo\.com$/;
+/** An `sso-*` synthetic inbox: a widget portal user, never a real address. */
+const portalUserEmailPattern = /^sso-[0-9a-f]+@feeblo\.com$/;
+
 /** Synthetic inboxes of SSO portal and shadow users are never real addresses. */
 export const isSyntheticEmail = (email: string): boolean =>
-  /^behalf-[0-9a-f]+@feeblo\.com$/.test(email.toLowerCase()) ||
-  /^sso-[0-9a-f]+@feeblo\.com$/.test(email.toLowerCase());
+  shadowUserEmailPattern.test(email.toLowerCase()) ||
+  portalUserEmailPattern.test(email.toLowerCase());
 
 /**
  * Email-local part of the synthetic inboxes backing shadow users. Distinct
@@ -15,4 +20,4 @@ export const isSyntheticEmail = (email: string): boolean =>
  * attribution-only shadows that identity linking may consume.
  */
 export const isShadowUserEmail = (email: string): boolean =>
-  /^behalf-[0-9a-f]+@feeblo\.com$/.test(email.toLowerCase());
+  shadowUserEmailPattern.test(email.toLowerCase());

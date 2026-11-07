@@ -3,7 +3,7 @@ import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-defa
 import { BoardId, LegidError, PostId } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -477,11 +477,17 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
     const tags = yield* TagRepository;
     const statuses = yield* PostStatusRepository;
     const writes = yield* PostWriteService;
-    const actor = yield* resolveImportActor(job);
 
-    const statusRows = yield* statuses.findMany({
-      organizationId: job.organizationId,
-    });
+    // The importer's actor and the workspace's statuses are read from
+    // different tables and neither needs the other, so a pass resolves them
+    // together instead of stacking two round trips before the first batch.
+    const [actor, statusRows] = yield* Effect.all(
+      [
+        resolveImportActor(job),
+        statuses.findMany({ organizationId: job.organizationId }),
+      ],
+      { concurrency: "unbounded" }
+    );
     // The workspace's stored default, not the `PENDING` type: a workspace may
     // repoint which status is the default, and several statuses may share a
     // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several),
@@ -536,6 +542,11 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           break;
         }
 
+        // Tags before boards, sequentially, and not as one concurrent pair:
+        // both resolvers create rows (`tags.create`, `boards.create`), so a tag
+        // lookup that fails must not be able to leave a board behind for a
+        // batch that will never apply. Running them together would also let a
+        // failure interrupt the other halfway through its create loop.
         const tagIdsByKey = yield* resolveBatchTags({
           organizationId: job.organizationId,
           rows,
@@ -630,8 +641,8 @@ export const runDataImportWorker = ({
 } = {}) =>
   Effect.gen(function* () {
     const repository = yield* DataTransferRepository;
-    const crypto = yield* Crypto.Crypto;
-    const leaseOwner = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+    const secureRandom = yield* SecureRandom.SecureRandom;
+    const leaseOwner = yield* secureRandom.uuidV4();
 
     const poll = Effect.gen(function* () {
       const claim = yield* repository.claimNextJob({

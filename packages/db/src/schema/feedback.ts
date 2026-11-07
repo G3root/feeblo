@@ -1,3 +1,4 @@
+import type { TBoardQuery } from "@feeblo/domain-contracts/board-query";
 import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
 import { sql } from "drizzle-orm";
 import {
@@ -564,6 +565,26 @@ export const postTable = pgTable(
       .$type<Record<string, string>>()
       .notNull()
       .default(sql`'{}'::jsonb`),
+    /**
+     * The workspace member a post is assigned to, for the dashboard's triage
+     * views. Null is "nobody is working on this"; the assignment is about the
+     * workspace, not the author, so it is a separate column from
+     * `creator_member_id`.
+     *
+     * A single-column reference rather than a `(id, organization_id)` pair:
+     * `on delete set null` on a composite foreign key would blank the
+     * not-null `organization_id` too, since Postgres only gained the
+     * column-list form in 15 and drizzle emits the plain one. Membership in
+     * the post's workspace is therefore checked by the write path
+     * (`PostWriteService`), which rejects a member from another workspace with
+     * a `BadRequestError` instead of letting the row exist unreadable.
+     */
+    assigneeMemberId: text("assignee_member_id").references(
+      () => memberTable.id,
+      {
+        onDelete: "set null",
+      }
+    ),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     mergedIntoPostId: text("merged_into_post_id"),
@@ -588,6 +609,12 @@ export const postTable = pgTable(
     // `ON DELETE SET NULL` from `contact` and the rename propagation both
     // look posts up by contact, and neither can use a partial index.
     index("post_contactId_idx").on(table.contactId),
+    // "Assigned to me" and the board's assigned-to filter both scope by
+    // workspace first, so the pair is the one an index can serve.
+    index("post_organizationId_assigneeMemberId_idx").on(
+      table.organizationId,
+      table.assigneeMemberId
+    ),
     index("post_statusId_idx").on(table.statusId),
     index("post_archivedAt_idx").on(table.archivedAt),
     index("post_mergedIntoPostId_idx").on(table.mergedIntoPostId),
@@ -1623,6 +1650,86 @@ export const notificationPreferenceTable = pgTable(
       table.channel,
       table.category
     ),
+  ]
+);
+
+/**
+ * A member's saved board query.
+ *
+ * The board's filter, grouping and ordering state lives in the client store
+ * (`board-store-context.tsx`) and is otherwise lost on navigation. A row here
+ * is that same query, stored so the toolbar can offer it back by name.
+ *
+ * `query` is one jsonb document rather than a column per filter for two
+ * reasons: the filter vocabulary is the board's, not the database's (a
+ * status-type checklist has no natural relational home), and `BoardQuery` in
+ * `@feeblo/domain-contracts` validates it on write, so a stored view can never
+ * describe a query the board cannot run. Ids inside it are not foreign keys:
+ * a deleted tag or member makes a saved view stale, not invalid, and the board
+ * renders the same empty match it would for a hand-picked missing id.
+ *
+ * `boardId` is null for the organization-wide feedback list and set for a
+ * single board, so the two surfaces keep separate views without a `scope`
+ * column that would duplicate it.
+ */
+export const savedViewTable = pgTable(
+  "saved_view",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    /**
+     * The owning member. A shared view is visible to the rest of the workspace
+     * but still only editable by this member, which the handler enforces by
+     * always scoping writes on this column rather than by trusting a payload.
+     */
+    memberId: text("member_id")
+      .notNull()
+      .references(() => memberTable.id, { onDelete: "cascade" }),
+    boardId: text("board_id").references(() => boardTable.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    /**
+     * Whether only the owner may see this view.
+     *
+     * Existing rows default to private so adding sharing does not publish the
+     * views members saved while every view was personal. New rows carry the
+     * member's choice explicitly.
+     */
+    isPrivate: boolean("is_private").default(true).notNull(),
+    /**
+     * Free text the member wrote to explain what the view is for. Null when
+     * they left it blank — an empty string is not a state the write path
+     * stores, so "no description" has one spelling.
+     */
+    description: text("description"),
+    /**
+     * Position among the member's views on this surface, ascending. The create
+     * write appends (last), and `ReorderSavedViews` rewrites the whole order in
+     * one call; nothing else reads it except the list's sort.
+     */
+    orderIndex: integer("order_index").default(0).notNull(),
+    query: jsonb("query").$type<TBoardQuery>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("saved_view_organizationId_memberId_idx").on(
+      table.organizationId,
+      table.memberId
+    ),
+    // Names are deliberately not unique. A view is a personal shortcut, and a
+    // member who duplicates one to try a variation ("Triage", "Triage") should
+    // not have to invent a suffix before they know which one they want to keep.
+    // The cost is two pills with the same label; the row is ordered, and each
+    // pill links to a different id.
   ]
 );
 

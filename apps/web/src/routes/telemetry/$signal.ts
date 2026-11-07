@@ -17,6 +17,9 @@ import { getPublicEnvServer } from "~/lib/server-runtime-public-env";
 const maxBodyBytes = 256 * 1024;
 const upstreamTimeoutMillis = 5_000;
 
+/** The API base is joined with a path, so one trailing slash is dropped. */
+const trailingSlashPattern = /\/+$/;
+
 const isSignal = (value: string): value is "traces" | "logs" =>
   value === "traces" || value === "logs";
 
@@ -35,7 +38,7 @@ const relay = async (signal: string, request: Request): Promise<Response> => {
     return empty(413);
   const body = await readBoundedText(request, maxBodyBytes);
   if (body === undefined) return empty(413);
-  const apiUrl = getPublicEnvServer().API_URL.replace(/\/+$/, "");
+  const apiUrl = getPublicEnvServer().API_URL.replace(trailingSlashPattern, "");
   try {
     const upstream = await fetch(`${apiUrl}/api/telemetry/${signal}`, {
       method: "POST",

@@ -20,7 +20,7 @@ import {
   IntegrationProviderPermanentRejection,
 } from "@feeblo/integration-core";
 import { and, eq } from "drizzle-orm";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -62,7 +62,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const domainConfig = yield* GitHubIntegrationConfig;
-      const crypto = yield* Crypto.Crypto;
+      const secureRandom = yield* SecureRandom.SecureRandom;
       const api = makeGitHubApiClient();
       const installationTokens = yield* makeGitHubInstallationTokenResolver({
         apiClient: api,
@@ -147,16 +147,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             const id = yield* IntegrationConnectionId.generate.pipe(
               Effect.mapError(() => providerFailure("connection id generation"))
             );
-            // Through the `Crypto` service, not the global: the OAuth state
-            // must be reproducible under `TestCrypto` in tests, and Workers
-            // forbid random value generation in global scope.
-            const nonce = yield* crypto
-              .randomUUIDv4()
-              .pipe(
-                Effect.mapError(() =>
-                  providerFailure("installation state generation")
-                )
-              );
+            // Through the `SecureRandom` service, not the global: the OAuth
+            // state must be substitutable in tests, and Workers forbid random
+            // value generation in global scope.
+            const nonce = yield* secureRandom.uuidV4();
             const state = yield* Schema.encodeEffect(
               Schema.fromJsonString(IntegrationOAuthState)
             )({ connectionId: id, organizationId, nonce }).pipe(
@@ -213,7 +207,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
               )
             );
             const [connection] = yield* db
-              .select()
+              .select({
+                credentialsCiphertext:
+                  schema.integrationConnectionTable.credentialsCiphertext,
+                id: schema.integrationConnectionTable.id,
+                organizationId:
+                  schema.integrationConnectionTable.organizationId,
+              })
               .from(schema.integrationConnectionTable)
               .where(
                 and(
@@ -333,7 +333,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                       : existingInstallation.connectionId;
                   if (reusedConnectionId !== undefined) {
                     const [reusedConnection] = yield* db
-                      .select()
+                      .select({
+                        id: schema.integrationConnectionTable.id,
+                        lifecycle: schema.integrationConnectionTable.lifecycle,
+                      })
                       .from(schema.integrationConnectionTable)
                       .where(
                         and(
@@ -602,43 +605,61 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
           installationTokenForConnection(input.connectionId).pipe(
             Effect.flatMap((accessToken) =>
               Effect.gen(function* () {
-                const issue = yield* api.getIssue({
-                  accessToken,
-                  repositoryOwner: input.repositoryOwner,
-                  repositoryName: input.repositoryName,
-                  issueNumber: input.issueNumber,
-                });
-                const existingLink = yield* db
-                  .select({ id: schema.postExternalResourceLinkTable.id })
-                  .from(schema.postExternalResourceLinkTable)
-                  .innerJoin(
-                    schema.integrationExternalResourceTable,
-                    eq(
-                      schema.integrationExternalResourceTable.id,
-                      schema.postExternalResourceLinkTable.externalResourceId
-                    )
-                  )
-                  .where(
-                    and(
-                      eq(
-                        schema.postExternalResourceLinkTable.postId,
-                        input.postId
-                      ),
-                      eq(
-                        schema.integrationExternalResourceTable.connectionId,
-                        input.connectionId
-                      ),
-                      ...gitHubIssueSafeMetadataConditions({
-                        issueNumber: input.issueNumber,
-                        repositoryName: input.repositoryName,
-                        repositoryOwner: input.repositoryOwner,
+                // The GitHub issue fetch and the link lookup share only the
+                // input — the lookup reads the connection, post and safe
+                // metadata columns, nothing from the fetched issue — so they
+                // run together and the API round trip hides the database
+                // read. `Effect.all` is sequential unless told otherwise.
+                // Failures surface as the first one to reject, the same
+                // mapped error either effects carried alone.
+                const [issue, existingLink] = yield* Effect.all(
+                  [
+                    api.getIssue({
+                      accessToken,
+                      repositoryOwner: input.repositoryOwner,
+                      repositoryName: input.repositoryName,
+                      issueNumber: input.issueNumber,
+                    }),
+                    db
+                      .select({
+                        id: schema.postExternalResourceLinkTable.id,
                       })
-                    )
-                  )
-                  .limit(1)
-                  .pipe(
-                    Effect.mapError(() => providerFailure("issue link lookup"))
-                  );
+                      .from(schema.postExternalResourceLinkTable)
+                      .innerJoin(
+                        schema.integrationExternalResourceTable,
+                        eq(
+                          schema.integrationExternalResourceTable.id,
+                          schema.postExternalResourceLinkTable
+                            .externalResourceId
+                        )
+                      )
+                      .where(
+                        and(
+                          eq(
+                            schema.postExternalResourceLinkTable.postId,
+                            input.postId
+                          ),
+                          eq(
+                            schema.integrationExternalResourceTable
+                              .connectionId,
+                            input.connectionId
+                          ),
+                          ...gitHubIssueSafeMetadataConditions({
+                            issueNumber: input.issueNumber,
+                            repositoryName: input.repositoryName,
+                            repositoryOwner: input.repositoryOwner,
+                          })
+                        )
+                      )
+                      .limit(1)
+                      .pipe(
+                        Effect.mapError(() =>
+                          providerFailure("issue link lookup")
+                        )
+                      ),
+                  ],
+                  { concurrency: "unbounded" }
+                );
                 if (existingLink.length === 0) {
                   yield* api.createIssueBacklinkComment({
                     accessToken,

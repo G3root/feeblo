@@ -320,6 +320,19 @@ const makePostPolicy = Effect.gen(function* () {
       Policy.canPermission(args.organizationId, "posts.status")
     );
 
+  /**
+   * Assignment is a triage decision, so it rides `posts.status` with the ETA
+   * rather than a permission of its own: a member who may move a post between
+   * statuses is already deciding who owns the work, and a separate grant would
+   * add a role-shaped distinction nobody asked for.
+   */
+  const canUpdateAssignee = (args: TPostRef) =>
+    Policy.all(
+      Policy.hasMembership(args.organizationId),
+      isNotMerged(args),
+      Policy.canPermission(args.organizationId, "posts.status")
+    );
+
   const canAdminUpdate = (args: TPostRef) =>
     Policy.all(
       isNotMerged(args),
@@ -339,6 +352,7 @@ const makePostPolicy = Effect.gen(function* () {
     canUpdateProperties,
     canUpdateAuthor,
     canUpdateEta,
+    canUpdateAssignee,
     canAdminUpdate,
     canMerge,
   };

@@ -127,10 +127,52 @@ export const makeIntegrationDeliveryWorkerRepository = (
         }
         const rows = yield* db
           .select({
-            connection: schema.integrationConnectionTable,
-            delivery: schema.integrationDeliveryTable,
-            event: schema.integrationEventTable,
-            route: schema.integrationRouteTable,
+            connection: {
+              credentialGeneration:
+                schema.integrationConnectionTable.credentialGeneration,
+              id: schema.integrationConnectionTable.id,
+              lifecycle: schema.integrationConnectionTable.lifecycle,
+              name: schema.integrationConnectionTable.name,
+              organizationId: schema.integrationConnectionTable.organizationId,
+              provider: schema.integrationConnectionTable.provider,
+              safeDisplayMetadata:
+                schema.integrationConnectionTable.safeDisplayMetadata,
+            },
+            delivery: {
+              actionKey: schema.integrationDeliveryTable.actionKey,
+              attemptCount: schema.integrationDeliveryTable.attemptCount,
+              eventId: schema.integrationDeliveryTable.eventId,
+              id: schema.integrationDeliveryTable.id,
+              leaseExpiresAt: schema.integrationDeliveryTable.leaseExpiresAt,
+              leaseOwner: schema.integrationDeliveryTable.leaseOwner,
+              nextAttemptAt: schema.integrationDeliveryTable.nextAttemptAt,
+              orderingKey: schema.integrationDeliveryTable.orderingKey,
+              routeId: schema.integrationDeliveryTable.routeId,
+              state: schema.integrationDeliveryTable.state,
+            },
+            event: {
+              causalHopCount: schema.integrationEventTable.causalHopCount,
+              causationId: schema.integrationEventTable.causationId,
+              correlationId: schema.integrationEventTable.correlationId,
+              id: schema.integrationEventTable.id,
+              occurredAt: schema.integrationEventTable.occurredAt,
+              organizationId: schema.integrationEventTable.organizationId,
+              origin: schema.integrationEventTable.origin,
+              payload: schema.integrationEventTable.payload,
+              type: schema.integrationEventTable.type,
+              version: schema.integrationEventTable.version,
+            },
+            route: {
+              capabilityKey: schema.integrationRouteTable.capabilityKey,
+              configVersion: schema.integrationRouteTable.configVersion,
+              connectionId: schema.integrationRouteTable.connectionId,
+              enabled: schema.integrationRouteTable.enabled,
+              eventTypes: schema.integrationRouteTable.eventTypes,
+              id: schema.integrationRouteTable.id,
+              providerConfig: schema.integrationRouteTable.providerConfig,
+              safeDisplayMetadata:
+                schema.integrationRouteTable.safeDisplayMetadata,
+            },
           })
           .from(schema.integrationDeliveryTable)
           .innerJoin(

@@ -1,3 +1,4 @@
+import { useAtomMount } from "@effect/atom-react";
 import {
   Menu,
   MenuItem,
@@ -27,11 +28,13 @@ import {
   usePolicy,
 } from "@feeblo/web-shared/use-policy";
 import {
+  Analytics01Icon,
   Building06Icon,
   Delete02Icon,
   Edit,
   Ellipsis,
   Home,
+  InboxIcon,
   InternetIcon,
   LayoutThreeColumnIcon,
   Megaphone03Icon,
@@ -43,7 +46,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { UpgradePlanDialog } from "~/features/billing/components/upgrade-dialog";
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
@@ -52,6 +55,10 @@ import {
   useDeleteBoardDialogContext,
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
+import {
+  DEFAULT_INSIGHTS_RANGE,
+  workspaceInsightsAtom,
+} from "~/features/insights/atoms";
 import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
@@ -91,6 +98,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 )}
               />
             </SidebarMenuItem>
+            <InsightsNav pathname={pathname} />
+            <MyFeedbackLink pathname={pathname} />
             <MyBoardLink />
 
             <SidebarMenuItem>
@@ -403,6 +412,61 @@ const RenameBoardButton = ({
   );
 };
 
+/**
+ * The insights entry warms the page's data on intent.
+ *
+ * The router already preloads the route's code on hover and focus
+ * (`defaultPreload: "intent"`), but the page's numbers would still wait for the
+ * click. Mounting the query atom the moment the pointer or focus reaches the
+ * link starts the RPC early, and because the prefetch component stays mounted
+ * after the first intent, leaving the link does not interrupt the request.
+ */
+function InsightsNav({ pathname }: { pathname: string }) {
+  const organizationId = useOrganizationId();
+  const [prefetch, setPrefetch] = useState(false);
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={pathname.startsWith(`/${organizationId}/insights`)}
+        render={(props) => (
+          <Link
+            {...props}
+            onFocus={() => setPrefetch(true)}
+            onMouseEnter={() => setPrefetch(true)}
+            params={{ organizationId }}
+            to="/$organizationId/insights"
+          >
+            <HugeiconsIcon icon={Analytics01Icon} />
+            <span>Insights</span>
+          </Link>
+        )}
+      />
+      {prefetch ? <InsightsPrefetch organizationId={organizationId} /> : null}
+    </SidebarMenuItem>
+  );
+}
+
+/**
+ * Mounts the insights query without reading it.
+ *
+ * The dashboard's link preloading only covers route code and collection
+ * reads; this atom is the page's one server round trip, so it is the piece a
+ * hover has to start to make the navigation feel instant. The component
+ * subscribes to nothing, so it cannot re-render the sidebar when the result
+ * arrives.
+ */
+function InsightsPrefetch({ organizationId }: { organizationId: string }) {
+  useAtomMount(
+    workspaceInsightsAtom({
+      organizationId,
+      range: DEFAULT_INSIGHTS_RANGE,
+    })
+  );
+
+  return null;
+}
+
 function RoadmapNav({ pathname }: { pathname: string }) {
   const organizationId = useOrganizationId();
   const isActive = pathname.startsWith(`/${organizationId}/roadmap`);
@@ -419,6 +483,28 @@ function RoadmapNav({ pathname }: { pathname: string }) {
           >
             <HugeiconsIcon icon={LayoutThreeColumnIcon} />
             <span>Roadmap</span>
+          </Link>
+        )}
+      />
+    </SidebarMenuItem>
+  );
+}
+
+function MyFeedbackLink({ pathname }: { pathname: string }) {
+  const organizationId = useOrganizationId();
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        isActive={pathname.startsWith(`/${organizationId}/my-feedback`)}
+        render={(props) => (
+          <Link
+            {...props}
+            params={{ organizationId }}
+            to="/$organizationId/my-feedback"
+          >
+            <HugeiconsIcon icon={InboxIcon} />
+            <span>My feedback</span>
           </Link>
         )}
       />

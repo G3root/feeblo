@@ -18,8 +18,11 @@ const isLocalDevHost = (host: string): boolean =>
 const parseUrl = (value: string): URL | null =>
   Option.getOrNull(Schema.decodeOption(Schema.URLFromString)(value));
 
+/** The characters that carry meaning in a `RegExp` source. */
+const regExpSyntaxPattern = /[.*+?^${}()|[\]\\]/g;
+
 const escapeRegExp = (value: string): string =>
-  value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  value.replaceAll(regExpSyntaxPattern, "\\$&");
 
 const wildcardToRegExp = (pattern: string): RegExp =>
   new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`, "i");

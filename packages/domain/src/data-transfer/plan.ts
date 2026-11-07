@@ -51,9 +51,11 @@ export type ImportPlan = {
  */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const ETA_PATTERN = /^(\d{4})-Q([1-4])$/iu;
+/** Anything that is not a lowercase letter or digit, dropped by `normalizeKey`. */
+const nonAlphanumericPattern = /[^a-z0-9]/gu;
 
 const normalizeKey = (value: string): string =>
-  value.toLowerCase().replaceAll(/[^a-z0-9]/gu, "");
+  value.toLowerCase().replaceAll(nonAlphanumericPattern, "");
 
 /**
  * The key two board names share when they mean the same board. Slugify is the

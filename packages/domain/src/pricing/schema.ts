@@ -63,7 +63,7 @@ const PlanLimits = PlanLimitsWire.pipe(
   )
 );
 
-const PlanCapabilities = S.Struct({
+const PlanCapabilitiesFields = {
   roadmap: S.Boolean,
   changelog: S.Boolean,
   unlimitedEndUsers: S.Boolean,
@@ -75,7 +75,27 @@ const PlanCapabilities = S.Struct({
   widgetSso: S.Boolean,
   integrations: S.Boolean,
   publicApi: S.Boolean,
-} satisfies { readonly [K in CapabilityFeatureKey]: S.Schema<boolean> });
+  userBans: S.Boolean,
+} satisfies { readonly [K in CapabilityFeatureKey]: S.Schema<boolean> };
+
+/**
+ * `userBans` was added after the endpoint shipped, so a body cached before it
+ * existed omits the key. A missing capability reads as false, the same
+ * "this plan does not include it" meaning an explicit false carries, and
+ * encoding emits the current key.
+ */
+const PlanCapabilities = S.Struct({
+  ...PlanCapabilitiesFields,
+  userBans: S.optionalKey(PlanCapabilitiesFields.userBans),
+}).pipe(
+  S.decodeTo(
+    S.Struct(PlanCapabilitiesFields),
+    SchemaTransformation.transform({
+      decode: (wire) => ({ ...wire, userBans: wire.userBans ?? false }),
+      encode: (capabilities) => capabilities,
+    })
+  )
+);
 
 export const PlanPrice = S.Struct({
   productId: S.String,

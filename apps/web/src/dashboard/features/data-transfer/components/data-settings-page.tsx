@@ -86,7 +86,7 @@ import {
   dataTransferBoardsAtom,
   type DataTransferBoard,
 } from "../atoms";
-import { isActiveStatus, plannedRowCount } from "../format";
+import { canConfirmStatus, isActiveStatus, plannedRowCount } from "../format";
 import { CancelImportDialog } from "./import-dialogs";
 import {
   ImportProgressBar,
@@ -97,6 +97,9 @@ import {
 
 /** The export picker's sentinel for "every board"; never a real board id. */
 const ALL_BOARDS = "__all_boards__";
+
+/** Imports and exports are CSV only; the picker checks the name, not the type. */
+const csvFileNamePattern = /\.csv$/iu;
 
 /**
  * Writes the download the importer accepts. The template comes from the same
@@ -242,7 +245,7 @@ function ImportDropzone({
     }
     // The server holds the same limits; checking here turns a round trip into
     // an immediate sentence about the file the person just picked.
-    if (!/\.csv$/iu.test(candidate.name)) {
+    if (!csvFileNamePattern.test(candidate.name)) {
       reject(m.quiet_fresh_moth());
       return;
     }
@@ -361,8 +364,7 @@ function ImportCard({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const staged =
-    activeJob !== null && activeJob.status === "awaiting_confirmation";
+  const staged = activeJob !== null && canConfirmStatus(activeJob.status);
 
   const handleUpload = async () => {
     if (file === null) {
@@ -749,7 +751,7 @@ export function DataSettingsPage() {
       : null;
   const activeJob = listedActive ?? unlistedLocal;
   const awaitingJob =
-    activeJob?.status === "awaiting_confirmation" ? activeJob : null;
+    activeJob !== null && canConfirmStatus(activeJob.status) ? activeJob : null;
 
   const showImport = canImport && !importPolicyPending;
   const showExport = canExport && !exportPolicyPending;

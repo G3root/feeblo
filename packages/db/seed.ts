@@ -19,6 +19,7 @@ import {
   SiteId,
   SubscriptionId,
   UpvoteId,
+  UserBanId,
   UserId,
   WorkspaceId,
 } from "@feeblo/id";
@@ -41,6 +42,7 @@ import {
   changelogCategoryLinkTable,
   changelogCategoryTable,
   changelogPostTable,
+  changelogSubscriptionTable,
   changelogTable,
   commentReactionTable,
   commentTable,
@@ -52,6 +54,7 @@ import {
   postActivityTable,
   postReactionTable,
   postStatusTable,
+  postSubscriptionTable,
   postTable,
   productTable,
   roadmapColumnTable,
@@ -59,6 +62,7 @@ import {
   siteTable,
   subscriptionTable,
   upvoteTable,
+  userBanTable,
   userTable,
 } from "./src/schema";
 
@@ -67,6 +71,11 @@ const TEST_USER = {
   password: "TestPassword123!",
   name: "Test User",
 };
+
+/** Anything that cannot survive in a slug. */
+const nonSlugCharacterPattern = /[^a-z0-9\s-]/g;
+/** Runs of whitespace, which become the slug's hyphens. */
+const whitespaceRunPattern = /\s+/g;
 
 /**
  * A second account whose workspace is deliberately over the Free plan, so the
@@ -403,9 +412,9 @@ class SeedDataError extends Data.TaggedError("SeedDataError")<{
 const slugify = (value: string) =>
   value
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(nonSlugCharacterPattern, "")
     .trim()
-    .replace(/\s+/g, "-");
+    .replace(whitespaceRunPattern, "-");
 
 /**
  * The address digest `provisionShadowUser` and `upsertSsoUser` store. The seed
@@ -450,15 +459,20 @@ const ensureUser = (
       .limit(1);
 
     if (!existingUser) {
-      const result = yield* Effect.tryPromise(() =>
-        auth.api.signUpEmail({
-          body: {
-            email,
-            password,
-            name,
-          },
-        })
-      );
+      const result = yield* Effect.tryPromise({
+        try: () =>
+          auth.api.signUpEmail({
+            body: {
+              email,
+              password,
+              name,
+            },
+          }),
+        catch: () =>
+          new SeedDataError({
+            message: `Failed to create user ${email}`,
+          }),
+      });
 
       if (!result || !isObject(result) || !("user" in result) || !result.user) {
         return yield* new SeedDataError({
@@ -1174,6 +1188,89 @@ const seedEngagement = ({
     }
 
     console.log(`   Created engagement for ${targetPosts.length} posts`);
+  });
+
+/**
+ * Seeds the workspace's ban list.
+ *
+ * Two shapes are covered because the ban row's facets are the feature: an
+ * address-only ban (somebody who never had an account) and an account ban
+ * carrying the same address (a person who commented and then got banned). The
+ * banned account keeps its seeded comments: a ban is forward-looking, so the
+ * existing content staying visible is the behaviour worth seeing here.
+ */
+const seedBans = ({
+  createdByMemberId,
+  organizationId,
+  targets,
+}: {
+  createdByMemberId: string;
+  organizationId: string;
+  targets: ReadonlyArray<{
+    email: string;
+    reason: string;
+    userId: string | null;
+  }>;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+
+    const [existing] = yield* db
+      .select({ id: userBanTable.id })
+      .from(userBanTable)
+      .where(eq(userBanTable.organizationId, organizationId))
+      .limit(1);
+    if (existing) {
+      console.log("   Bans already exist, skipping");
+      return;
+    }
+
+    const now = new Date();
+    for (const target of targets) {
+      yield* db.insert(userBanTable).values({
+        id: yield* UserBanId.generate,
+        organizationId,
+        userId: target.userId,
+        email: target.email,
+        reason: target.reason,
+        createdByMemberId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // The live ban path strips the account's votes and follows in the same
+      // transaction, so the seed rows are inserted the way a banned account
+      // actually looks. (The seed writes no email contacts, so there is no
+      // email subscription to unsubscribe here.)
+      if (target.userId !== null) {
+        yield* db
+          .delete(upvoteTable)
+          .where(
+            and(
+              eq(upvoteTable.organizationId, organizationId),
+              eq(upvoteTable.userId, target.userId)
+            )
+          );
+        yield* db
+          .delete(postSubscriptionTable)
+          .where(
+            and(
+              eq(postSubscriptionTable.organizationId, organizationId),
+              eq(postSubscriptionTable.userId, target.userId)
+            )
+          );
+        yield* db
+          .delete(changelogSubscriptionTable)
+          .where(
+            and(
+              eq(changelogSubscriptionTable.organizationId, organizationId),
+              eq(changelogSubscriptionTable.userId, target.userId)
+            )
+          );
+      }
+    }
+
+    console.log(`   Banned users: ${targets.length}`);
   });
 
 const seedChangelogs = ({
@@ -2088,6 +2185,29 @@ const seed = (auth: SeedAuth) =>
       posts: mainPosts,
     });
 
+    console.log("4b) Seeding banned end users in main org");
+    const bannedAccount = extraUsers.find((item) => !item.joinMainOrg);
+    yield* seedBans({
+      createdByMemberId: primaryMember.id,
+      organizationId: primaryOrg.id,
+      targets: [
+        {
+          email: "spam-bot@example.com",
+          reason: "Spam submitted through the feedback widget",
+          userId: null,
+        },
+        ...(bannedAccount
+          ? [
+              {
+                email: bannedAccount.email,
+                reason: "Personal attacks in comments",
+                userId: bannedAccount.id,
+              },
+            ]
+          : []),
+      ],
+    });
+
     console.log("5) Seeding changelogs in main org");
 
     yield* seedChangelogs({
@@ -2128,7 +2248,10 @@ const seedHandle = createSeedAuth({
 
 Effect.runPromise(
   seed(seedHandle.auth).pipe(
-    Effect.ensuring(Effect.tryPromise(seedHandle.close).pipe(Effect.ignore)),
+    // Closing the seed's database handle is best effort: a run that already
+    // wrote its rows must not fail on a shutdown error, and the process exit
+    // below would drop the failure anyway.
+    Effect.ensuring(Effect.promise(seedHandle.close).pipe(Effect.ignoreCause)),
     // eslint-disable-next-line effecttsgo/strict-effect-provide -- script entry point
     Effect.provide(SeedLayer)
   )

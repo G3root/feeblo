@@ -23,6 +23,9 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
  * which is what lets a crawler retry it during an incident.
  */
 
+/** An absolute URL, which already carries the scheme the caller used. */
+const absoluteUrlPattern = /^[a-z][a-z0-9+.-]*:\/\//iu;
+
 export const API_VERSION_PATH = "/api/v1";
 export const API_OPENAPI_PATH = `${API_VERSION_PATH}/openapi.json`;
 export const API_REFERENCE_PATH = `${API_VERSION_PATH}/docs`;
@@ -72,7 +75,7 @@ export const discoveryOrigin = (
   const fallback = new URL(fallbackOrigin);
   const url = new URL(request.url, fallback.origin);
 
-  if (/^[a-z][a-z0-9+.-]*:\/\//iu.test(request.url)) {
+  if (absoluteUrlPattern.test(request.url)) {
     return url.origin;
   }
 

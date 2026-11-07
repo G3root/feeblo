@@ -8,6 +8,9 @@ type LinkTarget = {
 
 const LINK_EVENTS = ["mousedown", "click", "contextmenu", "focusin"] as const;
 
+/** The brackets an IPv6 literal keeps when a `URL` renders it as a host. */
+const ipv6BracketPattern = /^\[|\]$/g;
+
 function findFeebloLink(target: EventTarget | null): HTMLAnchorElement | null {
   if (!(target instanceof Element)) {
     return null;
@@ -44,7 +47,7 @@ export function authenticateLink(link: HTMLAnchorElement, token: string): void {
  * credential that a network observer could otherwise replay.
  */
 const isLoopbackHost = (hostname: string): boolean => {
-  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const normalized = hostname.toLowerCase().replace(ipv6BracketPattern, "");
   return (
     normalized === "localhost" ||
     normalized.endsWith(".localhost") ||

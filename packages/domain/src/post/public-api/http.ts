@@ -115,7 +115,7 @@ export const postEndpoints = [
     .annotate(OpenApi.Summary, "List a post's timeline")
     .annotate(
       OpenApi.Description,
-      'Returns one post\'s history, newest first, as a cursor-paginated page: creation, status and board moves, tag changes, merges, and comment entries. `kind` names what happened and `previousValue`/`nextValue` are the values it moved between — a status id for STATUS_CHANGED, a tag id for TAG_ADDED, a post id for POST_MERGED. `actor` is null when the entry was written by an API key, which has no member identity; the dashboard shows the same entry as "Someone". A post merged into another is readable and reports its own history, including the merge.'
+      'Returns one post\'s history, newest first, as a cursor-paginated page: creation, status and board moves, tag changes, assignment changes, merges, and comment entries. `kind` names what happened and `previousValue`/`nextValue` are the values it moved between — a status id for STATUS_CHANGED, a tag id for TAG_ADDED, a post id for POST_MERGED. Both are null on ASSIGNEE_CHANGED, whose values would be member ids and so are not part of this payload. `actor` is null when the entry was written by an API key, which has no member identity; the dashboard shows the same entry as "Someone". A post merged into another is readable and reports its own history, including the merge.'
     ),
   HttpApiEndpoint.post("createPost", "/posts", {
     payload: CreatePostPayload,

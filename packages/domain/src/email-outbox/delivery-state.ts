@@ -1,68 +1,145 @@
-import type { TEmailDeliveryState } from "@feeblo/db/validation-schema/email";
+import type { TEmailDeliveryState } from "@feeblo/domain-contracts/email";
+import { setupEffect } from "@xstate/effect";
+import * as Schema from "effect/Schema";
+import { isUnhandled, transition } from "xstate";
 
-const EMPTY_STATES: readonly TEmailDeliveryState[] = [];
+/**
+ * The lifecycle of one email delivery, as an XState machine.
+ *
+ * This was the table the other machines were modelled on, and it stays the
+ * pattern: every guard in `repository.ts` is generated from
+ * `deliverySourceStatesFor`, so a transition cannot be written without naming
+ * where it may start. What changes here is only the idiom — `email-outbox/`
+ * held this file's hand-written table next to `intent-machine.ts`, one for each
+ * half of the same pipeline.
+ *
+ * There is exactly one source of truth in this file: the machine below. Every
+ * event is named after the state it enters, so a target names its own
+ * transition and no mapping table has to be kept beside it; the state list and
+ * the transition reverse-index are both read back off the machine.
+ */
 
-const transitionTargets = {
-  accepted: ["delivered", "deferred", "bounced", "failed"],
-  bounced: EMPTY_STATES,
-  deferred: [
-    "sending",
-    "expired",
-    "failed",
-    "paused_by_plan",
-    "suppressed",
-    "no_organization_access",
-  ],
-  delivered: EMPTY_STATES,
-  expired: EMPTY_STATES,
-  failed: EMPTY_STATES,
-  no_organization_access: EMPTY_STATES,
-  paused_by_plan: ["queued", "expired"],
-  queued: [
-    "sending",
-    "expired",
-    "failed",
-    "paused_by_plan",
-    "suppressed",
-    "no_organization_access",
-  ],
-  sending: [
-    "accepted",
-    "delivered",
-    "deferred",
-    "bounced",
-    "failed",
-    "expired",
-    "paused_by_plan",
-    "suppressed",
-    "no_organization_access",
-  ],
-  suppressed: EMPTY_STATES,
-} satisfies Readonly<
-  Record<TEmailDeliveryState, readonly TEmailDeliveryState[]>
->;
-// SAFETY: transitionTargets is exhaustively keyed by TEmailDeliveryState, so
-// Object.keys returns only TEmailDeliveryState values.
-const deliveryStates = Object.keys(
-  transitionTargets
+export const emailDeliveryMachine = setupEffect({
+  schemas: {
+    events: {
+      accepted: Schema.Struct({ type: Schema.Literal("accepted") }),
+      bounced: Schema.Struct({ type: Schema.Literal("bounced") }),
+      deferred: Schema.Struct({ type: Schema.Literal("deferred") }),
+      delivered: Schema.Struct({ type: Schema.Literal("delivered") }),
+      expired: Schema.Struct({ type: Schema.Literal("expired") }),
+      failed: Schema.Struct({ type: Schema.Literal("failed") }),
+      no_organization_access: Schema.Struct({
+        type: Schema.Literal("no_organization_access"),
+      }),
+      queued: Schema.Struct({ type: Schema.Literal("queued") }),
+      sending: Schema.Struct({ type: Schema.Literal("sending") }),
+      suppressed: Schema.Struct({ type: Schema.Literal("suppressed") }),
+    },
+  },
+}).createMachine({
+  context: {},
+  id: "emailDelivery",
+  initial: "queued",
+  states: {
+    queued: {
+      on: {
+        expired: { target: "expired" },
+        failed: { target: "failed" },
+        no_organization_access: { target: "no_organization_access" },
+        sending: { target: "sending" },
+        suppressed: { target: "suppressed" },
+      },
+    },
+    // The provider call is in flight. Every ending is possible, including the
+    // ambiguous ones a crash leaves behind.
+    sending: {
+      on: {
+        accepted: { target: "accepted" },
+        bounced: { target: "bounced" },
+        deferred: { target: "deferred" },
+        delivered: { target: "delivered" },
+        expired: { target: "expired" },
+        failed: { target: "failed" },
+        no_organization_access: { target: "no_organization_access" },
+        suppressed: { target: "suppressed" },
+      },
+    },
+    // The provider has the message; only a provider event resolves it.
+    accepted: {
+      on: {
+        bounced: { target: "bounced" },
+        deferred: { target: "deferred" },
+        delivered: { target: "delivered" },
+        failed: { target: "failed" },
+      },
+    },
+    // A soft or undetermined bounce is retried, and a retry re-sends.
+    deferred: {
+      on: {
+        expired: { target: "expired" },
+        failed: { target: "failed" },
+        no_organization_access: { target: "no_organization_access" },
+        sending: { target: "sending" },
+        suppressed: { target: "suppressed" },
+      },
+    },
+    delivered: {},
+    bounced: {},
+    failed: {},
+    suppressed: {},
+    expired: {},
+    no_organization_access: {},
+  },
+});
+
+/**
+ * The states the machine declares, read off the machine.
+ *
+ * `EMAIL_DELIVERY_STATES` in `@feeblo/domain-contracts` is the stored
+ * vocabulary and `delivery-state.test.ts` pins the two equal, so this cannot
+ * drift into a second list.
+ */
+// SAFETY: the machine declares exactly the states of the delivery vocabulary
+// (`delivery-state.test.ts` pins the two sets equal); `Object.keys` widens a
+// record's keys to `string` because the standard library does not preserve
+// them.
+const deliveryStates: readonly TEmailDeliveryState[] = Object.keys(
+  emailDeliveryMachine.states
 ) as readonly TEmailDeliveryState[];
+
+const snapshotFor = (state: TEmailDeliveryState) =>
+  emailDeliveryMachine.resolveState({ context: {}, value: state });
+
+/**
+ * True when `state` handles the event that enters `to`.
+ *
+ * `isUnhandled` rather than a value comparison: a self-transition leaves the
+ * value unchanged while still being a move, and comparing values would report
+ * it as rejected.
+ */
+const handles = (
+  state: TEmailDeliveryState,
+  to: TEmailDeliveryState
+): boolean => {
+  const before = snapshotFor(state);
+  return !isUnhandled(
+    before,
+    transition(emailDeliveryMachine, before, { type: to })
+  );
+};
 
 /** Returns whether a delivery may move between two persisted lifecycle states. */
 export const canTransitionDelivery = (
   from: TEmailDeliveryState,
   to: TEmailDeliveryState
-): boolean => {
-  // SAFETY: transitionTargets indexes every TEmailDeliveryState key.
-  const targets = transitionTargets[from] as readonly TEmailDeliveryState[];
-  return targets.includes(to);
-};
+): boolean => from !== to && handles(from, to);
 
 /** Persisted states from which a guarded SQL update may enter the target state. */
 export const deliverySourceStatesFor = (
   to: TEmailDeliveryState
 ): readonly TEmailDeliveryState[] =>
-  deliveryStates.filter((from) => canTransitionDelivery(from, to));
+  deliveryStates.filter((from) => from !== to && handles(from, to));
 
 /** Terminal delivery states are safe no-ops when a workflow is replayed. */
 export const isTerminalDeliveryState = (state: TEmailDeliveryState): boolean =>
-  transitionTargets[state].length === 0;
+  deliveryStates.every((to) => !handles(state, to));

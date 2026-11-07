@@ -16,6 +16,9 @@ export const PostActivityKind = S.Literals([
   "STATUS_CHANGED",
   "BOARD_CHANGED",
   "ETA_CHANGED",
+  // A post was assigned to a member, reassigned, or unassigned. The previous
+  // and next member ids are recorded in `previousValue` / `nextValue`.
+  "ASSIGNEE_CHANGED",
   "POST_LOCKED",
   "POST_UNLOCKED",
   "POST_ARCHIVED",

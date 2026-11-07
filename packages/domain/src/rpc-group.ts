@@ -13,6 +13,7 @@ import { ContactRpcs } from "./contact/rpcs";
 import { DataTransferRpcs } from "./data-transfer/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
 import { EmailSuppressionRpcs } from "./email-suppression/rpcs";
+import { InsightsRpcs } from "./insights/rpcs";
 import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { ExternalResourceRpcs } from "./integration/external-resource/rpcs";
 import { GitHubManagementRpcs } from "./integration/github/rpcs";
@@ -31,9 +32,11 @@ import { PostSubscriptionRpcs } from "./post-subscription/rpcs";
 import { PostRpcs } from "./post/rpcs";
 import { RoadmapColumnRpcs } from "./roadmap-column/rpcs";
 import { RoadmapRpcs } from "./roadmap/rpcs";
+import { SavedViewRpcs } from "./saved-view/rpcs";
 import { SiteRpcs } from "./site/rpcs";
 import { TagRpcs } from "./tag/rpcs";
 import { UpvoteRpcs } from "./upvote/rpcs";
+import { UserBanRpcs } from "./user-ban/rpcs";
 import { WorkspaceRpcs } from "./workspace/rpcs";
 
 /**
@@ -65,6 +68,7 @@ export const RpcGroups = [
   ["ChangelogPost", ChangelogPostRpcs],
   ["ChangelogCategory", ChangelogCategoryRpcs],
   ["ChangelogSubscription", ChangelogSubscriptionRpcs],
+  ["Insights", InsightsRpcs],
   ["JwtSecret", JwtSecretRpcs],
   ["ApiKey", ApiKeyRpcs],
   ["Membership", MembershipRpcs],
@@ -79,9 +83,11 @@ export const RpcGroups = [
   ["Site", SiteRpcs],
   ["Tag", TagRpcs],
   ["Upvote", UpvoteRpcs],
+  ["UserBan", UserBanRpcs],
   ["PostReaction", PostReactionRpcs],
   ["PostStatus", PostStatusRpcs],
   ["PostSubscription", PostSubscriptionRpcs],
+  ["SavedView", SavedViewRpcs],
   ["Roadmap", RoadmapRpcs],
   ["RoadmapColumn", RoadmapColumnRpcs],
   ["Workspace", WorkspaceRpcs],

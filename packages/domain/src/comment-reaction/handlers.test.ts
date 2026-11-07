@@ -8,6 +8,7 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -20,6 +21,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { CommentReactionRpcHandlersEffect } from "./handlers";
 import { CommentReactionRepository } from "./repository";
 
@@ -146,238 +148,274 @@ describe("CommentReactionRpcHandlers", () => {
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
-  layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
-    "handlers",
-    (it) => {
-      it.effect("does not list reactions for users without a membership", () =>
+  const FullTestLayer = Layer.mergeAll(
+    TestLayer,
+    Database.PgliteDatabaseLive,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
+  );
+
+  layer(FullTestLayer)("handlers", (it) => {
+    it.effect("does not list reactions for users without a membership", () =>
+      Effect.gen(function* () {
+        const handlers = yield* CommentReactionRpcHandlersEffect;
+        const f = yield* fixture();
+        const error = yield* Effect.flip(
+          handlers
+            .ListCommentReactions({
+              organizationId: f.organizationId,
+              slug: f.postSlug,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        );
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+    it.effect("toggles a member reaction on a comment", () =>
+      Effect.gen(function* () {
+        const handlers = yield* CommentReactionRpcHandlersEffect;
+        const f = yield* fixture();
+        const input = {
+          organizationId: f.organizationId,
+          postId: f.postId,
+          commentId: f.commentId,
+          emoji: "rocket" as const,
+        };
+        expect(
+          yield* handlers
+            .ToggleCommentReaction(input)
+            .pipe(Effect.provideService(CurrentSession, session(f)))
+        ).toEqual({ reacted: true, emoji: "rocket" });
+        const reactions = yield* handlers
+          .ListCommentReactions({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(Effect.provideService(CurrentSession, session(f)));
+        expect(reactions).toHaveLength(1);
+        expect(reactions[0]).toMatchObject({
+          commentId: f.commentId,
+          userId: f.userId,
+          memberId: f.membershipId,
+          emoji: "rocket",
+        });
+      })
+    );
+    it.effect("lists reactions for comments merged away from the post", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const postRepository = yield* PostRepository;
+        const handlers = yield* CommentReactionRpcHandlersEffect;
+        const f = yield* fixture();
+        const targetPostId = yield* PostId.generate;
+        const now = yield* DateTime.nowAsDate;
+
+        yield* db.insert(schema.postTable).values({
+          id: targetPostId,
+          title: "Target post",
+          content: "Target content",
+          slug: targetPostId,
+          excerpt: "Target content",
+          boardId: f.boardId,
+          organizationId: f.organizationId,
+          statusId: f.statusId,
+          creatorId: f.userId,
+          creatorMemberId: f.membershipId,
+          createdAt: now,
+          updatedAt: now,
+        });
+        yield* handlers
+          .ToggleCommentReaction({
+            commentId: f.commentId,
+            emoji: "rocket",
+            organizationId: f.organizationId,
+            postId: f.postId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session(f)));
+        yield* postRepository.merge({
+          organizationId: f.organizationId,
+          sourcePostId: f.postId,
+          targetPostId,
+        });
+
+        // The merged post's page lists the comment's reactions (and thus
+        // the counts) under its own slug, matching the comment list.
+        const reactions = yield* handlers
+          .ListCommentReactions({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(Effect.provideService(CurrentSession, session(f)));
+
+        expect(reactions).toHaveLength(1);
+        expect(reactions[0]).toMatchObject({
+          commentId: f.commentId,
+          emoji: "rocket",
+          postId: targetPostId,
+          postSlug: f.postSlug,
+        });
+      })
+    );
+    it.effect(
+      "does not react to comments on private boards through the public endpoint",
+      () =>
         Effect.gen(function* () {
           const handlers = yield* CommentReactionRpcHandlersEffect;
-          const f = yield* fixture();
+          const f = yield* fixture("PRIVATE");
           const error = yield* Effect.flip(
             handlers
-              .ListCommentReactions({
+              .ToggleCommentReactionPublic({
                 organizationId: f.organizationId,
-                slug: f.postSlug,
+                postId: f.postId,
+                commentId: f.commentId,
+                emoji: "fire",
               })
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           );
           expect(error._tag).toBe("PolicyDenied");
         })
-      );
-      it.effect("toggles a member reaction on a comment", () =>
-        Effect.gen(function* () {
-          const handlers = yield* CommentReactionRpcHandlersEffect;
-          const f = yield* fixture();
-          const input = {
-            organizationId: f.organizationId,
-            postId: f.postId,
-            commentId: f.commentId,
-            emoji: "rocket" as const,
-          };
-          expect(
-            yield* handlers
-              .ToggleCommentReaction(input)
-              .pipe(Effect.provideService(CurrentSession, session(f)))
-          ).toEqual({ reacted: true, emoji: "rocket" });
-          const reactions = yield* handlers
-            .ListCommentReactions({
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            })
-            .pipe(Effect.provideService(CurrentSession, session(f)));
-          expect(reactions).toHaveLength(1);
-          expect(reactions[0]).toMatchObject({
-            commentId: f.commentId,
-            userId: f.userId,
-            memberId: f.membershipId,
-            emoji: "rocket",
-          });
-        })
-      );
-      it.effect("lists reactions for comments merged away from the post", () =>
-        Effect.gen(function* () {
-          const db = yield* currentDb;
-          const postRepository = yield* PostRepository;
-          const handlers = yield* CommentReactionRpcHandlersEffect;
-          const f = yield* fixture();
-          const targetPostId = yield* PostId.generate;
-          const now = yield* DateTime.nowAsDate;
+    );
 
-          yield* db.insert(schema.postTable).values({
-            id: targetPostId,
-            title: "Target post",
-            content: "Target content",
-            slug: targetPostId,
-            excerpt: "Target content",
-            boardId: f.boardId,
-            organizationId: f.organizationId,
-            statusId: f.statusId,
-            creatorId: f.userId,
-            creatorMemberId: f.membershipId,
-            createdAt: now,
-            updatedAt: now,
-          });
-          yield* handlers
-            .ToggleCommentReaction({
-              commentId: f.commentId,
-              emoji: "rocket",
+    it.effect("refuses a public reaction from a banned non-member", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* CommentReactionRpcHandlersEffect;
+        const f = yield* fixture("PUBLIC");
+        const now = yield* DateTime.nowAsDate;
+
+        // The fixture's member row would exempt the session from the database
+        // membership check, so this case removes it first.
+        yield* db
+          .delete(schema.memberTable)
+          .where(eq(schema.memberTable.id, f.membershipId));
+        yield* db.insert(schema.userBanTable).values({
+          createdAt: now,
+          id: `ban_${f.organizationId}`,
+          organizationId: f.organizationId,
+          updatedAt: now,
+          userId: f.userId,
+        });
+
+        const error = yield* Effect.flip(
+          handlers
+            .ToggleCommentReactionPublic({
               organizationId: f.organizationId,
               postId: f.postId,
+              commentId: f.commentId,
+              emoji: "fire",
             })
-            .pipe(Effect.provideService(CurrentSession, session(f)));
-          yield* postRepository.merge({
+            .pipe(Effect.provideService(CurrentSession, session(f, false)))
+        );
+
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+    it.effect("redacts reactor identity on the public list", () =>
+      Effect.gen(function* () {
+        const handlers = yield* CommentReactionRpcHandlersEffect;
+        const f = yield* fixture();
+        const input = {
+          organizationId: f.organizationId,
+          postId: f.postId,
+          commentId: f.commentId,
+          emoji: "rocket" as const,
+        };
+        yield* handlers
+          .ToggleCommentReaction(input)
+          .pipe(Effect.provideService(CurrentSession, session(f)));
+
+        const anonymous = yield* handlers
+          .ListCommentReactionsPublic({
             organizationId: f.organizationId,
-            sourcePostId: f.postId,
-            targetPostId,
-          });
-
-          // The merged post's page lists the comment's reactions (and thus
-          // the counts) under its own slug, matching the comment list.
-          const reactions = yield* handlers
-            .ListCommentReactions({
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            })
-            .pipe(Effect.provideService(CurrentSession, session(f)));
-
-          expect(reactions).toHaveLength(1);
-          expect(reactions[0]).toMatchObject({
-            commentId: f.commentId,
-            emoji: "rocket",
-            postId: targetPostId,
-            postSlug: f.postSlug,
-          });
-        })
-      );
-      it.effect(
-        "does not react to comments on private boards through the public endpoint",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* CommentReactionRpcHandlersEffect;
-            const f = yield* fixture("PRIVATE");
-            const error = yield* Effect.flip(
-              handlers
-                .ToggleCommentReactionPublic({
-                  organizationId: f.organizationId,
-                  postId: f.postId,
-                  commentId: f.commentId,
-                  emoji: "fire",
-                })
-                .pipe(Effect.provideService(CurrentSession, session(f, false)))
-            );
-            expect(error._tag).toBe("PolicyDenied");
+            slug: f.postSlug,
           })
-      );
-      it.effect("redacts reactor identity on the public list", () =>
+          .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+        expect(anonymous).toHaveLength(1);
+        expect(anonymous[0]).toMatchObject({
+          commentId: f.commentId,
+          userId: null,
+          memberId: null,
+          emoji: "rocket",
+        });
+
+        const own = yield* handlers
+          .ListCommentReactionsPublic({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(
+            Effect.provideService(
+              OptionalCurrentSession,
+              Option.some(session(f))
+            )
+          );
+        expect(own[0]).toMatchObject({
+          commentId: f.commentId,
+          userId: f.userId,
+          memberId: f.membershipId,
+          emoji: "rocket",
+        });
+
+        // An authenticated caller who is not the reactor sees the reactor's
+        // identifiers redacted, same as an anonymous caller.
+        const otherUserId = `other_user_${f.organizationId}`;
+        const otherSession: Session = {
+          user: {
+            id: otherUserId,
+            email: `${otherUserId}@example.com`,
+            name: "Other User",
+            restrictedToOrganizationId: null,
+          },
+          session: { userId: otherUserId, token: "other-token" },
+          organizations: [{ id: f.organizationId }],
+          memberships: [],
+        };
+        const other = yield* handlers
+          .ListCommentReactionsPublic({
+            organizationId: f.organizationId,
+            slug: f.postSlug,
+          })
+          .pipe(
+            Effect.provideService(
+              OptionalCurrentSession,
+              Option.some(otherSession)
+            )
+          );
+        expect(other).toHaveLength(1);
+        expect(other[0]).toMatchObject({
+          commentId: f.commentId,
+          userId: null,
+          memberId: null,
+          emoji: "rocket",
+        });
+      })
+    );
+    it.effect(
+      "hides reactions on internal comments from the public endpoint",
+      () =>
         Effect.gen(function* () {
           const handlers = yield* CommentReactionRpcHandlersEffect;
-          const f = yield* fixture();
+          const f = yield* fixture("PUBLIC", "INTERNAL");
           const input = {
             organizationId: f.organizationId,
             postId: f.postId,
             commentId: f.commentId,
-            emoji: "rocket" as const,
           };
           yield* handlers
-            .ToggleCommentReaction(input)
+            .ToggleCommentReaction({ ...input, emoji: "thumbs_up" })
             .pipe(Effect.provideService(CurrentSession, session(f)));
-
-          const anonymous = yield* handlers
+          const reactions = yield* handlers
             .ListCommentReactionsPublic({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
-          expect(anonymous).toHaveLength(1);
-          expect(anonymous[0]).toMatchObject({
-            commentId: f.commentId,
-            userId: null,
-            memberId: null,
-            emoji: "rocket",
-          });
-
-          const own = yield* handlers
-            .ListCommentReactionsPublic({
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            })
-            .pipe(
-              Effect.provideService(
-                OptionalCurrentSession,
-                Option.some(session(f))
-              )
-            );
-          expect(own[0]).toMatchObject({
-            commentId: f.commentId,
-            userId: f.userId,
-            memberId: f.membershipId,
-            emoji: "rocket",
-          });
-
-          // An authenticated caller who is not the reactor sees the reactor's
-          // identifiers redacted, same as an anonymous caller.
-          const otherUserId = `other_user_${f.organizationId}`;
-          const otherSession: Session = {
-            user: {
-              id: otherUserId,
-              email: `${otherUserId}@example.com`,
-              name: "Other User",
-              restrictedToOrganizationId: null,
-            },
-            session: { userId: otherUserId, token: "other-token" },
-            organizations: [{ id: f.organizationId }],
-            memberships: [],
-          };
-          const other = yield* handlers
-            .ListCommentReactionsPublic({
-              organizationId: f.organizationId,
-              slug: f.postSlug,
-            })
-            .pipe(
-              Effect.provideService(
-                OptionalCurrentSession,
-                Option.some(otherSession)
-              )
-            );
-          expect(other).toHaveLength(1);
-          expect(other[0]).toMatchObject({
-            commentId: f.commentId,
-            userId: null,
-            memberId: null,
-            emoji: "rocket",
-          });
-        })
-      );
-      it.effect(
-        "hides reactions on internal comments from the public endpoint",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* CommentReactionRpcHandlersEffect;
-            const f = yield* fixture("PUBLIC", "INTERNAL");
-            const input = {
-              organizationId: f.organizationId,
-              postId: f.postId,
-              commentId: f.commentId,
-            };
+          expect(reactions).toHaveLength(0);
+          expect(
             yield* handlers
-              .ToggleCommentReaction({ ...input, emoji: "thumbs_up" })
-              .pipe(Effect.provideService(CurrentSession, session(f)));
-            const reactions = yield* handlers
-              .ListCommentReactionsPublic({
-                organizationId: f.organizationId,
-                slug: f.postSlug,
-              })
-              .pipe(
-                Effect.provideService(OptionalCurrentSession, Option.none())
-              );
-            expect(reactions).toHaveLength(0);
-            expect(
-              yield* handlers
-                .ToggleCommentReactionPublic({ ...input, emoji: "fire" })
-                .pipe(Effect.provideService(CurrentSession, session(f, false)))
-            ).toEqual({ reacted: false, emoji: null });
-          })
-      );
-    }
-  );
+              .ToggleCommentReactionPublic({ ...input, emoji: "fire" })
+              .pipe(Effect.provideService(CurrentSession, session(f, false)))
+          ).toEqual({ reacted: false, emoji: null });
+        })
+    );
+  });
 });

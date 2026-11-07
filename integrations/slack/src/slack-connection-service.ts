@@ -13,6 +13,10 @@ import {
   IntegrationRouteId,
 } from "@feeblo/id";
 import {
+  LISTED_CONNECTION_LIFECYCLES,
+  connectionSourceStatesFor,
+} from "@feeblo/integration-core/lifecycle";
+import {
   makeSlackApiClient,
   SLACK_OAUTH_AUTHORIZE_URL,
   type SlackApiClient,
@@ -29,7 +33,7 @@ import {
 } from "@feeblo/integration-slack/manifest";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -74,14 +78,14 @@ export const makeSlackConnectionServiceLive = (
 ): Layer.Layer<
   SlackConnectionService,
   never,
-  Database.Database | SlackIntegrationConfig | Crypto.Crypto
+  Database.Database | SlackIntegrationConfig | SecureRandom.SecureRandom
 > =>
   Layer.effect(
     SlackConnectionService,
     Effect.gen(function* () {
       const db = yield* currentDb;
       const config = yield* SlackIntegrationConfig;
-      const crypto = yield* Crypto.Crypto;
+      const secureRandom = yield* SecureRandom.SecureRandom;
 
       const connectStart = Effect.fn("SlackConnection.connectStart")(
         function* ({ organizationId }: S.TSlackConnectStart) {
@@ -90,17 +94,10 @@ export const makeSlackConnectionServiceLive = (
               message: "Slack integration is not configured",
             });
           }
-          // Through the `Crypto` service, not the global: the OAuth state must
-          // be reproducible under `TestCrypto` in tests, and Workers forbid
-          // random value generation in global scope.
-          const nonce = yield* crypto.randomUUIDv4().pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Could not generate a Slack OAuth state.",
-                })
-            )
-          );
+          // Through the `SecureRandom` service, not the global: the OAuth state
+          // must be substitutable in tests, and Workers forbid random value
+          // generation in global scope.
+          const nonce = yield* secureRandom.uuidV4();
           const connectionId = yield* IntegrationConnectionId.generate;
           const ciphertext = yield* encryptSlackCredentialMaterial(
             config.encryptionKey,
@@ -208,30 +205,36 @@ export const makeSlackConnectionServiceLive = (
             })
             .pipe(mapSlackApiError("OAuth handshake"));
           const botToken = Redacted.make(oauth.access_token);
-          const authTest = yield* apiClient
-            .authTest({ botToken })
-            .pipe(mapSlackApiError("workspace verification"));
-          const teamInfo = yield* apiClient
-            .teamInfo({ botToken })
-            .pipe(mapSlackApiError("workspace lookup"));
-          const ciphertext = yield* encryptSlackCredentialMaterial(
-            config.encryptionKey,
-            {
-              botToken: oauth.access_token,
-              ...(oauth.authed_user?.access_token !== undefined && {
-                userToken: oauth.authed_user.access_token,
-              }),
-              ...(oauth.incoming_webhook?.url !== undefined && {
-                incomingWebhookUrl: oauth.incoming_webhook.url,
-              }),
-            }
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new InternalServerError({
-                  message: "Slack credentials could not be encrypted",
-                })
-            )
+          // The two Slack calls share only the token and the encryption is a
+          // local operation over the token material, so all three run
+          // together: one Slack round trip instead of two. `Effect.all` is
+          // sequential unless told otherwise.
+          const [authTest, teamInfo, ciphertext] = yield* Effect.all(
+            [
+              apiClient
+                .authTest({ botToken })
+                .pipe(mapSlackApiError("workspace verification")),
+              apiClient
+                .teamInfo({ botToken })
+                .pipe(mapSlackApiError("workspace lookup")),
+              encryptSlackCredentialMaterial(config.encryptionKey, {
+                botToken: oauth.access_token,
+                ...(oauth.authed_user?.access_token !== undefined && {
+                  userToken: oauth.authed_user.access_token,
+                }),
+                ...(oauth.incoming_webhook?.url !== undefined && {
+                  incomingWebhookUrl: oauth.incoming_webhook.url,
+                }),
+              }).pipe(
+                Effect.mapError(
+                  () =>
+                    new InternalServerError({
+                      message: "Slack credentials could not be encrypted",
+                    })
+                )
+              ),
+            ],
+            { concurrency: "unbounded" }
           );
           return yield* db.transaction(() =>
             Effect.gen(function* () {
@@ -346,7 +349,14 @@ export const makeSlackConnectionServiceLive = (
       const listConnections = Effect.fn("SlackConnection.listConnections")(
         function* ({ organizationId }: { readonly organizationId: string }) {
           const rows = yield* db
-            .select()
+            .select({
+              createdAt: schema.integrationConnectionTable.createdAt,
+              id: schema.integrationConnectionTable.id,
+              lifecycle: schema.integrationConnectionTable.lifecycle,
+              name: schema.integrationConnectionTable.name,
+              safeDisplayMetadata:
+                schema.integrationConnectionTable.safeDisplayMetadata,
+            })
             .from(schema.integrationConnectionTable)
             .where(
               and(
@@ -359,13 +369,7 @@ export const makeSlackConnectionServiceLive = (
                   slackProviderKey
                 ),
                 inArray(schema.integrationConnectionTable.lifecycle, [
-                  "connecting",
-                  "active",
-                  "paused",
-                  "reauth_required",
-                  "disconnecting",
-                  "disconnected",
-                  "revocation_unconfirmed",
+                  ...LISTED_CONNECTION_LIFECYCLES,
                 ])
               )
             )
@@ -403,13 +407,40 @@ export const makeSlackConnectionServiceLive = (
                 });
               }
               if (connection.lifecycle === "archived") {
+                // The graph refuses to move an archived row, and a tombstone
+                // still holds whatever credentials it kept at archive time.
+                // Scrubbing them is the one part of a disconnect an archived
+                // connection still owes; it stays inside the transaction
+                // because it is database work only.
+                yield* db
+                  .update(schema.integrationConnectionTable)
+                  .set({
+                    credentialsCiphertext: null,
+                    updatedAt: yield* DateTime.nowAsDate,
+                  })
+                  .where(
+                    and(
+                      eq(schema.integrationConnectionTable.id, connectionId),
+                      eq(
+                        schema.integrationConnectionTable.lifecycle,
+                        "archived"
+                      )
+                    )
+                  );
                 return;
               }
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "disconnecting", updatedAt: now })
-                .where(eq(schema.integrationConnectionTable.id, connectionId));
+                .where(
+                  and(
+                    eq(schema.integrationConnectionTable.id, connectionId),
+                    inArray(schema.integrationConnectionTable.lifecycle, [
+                      ...connectionSourceStatesFor("disconnecting"),
+                    ])
+                  )
+                );
               yield* db
                 .update(schema.integrationRouteTable)
                 .set({ enabled: false, updatedAt: now })
@@ -489,7 +520,12 @@ export const makeSlackConnectionServiceLive = (
                     updatedAt: now,
                   })
                   .where(
-                    eq(schema.integrationConnectionTable.id, connectionId)
+                    and(
+                      eq(schema.integrationConnectionTable.id, connectionId),
+                      inArray(schema.integrationConnectionTable.lifecycle, [
+                        ...connectionSourceStatesFor("archived"),
+                      ])
+                    )
                   );
               })
             ),

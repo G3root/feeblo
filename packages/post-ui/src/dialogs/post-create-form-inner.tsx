@@ -346,6 +346,10 @@ export function PostCreateForm() {
         const authorIsMember = hasOnBehalfAuthorValue(authorSelection)
           ? (authorSelection.isMember ?? false)
           : member !== undefined;
+        // An optimistic row cannot be banned: the participation policy refuses
+        // a banned author's write, so the only way this row survives is for the
+        // server to agree that nobody here is banned. A rejection rolls it back.
+        const authorIsBanned = false;
 
         // The list row carries no body; it travels as action input to the
         // surface's `persistPost` RPC instead. On-behalf attribution rides
@@ -356,6 +360,9 @@ export function PostCreateForm() {
             id: postId,
             assetIds,
             archivedAt: null,
+            // A freshly created post is unassigned; triage is a separate write
+            // through `UpdatePostAssignee` once the row exists.
+            assigneeMemberId: null,
             boardId: value.boardId,
             title,
             slug: slugify(title) || "untitled",
@@ -371,6 +378,7 @@ export function PostCreateForm() {
             creatorId: session?.user?.id ?? null,
             creatorMemberId: member?.id ?? null,
             authorIsMember,
+            authorIsBanned,
             user: {
               name: session?.user?.name ?? null,
               image: session?.user?.image ?? null,

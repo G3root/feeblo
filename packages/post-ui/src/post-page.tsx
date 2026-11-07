@@ -2,9 +2,11 @@ import { lazy, type ReactNode, Suspense } from "react";
 
 import { CommentsList } from "./comment-display/list";
 import { ContentSkeleton } from "./content-skeleton";
+import { BanAuthorDialogProvider } from "./dialog-stores/ban-author";
 import { CommentDeleteDialogProvider } from "./dialog-stores/comment";
 import { CommentVisibilityDialogProvider } from "./dialog-stores/comment-visibility";
 import { PostDeleteDialogProvider } from "./dialog-stores/post";
+import { BanAuthorDialog } from "./dialogs/ban-author-dialog";
 import { CommentDeleteDialog } from "./dialogs/comment-delete-dialog";
 import { CommentVisibilityDialog } from "./dialogs/comment-visibility-dialog";
 import { PostDeleteDialog } from "./dialogs/post-delete-dialog";
@@ -50,12 +52,15 @@ function Root({ children, ...post }: PostCollectionDataProviderProps) {
     <PostDeleteDialogProvider>
       <CommentDeleteDialogProvider>
         <CommentVisibilityDialogProvider>
-          <PostCollectionDataProvider {...post}>
-            {children}
-            <PostDeleteDialog />
-            <CommentDeleteDialog />
-            <CommentVisibilityDialog />
-          </PostCollectionDataProvider>
+          <BanAuthorDialogProvider>
+            <PostCollectionDataProvider {...post}>
+              {children}
+              <PostDeleteDialog />
+              <CommentDeleteDialog />
+              <CommentVisibilityDialog />
+              <BanAuthorDialog />
+            </PostCollectionDataProvider>
+          </BanAuthorDialogProvider>
         </CommentVisibilityDialogProvider>
       </CommentDeleteDialogProvider>
     </PostDeleteDialogProvider>

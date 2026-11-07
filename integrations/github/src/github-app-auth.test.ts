@@ -18,7 +18,7 @@ const dateAt = (instant: string | number | Date): Date =>
   DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 const makePrivateKey = () =>
-  Effect.tryPromise(() =>
+  Effect.promise(() =>
     jose
       .generateKeyPair("RS256", { extractable: true })
       .then((keys) => jose.exportPKCS8(keys.privateKey))

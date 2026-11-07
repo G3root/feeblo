@@ -201,8 +201,10 @@
     "@number-flow/react": "^0.6.1",
     "@tanstack/react-db": "catalog:",
     "@tanstack/react-form": "catalog:",
+    "@xstate/react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "xstate": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

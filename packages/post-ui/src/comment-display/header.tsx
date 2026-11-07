@@ -3,6 +3,7 @@ import {
   CircleLockIcon,
   GitMergeIcon,
   Pin02Icon,
+  UserBlock01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
@@ -37,6 +38,11 @@ export function CommentDisplayHeader() {
       <span className="text-muted-foreground text-xs">
         {formatRelativeTime(state.createdAt)}
       </span>
+      {state.authorIsBanned && (
+        <Badge variant="error">
+          <HugeiconsIcon icon={UserBlock01Icon} /> Banned
+        </Badge>
+      )}
       {state.isInternal && (
         <Badge variant="info">
           <HugeiconsIcon icon={CircleLockIcon} /> {m.quaint_slimy_osprey()}

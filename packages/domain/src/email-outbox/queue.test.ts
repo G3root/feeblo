@@ -474,10 +474,7 @@ const waitForOutboxToSettle = (outboxId: string) =>
     const db = yield* Database.Database;
     for (let poll = 0; poll < 100_000; poll += 1) {
       const intent = yield* repository.findById(outboxId);
-      if (
-        intent !== undefined &&
-        (intent.state === "pending" || intent.state === "paused_by_plan")
-      ) {
+      if (intent !== undefined && intent.state === "pending") {
         yield* Effect.yieldNow;
         continue;
       }
@@ -490,8 +487,7 @@ const waitForOutboxToSettle = (outboxId: string) =>
           (row) =>
             row.state !== "queued" &&
             row.state !== "deferred" &&
-            row.state !== "sending" &&
-            row.state !== "paused_by_plan"
+            row.state !== "sending"
         )
       ) {
         return;
@@ -1501,7 +1497,17 @@ describe("EmailOutbox workflows", () => {
             (delivery) => delivery.state === "accepted"
           );
           const mailbox = yield* testMailerState;
-          expect(mailbox.renderedMessages[0]?.html).toContain(
+          // The mailbox is shared with the delivery worker, which also renders
+          // deliveries left queued by earlier tests in this file — the
+          // database is shared, and a reset only clears the mailbox, not the
+          // outbox. Scope the assertion to this test's recipient instead of
+          // assuming it is the first message rendered since the reset.
+          const rendered = mailbox.renderedMessages.find(
+            (message) =>
+              message.to ===
+              `verify-${organizationId}@example.test`.toLowerCase()
+          );
+          expect(rendered?.html).toContain(
             "https://test.feeblo.example/api/email-subscriptions/verify?token="
           );
           const db = yield* Database.Database;
@@ -1805,66 +1811,6 @@ describe("EmailOutbox workflows", () => {
         })
     );
 
-    it.effect("resumes a legacy plan-paused intent before materializing", () =>
-      Effect.gen(function* () {
-        yield* resetTestMailer();
-        const { intentId, organizationId, ownerEmail } = yield* fixture;
-        const db = yield* Database.Database;
-        const repository = yield* EmailOutboxRepository;
-        const changelogId = `resume_legacy_${organizationId}`;
-        const now = yield* DateTime.nowAsDate;
-        yield* db.insert(schema.changelogTable).values({
-          id: changelogId,
-          organizationId,
-          title: "Legacy paused release",
-          slug: "legacy-paused-release",
-          content: "x",
-          excerpt: "x",
-          status: "published",
-          publishedAt: now,
-          creatorId: null,
-          creatorMemberId: null,
-          createdAt: now,
-          updatedAt: now,
-        });
-        const intent = yield* repository.recordIntent({
-          aggregateId: changelogId,
-          aggregateType: "changelog",
-          deduplicationKey: `changelog.legacy-paused:${organizationId}:${changelogId}`,
-          expiresAt: shiftDate(fixtureNow, Duration.days(1)),
-          kind: "changelog.published",
-          organizationId,
-          payload: { kind: "changelog.published", changelogId },
-          scheduledAt: fixtureNow,
-        });
-        if (intent._tag !== "Inserted") {
-          return yield* Effect.die("Expected a legacy intent");
-        }
-        // Simulate a row parked by the retired intent-level plan gate.
-        yield* db
-          .update(schema.emailOutboxTable)
-          .set({ state: "paused_by_plan" })
-          .where(eq(schema.emailOutboxTable.id, intent.intent.id));
-
-        const deliveryIds = yield* materializeEmailIntent(intent.intent.id);
-        expect(deliveryIds).toHaveLength(1);
-        expect((yield* repository.findById(intent.intent.id))?.state).toBe(
-          "materialized"
-        );
-
-        yield* Effect.forEach(deliveryIds, (deliveryId) =>
-          deliverEmailDelivery({ deliveryId })
-        );
-        expect(
-          (yield* testMailerState).sentMessages.map((message) => message.to)
-        ).toEqual([ownerEmail.toLowerCase()]);
-        // Drain the fixture's own intent so a later test's reconciliation
-        // sweep cannot consume its mailer outcomes.
-        yield* reconcileEmailOutbox();
-        yield* waitForOutboxToSettle(intentId);
-      })
-    );
-
     it.effect(
       "marks a permanent provider failure terminal without retrying",
       () =>
@@ -2160,10 +2106,10 @@ describe("EmailOutbox workflows", () => {
           const failingRepository = EmailOutboxRepository.of({
             ...repository,
             createDelivery: () => Effect.fail(persistenceError),
-            markIntentState: (input) =>
-              input.state === "failed"
+            transitionIntent: (input) =>
+              input.event === "fail"
                 ? Effect.fail(persistenceError)
-                : repository.markIntentState(input),
+                : repository.transitionIntent(input),
           });
 
           const fiber = yield* dispatchEmailOutboxIntent({

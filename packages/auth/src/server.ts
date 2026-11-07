@@ -49,7 +49,7 @@ import {
   type GenericOAuthUserInfo,
   genericOAuth,
 } from "better-auth/plugins/generic-oauth";
-import { asc, eq } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -98,6 +98,25 @@ const createTestUtilsPlugin = (): BetterAuthPlugin =>
   // contract; the cast bridges its generically-typed result.
   testUtils({ captureOTP: true }) as BetterAuthPlugin;
 
+/**
+ * How many owned-workspace ids one membership count carries.
+ *
+ * PostgreSQL refuses a statement with more than 65535 bind parameters, and the
+ * ownership pre-check binds one per owned workspace. An account that owns this
+ * many is unlikely, but the grouped count is issued per batch and the totals
+ * are merged, so the query cannot fail on an unbounded `IN` list.
+ */
+const OWNED_WORKSPACE_BATCH_SIZE = 1_000;
+
+/**
+ * How many Polar revocations one account deletion runs at once.
+ *
+ * The revocations are independent — a workspace that is already deleted
+ * depends on no other — but each one is an external round trip, so an account
+ * owning many workspaces must not open one request per workspace at once.
+ */
+const WORKSPACE_REVOCATION_CONCURRENCY = 4;
+
 export const initAuthHandler = (
   makeMailerLayer: () => Layer.Layer<
     Mailer,
@@ -131,8 +150,10 @@ export const initAuthHandler = (
 
     // A half-configured Polar is the one failure mode that takes money without
     // granting a plan: checkout and the portal need only the access token, but
-    // the signed webhook endpoint (the only way a subscription reaches this
-    // deployment) is registered only when the secret is present too.
+    // the signed webhook endpoint (the durable sync; the checkout-success
+    // confirmation covers only the checkout it was opened for, not later
+    // renewals or cancellations) is registered only when the secret is present
+    // too.
     if (polarService.client && Option.isNone(polarService.webhookSecret)) {
       yield* Effect.logWarning(
         "POLAR_ACCESS_TOKEN is set without POLAR_WEBHOOK_SECRET: checkout can charge a card, but subscription webhooks will never be applied"
@@ -393,14 +414,12 @@ export const initAuthHandler = (
      * only a database failure surfaces here and is logged.
      */
     const revokePendingOrganizationSubscriptions = (organizationId: string) =>
-      callbackRuntime.runPromise(
-        revokePendingSubscriptionRevocations({ organizationId }).pipe(
-          Effect.catchCause((cause) =>
-            Effect.logWarning(
-              "Failed to revoke queued billing for a deleted organization",
-              cause
-            ).pipe(Effect.annotateLogs({ organizationId }))
-          )
+      revokePendingSubscriptionRevocations({ organizationId }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning(
+            "Failed to revoke queued billing for a deleted organization",
+            cause
+          ).pipe(Effect.annotateLogs({ organizationId }))
         )
       );
 
@@ -459,16 +478,45 @@ export const initAuthHandler = (
       }
 
       // Checked before anything is revoked or deleted: a refusal must not
-      // touch the billing of a workspace that is staying.
+      // touch the billing of a workspace that is staying. Grouped counts over
+      // batches of the owned workspaces rather than a query per workspace,
+      // because this pre-check only needs each total and an account may own
+      // several.
+      const ownedWorkspaceIds = ownedWorkspaces.map(
+        (workspace) => workspace.id
+      );
       const blockingWorkspaceNames = await callbackRuntime.runPromise(
         Effect.gen(function* () {
-          const blocking: string[] = [];
-          for (const workspace of ownedWorkspaces) {
-            if ((yield* countMembers(workspace.id)) > 1) {
-              blocking.push(workspace.name);
+          const memberCounts = new Map<string, number>();
+          for (
+            let start = 0;
+            start < ownedWorkspaceIds.length;
+            start += OWNED_WORKSPACE_BATCH_SIZE
+          ) {
+            const counts = yield* db
+              .select({
+                organizationId: schema.memberTable.organizationId,
+                total: count(),
+              })
+              .from(schema.memberTable)
+              .where(
+                inArray(
+                  schema.memberTable.organizationId,
+                  ownedWorkspaceIds.slice(
+                    start,
+                    start + OWNED_WORKSPACE_BATCH_SIZE
+                  )
+                )
+              )
+              .groupBy(schema.memberTable.organizationId);
+            for (const row of counts) {
+              memberCounts.set(row.organizationId, row.total);
             }
           }
-          return blocking;
+
+          return ownedWorkspaces
+            .filter((workspace) => (memberCounts.get(workspace.id) ?? 0) > 1)
+            .map((workspace) => workspace.name);
         })
       );
       if (blockingWorkspaceNames.length > 0) {
@@ -540,10 +588,20 @@ export const initAuthHandler = (
       // Revoked after the commit: an external call must not hold the
       // transaction's row locks, a workspace the re-check spared keeps the
       // subscription it still needs, and anything Polar refuses stays queued
-      // for `subscriptionRevocationMaintenance`.
-      for (const workspaceId of deletedWorkspaceIds) {
-        await revokePendingOrganizationSubscriptions(workspaceId);
-      }
+      // for `subscriptionRevocationMaintenance`. The workspaces do not depend on
+      // each other and each call already logs its own failure, so the Polar
+      // round trips overlap instead of queueing one behind the next — bounded,
+      // because an account may own many workspaces and Polar is external.
+      await callbackRuntime.runPromise(
+        Effect.forEach(
+          deletedWorkspaceIds,
+          revokePendingOrganizationSubscriptions,
+          {
+            concurrency: WORKSPACE_REVOCATION_CONCURRENCY,
+            discard: true,
+          }
+        )
+      );
     };
 
     // Local OAuth emulator (vercel-labs/emulate) support.
@@ -819,8 +877,14 @@ export const initAuthHandler = (
       emailVerification: {
         autoSignInAfterVerification: true,
         afterEmailVerification: async (user) => {
-          await healVerifiedIdentities(user);
-          await scheduleWelcome(user);
+          // Healing the verified account's shadow identities and enqueueing the
+          // welcome email touch different rows and neither needs the other's
+          // result, so they run together: the verification response no longer
+          // waits for the sum of both.
+          await Promise.all([
+            healVerifiedIdentities(user),
+            scheduleWelcome(user),
+          ]);
         },
       },
       emailAndPassword: {
@@ -1107,8 +1171,8 @@ export const initAuthHandler = (
               );
             },
             async afterDeleteOrganization(data) {
-              await revokePendingOrganizationSubscriptions(
-                data.organization.id
+              await callbackRuntime.runPromise(
+                revokePendingOrganizationSubscriptions(data.organization.id)
               );
             },
           },

@@ -14,6 +14,9 @@
 // oxlint-disable typescript/no-unnecessary-type-parameters -- A captured failure is any value a browser handler can throw. A generic parameter accepts it without naming `unknown` (banned by anti-slop), and the SDK accepts the value unchanged.
 import { isString } from "@feeblo/utils/runtime-kind";
 
+/** Chrome names an engine-provided frame `index <n>`. */
+const engineFrameIndexPattern = /^index \d+$/;
+
 /** The directory holding a surface's built chunks, derived from one of its own modules. */
 export const scriptDirectory = (moduleUrl: string): string =>
   moduleUrl.slice(0, moduleUrl.lastIndexOf("/") + 1);
@@ -24,7 +27,7 @@ const engineLocation = (location: string) =>
   location === "native" ||
   location === "[native code]" ||
   location.startsWith("self-hosted") ||
-  /^index \d+$/.test(location);
+  engineFrameIndexPattern.test(location);
 
 /** A V8 frame is `at name (location)` or `at location`. */
 const v8Frame = /^\s+at (?:[^(]*? \((.*)\)|(.*))$/;

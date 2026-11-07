@@ -40,6 +40,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
@@ -164,6 +165,29 @@ describe("PostRpcHandlers", () => {
     content,
   });
 
+  /**
+   * Bans the fixture's non-member session user.
+   *
+   * The fixture creates the member row its board references, and the database
+   * membership check below the policy would exempt the session, so the row goes
+   * first. What remains is a plain portal account that is banned here.
+   */
+  const banNonMember = (fixture: Fixture) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      yield* db
+        .delete(schema.memberTable)
+        .where(eq(schema.memberTable.id, fixture.membershipId));
+      yield* db.insert(schema.userBanTable).values({
+        createdAt: now,
+        id: `ban_${fixture.userId}`,
+        organizationId: fixture.organizationId,
+        updatedAt: now,
+        userId: fixture.userId,
+      });
+    });
+
   const addBoard = (fixture: Fixture, visibility: "PUBLIC" | "PRIVATE") =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -278,7 +302,8 @@ describe("PostRpcHandlers", () => {
     NodeCrypto.layer,
     S3Test,
     EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
-    IntegrationEventRecorderTest
+    IntegrationEventRecorderTest,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
   );
 
   const TestLayer = PostWriteService.layer.pipe(
@@ -2029,6 +2054,67 @@ describe("PostRpcHandlers", () => {
 
           expect(posts).toHaveLength(0);
         })
+      );
+
+      it.effect(
+        "refuses a non-member deleting another user's post, banned or not",
+        () =>
+          Effect.gen(function* () {
+            const handlers = yield* PostRpcHandlersEffect;
+            const fixture = yield* makeFixture("PUBLIC");
+            const postId = yield* PostId.generate;
+            const otherUserId = `other_${fixture.organizationId}`;
+            const otherEmail = `${otherUserId}@example.com`;
+            const db = yield* currentDb;
+            const session = makeSession(fixture, null);
+
+            yield* db.insert(schema.userTable).values({
+              id: otherUserId,
+              email: otherEmail,
+              name: "Other author",
+            });
+
+            const otherSession: Session = {
+              ...session,
+              user: { ...session.user, id: otherUserId, email: otherEmail },
+              session: { userId: otherUserId, token: "other-token" },
+            };
+            yield* handlers
+              .CreatePostPublic(
+                postCreateInput(fixture, postId, "Someone else's post")
+              )
+              .pipe(Effect.provideService(CurrentSession, otherSession));
+
+            const deleteAsSession = () =>
+              handlers
+                .DeletePostPublic({
+                  id: postId,
+                  organizationId: fixture.organizationId,
+                  boardId: fixture.boardId,
+                })
+                .pipe(Effect.provideService(CurrentSession, session));
+
+            const unbanned = yield* Effect.flip(deleteAsSession());
+            expect(unbanned._tag).toBe("PolicyDenied");
+
+            // A ban does not change the answer: the delete is refused because
+            // the post belongs to somebody else, not because of participation.
+            yield* banNonMember(fixture);
+            const banned = yield* Effect.flip(deleteAsSession());
+            expect(banned._tag).toBe("PolicyDenied");
+
+            // Both denials are refusals, not a delete that ran and failed
+            // afterwards, so the post is still on the public board.
+            const posts = yield* handlers
+              .ListPostsPublic({
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+            expect(posts.map((post) => post.id)).toContain(postId);
+          })
       );
 
       it.effect("rejects creator deletion after another user votes", () =>
@@ -4568,5 +4654,156 @@ describe("PostRpcHandlers", () => {
           expect(error).toBeInstanceOf(Policy.PolicyDeniedError);
         })
     );
+
+    // Each public write composes `participation.canParticipate` on its own, so
+    // one banned case per operation is what stops a dropped composition from
+    // passing CI.
+    describe("banned non-members", () => {
+      /** Creates a post as the non-member the fixture's session names. */
+      const seedOwnPost = (fixture: Fixture) =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const postId = yield* PostId.generate;
+          yield* handlers
+            .CreatePostPublic(postCreateInput(fixture, postId, "Own post"))
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+          return postId;
+        });
+
+      it.effect("refuses CreatePostPublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* PostId.generate;
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreatePostPublic(postCreateInput(fixture, postId, "Banned post"))
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("still lets a banned author delete their own post", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          // Withdrawing your own post is not participation, so the delete path
+          // must not carry the participation check the writes have.
+          yield* handlers
+            .DeletePostPublic({
+              id: postId,
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture, null))
+            );
+
+          const posts = yield* handlers
+            .ListPostsPublic({
+              organizationId: fixture.organizationId,
+              boardId: fixture.boardId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+          expect(posts).toHaveLength(0);
+        })
+      );
+
+      it.effect("refuses UpdatePostPublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostPublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                statusId: fixture.statusId,
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("refuses UpdatePostContentPublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostContentPublic({
+                assetIds: [],
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                content: "Edited while banned",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+
+      it.effect("refuses UpdatePostTitlePublic", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture("PUBLIC");
+          const postId = yield* seedOwnPost(fixture);
+          yield* banNonMember(fixture);
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdatePostTitlePublic({
+                id: postId,
+                organizationId: fixture.organizationId,
+                boardId: fixture.boardId,
+                title: "Renamed while banned",
+              })
+              .pipe(
+                Effect.provideService(
+                  CurrentSession,
+                  makeSession(fixture, null)
+                )
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
+      );
+    });
   });
 });

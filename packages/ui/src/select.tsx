@@ -34,6 +34,8 @@ export const selectTriggerIconClassName = "-me-1 size-4.5 opacity-80 sm:size-4";
 
 export interface SelectButtonProps extends useRender.ComponentProps<"button"> {
   size?: VariantProps<typeof selectTriggerVariants>["size"];
+  /** The property rows in a detail panel use a ghost trigger with no chevron. */
+  showTrigger?: boolean;
 }
 
 export function SelectButton({
@@ -41,6 +43,7 @@ export function SelectButton({
   size,
   render,
   children,
+  showTrigger = true,
   ...props
 }: SelectButtonProps): React.ReactElement {
   const typeValue: React.ButtonHTMLAttributes<HTMLButtonElement>["type"] =
@@ -52,10 +55,12 @@ export function SelectButton({
         <span className="in-data-placeholder:text-muted-foreground/72 flex-1 truncate">
           {children}
         </span>
-        <HugeiconsIcon
-          icon={UnfoldMoreIcon}
-          className={selectTriggerIconClassName}
-        />
+        {showTrigger ? (
+          <HugeiconsIcon
+            icon={UnfoldMoreIcon}
+            className={selectTriggerIconClassName}
+          />
+        ) : null}
       </>
     ),
     className: cn(selectTriggerVariants({ size }), "min-w-0", className),

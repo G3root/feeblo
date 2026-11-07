@@ -25,14 +25,18 @@ minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - drizzle-kit@1.0.0-rc.5
   - drizzle-orm@1.0.0-rc.5
-  # The compiler-train bump to tsrs. Both were published within a day of it,
-  # and `tsrs` 0.20.0 is the only release that ports the TypeScript 7.1
-  # compiler the `@effect/tsgo` patch supports, so waiting a day means shipping
-  # no compiler at all. Same rule as above: a version, never a bare name, so
-  # the exemption stops at the release that was reviewed. Drop both entries
-  # once they are a day old.
-  - "@effect/tsgo@0.59.0"
-  - tsrs@0.20.0-ts7.1.0-beta
+  # The `better-auth` bump is a security fix, and the age gate is the only
+  # thing between it and the install. 1.7.2 is affected by three advisories
+  # (GHSA-44jh-23m7-hpcf, GHSA-965c-763c-88jm, GHSA-r4xp-prcw-77qf), all fixed
+  # in 1.7.7; 1.7.15 and 1.7.16 clear them, and 1.7.16 also fixes revoked
+  # sessions staying usable against the session store. The plugin package peers
+  # on the exact `better-auth` patch it ships with (`@better-auth/api-key
+  # @1.7.16` peers `better-auth: ^1.7.16`), so the two entries below are the
+  # pair that has to be exempt together. Same rule as above: a version, never
+  # a bare name, so the exemption stops at the release that was reviewed. Drop
+  # both entries once they are a day old.
+  - better-auth@1.7.16
+  - "@better-auth/api-key@1.7.16"
   # The TanStack DB 1.0 RC. `@tanstack/react-db` and
   # `@tanstack/query-db-collection` are one track: the query adapter peers on
   # `@tanstack/db ^1.0.0-rc.0`, so they move together or the install resolves
@@ -40,6 +44,13 @@ minimumReleaseAgeExclude:
   # name. Drop these once the RC is a day old.
   - "@tanstack/react-db@1.0.0-rc.1"
   - "@tanstack/query-db-collection@1.5.0"
+  # The XState 6 alpha track. `xstate`, `@xstate/effect` and `@xstate/react`
+  # publish on one cadence and peer on each other by exact alpha range, so the
+  # three land in the same release window and the age gate would otherwise
+  # refuse all of them. Same rule as above: a version, never a bare name.
+  - "xstate@6.0.0-alpha.73"
+  - "@xstate/effect@1.0.0-alpha.12"
+  - "@xstate/react@7.0.0-alpha.7"
 
 allowBuilds:
   "@parcel/watcher": true
@@ -56,20 +67,26 @@ allowBuilds:
   workerd: true
 catalog:
   "@base-ui/react": ^1.7.0
-  "@better-auth/api-key": 1.7.14
-  "@better-auth/cimd": 1.7.14
-  "@better-auth/mcp": 1.7.14
-  "@better-auth/oauth-provider": 1.7.14
+  "@better-auth/api-key": 1.7.16
+  "@better-auth/cimd": 1.7.16
+  "@better-auth/mcp": 1.7.16
+  "@better-auth/oauth-provider": 1.7.16
   "@bufbuild/protobuf": 2.16.0
   "@cloudflare/workers-types": ^5.20261023.1
   "@dotenvx/dotenvx": ^2.38.2
   "@effect-aws/client-s3": 2.0.0
-  "@effect/ai-openai": 4.0.5
-  "@effect/atom-react": 4.0.5
-  "@effect/platform-node": 4.0.5
-  "@effect/sql-pg": 4.0.5
-  "@effect/sql-pglite": 4.0.5
-  "@effect/vitest": 4.0.5
+  "@effect/ai-openai": 4.1.2
+  "@effect/atom-react": 4.1.2
+  "@effect/platform-node": 4.1.2
+  "@effect/sql-pg": 4.1.2
+  "@effect/sql-pglite": 4.1.2
+  "@effect/vitest": 4.1.2
+  # `@effect/sql-pglite` 4.1.2 depends on `@electric-sql/pglite` `^0.5.14`
+  # directly, where 4.0.5 took it as a peer. Left at the older spec the
+  # workspace resolves 0.5.11 and the driver gets a second, structurally
+  # different `PGlite` class from the 0.5.14 copy under `drizzle-orm`, so
+  # `drizzle({ client })` stops typechecking even though both are PGlite.
+  "@electric-sql/pglite": 0.5.14
   "@floating-ui/dom": ^1.8.0
   "@isaacs/ttlcache": ^2.1.5
   "@polar-sh/better-auth": ^2.1.0
@@ -97,7 +114,15 @@ catalog:
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.4
   "@vitejs/plugin-react": ^6.1.1
-  better-auth: 1.7.14
+  # XState 6 is still alpha and its dist-tags disagree: `@xstate/effect@alpha`
+  # resolves to 0.1.0-alpha.4 (peer `effect ^4.0.0-rc.115`, `xstate
+  # ^6.0.0-alpha.61`), while the newest build published under `latest` is
+  # 1.0.0-alpha.12 (peer `effect ^4.0.0`, `xstate ^6.0.0-alpha.73`). The three
+  # are pinned to exact versions, not `@alpha`, so a later tag move cannot
+  # change what the lockfile resolves.
+  "@xstate/effect": 1.0.0-alpha.12
+  "@xstate/react": 7.0.0-alpha.7
+  better-auth: 1.7.16
   class-variance-authority: ^0.7.1
   cn: ^0.5.0
   dotenv: ^18.0.9
@@ -109,7 +134,7 @@ catalog:
   # regenerating the chain.
   drizzle-kit: 1.0.0-rc.5
   drizzle-orm: 1.0.0-rc.5
-  effect: 4.0.5
+  effect: 4.1.2
   jose: ^6.2.3
   knip: ^6.42.1
   postgres: ^3.4.7
@@ -126,18 +151,19 @@ catalog:
   shadcn: ^4.22.1
   solid-js: ^1.9.17
   tailwindcss: ^4.3.3
-  tsrs: 0.20.0-ts7.1.0-beta
+  tsrs: 0.20.1-ts7.1.0-beta
   tsx: ^4.20.6
   tw-animate-css: ^1.4.0
   vite: ^8.3.5
   "vite-plugin-icons-spritesheet": ^3.1.0
   vite-plugin-solid: ^2.11.12
-  # `@effect/vitest` 4.0.5 peers on vitest >=5.0.0 <6.0.0; keep the
+  xstate: 6.0.0-alpha.73
+  # `@effect/vitest` 4.1.2 peers on vitest >=5.0.0 <6.0.0; keep the
   # two on the same major so the helper package is not running against an
   # unsupported vitest API.
   vitest: ^5.0.2
   zod: ^4.4.3
 nodeLinker: hoisted
 overrides:
-  "@effect/platform-node-shared": 4.0.5
+  "@effect/platform-node-shared": 4.1.2
   prosemirror-model: ^1.25.9

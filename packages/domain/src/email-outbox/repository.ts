@@ -1,9 +1,9 @@
 import { Database, schema } from "@feeblo/db";
 import { EmailDeliveryId, EmailOutboxId } from "@feeblo/id";
 import { MESSAGE_ID_DOMAIN } from "@feeblo/transactional/config";
-import { and, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -21,6 +21,11 @@ import {
   submissionWindowMaxPosts,
 } from "./config";
 import { deliverySourceStatesFor } from "./delivery-state";
+import {
+  sourceStatesFor as intentSourceStatesFor,
+  targetStateFor as intentTargetStateFor,
+  type TEmailIntentEvent,
+} from "./intent-machine";
 import {
   type EmailDeliveryRecord as EmailDelivery,
   EmailDeliveryRecord,
@@ -114,13 +119,6 @@ export interface FindDueEmailDeliveriesInput {
   readonly staleSendingBefore: Date;
 }
 
-/** A paused delivery resumed into `queued`, with the version that resume wrote. */
-export type ResumedEmailDelivery = {
-  readonly attemptCount: number;
-  readonly id: string;
-  readonly transitionVersion: number;
-};
-
 const dataError = (operation: string, reason: string): EmailOutboxDataError =>
   new EmailOutboxDataError({ operation, reason });
 
@@ -209,15 +207,13 @@ export const emailDeliveryMessageId = (
   recipientEmail: string
 ) =>
   Effect.gen(function* () {
-    const crypto = yield* Crypto.Crypto;
-    const recipientHash = Buffer.from(
-      yield* crypto.digest(
-        "SHA-256",
-        new TextEncoder().encode(`${outboxId}:${recipientEmail}`)
-      )
-    ).toString("hex");
+    const digest = yield* Digest.Digest;
+    const recipientHash = yield* digest.digestHex(
+      Digest.sha256,
+      new TextEncoder().encode(`${outboxId}:${recipientEmail}`)
+    );
     return `<email.${recipientHash}@${MESSAGE_ID_DOMAIN}>`;
-  }).pipe(Effect.orDie);
+  });
 
 const makeEmailOutboxRepository = Effect.gen(function* () {
   const db = yield* Database.Database;
@@ -635,36 +631,6 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
   );
 
-  const findPausedByPlan = Effect.fn("EmailOutboxRepository.findPausedByPlan")(
-    function* ({
-      before,
-      limit = 100,
-    }: {
-      readonly before: Date;
-      readonly limit?: number;
-    }) {
-      const rows = yield* db
-        .select()
-        .from(schema.emailOutboxTable)
-        .where(
-          and(
-            eq(schema.emailOutboxTable.state, "paused_by_plan"),
-            lte(schema.emailOutboxTable.scheduledAt, before)
-          )
-        )
-        .orderBy(schema.emailOutboxTable.scheduledAt)
-        .limit(limit);
-      return yield* Effect.forEach(rows, (row) =>
-        decodeEmailIntent(
-          // SAFETY: the stored row is the encoded outbox record; the decoder
-          // re-validates it before it is used.
-          row as Schema.Codec.Encoded<typeof EmailOutboxRecord>,
-          "findPausedByPlan.decodeIntent"
-        )
-      );
-    }
-  );
-
   const findById = Effect.fn("EmailOutboxRepository.findById")(function* (
     id: string
   ) {
@@ -723,136 +689,42 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
   );
 
-  const markIntentState = Effect.fn("EmailOutboxRepository.markIntentState")(
+  /**
+   * Moves one intent along its lifecycle, or does nothing.
+   *
+   * The `SET` and the `WHERE` are both generated from `intent-machine.ts`: the
+   * target is the single state the event produces, and the sources are the
+   * states that accept it. Before this, the sources were a ternary inside this
+   * `WHERE`.
+   *
+   * Returns whether a row moved. `false` is not an error — a concurrent worker
+   * may have taken the transition, or a job may have been canceled underneath
+   * this one — so every caller decides what a lost race means.
+   */
+  const transitionIntent = Effect.fn("EmailOutboxRepository.transitionIntent")(
     function* ({
       id,
-      state,
+      event,
     }: {
       readonly id: string;
-      readonly state: "materialized" | "paused_by_plan" | "failed" | "expired";
+      readonly event: TEmailIntentEvent;
     }) {
       const updatedAt = yield* DateTime.nowAsDate;
       const rows = yield* db
         .update(schema.emailOutboxTable)
-        .set({ state, updatedAt })
+        .set({ state: intentTargetStateFor(event), updatedAt })
         .where(
           and(
             eq(schema.emailOutboxTable.id, id),
-            state === "expired" || state === "failed"
-              ? inArray(schema.emailOutboxTable.state, [
-                  "pending",
-                  "paused_by_plan",
-                ])
-              : eq(schema.emailOutboxTable.state, "pending")
+            inArray(schema.emailOutboxTable.state, [
+              ...intentSourceStatesFor(event),
+            ])
           )
         )
         .returning({ id: schema.emailOutboxTable.id });
       return rows.length === 1;
     }
   );
-
-  const resumePausedIntent = Effect.fn(
-    "EmailOutboxRepository.resumePausedIntent"
-  )(function* ({ id }: { readonly id: string }) {
-    const updatedAt = yield* DateTime.nowAsDate;
-    const rows = yield* db
-      .update(schema.emailOutboxTable)
-      .set({
-        state: "pending",
-        updatedAt,
-      })
-      .where(
-        and(
-          eq(schema.emailOutboxTable.id, id),
-          eq(schema.emailOutboxTable.state, "paused_by_plan")
-        )
-      )
-      .returning({ id: schema.emailOutboxTable.id });
-    return rows.length === 1;
-  });
-
-  const resumePausedDeliveries = Effect.fn(
-    "EmailOutboxRepository.resumePausedDeliveries"
-  )(function* ({
-    now,
-    organizationId,
-  }: {
-    readonly now: Date;
-    readonly organizationId: string;
-  }) {
-    const resumableIds = db
-      .select({ id: schema.emailDeliveryTable.id })
-      .from(schema.emailDeliveryTable)
-      .innerJoin(
-        schema.emailOutboxTable,
-        eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId)
-      )
-      .where(
-        and(
-          eq(schema.emailDeliveryTable.state, "paused_by_plan"),
-          eq(schema.emailOutboxTable.organizationId, organizationId),
-          or(
-            isNull(schema.emailOutboxTable.expiresAt),
-            gte(schema.emailOutboxTable.expiresAt, now)
-          )
-        )
-      );
-    const resumed = yield* db
-      .update(schema.emailDeliveryTable)
-      .set({
-        state: "queued",
-        nextAttemptAt: null,
-        transitionVersion: nextTransitionVersion,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          inArray(schema.emailDeliveryTable.id, resumableIds),
-          eq(schema.emailDeliveryTable.state, "paused_by_plan")
-        )
-      )
-      // The caller re-offers each row, so it needs the persisted attempt count
-      // and the version this resume just produced for the queue element id.
-      .returning({
-        attemptCount: schema.emailDeliveryTable.attemptCount,
-        id: schema.emailDeliveryTable.id,
-        transitionVersion: schema.emailDeliveryTable.transitionVersion,
-      });
-    return resumed;
-  });
-
-  const expirePausedDeliveries = Effect.fn(
-    "EmailOutboxRepository.expirePausedDeliveries"
-  )(function* ({ now }: { readonly now: Date }) {
-    const expirableIds = db
-      .select({ id: schema.emailDeliveryTable.id })
-      .from(schema.emailDeliveryTable)
-      .innerJoin(
-        schema.emailOutboxTable,
-        eq(schema.emailOutboxTable.id, schema.emailDeliveryTable.outboxId)
-      )
-      .where(
-        and(
-          eq(schema.emailDeliveryTable.state, "paused_by_plan"),
-          lte(schema.emailOutboxTable.expiresAt, now)
-        )
-      );
-    const expired = yield* db
-      .update(schema.emailDeliveryTable)
-      .set({
-        state: "expired",
-        transitionVersion: nextTransitionVersion,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          inArray(schema.emailDeliveryTable.id, expirableIds),
-          eq(schema.emailDeliveryTable.state, "paused_by_plan")
-        )
-      )
-      .returning({ id: schema.emailDeliveryTable.id });
-    return expired.map((row) => row.id);
-  });
 
   const createDelivery = Effect.fn("EmailOutboxRepository.createDelivery")(
     function* (input: CreateEmailDeliveryInput) {
@@ -1124,7 +996,6 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       | "failed"
       | "suppressed"
       | "expired"
-      | "paused_by_plan"
       | "no_organization_access";
     readonly lastError?: unknown;
   }) {
@@ -1200,14 +1071,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     upsertPendingStatusChange,
     upsertPendingSubmissionWindow,
     findPending,
-    findPausedByPlan,
     findById,
     findByIdForUpdate,
     findDeliveryById,
-    markIntentState,
-    resumePausedIntent,
-    resumePausedDeliveries,
-    expirePausedDeliveries,
+    transitionIntent,
     createDelivery,
     findDueDeliveries,
     recoverStaleSendingDeliveries,

@@ -123,7 +123,7 @@ const upsertSsoContact = (args: {
   readonly avatar?: string | undefined;
   readonly companyId: string | null;
   readonly organizationId: string;
-  readonly userId: string | null;
+  readonly userId?: string | null;
 }) =>
   Effect.gen(function* () {
     const contactRepository = yield* ContactRepository;
@@ -197,7 +197,7 @@ export function upsertContactFromParsed(
       name: parsedContact.commonFields.name,
       avatar: parsedContact.commonFields.avatar,
       companyId: linkedCompanyId ?? null,
-      userId: userId ?? null,
+      ...(userId !== undefined && { userId }),
     });
 
     let contactId: string | undefined;
@@ -454,24 +454,29 @@ export const linkAnonymousAccount = ({
     }
 
     const db = yield* currentDb;
-    const [anonymousUser, newUser] = yield* Effect.all([
-      db
-        .select({
-          restrictedToOrganizationId:
-            schema.userTable.restrictedToOrganizationId,
-        })
-        .from(schema.userTable)
-        .where(eq(schema.userTable.id, anonymousUserId))
-        .limit(1),
-      db
-        .select({
-          restrictedToOrganizationId:
-            schema.userTable.restrictedToOrganizationId,
-        })
-        .from(schema.userTable)
-        .where(eq(schema.userTable.id, newUserId))
-        .limit(1),
-    ]);
+    // Two lookups by id; the transfer below compares them, so they resolve
+    // together instead of one after the other.
+    const [anonymousUser, newUser] = yield* Effect.all(
+      [
+        db
+          .select({
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, anonymousUserId))
+          .limit(1),
+        db
+          .select({
+            restrictedToOrganizationId:
+              schema.userTable.restrictedToOrganizationId,
+          })
+          .from(schema.userTable)
+          .where(eq(schema.userTable.id, newUserId))
+          .limit(1),
+      ],
+      { concurrency: "unbounded" }
+    );
     const anonymous = anonymousUser[0];
     const target = newUser[0];
 

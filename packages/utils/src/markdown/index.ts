@@ -21,8 +21,11 @@ import { unified } from "unified";
 import { rehypeCodeHighlight } from "./rehype-code-highlight";
 import { rehypeSafeUrlAttributes } from "./rehype-safe-urls";
 
+/** An escaped underscore, which the Markdown renderer reads as emphasis. */
+const escapedUnderscorePattern = /(^|[^\\])\\_/g;
+
 const unescapeUnderscore = (str: string) => {
-  return str.replace(/(^|[^\\])\\_/g, "$1_");
+  return str.replace(escapedUnderscorePattern, "$1_");
 };
 
 export const htmlToMarkdown = (html: string): string => {

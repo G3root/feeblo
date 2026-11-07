@@ -3,7 +3,7 @@ import { UserId } from "@feeblo/id";
 import { and, eq, sql, type SQLWrapper } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest, SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -19,21 +19,21 @@ import { UserPersistenceError } from "./errors";
  */
 export const hashEmail = (email: string) =>
   Effect.gen(function* () {
-    const crypto = yield* Crypto.Crypto;
-    return Buffer.from(
-      yield* crypto.digest(
-        "SHA-256",
-        new TextEncoder().encode(email.toLowerCase().trim())
-      )
-    ).toString("hex");
-  }).pipe(Effect.orDie);
+    const digest = yield* Digest.Digest;
+    return yield* digest.digestHex(
+      Digest.sha256,
+      new TextEncoder().encode(email.toLowerCase().trim())
+    );
+  });
 
 const generateRandomEmail = (prefix: string) =>
   Effect.gen(function* () {
-    const crypto = yield* Crypto.Crypto;
-    const suffix = Buffer.from(yield* crypto.randomBytes(8)).toString("hex");
+    const secureRandom = yield* SecureRandom.SecureRandom;
+    const suffix = Buffer.from(yield* secureRandom.randomBytes(8)).toString(
+      "hex"
+    );
     return `${prefix}-${suffix}@feeblo.com`;
-  }).pipe(Effect.orDie);
+  });
 
 interface UpsertSsoUserInput {
   email: string;
@@ -152,7 +152,10 @@ const makeUserRepository = Effect.gen(function* () {
 
         // Match an existing SSO-only user by its email hash and organization.
         const existingByHash = yield* db
-          .select()
+          .select({
+            email: schema.userTable.email,
+            id: schema.userTable.id,
+          })
           .from(schema.userTable)
           .where(
             and(
@@ -229,7 +232,10 @@ const makeUserRepository = Effect.gen(function* () {
           return created;
         }
         const [winner] = yield* db
-          .select()
+          .select({
+            email: schema.userTable.email,
+            id: schema.userTable.id,
+          })
           .from(schema.userTable)
           .where(
             and(
@@ -351,7 +357,7 @@ const makeUserRepository = Effect.gen(function* () {
           return created;
         }
         const [winner] = yield* db
-          .select()
+          .select({ id: schema.userTable.id })
           .from(schema.userTable)
           .where(
             and(

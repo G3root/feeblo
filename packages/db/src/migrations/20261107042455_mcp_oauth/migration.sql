@@ -129,8 +129,6 @@ CREATE TABLE "oauth_resource" (
 	"metadata" jsonb
 );
 --> statement-breakpoint
-DROP INDEX "account_issuer_account_id_uidx";--> statement-breakpoint
-ALTER TABLE "account" DROP COLUMN "issuer";--> statement-breakpoint
 CREATE INDEX "oauthAccessToken_clientId_idx" ON "oauth_access_token" ("client_id");--> statement-breakpoint
 CREATE INDEX "oauthAccessToken_sessionId_idx" ON "oauth_access_token" ("session_id");--> statement-breakpoint
 CREATE INDEX "oauthAccessToken_userId_idx" ON "oauth_access_token" ("user_id");--> statement-breakpoint

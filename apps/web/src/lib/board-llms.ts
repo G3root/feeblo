@@ -29,8 +29,13 @@ export interface BoardContent {
 const BOARD_LLMS_POST_LIMIT = 50;
 const BOARD_LLMS_EXCERPT_LIMIT = 180;
 
+/** Any run of whitespace, collapsed so a line stays one line. */
+const whitespaceRunPattern = /\s+/gu;
+/** The characters that end a Markdown link label or list item. */
+const markdownEscapePattern = /([\\[\]])/gu;
+
 const clampLine = (value: string, limit: number) => {
-  const collapsed = value.replaceAll(/\s+/gu, " ").trim();
+  const collapsed = value.replaceAll(whitespaceRunPattern, " ").trim();
   return collapsed.length <= limit
     ? collapsed
     : `${collapsed.slice(0, limit).trimEnd()}…`;
@@ -39,9 +44,9 @@ const clampLine = (value: string, limit: number) => {
 /** Escape a value that sits inside a Markdown link label or list item. */
 const escapeMarkdownText = (value: string) =>
   value
-    .replaceAll(/\s+/gu, " ")
+    .replaceAll(whitespaceRunPattern, " ")
     .trim()
-    .replaceAll(/([\\[\]])/gu, "\\$1");
+    .replaceAll(markdownEscapePattern, "\\$1");
 
 const markdownLine = (label: string, url: string, detail?: string) => {
   const text = escapeMarkdownText(label);

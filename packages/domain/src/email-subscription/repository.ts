@@ -18,6 +18,11 @@ import {
   type EmailSubscriptionRecord as Subscription,
 } from "./schema";
 import {
+  nextStateForRequest,
+  sourceStatesFor,
+  targetStateFor,
+} from "./subscription-machine";
+import {
   type EmailSubscriptionToken,
   type EmailSubscriptionTokenError,
   EmailSubscriptionTokenService,
@@ -102,35 +107,6 @@ const topicCondition = (
         eq(table.topicType, topic.topicType),
         eq(table.topicId, topic.topicId)
       );
-
-const verifiedStateFor = (
-  subscription: Subscription | undefined,
-  alreadyVerified: boolean,
-  deferredNoAccess: boolean
-): Subscription["state"] => {
-  if (alreadyVerified) {
-    return "active";
-  }
-  if (
-    subscription?.state === "paused_by_plan" ||
-    subscription?.state === "unsubscribed"
-  ) {
-    return subscription.state;
-  }
-  // Established consent is never downgraded by a deferred request.
-  if (subscription?.state === "active") {
-    return "active";
-  }
-  // A pending verification keeps its token/expiry; a deferred request must
-  // not clear them by flipping the state to deferred_no_access.
-  if (subscription?.state === "pending_verification") {
-    return "pending_verification";
-  }
-  if (deferredNoAccess) {
-    return "deferred_no_access";
-  }
-  return "pending_verification";
-};
 
 const makeEmailSubscriptionRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -295,11 +271,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         verificationToken: Option.none<EmailSubscriptionToken>(),
       };
     }
-    const state = verifiedStateFor(
-      priorSubscription,
+    const state = nextStateForRequest(priorSubscription?.state, {
       alreadyVerified,
-      deferredNoAccess
-    );
+      deferredNoAccess,
+    });
     const subscriptionId =
       priorSubscription?.id ?? (yield* EmailSubscriptionId.generate);
     const unsubscribeToken =
@@ -456,11 +431,10 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                     verificationToken: Option.none<EmailSubscriptionToken>(),
                   };
                 }
-                const winnerState = verifiedStateFor(
-                  winner,
+                const winnerState = nextStateForRequest(winner.state, {
                   alreadyVerified,
-                  deferredNoAccess
-                );
+                  deferredNoAccess,
+                });
                 // A fresh verification token is derived from the winner's own
                 // id and its hash is what the row stores, so the token this
                 // request returns names the stored row — never the losing
@@ -523,15 +497,20 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const tokenHash = yield* hashEmailSubscriptionToken(
       redactEmailSubscriptionToken(input.verificationToken)
     );
-    const [row] = yield* db
-      .select()
+    const [subscription] = yield* db
+      .select({
+        contactId: schema.emailSubscriptionTable.contactId,
+        id: schema.emailSubscriptionTable.id,
+        state: schema.emailSubscriptionTable.state,
+        verificationExpiresAt:
+          schema.emailSubscriptionTable.verificationExpiresAt,
+      })
       .from(schema.emailSubscriptionTable)
       .where(eq(schema.emailSubscriptionTable.verificationTokenHash, tokenHash))
       .limit(1);
-    if (row === undefined) {
+    if (subscription === undefined) {
       return { _tag: "Invalid" as const };
     }
-    const subscription = yield* decodeSubscription(row, "verifySubscription");
     if (
       subscription.state === "active" ||
       subscription.state === "paused_by_plan"
@@ -549,15 +528,44 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const [updated] = yield* db
       .update(schema.emailSubscriptionTable)
       .set({
-        state: "active",
+        state: targetStateFor("verify"),
         verificationExpiresAt: null,
         verificationTokenHash: null,
         verifiedAt: input.now,
         updatedAt: input.now,
       })
-      .where(eq(schema.emailSubscriptionTable.id, subscription.id))
+      .where(
+        and(
+          eq(schema.emailSubscriptionTable.id, subscription.id),
+          inArray(schema.emailSubscriptionTable.state, [
+            ...sourceStatesFor("verify"),
+          ])
+        )
+      )
       .returning();
     if (updated === undefined) {
+      // The guarded `UPDATE` matched nothing, which has two causes worth
+      // telling apart: another request verified this subscription between the
+      // read above and this write — that is the same success, reached twice —
+      // or the row moved somewhere this token may not take it, which is a real
+      // inconsistency. Re-read to find out which.
+      const [current] = yield* db
+        .select()
+        .from(schema.emailSubscriptionTable)
+        .where(eq(schema.emailSubscriptionTable.id, subscription.id))
+        .limit(1);
+      const reread =
+        current === undefined
+          ? undefined
+          : yield* decodeSubscription(current, "verifySubscription.reread");
+      if (reread?.state === "active" || reread?.state === "paused_by_plan") {
+        return { _tag: "AlreadyVerified" as const };
+      }
+      // Consent withdrawn under the request: the sequential path answers
+      // `Expired` for exactly this state, and the raced path must agree.
+      if (reread?.state === "unsubscribed") {
+        return { _tag: "Expired" as const };
+      }
       return yield* dataError(
         "verifySubscription",
         "Email subscription verification did not return a row"
@@ -579,6 +587,14 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       const tokenHash = yield* hashEmailSubscriptionToken(
         redactEmailSubscriptionToken(input.unsubscribeToken)
       );
+      // A full-row read with its decoder, not the column projection the
+      // neighbouring reads got: this method is the one seam where projecting
+      // the columns collapses inference across the handler layer with
+      // tsrs 0.20.1-ts7.1.0-beta — the guarded write below and its outcome
+      // union resolve to `unknown` at three call sites, and no local shape of
+      // the projection stops it. The cost is one row's extra columns on a
+      // single-row lookup by unique index, so the projection buys nothing
+      // here anyway. Revisit with the next compiler-train bump.
       const [row] = yield* db
         .select()
         .from(schema.emailSubscriptionTable)
@@ -600,13 +616,23 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           unsubscribedAt: input.now,
           updatedAt: input.now,
         })
-        .where(eq(schema.emailSubscriptionTable.id, subscription.id))
+        // The machine reads the sources, same as the authenticated path: no
+        // state the graph forbids subscribing out of can be written past this
+        // `WHERE` if one ever appears.
+        .where(
+          and(
+            eq(schema.emailSubscriptionTable.id, subscription.id),
+            inArray(schema.emailSubscriptionTable.state, [
+              ...sourceStatesFor("unsubscribe"),
+            ])
+          )
+        )
         .returning();
       if (updated === undefined) {
-        return yield* dataError(
-          "unsubscribe",
-          "Email subscription unsubscribe did not return a row"
-        );
+        // The pre-write read above lost a race: the row reached `unsubscribed`,
+        // the only state that cannot take this event, between the read and
+        // this write — the caller's outcome, reached twice.
+        return { _tag: "AlreadyUnsubscribed" as const };
       }
       return { _tag: "Unsubscribed" as const };
     }
@@ -664,9 +690,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         and(
           inArray(schema.emailSubscriptionTable.id, subscribedIds),
           inArray(schema.emailSubscriptionTable.state, [
-            "pending_verification",
-            "active",
-            "paused_by_plan",
+            ...sourceStatesFor("unsubscribe"),
           ])
         )
       )
@@ -774,13 +798,15 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       : yield* db
           .update(schema.emailSubscriptionTable)
           .set({
-            state: "paused_by_plan",
+            state: targetStateFor("pause"),
             updatedAt: now,
           })
           .where(
             and(
               eq(schema.emailSubscriptionTable.organizationId, organizationId),
-              eq(schema.emailSubscriptionTable.state, "active")
+              inArray(schema.emailSubscriptionTable.state, [
+                ...sourceStatesFor("pause"),
+              ])
             )
           )
           .returning({ id: schema.emailSubscriptionTable.id });
@@ -788,13 +814,15 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       ? yield* db
           .update(schema.emailSubscriptionTable)
           .set({
-            state: "active",
+            state: targetStateFor("resume"),
             updatedAt: now,
           })
           .where(
             and(
               eq(schema.emailSubscriptionTable.organizationId, organizationId),
-              eq(schema.emailSubscriptionTable.state, "paused_by_plan")
+              inArray(schema.emailSubscriptionTable.state, [
+                ...sourceStatesFor("resume"),
+              ])
             )
           )
           .returning({ id: schema.emailSubscriptionTable.id })

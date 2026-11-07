@@ -205,7 +205,7 @@ describe("sendWebhookDelivery", () => {
         });
         expect(result).toEqual({ status: 204 });
 
-        const request = yield* Effect.tryPromise(() => received);
+        const request = yield* Effect.promise(() => received);
         expect(request.body).toBe(rawBody);
         expect(request.headers["content-type"]).toBe("application/json");
         expect(request.headers["user-agent"]).toBe("Feeblo-Webhooks/1");
@@ -333,7 +333,7 @@ describe("sendWebhookDelivery", () => {
           rawBody: "{}",
           signingHeaders,
         }).pipe(Effect.flip, Effect.forkChild);
-        yield* Effect.tryPromise(() => requestArrived);
+        yield* Effect.promise(() => requestArrived);
         yield* TestClock.adjust(WEBHOOK_REQUEST_TIMEOUT_MS);
         return yield* Fiber.join(delivery);
       });

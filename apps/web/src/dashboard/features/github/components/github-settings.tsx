@@ -34,7 +34,9 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import * as Option from "effect/Option";
 import * as Result from "effect/reactivity/AsyncResult";
 import * as Schema from "effect/Schema";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+
+import { useProviderConnect } from "~/features/integrations/hooks/use-provider-connect";
 
 import {
   type GitHubConnection,
@@ -100,7 +102,6 @@ function GitHubSettingsContent({
 }: {
   readonly organizationId: string;
 }) {
-  const [connecting, setConnecting] = useState(false);
   const startConnect = useAtomSet(startGitHubConnectAtom, {
     mode: "promise",
   });
@@ -119,22 +120,17 @@ function GitHubSettingsContent({
     .exhaustive();
   const connections = useAsyncList<GitHubConnection>(connectionsResult);
 
-  const installGitHubApp = async () => {
-    setConnecting(true);
-    try {
-      const { authorizeUrl } = await startConnect({
-        payload: { organizationId },
-        reactivityKeys: gitHubReactivityKeys(organizationId),
-      });
-      window.location.assign(authorizeUrl.toString());
-    } catch {
-      setConnecting(false);
-      toastManager.add({
-        title: "Could not start GitHub App installation",
-        type: "error",
-      });
-    }
-  };
+  const installGitHubApp = useProviderConnect({
+    authorize: useCallback(
+      () =>
+        startConnect({
+          payload: { organizationId },
+          reactivityKeys: gitHubReactivityKeys(organizationId),
+        }),
+      [organizationId, startConnect]
+    ),
+    failureTitle: "Could not start GitHub App installation",
+  });
 
   if (configured === null) {
     return <LoadingCard message="Loading GitHub…" />;
@@ -173,8 +169,13 @@ function GitHubSettingsContent({
             issue states.
           </p>
           <div className="mt-4">
-            <Button disabled={connecting} onClick={installGitHubApp}>
-              {connecting ? "Opening GitHub…" : "Install GitHub App"}
+            <Button
+              disabled={installGitHubApp.status !== "idle"}
+              onClick={installGitHubApp.connect}
+            >
+              {installGitHubApp.status === "idle"
+                ? "Install GitHub App"
+                : "Opening GitHub…"}
             </Button>
           </div>
         </FramePanel>

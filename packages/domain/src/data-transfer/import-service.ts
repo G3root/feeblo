@@ -1,7 +1,7 @@
 import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-default";
 import { DataImportJobId, type LegidError } from "@feeblo/id";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest } from "effect/crypto";
 import * as Effect from "effect/Effect";
 import * as Filter from "effect/Filter";
 import * as Layer from "effect/Layer";
@@ -26,6 +26,10 @@ import {
   InvalidBoardPostCsvError,
 } from "./errors";
 import { DATA_IMPORT_MAX_BYTES, DATA_IMPORT_WATCH_MS } from "./limits";
+import {
+  canConfirmDataImportStatus,
+  isActiveDataImportStatus,
+} from "./machine";
 import { planImportRows } from "./plan";
 import { canImportPosts } from "./policies";
 import {
@@ -147,23 +151,6 @@ export type DataImportServiceContract = {
 /** The most recent jobs a workspace sees, newest first. */
 const IMPORT_JOB_LIST_LIMIT = 20;
 
-const toHex = (bytes: Uint8Array): string =>
-  Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-
-const hashBytes = (
-  crypto: Crypto.Crypto,
-  bytes: Uint8Array
-): Effect.Effect<string, InternalServerError> =>
-  crypto.digest("SHA-256", bytes).pipe(
-    Effect.mapError(
-      () =>
-        new InternalServerError({
-          message: "Could not fingerprint the uploaded file.",
-        })
-    ),
-    Effect.map(toHex)
-  );
-
 /** Normalizes a store failure to one stable internal failure. */
 const fromStore = <A, R>(
   operation: string,
@@ -189,16 +176,6 @@ const clampReportWindow = (
   ),
   offset: Math.max(offset ?? 0, 0),
 });
-
-/**
- * A job still moves through these statuses on its own; everything else is
- * final. A detail watch writes its last snapshot and ends on the transition
- * out.
- */
-const statusIsActive = (status: DataImportJobRecord["status"]): boolean =>
-  status === "awaiting_confirmation" ||
-  status === "queued" ||
-  status === "running";
 
 /**
  * A cheap key over the fields of a job a viewer sees change while it runs.
@@ -268,7 +245,11 @@ const makeDataImportService = Effect.gen(function* () {
   const repository = yield* DataTransferRepository;
   const boards = yield* BoardRepository;
   const statuses = yield* PostStatusRepository;
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
+
+  /** SHA-256 of the uploaded file, hex encoded; the import's idempotency key. */
+  const hashBytes = (bytes: Uint8Array) =>
+    digest.digestHex(Digest.sha256, bytes);
 
   const stageBoardImport: DataImportServiceContract["stageBoardImport"] = (
     input
@@ -297,9 +278,22 @@ const makeDataImportService = Effect.gen(function* () {
       // row. The oldest board is the fallback for a row with an empty cell,
       // and is null only when the workspace has no boards at all. The read
       // and the sort happen here so the plan stays a pure function of them.
-      const existingBoards = yield* boards
-        .findMany({ organizationId: input.organizationId })
-        .pipe(withRemapDbErrors("Board", "select"));
+      // The two workspace reads (boards and statuses) and the two file
+      // computations (decode and hash) each need nothing the other produces,
+      // so the pairs run together: two round trips for the reads and a
+      // concurrent decode instead of four steps in sequence. `Effect.all` is
+      // sequential unless told otherwise.
+      const [existingBoards, statusRows] = yield* Effect.all(
+        [
+          boards
+            .findMany({ organizationId: input.organizationId })
+            .pipe(withRemapDbErrors("Board", "select")),
+          statuses
+            .findMany({ organizationId: input.organizationId })
+            .pipe(withRemapDbErrors("PostStatus", "select")),
+        ],
+        { concurrency: "unbounded" }
+      );
       const sortedBoards = [...existingBoards].sort(
         (left, right) =>
           left.createdAt.getTime() - right.createdAt.getTime() ||
@@ -307,12 +301,11 @@ const makeDataImportService = Effect.gen(function* () {
       );
       const [defaultBoard = null] = sortedBoards;
 
-      const text = yield* decodeBoardPostCsv(input.bytes);
-      const fileHash = yield* hashBytes(crypto, input.bytes);
+      const [text, fileHash] = yield* Effect.all(
+        [decodeBoardPostCsv(input.bytes), hashBytes(input.bytes)],
+        { concurrency: "unbounded" }
+      );
 
-      const statusRows = yield* statuses
-        .findMany({ organizationId: input.organizationId })
-        .pipe(withRemapDbErrors("PostStatus", "select"));
       // The workspace's stored default, not the `PENDING` type: a workspace may
       // repoint which status is the default, and several statuses may share a
       // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several).
@@ -463,32 +456,40 @@ const makeDataImportService = Effect.gen(function* () {
         });
       }
       const window = clampReportWindow(input.limit, input.offset);
-      const report = yield* fromStore(
-        "listRows",
-        repository.listRows({
-          board: input.board,
-          filter: input.filter,
-          jobId: input.id,
-          limit: window.limit,
-          message: input.message,
-          offset: window.offset,
-          sort: input.sort,
-        })
+      // The row window, its summary, and the pending board names are three
+      // reads of the same staged job and none needs another's answer, so they
+      // resolve together; the report is polled while an import runs, which is
+      // exactly when it should not cost three round trips.
+      const [report, summary, newBoards] = yield* Effect.all(
+        [
+          fromStore(
+            "listRows",
+            repository.listRows({
+              board: input.board,
+              filter: input.filter,
+              jobId: input.id,
+              limit: window.limit,
+              message: input.message,
+              offset: window.offset,
+              sort: input.sort,
+            })
+          ),
+          fromStore(
+            "summarizeReport",
+            repository.summarizeReport({ jobId: input.id })
+          ),
+          // A staged file may name boards that do not exist yet, and the
+          // confirmation names them. Once the job runs, the worker creates
+          // them, so an unchanged list would only be stale.
+          canConfirmDataImportStatus(job.value.status)
+            ? fromStore(
+                "listNewBoardNames",
+                repository.listNewBoardNames({ jobId: input.id })
+              )
+            : Effect.succeed([]),
+        ],
+        { concurrency: "unbounded" }
       );
-      const summary = yield* fromStore(
-        "summarizeReport",
-        repository.summarizeReport({ jobId: input.id })
-      );
-      // A staged file may name boards that do not exist yet, and the
-      // confirmation names them. Once the job runs, the worker creates them,
-      // so an unchanged list would only be stale.
-      const newBoards =
-        job.value.status === "awaiting_confirmation"
-          ? yield* fromStore(
-              "listNewBoardNames",
-              repository.listNewBoardNames({ jobId: input.id })
-            )
-          : [];
       return {
         job: job.value,
         newBoards: [...newBoards],
@@ -521,7 +522,13 @@ const makeDataImportService = Effect.gen(function* () {
           (option: Option.Option<DataImportJobDetail>) => option
         )
       ),
-      Stream.takeUntil((detail) => !statusIsActive(detail.job.status)),
+      // A job still moves through the active statuses on its own; everything
+      // else is final. This watch writes its last snapshot and ends on the
+      // transition out — the predicate is the machine's, the same graph every
+      // guarded `UPDATE` in the repository asks.
+      Stream.takeUntil(
+        (detail) => !isActiveDataImportStatus(detail.job.status)
+      ),
       excludeUnchanged(reportChangeKey)
     );
 

@@ -29,7 +29,8 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { IntegrationEventRecorder } from "@feeblo/integration-core";
-import { and, asc, eq } from "drizzle-orm";
+import { connectionSourceStatesFor } from "@feeblo/integration-core/lifecycle";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -137,6 +138,34 @@ const makeGitHubInboundService = Effect.gen(function* () {
               )
             )
             .pipe(Effect.mapError(inboundDatabaseError("issue link lookup")));
+          // The rule list is the same for every post linked to this issue and
+          // nothing in this envelope changes it, so it is read once here and
+          // not re-read per link. A webhook for an issue this workspace never
+          // linked still costs no extra query.
+          const rules =
+            links.length === 0
+              ? []
+              : yield* db
+                  .select()
+                  .from(schema.githubSyncRuleTable)
+                  .where(
+                    and(
+                      eq(
+                        schema.githubSyncRuleTable.connectionId,
+                        activeConnection.id
+                      ),
+                      eq(schema.githubSyncRuleTable.enabled, true)
+                    )
+                  )
+                  .orderBy(
+                    asc(schema.githubSyncRuleTable.createdAt),
+                    asc(schema.githubSyncRuleTable.id)
+                  )
+                  .pipe(
+                    Effect.mapError(
+                      inboundDatabaseError("synchronization rule lookup")
+                    )
+                  );
           for (const link of links) {
             yield* db
               .update(schema.integrationExternalResourceTable)
@@ -178,27 +207,6 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .pipe(
                 Effect.mapError(
                   inboundDatabaseError("linked issue aggregation")
-                )
-              );
-            const rules = yield* db
-              .select()
-              .from(schema.githubSyncRuleTable)
-              .where(
-                and(
-                  eq(
-                    schema.githubSyncRuleTable.connectionId,
-                    activeConnection.id
-                  ),
-                  eq(schema.githubSyncRuleTable.enabled, true)
-                )
-              )
-              .orderBy(
-                asc(schema.githubSyncRuleTable.createdAt),
-                asc(schema.githubSyncRuleTable.id)
-              )
-              .pipe(
-                Effect.mapError(
-                  inboundDatabaseError("synchronization rule lookup")
                 )
               );
             const matches = findMatchingGitHubSyncRules(
@@ -364,9 +372,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 archivedAt: yield* DateTime.nowAsDate,
               })
               .where(
-                eq(
-                  schema.integrationConnectionTable.id,
-                  installation.connectionId
+                and(
+                  eq(
+                    schema.integrationConnectionTable.id,
+                    installation.connectionId
+                  ),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("archived"),
+                  ])
                 )
               )
               .pipe(
@@ -391,9 +404,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .update(schema.integrationConnectionTable)
               .set({ lifecycle: "paused" })
               .where(
-                eq(
-                  schema.integrationConnectionTable.id,
-                  installation.connectionId
+                and(
+                  eq(
+                    schema.integrationConnectionTable.id,
+                    installation.connectionId
+                  ),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("paused"),
+                  ])
                 )
               )
               .pipe(Effect.mapError(inboundDatabaseError("connection pause")));
@@ -422,9 +440,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .update(schema.integrationConnectionTable)
               .set({ lifecycle: "active" })
               .where(
-                eq(
-                  schema.integrationConnectionTable.id,
-                  installation.connectionId
+                and(
+                  eq(
+                    schema.integrationConnectionTable.id,
+                    installation.connectionId
+                  ),
+                  inArray(schema.integrationConnectionTable.lifecycle, [
+                    ...connectionSourceStatesFor("active"),
+                  ])
                 )
               )
               .pipe(

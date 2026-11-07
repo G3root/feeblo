@@ -143,22 +143,34 @@ export const toActivitySource = (row: {
  * An entry nobody can be named for — one a machine key wrote — reports
  * `actor: null` rather than an invented identity, which is what the dashboard
  * shows as "Someone".
+ *
+ * `ASSIGNEE_CHANGED` reports both values as `null`. Its values are `member` row
+ * ids, and a member id is precisely the person identifier the public payload
+ * excludes — the same rule that keeps the actor's user and member ids out (see
+ * `docs/adr/0004`). The kind still says an assignment happened; who it moved
+ * between stays on the dashboard. Every other kind passes its values through
+ * unchanged, because those name workspace resources (a status, a board, a tag,
+ * a post), not people.
  */
 export const toPublicApiPostActivity = (
   entry: PublicApiPostActivitySource
-): TPublicApiPostActivity => ({
-  actor:
-    entry.actor.type === null
-      ? null
-      : {
-          avatarUrl: entry.actor.avatarUrl,
-          displayName: entry.actor.displayName,
-          type: entry.actor.type,
-        },
-  commentId: entry.commentId,
-  createdAt: entry.createdAt,
-  id: entry.id,
-  kind: entry.kind,
-  nextValue: entry.nextValue,
-  previousValue: entry.previousValue,
-});
+): TPublicApiPostActivity => {
+  const hidesValues = entry.kind === "ASSIGNEE_CHANGED";
+
+  return {
+    actor:
+      entry.actor.type === null
+        ? null
+        : {
+            avatarUrl: entry.actor.avatarUrl,
+            displayName: entry.actor.displayName,
+            type: entry.actor.type,
+          },
+    commentId: entry.commentId,
+    createdAt: entry.createdAt,
+    id: entry.id,
+    kind: entry.kind,
+    nextValue: hidesValues ? null : entry.nextValue,
+    previousValue: hidesValues ? null : entry.previousValue,
+  };
+};

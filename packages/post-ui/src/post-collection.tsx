@@ -33,6 +33,8 @@ type ResolvedProviderProps = PostCollectionDataProviderProps & {
 
 function ResolvedPostCollectionProvider({
   board,
+  canBanAuthors = false,
+  canUnbanAuthors = false,
   canDeletePost,
   canManageAllPosts,
   canManagePost,
@@ -42,9 +44,12 @@ function ResolvedPostCollectionProvider({
   organizationId,
   pageType,
   post,
+  userBanActions,
 }: ResolvedProviderProps) {
   const state = buildPostCollectionState({
     board,
+    canBanAuthors,
+    canUnbanAuthors,
     canDeletePost,
     post,
     canManagePost,
@@ -53,6 +58,7 @@ function ResolvedPostCollectionProvider({
     isMember,
     isAuthenticated: isSessionAuthenticated,
     pageType,
+    userBanActions,
   });
 
   return <StateProvider value={state}>{children}</StateProvider>;
@@ -115,10 +121,13 @@ function ContributorEligibilityProvider({
 
 export function PostCollectionDataProvider({
   board,
+  canBanAuthors = false,
+  canUnbanAuthors = false,
   children,
   post,
   organizationId,
   pageType,
+  userBanActions,
 }: PostCollectionDataProviderProps) {
   const { data: session } = useAuthState();
   const { allowed: canManageAllPosts } = usePolicy(
@@ -148,6 +157,7 @@ export function PostCollectionDataProvider({
 
   const resolved = {
     board,
+    canBanAuthors,
     canManageAllPosts,
     canManagePost,
     children,
@@ -159,6 +169,8 @@ export function PostCollectionDataProvider({
     organizationId,
     pageType,
     post,
+    userBanActions,
+    canUnbanAuthors,
   };
 
   // A post id is always present here; the guard documents what the branch

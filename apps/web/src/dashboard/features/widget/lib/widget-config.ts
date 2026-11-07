@@ -9,6 +9,9 @@ import type { WidgetModule, WidgetMode } from "@feeblo/feedback-widget/config";
  * can be asserted without a browser.
  */
 
+/** The embed URL is joined with a path, so one trailing slash is dropped. */
+const trailingSlashPattern = /\/+$/;
+
 /** Every module the iframe understands, in their default order. */
 export const WIDGET_MODULES = [
   "feedback",
@@ -209,7 +212,7 @@ export function widgetDraftReducer(
 }
 
 function stripTrailingSlash(url: string): string {
-  return url.replace(/\/+$/, "");
+  return url.replace(trailingSlashPattern, "");
 }
 
 /**

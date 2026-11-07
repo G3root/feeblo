@@ -30,11 +30,18 @@ const makeWorkspacePolicy = Effect.gen(function* () {
     Effect.gen(function* () {
       const owned = yield* repository.findOwnedWorkspaces(userId);
 
-      const withPlans = yield* Effect.forEach(owned, (workspace) =>
-        repository
-          .findPlanByOrganizationId({ organizationId: workspace.id })
-          .pipe(Effect.map(({ plan }) => ({ ...workspace, plan })))
+      // One statement for every owned workspace's plan, not one per workspace:
+      // this runs inside the create transaction, where a fan-out would just
+      // queue N statements on the transaction's single reserved connection.
+      // A workspace with no entitled subscription is absent from the map and
+      // is `free`, which is the same rule the single-workspace lookup applies.
+      const plans = yield* repository.findPlansByOrganizationIds(
+        owned.map((workspace) => workspace.id)
       );
+      const withPlans = owned.map((workspace) => ({
+        ...workspace,
+        plan: plans.get(workspace.id) ?? "free",
+      }));
 
       const freeWorkspaces = withPlans
         .filter(({ plan }) => plan === "free")

@@ -1,5 +1,6 @@
 import { KeyboardSensor, PointerSensor } from "@dnd-kit/dom";
 import { type DragDropEventHandlers, DragDropProvider } from "@dnd-kit/react";
+import type { TBoardGroupBy } from "@feeblo/domain-contracts/board-query";
 import { Button } from "@feeblo/ui/button";
 import { toastManager } from "@feeblo/ui/toast";
 import { trackEvent } from "@feeblo/web-shared/analytics-provider";
@@ -32,8 +33,17 @@ function movePostToColumn(
     lane.posts.some((post) => post.id === sourceId)
   );
   const toLane = lanes.find((lane) => lane.statusId === targetStatusId);
+  const fromStatusId = fromLane?.statusId;
+  const targetStatus = toLane?.status;
+  const targetLaneStatusId = toLane?.statusId;
 
-  if (!(fromLane && toLane) || fromLane.statusId === toLane.statusId) {
+  if (
+    !(fromLane && toLane) ||
+    fromStatusId === undefined ||
+    targetStatus === undefined ||
+    targetLaneStatusId === undefined ||
+    fromStatusId === targetLaneStatusId
+  ) {
     return lanes;
   }
 
@@ -50,21 +60,21 @@ function movePostToColumn(
   }
 
   return lanes.map((lane) => {
-    if (lane.statusId === fromLane.statusId) {
+    if (lane.statusId === fromStatusId) {
       return {
         ...lane,
         posts: lane.posts.filter((post) => post.id !== sourceId),
       };
     }
 
-    if (lane.statusId === toLane.statusId) {
+    if (lane.statusId === targetLaneStatusId) {
       return {
         ...lane,
         posts: [
           {
             ...movedPost,
-            status: toLane.status,
-            statusId: toLane.statusId,
+            status: targetStatus,
+            statusId: targetLaneStatusId,
           },
           ...lane.posts,
         ],
@@ -78,10 +88,12 @@ function movePostToColumn(
 export function BoardGridView({
   organizationId,
   boardId,
+  groupBy,
   groupedPosts,
 }: {
   organizationId: string;
   boardId?: string;
+  groupBy: TBoardGroupBy;
   groupedPosts: BoardPostLane[];
 }) {
   const { postCollection } = useDashboardCollections();
@@ -106,6 +118,13 @@ export function BoardGridView({
   const [visibleCounts, setVisibleCounts] = useState<
     Readonly<Record<string, number>>
   >({});
+  // `none` is a single lane whose id is the fixed `"all"` from
+  // `groupBoardPosts`, so it pages through the same map as the grouped lanes.
+  const flatLaneId = items[0]?.id ?? "all";
+  const flatRows = items[0]?.posts ?? [];
+  const flatVisibleCount = visibleCounts[flatLaneId] ?? GRID_PAGE_SIZE;
+  const flatVisibleRows = flatRows.slice(0, flatVisibleCount);
+  const flatRemainingCount = flatRows.length - flatVisibleRows.length;
   const [initialSnapshot] = useState(() => items);
   const snapshot = useRef(initialSnapshot);
   const activeDrag = useRef<{
@@ -228,60 +247,94 @@ export function BoardGridView({
       onDragEnd={handleDragEnd}
       onDragOver={handleDragOver}
       onDragStart={handleDragStart}
-      sensors={canChangeStatus ? sensors : []}
+      sensors={canChangeStatus && groupBy === "status" ? sensors : []}
     >
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3 pb-[max(calc(var(--spacing)*3),env(safe-area-inset-bottom))]">
-        <div className="grid h-full min-h-0 min-w-max auto-cols-max grid-flow-col gap-4">
-          {items.map((lane, columnIndex) => {
-            const column = lane.status;
-            const rows = lane.posts;
-            const laneId = `${boardId ?? organizationId}:${columnIndex}`;
-            const visibleCount = visibleCounts[lane.statusId] ?? GRID_PAGE_SIZE;
-            const visibleRows = rows.slice(0, visibleCount);
-            const remainingCount = rows.length - visibleRows.length;
-            return (
-              <BoardGridLaneColumn
-                boardId={boardId}
-                id={laneId}
-                index={columnIndex}
-                key={lane.statusId}
-                label={lane.label}
-                status={column}
-                statusId={lane.statusId}
-                totalPosts={rows.length}
-              >
-                {visibleRows.map((post, postIndex) => (
-                  <BoardGridPostCard
-                    column={column}
-                    id={post.id}
-                    index={postIndex}
-                    key={post.id}
-                    organizationId={organizationId}
-                    post={post}
-                    statusId={post.statusId}
-                  />
-                ))}
-                {remainingCount > 0 ? (
-                  <Button
-                    onClick={() =>
-                      setVisibleCounts((current) => ({
-                        ...current,
-                        [lane.statusId]:
-                          (current[lane.statusId] ?? GRID_PAGE_SIZE) +
-                          GRID_PAGE_SIZE,
-                      }))
-                    }
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Show {Math.min(remainingCount, GRID_PAGE_SIZE)} more
-                  </Button>
-                ) : null}
-              </BoardGridLaneColumn>
-            );
-          })}
+      {groupBy === "none" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
+            {flatVisibleRows.map((post, postIndex) => (
+              <BoardGridPostCard
+                groupId="all"
+                index={postIndex}
+                key={post.id}
+                organizationId={organizationId}
+                post={post}
+                sortableId={`all:${post.id}`}
+              />
+            ))}
+          </div>
+          {flatRemainingCount > 0 ? (
+            <Button
+              className="mt-3"
+              onClick={() =>
+                setVisibleCounts((current) => ({
+                  ...current,
+                  [flatLaneId]:
+                    (current[flatLaneId] ?? GRID_PAGE_SIZE) + GRID_PAGE_SIZE,
+                }))
+              }
+              size="sm"
+              variant="ghost"
+            >
+              Show {Math.min(flatRemainingCount, GRID_PAGE_SIZE)} more
+            </Button>
+          ) : null}
         </div>
-      </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-3 pb-[max(calc(var(--spacing)*3),env(safe-area-inset-bottom))]">
+          <div className="grid h-full min-h-0 min-w-max auto-cols-max grid-flow-col gap-4">
+            {items.map((lane, columnIndex) => {
+              const rows = lane.posts;
+              const laneId = `${boardId ?? organizationId}:${lane.id}`;
+              const visibleCount = visibleCounts[lane.id] ?? GRID_PAGE_SIZE;
+              const visibleRows = rows.slice(0, visibleCount);
+              const remainingCount = rows.length - visibleRows.length;
+              return (
+                <BoardGridLaneColumn
+                  boardId={boardId}
+                  groupBy={groupBy}
+                  id={laneId}
+                  index={columnIndex}
+                  key={lane.id}
+                  label={lane.label}
+                  status={lane.status}
+                  statusId={lane.statusId}
+                  totalPosts={rows.length}
+                >
+                  {visibleRows.map((post, postIndex) => (
+                    <BoardGridPostCard
+                      groupId={lane.id}
+                      index={postIndex}
+                      key={post.id}
+                      organizationId={organizationId}
+                      post={post}
+                      sortableId={
+                        groupBy === "status" ? post.id : `${lane.id}:${post.id}`
+                      }
+                    />
+                  ))}
+                  {remainingCount > 0 ? (
+                    <Button
+                      onClick={() =>
+                        setVisibleCounts((current) => ({
+                          ...current,
+                          [lane.id]:
+                            (current[lane.id] ?? GRID_PAGE_SIZE) +
+                            GRID_PAGE_SIZE,
+                        }))
+                      }
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Show {Math.min(remainingCount, GRID_PAGE_SIZE)} more
+                    </Button>
+                  ) : null}
+                </BoardGridLaneColumn>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </DragDropProvider>
   );
 }

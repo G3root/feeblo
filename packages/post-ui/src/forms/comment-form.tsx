@@ -185,6 +185,10 @@ export function useCreateCommentAction() {
         // On-behalf comments keep staff attribution out of the author fields.
         memberId: onBehalf ? null : (membership?.membershipId ?? null),
         authorIsMember: optimisticAuthorIsMember,
+        // An optimistic row cannot be banned: the participation policy refuses
+        // a banned author's write, so this row only survives if the server
+        // agrees nobody here is banned. A rejection rolls it back.
+        authorIsBanned: false,
         // Optimistic rows are authored on this post, never merged in.
         mergedFromPostId: null,
         postId,

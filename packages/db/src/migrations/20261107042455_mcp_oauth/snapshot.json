@@ -2,9 +2,10 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "ef32e9c3-85ef-4851-b174-1071b3f32346",
+  "id": "b07d43d7-557a-4c61-80b1-9c6c80a49600",
   "prevIds": [
-    "f59c1f8c-14d5-4e72-a7c6-3a726cf1a4a3"
+    "4bd8d985-05f4-442f-923c-f3422cf3007a",
+    "f332849a-bbad-44b9-9097-e503209c3f91"
   ],
   "footprints": [
     {
@@ -160,48 +161,6 @@
         "n|rel|public.oauth_resource_identifier_key"
       ],
       "reads": [
-        "n|sch|public"
-      ]
-    },
-    {
-      "statementType": "drop_index",
-      "statementTarget": [
-        "index",
-        "public",
-        "account",
-        "account_issuer_account_id_uidx"
-      ],
-      "writes": [
-        "s|idx|public.account_issuer_account_id_uidx",
-        "n|idx|public.account_issuer_account_id_uidx",
-        "e|idx|public.account_issuer_account_id_uidx",
-        "n|rel|public.account_issuer_account_id_uidx"
-      ],
-      "reads": [
-        "n|tbl|public.account",
-        "n|sch|public",
-        "e|col|public.account.issuer",
-        "e|col|public.account.account_id"
-      ],
-      "sharedWrites": [
-        "e|uniqueness|public.account.account_id.issuer"
-      ]
-    },
-    {
-      "statementType": "drop_column",
-      "statementTarget": [
-        "column",
-        "public",
-        "account",
-        "issuer"
-      ],
-      "writes": [
-        "s|col|public.account.issuer",
-        "n|col|public.account.issuer",
-        "e|col|public.account.issuer"
-      ],
-      "reads": [
-        "n|tbl|public.account",
         "n|sch|public"
       ]
     },
@@ -3378,14 +3337,6 @@
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
-    },
-    {
-      "op": "drop",
-      "key": "columns\u0000[\"public\",\"account\",\"issuer\"]"
-    },
-    {
-      "op": "drop",
-      "key": "indexes\u0000[\"public\",\"account_issuer_account_id_uidx\"]"
     }
   ]
 }

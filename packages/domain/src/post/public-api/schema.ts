@@ -115,6 +115,12 @@ export type TPublicApiPostTags = Schema.Schema.Type<typeof PublicApiPostTags>;
  * moved between, and what they name depends on `kind`: a status id for
  * `STATUS_CHANGED`, a tag id for `TAG_ADDED`, a post id for `POST_MERGED`.
  *
+ * `ASSIGNEE_CHANGED` is the exception: both values are `null`, because they
+ * would be `member` row ids and a member id is a person identifier, which this
+ * payload excludes for the same reason it excludes the actor's ids. The `kind`
+ * still reports that the assignment changed; who it moved between is the
+ * dashboard's to show.
+ *
  * `actor` is `null` when a machine key wrote the entry, because an API key is
  * not a member and has no identity to attribute; the alternative would be to
  * invent one. The entry's internal identifiers — the actor's user and member

@@ -27,6 +27,15 @@ export const Notification = S.Struct({
   createdAt: S.DateFromString,
 });
 
+/**
+ * How many inbox rows one request may ask for.
+ *
+ * The client asks for 20 and pages by cursor, and the inbox only grows, so an
+ * unbounded `limit` let one caller turn a page request into a full-table read
+ * (or a `500` from `LIMIT -1`). Same bound the delivery-history page uses.
+ */
+const NOTIFICATION_PAGE_MAX_LIMIT = 100;
+
 export const NotificationList = S.Struct({
   organizationId: WorkspaceId.schema,
   /**
@@ -38,7 +47,11 @@ export const NotificationList = S.Struct({
    * than ignored, so a corrupt cursor cannot silently restart the list.
    */
   cursor: S.optional(S.String),
-  limit: S.optional(S.Finite),
+  limit: S.optional(
+    S.Int.check(
+      S.isBetween({ minimum: 1, maximum: NOTIFICATION_PAGE_MAX_LIMIT })
+    )
+  ),
 });
 
 export const NotificationUnreadCount = S.Struct({

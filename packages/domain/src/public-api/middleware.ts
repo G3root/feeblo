@@ -2,10 +2,12 @@ import {
   hasPublicApiScope,
   type PublicApiScope,
 } from "@feeblo/domain-contracts/public-api-scope";
+import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as ErrorReporter from "effect/ErrorReporter";
 import type { HttpApiSchemaError } from "effect/http-api/HttpApiError";
 import * as HttpApiMiddleware from "effect/http-api/HttpApiMiddleware";
 import * as HttpApiSecurity from "effect/http-api/HttpApiSecurity";
@@ -214,14 +216,36 @@ const requestSchemaErrorMessage = (
   }
 };
 
+/**
+ * Answer a rejected request, reporting the rejection on the request span
+ * before the typed error that carries the issue list is replaced.
+ *
+ * The report travels through `ErrorReporter` rather than writing span
+ * attributes here on purpose: the attribute vocabulary and the decision that
+ * a 4xx is not an incident belong to the server (`apps/server` owns both), and
+ * a package may not import it. Forwarding the cause keeps the two concerns
+ * where they already live, and an endpoint that fails without a server
+ * reporter installed simply records nothing.
+ *
+ * This is the only point that still holds the `HttpApiSchemaError`: the
+ * framework answers an escaped one with an empty 400, and this API answers
+ * `INVALID_REQUEST`, so neither a reporter nor the server's Sentry filter can
+ * tell afterwards which part of the request did not match.
+ */
+export const rejectRequest = (
+  error: HttpApiSchemaError
+): Effect.Effect<never, HttpApiSchemaError | InvalidRequestError> => {
+  const message = requestSchemaErrorMessage(error);
+  return message === undefined
+    ? Effect.fail(error)
+    : ErrorReporter.report(Cause.fail(error)).pipe(
+        Effect.andThen(Effect.fail(invalidRequestError(message)))
+      );
+};
+
 /** The schema-error handler as production composes it. */
 export const PublicApiSchemaErrorHandlerLive =
   HttpApiMiddleware.layerSchemaErrorTransform(
     PublicApiSchemaErrorHandler,
-    (error) => {
-      const message = requestSchemaErrorMessage(error);
-      return message === undefined
-        ? Effect.fail(error)
-        : Effect.fail(invalidRequestError(message));
-    }
+    rejectRequest
   );

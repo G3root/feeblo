@@ -44,6 +44,11 @@ export const httpSpanAttributeAllowlist: ReadonlySet<string> = new Set([
   "http.response.header.content-length",
   // The server tracer records the user agent a second time under its own name.
   "user_agent.original",
+  // The transport peer the server tracer reads off the request: the address
+  // this process accepted the connection from, not a header the caller chose.
+  // Behind a proxy this is the proxy's address, the same one the rate limiter
+  // falls back to when no forwarding header is trusted.
+  "client.address",
 ]);
 
 /** Record this attribute? HTTP names must be allowlisted; product names pass through. */

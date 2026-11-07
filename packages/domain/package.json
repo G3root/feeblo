@@ -133,6 +133,9 @@
     "./data-transfer/limits": {
       "default": "./src/data-transfer/limits.ts"
     },
+    "./data-transfer/machine": {
+      "default": "./src/data-transfer/machine.ts"
+    },
     "./data-transfer/repository": {
       "default": "./src/data-transfer/repository.ts"
     },
@@ -192,6 +195,9 @@
     },
     "./identity/service": {
       "default": "./src/identity/service.ts"
+    },
+    "./insights/schema": {
+      "default": "./src/insights/schema.ts"
     },
     "./integration/chat": {
       "default": "./src/integration/chat/index.ts"
@@ -472,6 +478,9 @@
     "./rpc-kind": {
       "default": "./src/rpc-kind.ts"
     },
+    "./saved-view/schema": {
+      "default": "./src/saved-view/schema.ts"
+    },
     "./rpc-router": {
       "default": "./src/rpc-router.ts"
     },
@@ -541,6 +550,7 @@
     "@feeblo/utils": "workspace:*",
     "@isaacs/ttlcache": "catalog:",
     "@polar-sh/sdk": "catalog:",
+    "@xstate/effect": "catalog:",
     "cookie-es": "^3.1.1",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
@@ -549,6 +559,7 @@
     "leo-profanity": "^1.9.0",
     "react": "catalog:",
     "takumi-js": "^2.4.0",
+    "xstate": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

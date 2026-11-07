@@ -4,6 +4,11 @@ export {
   useAuthDialogContext,
 } from "./auth";
 export {
+  type BanAuthorTarget,
+  BanAuthorDialogProvider,
+  useBanAuthorDialogContext,
+} from "./ban-author";
+export {
   CommentDeleteDialogProvider,
   useCommentDeleteDialogContext,
 } from "./comment";

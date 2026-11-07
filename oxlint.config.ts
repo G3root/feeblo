@@ -157,6 +157,15 @@ export default defineConfig({
     // The widget, the SDK, and CLI entry points log to the console on purpose;
     // they have no logger to route through.
     "effecttsgo/global-console": "off",
+    // `JSON.parse`/`JSON.stringify` outside Effect is ordinary work: Vite and
+    // Vitest configs, the embeddable widget and SDK, browser telemetry, Drizzle
+    // JSON columns and build scripts all use it on purpose. The defect is the
+    // same call inside Effect, where it throws instead of failing with a typed
+    // error, and that half stays `error` below. This rule supersedes
+    // `prefer-schema-over-json`, which `@effect/tsgo@0.64.1` removed; the
+    // exception that rule carried for test files now sits on its `-in-effect`
+    // sibling.
+    "effecttsgo/global-json": "off",
 
     // ---------------------------------------------------------------------
     // The rest of the boundary pattern above, extended to the plain halves
@@ -278,6 +287,7 @@ export default defineConfig({
     "effecttsgo/abort-controller-in-effect": "error",
     "effecttsgo/crypto-random-uuid-in-effect": "error",
     "effecttsgo/global-fetch-in-effect": "error",
+    "effecttsgo/global-json-in-effect": "error",
     "effecttsgo/global-random-in-effect": "error",
     "effecttsgo/global-timers-in-effect": "error",
     "effecttsgo/instance-of-schema": "error",
@@ -348,13 +358,15 @@ export default defineConfig({
     },
     {
       // Tests build the exact wire bytes a provider's signature covers
-      // (`JSON.stringify` of the body) and assert what a serialized error
-      // contains. That is the input under test, not a decode boundary that
-      // should go through a Schema codec; production code is covered by the
-      // rule, and the two production findings it had were fixed.
+      // (`JSON.stringify` of the body) and read back what a serialized payload
+      // or error contains. That is the input under test, not a decode boundary
+      // that should go through a Schema codec; production code is covered by
+      // the rule above, and its findings are clear. `prefer-schema-over-json`
+      // carried this exception until `@effect/tsgo@0.64.1` replaced it with
+      // `global-json`/`global-json-in-effect`.
       files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
       rules: {
-        "effecttsgo/prefer-schema-over-json": "off",
+        "effecttsgo/global-json-in-effect": "off",
       },
     },
     {

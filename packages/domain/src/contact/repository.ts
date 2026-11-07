@@ -42,6 +42,9 @@ const ACCOUNT_KIND_BY_CLASS = {
   sso: "PORTAL",
 } as const satisfies Record<EmailRecipientAccessClass, TContactAccountKind>;
 
+/** The `LIKE`/`ILIKE` metacharacters a search term must not smuggle in. */
+const likeMetacharacterPattern = /[\\%_]/g;
+
 /**
  * Keeps a synthetic account's display name in step with the customer record
  * that owns it.
@@ -340,10 +343,10 @@ const makeContactRepository = Effect.gen(function* () {
         return contact !== undefined;
       }),
 
-    /** The full row, for callers that need more than the id. */
+    /** The unsubscribe target's address, and nothing else. */
     findById: ({ id, organizationId }: TContactDelete) =>
       db
-        .select()
+        .select({ email: schema.contactTable.email })
         .from(schema.contactTable)
         .where(
           and(
@@ -673,7 +676,7 @@ const makeContactRepository = Effect.gen(function* () {
       // (lower(email) = ...), not ILIKE, so LIKE escaping would break exact
       // matches for emails containing %, _ or \. escaped stays scoped to
       // the ILIKE prefix/substring patterns below.
-      const escaped = trimmed.replace(/[\\%_]/g, "\\$&");
+      const escaped = trimmed.replace(likeMetacharacterPattern, "\\$&");
       const exactEmail = trimmed.toLowerCase();
       const prefix = `${escaped}%`;
       const substring = `%${escaped}%`;
