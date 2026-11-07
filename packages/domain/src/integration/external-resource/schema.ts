@@ -92,17 +92,42 @@ export type ExternalResourceCreationReservation = Schema.Schema.Type<
   typeof ExternalResourceCreationReservation
 >;
 
-export const ExternalResourceCreationReservationResult = Schema.Struct({
-  id: ExternalResourceCreateRequestId.schema,
-  reserved: Schema.Boolean,
-  postExternalResourceLinkId: Schema.NullOr(PostExternalResourceLinkId.schema),
-});
+/**
+ * The outcome of asking for a reservation.
+ *
+ * A taken reservation carries `reservedAt`: the instant that claim was taken,
+ * which is also the row's `createdAt`. It is the claim's **fence**. A holder
+ * whose lease expired can be re-claimed by another caller, and the re-claim
+ * leaves the row `pending`, so `state` cannot tell the two apart — without the
+ * fence the expired holder's `completeCreation`/`failCreation` still match and
+ * overwrite the new claim's row.
+ *
+ * The not-taken branch deliberately has no token: a caller that did not take the
+ * claim has no claim to end, and the type should not hand it one.
+ */
+export const ExternalResourceCreationReservationResult = Schema.Union([
+  Schema.Struct({
+    id: ExternalResourceCreateRequestId.schema,
+    reserved: Schema.Literal(true),
+    reservedAt: Schema.Date,
+    postExternalResourceLinkId: Schema.Null,
+  }),
+  Schema.Struct({
+    id: ExternalResourceCreateRequestId.schema,
+    reserved: Schema.Literal(false),
+    postExternalResourceLinkId: Schema.NullOr(
+      PostExternalResourceLinkId.schema
+    ),
+  }),
+]);
 export type ExternalResourceCreationReservationResult = Schema.Schema.Type<
   typeof ExternalResourceCreationReservationResult
 >;
 
 export const ExternalResourceCreationCompletion = Schema.Struct({
   requestId: ExternalResourceCreateRequestId.schema,
+  /** The claim this completion belongs to; a re-claimed row will not match. */
+  reservedAt: Schema.Date,
   externalResourceId: IntegrationExternalResourceId.schema,
   postExternalResourceLinkId: PostExternalResourceLinkId.schema,
 });
@@ -112,6 +137,8 @@ export type ExternalResourceCreationCompletion = Schema.Schema.Type<
 
 export const ExternalResourceCreationFailure = Schema.Struct({
   requestId: ExternalResourceCreateRequestId.schema,
+  /** The claim this release belongs to; a re-claimed row will not match. */
+  reservedAt: Schema.Date,
 });
 export type ExternalResourceCreationFailure = Schema.Schema.Type<
   typeof ExternalResourceCreationFailure

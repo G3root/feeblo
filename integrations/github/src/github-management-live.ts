@@ -727,16 +727,36 @@ const makeGitHubManagementService = Effect.gen(function* () {
             organizationId: input.organizationId,
             postId: input.postId,
           });
-          yield* externalResources.completeCreation({
+          const completed = yield* externalResources.completeCreation({
             externalResourceId: recorded.externalResourceId,
             postExternalResourceLinkId: recorded.link.id,
             requestId: request.id,
+            reservedAt: request.reservedAt,
           });
+          if (!completed) {
+            // The lease expired while the provider call was in flight and
+            // another caller took the reservation over, so the row now belongs
+            // to that claim. The issue exists and is linked — only this claim's
+            // bookkeeping was superseded.
+            yield* Effect.logWarning(
+              "GitHub issue creation finished after its reservation was re-claimed"
+            ).pipe(
+              Effect.annotateLogs({
+                connectionId: input.connectionId,
+                organizationId: input.organizationId,
+                postId: input.postId,
+                requestId: request.id,
+              })
+            );
+          }
           return recorded.link;
         }).pipe(
           Effect.onErrorIf(shouldReleaseCreation, () =>
             externalResources
-              .failCreation({ requestId: request.id })
+              .failCreation({
+                requestId: request.id,
+                reservedAt: request.reservedAt,
+              })
               .pipe(Effect.catch((cause) => Effect.logError(cause)))
           )
         );

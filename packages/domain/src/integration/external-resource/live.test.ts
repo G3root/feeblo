@@ -18,6 +18,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import { TestClock } from "effect/testing";
 
 import { ExternalResourceServiceLive } from "./live";
 import { ExternalResourceService } from "./service";
@@ -203,7 +204,13 @@ describe("external resource service", () => {
           expect(reserved.reserved).toBe(true);
           expect(duplicate.reserved).toBe(false);
           expect(duplicate.id).toBe(reserved.id);
-          yield* service.failCreation({ requestId: reserved.id });
+          if (!reserved.reserved) {
+            return yield* Effect.die("Expected the first reservation to win");
+          }
+          yield* service.failCreation({
+            requestId: reserved.id,
+            reservedAt: reserved.reservedAt,
+          });
           const retried = yield* service.reserveCreation({
             connectionId: github,
             organizationId: first.organizationId,
@@ -248,7 +255,13 @@ describe("external resource service", () => {
 
         const held = yield* service.reserveCreation(input);
         expect(held.reserved).toBe(true);
-        yield* service.failCreation({ requestId: held.id });
+        if (!held.reserved) {
+          return yield* Effect.die("Expected the reservation to be taken");
+        }
+        yield* service.failCreation({
+          requestId: held.id,
+          reservedAt: held.reservedAt,
+        });
 
         const raced = yield* Effect.all(
           [service.reserveCreation(input), service.reserveCreation(input)],
@@ -289,6 +302,98 @@ describe("external resource service", () => {
 
         expect(raced.filter((result) => result.reserved)).toHaveLength(1);
       })
+    );
+
+    /**
+     * The lease exists so a stalled holder can be taken over, and taking it over
+     * is only safe if the stalled holder can no longer write to the row. A
+     * re-claim leaves the row `pending`, so the source-state check alone still
+     * matches it; the claim instant is what fences the old holder out.
+     */
+    it.effect(
+      "does not let an expired claim end a re-claimed reservation",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* ExternalResourceService;
+          const post = yield* seedPost("claim-fence");
+          const connection = yield* seedConnection(
+            post.organizationId,
+            "github"
+          );
+          const input = {
+            connectionId: connection,
+            idempotencyKey: "create-issue-claim-fence",
+            organizationId: post.organizationId,
+            postId: post.postId,
+          };
+
+          const expired = yield* service.reserveCreation(input);
+          if (!expired.reserved) {
+            return yield* Effect.die(
+              "Expected the first reservation to be taken"
+            );
+          }
+
+          // Let the lease lapse, then let a second caller take it over. The clock
+          // is advanced rather than the row's `createdAt` rewound: the fence
+          // relies on that stamp only ever moving forward.
+          yield* TestClock.adjust("2 hours");
+          const current = yield* service.reserveCreation(input);
+          if (!current.reserved) {
+            return yield* Effect.die(
+              "Expected the reservation to be re-claimed"
+            );
+          }
+
+          expect(current.id).toBe(expired.id);
+          expect(current.reservedAt).not.toStrictEqual(expired.reservedAt);
+
+          const recorded = yield* service.recordPostLink({
+            postId: post.postId,
+            resource: resource(post.organizationId, connection),
+          });
+
+          // The expired holder can neither complete nor release the row.
+          expect(
+            yield* service.completeCreation({
+              externalResourceId: recorded.externalResourceId,
+              postExternalResourceLinkId: recorded.postExternalResourceLinkId,
+              requestId: expired.id,
+              reservedAt: expired.reservedAt,
+            })
+          ).toBe(false);
+          expect(
+            yield* service.failCreation({
+              requestId: expired.id,
+              reservedAt: expired.reservedAt,
+            })
+          ).toBe(false);
+
+          const [afterExpired] = yield* db
+            .select({
+              postExternalResourceLinkId:
+                schema.externalResourceCreateRequestTable
+                  .postExternalResourceLinkId,
+              state: schema.externalResourceCreateRequestTable.state,
+            })
+            .from(schema.externalResourceCreateRequestTable)
+            .where(
+              eq(schema.externalResourceCreateRequestTable.id, expired.id)
+            );
+          expect(afterExpired?.state).toBe("pending");
+          expect(afterExpired?.postExternalResourceLinkId).toBeNull();
+
+          // The holder that owns the row still can.
+          expect(
+            yield* service.completeCreation({
+              externalResourceId: recorded.externalResourceId,
+              postExternalResourceLinkId: recorded.postExternalResourceLinkId,
+              requestId: current.id,
+              reservedAt: current.reservedAt,
+            })
+          ).toBe(true);
+        })
     );
 
     it.effect("rejects a provider URL that is not http(s) at write time", () =>
