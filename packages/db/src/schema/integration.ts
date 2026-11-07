@@ -624,6 +624,17 @@ export const externalResourceCreateRequestTable = pgTable(
     postId: text("post_id").notNull(),
     idempotencyKey: text("idempotency_key").notNull(),
     state: text("state").$type<TExternalResourceCreateRequestState>().notNull(),
+    /**
+     * Which claim currently owns the reservation.
+     *
+     * The insert starts at 1 and every re-claim adds one, so a claim's
+     * generation is distinct by construction — unlike a timestamp, which two
+     * claims can share inside one millisecond. `completeCreation` and
+     * `failCreation` match it, which is what stops a holder whose lease expired
+     * from writing to a row another caller has since taken over; `created_at`
+     * cannot serve that purpose because it is already the lease clock.
+     */
+    claimGeneration: integer("claim_generation").default(1).notNull(),
     externalResourceId: text("external_resource_id"),
     postExternalResourceLinkId: text("post_external_resource_link_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -635,6 +646,10 @@ export const externalResourceCreateRequestTable = pgTable(
       .notNull(),
   },
   (table) => [
+    check(
+      "external_resource_create_request_claim_generation_check",
+      sql`${table.claimGeneration} > 0`
+    ),
     foreignKey({
       columns: [table.organizationId, table.connectionId],
       foreignColumns: [
