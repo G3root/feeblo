@@ -13,6 +13,7 @@ import { ContactRpcs } from "./contact/rpcs";
 import { DataTransferRpcs } from "./data-transfer/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
 import { EmailSuppressionRpcs } from "./email-suppression/rpcs";
+import { InsightsRpcs } from "./insights/rpcs";
 import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { ExternalResourceRpcs } from "./integration/external-resource/rpcs";
 import { GitHubManagementRpcs } from "./integration/github/rpcs";
@@ -67,6 +68,7 @@ export const RpcGroups = [
   ["ChangelogPost", ChangelogPostRpcs],
   ["ChangelogCategory", ChangelogCategoryRpcs],
   ["ChangelogSubscription", ChangelogSubscriptionRpcs],
+  ["Insights", InsightsRpcs],
   ["JwtSecret", JwtSecretRpcs],
   ["ApiKey", ApiKeyRpcs],
   ["Membership", MembershipRpcs],

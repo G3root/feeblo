@@ -20,6 +20,14 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Saved view**: A view a member stored under a name, with an optional description and a position, per surface (one board, or the organization-wide feedback list). It is visible to every member of the workspace unless its owner marked it private, and it has its own path (`/…/feedback/view/{id}`), so a link to one is a link to a result set rather than to a filter mode. _Avoid_: preset, filter set, segment
 
+### Insights
+
+**Insight**: A number computed from a workspace's history — volume, response time, the status mix, or a leaderboard — read on the insights page. An insight is a measurement, not a stored event: it is derived from posts, votes, and post activity every time it is read. _Avoid_: metric, report, analytics, statistic
+
+**First response**: The first status change on a post, and the time from the post's creation to it. A comment is not a first response. A post with no status change has none — it is not a zero-second response. _Avoid_: reply, answer, reaction
+
+**Untouched post**: An active post with no assignee, no status change, and no comment. The word is about decisions, not edits: a changed title or body does not make a post touched. _Avoid_: stale post, idle post, neglected post
+
 ### Data transfer
 
 **Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup

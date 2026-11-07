@@ -196,6 +196,9 @@
     "./identity/service": {
       "default": "./src/identity/service.ts"
     },
+    "./insights/schema": {
+      "default": "./src/insights/schema.ts"
+    },
     "./integration/chat": {
       "default": "./src/integration/chat/index.ts"
     },
