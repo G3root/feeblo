@@ -2,7 +2,7 @@ import { Database, schema, transaction } from "@feeblo/db";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { and, eq } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { Digest, SecureRandom } from "effect/crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -129,13 +129,15 @@ const makeCommentService = Effect.gen(function* () {
    * fiber-local, not a service.
    */
   const database = yield* Database.Database;
-  const crypto = yield* Crypto.Crypto;
+  const digest = yield* Digest.Digest;
+  const secureRandom = yield* SecureRandom.SecureRandom;
   const resolvePrincipal = yield* ResolvePrincipalService;
 
   const provideInternals = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.provideService(Database.Database, database),
-      Effect.provideService(Crypto.Crypto, crypto),
+      Effect.provideService(SecureRandom.SecureRandom, secureRandom),
+      Effect.provideService(Digest.Digest, digest),
       Effect.provideService(ResolvePrincipalService, resolvePrincipal)
     );
 

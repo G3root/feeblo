@@ -8,7 +8,15 @@ import { useNavigate } from "@tanstack/react-router";
 import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
+export function PostBoardField({
+  disabled = false,
+  showTrigger = true,
+  triggerClassName,
+}: {
+  disabled?: boolean;
+  showTrigger?: boolean;
+  triggerClassName?: string;
+}) {
   const { post, board, organizationId, isLocked, isMerged } =
     usePostCollectionData();
   const { allowed: canMovePost } = usePolicy(
@@ -29,6 +37,8 @@ export function PostBoardField({ disabled = false }: { disabled?: boolean }) {
       boards={allBoards}
       currentBoardId={board.id}
       disabled={isDisabled}
+      showTrigger={showTrigger}
+      triggerClassName={triggerClassName}
       onValueChange={async (boardId) => {
         if (!boardId || isDisabled) {
           return;

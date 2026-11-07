@@ -14,6 +14,12 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Public portal**: The feedback-board and widget surface that is readable without a dashboard session. `*Public` in RPC names — `ListPostsPublic`, `GetPostPublic` — refers to this surface, not to anonymity and not to the Public API. _Avoid_: Public API, anonymous API
 
+**Assignee**: The workspace member currently working on a post. Every post has at most one, and an unassigned post is the default rather than an error state. The assignee is not the author: authorship is who wrote the post, assignment is who owns it. _Avoid_: owner, lead, responsible person
+
+**View**: What the board is showing — its filters, its grouping, and its ordering. `All feedbacks`, `Active`, and `Backlog` are built-in views, one route each. `Created` and `Assigned`, on the member's own feedback page, are scopes rather than filters: the page pins them to the session's member, the filter menu cannot clear them, and no saved view can store them. _Avoid_: filter, tab
+
+**Saved view**: A view a member stored under a name, with an optional description and a position, per surface (one board, or the organization-wide feedback list). It is visible to every member of the workspace unless its owner marked it private, and it has its own path (`/…/feedback/view/{id}`), so a link to one is a link to a result set rather than to a filter mode. _Avoid_: preset, filter set, segment
+
 ### Data transfer
 
 **Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup
@@ -57,6 +63,10 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 **End user**: A person who posts, votes, or comments on the public board or through the widget. An end user is not a member and never consumes the member allowance; end users are unlimited on every plan. _Avoid_: customer, visitor, anonymous member
 
 **Admin role**: A member holding `owner` or `admin`. It grants workspace management permissions; it is no longer a plan unit, so promoting a member does not change what the plan counts. _Avoid_: privileged member, seat, admin seat
+
+### Moderation
+
+**Ban**: A workspace-scoped instruction that stops one end user from participating — posting, commenting, voting, reacting, or subscribing — on that workspace's public portal and widget. A ban does not stop them reading, does not stop email delivery (that is a suppression), and does not lock their account from signing in. A ban does remove their votes and their post, changelog, and email subscriptions in that workspace; deleting their existing posts and comments is an explicit option on the ban, never part of it. Requires the `userBans` plan capability to create. _Avoid_: block, blocklist, suspension, suppression
 
 ### Plans
 

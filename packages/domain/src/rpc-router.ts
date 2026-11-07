@@ -33,6 +33,7 @@ import { PublicRpcRateLimitMiddlewareLive } from "./rate-limit";
 import { RoadmapColumnRpcHandlers } from "./roadmap-column/handlers";
 import { RoadmapRpcHandlers } from "./roadmap/handlers";
 import { AllRpcs, type RpcGroupName } from "./rpc-group";
+import { SavedViewRpcHandlers } from "./saved-view/handlers";
 import { S3UploadServiceLive } from "./services/s3";
 import {
   AuthMiddlewareLive,
@@ -42,6 +43,7 @@ import {
 import { SiteRpcHandlers } from "./site/handlers";
 import { TagRpcHandlers } from "./tag/handlers";
 import { UpvoteRpcHandlers } from "./upvote/handlers";
+import { UserBanRpcHandlers } from "./user-ban/handlers";
 import { WorkspaceRpcHandlers } from "./workspace/handlers";
 
 /**
@@ -84,9 +86,11 @@ export const RpcHandlerRegistrations = {
   Site: SiteRpcHandlers,
   Tag: TagRpcHandlers,
   Upvote: UpvoteRpcHandlers,
+  UserBan: UserBanRpcHandlers,
   PostReaction: PostReactionRpcHandlers,
   PostStatus: PostStatusRpcHandlers,
   PostSubscription: PostSubscriptionRpcHandlers,
+  SavedView: SavedViewRpcHandlers,
   Roadmap: RoadmapRpcHandlers,
   RoadmapColumn: RoadmapColumnRpcHandlers,
   Workspace: WorkspaceRpcHandlers,

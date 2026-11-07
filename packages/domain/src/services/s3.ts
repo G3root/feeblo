@@ -1,6 +1,6 @@
 import { S3 } from "@effect-aws/client-s3";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -119,9 +119,9 @@ const makeS3UploadService = Effect.gen(function* () {
       userId: string;
     }) =>
       Effect.gen(function* () {
-        const crypto = yield* Crypto.Crypto;
+        const secureRandom = yield* SecureRandom.SecureRandom;
         const now = yield* DateTime.now;
-        const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4()}.${extension}`;
+        const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${now.epochMilliseconds}-${yield* secureRandom.uuidV4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
         return resolvePublicUrl(fileKey);
       }),
@@ -137,9 +137,9 @@ const makeS3UploadService = Effect.gen(function* () {
       organizationId: string;
     }) =>
       Effect.gen(function* () {
-        const crypto = yield* Crypto.Crypto;
+        const secureRandom = yield* SecureRandom.SecureRandom;
         const now = yield* DateTime.now;
-        const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4()}.${extension}`;
+        const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${now.epochMilliseconds}-${yield* secureRandom.uuidV4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
         return resolvePublicUrl(fileKey);
       }),
@@ -157,9 +157,9 @@ const makeS3UploadService = Effect.gen(function* () {
       userId: string;
     }) =>
       Effect.gen(function* () {
-        const crypto = yield* Crypto.Crypto;
+        const secureRandom = yield* SecureRandom.SecureRandom;
         const now = yield* DateTime.now;
-        const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${now.epochMilliseconds}-${yield* crypto.randomUUIDv4()}.${extension}`;
+        const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${now.epochMilliseconds}-${yield* secureRandom.uuidV4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
         return resolvePublicUrl(fileKey);
       }),

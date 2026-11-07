@@ -3,7 +3,7 @@ import { pickDefaultPostStatus } from "@feeblo/domain-contracts/post-status-defa
 import { BoardId, LegidError, PostId } from "@feeblo/id";
 import { sanitizeMarkdown } from "@feeblo/utils/markdown-sanitizer";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -641,8 +641,8 @@ export const runDataImportWorker = ({
 } = {}) =>
   Effect.gen(function* () {
     const repository = yield* DataTransferRepository;
-    const crypto = yield* Crypto.Crypto;
-    const leaseOwner = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+    const secureRandom = yield* SecureRandom.SecureRandom;
+    const leaseOwner = yield* secureRandom.uuidV4();
 
     const poll = Effect.gen(function* () {
       const claim = yield* repository.claimNextJob({

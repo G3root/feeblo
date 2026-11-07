@@ -1,4 +1,3 @@
-import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -13,7 +12,7 @@ import { Separator } from "@feeblo/ui/separator";
 import { getAuthSession } from "@feeblo/web-shared/auth-session";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
@@ -21,6 +20,7 @@ import {
   CurrentPlanStat,
   PlanGridSkeleton,
 } from "~/features/billing/components/billing-plan-summary";
+import { CheckoutConfirmationAlert } from "~/features/billing/components/checkout-confirmation-alert";
 import {
   startBillingCheckout,
   startBillingPortal,
@@ -86,9 +86,6 @@ function BillingSettingsContent({
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
   const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);
-  const [confirmationStatus, setConfirmationStatus] = useState<
-    "pending" | "delayed" | "error"
-  >("pending");
 
   const catalog = usePlanCatalog();
 
@@ -97,44 +94,6 @@ function BillingSettingsContent({
   const { plans } = buildPlanCards(catalog.data ?? [], currentPlanType);
   const currentPlan = plans.find((plan) => plan.planType === currentPlanType);
   const hasPaidPlan = currentPlanType !== "free";
-
-  useEffect(() => {
-    if (!(search.checkout_id && !hasPaidPlan)) {
-      return;
-    }
-
-    setConfirmationStatus("pending");
-    let attempts = 0;
-    const timer = window.setInterval(() => {
-      attempts += 1;
-      dashboardCollections.workspacePlanCollection.utils
-        // `throwOnError` is what makes the catch reachable: without it the
-        // refetch resolves with the error in the result and the alert would
-        // stay on "pending" through a network failure.
-        .refetch({ throwOnError: true })
-        .catch(() => setConfirmationStatus("error"));
-      if (attempts >= 10) {
-        window.clearInterval(timer);
-        setConfirmationStatus("delayed");
-      }
-    }, 3000);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [hasPaidPlan, search.checkout_id]);
-
-  const refreshCheckoutConfirmation = async () => {
-    setConfirmationStatus("pending");
-    try {
-      await dashboardCollections.workspacePlanCollection.utils.refetch({
-        throwOnError: true,
-      });
-      setConfirmationStatus("delayed");
-    } catch {
-      setConfirmationStatus("error");
-    }
-  };
 
   return (
     <SettingsLayout.Root size="large">
@@ -146,44 +105,16 @@ function BillingSettingsContent({
       </SettingsLayout.Header>
       <SettingsLayout.Content>
         <div className="space-y-6">
+          {/* Keyed so a changed checkout id or workspace remounts the machine
+              instead of reusing the previous id in the retry path; removing
+              the id unmounts the alert entirely. */}
           {search.checkout_id ? (
-            <Alert
-              variant={
-                hasPaidPlan
-                  ? "success"
-                  : confirmationStatus === "error"
-                    ? "error"
-                    : "info"
-              }
-            >
-              <AlertTitle>
-                {hasPaidPlan
-                  ? "Subscription activated"
-                  : confirmationStatus === "delayed"
-                    ? "Subscription confirmation is taking longer than expected"
-                    : confirmationStatus === "error"
-                      ? "Could not refresh subscription status"
-                      : "Checkout completed — confirming your subscription"}
-              </AlertTitle>
-              <AlertDescription>
-                {hasPaidPlan
-                  ? `This workspace now has the ${PLAN_COPY[currentPlanType].name} plan.`
-                  : confirmationStatus === "pending"
-                    ? "Polar is confirming the subscription. This page will update automatically; it can take a few seconds."
-                    : "Your checkout may still be processing. Refresh the subscription status to try again."}
-              </AlertDescription>
-              {!hasPaidPlan && confirmationStatus !== "pending" ? (
-                <Button
-                  className="mt-3"
-                  onClick={refreshCheckoutConfirmation}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  Refresh status
-                </Button>
-              ) : null}
-            </Alert>
+            <CheckoutConfirmationAlert
+              key={`${organizationId}:${search.checkout_id}`}
+              checkoutId={search.checkout_id}
+              organizationId={organizationId}
+              plan={currentSubscribedPlan.data?.plan}
+            />
           ) : null}
           <Card className="border-border border shadow-none ring-0">
             <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">

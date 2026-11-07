@@ -1,0 +1,497 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "f332849a-bbad-44b9-9097-e503209c3f91",
+  "prevIds": [
+    "f59c1f8c-14d5-4e72-a7c6-3a726cf1a4a3"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "user_ban"
+      ],
+      "writes": [
+        "s|tbl|public.user_ban",
+        "n|tbl|public.user_ban",
+        "e|tbl|public.user_ban",
+        "n|rel|public.user_ban",
+        "n|type|public.user_ban",
+        "n|rel|public.user_ban_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "user_ban",
+        "user_ban_organizationId_userId_uidx"
+      ],
+      "writes": [
+        "s|idx|public.user_ban_organizationId_userId_uidx",
+        "n|idx|public.user_ban_organizationId_userId_uidx",
+        "e|idx|public.user_ban_organizationId_userId_uidx",
+        "n|rel|public.user_ban_organizationId_userId_uidx"
+      ],
+      "reads": [
+        "n|tbl|public.user_ban",
+        "n|sch|public",
+        "n|col|public.user_ban.organization_id",
+        "n|col|public.user_ban.user_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "user_ban",
+        "user_ban_organizationId_email_uidx"
+      ],
+      "writes": [
+        "s|idx|public.user_ban_organizationId_email_uidx",
+        "n|idx|public.user_ban_organizationId_email_uidx",
+        "e|idx|public.user_ban_organizationId_email_uidx",
+        "n|rel|public.user_ban_organizationId_email_uidx"
+      ],
+      "reads": [
+        "n|tbl|public.user_ban",
+        "n|sch|public",
+        "n|col|public.user_ban.organization_id",
+        "n|col|public.user_ban.email"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "user_ban",
+        "user_ban_organizationId_createdAt_idx"
+      ],
+      "writes": [
+        "s|idx|public.user_ban_organizationId_createdAt_idx",
+        "n|idx|public.user_ban_organizationId_createdAt_idx",
+        "e|idx|public.user_ban_organizationId_createdAt_idx",
+        "n|rel|public.user_ban_organizationId_createdAt_idx"
+      ],
+      "reads": [
+        "n|tbl|public.user_ban",
+        "n|sch|public",
+        "n|col|public.user_ban.organization_id",
+        "n|col|public.user_ban.created_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "user_ban"
+      ],
+      "writes": [
+        "s|fk|public.user_ban.user_ban_organization_id_organization_id_fkey",
+        "n|fk|public.user_ban.user_ban_organization_id_organization_id_fkey",
+        "e|fk|public.user_ban.user_ban_organization_id_organization_id_fkey",
+        "n|con|public.user_ban.user_ban_organization_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.user_ban",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.user_ban.organization_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "user_ban"
+      ],
+      "writes": [
+        "s|fk|public.user_ban.user_ban_user_id_user_id_fkey",
+        "n|fk|public.user_ban.user_ban_user_id_user_id_fkey",
+        "e|fk|public.user_ban.user_ban_user_id_user_id_fkey",
+        "n|con|public.user_ban.user_ban_user_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.user_ban",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.user_ban.user_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "user_ban"
+      ],
+      "writes": [
+        "s|fk|public.user_ban.user_ban_created_by_member_id_member_id_fkey",
+        "n|fk|public.user_ban.user_ban_created_by_member_id_member_id_fkey",
+        "e|fk|public.user_ban.user_ban_created_by_member_id_member_id_fkey",
+        "n|con|public.user_ban.user_ban_created_by_member_id_member_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.user_ban",
+        "n|sch|public",
+        "n|tbl|public.member",
+        "n|sch|public",
+        "n|col|public.user_ban.created_by_member_id",
+        "n|col|public.member.id",
+        "e|uniqueness|public.member.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "user_ban",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "email",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "reason",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "created_by_member_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_organizationId_userId_uidx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "user_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": "\"user_id\" is not null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_organizationId_email_uidx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "email",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": "\"email\" is not null",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_organizationId_createdAt_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "created_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_organization_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "organization_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_user_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "user_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_created_by_member_id_member_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "created_by_member_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "member",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_subject_chk",
+        "value": "\"user_id\" is not null or \"email\" is not null",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_email_normalized_chk",
+        "value": "\"email\" is null or \"email\" = lower(btrim(\"email\"))",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "user_ban",
+        "name": "user_ban_reason_chk",
+        "value": "\"reason\" is null or (length(\"reason\") between 1 and 500)",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

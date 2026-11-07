@@ -33,6 +33,7 @@ export const PLAN_PRICING_FEATURES = {
     { key: "workspaces", label: "Unlimited Workspaces" },
     { key: "integrations", label: "Integrations" },
     { key: "publicApi", label: "Public API" },
+    { key: "userBans", label: "User Bans" },
     {
       key: "subscriberEmails",
       label: "Subscriber Email Notifications",

@@ -4,7 +4,7 @@ import { NotificationId } from "@feeblo/id";
 import { isString } from "@feeblo/utils/runtime-kind";
 import { and, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -369,10 +369,8 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, postId)
             )
           );
-        const crypto = yield* Crypto.Crypto;
-        const statusChangedUuid = yield* crypto
-          .randomUUIDv4()
-          .pipe(Effect.orDie);
+        const secureRandom = yield* SecureRandom.SecureRandom;
+        const statusChangedUuid = yield* secureRandom.uuidV4();
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
@@ -532,8 +530,8 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.upvoteTable.postId, targetPostId)
             )
           );
-        const crypto = yield* Crypto.Crypto;
-        const eventId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+        const secureRandom = yield* SecureRandom.SecureRandom;
+        const eventId = yield* secureRandom.uuidV4();
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
@@ -605,8 +603,8 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.upvoteTable.postId, sourcePostId)
             )
           );
-        const crypto = yield* Crypto.Crypto;
-        const eventId = yield* crypto.randomUUIDv4().pipe(Effect.orDie);
+        const secureRandom = yield* SecureRandom.SecureRandom;
+        const eventId = yield* secureRandom.uuidV4();
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,

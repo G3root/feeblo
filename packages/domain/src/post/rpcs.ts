@@ -22,6 +22,7 @@ import {
   PostSuggestions,
   PostUnmerge,
   PostUpdate,
+  PostUpdateAssignee,
   PostUpdateAuthor,
   PostUpdateContent,
   PostUpdateEta,
@@ -149,6 +150,12 @@ export class PostRpcs extends RpcGroup.make(
   Rpc.make("UpdatePostEta", {
     success: Schema.Void,
     payload: PostUpdateEta,
+    error: PostServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  Rpc.make("UpdatePostAssignee", {
+    success: Schema.Void,
+    payload: PostUpdateAssignee,
     error: PostServiceErrors,
   }).middleware(AuthMiddleware),
 

@@ -5,11 +5,21 @@ import * as dayjs from "@feeblo/utils/dayjs";
 import {
   Calendar03Icon,
   CircleLockIcon,
+  DashedLine02Icon,
+  DashedLineCircleIcon,
+  UserCircleIcon,
   UserIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { ReactNode } from "react";
 
+import { PostStatusSelect } from "~/features/post-status/components/post-status-select";
+
+import { GHOST_PROPERTY_TRIGGER } from "../lib/property-trigger";
+import { PostAssigneeField } from "./post-assignee-field";
 import { PostAuthorField } from "./post-author-field";
+import { PostBoardField } from "./post-board-field";
+import { PostEtaField } from "./post-eta-field";
 
 export function PostPageSkeleton() {
   return (
@@ -41,6 +51,39 @@ export function PostPageSkeleton() {
     </div>
   );
 }
+/**
+ * One label/value row in the post's details list.
+ *
+ * The property fields self-gate and render their own editors, so the row only
+ * owns the label/value geometry. The control sits on the right with the same
+ * max width as the author and created values, which is what turns the old
+ * full-width toolbar buttons into metadata rather than a second toolbar.
+ */
+function PostDetailRow({
+  children,
+  icon,
+  label,
+}: {
+  children: ReactNode;
+  icon: typeof UserIcon;
+  label: string;
+}) {
+  return (
+    <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs">
+      <HugeiconsIcon
+        aria-hidden="true"
+        className="text-muted-foreground/72 size-4"
+        icon={icon}
+        strokeWidth={1.75}
+      />
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-foreground flex max-w-44 min-w-0 justify-end font-medium">
+        {children}
+      </dd>
+    </div>
+  );
+}
+
 export function PostDetails({ createdAt }: { createdAt: Date | string }) {
   return (
     <section aria-labelledby="post-details-heading" className="space-y-2.5">
@@ -48,30 +91,30 @@ export function PostDetails({ createdAt }: { createdAt: Date | string }) {
         Details
       </h2>
       <dl className="space-y-2">
-        <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs">
-          <HugeiconsIcon
-            aria-hidden="true"
-            className="text-muted-foreground/72 size-4"
-            icon={UserIcon}
-            strokeWidth={1.75}
+        <PostDetailRow icon={DashedLineCircleIcon} label="Status">
+          <PostStatusSelect
+            showTrigger={false}
+            triggerClassName={GHOST_PROPERTY_TRIGGER}
           />
-          <dt className="text-muted-foreground">Author</dt>
-          <dd className="text-foreground max-w-32 font-medium">
-            <PostAuthorField />
-          </dd>
-        </div>
-        <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs">
-          <HugeiconsIcon
-            aria-hidden="true"
-            className="text-muted-foreground/72 size-4"
-            icon={Calendar03Icon}
-            strokeWidth={1.75}
+        </PostDetailRow>
+        <PostDetailRow icon={DashedLine02Icon} label="Board">
+          <PostBoardField
+            showTrigger={false}
+            triggerClassName={GHOST_PROPERTY_TRIGGER}
           />
-          <dt className="text-muted-foreground">Created</dt>
-          <dd className="text-foreground max-w-32 truncate font-medium">
-            {dayjs.default(createdAt).fromNow()}
-          </dd>
-        </div>
+        </PostDetailRow>
+        <PostDetailRow icon={UserCircleIcon} label="Assignee">
+          <PostAssigneeField />
+        </PostDetailRow>
+        <PostDetailRow icon={Calendar03Icon} label="ETA">
+          <PostEtaField />
+        </PostDetailRow>
+        <PostDetailRow icon={UserIcon} label="Author">
+          <PostAuthorField />
+        </PostDetailRow>
+        <PostDetailRow icon={Calendar03Icon} label="Created">
+          <span className="truncate">{dayjs.default(createdAt).fromNow()}</span>
+        </PostDetailRow>
       </dl>
     </section>
   );

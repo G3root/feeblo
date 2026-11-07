@@ -49,10 +49,16 @@ describe("PlansResponse", () => {
     workspaces: 3,
   };
 
-  it("decodes a body that predates the workspaces key", () => {
+  it("reads a body that predates the workspaces key", () => {
     const decoded = decode({ plans: [plan(legacyLimits)] });
 
     expect(decoded.plans[0]?.limits.workspaces).toBeNull();
+  });
+
+  it("reads a body that predates the userBans capability as not included", () => {
+    const decoded = decode({ plans: [plan(legacyLimits)] });
+
+    expect(decoded.plans[0]?.capabilities.userBans).toBe(false);
   });
 
   it("reads the allowance from a body that predates the members rename", () => {

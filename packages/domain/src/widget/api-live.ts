@@ -28,6 +28,7 @@ import {
   verifyJwt,
 } from "../jwt-secret/verification";
 import { OrganizationRepository } from "../organization/repository";
+import { PolicyDeniedError } from "../policy";
 import { PostStatusRepository } from "../post-status/repository";
 import { PostEmbeddingService } from "../post/embedding-service";
 import { PostRepository } from "../post/repository";
@@ -41,6 +42,7 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { WidgetCreateFeedbackErrors } from "./api-contract";
 import {
   type TWidgetFeedbackMetadata,
@@ -49,19 +51,23 @@ import {
 import { upsertContactFromParsed } from "./sso";
 
 /**
- * The failures the widget feedback endpoint publishes for a bad SSO token.
+ * The failures the widget feedback endpoint publishes from the token
+ * transaction.
  *
  * `verifyJwt` answers `UnauthorizedError` (expired, bad signature, wrong
- * audience, missing claims) and `parsePersonAttributes` answers
- * `DataValidationError` (missing or malformed claims). Both are in the
- * endpoint's declared error union, so the write path passes them through;
- * everything else in the token transaction is a contact-store failure and is
- * answered as internal.
+ * audience, missing claims), `parsePersonAttributes` answers
+ * `DataValidationError` (missing or malformed claims), and a banned SSO
+ * identity answers `PolicyDeniedError`. All three are in the endpoint's
+ * declared error union, so the write path passes them through; everything
+ * else in the token transaction is a contact-store failure and is answered as
+ * internal.
  */
-const isFeedbackTokenFailure = <T>(
+const isPublishedFeedbackFailure = <T>(
   error: T
-): error is T & (UnauthorizedError | DataValidationError) =>
-  Schema.is(UnauthorizedError)(error) || Schema.is(DataValidationError)(error);
+): error is T & (UnauthorizedError | DataValidationError | PolicyDeniedError) =>
+  Schema.is(UnauthorizedError)(error) ||
+  Schema.is(DataValidationError)(error) ||
+  Schema.is(PolicyDeniedError)(error);
 
 export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
   organizationId,
@@ -118,6 +124,106 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
 });
 
 /**
+ * Resolves the SSO customer a feedback submission is attributed to.
+ *
+ * The contact upsert and the participation check run in one transaction, so a
+ * banned submission rolls back the contact it just created: a denial leaves
+ * neither a post nor a contact behind. Reads and providers are passed in
+ * rather than resolved from the context so a test can exercise this step
+ * without building the whole widget HTTP surface.
+ */
+export const resolveFeedbackContact = (input: {
+  readonly organizationId: string;
+  readonly token: string;
+  readonly attributeDefinitionRepository: AttributeDefinitionRepository["Service"];
+  readonly entitlementPolicy: EntitlementPolicy["Service"];
+  readonly jwtSecretRepository: JwtSecretRepository["Service"];
+  readonly organizationRepository: OrganizationRepository["Service"];
+  readonly participation: ParticipationPolicy["Service"];
+}) =>
+  transaction(
+    Effect.gen(function* () {
+      const secrets = yield* input.jwtSecretRepository.getSecretsForOrg({
+        organizationId: input.organizationId,
+      });
+      if (secrets.length === 0) {
+        return yield* new UnauthorizedError({
+          message: "Organization has no JWT secret configured",
+        });
+      }
+
+      // Per-workspace lifetime cap tightens (never loosens) the 24h default;
+      // invalid stored values fall back to the default.
+      const maxTokenLifetimeMinutes =
+        yield* input.organizationRepository.findJwtMaxTokenLifetimeMinutes({
+          organizationId: input.organizationId,
+        });
+      const maxTokenLifetime = maxTokenLifetimeFromMinutes(
+        maxTokenLifetimeMinutes
+      );
+
+      const contactDefs =
+        // SAFETY: the repository contract returns contact attribute definitions
+        // in the canonical domain shape; the cast bridges the DB-row encoding.
+        (yield* input.attributeDefinitionRepository.findContactAttributeDefinitions(
+          input.organizationId
+        )) as readonly TContactAttributeDefinition[];
+      const companyDefs =
+        // SAFETY: the repository contract returns company attribute definitions
+        // in the canonical domain shape; the cast bridges the DB-row encoding.
+        (yield* input.attributeDefinitionRepository.findCompanyAttributeDefinitions(
+          input.organizationId
+        )) as readonly TCompanyAttributeDefinition[];
+
+      const jwtPayload = yield* verifyJwt(
+        input.token,
+        secrets.map((secret) => secret.secret),
+        input.organizationId,
+        { maxTokenLifetime }
+      );
+
+      const parsedContact = yield* parsePersonAttributes(
+        jwtPayload,
+        contactDefs,
+        companyDefs
+      );
+
+      const contactId = yield* upsertContactFromParsed(
+        input.organizationId,
+        parsedContact
+      );
+      yield* input.participation.canSubjectParticipate({
+        organizationId: input.organizationId,
+        ...(contactId !== undefined && { contactId }),
+      });
+      return contactId;
+    })
+  ).pipe(
+    // The contact upsert reads the plan decision and the attribute
+    // definitions from the context; provide the instances the caller captured
+    // rather than rebuilding them inside the transaction.
+    Effect.provideService(
+      AttributeDefinitionRepository,
+      input.attributeDefinitionRepository
+    ),
+    Effect.provideService(EntitlementPolicy, input.entitlementPolicy),
+    // A rejected or malformed SSO token is the caller's mistake, and the
+    // endpoint publishes both tags for it: answer with the real 401/400
+    // instead of folding them into a 500 that says the server failed and can
+    // never be retried. A ban denial is published as the same 403 the
+    // portal answers. `mapError`, not `catchIf`: the type predicate is what
+    // removes the contact-store errors from the channel, so the handler's
+    // declared error union stays exact.
+    Effect.mapError((error) =>
+      isPublishedFeedbackFailure(error)
+        ? error
+        : new InternalServerError({
+            message: "Failed to create feedback contact",
+          })
+    )
+  );
+
+/**
  * The widget HTTP surface, composed once.
  *
  * The feedback write is the shared post write path (`post/write.ts`), built
@@ -146,6 +252,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
       const entitlementPolicy = yield* EntitlementPolicy;
       const postRepository = yield* PostRepository;
       const postEmbeddings = yield* PostEmbeddingService;
+      const participation = yield* ParticipationPolicy;
       // The same suggestion program the dashboard and public portal RPCs run,
       // with the widget's public-only rule. Its collaborators are captured
       // here so the handler does not build a layer per request.
@@ -238,9 +345,6 @@ export const WidgetApiLive = HttpApiBuilder.group(
           return Effect.gen(function* () {
             const boardRepository = yield* BoardRepository;
             const postStatusRepository = yield* PostStatusRepository;
-            const jwtSecretRepository = yield* JwtSecretRepository;
-            const attributeDefinitionRepository =
-              yield* AttributeDefinitionRepository;
 
             // Defense-in-depth re-validation of the public request metadata
             // before it is stored / delivered downstream (webhooks, email,
@@ -288,93 +392,21 @@ export const WidgetApiLive = HttpApiBuilder.group(
               });
             }
 
-            // The write path sanitizes and owns the transaction; the
-            // attribution subject is resolved inside it from the customer
-            // record this upsert files. The upsert joins its own transaction
-            // first: the contact is a durable customer record, and a failed
-            // feedback write leaves it in place rather than rolling back a
-            // customer the workspace knows about.
+            // The SSO contact upsert and the participation check share one
+            // transaction: a banned submission rolls back the contact it just
+            // created, so a denial leaves neither a post nor a contact. The
+            // post write itself runs afterwards, so a later write failure still
+            // leaves a known customer in place.
             const contactId = token
-              ? yield* transaction(
-                  Effect.gen(function* () {
-                    const secrets = yield* jwtSecretRepository.getSecretsForOrg(
-                      {
-                        organizationId,
-                      }
-                    );
-
-                    if (secrets.length === 0) {
-                      return yield* new UnauthorizedError({
-                        message: "Organization has no JWT secret configured",
-                      });
-                    }
-
-                    // Per-workspace lifetime cap tightens (never loosens) the
-                    // 24h default; invalid stored values fall back to the
-                    // default.
-                    const organizationRepository =
-                      yield* OrganizationRepository;
-                    const maxTokenLifetimeMinutes =
-                      yield* organizationRepository.findJwtMaxTokenLifetimeMinutes(
-                        {
-                          organizationId,
-                        }
-                      );
-                    const maxTokenLifetime = maxTokenLifetimeFromMinutes(
-                      maxTokenLifetimeMinutes
-                    );
-
-                    const contactDefs =
-                      // SAFETY: the repository contract returns contact attribute definitions
-                      // in the canonical domain shape; the cast bridges the DB-row encoding.
-                      (yield* attributeDefinitionRepository.findContactAttributeDefinitions(
-                        organizationId
-                      )) as readonly TContactAttributeDefinition[];
-                    const companyDefs =
-                      // SAFETY: the repository contract returns company attribute definitions
-                      // in the canonical domain shape; the cast bridges the DB-row encoding.
-                      (yield* attributeDefinitionRepository.findCompanyAttributeDefinitions(
-                        organizationId
-                      )) as readonly TCompanyAttributeDefinition[];
-
-                    const jwtPayload = yield* verifyJwt(
-                      token,
-                      secrets.map((s) => s.secret),
-                      organizationId,
-                      { maxTokenLifetime }
-                    );
-
-                    const parsedContact = yield* parsePersonAttributes(
-                      jwtPayload,
-                      contactDefs,
-                      companyDefs
-                    );
-
-                    return yield* upsertContactFromParsed(
-                      organizationId,
-                      parsedContact
-                    );
-                  })
-                ).pipe(
-                  // The SSO contact upsert creates through the shared intake
-                  // module, which reads the plan decision from the context.
-                  Effect.provideService(EntitlementPolicy, entitlementPolicy),
-                  // A rejected or malformed SSO token is the caller's mistake,
-                  // and the endpoint publishes both tags for it: answer with
-                  // the real 401/400 instead of folding them into a 500 that
-                  // says the server failed and can never be retried. Only the
-                  // contact-store failures left in this effect are internal.
-                  // `mapError`, not `catchIf`: the type predicate is what
-                  // removes the contact-store errors from the channel, so the
-                  // handler's declared error union stays exact.
-                  Effect.mapError((error) =>
-                    isFeedbackTokenFailure(error)
-                      ? error
-                      : new InternalServerError({
-                          message: "Failed to create feedback contact",
-                        })
-                  )
-                )
+              ? yield* resolveFeedbackContact({
+                  attributeDefinitionRepository,
+                  entitlementPolicy,
+                  jwtSecretRepository,
+                  organizationId,
+                  organizationRepository,
+                  participation,
+                  token,
+                })
               : undefined;
 
             const id = yield* PostId.generate;
@@ -455,7 +487,8 @@ export const WidgetApiLive = HttpApiBuilder.group(
       PostEmbeddingService.layer,
       PostRepository.layer,
       PostStatusRepository.layer,
-      SitePolicy.layer
+      SitePolicy.layer,
+      ParticipationPolicy.layer
     )
   )
 );

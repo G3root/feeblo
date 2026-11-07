@@ -37,11 +37,35 @@ export const Post = S.Struct({
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
   /**
+   * The workspace member working on this post. Null is unassigned.
+   *
+   * Deliberately on both read models rather than behind its own RPC: the
+   * board's assigned-to filter is a live-query predicate over the overfetched
+   * post collection, so the id has to be on every list row for the filter to
+   * narrow without a second round trip.
+   */
+  assigneeMemberId: S.NullOr(S.String),
+  /**
    * Whether the author is a member of the workspace. Derived from
    * `creatorMemberId` in SQL: public reads redact the identifier, and a
    * boolean is not an identifier, so it survives the redaction.
    */
   authorIsMember: S.Boolean,
+  /**
+   * Whether the author is banned from participating in this workspace.
+   *
+   * `true`/`false` on the dashboard reads that ask for it (`GetPost`,
+   * `ListPosts`) and `null` everywhere else, including every public
+   * projection: a ban is a moderation decision, and a public reader has no
+   * business learning it. `null` means "not disclosed" rather than "not
+   * banned", so a consumer compares against `true` instead of branching on a
+   * falsy value.
+   *
+   * Derived in SQL for the same reason {@link Post.authorIsMember} is: an
+   * address-only ban has no account id for a client-side join, and the
+   * identifiers a public read redacts are exactly the ones such a join needs.
+   */
+  authorIsBanned: S.NullOr(S.Boolean),
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),
@@ -77,8 +101,12 @@ export const PostListItem = S.Struct({
   organizationId: S.String,
   creatorMemberId: S.NullOr(S.String),
   creatorId: S.NullOr(S.String),
+  /** See {@link Post.assigneeMemberId}. */
+  assigneeMemberId: S.NullOr(S.String),
   /** See {@link Post.authorIsMember}. */
   authorIsMember: S.Boolean,
+  /** See {@link Post.authorIsBanned}. */
+  authorIsBanned: S.NullOr(S.Boolean),
   lockedAt: S.NullOr(S.DateFromString),
   archivedAt: S.NullOr(S.DateFromString),
   mergedIntoPostId: S.NullOr(S.String),
@@ -190,6 +218,23 @@ export const PostUpdateEta = S.Struct({
 });
 
 export type TPostUpdateEta = S.Schema.Type<typeof PostUpdateEta>;
+
+/**
+ * Assignment is a separate payload from the status/board update for the same
+ * reason the ETA is: it carries its own permission (`posts.assign`) and its own
+ * timeline entry, and it is written from a different place in the UI.
+ *
+ * `null` unassigns. That is a real value rather than an absence — the field is
+ * required and nullable — so a payload can never mean "leave the assignee
+ * alone" by accident, which is what an optional field would invite.
+ */
+export const PostUpdateAssignee = S.Struct({
+  id: PostId.schema,
+  organizationId: WorkspaceId.schema,
+  assigneeMemberId: S.NullOr(S.String),
+});
+
+export type TPostUpdateAssignee = S.Schema.Type<typeof PostUpdateAssignee>;
 
 export const PostUpdateContent = S.Struct({
   assetIds: S.Array(S.String),

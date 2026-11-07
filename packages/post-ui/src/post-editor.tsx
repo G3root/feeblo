@@ -6,6 +6,7 @@ import { refetchInBackground } from "@feeblo/web-shared/collections";
 import { isRpcErrorTag } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { createOptimisticAction } from "@tanstack/react-db";
+import { useMachine } from "@xstate/react";
 import {
   createContext,
   memo,
@@ -19,6 +20,7 @@ import {
 
 import { ContentSkeleton } from "./content-skeleton";
 import { m } from "./paraglide/messages.js";
+import { postEditorMachine, toPostEditorState } from "./post-editor-machine";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 import { usePostDetail } from "./use-post-detail";
@@ -373,18 +375,24 @@ export function PostContentUpdateInput() {
   // Initial body + attachments resolve through the detail collection (the
   // context row is a slim list item without `content`).
   const detail = usePostDetail();
-  const [draftVersion, setDraftVersion] = useState<Date>();
-  const [hasVersionConflict, setHasVersionConflict] = useState(false);
-  const [editorKey, setEditorKey] = useState(0);
+  // The save lifecycle lives in `post-editor-machine.ts`: the version the draft
+  // is based on, the conflict, and the remount that "reload latest" performs.
+  const [snapshot, send] = useMachine(postEditorMachine);
+  const editor = toPostEditorState(snapshot);
 
   // Pin the version to the row the editor was opened with. A background or
   // conflict refresh may load a newer row; the mounted draft must not silently
   // adopt its version and overwrite that newer content on the next save.
+  //
+  // `VERSION_AVAILABLE` is handled only from `loading`, so a refresh that lands
+  // after the draft is pinned is ignored by the graph rather than by a guard
+  // written here — and the conflict choices are the only way to adopt a newer
+  // version once there is one.
   useEffect(() => {
-    if (draftVersion === undefined && detail.updatedAt !== undefined) {
-      setDraftVersion(detail.updatedAt);
+    if (detail.updatedAt !== undefined) {
+      send({ type: "VERSION_AVAILABLE", version: detail.updatedAt });
     }
-  }, [detail.updatedAt, draftVersion]);
+  }, [detail.updatedAt, send]);
 
   // Merged posts are read-only until unmerged (title/content mutations are
   // denied by PostPolicy for the same reason).
@@ -446,7 +454,7 @@ export function PostContentUpdateInput() {
     );
   }
 
-  const expectedUpdatedAt = draftVersion;
+  const expectedUpdatedAt = editor.version;
 
   if (
     detail.isLoading ||
@@ -458,7 +466,7 @@ export function PostContentUpdateInput() {
 
   return (
     <PostEditor
-      key={editorKey}
+      key={editor.editorKey}
       content={detail.content}
       disabled={disabled || detail.isSyncError}
       existingAssetIds={detail.assetIds ?? post.assetIds}
@@ -471,16 +479,13 @@ export function PostContentUpdateInput() {
           });
           await tx.when("settled");
           const refreshedVersion = postDetailCollection.get(post.id)?.updatedAt;
-          if (refreshedVersion !== undefined) {
-            setDraftVersion(refreshedVersion);
-          }
-          setHasVersionConflict(false);
+          send({ type: "SAVED", version: refreshedVersion });
         } catch (error) {
           if (isRpcErrorTag(error, "PostVersionConflictError")) {
             // The refresh in `mutationFn` loaded the newer server row. Keep the
             // draft on its original version until the user explicitly chooses
             // to overwrite that row or discard the draft.
-            setHasVersionConflict(true);
+            send({ type: "CONFLICT" });
           } else {
             toastManager.add({
               title: m.tame_such_reindeer(),
@@ -493,7 +498,7 @@ export function PostContentUpdateInput() {
       organizationId={organizationId}
       submitLabel={m.key_bald_mule()}
     >
-      {hasVersionConflict ? (
+      {editor.status === "conflict" ? (
         <div className="border-destructive/30 bg-destructive/5 mt-2 rounded-lg border p-3 text-sm">
           <p>{m.amber_witty_ocelot()}</p>
           <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
@@ -503,9 +508,9 @@ export function PostContentUpdateInput() {
                 if (detail.updatedAt === undefined) {
                   return;
                 }
-                setDraftVersion(detail.updatedAt);
-                setHasVersionConflict(false);
-                setEditorKey((key) => key + 1);
+                // Remounts the editor, so the draft is replaced by the server's
+                // body; only this choice increments the key.
+                send({ type: "RELOAD_LATEST", version: detail.updatedAt });
               }}
               size="sm"
               type="button"
@@ -519,8 +524,9 @@ export function PostContentUpdateInput() {
                 if (detail.updatedAt === undefined) {
                   return;
                 }
-                setDraftVersion(detail.updatedAt);
-                setHasVersionConflict(false);
+                // Keeps the mounted draft and adopts the server's version, so
+                // the next save overwrites the newer row.
+                send({ type: "KEEP_DRAFT", version: detail.updatedAt });
               }}
               size="sm"
               type="button"

@@ -121,8 +121,10 @@ export const initAuthHandler = (
 
     // A half-configured Polar is the one failure mode that takes money without
     // granting a plan: checkout and the portal need only the access token, but
-    // the signed webhook endpoint (the only way a subscription reaches this
-    // deployment) is registered only when the secret is present too.
+    // the signed webhook endpoint (the durable sync; the checkout-success
+    // confirmation covers only the checkout it was opened for, not later
+    // renewals or cancellations) is registered only when the secret is present
+    // too.
     if (polarService.client && Option.isNone(polarService.webhookSecret)) {
       yield* Effect.logWarning(
         "POLAR_ACCESS_TOKEN is set without POLAR_WEBHOOK_SECRET: checkout can charge a card, but subscription webhooks will never be applied"

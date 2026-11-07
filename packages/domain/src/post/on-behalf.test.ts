@@ -32,6 +32,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { PostRpcHandlersEffect } from "./handlers";
@@ -202,6 +203,9 @@ describe("PostRpcHandlers on-behalf", () => {
         NodeCrypto.layer,
         S3Test,
         EmailOutboxConfig.layerTest(new URL("https://feeblo.test")),
+        ParticipationPolicy.layer.pipe(
+          Layer.provide(Database.PgliteDatabaseLive)
+        ),
         Layer.succeed(
           IntegrationEventRecorder,
           IntegrationEventRecorder.of({

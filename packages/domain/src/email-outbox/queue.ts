@@ -21,7 +21,7 @@ import {
   sql,
 } from "drizzle-orm";
 import * as Context from "effect/Context";
-import * as Crypto from "effect/Crypto";
+import { SecureRandom } from "effect/crypto";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -1844,7 +1844,7 @@ export const reconcileEmailOutbox = ({
 } = {}): Effect.Effect<
   void,
   never,
-  | Crypto.Crypto
+  | SecureRandom.SecureRandom
   | DatabaseService
   | EmailOutboxConfig
   | EmailOutboxRepository

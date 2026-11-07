@@ -1,37 +1,39 @@
 import { useSortable } from "@dnd-kit/react/sortable";
 import { SortableRoadmapIssueCard } from "@feeblo/post-ui/roadmap/roadmap-issue-card";
-import type { BoardPostStatus } from "@feeblo/web-shared/board/constants";
 import { useNavigate } from "@tanstack/react-router";
 import { memo } from "react";
 
 import type { BoardPostRow } from "./types";
 
 interface BoardGridPostCardProps {
-  column: string;
-  id: string;
-  index: number;
+  /** The lane's id; a card is sortable within the lane it is rendered in. */
+  groupId: string;
   organizationId: string;
   post: BoardPostRow;
-  statusId: string;
+  /**
+   * The dnd-kit id. A label grouping can render the same post in more than one
+   * lane, so the id carries the lane as well; a status lane keeps the post id
+   * because the drop handler resolves the dragged post from it.
+   */
+  sortableId: string;
+  index: number;
 }
 
 export const BoardGridPostCard = memo(function BoardGridPostCard({
-  id,
   index,
-  column,
+  groupId,
   organizationId,
   post,
-  statusId,
+  sortableId,
 }: BoardGridPostCardProps) {
   const navigate = useNavigate();
-  const group = column;
   const { isDragging, ref } = useSortable({
-    id,
-    group,
+    id: sortableId,
+    group: groupId,
     accept: "item",
     type: "item",
     index,
-    data: { column, statusId },
+    data: { statusId: post.statusId },
   });
 
   return (
@@ -48,8 +50,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
         })
       }
       rootRef={ref}
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      status={group as BoardPostStatus}
+      status={post.status}
       title={post.title}
       updatedAt={post.updatedAt}
     />

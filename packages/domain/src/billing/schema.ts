@@ -21,6 +21,15 @@ export const BillingPortalInput = S.Struct({
 
 export type TBillingPortalInput = S.Schema.Type<typeof BillingPortalInput>;
 
+export const BillingCheckoutConfirmationInput = S.Struct({
+  organizationId: S.String,
+  checkoutId: S.String,
+});
+
+export type TBillingCheckoutConfirmationInput = S.Schema.Type<
+  typeof BillingCheckoutConfirmationInput
+>;
+
 export const BillingPortalOutput = S.Struct({
   url: S.String,
 });

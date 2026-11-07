@@ -24,6 +24,7 @@ import {
   OptionalCurrentSession,
   type Session,
 } from "../session-middleware";
+import { ParticipationPolicy } from "../user-ban/policies";
 import { UserRepository } from "../user/repository";
 import { UpvoteRpcHandlersEffect } from "./handlers";
 import { UpvotePolicy } from "./policies";
@@ -177,7 +178,11 @@ describe("UpvoteRpcHandlers", () => {
     Layer.provideMerge(RepositoriesTest)
   );
 
-  const TestLayer = Layer.merge(HandlerTest, Database.PgliteDatabaseLive);
+  const TestLayer = Layer.mergeAll(
+    HandlerTest,
+    Database.PgliteDatabaseLive,
+    ParticipationPolicy.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
+  );
 
   layer(TestLayer)("handlers", (it) => {
     describe("ListUpvotes", () => {

@@ -112,6 +112,10 @@ export const TagId = makeId("tag", "tag", {
   approximateLength,
 });
 
+export const SavedViewId = makeId("saved_view", "svw", {
+  approximateLength,
+});
+
 export const PostTagId = makeId("post_tag", "ptg", {
   approximateLength,
 });
@@ -231,5 +235,10 @@ export const DataImportJobId = makeId("data_import_job", "dij", {
 
 /** Identifies one staged CSV row inside an import job. */
 export const DataImportRowId = makeId("data_import_row", "dir", {
+  approximateLength,
+});
+
+/** Identifies one workspace-scoped ban of an end user. */
+export const UserBanId = makeId("user_ban", "ubn", {
   approximateLength,
 });
