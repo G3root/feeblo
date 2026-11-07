@@ -35,6 +35,10 @@ describe("NotificationMarkRead", () => {
       expect(
         S.is(NotificationMarkRead)({ notificationId, organizationId })
       ).toBe(true);
+      // The workspace is what scopes the write, so a payload that names only
+      // the notification must not decode: the handler would have no tenant to
+      // authorize the mark-read against.
+      expect(S.is(NotificationMarkRead)({ notificationId })).toBe(false);
     })
   );
 });

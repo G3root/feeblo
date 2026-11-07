@@ -112,17 +112,43 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
       .limit(1)
       .pipe(Effect.map((rows) => rows[0] !== undefined));
 
+  const contactAttributeDefinitions = (organizationId: string) =>
+    db
+      .select()
+      .from(schema.contactAttributeDefinitionTable)
+      .where(
+        eq(
+          schema.contactAttributeDefinitionTable.organizationId,
+          organizationId
+        )
+      );
+
+  const companyAttributeDefinitions = (organizationId: string) =>
+    db
+      .select()
+      .from(schema.companyAttributeDefinitionTable)
+      .where(
+        eq(
+          schema.companyAttributeDefinitionTable.organizationId,
+          organizationId
+        )
+      );
+
   return {
-    findContactAttributeDefinitions: (organizationId: string) =>
-      db
-        .select()
-        .from(schema.contactAttributeDefinitionTable)
-        .where(
-          eq(
-            schema.contactAttributeDefinitionTable.organizationId,
-            organizationId
-          )
-        ),
+    findContactAttributeDefinitions: contactAttributeDefinitions,
+
+    /**
+     * The same rows, share-locked for the caller's transaction.
+     *
+     * A create validates its supplied values against these definitions and
+     * then writes the rows, so an edit landing in between would validate a
+     * value against a definition that no longer applies — a `null` accepted
+     * for an attribute that became required before the insert. `FOR SHARE`
+     * makes a concurrent definition update wait for the create to commit, so
+     * validation and storage share one current snapshot.
+     */
+    findContactAttributeDefinitionsForShare: (organizationId: string) =>
+      contactAttributeDefinitions(organizationId).for("share"),
 
     createContactAttributeDefinition: (
       args: TContactAttributeDefinitionCreate
@@ -220,16 +246,11 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows[0])),
 
-    findCompanyAttributeDefinitions: (organizationId: string) =>
-      db
-        .select()
-        .from(schema.companyAttributeDefinitionTable)
-        .where(
-          eq(
-            schema.companyAttributeDefinitionTable.organizationId,
-            organizationId
-          )
-        ),
+    findCompanyAttributeDefinitions: companyAttributeDefinitions,
+
+    /** `findCompanyAttributeDefinitions`, share-locked for a create. */
+    findCompanyAttributeDefinitionsForShare: (organizationId: string) =>
+      companyAttributeDefinitions(organizationId).for("share"),
 
     createCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionCreate

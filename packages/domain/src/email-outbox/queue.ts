@@ -1915,12 +1915,12 @@ export const reconcileEmailOutbox = ({
             )
           )
     );
-    // Each wake is one read of its intent plus a queue offer, and no intent's
-    // wake depends on another's, so they go out together the way the delivery
-    // fan-out below already does. Sequentially this cost one round trip per
-    // pending intent on every reconciliation pass.
+    // Sequential on purpose, unlike the delivery fan-out below: a wake is a
+    // read of its intent plus a queue offer, and a bounded `forEach` interrupts
+    // the siblings still running when one of them fails — cancelling a wake
+    // before it offers its intent. One at a time means a failure only stops the
+    // wakes after it, and the ones already offered stand.
     yield* Effect.forEach(pending, (intent) => wakeEmailOutbox(intent.id), {
-      concurrency: maxConcurrentSends,
       discard: true,
     });
     yield* Effect.forEach(

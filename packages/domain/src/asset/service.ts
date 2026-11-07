@@ -2,9 +2,12 @@ import { attachCause, currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
 import { and, eq, inArray, lt, notExists, or } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Result from "effect/Result";
 
 import { InternalServerError } from "../rpc-errors";
 import { isTemporaryEditorMediaKey, S3UploadService } from "../services/s3";
@@ -277,47 +280,55 @@ export const prepareEditorAssetContent = ({
 
     const s3 = yield* S3UploadService;
     const completedPromotions: PromotedEditorAsset[] = [];
-    const promotionFailures: Array<unknown> = [];
-    yield* Effect.forEach(
+    // Each copy is captured as an exit rather than propagated, so a sibling
+    // that dies cannot interrupt a copy still in flight: an interrupted
+    // `CopyObject` can still land in the bucket, and the rollback below has to
+    // run after every dispatched copy has settled so it sees each object that
+    // landed. The defect still reaches the caller once the rollback is done.
+    const promotionExits = yield* Effect.forEach(
       temporaryAssets,
       (asset) =>
         s3.promoteEditorMedia({ bucket: asset.bucket, key: asset.key }).pipe(
-          Effect.map((permanentObject) => ({
-            asset,
-            temporaryObject: { bucket: asset.bucket, key: asset.key },
-            permanentObject,
-          })),
-          Effect.tap((promotion) =>
-            Effect.sync(() => {
-              completedPromotions.push(promotion);
-            })
-          ),
-          // The typed failure is recorded rather than propagated, because the
-          // default fail-fast would interrupt the copies running beside it and
-          // an abandoned `CopyObject` can still land in the bucket — a
-          // permanent object the rollback below cannot see and no sweep finds.
-          // A defect is deliberately not caught here: `onError` rolls the
-          // completed copies back and the defect still reaches the caller.
-          Effect.catch((error) =>
-            Effect.sync(() => {
-              promotionFailures.push(error);
-            })
-          )
+          Effect.map((permanentObject) => {
+            const promotion = {
+              asset,
+              temporaryObject: { bucket: asset.bucket, key: asset.key },
+              permanentObject,
+            };
+            // Recorded in the continuation, not in a later `tap`: the copy has
+            // landed by the time this runs, and an interruption before the next
+            // step must not hide that object from the rollback.
+            completedPromotions.push(promotion);
+            return promotion;
+          }),
+          Effect.exit
         ),
-      { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
+      { concurrency: EDITOR_ASSET_IO_CONCURRENCY }
     ).pipe(
+      // The loop cannot fail — every copy's exit is captured — so this is the
+      // interruption path: the children are interrupted and joined before the
+      // rollback runs, which is what keeps it from racing a copy that lands
+      // after the initiating fiber is interrupted.
       Effect.onError(() => rollbackPreparedEditorAssets(completedPromotions))
     );
 
-    const [promotionFailure] = promotionFailures;
+    const promotionFailure = promotionExits.find(Exit.isFailure);
     if (promotionFailure !== undefined) {
       yield* rollbackPreparedEditorAssets(completedPromotions);
-      return yield* attachCause(
-        new InternalServerError({
-          message: "Failed to promote temporary editor asset",
-        }),
-        promotionFailure
-      );
+      // `findFail` splits the typed error from the rest of the cause: the
+      // typed one becomes the `InternalServerError` this function has always
+      // declared, and a defect is re-raised as a defect without widening the
+      // error channel the callers type against.
+      const failure = Cause.findFail(promotionFailure.cause);
+      if (Result.isSuccess(failure)) {
+        return yield* attachCause(
+          new InternalServerError({
+            message: "Failed to promote temporary editor asset",
+          }),
+          failure.success.error
+        );
+      }
+      return yield* Effect.failCause(failure.failure);
     }
 
     const rewriteUrls = (value: string) =>

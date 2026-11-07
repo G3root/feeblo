@@ -3,9 +3,11 @@ import { currentDb, Database, schema } from "@feeblo/db";
 import { eq } from "drizzle-orm";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Predicate from "effect/Predicate";
 import * as Ref from "effect/Ref";
@@ -348,12 +350,15 @@ describe("registerUploadedAsset", () => {
     );
 
     it.effect(
-      "rolls back the copies that landed when a promotion fails with a typed error",
+      "waits for a copy still in flight before rolling it back when another fails with a typed error",
       () =>
         Effect.gen(function* () {
           const db = yield* currentDb;
           const organizationId = "org_timed_out_asset_promotion";
           const deletedKeys = yield* Ref.make<string[]>([]);
+          const firstCopyStarted = yield* Deferred.make<void>();
+          const releaseFirstCopy = yield* Deferred.make<void>();
+          const settled = yield* Ref.make(false);
 
           yield* db.insert(schema.organizationTable).values({
             id: organizationId,
@@ -383,8 +388,10 @@ describe("registerUploadedAsset", () => {
           // A typed failure is caught per copy so the copies beside it finish
           // rather than being interrupted mid-`CopyObject`; the ones that
           // landed are rolled back, and the failure that stopped the save
-          // stays attached to the error for the logs.
-          const failure = yield* prepareEditorAssetContent({
+          // stays attached to the error for the logs. The first copy is held
+          // in flight while the second fails, so the rollback below only sees
+          // it because the preparation waited for it to land.
+          const preparation = yield* prepareEditorAssetContent({
             organizationId,
             content:
               "![first](https://assets.example/tmp/typed-first.png) ![second](https://assets.example/tmp/typed-second.png)",
@@ -400,18 +407,31 @@ describe("registerUploadedAsset", () => {
               promoteEditorMedia: ({ key }) =>
                 key.endsWith("typed-second.png")
                   ? Effect.fail(new Cause.TimeoutError("copy timed out"))
-                  : Effect.succeed({
-                      bucket: "test-bucket",
-                      key: "editor-media/user/image/typed-first.png",
-                      url: "https://assets.example/typed-first.png",
-                    }),
+                  : Deferred.succeed(firstCopyStarted, undefined).pipe(
+                      Effect.andThen(Deferred.await(releaseFirstCopy)),
+                      Effect.as({
+                        bucket: "test-bucket",
+                        key: "editor-media/user/image/typed-first.png",
+                        url: "https://assets.example/typed-first.png",
+                      })
+                    ),
               deleteObject: (_bucket, key) =>
                 Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
                   Effect.as({ $metadata: { httpStatusCode: 204 } })
                 ),
             }),
-            Effect.flip
+            Effect.onExit(() => Ref.set(settled, true)),
+            Effect.flip,
+            Effect.forkChild
           );
+
+          yield* Deferred.await(firstCopyStarted);
+          // The other copy has already failed; the one still in flight must
+          // keep the preparation pending rather than be interrupted.
+          expect(yield* Ref.get(settled)).toBe(false);
+
+          yield* Deferred.succeed(releaseFirstCopy, undefined);
+          const failure = yield* Fiber.join(preparation);
 
           expect(Schema.is(InternalServerError)(failure)).toBe(true);
           const hasCause = Predicate.hasProperty("cause");
