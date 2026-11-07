@@ -1,4 +1,4 @@
-import { roleGrants } from "@feeblo/permissions";
+import { isRole, roleGrants } from "@feeblo/permissions";
 import { Button } from "@feeblo/ui/button";
 import { authClient } from "@feeblo/web-shared/auth-client";
 import { useResolvedAuth } from "@feeblo/web-shared/auth-context";
@@ -18,6 +18,19 @@ export const Route = createFileRoute("/oauth/select-workspace")({
 });
 
 type Workspace = { readonly id: string; readonly name: string };
+
+/**
+ * `member.role` is text, and better-auth stores a member holding several roles
+ * as a comma-separated list, so the raw value is not always one `Role`. The
+ * server's `roleMayAuthorizeWorkspaceCredential` splits the same column; doing
+ * the same here keeps the chooser from hiding a workspace the server would let
+ * the member authorize.
+ */
+const mayAuthorizeWorkspace = (role: string): boolean =>
+  role.split(",").some((entry) => {
+    const candidate = entry.trim();
+    return isRole(candidate) && roleGrants(candidate, "apiKeys.manage");
+  });
 
 function SelectWorkspacePage() {
   const auth = useResolvedAuth();
@@ -85,9 +98,7 @@ function SelectWorkspacePage() {
     auth.status === "authenticated" && auth.data !== null
       ? new Set(
           auth.data.memberships
-            .filter((membership) =>
-              roleGrants(membership.role, "apiKeys.manage")
-            )
+            .filter((membership) => mayAuthorizeWorkspace(membership.role))
             .map((membership) => membership.organizationId)
         )
       : new Set<string>();
