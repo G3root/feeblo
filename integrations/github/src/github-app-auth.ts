@@ -37,10 +37,7 @@ export const createGitHubAppJwt = ({
       const normalizedPrivateKey = createPrivateKey(
         Redacted.value(privateKey)
       ).export({ format: "pem", type: "pkcs8" });
-      const key = await jose.importPKCS8(
-        normalizedPrivateKey.toString(),
-        "RS256"
-      );
+      const key = await jose.importPKCS8(normalizedPrivateKey, "RS256");
       return new jose.SignJWT({})
         .setProtectedHeader({ alg: "RS256", typ: "JWT" })
         .setIssuedAt(Math.floor(now.getTime() / 1000) - 60)

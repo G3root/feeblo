@@ -30,10 +30,7 @@ export type WebhookEncryptedCredentialMaterial = Schema.Schema.Type<
 export const validateWebhookEncryptionKey = (
   encryptionKey: Redacted.Redacted<string>,
   operation: "decrypt" | "encrypt" = "encrypt"
-): Effect.Effect<
-  Redacted.Redacted<string>,
-  WebhookCredentialEncryptionError
-> =>
+): Effect.Effect<Redacted.Redacted<string>, WebhookCredentialEncryptionError> =>
   new TextEncoder().encode(Redacted.value(encryptionKey)).byteLength >= 32
     ? Effect.succeed(encryptionKey)
     : Effect.fail(

@@ -1,5 +1,5 @@
 import { serve } from "srvx/node";
-import { serveStatic } from "srvx/static";
+import { staticMiddleware } from "srvx/static";
 
 import handler from "./dist/server/server.js";
 
@@ -26,6 +26,14 @@ const clientDirectory = new URL("./dist/client", import.meta.url).pathname;
  * everything under `assets/`, so those files can be cached forever. The
  * widget's filenames are fixed (`widget.js` / `widget.css` are rewritten each
  * deploy), so they only get a short TTL.
+ *
+ * The header is set on the response the static middleware returned rather than
+ * on a copy of it. A `new Response(response.body, …)` drops the original
+ * response object, and with it whatever owns the body: srvx serves a file from
+ * an open `FileHandle` through a compressed stream, so a replaced response
+ * leaves that handle to the garbage collector. Node 26 treats a `FileHandle`
+ * closed during collection as a fatal error, and the server exits mid-request
+ * — which is what took out `auth.spec.ts` until this was one `headers.set`.
  */
 const staticCacheControl = async (request, next) => {
   const response = await next();
@@ -37,25 +45,20 @@ const staticCacheControl = async (request, next) => {
       ? "public, max-age=300"
       : undefined;
 
-  if (!cacheControl) {
-    return response;
+  if (cacheControl) {
+    response.headers.set("Cache-Control", cacheControl);
   }
 
-  const headers = new Headers(response.headers);
-  headers.set("Cache-Control", cacheControl);
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
+  return response;
 };
 
 serve({
-  fetch: handler.fetch,
+  // Called as a method rather than handed over as a bare reference, so the
+  // handler keeps whatever receiver it expects.
+  fetch: (request) => handler.fetch(request),
   middleware: [
     staticCacheControl,
-    serveStatic({
+    staticMiddleware({
       dir: clientDirectory,
     }),
   ],

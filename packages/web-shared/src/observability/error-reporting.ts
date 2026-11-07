@@ -173,7 +173,17 @@ export const startErrorReporting = (
     dsn: settings.dsn,
     environment: settings.environment,
     release: settings.release,
-    sendDefaultPii: false,
+    // Sentry 11 replaced `sendDefaultPii` with a switch per data source. Every
+    // source the SDK would collect on its own is off: the only user data here is
+    // the id `setUser` sets, and `beforeSend` still strips the URL, headers,
+    // cookies and body as a second line of defence for what integrations attach.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: false,
+      httpBodies: [],
+      urlQueryParams: false,
+    },
     tracesSampleRate: 0,
     initialScope: {
       tags: {

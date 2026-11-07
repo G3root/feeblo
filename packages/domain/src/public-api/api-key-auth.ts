@@ -87,9 +87,7 @@ export type PublicApiKeyBudget = {
   readonly window: Duration.Input;
 };
 
-const retryAfterSeconds = (
-  retryAfter: Duration.Duration | undefined
-): number =>
+const retryAfterSeconds = (retryAfter: Duration.Duration | undefined): number =>
   retryAfter === undefined
     ? 1
     : Math.max(1, Math.ceil(Duration.toSeconds(retryAfter)));
