@@ -116,6 +116,14 @@ const makeInsightsRepository = Effect.gen(function* () {
    * Both bounds apply to the activity as well: a status change after `until`
    * did not exist yet at the moment the window ends, even if its row committed
    * before this snapshot.
+   *
+   * The status-change lookup is correlated with each windowed post instead of
+   * being aggregated over the whole workspace first: `post_activity`'s
+   * `(post_id, created_at)` index answers "the first change on this post" with
+   * one ordered lookup, and the work now scales with the posts created in the
+   * window rather than with every status change the workspace has ever
+   * recorded. The lateral always yields a row, so `changed_at is not null` is
+   * what keeps the inner-join semantics: an unanswered post stays excluded.
    */
   const firstResponse = ({ organizationId, since, until }: TWindow) =>
     db
@@ -128,17 +136,18 @@ const makeInsightsRepository = Effect.gen(function* () {
             )::double precision
           ) as "medianFirstResponseSeconds"
         from ${schema.postTable} p
-        join (
-          select a.post_id, min(a.created_at) as changed_at
+        cross join lateral (
+          select min(a.created_at) as changed_at
           from ${schema.postActivityTable} a
-          where a.organization_id = ${organizationId}
+          where a.post_id = p.id
+            and a.organization_id = ${organizationId}
             and a.kind = 'STATUS_CHANGED'
             and a.created_at <= ${until}
-          group by a.post_id
-        ) first_change on first_change.post_id = p.id
+        ) first_change
         where p.organization_id = ${organizationId}
           and p.created_at >= ${since}
           and p.created_at <= ${until}
+          and first_change.changed_at is not null
       `)
       .pipe(
         Effect.map(

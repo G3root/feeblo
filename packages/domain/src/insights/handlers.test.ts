@@ -466,9 +466,23 @@ describe("InsightsRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* InsightsRpcHandlersEffect;
           const fixture = yield* makeFixture();
-          const post = yield* addPost(fixture, "today");
-          yield* addPost(fixture, "today-2");
-          yield* addVote(fixture, post, "today");
+          const now = yield* DateTime.now;
+          const twoDaysAgo = DateTime.subtract({ days: 2 })(now);
+          const fourDaysAgo = DateTime.subtract({ days: 4 })(now);
+
+          const todayPost = yield* addPost(fixture, "today");
+          const earlierPost = yield* addPost(fixture, "two-days-ago", {
+            createdAt: DateTime.toDate(twoDaysAgo),
+            updatedAt: DateTime.toDate(twoDaysAgo),
+          });
+          yield* addPost(fixture, "four-days-ago", {
+            createdAt: DateTime.toDate(fourDaysAgo),
+            updatedAt: DateTime.toDate(fourDaysAgo),
+          });
+          yield* addVote(fixture, todayPost, "today");
+          yield* addVote(fixture, earlierPost, "two-days-ago", {
+            createdAt: DateTime.toDate(twoDaysAgo),
+          });
 
           const insights = yield* handlers
             .GetWorkspaceInsights({
@@ -477,20 +491,36 @@ describe("InsightsRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
-          // Today plus the six days before it.
+          const byDate = new Map(
+            insights.volume.map((point) => [point.date, point])
+          );
+          const today = DateTime.formatIsoDate(now);
+          const yesterday = DateTime.formatIsoDate(
+            DateTime.subtract({ days: 1 })(now)
+          );
+
+          // Today plus the six days before it, each with its own counts.
           expect(insights.volume).toHaveLength(7);
-          expect(
-            insights.volume.every((point) =>
-              /^\d{4}-\d{2}-\d{2}$/.test(point.date)
-            )
-          ).toBe(true);
-          expect(insights.volume[0]?.posts).toBe(0);
+          expect(byDate.get(today)).toEqual({
+            date: today,
+            posts: 1,
+            votes: 1,
+          });
+          expect(byDate.get(DateTime.formatIsoDate(twoDaysAgo))).toMatchObject({
+            posts: 1,
+            votes: 1,
+          });
+          expect(byDate.get(DateTime.formatIsoDate(fourDaysAgo))).toMatchObject(
+            { posts: 1, votes: 0 }
+          );
+          // A day with no activity is still a row.
+          expect(byDate.get(yesterday)).toMatchObject({ posts: 0, votes: 0 });
           expect(
             insights.volume.reduce((total, point) => total + point.posts, 0)
-          ).toBe(2);
+          ).toBe(3);
           expect(
             insights.volume.reduce((total, point) => total + point.votes, 0)
-          ).toBe(1);
+          ).toBe(2);
         })
       );
 
