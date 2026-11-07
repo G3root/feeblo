@@ -1,10 +1,13 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { attachCause, currentDb, schema, transaction } from "@feeblo/db";
 import { AssetId } from "@feeblo/id";
 import { and, eq, inArray, lt, notExists, or } from "drizzle-orm";
 import type * as PgDrizzle from "drizzle-orm/effect-postgres";
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Result from "effect/Result";
 
 import { InternalServerError } from "../rpc-errors";
 import { isTemporaryEditorMediaKey, S3UploadService } from "../services/s3";
@@ -15,6 +18,17 @@ const EDITOR_ASSET_KINDS = ["editor_image", "editor_video"] as const;
 // Cleanup can still win the lock race against a concurrent reference insert
 // after this grace period, causing that save to fail its foreign-key check.
 const ORPHANED_EDITOR_ASSET_GRACE_PERIOD = Duration.hours(1);
+/**
+ * How many editor-asset objects one request moves at once.
+ *
+ * Promotion and cleanup are one S3 request per object, so a post saved with
+ * six pasted screenshots serialized six round trips before its write could
+ * even start. Four at a time removes the serialization without filling the
+ * SDK's connection pool, and matches the bound the importer's embedding
+ * fan-out already uses. Order is completion order, which nothing downstream
+ * depends on: the promotions are matched by asset id and URL.
+ */
+const EDITOR_ASSET_IO_CONCURRENCY = 4;
 
 interface UploadedAsset {
   readonly bucket: string;
@@ -266,30 +280,59 @@ export const prepareEditorAssetContent = ({
 
     const s3 = yield* S3UploadService;
     const completedPromotions: PromotedEditorAsset[] = [];
-    const promotions = yield* Effect.forEach(temporaryAssets, (asset) =>
-      s3.promoteEditorMedia({ bucket: asset.bucket, key: asset.key }).pipe(
-        Effect.map((permanentObject) => ({
-          asset,
-          temporaryObject: { bucket: asset.bucket, key: asset.key },
-          permanentObject,
-        })),
-        Effect.tap((promotion) =>
-          Effect.sync(() => {
+    // Each copy is captured as an exit rather than propagated, so a sibling
+    // that dies cannot interrupt a copy still in flight: an interrupted
+    // `CopyObject` can still land in the bucket, and the rollback below has to
+    // run after every dispatched copy has settled so it sees each object that
+    // landed. The defect still reaches the caller once the rollback is done.
+    const promotionExits = yield* Effect.forEach(
+      temporaryAssets,
+      (asset) =>
+        s3.promoteEditorMedia({ bucket: asset.bucket, key: asset.key }).pipe(
+          Effect.map((permanentObject) => {
+            const promotion = {
+              asset,
+              temporaryObject: { bucket: asset.bucket, key: asset.key },
+              permanentObject,
+            };
+            // Recorded in the continuation, not in a later `tap`: the copy has
+            // landed by the time this runs, and an interruption before the next
+            // step must not hide that object from the rollback.
             completedPromotions.push(promotion);
-          })
-        )
-      )
+            return promotion;
+          }),
+          Effect.exit
+        ),
+      { concurrency: EDITOR_ASSET_IO_CONCURRENCY }
     ).pipe(
-      Effect.onError(() => rollbackPreparedEditorAssets(completedPromotions)),
-      Effect.mapError(
-        () =>
+      // The loop cannot fail — every copy's exit is captured — so this is the
+      // interruption path: the children are interrupted and joined before the
+      // rollback runs, which is what keeps it from racing a copy that lands
+      // after the initiating fiber is interrupted.
+      Effect.onError(() => rollbackPreparedEditorAssets(completedPromotions))
+    );
+
+    const promotionFailure = promotionExits.find(Exit.isFailure);
+    if (promotionFailure !== undefined) {
+      yield* rollbackPreparedEditorAssets(completedPromotions);
+      // `findFail` splits the typed error from the rest of the cause: the
+      // typed one becomes the `InternalServerError` this function has always
+      // declared, and a defect is re-raised as a defect without widening the
+      // error channel the callers type against.
+      const failure = Cause.findFail(promotionFailure.cause);
+      if (Result.isSuccess(failure)) {
+        return yield* attachCause(
           new InternalServerError({
             message: "Failed to promote temporary editor asset",
-          })
-      )
-    );
+          }),
+          failure.success.error
+        );
+      }
+      return yield* Effect.failCause(failure.failure);
+    }
+
     const rewriteUrls = (value: string) =>
-      promotions.reduce(
+      completedPromotions.reduce(
         (result, { asset, permanentObject }) =>
           result.split(asset.url).join(permanentObject.url),
         value
@@ -301,7 +344,7 @@ export const prepareEditorAssetContent = ({
         coverImageUrl === undefined || coverImageUrl === null
           ? null
           : rewriteUrls(coverImageUrl),
-      promotions,
+      promotions: completedPromotions,
     };
   });
 
@@ -314,6 +357,9 @@ const commitEditorAssetPromotions = (
     }
 
     const db = yield* currentDb;
+    // Sequential on purpose: this runs inside the caller's transaction, so
+    // every statement shares its one reserved connection and concurrency buys
+    // nothing but interleaving.
     yield* Effect.forEach(
       promotions,
       ({ asset, permanentObject }) =>
@@ -339,7 +385,7 @@ export const cleanupPreparedEditorAssets = (
         temporaryObject,
         "Failed to remove a promoted temporary editor asset"
       ),
-    { discard: true }
+    { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
   );
 
 const syncReferences = <E1, R1, E2, R2, E3, R3>({
@@ -669,7 +715,7 @@ export const cleanupOrphanedEditorAssets = ({
           asset,
           "Failed to remove an orphaned editor asset"
         ),
-      { discard: true }
+      { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
     );
   });
 
@@ -687,5 +733,5 @@ export const rollbackPreparedEditorAssets = (
         permanentObject,
         "Failed to remove a failed editor asset promotion"
       ),
-    { discard: true }
+    { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
   );

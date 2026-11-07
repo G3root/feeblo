@@ -200,6 +200,29 @@ export const PgliteDatabaseLive = Layer.effect(Database, pgliteDbEffect).pipe(
   Layer.provide(PgDrizzlePglite.DefaultServices)
 );
 
+/**
+ * The PGlite database with a caller-supplied Drizzle logger.
+ *
+ * `PgliteDatabaseLive` installs the no-op default, so nothing observes the
+ * statements a path issues. A test that needs to — how many times a hot path
+ * reads one table — supplies a logger here instead of wrapping the database.
+ */
+export const PgliteDatabaseLiveWithLogger = (logger: {
+  readonly logQuery: (
+    query: string,
+    parameters: unknown[]
+  ) => Effect.Effect<void>;
+}) =>
+  Layer.effect(
+    Database,
+    pgliteDbEffect.pipe(
+      Effect.provideService(PgDrizzlePglite.EffectLogger, logger)
+    )
+  ).pipe(
+    Layer.provide(PgliteClientLive),
+    Layer.provide(PgDrizzlePglite.DefaultServices)
+  );
+
 // Pick the appropriate database layer based on the configured DATABASE_URL.
 // `memory://` URLs (and any other PGlite-style data directory) use the
 // embedded PGlite client; everything else assumes a real Postgres server.

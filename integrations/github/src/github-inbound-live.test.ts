@@ -26,6 +26,26 @@ import * as Layer from "effect/Layer";
 
 import { GitHubInboundServiceLive } from "./github-inbound-live";
 
+/**
+ * Statements the test database executed, so a test can count the reads one
+ * webhook issues. A test clears it before the call under test; the suite is
+ * sequential, and the logger is the only writer.
+ */
+const executedStatements: string[] = [];
+
+const DatabaseLive = Database.PgliteDatabaseLiveWithLogger({
+  logQuery: (statement) =>
+    Effect.sync(() => {
+      executedStatements.push(statement);
+    }),
+});
+
+/** How many statements read the GitHub synchronization rules since the reset. */
+const ruleReadCount = () =>
+  executedStatements.filter((statement) =>
+    statement.includes("github_sync_rule")
+  ).length;
+
 const TestLayer = Layer.mergeAll(
   GitHubInboundServiceLive.pipe(
     Layer.provide(NotificationService.layer),
@@ -34,16 +54,18 @@ const TestLayer = Layer.mergeAll(
     Layer.provide(
       EmailOutboxConfig.layerTest(new URL("https://feeblo.example"))
     ),
-    Layer.provide(Database.PgliteDatabaseLive)
+    Layer.provide(DatabaseLive)
   ),
-  Database.PgliteDatabaseLive
+  DatabaseLive
 );
 
 const seedRuleScenario = ({
   linkedIssueStates,
   rules,
+  linkedPosts = 1,
 }: {
   readonly linkedIssueStates: readonly ("open" | "closed")[];
+  readonly linkedPosts?: number;
   readonly rules: readonly {
     readonly issueMatchMode: "all" | "any";
     readonly issueState: "open" | "closed";
@@ -61,6 +83,11 @@ const seedRuleScenario = ({
     const completedStatusId = yield* PostStatusId.generate;
     const closedStatusId = yield* PostStatusId.generate;
     const postId = yield* PostId.generate;
+    const extraPostIds = yield* Effect.forEach(
+      Array.from({ length: linkedPosts - 1 }, (_, index) => index),
+      () => PostId.generate
+    );
+    const postIds = [postId, ...extraPostIds];
     const connectionId = yield* IntegrationConnectionId.generate;
     const installationId = `gh-installation-${organizationId}`;
 
@@ -99,17 +126,19 @@ const seedRuleScenario = ({
         orderIndex: 2,
       },
     ]);
-    yield* db.insert(schema.postTable).values({
-      id: postId,
-      organizationId,
-      boardId,
-      statusId: openStatusId,
-      title: "Close this post",
-      slug: "close-this-post",
-      content: "Content",
-      createdAt: now,
-      updatedAt: now,
-    });
+    yield* db.insert(schema.postTable).values(
+      postIds.map((linkedPostId, index) => ({
+        id: linkedPostId,
+        organizationId,
+        boardId,
+        statusId: openStatusId,
+        title: `Close this post ${index + 1}`,
+        slug: `close-this-post-${index + 1}`,
+        content: "Content",
+        createdAt: now,
+        updatedAt: now,
+      }))
+    );
     yield* db.insert(schema.integrationConnectionTable).values({
       id: connectionId,
       organizationId,
@@ -127,7 +156,6 @@ const seedRuleScenario = ({
 
     for (const [index, stateKey] of linkedIssueStates.entries()) {
       const externalResourceId = yield* IntegrationExternalResourceId.generate;
-      const linkId = yield* PostExternalResourceLinkId.generate;
       const issueNumber = index + 10;
       yield* db.insert(schema.integrationExternalResourceTable).values({
         id: externalResourceId,
@@ -145,12 +173,17 @@ const seedRuleScenario = ({
           repositoryOwner: "feeblo",
         },
       });
-      yield* db.insert(schema.postExternalResourceLinkTable).values({
-        id: linkId,
-        organizationId,
-        postId,
-        externalResourceId,
-      });
+      yield* Effect.forEach(postIds, (linkedPostId) =>
+        Effect.gen(function* () {
+          const linkId = yield* PostExternalResourceLinkId.generate;
+          yield* db.insert(schema.postExternalResourceLinkTable).values({
+            id: linkId,
+            organizationId,
+            postId: linkedPostId,
+            externalResourceId,
+          });
+        })
+      );
     }
 
     const targetStatusIds = {
@@ -180,6 +213,7 @@ const seedRuleScenario = ({
       completedStatusId,
       installationId,
       openStatusId,
+      organizationId,
       postId,
     };
   });
@@ -470,6 +504,86 @@ describe("GitHub inbound synchronization", () => {
           .where(eq(schema.postTable.id, seeded.postId));
         expect(post?.statusId).toBe(seeded.completedStatusId);
       })
+    );
+
+    it.effect(
+      "reads the synchronization rules once for an issue linked to several posts",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const inbound = yield* GitHubInboundService;
+          const seeded = yield* seedRuleScenario({
+            linkedIssueStates: ["open"],
+            linkedPosts: 2,
+            rules: [
+              {
+                issueMatchMode: "all",
+                issueState: "closed",
+                targetStatus: "closed",
+              },
+            ],
+          });
+
+          executedStatements.length = 0;
+          yield* inbound.applyIssueWebhook({
+            deliveryId: "delivery-multi-post",
+            eventName: "issues",
+            installationId: seeded.installationId,
+            issueNumber: 10,
+            issueState: "closed",
+            repositoryName: "test",
+            repositoryOwner: "feeblo",
+          });
+
+          // Nothing in one envelope changes the rule list, so it is read once
+          // for the delivery rather than once per linked post.
+          expect(ruleReadCount()).toBe(1);
+          const posts = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, seeded.organizationId));
+          expect(posts).toHaveLength(2);
+          expect(
+            posts.every((post) => post.statusId === seeded.closedStatusId)
+          ).toBe(true);
+        })
+    );
+
+    it.effect(
+      "reads no synchronization rules for an issue the workspace never linked",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const inbound = yield* GitHubInboundService;
+          const seeded = yield* seedRuleScenario({
+            linkedIssueStates: ["open"],
+            rules: [
+              {
+                issueMatchMode: "all",
+                issueState: "closed",
+                targetStatus: "closed",
+              },
+            ],
+          });
+
+          executedStatements.length = 0;
+          yield* inbound.applyIssueWebhook({
+            deliveryId: "delivery-unlinked-issue",
+            eventName: "issues",
+            installationId: seeded.installationId,
+            issueNumber: 99,
+            issueState: "closed",
+            repositoryName: "test",
+            repositoryOwner: "feeblo",
+          });
+
+          expect(ruleReadCount()).toBe(0);
+          const [post] = yield* db
+            .select({ statusId: schema.postTable.statusId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.id, seeded.postId));
+          expect(post?.statusId).toBe(seeded.openStatusId);
+        })
     );
   });
 });

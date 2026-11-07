@@ -138,6 +138,34 @@ const makeGitHubInboundService = Effect.gen(function* () {
               )
             )
             .pipe(Effect.mapError(inboundDatabaseError("issue link lookup")));
+          // The rule list is the same for every post linked to this issue and
+          // nothing in this envelope changes it, so it is read once here and
+          // not re-read per link. A webhook for an issue this workspace never
+          // linked still costs no extra query.
+          const rules =
+            links.length === 0
+              ? []
+              : yield* db
+                  .select()
+                  .from(schema.githubSyncRuleTable)
+                  .where(
+                    and(
+                      eq(
+                        schema.githubSyncRuleTable.connectionId,
+                        activeConnection.id
+                      ),
+                      eq(schema.githubSyncRuleTable.enabled, true)
+                    )
+                  )
+                  .orderBy(
+                    asc(schema.githubSyncRuleTable.createdAt),
+                    asc(schema.githubSyncRuleTable.id)
+                  )
+                  .pipe(
+                    Effect.mapError(
+                      inboundDatabaseError("synchronization rule lookup")
+                    )
+                  );
           for (const link of links) {
             yield* db
               .update(schema.integrationExternalResourceTable)
@@ -179,27 +207,6 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .pipe(
                 Effect.mapError(
                   inboundDatabaseError("linked issue aggregation")
-                )
-              );
-            const rules = yield* db
-              .select()
-              .from(schema.githubSyncRuleTable)
-              .where(
-                and(
-                  eq(
-                    schema.githubSyncRuleTable.connectionId,
-                    activeConnection.id
-                  ),
-                  eq(schema.githubSyncRuleTable.enabled, true)
-                )
-              )
-              .orderBy(
-                asc(schema.githubSyncRuleTable.createdAt),
-                asc(schema.githubSyncRuleTable.id)
-              )
-              .pipe(
-                Effect.mapError(
-                  inboundDatabaseError("synchronization rule lookup")
                 )
               );
             const matches = findMatchingGitHubSyncRules(
