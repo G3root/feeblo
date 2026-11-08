@@ -1,16 +1,28 @@
 # Feeblo
 
-Open-source customer feedback platform — collect feature requests, roadmaps, changelogs, and an embeddable feedback widget. Built as a pnpm + Turborepo monorepo using [Effect](https://effect.website), [Drizzle](https://orm.drizzle.team), and [TanStack Start](https://tanstack.com/start).
+![Feeblo — Build better products. Collect feature requests, prioritize in public, and ship what matters.](./apps/web/public/og.png)
 
-Licensed under the [GNU AGPL-3.0](./LICENSE).
+Open-source customer feedback platform. Teams collect feature requests on boards, prioritize them in public, publish a roadmap and changelog, and embed the feedback widget in their own product. Agents and scripts reach the same workspace through the Public API and its MCP projection.
+
+Built as a pnpm + Turborepo monorepo with [Effect](https://effect.website), [Drizzle](https://orm.drizzle.team), and [TanStack Start](https://tanstack.com/start). Licensed under the [GNU AGPL-3.0](./LICENSE).
+
+## What it includes
+
+- Feedback boards with posts, comments, voting, tags, statuses, assignees, and saved views.
+- A public roadmap, changelog with RSS, and post pages, with generated Open Graph images.
+- An embeddable widget with ESM and UMD builds, React bindings, hub modes, and JWT SSO for signed-in users.
+- Workspace insights over 7, 30, or 90 day windows, plus CSV import and export.
+- Slack, Discord, GitHub, and signed webhook integrations, with durable outbound delivery and retries.
+- A versioned Public API, and the same operations as MCP tools that accept either an API key or OAuth.
+- In-app and email notifications, email suppression and bounce handling, and Polar billing.
 
 ## Monorepo layout
 
 ```
 apps/
-  server/               Effect HTTP API: RPC route, Public API, integration providers
-  web/                  Dashboard (TanStack Start, React, Cloudflare)
-  public-feature-board/ Public portal: boards, roadmap, changelog (TanStack Start)
+  server/               Effect HTTP API: RPC, Public API, MCP, integration providers
+  web/                  Dashboard and public portal (TanStack Start, React); Cloudflare or Docker
+  public-feature-board/ Public portal UI and collections: boards, roadmap, changelog
 packages/
   auth/                 better-auth wiring, organization ACL, API-key plugin
   config/               Shared tsconfig base and Effect Config helpers
@@ -31,8 +43,10 @@ packages/
   web-shared/           Browser-side shared code: collections, auth context, error parsing
 integrations/
   core/                 Provider registry, delivery worker, credential encryption
-  discord/ github/      Provider adapters
-  slack/ webhook/
+  webhook/              Signed webhooks
+  slack/ discord/       Chat providers
+  github/               Issue tracker provider
+tools/                  Oxlint plugin and test runners
 e2e/                    Playwright end-to-end suite
 docker/                 Local development infrastructure
 docs/                   Topic docs and docs/adr/ decision records
@@ -45,7 +59,9 @@ docs/                   Topic docs and docs/adr/ decision records
 - **Auth:** better-auth, with Polar for billing
 - **Web:** TanStack Start, React 19, TanStack Router/DB/Query/Form, Tailwind v4
 - **Widget:** SolidJS, Vite-built, Floating UI positioning
-- **Tooling:** pnpm 11, Turborepo, Oxlint + Oxfmt (type-aware via `@effect/tsgo`), Vitest, Playwright, TypeScript 7
+- **State:** XState 6
+- **Observability:** OpenTelemetry over OTLP, Sentry for errors, PostHog for product analytics
+- **Tooling:** pnpm 11, Turborepo, tsrs (a Rust port of TypeScript 7), Oxlint + Oxfmt (type-aware via `@effect/tsgo`), Knip, Vitest, Playwright
 - **Infra/Deploy:** Docker, Cloudflare via Wrangler
 
 ## Prerequisites
@@ -97,25 +113,29 @@ docs/                   Topic docs and docs/adr/ decision records
    pnpm dev:web      # Dashboard on http://localhost:3001
    ```
 
+   Public boards answer on workspace subdomains of `APP_ROOT_DOMAIN`, such as `acme.localhost:3001`.
+
 ## Quality gate
 
 ```sh
 pnpm check
 ```
 
-That runs every package's `tsrs --noEmit`, then type-aware Oxlint, then the formatter check. It needs no database, no build output, and no env file, and CI runs it on every push. Run it before opening a pull request.
+That runs the toolchain guard, every package's `tsrs --noEmit`, type-aware Oxlint, the formatter check, and Knip. It needs no database, no build output, and no env file, and CI runs it on every push. Run it before opening a pull request.
 
-`AGENTS.md` is the repo law: commands, architecture, and the changes that need an owner decision. `CONTEXT.md` fixes the product's vocabulary. `docs/adr/` records why specific boundaries exist.
+`AGENTS.md` is the repo law: commands, architecture, and the changes that need an owner decision. `CONTEXT.md` fixes the product's vocabulary. `docs/adr/` records why specific boundaries exist. See [Documentation](#documentation) for the topic guides.
 
 ## Common scripts
 
 | Script | Description |
 | --- | --- |
 | `pnpm dev` | Run all dev tasks across the workspace |
-| `pnpm dev:server` / `pnpm dev:web` / `pnpm dev:native` | Run a single app |
+| `pnpm dev:server` / `pnpm dev:web` | Run the API or the dashboard |
 | `pnpm build` | Build all packages and apps |
-| `pnpm check` | The gate: typecheck, lint, and format check |
+| `pnpm check` | The gate: toolchain, typecheck, lint, format check, and Knip |
 | `pnpm typecheck` | Types only, cached per package |
+| `pnpm knip` | Unused files, dependencies, and exports |
+| `pnpm toolchain` | Check that the Effect and compiler version trains agree |
 | `pnpm test` | Unit tests (`@feeblo/e2e` excluded) |
 | `pnpm test:e2e` | Playwright end-to-end suite |
 | `pnpm lint` / `pnpm lint:fix` | Lint and format check / autofix |
@@ -129,10 +149,24 @@ That runs every package's `tsrs --noEmit`, then type-aware Oxlint, then the form
 | `pnpm db:seed` | Seed the database with sample data |
 | `pnpm db:studio` | Open Drizzle Studio |
 | `pnpm db:nuke` | Drop and recreate the database |
+| `pnpm db:configure-embeddings` | Set the post embedding vector size (default 1536) |
+
+## Documentation
+
+- [Public API and MCP](./docs/public-api.md)
+- [Integrations](./docs/integrations.md)
+- [Webhooks](./docs/webhooks.md)
+- [Notifications](./docs/notifications.md)
+- [Permissions](./docs/permissions.md)
+- [CSV import and export](./docs/data-transfer.md)
+- [Widget SSO](./docs/widget-sso.md)
+- [Telemetry](./docs/telemetry.md)
+- [i18n](./docs/i18n/README.md)
+- [Architecture decisions](./docs/adr/)
 
 ## Feedback widget SDK
 
-The embeddable SDK lives in `packages/sdk` and ships ESM + UMD builds, with React bindings in `packages/sdk-react`. See [`packages/sdk/README.md`](./packages/sdk/README.md) for installation and usage.
+The embeddable SDK lives in `packages/sdk` and ships ESM + UMD builds, with React bindings in `packages/sdk-react`. See [`packages/sdk/README.md`](./packages/sdk/README.md) and [`packages/sdk-react/README.md`](./packages/sdk-react/README.md) for installation and usage. Release steps are in [`docs/sdk-releases.md`](./docs/sdk-releases.md).
 
 ## Billing
 
@@ -177,7 +211,7 @@ docker compose run --rm server \
   --clear-existing
 ```
 
-The command clears incompatible vectors and rebuilds the HNSW index. Omit `--clear-existing` to make it fail safely when existing vectors would be lost.
+The command clears incompatible vectors and rebuilds the HNSW index. Omit `--clear-existing` to make it fail safely when existing vectors would be lost. For a local database, run the same command through `pnpm db:configure-embeddings --dimensions 768 --clear-existing`.
 
 ## License
 
