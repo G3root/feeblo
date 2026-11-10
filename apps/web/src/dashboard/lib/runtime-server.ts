@@ -3,7 +3,7 @@ import { RpcError } from "@feeblo/web-shared/rpc-error";
 import type * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 
-import { getServerRuntimePublicEnv } from "./server-runtime-public-env";
+import { getServerApiBaseUrl } from "./server-runtime-public-env";
 
 // Created on first use rather than at module scope: Cloudflare Workers inject
 // env per request, so a module-scope `process.env` read (and the runtime built
@@ -13,7 +13,7 @@ import { getServerRuntimePublicEnv } from "./server-runtime-public-env";
 let runtime: ReturnType<typeof createRuntime> | null = null;
 
 function getRuntime() {
-  runtime ??= createRuntime(getServerRuntimePublicEnv().apiUrl);
+  runtime ??= createRuntime(getServerApiBaseUrl());
   return runtime;
 }
 

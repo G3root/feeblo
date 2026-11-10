@@ -12,6 +12,8 @@ build
 # Environment variables
 .env
 .env*.local
+# Self-hosted compose secrets (see docs/self-hosting.md)
+docker/.env.selfhost
 
 # IDEs and editors
 .vscode/*
@@ -55,6 +57,7 @@ temp
 # Generated assets
 packages/feedback-widget/src/icons/sprite.svg
 apps/web/public/widget/
+project.inlang/cache/
 
 # playwright e2e artifacts
 test-results/
