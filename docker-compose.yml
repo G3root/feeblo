@@ -142,12 +142,14 @@ services:
     restart: always
     depends_on:
       - server
-    env_file:
-      - path: ./docker/.env.selfhost
-        required: false
+    # Deliberately no `env_file`: the web process only needs public URLs and
+    # browser-safe settings. The server container receives the operator file,
+    # which carries DATABASE_URL, AUTH_ENCRYPTION_KEY, SMTP_PASSWORD and the
+    # object-storage secret; none of those belong in this container.
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
+      APP_RELEASE: ${APP_RELEASE:-dev}
       # Browser-facing origin, injected into `window.global.__ENV`.
       API_URL: ${API_URL:-http://localhost:8080}
       # Server-side origin for board/feed rendering and the telemetry relay.
@@ -161,6 +163,14 @@ services:
       # NO_INDEX). Both are read per request by the web process.
       APP_ENV: ${APP_ENV:-production}
       NO_INDEX: ${NO_INDEX:-}
+      # Browser-safe analytics and error reporting. A Sentry DSN identifies a
+      # project; it does not authorize ingestion. Both are injected into the
+      # page, so they are public by design.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      POSTHOG_KEY: ${POSTHOG_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       # The web process attaches the page security headers, and its `img-src`
       # allow-list has to name the media origin or every uploaded image is
       # blocked. Optional here because a deployment that has not configured

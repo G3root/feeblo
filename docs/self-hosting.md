@@ -41,13 +41,14 @@ If the proxy is the only route to the API, tell the server to trust its `X-Forwa
 The deployment must **not** use the development `.env`. Its `DATABASE_URL` and `REDIS_URL` point at the dev stack's host ports, and its origins use the dev ports; inside a container those addresses are the container itself.
 
 ```sh
-cp docker/.env.selfhost.example docker/.env.selfhost
+test -f docker/.env.selfhost || (umask 077 && cp docker/.env.selfhost.example docker/.env.selfhost)
+chmod 600 docker/.env.selfhost
 $EDITOR docker/.env.selfhost
 ```
 
 Fill at least:
 
-- `POSTGRES_PASSWORD`, and the same password inside `DATABASE_URL`.
+- `POSTGRES_PASSWORD`, and the same password inside `DATABASE_URL`. If the password contains URI-reserved characters (`@ : / ? # [ ]` or `%`), percent-encode them in `DATABASE_URL` (for example `p@ss` → `p%40ss`) or use a password made of URL-safe characters.
 - `APP_URL`, `API_URL`, `APP_ROOT_DOMAIN`, `APP_RELEASE`.
 - `AUTH_ENCRYPTION_KEY` (`openssl rand -hex 32`).
 - `SMTP_*`, including a sender address on a domain you have authenticated.
@@ -62,6 +63,8 @@ Every variable in `.env.example` is read from this file; the example file keeps 
 
 `DATABASE_URL` and `REDIS_URL` must use the compose service names `pg` and `redis`, which the self-host example already does.
 
+`AUTH_TRUSTED_ORIGINS` is derived from `APP_URL`, `API_URL` and `*.APP_ROOT_DOMAIN` when unset. A nonempty value **replaces** that derived list, so include all three plus any additional board hostname.
+
 ## 3. Start
 
 ```sh
@@ -70,7 +73,7 @@ docker compose --env-file docker/.env.selfhost up -d
 
 `--env-file` replaces the default `.env`, so the dev file is never read. The server image runs the migrator before it starts listening; on a new database the first boot takes as long as the migrations need.
 
-The web process also receives the file through `env_file`, which is what forwards the optional integrations that the compose `environment` block does not name one by one.
+The server receives the operator file through `env_file`, so the optional integrations are not dropped by a hand-written allow-list. The web service gets an explicit allow-list of only the public settings it needs (its origins, the Sentry DSN, PostHog and Turnstile site keys, and the media/CSP origins); the database, mail, auth and object-storage secrets never enter that container.
 
 ## 4. Verify
 
@@ -128,7 +131,8 @@ The server runs migrations on start and serializes them with an advisory lock, s
 
 ```sh
 docker compose --env-file docker/.env.selfhost exec pg \
-  pg_dump -U feeblo -Fc feeblo > feeblo-$(date +%F).dump
+  sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' \
+  > feeblo-$(date +%F).dump
 ```
 
 Object storage is not in the database; back up the bucket separately.
@@ -138,9 +142,9 @@ Object storage is not in the database; back up the bucket separately.
 | Symptom | Likely cause |
 | --- | --- |
 | Sign-in succeeds, then the app is anonymous again | The deployment is on HTTP, or `APP_ROOT_DOMAIN` is `localhost`/an IP. Use HTTPS and a real root domain. |
-| State-changing requests return 403 | The page origin is not in `AUTH_TRUSTED_ORIGINS`. It defaults to `APP_URL`, `API_URL` and `*.APP_ROOT_DOMAIN`; add a custom board hostname explicitly. |
+| State-changing requests return 403 | The page origin is not in `AUTH_TRUSTED_ORIGINS`. It is derived from `APP_URL`, `API_URL` and `*.APP_ROOT_DOMAIN` when unset; a nonempty value replaces that derived list, so include all of them plus any custom board hostname. |
 | Public boards show the unavailable page | The web process cannot reach the API. Check `API_URL_INTERNAL` and that the `server` service is healthy. |
 | Everyone hits rate limits at once | The proxy's IP is used as the client IP. Set `TRUSTED_PROXY_IPS` or `TRUST_PROXY_HEADERS`. |
 | Sign-up fails or no email arrives | SMTP is not configured or the sender domain is not authenticated. |
 | `docker compose up` refuses a value | The `:?` checks (encryption key, media credentials) or the server's own startup validation is reporting a missing required value; read the message. |
-| Container restarts after an upgrade | The migrator failed. Check `docker compose logs server`; the old image can be restored from the previous `IMAGE_TAG`. |
+| Container restarts after an upgrade | The migrator failed. Check `docker compose --env-file docker/.env.selfhost logs server`; the old image can be restored from the previous `IMAGE_TAG`. |

@@ -10,7 +10,7 @@ Fixed in the same branch:
 
 - **P0.1** — `docker/.env.selfhost.example`, `docs/self-hosting.md` and the README now document a dedicated operator file passed with `--env-file`, so the dev `.env` is no longer the production stack's input.
 - **P0.2** — compose defaults for `APP_URL`/`API_URL` now match the published ports (`4321`/`8080`), and the web service receives `API_URL_INTERNAL`.
-- **P1.5** — the web and server services read the operator file through `env_file`, so the optional integrations are no longer dropped by the hand-written list.
+- **P1.5** — the server reads the operator file through `env_file`, so the optional integrations are no longer dropped by the hand-written list; the web service gets an explicit allow-list of the public settings it needs, so the database, mail, auth and storage secrets never enter that container.
 - **P1.6** — `TRUST_PROXY_HEADERS`/`TRUSTED_PROXY_IPS` are forwarded by compose and documented in `.env.example`, the operator file and the self-hosting guide.
 - **P1.7** — `API_URL_INTERNAL` gives SSR its own API origin, separate from the browser-facing `API_URL`.
 - **P1.8** — the dead `SMTP_TRANSPORT` setting is removed from `.env.example`.

@@ -201,7 +201,8 @@ Production deployments use the Docker images referenced in `docker-compose.yml` 
 The compose stack uses its own operator file. The development `.env` is not valid for it: its `DATABASE_URL` and `REDIS_URL` point at host ports that do not exist inside the containers.
 
 ```sh
-cp docker/.env.selfhost.example docker/.env.selfhost
+test -f docker/.env.selfhost || (umask 077 && cp docker/.env.selfhost.example docker/.env.selfhost)
+chmod 600 docker/.env.selfhost
 $EDITOR docker/.env.selfhost
 docker compose --env-file docker/.env.selfhost up -d
 ```
@@ -217,7 +218,7 @@ The Compose database uses the pgvector-enabled PostgreSQL image. Post embeddings
 When changing to a model with a different vector size, reconfigure the database column from the published server image before restarting it:
 
 ```sh
-docker compose run --rm server \
+docker compose --env-file docker/.env.selfhost run --rm server \
   node ./migrate/configure-embeddings.js \
   --dimensions 768 \
   --clear-existing
