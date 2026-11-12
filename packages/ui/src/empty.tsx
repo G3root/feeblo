@@ -26,6 +26,15 @@ export function Empty({
     <div
       className={cn(
         "flex min-w-0 flex-1 flex-col items-center justify-center gap-6 px-6 py-12 text-center text-balance md:py-20",
+        // An empty state replaces a loading skeleton in the same slot, so it
+        // should arrive rather than snap. `starting:` is `@starting-style`:
+        // no JS, no mount flag, and the transition is read off the element's
+        // own rest style. 200ms, `translate`/`scale`/`opacity` only, so
+        // nothing here can trigger layout on a page that just finished
+        // loading. Reduced motion keeps the fade and drops the 4px rise and
+        // 2% scale, which is the part that carries the movement.
+        "ease-out-strong transition-[opacity,translate,scale] duration-200 starting:translate-y-1 starting:scale-98 starting:opacity-0",
+        "motion-reduce:transition-opacity motion-reduce:starting:translate-y-0 motion-reduce:starting:scale-100",
         className
       )}
       data-slot="empty"
