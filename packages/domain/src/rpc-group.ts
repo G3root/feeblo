@@ -29,6 +29,7 @@ import { PostActivityRpcs } from "./post-activity/rpcs";
 import { PostReactionRpcs } from "./post-reaction/rpcs";
 import { PostStatusRpcs } from "./post-status/rpcs";
 import { PostSubscriptionRpcs } from "./post-subscription/rpcs";
+import { PostTrafficRpcs } from "./post-traffic/rpcs";
 import { PostRpcs } from "./post/rpcs";
 import { RoadmapColumnRpcs } from "./roadmap-column/rpcs";
 import { RoadmapRpcs } from "./roadmap/rpcs";
@@ -87,6 +88,7 @@ export const RpcGroups = [
   ["PostReaction", PostReactionRpcs],
   ["PostStatus", PostStatusRpcs],
   ["PostSubscription", PostSubscriptionRpcs],
+  ["PostTraffic", PostTrafficRpcs],
   ["SavedView", SavedViewRpcs],
   ["Roadmap", RoadmapRpcs],
   ["RoadmapColumn", RoadmapColumnRpcs],

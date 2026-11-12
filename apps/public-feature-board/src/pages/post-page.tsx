@@ -27,6 +27,7 @@ import {
   isLiveQueryFailed,
   isLiveQueryPending,
 } from "@feeblo/web-shared/collections";
+import { trackPostView } from "@feeblo/web-shared/post-view";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
@@ -390,6 +391,14 @@ function PostPageContent({
   readonly postStatus: TPostStatus | undefined;
   readonly selectedTags: Array<{ id: string; name: string }>;
 }) {
+  // One view per post per tab session, sent after the page is interactive.
+  // The route is client-rendered, so this is also the first point at which a
+  // real reader exists; a server-side count would include crawlers and cache
+  // hits that never rendered the page.
+  useEffect(() => {
+    trackPostView(post.id);
+  }, [post.id]);
+
   return (
     <ComposedPostPage.Root
       board={board}

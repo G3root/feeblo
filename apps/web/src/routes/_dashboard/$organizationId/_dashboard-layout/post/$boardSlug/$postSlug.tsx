@@ -39,6 +39,7 @@ import {
 } from "~/features/post/components/post-page-sections";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
+import { PostViews } from "~/features/post/components/post-views";
 import {
   banUserAtom,
   unbanUserAtom,
@@ -348,7 +349,9 @@ function RouteComponent() {
                 (PostPolicy.canUpdateProperties): status → posts.status,
                 board → posts.move, ETA → posts.status, assignee →
                 posts.status. */}
-            <PostDetails createdAt={post.createdAt} />
+            <PostDetails createdAt={post.createdAt}>
+              <PostViews organizationId={organizationId} postId={post.id} />
+            </PostDetails>
 
             {/* Voter management: add/remove on behalf of customers.
                 Controls self-gate with `votes.onBehalf` (contributor+).

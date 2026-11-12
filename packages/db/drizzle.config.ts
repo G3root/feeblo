@@ -14,6 +14,7 @@ export default defineConfig({
     "./src/schema/media.ts",
     "./src/schema/moderation.ts",
     "./src/schema/oauth.ts",
+    "./src/schema/post-view.ts",
   ],
   out: "./src/migrations",
   dialect: "postgresql",

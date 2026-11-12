@@ -17,6 +17,8 @@ import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/con
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
 import { ExternalResourceService } from "@feeblo/domain/integration/external-resource/service";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
+import { PostTrafficRepository } from "@feeblo/domain/post-traffic/repository";
+import { postTrafficRetention } from "@feeblo/domain/post-traffic/retention";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
   makeMailerTestLayer,
@@ -202,6 +204,15 @@ export const program = Effect.gen(function* () {
   );
   yield* subscriptionRevocationMaintenance.pipe(
     Effect.provide(billingRuntime),
+    Effect.forkScoped
+  );
+
+  // Raw page-view events age out while the counter stays; the pass reads only
+  // the repository, so it builds its own copy next to the one the route tree
+  // uses.
+  const trafficRuntime = yield* Layer.build(PostTrafficRepository.layer);
+  yield* postTrafficRetention.pipe(
+    Effect.provide(trafficRuntime),
     Effect.forkScoped
   );
 

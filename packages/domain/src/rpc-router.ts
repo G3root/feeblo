@@ -29,6 +29,7 @@ import { PostActivityRpcHandlers } from "./post-activity/handlers";
 import { PostReactionRpcHandlers } from "./post-reaction/handlers";
 import { PostStatusRpcHandlers } from "./post-status/handlers";
 import { PostSubscriptionRpcHandlers } from "./post-subscription/handlers";
+import { PostTrafficRpcHandlers } from "./post-traffic/handlers";
 import { PostRpcHandlers } from "./post/handlers";
 import { PublicRpcRateLimitMiddlewareLive } from "./rate-limit";
 import { RoadmapColumnRpcHandlers } from "./roadmap-column/handlers";
@@ -92,6 +93,7 @@ export const RpcHandlerRegistrations = {
   PostReaction: PostReactionRpcHandlers,
   PostStatus: PostStatusRpcHandlers,
   PostSubscription: PostSubscriptionRpcHandlers,
+  PostTraffic: PostTrafficRpcHandlers,
   SavedView: SavedViewRpcHandlers,
   Roadmap: RoadmapRpcHandlers,
   RoadmapColumn: RoadmapColumnRpcHandlers,

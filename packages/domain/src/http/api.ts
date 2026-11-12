@@ -6,6 +6,7 @@ import { EmailSubscriptionApiGroup } from "../email-subscription/api-contract";
 import { MediaApiGroup } from "../media/api-contract";
 import { NotificationPreferenceApiGroup } from "../notification-preference/api-contract";
 import { OrganizationApiGroup } from "../organization/api-contract";
+import { PostTrafficApi } from "../post-traffic/api-contract";
 import { PricingApiGroup } from "../pricing/api-contract";
 import { ProfileApiGroup } from "../profile/api-contract";
 import { WidgetApi } from "../widget/api-contract";
@@ -20,4 +21,5 @@ export class Api extends HttpApi.make("Api")
   .add(PricingApiGroup)
   .add(ProfileApiGroup)
   .prefix("/api")
-  .addHttpApi(WidgetApi) {}
+  .addHttpApi(WidgetApi)
+  .addHttpApi(PostTrafficApi) {}
