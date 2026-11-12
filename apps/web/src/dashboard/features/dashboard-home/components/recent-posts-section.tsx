@@ -86,7 +86,10 @@ export function RecentPostsSection({
           There was a problem loading your recent posts.
         </div>
       ) : recentPosts.length > 0 ? (
-        <div className="divide-border/40 border-border/60 overflow-hidden rounded-xl border">
+        // The section swaps between three branches, so the rows mount where the
+        // skeleton was and would otherwise land in one hard cut. Same entrance
+        // as `Empty`: fade, 4px rise, 2% settle, 200ms.
+        <div className="divide-border/40 border-border/60 ease-out-strong overflow-hidden rounded-xl border transition-[opacity,translate,scale] duration-200 motion-reduce:transition-opacity starting:translate-y-1 starting:scale-98 starting:opacity-0 motion-reduce:starting:translate-y-0 motion-reduce:starting:scale-100">
           {recentPosts.map((post) => {
             const board = boardMap.get(post.boardId);
             const status = statuses.find((s) => s.id === post.statusId);
