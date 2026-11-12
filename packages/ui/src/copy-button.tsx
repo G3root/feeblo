@@ -55,7 +55,15 @@ export function CopyButton({
             }}
             ref={copyButtonRef}
           >
-            <HugeiconsIcon icon={isCopied ? Tick02Icon : Copy01Icon} />
+            {/* Keyed so the swap is a remount: without it React reuses the
+                <svg> and `@starting-style` never fires, so the tick would just
+                replace the copy icon's paths. */}
+            <span
+              className="ease-out-strong flex transition-[scale,opacity] duration-150 motion-reduce:transition-opacity starting:scale-80 starting:opacity-0 motion-reduce:starting:scale-100"
+              key={isCopied ? "copied" : "copy"}
+            >
+              <HugeiconsIcon icon={isCopied ? Tick02Icon : Copy01Icon} />
+            </span>
             {children}
           </Button>
         )}
