@@ -12,6 +12,12 @@ import { z } from "zod";
  */
 const serverEnvSchema = z.object({
   API_URL: z.string().min(1),
+  // Server-side API origin used by SSR (public board renders, feeds, and the
+  // browser telemetry relay). Defaults to API_URL. In a container deployment
+  // the public origin may not be reachable from the web process, so this can
+  // name the compose service (`http://server:8080`) while the browser keeps
+  // using API_URL. Never exposed to the browser.
+  API_URL_INTERNAL: z.string().optional(),
   APP_URL: z.string().min(1),
   APP_ROOT_DOMAIN: z.string().min(1),
   APP_RELEASE: z.string().optional(),
@@ -36,6 +42,7 @@ export type ServerPublicEnv = z.infer<typeof serverEnvSchema>;
 export function getPublicEnvServer(): ServerPublicEnv {
   return serverEnvSchema.parse({
     API_URL: process.env.API_URL,
+    API_URL_INTERNAL: process.env.API_URL_INTERNAL,
     APP_URL: process.env.APP_URL,
     APP_ROOT_DOMAIN: process.env.APP_ROOT_DOMAIN,
     APP_RELEASE: process.env.APP_RELEASE,
@@ -64,6 +71,23 @@ export function getServerRuntimePublicEnv() {
     sentryDsn: env.SENTRY_DSN,
     sentryEnvironment: env.SENTRY_ENVIRONMENT,
   };
+}
+
+/**
+ * The API origin the web server itself calls.
+ *
+ * `getServerRuntimePublicEnv().apiUrl` remains the public origin because it is
+ * also used for crawler-facing URLs such as `og:image`. Server-side RPC and
+ * the telemetry relay go through this instead, so a deployment whose public
+ * origin is not reachable from the web container can set `API_URL_INTERNAL`
+ * (the compose stack sets it to `http://server:8080`).
+ */
+export function getServerApiBaseUrl(): string {
+  const env = getPublicEnvServer();
+  const internal = env.API_URL_INTERNAL?.trim();
+  return internal === undefined || internal.length === 0
+    ? env.API_URL
+    : internal;
 }
 
 /**

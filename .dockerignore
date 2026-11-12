@@ -16,6 +16,9 @@ build
 *.log
 .env
 .env.local
+# The self-hosted operator file carries secrets and must not enter the build
+# context (`COPY . .` in the prepare stage).
+**/.env.selfhost
 .env.*.local
 tmp
 temp

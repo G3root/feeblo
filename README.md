@@ -196,6 +196,19 @@ Polar also caps a customer at one billable subscription unless the organization 
 
 Production deployments use the Docker images referenced in `docker-compose.yml` (`ghcr.io/g3root/feeblo-server` and `ghcr.io/g3root/feeblo-web`). Images are published automatically to GHCR: pushes to `main` produce `edge` and `sha-*` tags, while version tags produce the release version, `major.minor`, `major`, and `latest` tags. The dashboard can alternatively be deployed to Cloudflare using the Wrangler configuration in `apps/web/wrangler.jsonc`.
 
+### Self-hosting
+
+The compose stack uses its own operator file. The development `.env` is not valid for it: its `DATABASE_URL` and `REDIS_URL` point at host ports that do not exist inside the containers.
+
+```sh
+test -f docker/.env.selfhost || (umask 077 && cp docker/.env.selfhost.example docker/.env.selfhost)
+chmod 600 docker/.env.selfhost
+$EDITOR docker/.env.selfhost
+docker compose --env-file docker/.env.selfhost up -d
+```
+
+The stack expects HTTPS hostnames (the session cookie is `Secure`), a working SMTP server (account verification sends a code by email), and S3-compatible object storage. See [docs/self-hosting.md](./docs/self-hosting.md) for DNS and TLS, reverse-proxy trust, OAuth callbacks, public-board subdomains, upgrades, and backups.
+
 The Cloudflare Worker is built from the `prod` branch, which only ever moves forward to a release tag: run the **Promote prod** workflow with the tag name (Actions → Promote prod → Run workflow), which checks first and does nothing else while **dry run** is checked, then run it again with that box cleared to move the branch. From a terminal that is `gh workflow run promote-prod.yml -f tag=v1.2.0 -f dry_run=true`, then the same command with `-f dry_run=false`; the tag must have a published Release, because the Docker images are published from that event. `prod` is never merged into and never force-pushed; see `docs/adr/0018`.
 
 Production startup enforces two safety checks: `AUTH_ENCRYPTION_KEY` must be at least 32 bytes, and `REDIS_URL` must be set so rate limits are shared across server instances.
@@ -205,7 +218,7 @@ The Compose database uses the pgvector-enabled PostgreSQL image. Post embeddings
 When changing to a model with a different vector size, reconfigure the database column from the published server image before restarting it:
 
 ```sh
-docker compose run --rm server \
+docker compose --env-file docker/.env.selfhost run --rm server \
   node ./migrate/configure-embeddings.js \
   --dimensions 768 \
   --clear-existing

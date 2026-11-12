@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { readBoundedText } from "~/lib/bounded-body";
-import { getPublicEnvServer } from "~/lib/server-runtime-public-env";
+import { getServerApiBaseUrl } from "~/lib/server-runtime-public-env";
 
 /**
  * Same-origin browser telemetry relay.
@@ -38,7 +38,7 @@ const relay = async (signal: string, request: Request): Promise<Response> => {
     return empty(413);
   const body = await readBoundedText(request, maxBodyBytes);
   if (body === undefined) return empty(413);
-  const apiUrl = getPublicEnvServer().API_URL.replace(trailingSlashPattern, "");
+  const apiUrl = getServerApiBaseUrl().replace(trailingSlashPattern, "");
   try {
     const upstream = await fetch(`${apiUrl}/api/telemetry/${signal}`, {
       method: "POST",
