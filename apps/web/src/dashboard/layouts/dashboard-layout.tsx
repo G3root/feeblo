@@ -130,7 +130,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                           <PostDeleteDialogProvider>
                             <MobileBottomSlotProvider>
                               <SidebarProvider
-                                className="h-dvh overflow-hidden"
+                                // `DashboardPendingShell` unmounts in the same
+                                // commit that mounts this shell, and it has no
+                                // exit animation of its own, so the handoff is
+                                // otherwise a hard cut. Fade instead: the
+                                // loader already left the body background and
+                                // the provider's `bg-sidebar` behind it, so the
+                                // 200ms only moves the chrome and the page
+                                // from transparent to resolved. Opacity alone —
+                                // a viewport-sized element that translates
+                                // would show the body through its edge — and a
+                                // pure opacity change has no movement for
+                                // `motion-reduce` to soften.
+                                className="ease-out-strong h-dvh overflow-hidden transition-opacity duration-200 starting:opacity-0"
                                 style={
                                   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                                   {
