@@ -125,7 +125,14 @@ function CommentThreadRow({
   const expandReplies = useCallback(() => setIsExpanded(true), []);
 
   return (
-    <div data-slot="comment-thread">
+    <div
+      // The list is `createdAt DESC`, so a new thread lands at the top and
+      // pushes every thread below it down in the same frame. Entering from
+      // 4px above matches the direction the rest of the list moved, so the
+      // row reads as the thing that displaced them rather than a pop-in.
+      className="ease-out-strong transition-[opacity,translate] duration-200 motion-reduce:transition-opacity starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0"
+      data-slot="comment-thread"
+    >
       <CommentThreadContext value={{ expandReplies }}>
         <CommentDisplayItem currentUserId={currentUserId} data={comment} />
       </CommentThreadContext>
