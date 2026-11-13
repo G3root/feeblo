@@ -42,7 +42,11 @@ import {
   InsightsTopVoters,
   InsightsVolumeChart,
 } from "./insights-sections";
-import { InsightsTraffic, InsightsTrafficSkeleton } from "./insights-traffic";
+import {
+  InsightsTraffic,
+  InsightsTrafficFailure,
+  InsightsTrafficSkeleton,
+} from "./insights-traffic";
 
 const numberFormatter = new Intl.NumberFormat();
 
@@ -105,10 +109,12 @@ export function InsightsPage({
   const refresh = useAtomRefresh(atom);
   // Started next to the insights read, not after it: the two are independent
   // sources, and a second round trip behind the first would be a waterfall.
-  const trafficResult = useAtomValue(workspaceTrafficAtom(args));
+  const trafficAtom = workspaceTrafficAtom(args);
+  const trafficResult = useAtomValue(trafficAtom);
+  const refreshTraffic = useAtomRefresh(trafficAtom);
   const trafficSection = Result.builder(trafficResult)
     .onInitial(() => <InsightsTrafficSkeleton />)
-    .onFailure(() => null)
+    .onFailure(() => <InsightsTrafficFailure onRetry={refreshTraffic} />)
     .onSuccess((traffic) => (
       <InsightsTraffic rangeLabel={RANGE_LABELS[range]} traffic={traffic} />
     ))
@@ -188,18 +194,23 @@ function InsightsContent({
 
   if (!hasActivity) {
     return (
-      <Empty className="border">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <HugeiconsIcon icon={ChartLineData01Icon} />
-          </EmptyMedia>
-          <EmptyTitle>No feedback to measure yet</EmptyTitle>
-          <EmptyDescription>
-            Once people post and vote, this page shows volume, response time,
-            the status mix, and the posts waiting for an owner.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={ChartLineData01Icon} />
+            </EmptyMedia>
+            <EmptyTitle>No feedback to measure yet</EmptyTitle>
+            <EmptyDescription>
+              Once people post and vote, this page shows volume, response time,
+              the status mix, and the posts waiting for an owner.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+        {/* Traffic is independent of the feedback activity above; a workspace
+            whose posts were archived still has views worth showing. */}
+        {trafficSection}
+      </>
     );
   }
 

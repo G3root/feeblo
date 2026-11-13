@@ -1,3 +1,11 @@
+import { Button } from "@feeblo/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardPanel,
+  CardTitle,
+} from "@feeblo/ui/card";
 import { Skeleton } from "@feeblo/ui/skeleton";
 
 import {
@@ -24,12 +32,7 @@ export function InsightsTraffic({
 }) {
   return (
     <section className="space-y-3">
-      <div>
-        <h2 className="text-base font-semibold tracking-tight">Traffic</h2>
-        <p className="text-muted-foreground text-sm">
-          Views of your public posts.
-        </p>
-      </div>
+      <TrafficHeading />
 
       <TrafficTotals
         allTimeViews={traffic.allTimeViews}
@@ -48,6 +51,49 @@ export function InsightsTraffic({
         />
       )}
     </section>
+  );
+}
+
+/**
+ * A failed traffic read is its own section, with its own retry.
+ *
+ * The feedback numbers above it do not depend on this query, so folding the
+ * failure into the page-level error would throw away data that did load.
+ */
+export function InsightsTrafficFailure({
+  onRetry,
+}: {
+  readonly onRetry: () => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <TrafficHeading />
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Traffic could not be loaded</CardTitle>
+          <CardDescription>
+            The view counts are unavailable right now. Retrying asks the server
+            again; the feedback numbers above are unaffected.
+          </CardDescription>
+        </CardHeader>
+        <CardPanel>
+          <Button onClick={onRetry} size="sm" variant="outline">
+            Try again
+          </Button>
+        </CardPanel>
+      </Card>
+    </section>
+  );
+}
+
+function TrafficHeading() {
+  return (
+    <div>
+      <h2 className="text-base font-semibold tracking-tight">Traffic</h2>
+      <p className="text-muted-foreground text-sm">
+        Views of your public posts.
+      </p>
+    </div>
   );
 }
 
