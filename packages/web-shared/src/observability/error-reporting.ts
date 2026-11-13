@@ -95,7 +95,7 @@ let scripts = "";
  *
  * Tagged Effect failures carry `_tag`; a decoded error is a plain object. The
  * value is bounded and restricted to a safe alphabet because it becomes a
- * Sentry fingerprint and a PostHog property.
+ * Sentry fingerprint and a Databuddy event property.
  */
 export const errorType = <T>(error: T): string => {
   const candidate =
@@ -112,16 +112,17 @@ export const errorType = <T>(error: T): string => {
 /**
  * Report a failure from a React render, router boundary, or client operation.
  *
- * The same call emits `feeblo:operation-failed`, which PostHog turns into a
- * `browser_operation_failed` product event; the two systems then describe the
- * same failure without either owning the other's transport.
+ * The same call emits `feeblo:operation-failed`, which the dashboard's
+ * Databuddy wiring turns into a `browser_operation_failed` product event; the
+ * two systems then describe the same failure without either owning the
+ * other's transport.
  */
 export const captureBrowserError = <T>(
   error: T,
   tags?: Record<string, string>
 ): void => {
   // Product analytics listens independently of Sentry: a deployment may
-  // configure PostHog without an error tracker, and the event is still useful.
+  // configure Databuddy without an error tracker, and the event is still useful.
   if (started) {
     if (tags === undefined) Sentry.captureException(error);
     else Sentry.captureException(error, { tags });

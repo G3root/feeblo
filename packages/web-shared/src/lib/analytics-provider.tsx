@@ -5,7 +5,7 @@ import type * as React from "react";
 // client set by a provider the HOST mounts, and a free `trackEvent` function
 // callsites import directly (works outside React, e.g. oauth-popup callbacks).
 // No client mounted (local, self-host, cloudflare, tests) → every call is a
-// no-op. Cloud mounts `AnalyticsProvider` with a posthog-backed client.
+// no-op. Cloud mounts `AnalyticsProvider` with a Databuddy-backed client.
 //
 // `AnalyticsEvents` is the single catalog of every product event: names are
 // `object_verb` snake_case, properties are snake_case. A callsite with a typo
@@ -23,8 +23,8 @@ import type * as React from "react";
 //   - connection names or tool ADDRESSES (both embed user-entered label text;
 //     integration slugs and spec-derived tool names are fine)
 //   - policy patterns (user-entered globs) — use `pattern_kind` instead
-// Identity attaches via posthog identify/group (the host's concern), never as
-// event properties.
+// Identity attaches through the sink's own identify call (the host's concern),
+// never as event properties.
 // ---------------------------------------------------------------------------
 
 export interface AnalyticsEvents {
@@ -143,7 +143,7 @@ export type PostCreationSource =
 export type AnalyticsEventName = keyof AnalyticsEvents;
 
 /**
- * The host-supplied sink. Cloud backs this with `posthog.capture`; hosts that
+ * The host-supplied sink. Cloud backs this with Databuddy's `track`; hosts that
  * mount no provider get the no-op default.
  */
 export type AnalyticsClient = <Name extends AnalyticsEventName>(

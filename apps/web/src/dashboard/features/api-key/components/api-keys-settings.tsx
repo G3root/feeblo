@@ -158,11 +158,11 @@ function OneTimeKeyPanel({
         The key for {created.name} will not be shown again. Store it wherever
         the integration reads its configuration.
       </p>
-      {/* `data-ph-block` keeps the one-time key out of session replays even
-          if the blanket text mask is ever relaxed. */}
+      {/* `data-replay-block` keeps the one-time key out of Databuddy session
+          replays if recording is ever enabled for this surface. */}
       <code
         className="bg-background mt-3 block rounded-md border p-3 text-sm break-all"
-        data-ph-block
+        data-replay-block
       >
         {created.key}
       </code>
