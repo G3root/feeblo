@@ -13,7 +13,7 @@ That means ~90 `trackEvent(…)` calls across the dashboard did not move, and a 
 | PostHog | Databuddy |
 | --- | --- |
 | `POSTHOG_KEY` | `DATABUDDY_CLIENT_ID` |
-| `POSTHOG_HOST` | `DATABUDDY_API_URL` (only for a self-hosted collector; defaults to the hosted ingestion endpoint) |
+| `POSTHOG_HOST` | `DATABUDDY_API_URL` (a first-party ingestion proxy; see "The collector is hosted only" below) |
 | `posthog.capture(name, props)` | `track(name, props)` |
 | `posthog.identify(id, { email, name })` | `identify(id, { email, name })` |
 | `posthog.reset()` | `reset()` |
@@ -30,6 +30,8 @@ That means ~90 `trackEvent(…)` calls across the dashboard did not move, and a 
 **The workspace is a global property, not a group.** Databuddy's browser SDK has no group entity, so `organization_id` is attached to every event instead. It is an opaque id and `reset()` clears it, but it is a tenant identifier travelling with each event — the same exposure the old `group()` call had.
 
 **Session replay is off.** The old wiring started recording only after a session was confirmed. Databuddy loads the recorder with `init()`, and `startSessionRecording()` is a no-op, so gating it means initialising the tracker after the session resolves — which tears the tracker down and records a second pageview for the landing route. Turning replay on here would also record `/register` and `/reset-password`, which live inside the dashboard boundary. Enabling it is a product decision, not a migration detail.
+
+**The collector is hosted only.** Databuddy's documentation offers no way to self-host the service; the only self-hosting it describes is serving the _tracker script_ from your own domain (`scriptUrl`), which still sends events to Databuddy. So `DATABUDDY_CLIENT_ID` is the switch that makes this deployment a Databuddy customer: a self-hosted Feeblo that sets it is choosing a third-party data processor, and one that leaves it unset has no product analytics at all. `DATABUDDY_API_URL` exists for an operator who proxies `basket.databuddy.cc` through their own origin, not for a private collector.
 
 **No property denylist.** Databuddy has no `property_denylist`, `before_send` or `persistence` equivalent. The catalog's property rules are the only control, so a sensitive value must never be _declared_ in `AnalyticsEvents`.
 

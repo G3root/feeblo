@@ -29,7 +29,9 @@ const serverEnvSchema = z.object({
   TURNSTILE_SITE_KEY: z.string().optional(),
   NO_INDEX: z.string().optional(),
   // Databuddy identifies a website by its public client id; the API origin is
-  // only set for a self-hosted collector. Both reach the browser by design.
+  // only set when the deployment proxies ingestion through its own domain.
+  // Databuddy is hosted only — there is no collector to point this at — and
+  // both values reach the browser by design.
   DATABUDDY_CLIENT_ID: z.string().optional(),
   DATABUDDY_API_URL: z.string().optional(),
   // Public by design: a Sentry DSN identifies a project, it does not

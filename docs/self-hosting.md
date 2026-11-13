@@ -58,7 +58,7 @@ Every variable in `.env.example` is read from this file; the example file keeps 
 
 - Social login: register `<API_URL>/api/auth/callback/github` and `<API_URL>/api/auth/callback/google`.
 - GitHub App: callback `<API_URL>/github/app/installations/callback`, webhook `<API_URL>/github/app/webhooks`.
-- Sentry, Databuddy, embeddings and OTLP are off unless their keys are uncommented.
+- Sentry, Databuddy, embeddings and OTLP are off unless their keys are uncommented. Databuddy has no self-hosted deployment: uncommenting `DATABUDDY_CLIENT_ID` sends pageviews and product events to databuddy.cc, so leave it unset unless that is the processor you intend.
 - `AUTH_SIGN_UP_ENABLED`, `AUTH_EMAIL_VERIFICATION_REQUIRED`, `ALLOWED_EMAILS` and `TURNSTILE_*` control who can register.
 
 `DATABASE_URL` and `REDIS_URL` must use the compose service names `pg` and `redis`, which the self-host example already does.
