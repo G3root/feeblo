@@ -211,30 +211,52 @@ layer(TestLayer)("PostTrafficRepository", (it) => {
       })
     );
 
-    it.effect("prunes old events but keeps the all-time counter", () =>
-      Effect.gen(function* () {
-        const { organizationId, postId } = yield* makeFixture();
-        const repository = yield* PostTrafficRepository;
-        const now = yield* DateTime.now;
+    it.effect(
+      "prunes old events, keeps recent ones, and keeps the counter",
+      () =>
+        Effect.gen(function* () {
+          const { organizationId, postId } = yield* makeFixture();
+          const repository = yield* PostTrafficRepository;
+          const db = yield* currentDb;
+          const now = yield* DateTime.now;
 
-        yield* repository.recordView(view(postId, `${postId}:view-1`));
-        // Everything recorded in this fixture is older than "one second from
-        // now", so the retention pass sees it as expired.
-        yield* repository.deleteEventsBefore(
-          DateTime.toDate(DateTime.add({ seconds: 1 })(now))
-        );
-
-        const traffic = Option.getOrThrow(
-          yield* repository.getPostTraffic({
-            organizationId,
+          yield* repository.recordView(view(postId, `${postId}:view-1`));
+          // A second event after the cutoff. Inserted directly because
+          // `recordView` reads the clock, and the repository only owns the
+          // deletion half of retention.
+          yield* db.insert(schema.postViewEventTable).values({
+            browser: "Chrome",
+            country: "US",
+            device: "desktop",
+            id: `${postId}:recent`,
+            occurredAt: DateTime.toDate(DateTime.add({ seconds: 10 })(now)),
+            os: "macOS",
             postId,
-            since: DateTime.toDate(DateTime.subtract({ seconds: 1 })(now)),
-          })
-        );
+          });
 
-        expect(traffic.views).toBe(1);
-        expect(traffic.last30Days.views).toBe(0);
-      })
+          yield* repository.deleteEventsBefore(
+            DateTime.toDate(DateTime.add({ seconds: 5 })(now))
+          );
+
+          const remaining = yield* db
+            .select({ id: schema.postViewEventTable.id })
+            .from(schema.postViewEventTable)
+            .where(eq(schema.postViewEventTable.postId, postId));
+
+          expect(remaining).toEqual([{ id: `${postId}:recent` }]);
+
+          const traffic = Option.getOrThrow(
+            yield* repository.getPostTraffic({
+              organizationId,
+              postId,
+              since: DateTime.toDate(DateTime.subtract({ seconds: 1 })(now)),
+            })
+          );
+
+          // The counter is untouched by either event's age.
+          expect(traffic.views).toBe(1);
+          expect(traffic.last30Days.views).toBe(1);
+        })
     );
 
     it.effect("drops the post's views when the post is deleted", () =>

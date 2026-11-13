@@ -15,5 +15,6 @@ CREATE TABLE "post_view_total" (
 );
 --> statement-breakpoint
 CREATE INDEX "post_view_event_postId_occurredAt_idx" ON "post_view_event" ("post_id","occurred_at");--> statement-breakpoint
+CREATE INDEX "post_view_event_occurredAt_idx" ON "post_view_event" ("occurred_at");--> statement-breakpoint
 ALTER TABLE "post_view_event" ADD CONSTRAINT "post_view_event_post_id_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "post"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "post_view_total" ADD CONSTRAINT "post_view_total_post_id_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "post"("id") ON DELETE CASCADE;

@@ -17,15 +17,29 @@ import { getPublicEnvServer } from "~/lib/server-runtime-public-env";
  * The browser's user agent and the edge's country are added to the body rather
  * than forwarded as headers: a server runtime that overwrites the outbound
  * `User-Agent` (Cloudflare Workers does) would otherwise make every view look
- * like a bot. A failed forward is dropped — a page view is not worth a retry the
- * page cannot observe, and the API answers the same whether it stored the view
- * or discarded it.
+ * like a bot. The visitor address goes in `X-Forwarded-For` because that is the
+ * header the API's client-IP trust path understands; the API ignores it unless
+ * this relay is configured as a trusted proxy, and then it can rate-limit per
+ * visitor instead of per relay.
+ *
+ * A failed forward is dropped — a page view is not worth a retry the page
+ * cannot observe, and the API answers the same whether it stored the view or
+ * discarded it.
  */
 const maxBodyBytes = 2 * 1024;
 const upstreamTimeoutMillis = 3_000;
 const trailingSlashPattern = /\/+$/;
 
 const empty = (status: number): Response => new Response(null, { status });
+
+/** The visitor address the edge exposed to this server, if any. */
+const visitorAddress = (request: Request): string | undefined => {
+  const direct =
+    request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip");
+  if (direct !== null && direct.trim() !== "") return direct.trim();
+  const chain = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return chain === undefined || chain === "" ? undefined : chain;
+};
 
 const relay = async (request: Request): Promise<Response> => {
   const raw = await readBoundedText(request, maxBodyBytes);
@@ -50,11 +64,16 @@ const relay = async (request: Request): Promise<Response> => {
   };
 
   const apiUrl = getPublicEnvServer().API_URL.replace(trailingSlashPattern, "");
+  const headers = new Headers({ "content-type": "application/json" });
+  const address = visitorAddress(request);
+  if (address !== undefined) {
+    headers.set("x-forwarded-for", address);
+  }
 
   try {
     const upstream = await fetch(`${apiUrl}/api/traffic/v1/views`, {
       body: JSON.stringify(payload),
-      headers: { "content-type": "application/json" },
+      headers,
       method: "POST",
       signal: AbortSignal.timeout(upstreamTimeoutMillis),
     });

@@ -9,6 +9,11 @@
  * Deliberately no identity: no cookie, no fingerprint, no visitor id. One tab
  * session counts one view per post, which is what `sessionStorage` is for here;
  * clearing it counts again, and that is the intended ceiling on precision.
+ *
+ * The device hint is the one thing the user agent cannot always answer:
+ * iPadOS 13+ reports a Macintosh agent. Touch points separate the two without
+ * a fingerprint, and omitting the hint tells the server the form factor is
+ * genuinely ambiguous.
  */
 
 import { hasWindow } from "@feeblo/utils/runtime-kind";
@@ -16,9 +21,25 @@ import { hasWindow } from "@feeblo/utils/runtime-kind";
 const RELAY_PATH = "/traffic/view";
 const STORAGE_PREFIX = "feeblo:post-view:";
 
+type DeviceHint = "desktop" | "mobile" | "tablet";
+
 // Every target deployment is a secure context, which is what `randomUUID`
 // requires; it is also the one id shape the endpoint's schema can rely on.
 const newId = (): string => crypto.randomUUID();
+
+const detectDeviceHint = (): DeviceHint | undefined => {
+  const userAgent = navigator.userAgent;
+  if (/iPad/.test(userAgent)) return "tablet";
+  if (/Mobi|iPhone|iPod|Android.*Mobile/.test(userAgent)) return "mobile";
+  if (/Android/.test(userAgent)) return "tablet";
+  // iPadOS 13+ reports a Macintosh agent. A Mac has no touch points; an iPad
+  // has several, and that is enough to tell them apart without a fingerprint.
+  if (/Macintosh/.test(userAgent)) {
+    return navigator.maxTouchPoints > 1 ? "tablet" : "desktop";
+  }
+  if (/Windows|Linux|CrOS/.test(userAgent)) return "desktop";
+  return undefined;
+};
 
 const alreadyCounted = (postId: string): boolean => {
   const key = `${STORAGE_PREFIX}${postId}`;
@@ -52,7 +73,13 @@ export const trackPostView = (postId: string): void => {
     return;
   }
 
-  const body = JSON.stringify({ id: newId(), postId });
+  // `undefined` is dropped by `JSON.stringify`, so an ambiguous form factor
+  // sends no hint rather than a guess.
+  const body = JSON.stringify({
+    deviceHint: detectDeviceHint(),
+    id: newId(),
+    postId,
+  });
   // A string body with a text/plain type is a CORS-simple request, so the
   // beacon cannot be stopped by a preflight. The relay accepts plain text.
   const sent = navigator.sendBeacon?.(

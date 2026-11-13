@@ -75,6 +75,9 @@ describe("toInternalPath", () => {
     expect(
       toInternalPath("/telemetry/logs", "acme.example.com", ROOT_DOMAIN)
     ).toBe("/telemetry/logs");
+    expect(
+      toInternalPath("/traffic/view", "acme.example.com", ROOT_DOMAIN)
+    ).toBe("/traffic/view");
   });
 
   it("keeps dashboard auth pages reachable from board hosts", () => {

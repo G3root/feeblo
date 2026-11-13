@@ -36,6 +36,9 @@ export const postViewEventTable = pgTable(
       table.postId,
       table.occurredAt
     ),
+    // The retention pass filters on time alone, so it cannot use the
+    // postId-led index above.
+    index("post_view_event_occurredAt_idx").on(table.occurredAt),
   ]
 );
 

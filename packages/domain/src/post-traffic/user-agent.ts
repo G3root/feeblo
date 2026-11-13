@@ -5,6 +5,8 @@
  * breakdown with a thousand spellings of "Chrome" is a breakdown nobody can
  * read, and a closed vocabulary is what keeps the dashboard's grouping honest.
  */
+import type { TPostViewDeviceHint } from "./schema";
+
 export type TPostViewClient = {
   readonly browser: string;
   readonly device: string;
@@ -13,7 +15,7 @@ export type TPostViewClient = {
 
 const OTHER: TPostViewClient = {
   browser: "Other",
-  device: "other",
+  device: "unknown",
   os: "Other",
 };
 
@@ -56,9 +58,19 @@ const browserOf = (userAgent: string): string => {
   return "Other";
 };
 
-const deviceOf = (userAgent: string): string => {
+const deviceOf = (
+  userAgent: string,
+  hint: TPostViewDeviceHint | undefined
+): string => {
+  if (hint !== undefined) {
+    return hint;
+  }
   if (TABLET.test(userAgent)) return "tablet";
   if (MOBILE.test(userAgent)) return "mobile";
+  // iPadOS 13+ reports a Macintosh agent. Without the browser's own hint a
+  // Macintosh agent is a Mac or an iPad, so claiming desktop would overstate
+  // what the agent proves.
+  if (MACOS.test(userAgent)) return "unknown";
   return "desktop";
 };
 
@@ -69,14 +81,17 @@ const deviceOf = (userAgent: string): string => {
  * device database, and every branch returns a value. The caller discards the
  * user agent itself, so nothing richer than this ever reaches storage.
  */
-export const parseUserAgent = (userAgent: string): TPostViewClient => {
+export const parseUserAgent = (
+  userAgent: string,
+  deviceHint?: TPostViewDeviceHint
+): TPostViewClient => {
   if (userAgent.trim() === "") {
     return OTHER;
   }
 
   return {
     browser: browserOf(userAgent),
-    device: deviceOf(userAgent),
+    device: deviceOf(userAgent, deviceHint),
     os: osOf(userAgent),
   };
 };

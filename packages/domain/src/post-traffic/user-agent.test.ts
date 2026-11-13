@@ -18,12 +18,21 @@ const CHROME_LINUX =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
 describe("parseUserAgent", () => {
-  it("reads the desktop Chrome agent", () => {
-    expect(parseUserAgent(CHROME_MACOS)).toEqual({
+  it("reads the desktop Chrome agent when the browser proves desktop", () => {
+    expect(parseUserAgent(CHROME_MACOS, "desktop")).toEqual({
       browser: "Chrome",
       device: "desktop",
       os: "macOS",
     });
+  });
+
+  it("does not call an unhinted Macintosh agent desktop", () => {
+    // iPadOS 13+ reports a Macintosh agent, so desktop would be a guess.
+    expect(parseUserAgent(CHROME_MACOS).device).toBe("unknown");
+  });
+
+  it("lets the browser's device hint settle the ambiguity", () => {
+    expect(parseUserAgent(CHROME_MACOS, "tablet").device).toBe("tablet");
   });
 
   it("keeps Safari distinct from Chrome", () => {
@@ -69,7 +78,7 @@ describe("parseUserAgent", () => {
   it("is total: an empty agent is Other", () => {
     expect(parseUserAgent("")).toEqual({
       browser: "Other",
-      device: "other",
+      device: "unknown",
       os: "Other",
     });
   });
