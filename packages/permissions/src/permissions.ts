@@ -68,6 +68,10 @@ const PERMISSION_ACTIONS = {
   webhooks: ["manage"],
   integrations: ["manage"],
   apiKeys: ["manage"],
+  // Reading the workspace audit log: the whole workspace's activity, its
+  // refusal history and origin addresses. Admins only, like the rest of the
+  // organization's security surface.
+  auditLog: ["read"],
   emailSuppressions: ["manage"],
   userBans: ["manage"],
 } as const satisfies Record<string, readonly string[]>;

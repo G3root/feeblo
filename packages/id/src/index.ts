@@ -65,6 +65,10 @@ export const EmailContactId = makeId("email_contact", "ect", {
 export const EmailSubscriptionId = makeId("email_subscription", "esb", {
   approximateLength,
 });
+export const AuditLogId = makeId("audit_log", "alog", {
+  approximateLength,
+});
+
 export const PostActivityId = makeId("post_activity", "pac", {
   approximateLength,
 });
