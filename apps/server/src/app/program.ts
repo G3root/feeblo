@@ -9,6 +9,8 @@ import {
   NodeRuntime,
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
+import { AuditLogRepository } from "@feeblo/domain/audit-log/repository";
+import { auditLogRetention } from "@feeblo/domain/audit-log/retention";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
@@ -213,6 +215,15 @@ export const program = Effect.gen(function* () {
   const trafficRuntime = yield* Layer.build(PostTrafficRepository.layer);
   yield* postTrafficRetention.pipe(
     Effect.provide(trafficRuntime),
+    Effect.forkScoped
+  );
+
+  // The audit log owns the one writer allowed to delete from an append-only
+  // table; the sweep says so on its own transaction. It builds its own copy of
+  // the repository next to the one the route tree uses, like the pass above.
+  const auditLogRuntime = yield* Layer.build(AuditLogRepository.layer);
+  yield* auditLogRetention.pipe(
+    Effect.provide(auditLogRuntime),
     Effect.forkScoped
   );
 

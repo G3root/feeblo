@@ -1,4 +1,4 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import type {
   TAuditActorType,
   TAuditChanges,
@@ -76,6 +76,16 @@ export interface TAuditLogPageQuery {
 }
 
 const table = schema.auditLogTable;
+
+/**
+ * The transaction-local setting the append-only trigger reads.
+ *
+ * The migration raises on `UPDATE` and `DELETE` unless this is `on`, so the
+ * retention sweep is the only writer that can remove a row and it says so on
+ * its own transaction. A `SET LOCAL` outside a transaction is a no-op, which is
+ * why the sweep runs inside `transaction()` rather than as a bare statement.
+ */
+export const AUDIT_LOG_RETENTION_SETTING = "feeblo.audit_retention";
 
 const dataError = (operation: string, reason: string, cause?: unknown) =>
   new AuditLogDataError({
@@ -213,7 +223,38 @@ const makeAuditLogRepository = Effect.gen(function* () {
     };
   });
 
-  return { findPage, insert };
+  /**
+   * Removes one batch of entries older than `cutoff`, and answers how many it
+   * removed.
+   *
+   * Batched through `ctid` because `DELETE … LIMIT` is not Postgres: the
+   * subquery picks the oldest rows, the delete touches only those, and the
+   * caller repeats while a full batch comes back. Each batch is its own short
+   * transaction, so a sweep never holds a lock long enough to block a writer.
+   */
+  const deleteBefore = Effect.fn("AuditLogRepository.deleteBefore")(function* (
+    cutoff: Date,
+    batchSize: number
+  ) {
+    return yield* transaction(
+      Effect.gen(function* () {
+        const tx = yield* currentDb;
+        yield* tx.execute(sql`set local feeblo.audit_retention = 'on'`);
+        const deleted = yield* tx.execute(sql`
+            delete from audit_log
+            where ctid in (
+              select ctid from audit_log
+              where occurred_at < ${cutoff}
+              order by occurred_at
+              limit ${batchSize}
+            )
+          `);
+        return deleted.rowCount ?? 0;
+      })
+    );
+  });
+
+  return { deleteBefore, findPage, insert };
 });
 
 export class AuditLogRepository extends Context.Service<AuditLogRepository>()(
