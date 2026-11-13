@@ -24,6 +24,7 @@ import {
   type PublicApiCall,
   publicApiRateLimitHeaders,
 } from "./api-key-auth";
+import { recordScopeDenial } from "./audit";
 import {
   forbiddenScopeError,
   invalidRequestError,
@@ -91,6 +92,9 @@ export const requirePublicApiScope = (scope: PublicApiScope) =>
   Effect.gen(function* () {
     const caller = yield* PublicApiCaller;
     if (!hasPublicApiScope(caller.scopes, scope)) {
+      // The one place every operation passes through, so it is the one place a
+      // refused credential can be recorded without a per-endpoint edit.
+      yield* recordScopeDenial(caller, scope);
       return yield* forbiddenScopeError(scope);
     }
   });

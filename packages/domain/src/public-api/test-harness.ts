@@ -21,6 +21,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import type { ApiKeyAuthRecord } from "../api-key/schema";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { Auth, type McpAccessTokenClaims } from "../auth-handler";
 import { BoardRepository } from "../board/repository";
 import { CompanyRepository } from "../company/repository";
@@ -201,6 +202,10 @@ export const makePublicApiDependencies = (
     // Merged, not only provided: a test asserts the email intent a publish
     // records, and the layer is the only way a test body reaches the outbox.
     EmailOutboxRepository.layer,
+    // The scope gate records a refusal, so the surface's handler context
+    // carries the audit writer. The flag stays off unless a test turns it on,
+    // which is what keeps every other test's writes at zero.
+    AuditLogRecorder.layer,
     // The company repository is shared with the dashboard; the tests drive it
     // directly for the races the HTTP surface cannot produce.
     CompanyRepository.layer,
