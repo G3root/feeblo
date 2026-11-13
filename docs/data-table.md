@@ -1,6 +1,6 @@
 # Data table
 
-The dashboard's table kit lives in `packages/ui/src/data-table` and is imported as `@feeblo/ui/data-table`. It is a port of the diceui `@diceui/data-table` family: same feature set (multi-column sorting, a filter builder, pagination, row selection, column visibility, an actions column), rebuilt on this repository's primitives. Nothing in `apps/web` mounts it yet; it is the design system's table, so the first page that needs one adds a consumer rather than a second table.
+The dashboard's table kit lives in `packages/ui/src/data-table` and is imported as `@feeblo/ui/data-table`. It is a port of the diceui `@diceui/data-table` family: same feature set (multi-column sorting, a filter builder, pagination, row selection, column visibility, an actions column), rebuilt on this repository's primitives. The CRM contact list (`apps/web/src/dashboard/features/contact/components/contact-table.tsx`) is the first consumer; a page that needs a table adds a consumer of this one rather than a second table.
 
 ## What it is built from
 
