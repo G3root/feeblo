@@ -9,6 +9,7 @@ It is **not** the public portal — the feedback board and widget that anyone ca
 - **OpenAPI:** `GET {API_URL}/api/v1/openapi.json`
 - **Reference:** `{API_URL}/api/v1/docs` — a Scalar page rendered from the same document. It carries the API key security scheme, so the Authorize button stores the key and sends it as `x-api-key` in the Try-it requests.
 - **MCP:** `POST {API_URL}/mcp` — the same operations as [Model Context Protocol (MCP)](#model-context-protocol-mcp) tools, for a client that speaks the protocol instead of HTTP.
+- **MCP code mode:** `POST {API_URL}/mcp/code` — the same operations as two tools, `search` and `execute`, for a client that would rather run one program than call several tools.
 
 ## Agent discovery
 
@@ -109,6 +110,17 @@ Scopes, the plan gate, and the per-credential rate limit apply exactly as they d
 A rejected OAuth token is answered before that point, and not with the envelope: `/mcp` returns a JSON-RPC error and a `WWW-Authenticate` header (RFC 9728) pointing at `/.well-known/oauth-protected-resource`. That header is what tells an MCP client where to send the member to authorize; the key surface's `401` body is unchanged.
 
 Requests carrying an `Origin` header are rejected: the transport does not enable cross-origin access, so a browser-based client must reach it through a same-origin proxy. Clients that send no `Origin` — the desktop and server integrations — are unaffected.
+
+### Code mode
+
+`POST {API_URL}/mcp/code` serves the same operations, the same credential, and the same scopes as `/mcp`, as two tools instead of one tool per operation. It is a second endpoint rather than a mode on the first: a client that lists forty tools should keep listing them.
+
+- **`search`** takes `{ query, limit?, offset? }` and returns the operations a task needs, each with the TypeScript signature it has inside a program, its scope, and its read-only/destructive annotations. Ranking is deterministic: an exact operation name first, then name matches, then description and field matches.
+- **`execute`** takes `{ code }` and runs the body of an async function with a `tools` object in scope: `const page = await tools.listPosts({ limit: 5 }); return page.data.map((post) => post.title);`. `console.log` output comes back in `logs`, the tool names it called in `calls`, and the returned value in `result`. A call that fails throws, so a program can catch `FORBIDDEN_SCOPE`, try another call, and still return an answer.
+
+A program runs in a sandbox, not in the API process: a separate Node process with the permission model on, no file system, network, child-process, worker, or addon access, and code generation from strings disabled. It is bounded to ten seconds of wall clock, one second per synchronous evaluation, one hundred tool calls, two hundred log lines, and a 100 000-character result.
+
+Every call is the operation's own: the input is decoded with the operation's schema, the operation's scope check runs, and the result is the published DTO. A destructive call inside a program asks the same server-side approval gate the direct tool does, so a deployment that refuses destructive MCP calls refuses them either way. Set `MCP_APPROVAL` to `allow` (the default), `deny`, or `ask`; `ask` spends an MCP elicitation request on the connected client and refuses when the client cannot be asked.
 
 ## Endpoints
 

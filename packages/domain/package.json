@@ -445,6 +445,12 @@
     "./public-api/approval": {
       "default": "./src/public-api/approval.ts"
     },
+    "./public-api/catalog": {
+      "default": "./src/public-api/catalog.ts"
+    },
+    "./public-api/code-mode": {
+      "default": "./src/public-api/code-mode.ts"
+    },
     "./public-api/config": {
       "default": "./src/public-api/config.ts"
     },
@@ -468,6 +474,12 @@
     },
     "./public-api/router": {
       "default": "./src/public-api/router.ts"
+    },
+    "./public-api/sandbox": {
+      "default": "./src/public-api/sandbox.ts"
+    },
+    "./public-api/sandbox-node": {
+      "default": "./src/public-api/sandbox-node.ts"
     },
     "./public-api/schema": {
       "default": "./src/public-api/schema.ts"

@@ -95,7 +95,7 @@ const MCP_SERVER_INSTRUCTIONS =
  * not name one, and every revision a current client might offer is present so a
  * connection is not refused for a version mismatch that has a schema for it.
  */
-const MCP_PROTOCOLS = [
+export const MCP_PROTOCOLS = [
   McpProtocol.v2026_07_28,
   McpProtocol.v2025_11_25,
   McpProtocol.v2025_06_18,
@@ -177,8 +177,8 @@ const buildPublicApiMcpHandlers = () =>
 
     const handlers: Record<
       string,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The registry erases each operation's input to `unknown` (ADR 0007), and a record keyed by tool name cannot name one input type per key; the toolkit decodes a call's parameters with the operation's own schema before this handler runs, which is what turns the erased input back into the operation's input type.
       (
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The registry erases each operation's input to `unknown` (ADR 0007), and a record keyed by tool name cannot name one input type per key; the toolkit decodes a call's parameters with the operation's own schema before this handler runs, which is what turns the erased input back into the operation's input type.
         parameters: unknown
       ) => Effect.Effect<
         unknown,
@@ -362,7 +362,7 @@ const mcpChallengeResponse = (rejection: {
  * responsible for origin and protocol checks; authentication runs first, so an
  * unauthenticated request never reaches JSON-RPC parsing.
  */
-const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
+export const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
   HttpRouter.middleware(
     Effect.gen(function* () {
       // The services the checks need are resolved once, when the route is

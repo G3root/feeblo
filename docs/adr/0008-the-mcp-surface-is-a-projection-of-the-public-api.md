@@ -33,3 +33,5 @@ A parameter an operation's schema rejects is answered as an `InvalidParams` prot
 A refused request — no key, an unknown key, an exhausted budget, a plan without the Public API — answers the `/api/v1` envelope with the status the failing schema's own `httpApiStatus` annotation publishes. Reading the status from the annotation rather than a second table is what keeps `/mcp` and `/api/v1` from answering the same refusal differently.
 
 `docs/public-api.md` documents the surface for customers; there is no second MCP-specific contract document, because there is no second contract.
+
+`/mcp/code` is the second projection of the same registry: two tools (`search`, `execute`) over the same handlers, scope checks, and approval gate. `docs/adr/0028` records why it exists and why it is a separate endpoint rather than extra tools here.
