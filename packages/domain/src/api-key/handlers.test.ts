@@ -8,6 +8,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { InternalServerError } from "../rpc-errors";
 import { Auth, CurrentSession, type Session } from "../session-middleware";
@@ -208,6 +209,7 @@ describe("ApiKeyRpcHandlers", () => {
 
   const TestLayer = Layer.mergeAll(
     DatabaseLive,
+    AuditLogRecorder.layer.pipe(Layer.provide(DatabaseLive)),
     ApiKeyRepository.layer.pipe(Layer.provide(DatabaseLive)),
     ApiKeyPolicy.layer.pipe(
       Layer.provide(EntitlementPolicyLive),

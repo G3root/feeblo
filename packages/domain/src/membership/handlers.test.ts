@@ -6,6 +6,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -88,6 +89,7 @@ describe("MembershipRpcHandlers", () => {
       return memberId;
     });
   const Repositories = Layer.mergeAll(
+    AuditLogRecorder.layer,
     MembershipRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
