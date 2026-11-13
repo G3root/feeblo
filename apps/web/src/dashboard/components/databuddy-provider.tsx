@@ -1,7 +1,7 @@
 import {
-  identify,
+  identify as identifyTracker,
   init,
-  reset,
+  reset as resetTracker,
   setGlobalProperties,
   track,
 } from "@databuddy/sdk";
@@ -14,8 +14,11 @@ import type {
 import { useResolvedAuth } from "@feeblo/web-shared/auth-context";
 import { setErrorReportingUser } from "@feeblo/web-shared/error-reporting";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useActorRef } from "@xstate/react";
+import { useEffect, type ReactNode } from "react";
 import { z } from "zod";
+
+import { createAnalyticsIdentityMachine } from "./analytics-identity-machine";
 
 // ---------------------------------------------------------------------------
 // Product analytics, backed by Databuddy.
@@ -43,12 +46,16 @@ import { z } from "zod";
 //   true }` below records every dashboard session, including `/register` and
 //   `/reset-password`, because those routes live inside this boundary), not
 //   something to switch on as a side effect of a migration.
-// - Identity attaches through the SDK's `identify`, never as event properties,
-//   and `reset` clears the profile on sign-out. The workspace is the one
-//   deliberate exception: `organization_id` is set as a global property,
-//   because Databuddy's browser SDK has no group entity and a workspace
-//   dimension is the whole point of a B2B product's analytics. That id is
-//   opaque, and `reset` clears it with the session.
+// - Identity is the machine in `./analytics-identity-machine`, never event
+//   properties. It is a machine rather than an effect because the states are
+//   real — "the tracker holds a profile" is the only state a sign-out may reset
+//   — and the three ways to get that wrong (reset on a cold anonymous load,
+//   reset twice, identify a second user before forgetting the first) are
+//   transitions a test can walk. The workspace is the one deliberate exception
+//   to "no identifiers in events": `organization_id` is set as a global
+//   property, because Databuddy's browser SDK has no group entity and a
+//   workspace dimension is the whole point of a B2B product's analytics. That
+//   id is opaque, and `reset` clears it with the session.
 //
 // The tracker is loaded with `init()` rather than `<DatabuddyProvider>`. The
 // provider also mounts Databuddy's feature-flag manager, which fetches on mount
@@ -180,6 +187,25 @@ if (hasWindow() && clientId) {
 }
 
 /**
+ * The identity lifecycle wired to the tracker and to error reporting.
+ *
+ * The two sinks stay together because they are one decision: whoever the
+ * tracker believes the visitor is, the error reporter is told the same, and
+ * `reset` clears both. `reset` also clears the workspace global property, so a
+ * workspace id cannot outlive the profile that set it.
+ */
+const analyticsIdentityMachine = createAnalyticsIdentityMachine({
+  identify: ({ userId, email, name }) => {
+    identifyTracker(userId, { email, name });
+    setErrorReportingUser({ id: userId });
+  },
+  forget: () => {
+    resetTracker();
+    setErrorReportingUser(null);
+  },
+});
+
+/**
  * Starts the tracker and keeps its profile in step with the auth session.
  *
  * Mounted inside `AuthProvider` so it can read the authoritative session; it
@@ -210,30 +236,21 @@ export function DashboardAnalytics({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // The id this browser has been identified as, so a sign-out resets exactly
-  // once and a merely anonymous load never mints a fresh session id. `reset`
-  // clears the workspace global property with the profile.
-  const identified = useRef<string | null>(null);
+  // The session is the authority and the machine only keeps the tracker in step
+  // with it, so `loading` is never sent: an unresolved read must not identify
+  // anonymously or clear a live profile.
+  const identity = useActorRef(analyticsIdentityMachine);
   useEffect(() => {
     if (pending) return;
 
-    if (userId === null || userEmail === null) {
-      if (identified.current !== null) {
-        reset();
-        identified.current = null;
-      }
-    } else {
-      // The opaque user id is the identity; email and name are traits so a
-      // later profile change does not mint a new person.
-      if (identified.current !== null && identified.current !== userId) {
-        reset();
-      }
-      identify(userId, { email: userEmail, name: userName ?? "" });
-      identified.current = userId;
-    }
-
-    setErrorReportingUser(userId === null ? null : { id: userId });
-  }, [pending, userId, userEmail, userName]);
+    identity.send({
+      type: "SESSION",
+      session:
+        userId === null || userEmail === null
+          ? null
+          : { userId, email: userEmail, name: userName ?? "" },
+    });
+  }, [identity, pending, userId, userEmail, userName]);
 
   return <>{children}</>;
 }

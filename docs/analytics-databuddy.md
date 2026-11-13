@@ -35,7 +35,17 @@ That means ~90 `trackEvent(…)` calls across the dashboard did not move, and a 
 
 **Errors and Web Vitals stay with Sentry.** `autocapture` is off entirely, matching the old `capture_exceptions`/`capture_performance`/`autocapture` all off. `browser_operation_failed` is still emitted from `feeblo:operation-failed`, so the same failure appears in Sentry and in analytics with a shared `error_type`.
 
-**Not `<DatabuddyProvider>`.** The React provider also mounts Databuddy's feature-flag manager, which fetches on mount with the signed-in user's email in its request context. This app uses no flags, so the tracker is started with `init()` and identity is synchronised by an effect instead — one vendor endpoint, not two.
+**Not `<DatabuddyProvider>`.** The React provider also mounts Databuddy's feature-flag manager, which fetches on mount with the signed-in user's email in its request context. This app uses no flags, so the tracker is started with `init()` and identity is synchronised by `./analytics-identity-machine` instead — one vendor endpoint, not two.
+
+## Identity is a machine
+
+`apps/web/src/dashboard/components/analytics-identity-machine.ts` declares what the tracker believes it is talking to. It replaces a `useRef` and an `if`/`else` chain that held the same lifecycle implicitly, with three traps worth a name:
+
+- a cold anonymous load must not reset, or every page load mints a new anonymous id and one visitor arrives as many;
+- a sign-out must reset exactly once, not once per re-resolution;
+- a switch from one user to another must reset **before** identifying, or the second user's events land on the first user's profile.
+
+The machine has two states — `unidentified` and `identified` — with the invariant `identified ⟺ context.identity !== null` pinned by a test that walks every state by every event. The same person with changed traits (a rename re-resolves the session) re-sends them without resetting; a different id forgets first. Effects are enqueued by the transition function, so the condition, the target and the two calls are in one place, and `analytics-identity-machine.test.ts` records them against an injected sink instead of mocking `@databuddy/sdk`.
 
 ## Open decisions
 
