@@ -2,10 +2,13 @@ import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { BoardId, type LegidOf, WorkspaceId } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardPolicy } from "../board/policies";
 import { BoardRepository } from "../board/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -125,6 +128,7 @@ describe("BoardRpcHandlers", () => {
   });
 
   const RepositoriesTest = Layer.mergeAll(
+    AuditLogRecorder.layer,
     BoardRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
@@ -497,6 +501,44 @@ describe("BoardRpcHandlers", () => {
           });
 
           expect(boards).toHaveLength(0);
+        })
+      );
+
+      it.effect("records the deletion against the person who made it", () =>
+        Effect.gen(function* () {
+          const handlers = yield* BoardRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+
+          yield* handlers
+            .DeleteBoard({
+              id: fixture.boardId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(AuditLogEnabled, true)
+            );
+
+          const db = yield* currentDb;
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.action, "board.deleted")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            actorType: "user",
+            actorUserId: fixture.userId,
+            outcome: "allowed",
+            resourceId: fixture.boardId,
+            resourceType: "board",
+            source: "dashboard",
+          });
         })
       );
     });

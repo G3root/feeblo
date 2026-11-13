@@ -8,6 +8,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
@@ -86,6 +88,8 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
         // rejects `permissions`, which is where the key's scopes live. The
         // plugin still re-checks that this user is an organization member
         // whose ACL role grants API-key management.
+        const audit = yield* AuditLogRecorder;
+
         const created = yield* Effect.tryPromise({
           try: () =>
             auth.api.createApiKey({
@@ -130,6 +134,24 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
             )
           );
 
+        // Best effort: the key exists and its plaintext is returned exactly
+        // once, so failing the request here would strand a live credential
+        // nobody can read. The plugin's insert is not inside a transaction, so
+        // there is nothing to make atomic with.
+        yield* audit.recordBestEffort({
+          organizationId,
+          actor: actorFromSession(session, organizationId),
+          source: "dashboard",
+          action: "api_key.created",
+          resourceId: created.id,
+          // Which authority was granted is the audit fact; the secret never
+          // appears here, and the recorder would redact it if it did.
+          metadata: {
+            name: created.name,
+            scopes: [...granted],
+          },
+        });
+
         return {
           key: created.key,
           summary: toCreatedSummary(created, creatorId),
@@ -145,9 +167,20 @@ export const ApiKeyRpcHandlersEffect = Effect.gen(function* () {
         .pipe(Policy.withPolicy(apiKeyPolicy.canManage(organizationId))),
 
     RevokeApiKey: ({ organizationId, keyId }: TApiKeyRevoke) =>
-      repository
-        .revoke({ organizationId, keyId })
-        .pipe(Policy.withPolicy(apiKeyPolicy.canManage(organizationId))),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* repository.revoke({ organizationId, keyId });
+        // Best effort for the same reason as the create: the revoke already
+        // committed, and a live key that is gone is worse than a missing row.
+        yield* audit.recordBestEffort({
+          organizationId,
+          actor: actorFromSession(session, organizationId),
+          source: "dashboard",
+          action: "api_key.revoked",
+          resourceId: keyId,
+        });
+      }).pipe(Policy.withPolicy(apiKeyPolicy.canManage(organizationId))),
   };
 });
 
@@ -161,5 +194,6 @@ export const ApiKeyRpcHandlers = ApiKeyRpcs.toLayer(
         EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
       )
     )
-  )
+  ),
+  Layer.provide(AuditLogRecorder.layer)
 );

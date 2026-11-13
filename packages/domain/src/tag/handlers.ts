@@ -119,19 +119,50 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           (entry) => entry.organizationId === args.organizationId
         );
 
-        yield* repository.create({
-          ...args,
-          creatorId: session.session.userId,
-          ...(membership && { creatorMemberId: membership.membershipId }),
-        });
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.create({
+              ...args,
+              creatorId: session.session.userId,
+              ...(membership && { creatorMemberId: membership.membershipId }),
+            });
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "tag.created",
+              resourceId: args.id,
+              metadata: { name: args.name },
+            });
+          })
+        );
       }).pipe(
         Policy.withPolicy(tagPolicy.canCreate(args.organizationId)),
         withRemapDbErrors("Tag", "create")
       ),
 
     UpdateTag: (args: TTagUpdate) =>
-      repository.update(args).pipe(
-        Effect.asVoid,
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.update(args);
+            // The update returns the row it wrote, not the one it replaced, so
+            // the new name goes in `metadata` rather than posing as a diff with
+            // an empty `before`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "tag.updated",
+              resourceId: args.id,
+              metadata: { name: args.name },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(
           tagPolicy.canUpdate({
             organizationId: args.organizationId,
@@ -142,8 +173,22 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     DeleteTag: (args: TTagDelete) =>
-      repository.delete(args).pipe(
-        Effect.asVoid,
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.delete(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "tag.deleted",
+              resourceId: args.id,
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(
           tagPolicy.canDelete({
             organizationId: args.organizationId,

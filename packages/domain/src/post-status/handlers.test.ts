@@ -12,6 +12,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { CurrentSession, type Session } from "../session-middleware";
 import { PostStatusRpcHandlersEffect } from "./handlers";
 import { PostStatusRepository } from "./repository";
@@ -154,8 +155,9 @@ describe("PostStatusRpcHandlers", () => {
       });
     });
 
-  const TestLayer = Layer.merge(
+  const TestLayer = Layer.mergeAll(
     PostStatusRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
