@@ -1,4 +1,5 @@
 import {
+  getIds,
   identify as identifyTracker,
   init,
   reset as resetTracker,
@@ -51,9 +52,11 @@ import { createAnalyticsIdentityMachine } from "./analytics-identity-machine";
 //   real — "the tracker holds a profile" is the only state a sign-out may reset
 //   — and the three ways to get that wrong (reset on a cold anonymous load,
 //   reset twice, identify a second user before forgetting the first) are
-//   transitions a test can walk. The workspace is the one deliberate exception
-//   to "no identifiers in events": `organization_id` is set as a global
-//   property, because Databuddy's browser SDK has no group entity and a
+//   transitions a test can walk. The tracker restores a profile from its own
+//   storage on load, so the machine also asks what the tracker already holds
+//   before deciding a reset is owed. The workspace is the one deliberate
+//   exception to "no identifiers in events": `organization_id` is set as a
+//   global property, because Databuddy's browser SDK has no group entity and a
 //   workspace dimension is the whole point of a B2B product's analytics. That
 //   id is opaque, and `reset` clears it with the session.
 //
@@ -203,6 +206,11 @@ const analyticsIdentityMachine = createAnalyticsIdentityMachine({
     resetTracker();
     setErrorReportingUser(null);
   },
+  // `getIds()` is the current read; `getProfileId()` is deprecated in 3.5.1.
+  // Its implementation prefers the running tracker and falls back to the
+  // `did_profile` entry the tracker restores from, so it answers correctly
+  // before the CDN script has loaded.
+  readProfileId: () => getIds().profileId,
 });
 
 /**

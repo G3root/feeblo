@@ -46,16 +46,21 @@ export type AnalyticsIdentity = {
 };
 
 /**
- * The two calls the lifecycle makes, injected so a test can record them.
+ * The calls the lifecycle makes, injected so a test can record them.
  *
- * Both are idempotent from the tracker's side — `identify` re-sends traits for
- * a user it already knows, and `reset` on an already-anonymous visitor only
- * costs a fresh anonymous id — but the order of the pair is not, which is why
- * `forget` and `identify` are separate rather than one `switchTo`.
+ * `identify` and `forget` are idempotent from the tracker's side — `identify`
+ * re-sends traits for a user it already knows, and `forget` on an
+ * already-anonymous visitor only costs a fresh anonymous id — but the order of
+ * the pair is not, which is why they are separate rather than one `switchTo`.
+ *
+ * `readProfileId` is a read, not a write: it answers "which profile does the
+ * tracker hold right now", including one it restored from storage at init. It
+ * is asked before deciding whether a reset is owed.
  */
 export type AnalyticsIdentitySink = {
   readonly identify: (identity: AnalyticsIdentity) => void;
   readonly forget: () => void;
+  readonly readProfileId: () => string | null;
 };
 
 /** A resolved session: signed in, or definitely not. `loading` sends nothing. */
@@ -108,17 +113,40 @@ export const createAnalyticsIdentityMachine = (sink: AnalyticsIdentitySink) =>
     id: "analyticsIdentity",
     initial: "unidentified",
     states: {
-      // The tracker holds no profile. Nothing here may reset: this is the state
-      // of every first page load, and resetting it would mint a new anonymous
-      // id per load and split each visitor's history into pieces.
+      // The tracker holds no profile. Nothing here may reset for its own sake:
+      // this is the state of every first page load, and resetting it would mint
+      // a new anonymous id per load and split each visitor's history into
+      // pieces. What it must reset is a profile the tracker restored from
+      // storage, which a session ending without this code running leaves
+      // behind.
       unidentified: {
         on: {
           SESSION: (args, enq) => {
             const { event } = args;
+            // The profile the tracker already holds, restored at init. Asking
+            // it rather than trusting the state is what separates "a visitor
+            // who was never identified" from "a visitor whose previous
+            // session ended somewhere this component could not see it" — a
+            // closed tab, an expired cookie, a sign-out in another tab.
+            const restored = sink.readProfileId();
+
             if (event.session === null) {
-              // Still nobody signed in. There is nothing to forget, so this is
-              // not a transition at all.
-              return undefined;
+              if (restored === null) {
+                // Nobody signed in, and nobody left a profile behind. There is
+                // nothing to forget, so this is not a transition at all.
+                return undefined;
+              }
+              enq(args.actions.forget);
+              return { context: { identity: null } };
+            }
+
+            // A stale profile from a previous session must not absorb the page
+            // view the tracker already sent for this load, so it is dropped
+            // before the new identity is set. The same id is a reload, not a
+            // stale profile, and resetting it would cost a fresh anonymous id
+            // for nothing.
+            if (restored !== null && restored !== event.session.userId) {
+              enq(args.actions.forget);
             }
             enq(args.actions.identify, event.session);
             return {

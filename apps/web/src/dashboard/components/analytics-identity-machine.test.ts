@@ -35,11 +35,13 @@ const grace: AnalyticsIdentity = {
 
 describe("analytics identity machine", () => {
   let calls: string[];
+  let restored: string | null;
   let machine: ReturnType<typeof createAnalyticsIdentityMachine>;
 
   const sink: AnalyticsIdentitySink = {
     identify: (identity) => calls.push(`identify:${identity.userId}`),
     forget: () => calls.push("forget"),
+    readProfileId: () => restored,
   };
 
   const start = () => createActor(machine).start();
@@ -49,6 +51,7 @@ describe("analytics identity machine", () => {
 
   beforeEach(() => {
     calls = [];
+    restored = null;
     machine = createAnalyticsIdentityMachine(sink);
   });
 
@@ -73,6 +76,43 @@ describe("analytics identity machine", () => {
 
     expect(calls).toStrictEqual([]);
     expect(actor.getSnapshot().value).toBe("unidentified");
+  });
+
+  it("forgets a profile the tracker restored for a signed-out visitor", () => {
+    // A session that ended while this component could not see it — a closed
+    // tab, an expired cookie, a sign-out in another tab — leaves the tracker's
+    // stored profile behind, and the tracker restores it at init. Nothing here
+    // is signed in, so that profile must not keep collecting events.
+    restored = ada.userId;
+    const actor = start();
+    actor.send(session(null));
+
+    expect(calls).toStrictEqual(["forget"]);
+    expect(actor.getSnapshot().value).toBe("unidentified");
+    expect(actor.getSnapshot().context.identity).toBeNull();
+  });
+
+  it("forgets a restored profile before identifying somebody else", () => {
+    // The page view the tracker sent on load already belonged to the restored
+    // profile; set the new identity without forgetting and the rest of the
+    // session is filed under the previous user.
+    restored = ada.userId;
+    const actor = start();
+    actor.send(session(grace));
+
+    expect(calls).toStrictEqual(["forget", "identify:usr_grace"]);
+    expect(actor.getSnapshot().context.identity).toStrictEqual(grace);
+  });
+
+  it("keeps a restored profile that belongs to the session", () => {
+    // A reload by the same user restores their own profile. Resetting it would
+    // cost a fresh anonymous id for a visitor who never changed.
+    restored = ada.userId;
+    const actor = start();
+    actor.send(session(ada));
+
+    expect(calls).toStrictEqual(["identify:usr_ada"]);
+    expect(actor.getSnapshot().context.identity).toStrictEqual(ada);
   });
 
   it("identifies a first sign-in", () => {
