@@ -7,7 +7,11 @@ import { PostNotFoundError } from "../post/errors";
 import { withRemapDbErrors } from "../rpc-errors";
 import { PostTrafficRepository } from "./repository";
 import { PostTrafficRpcs } from "./rpcs";
-import type { TPostTrafficPayload } from "./schema";
+import {
+  TRAFFIC_RANGE_DAYS,
+  type TPostTrafficPayload,
+  type TWorkspaceTrafficPayload,
+} from "./schema";
 
 /**
  * The breakdown window. The all-time number is the counter; this is how far
@@ -19,6 +23,30 @@ export const PostTrafficRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostTrafficRepository;
 
   return {
+    GetWorkspaceTraffic: (args: TWorkspaceTrafficPayload) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.now;
+        // Same UTC day boundary as the insights read, so the two sections
+        // describe the same window.
+        const since = DateTime.toDate(
+          DateTime.startOf(
+            DateTime.subtract({
+              days: TRAFFIC_RANGE_DAYS[args.range] - 1,
+            })(now),
+            "day"
+          )
+        );
+
+        const traffic = yield* repository.getWorkspaceTraffic({
+          organizationId: args.organizationId,
+          since,
+        });
+
+        return { range: args.range, ...traffic };
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("PostTraffic", "select")
+      ),
     GetPostViewCount: (args: TPostTrafficPayload) =>
       Effect.gen(function* () {
         const views = yield* repository.getPostViewCount({

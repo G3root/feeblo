@@ -60,6 +60,45 @@ export const PostViewCount = S.Struct({
 
 export type TPostViewCount = S.Schema.Type<typeof PostViewCount>;
 
+/** The insights page's windows, aligned with its own range toggle. */
+export const TrafficRange = S.Literals(["7d", "30d", "90d"]);
+
+export type TTrafficRange = S.Schema.Type<typeof TrafficRange>;
+
+/** Days back from "now" for each window, matching the insights page. */
+export const TRAFFIC_RANGE_DAYS = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+} as const satisfies Record<TTrafficRange, number>;
+
+export const WorkspaceTrafficPayload = S.Struct({
+  organizationId: WorkspaceId.schema,
+  range: TrafficRange,
+});
+
+export type TWorkspaceTrafficPayload = S.Schema.Type<
+  typeof WorkspaceTrafficPayload
+>;
+
+/**
+ * The insights page's traffic section.
+ *
+ * `views` is the selected window; `allTimeViews` sums the counters so the
+ * second number does not shrink when the event retention runs.
+ */
+export const WorkspaceTraffic = S.Struct({
+  range: TrafficRange,
+  views: S.Finite,
+  allTimeViews: S.Finite,
+  countries: S.Array(PostViewDimensionCount),
+  devices: S.Array(PostViewDimensionCount),
+  browsers: S.Array(PostViewDimensionCount),
+  os: S.Array(PostViewDimensionCount),
+});
+
+export type TWorkspaceTraffic = S.Schema.Type<typeof WorkspaceTraffic>;
+
 /**
  * What the browser could tell about its own form factor.
  *

@@ -31,6 +31,7 @@ import {
   type InsightsSummary,
   type WorkspaceInsights,
   workspaceInsightsAtom,
+  workspaceTrafficAtom,
 } from "../atoms";
 import {
   InsightsStat,
@@ -41,6 +42,7 @@ import {
   InsightsTopVoters,
   InsightsVolumeChart,
 } from "./insights-sections";
+import { InsightsTraffic, InsightsTrafficSkeleton } from "./insights-traffic";
 
 const numberFormatter = new Intl.NumberFormat();
 
@@ -101,6 +103,16 @@ export function InsightsPage({
   const atom = workspaceInsightsAtom(args);
   const result = useAtomValue(atom);
   const refresh = useAtomRefresh(atom);
+  // Started next to the insights read, not after it: the two are independent
+  // sources, and a second round trip behind the first would be a waterfall.
+  const trafficResult = useAtomValue(workspaceTrafficAtom(args));
+  const trafficSection = Result.builder(trafficResult)
+    .onInitial(() => <InsightsTrafficSkeleton />)
+    .onFailure(() => null)
+    .onSuccess((traffic) => (
+      <InsightsTraffic rangeLabel={RANGE_LABELS[range]} traffic={traffic} />
+    ))
+    .exhaustive();
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
@@ -139,6 +151,7 @@ export function InsightsPage({
             insights={insights}
             organizationId={organizationId}
             range={range}
+            trafficSection={trafficSection}
           />
         ))
         .exhaustive()}
@@ -150,10 +163,12 @@ function InsightsContent({
   insights,
   organizationId,
   range,
+  trafficSection,
 }: {
   readonly insights: WorkspaceInsights;
   readonly organizationId: string;
   readonly range: TInsightsRange;
+  readonly trafficSection: React.ReactNode;
 }) {
   const { summary, subscriptions } = insights;
   const days = INSIGHTS_RANGE_DAYS[range];
@@ -215,6 +230,8 @@ function InsightsContent({
           title="Votes per day"
         />
       </section>
+
+      {trafficSection}
 
       <section className="grid gap-3 lg:grid-cols-2">
         <InsightsStatusMix

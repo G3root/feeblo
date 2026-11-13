@@ -177,6 +177,46 @@ layer(TestLayer)("PostTrafficRepository", (it) => {
     );
   });
 
+  describe("getWorkspaceTraffic", () => {
+    it.effect("sums one workspace's window and all-time counters", () =>
+      Effect.gen(function* () {
+        const first = yield* makeFixture();
+        const second = yield* makeFixture();
+        const repository = yield* PostTrafficRepository;
+        const now = yield* DateTime.now;
+
+        yield* repository.recordView(
+          view(first.postId, `${first.postId}:view-1`)
+        );
+        yield* repository.recordView(
+          view(first.postId, `${first.postId}:view-2`, {
+            country: "DE",
+            device: "mobile",
+          })
+        );
+        yield* repository.recordView(
+          view(second.postId, `${second.postId}:view-1`)
+        );
+
+        const traffic = yield* repository.getWorkspaceTraffic({
+          organizationId: first.organizationId,
+          since: DateTime.toDate(DateTime.subtract({ seconds: 1 })(now)),
+        });
+
+        expect(traffic.views).toBe(2);
+        expect(traffic.allTimeViews).toBe(2);
+        expect(traffic.countries).toEqual([
+          { value: "DE", views: 1 },
+          { value: "US", views: 1 },
+        ]);
+        expect(traffic.devices).toEqual([
+          { value: "desktop", views: 1 },
+          { value: "mobile", views: 1 },
+        ]);
+      })
+    );
+  });
+
   describe("getPostTraffic", () => {
     it.effect("breaks the window down by country and device", () =>
       Effect.gen(function* () {

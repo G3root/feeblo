@@ -58,6 +58,7 @@ import {
 import {
   DEFAULT_INSIGHTS_RANGE,
   workspaceInsightsAtom,
+  workspaceTrafficAtom,
 } from "~/features/insights/atoms";
 import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -448,17 +449,23 @@ function InsightsNav({ pathname }: { pathname: string }) {
 }
 
 /**
- * Mounts the insights query without reading it.
+ * Mounts both insights reads without subscribing to either.
  *
  * The dashboard's link preloading only covers route code and collection
- * reads; this atom is the page's one server round trip, so it is the piece a
- * hover has to start to make the navigation feel instant. The component
- * subscribes to nothing, so it cannot re-render the sidebar when the result
+ * reads; these atoms are the page's two server round trips, so they are what
+ * a hover has to start to make the navigation feel instant. The component
+ * subscribes to nothing, so it cannot re-render the sidebar when a result
  * arrives.
  */
 function InsightsPrefetch({ organizationId }: { organizationId: string }) {
   useAtomMount(
     workspaceInsightsAtom({
+      organizationId,
+      range: DEFAULT_INSIGHTS_RANGE,
+    })
+  );
+  useAtomMount(
+    workspaceTrafficAtom({
       organizationId,
       range: DEFAULT_INSIGHTS_RANGE,
     })

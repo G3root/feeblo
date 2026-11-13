@@ -25,19 +25,35 @@ export interface TPostTrafficRead {
   readonly since: Date;
 }
 
+/**
+ * The two scopes a traffic read has: one post, or one workspace's posts.
+ *
+ * Both need the event window; the post read is the detail tab's, the
+ * workspace read is the insights page's.
+ */
+type TTrafficScope =
+  | Pick<TPostTrafficRead, "postId" | "since">
+  | Pick<TPostTrafficRead, "organizationId" | "since">;
+
 const makePostTrafficRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+
+  const scopeCondition = (scope: TTrafficScope) =>
+    "postId" in scope
+      ? eq(schema.postTable.id, scope.postId)
+      : eq(schema.postTable.organizationId, scope.organizationId);
 
   /**
    * One breakdown over the event window.
    *
-   * The column is passed as a value rather than a name so the four calls are
-   * the same query shape with a different column, and no caller can turn a
-   * request parameter into SQL.
+   * The column is passed as a value rather than a name so the calls are the
+   * same query shape with a different column, and no caller can turn a request
+   * parameter into SQL. The post join is what lets the same query answer for a
+   * single post and for a whole workspace.
    */
   const breakdown = (
     column: typeof schema.postViewEventTable.country,
-    { postId, since }: Pick<TPostTrafficRead, "postId" | "since">
+    scope: TTrafficScope
   ) =>
     db
       .select({
@@ -45,16 +61,36 @@ const makePostTrafficRepository = Effect.gen(function* () {
         views: sql<number>`count(*)::int`,
       })
       .from(schema.postViewEventTable)
+      .innerJoin(
+        schema.postTable,
+        eq(schema.postViewEventTable.postId, schema.postTable.id)
+      )
       .where(
         and(
-          eq(schema.postViewEventTable.postId, postId),
-          gte(schema.postViewEventTable.occurredAt, since),
+          scopeCondition(scope),
+          gte(schema.postViewEventTable.occurredAt, scope.since),
           ne(column, "")
         )
       )
       .groupBy(column)
       .orderBy(desc(sql`count(*)`), column)
       .limit(BREAKDOWN_LIMIT);
+
+  /** Views inside the window, for the same two scopes. */
+  const viewsInWindow = (scope: TTrafficScope) =>
+    db
+      .select({ views: sql<number>`count(*)::int` })
+      .from(schema.postViewEventTable)
+      .innerJoin(
+        schema.postTable,
+        eq(schema.postViewEventTable.postId, schema.postTable.id)
+      )
+      .where(
+        and(
+          scopeCondition(scope),
+          gte(schema.postViewEventTable.occurredAt, scope.since)
+        )
+      );
 
   return {
     /**
@@ -201,15 +237,7 @@ const makePostTrafficRepository = Effect.gen(function* () {
           .where(eq(schema.postViewTotalTable.postId, postId))
           .limit(1);
 
-        const windowViews = yield* db
-          .select({ views: sql<number>`count(*)::int` })
-          .from(schema.postViewEventTable)
-          .where(
-            and(
-              eq(schema.postViewEventTable.postId, postId),
-              gte(schema.postViewEventTable.occurredAt, since)
-            )
-          );
+        const window = yield* viewsInWindow({ postId, since });
 
         const countries = yield* breakdown(schema.postViewEventTable.country, {
           postId,
@@ -240,11 +268,59 @@ const makePostTrafficRepository = Effect.gen(function* () {
             countries: toDimension(countries),
             devices: toDimension(devices),
             os: toDimension(os),
-            views: windowViews[0]?.views ?? 0,
+            views: window[0]?.views ?? 0,
           },
           postId,
           views: totals[0]?.views ?? 0,
         });
+      }),
+
+    /**
+     * The same breakdowns, scoped to every post in one workspace.
+     *
+     * The insights page owns this read: its window follows the page's range
+     * toggle, while `allTimeViews` sums the counters so the number survives
+     * the event retention.
+     */
+    getWorkspaceTraffic: ({
+      organizationId,
+      since,
+    }: Pick<TPostTrafficRead, "organizationId" | "since">) =>
+      Effect.gen(function* () {
+        const window = yield* viewsInWindow({ organizationId, since });
+        const allTime = yield* db.execute<{ views: number }>(sql`
+          select coalesce(sum(${schema.postViewTotalTable.views}), 0)::int as "views"
+          from ${schema.postViewTotalTable}
+          join ${schema.postTable}
+            on ${schema.postTable.id} = ${schema.postViewTotalTable.postId}
+          where ${schema.postTable.organizationId} = ${organizationId}
+        `);
+
+        const countries = yield* breakdown(schema.postViewEventTable.country, {
+          organizationId,
+          since,
+        });
+        const devices = yield* breakdown(schema.postViewEventTable.device, {
+          organizationId,
+          since,
+        });
+        const browsers = yield* breakdown(schema.postViewEventTable.browser, {
+          organizationId,
+          since,
+        });
+        const os = yield* breakdown(schema.postViewEventTable.os, {
+          organizationId,
+          since,
+        });
+
+        return {
+          allTimeViews: allTime.rows[0]?.views ?? 0,
+          browsers,
+          countries,
+          devices,
+          os,
+          views: window[0]?.views ?? 0,
+        };
       }),
 
     /**

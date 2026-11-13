@@ -2,7 +2,7 @@
 
 ## Decision
 
-A post's view count is recorded by a first-party beacon and stored in two tables: `post_view_event`, one row per view with a timestamp and four coarse dimensions (`country`, `os`, `browser`, `device`), and `post_view_total`, an all-time counter per post. The dashboard reads the counter through `GetPostViewCount` (the post sidebar) and the counter plus breakdowns through `GetPostTraffic` (the post's Analytics tab, fetched when that tab is opened or prefetched); the public board renders neither.
+A post's view count is recorded by a first-party beacon and stored in two tables: `post_view_event`, one row per view with a timestamp and four coarse dimensions (`country`, `os`, `browser`, `device`), and `post_view_total`, an all-time counter per post. The dashboard reads the counter through `GetPostViewCount` (the post sidebar) and the counter plus breakdowns through `GetPostTraffic` (the post's Analytics tab, fetched when that tab is opened or prefetched). The insights page adds `GetWorkspaceTraffic` for the same breakdowns across a workspace, mounted with the insights read so the two fetch in parallel. The public board renders none of it.
 
 The data contract is the decision:
 
