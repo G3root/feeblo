@@ -13,6 +13,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 import { makePublicApiMcpRoute } from "./mcp";
+import { PUBLIC_API_KEY_RATE_LIMIT } from "./middleware";
 import { PublicApiOperations } from "./operations";
 import {
   PublicApiPostTags,
@@ -634,6 +635,89 @@ layer(
       // headers, so a client pacing itself reads one contract on both.
       expect(refused.headers["x-ratelimit-limit"]).toBe("1");
       expect(refused.headers["x-ratelimit-remaining"]).toBe("0");
+    })
+  );
+});
+
+/**
+ * The server-side approval gate over the live transport.
+ *
+ * The projection test pins that a destructive tool declares the refusal; this
+ * one pins that the route actually asks, that a `deny` deployment cannot be
+ * talked past the web client's own approval prompt, and that the refusal leaves
+ * the record the call would have deleted exactly where it was.
+ */
+layer(
+  makePublicApiMcpRoute(PUBLIC_API_KEY_RATE_LIMIT, "deny").pipe(
+    Layer.provideMerge(PublicApiDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api mcp approval", (it) => {
+  it.effect("refuses a destructive call the gate denies", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_mcp_gated", "Gated");
+      registerKey(
+        "fbk_mcp_gated",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession("fbk_mcp_gated");
+      const refused = yield* callTool(sessionId, "fbk_mcp_gated", "deleteTag", {
+        tagId: "tag_mcp_gated",
+      });
+
+      // A declared failure, not a protocol error: the call reached the tool,
+      // and the client reads the gate's own message instead of a transport
+      // fault. The MTK toolkit answers a declared failure that is an `Error`
+      // with its message, which is the shape every Public API refusal already
+      // arrives in on this surface.
+      expect(refused.isError).toBe(true);
+      const [content] = refused.content;
+      if (content?.type !== "text") {
+        return yield* Effect.die("the refusal carried no text content");
+      }
+      expect(content.text).toContain("refuses destructive MCP calls");
+
+      // The point of a server-side gate is that the record survives a client
+      // that never asked its user: the tag is still there.
+      const db = yield* currentDb;
+      const remaining = yield* db
+        .select()
+        .from(schema.tagTable)
+        .where(eq(schema.tagTable.id, "tag_mcp_gated"));
+      expect(remaining).toHaveLength(1);
+    })
+  );
+
+  it.effect("leaves a read-only call alone", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(
+        workspace.organizationId,
+        "tag_mcp_gated_read",
+        "Readable"
+      );
+      registerKey(
+        "fbk_mcp_readonly",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession("fbk_mcp_readonly");
+      const listed = yield* callTool(
+        sessionId,
+        "fbk_mcp_readonly",
+        "listTags",
+        {}
+      );
+
+      expect(listed.isError).toBe(false);
+      const page = yield* Schema.decodeUnknownEffect(PublicApiTagPage)(
+        listed.structuredContent
+      );
+      expect(page.data.map((tag) => tag.name)).toEqual(["Readable"]);
     })
   );
 });

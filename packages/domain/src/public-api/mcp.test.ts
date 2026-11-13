@@ -1,7 +1,9 @@
 import { Tool } from "effect/ai";
 import * as Context from "effect/Context";
+import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vitest";
 
+import { ApprovalDenied } from "./approval";
 import { PublicApiMcpToolkit } from "./mcp";
 import { PublicApiOperations } from "./operations";
 
@@ -33,7 +35,31 @@ describe("public api mcp projection", () => {
       // the operation itself declares, so there is no second copy to sync.
       expect(tool.parametersSchema).toBe(operation.input);
       expect(tool.successSchema).toBe(operation.output);
+    }
+  });
+
+  it("adds the gate's refusal to a destructive tool's declared failures", () => {
+    for (const operation of PublicApiOperations.filter(
+      (candidate) => candidate.annotations.destructive
+    )) {
+      const tool = PublicApiMcpToolkit.tools[operation.name];
+
+      // The operation's schema stays one of the union's members, so a caller
+      // sees the same published codes on `/mcp` as on `/api/v1`, plus the one
+      // failure only a destructive call can produce.
+      expect(tool.failureSchema).not.toBe(operation.failure);
+      expect(Schema.is(tool.failureSchema)(denial())).toBe(true);
+    }
+  });
+
+  it("leaves a non-destructive tool's failure vocabulary untouched", () => {
+    for (const operation of PublicApiOperations.filter(
+      (candidate) => !candidate.annotations.destructive
+    )) {
+      const tool = PublicApiMcpToolkit.tools[operation.name];
+
       expect(tool.failureSchema).toBe(operation.failure);
+      expect(Schema.is(tool.failureSchema)(denial())).toBe(false);
     }
   });
 
@@ -57,3 +83,10 @@ describe("public api mcp projection", () => {
     }
   });
 });
+
+/** A refusal shaped like the gate's, for the schema membership checks above. */
+const denial = () =>
+  new ApprovalDenied({
+    message: "This deployment refuses destructive MCP calls.",
+    operation: "deletePost",
+  });

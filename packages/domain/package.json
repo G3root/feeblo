@@ -442,6 +442,9 @@
     "./public-api/api-live": {
       "default": "./src/public-api/api-live.ts"
     },
+    "./public-api/approval": {
+      "default": "./src/public-api/approval.ts"
+    },
     "./public-api/config": {
       "default": "./src/public-api/config.ts"
     },
