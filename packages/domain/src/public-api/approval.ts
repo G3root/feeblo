@@ -19,8 +19,10 @@ import * as Schema from "effect/Schema";
  *
  * - `allowAll` is the previous behaviour, and the default, so an existing
  *   client is not broken by the gate's introduction.
- * - `denyAll` refuses every destructive call. That is the shape a read-only
- *   deployment or a review environment wants.
+ * - `denyAll` refuses every destructive call — a delete, a merge, a publish.
+ *   It is not a read-only mode: operations the registry does not annotate
+ *   destructive still run, so a genuinely read-only credential is an API key
+ *   with read scopes, not a gate mode.
  * - `ask` is the enforced one: it spends MCP's own elicitation request on the
  *   client, and refuses when the client cannot be asked or answers no. This is
  *   what makes the approval server-side rather than advisory.
@@ -88,6 +90,24 @@ const ApprovalAnswer = Schema.Struct({
   approved: Schema.Boolean,
 });
 
+/**
+ * The most of a call's input the prompt shows.
+ *
+ * A person approving a delete needs to see which record it targets, not the
+ * whole body: a post's content or a merge's comment list can be long, and a
+ * dialog that scrolls is a dialog people approve without reading. The prefix is
+ * enough to tell two calls apart, and the call is shown in full in the
+ * dashboard the prompt links to.
+ */
+const MAX_PROMPT_INPUT_CHARS = 200;
+
+const describeInput = (input: Schema.Json): string => {
+  const encoded = JSON.stringify(input) ?? "{}";
+  return encoded.length > MAX_PROMPT_INPUT_CHARS
+    ? `${encoded.slice(0, MAX_PROMPT_INPUT_CHARS - 3)}...`
+    : encoded;
+};
+
 const denied = (request: ApprovalRequest, message: string) =>
   new ApprovalDenied({ message, operation: request.operation });
 
@@ -100,7 +120,10 @@ export class Approval extends Context.Service<Approval, ApprovalService>()(
     Approval.of({ approve: () => Effect.void })
   );
 
-  /** Refuses every destructive call, for a deployment that may only read. */
+  /**
+   * Refuses every destructive call. Not a read-only mode: a non-destructive
+   * write still runs, because the gate only sees the destructive annotation.
+   */
   static readonly denyAll = Layer.succeed(
     Approval,
     Approval.of({
@@ -133,7 +156,7 @@ export class Approval extends Context.Service<Approval, ApprovalService>()(
           }
 
           const answered = yield* McpServer.elicit({
-            message: `Allow "${request.operation}" to change this workspace?`,
+            message: `Allow "${request.operation}" with ${describeInput(request.input)}?`,
             schema: ApprovalAnswer,
           }).pipe(
             Effect.catchTag("ElicitationDeclined", () =>

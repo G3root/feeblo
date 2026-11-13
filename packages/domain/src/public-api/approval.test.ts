@@ -109,12 +109,16 @@ const clientLayer = (options: {
 /** One approval through `ask`, with the connection a test scripted. */
 const approve = (options: {
   readonly answer: Answer;
+  readonly input?: Schema.Json | undefined;
   readonly seen: Ref.Ref<Option.Option<McpSchema.ElicitRequestParams>>;
   readonly supportsElicitation: boolean;
 }) =>
   Effect.gen(function* () {
     const approval = yield* Approval;
-    return yield* approval.approve(approvalRequest);
+    return yield* approval.approve({
+      input: options.input ?? approvalRequest.input,
+      operation: approvalRequest.operation,
+    });
   }).pipe(
     // The connection a case scripts is request-scoped data, not a shared
     // layer, so it cannot be hoisted into an `it.layer`; this helper is the
@@ -151,6 +155,60 @@ it.effect("asks the client and runs the call when the person approves", () =>
     if (shown.mode !== "form") return;
     // The form asks for exactly one boolean, so a client renders a yes/no.
     expect(JSON.stringify(shown.requestedSchema)).toContain("approved");
+  })
+);
+
+it.effect("names the record the call would change", () =>
+  Effect.gen(function* () {
+    const first = yield* Ref.make<Option.Option<McpSchema.ElicitRequestParams>>(
+      Option.none()
+    );
+    const second = yield* Ref.make<
+      Option.Option<McpSchema.ElicitRequestParams>
+    >(Option.none());
+
+    // The answer is irrelevant here; the request is what is being read.
+    for (const [seen, postId] of [
+      [first, "post_1"],
+      [second, "post_2"],
+    ] as const) {
+      yield* approve({
+        answer: { action: "decline" },
+        input: { postId },
+        seen,
+        supportsElicitation: true,
+      }).pipe(Effect.ignore);
+    }
+
+    const firstMessage = shownRequest(yield* Ref.get(first)).message;
+    const secondMessage = shownRequest(yield* Ref.get(second)).message;
+
+    expect(firstMessage).toContain("post_1");
+    expect(secondMessage).toContain("post_2");
+    // Same operation, different target: the person must be able to tell the
+    // two calls apart before approving either.
+    expect(firstMessage).not.toBe(secondMessage);
+  })
+);
+
+it.effect("bounds the input it shows", () =>
+  Effect.gen(function* () {
+    const seen = yield* Ref.make<Option.Option<McpSchema.ElicitRequestParams>>(
+      Option.none()
+    );
+
+    yield* approve({
+      answer: { action: "decline" },
+      input: { content: "x".repeat(5_000) },
+      seen,
+      supportsElicitation: true,
+    }).pipe(Effect.ignore);
+
+    const message = shownRequest(yield* Ref.get(seen)).message;
+
+    // A dialog that scrolls is a dialog people approve without reading.
+    expect(message.length).toBeLessThan(400);
+    expect(message.endsWith("...?")).toBe(true);
   })
 );
 

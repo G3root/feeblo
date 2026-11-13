@@ -31,6 +31,14 @@ export interface SandboxLimits {
   readonly maxLogs: number;
   /** The most characters the encoded result may hold. */
   readonly maxResultChars: number;
+  /**
+   * The resident memory the child may reach before it stops itself.
+   *
+   * Enforced by the child, not the OS: Node exposes no portable per-child
+   * limit, so this is the tight bound the sandbox can apply by itself. The
+   * deployment's container memory limit is the hard, OS-level backstop.
+   */
+  readonly maxRssBytes: number;
 }
 
 /**
@@ -46,6 +54,7 @@ export const DEFAULT_SANDBOX_LIMITS: SandboxLimits = {
   maxCalls: 100,
   maxLogs: 200,
   maxResultChars: 100_000,
+  maxRssBytes: 256 * 1024 * 1024,
   wallClockMs: 10_000,
 };
 

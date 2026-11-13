@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest";
 import { currentDb, schema } from "@feeblo/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { McpSchema } from "effect/ai";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -859,12 +859,19 @@ layer(
         names: ["Live"],
       });
 
-      // The write landed through the same service the endpoint uses.
+      // The write landed through the same service the endpoint uses: the
+      // created tag — not the seeded one the program read — is in this
+      // workspace.
       const db = yield* currentDb;
       const created = yield* db
         .select()
         .from(schema.tagTable)
-        .where(eq(schema.tagTable.id, "tag_code_mode"));
+        .where(
+          and(
+            eq(schema.tagTable.organizationId, workspace.organizationId),
+            eq(schema.tagTable.name, "From a program")
+          )
+        );
       expect(created).toHaveLength(1);
     })
   );

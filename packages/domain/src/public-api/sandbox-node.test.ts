@@ -96,24 +96,69 @@ layer(SandboxLive)("sandbox", (it) => {
             }
           };
           return {
+            bridge: typeof __sandbox,
+            console: escape(() => console.log.constructor("return process")()),
             constructor: escape(() => this.constructor.constructor("return process")()),
             eval: escape(() => eval("1 + 1")),
+            fetch: typeof fetch,
             function: escape(() => new Function("return 1")()),
             process: typeof process,
             require: typeof require,
-            fetch: typeof fetch,
+            tools: escape(() => tools.echo.constructor("return process")()),
           };
         `,
       });
 
       expect(outcome.result).toEqual({
+        bridge: "undefined",
+        console: "blocked: EvalError",
         constructor: "blocked: EvalError",
         eval: "blocked: EvalError",
         fetch: "undefined",
         function: "blocked: EvalError",
         process: "undefined",
         require: "undefined",
+        tools: "blocked: EvalError",
       });
+    })
+  );
+
+  it.effect("refuses a frame larger than the protocol allows", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+      const failure = yield* sandbox
+        .run({
+          call: noCalls,
+          code: 'return "x".repeat(2_000_000);',
+          // The result cap is raised so the frame bound is what refuses it.
+          limits: { maxResultChars: 5_000_000 },
+        })
+        .pipe(Effect.flip);
+
+      expect(Schema.is(SandboxError)(failure)).toBe(true);
+      if (!Schema.is(SandboxError)(failure)) return;
+      expect(failure.code).toBe("LIMIT_EXCEEDED");
+      expect(failure.message).toContain("frame larger");
+    })
+  );
+
+  it.effect("stops a program at the memory watchdog", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+      const failure = yield* sandbox
+        .run({
+          // The program waits on a call that never answers, so the watchdog
+          // — not the wall clock — is what ends it.
+          call: () => Effect.never,
+          code: "return await tools.slow({});",
+          limits: { maxRssBytes: 1, wallClockMs: 5_000 },
+        })
+        .pipe(Effect.flip);
+
+      expect(Schema.is(SandboxError)(failure)).toBe(true);
+      if (!Schema.is(SandboxError)(failure)) return;
+      expect(failure.code).toBe("LIMIT_EXCEEDED");
+      expect(failure.message).toContain("memory budget");
     })
   );
 
