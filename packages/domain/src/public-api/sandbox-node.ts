@@ -70,20 +70,21 @@ const send = (message) => {
 
 const log = (level, args) => {
   if (logs.length >= maxLogs) return;
-  logs.push(
+  const text =
     level +
-      ": " +
-      args
-        .map((value) => {
-          if (typeof value === "string") return value;
-          try {
-            return JSON.stringify(value);
-          } catch {
-            return String(value);
-          }
-        })
-        .join(" ")
-  );
+    ": " +
+    args
+      .map((value) => {
+        if (typeof value === "string") return value;
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return String(value);
+        }
+      })
+      .join(" ");
+  // One enormous line must not outgrow the log budget the host enforces.
+  logs.push(text.length > 2000 ? text.slice(0, 2000) : text);
 };
 
 const callTool = (name, input) =>
@@ -293,13 +294,20 @@ export const NodeSandboxLive = Layer.effect(
             // worker, add a native addon, or open a socket.
             ChildProcess.make(process.execPath, [
               "--permission",
+              // A program that allocates without bound dies on its own heap
+              // rather than through the host's wall clock.
+              "--max-old-space-size=128",
               "--input-type=module",
               "--no-warnings",
               "-e",
               RUNNER_SOURCE,
             ])
           );
-          yield* Effect.addFinalizer(() => child.kill().pipe(Effect.ignore));
+          yield* Effect.addFinalizer(() =>
+            // A program that starves its own event loop cannot act on SIGTERM,
+            // so the forced kill is the only termination the sandbox promises.
+            child.kill({ forceKillAfter: "250 millis" }).pipe(Effect.ignore)
+          );
 
           const input = yield* Queue.unbounded<Uint8Array>();
           yield* Stream.fromQueue(input).pipe(

@@ -165,6 +165,29 @@ layer(SandboxLive)("sandbox", (it) => {
     })
   );
 
+  it.effect("stops a program that starves the child's own event loop", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+
+      // The program keeps resolving promises, so the child's event loop never
+      // processes the signal handler a graceful kill would rely on; only the
+      // forced kill ends it.
+      const fiber = yield* sandbox
+        .run({
+          call: noCalls,
+          code: "for (;;) { await Promise.resolve(); }",
+          limits: { wallClockMs: 200 },
+        })
+        .pipe(Effect.flip, Effect.forkChild);
+      yield* TestClock.adjust("200 millis");
+      const failure = yield* Fiber.join(fiber);
+
+      expect(Schema.is(SandboxError)(failure)).toBe(true);
+      if (!Schema.is(SandboxError)(failure)) return;
+      expect(failure.code).toBe("LIMIT_EXCEEDED");
+    })
+  );
+
   it.effect("refuses a result larger than the budget", () =>
     Effect.gen(function* () {
       const failure = yield* failureOf('return "x".repeat(100);', {
