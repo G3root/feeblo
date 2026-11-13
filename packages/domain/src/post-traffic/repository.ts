@@ -1,11 +1,12 @@
 import { currentDb, schema, withTransactionAbortRetry } from "@feeblo/db";
-import { and, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { publicPostVisibility } from "../post/public-visibility";
 import type { TPostTraffic, TPostViewDimensionCount } from "./schema";
 import type { TPostViewClient } from "./user-agent";
 
@@ -83,12 +84,14 @@ const makePostTrafficRepository = Effect.gen(function* () {
                   schema.boardTable,
                   eq(schema.boardTable.id, schema.postTable.boardId)
                 )
+                // The post lifecycle's own predicate: an archived or merged
+                // post has no public page, and a private board's post is not
+                // reachable. Reusing the derived fragment is what keeps this
+                // ingest from becoming a second copy of the machine.
                 .where(
                   and(
                     eq(schema.postTable.id, input.postId),
-                    isNull(schema.postTable.archivedAt),
-                    isNull(schema.postTable.mergedIntoPostId),
-                    eq(schema.boardTable.visibility, "PUBLIC")
+                    publicPostVisibility
                   )
                 )
                 .limit(1);
