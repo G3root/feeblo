@@ -33,6 +33,7 @@ import { NotificationService } from "@feeblo/domain/notification/service";
 import { PostActivityRepository } from "@feeblo/domain/post-activity/repository";
 import { PostStatusRepository } from "@feeblo/domain/post-status/repository";
 import { PostSubscriptionRepository } from "@feeblo/domain/post-subscription/repository";
+import { PostTrafficRepository } from "@feeblo/domain/post-traffic/repository";
 import { PostEmbeddingService } from "@feeblo/domain/post/embedding-service";
 import { PostRepository } from "@feeblo/domain/post/repository";
 import { PostWriteService } from "@feeblo/domain/post/write";
@@ -283,6 +284,9 @@ export const makeServiceLayers = ({
   const ServiceCore = Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
+    // The post detail's traffic read runs on the dashboard's RPC route; the
+    // repository is built once here like the rest of the read models.
+    PostTrafficRepository.layer,
     // The media-upload surfaces replace a singleton asset through the asset
     // repository; provided once here rather than rebuilt inside each handler.
     AssetRepository.layer,

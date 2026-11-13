@@ -12,13 +12,19 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Separator } from "@feeblo/ui/separator";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import { Activity01Icon, Comment01Icon } from "@hugeicons/core-free-icons";
+import {
+  Activity01Icon,
+  ChartLineData01Icon,
+  Comment01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 
 import {
   GitHubPostIssueDialog,
@@ -39,6 +45,8 @@ import {
 } from "~/features/post/components/post-page-sections";
 import { PostSidebarActions } from "~/features/post/components/post-sidebar-actions";
 import { PostTagField } from "~/features/post/components/post-tag-field";
+import { PostViews } from "~/features/post/components/post-views";
+import { postTrafficQueryOptions } from "~/features/post/lib/post-traffic-query";
 import {
   banUserAtom,
   unbanUserAtom,
@@ -83,9 +91,18 @@ const toUserBanTarget = (target: BanAuthorTarget) =>
       }
     : { _tag: "post" as const, postId: asLegid(PostId)(target.postId) };
 
+// The analytics tab is its own chunk: the post's first load should not carry
+// the breakdown UI for a tab the reader may never open.
+const LazyPostAnalytics = lazy(() =>
+  import("~/features/post/components/post-analytics").then((module) => ({
+    default: module.PostAnalytics,
+  }))
+);
+
 function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
+  const queryClient = useQueryClient();
   // The linked-resources panel and its GitHub actions are read/written through
   // RPCs that require integrations.manage, so gate them the same way the
   // settings route does instead of rendering actions that will 403.
@@ -229,6 +246,15 @@ function RouteComponent() {
   // live on the survivor now, so those panels would show a misleading subset.
   const isMerged = post.mergedIntoPostId != null;
 
+  // Warm both halves of the tab on intent: the chunk and the read. The
+  // panel's `useQuery` then joins the request instead of starting one.
+  const preloadAnalytics = () => {
+    void import("~/features/post/components/post-analytics");
+    void queryClient.prefetchQuery(
+      postTrafficQueryOptions({ organizationId, postId: post.id })
+    );
+  };
+
   return (
     <PostPage.Root
       board={board}
@@ -286,6 +312,14 @@ function RouteComponent() {
                   <HugeiconsIcon icon={Activity01Icon} />
                   Activity
                 </TabsTab>
+                <TabsTab
+                  onMouseEnter={preloadAnalytics}
+                  onFocus={preloadAnalytics}
+                  value="analytics"
+                >
+                  <HugeiconsIcon icon={ChartLineData01Icon} />
+                  Analytics
+                </TabsTab>
               </TabsList>
               <TabsPanel className="space-y-6 pt-4" value="comments">
                 <PostPage.DashboardCommentComposer />
@@ -296,6 +330,23 @@ function RouteComponent() {
                   activityQuery={activityQuery}
                   organizationId={organizationId}
                 />
+              </TabsPanel>
+              <TabsPanel className="pt-4" value="analytics">
+                <Suspense
+                  fallback={
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <Skeleton className="h-36 rounded-xl" />
+                      <Skeleton className="h-36 rounded-xl" />
+                      <Skeleton className="h-36 rounded-xl" />
+                      <Skeleton className="h-36 rounded-xl" />
+                    </div>
+                  }
+                >
+                  <LazyPostAnalytics
+                    organizationId={organizationId}
+                    postId={post.id}
+                  />
+                </Suspense>
               </TabsPanel>
             </Tabs>
           </section>
@@ -348,7 +399,9 @@ function RouteComponent() {
                 (PostPolicy.canUpdateProperties): status → posts.status,
                 board → posts.move, ETA → posts.status, assignee →
                 posts.status. */}
-            <PostDetails createdAt={post.createdAt} />
+            <PostDetails createdAt={post.createdAt}>
+              <PostViews organizationId={organizationId} postId={post.id} />
+            </PostDetails>
 
             {/* Voter management: add/remove on behalf of customers.
                 Controls self-gate with `votes.onBehalf` (contributor+).

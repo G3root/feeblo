@@ -36,6 +36,30 @@ export type WorkspaceInsights = Atom.Success<
   ReturnType<typeof workspaceInsightsAtom>
 >;
 
+/**
+ * The insights page's traffic section.
+ *
+ * A second atom, fetched in parallel with the insights read: post views do not
+ * change when a post or a vote does, so they share neither a query nor a
+ * reactivity key. The window is the page's own range.
+ */
+export type WorkspaceTrafficAtomArgs = {
+  readonly organizationId: string;
+  readonly range: TInsightsRange;
+};
+
+export const workspaceTrafficAtom = Atom.family(
+  (args: WorkspaceTrafficAtomArgs) =>
+    DashboardClient.query("GetWorkspaceTraffic", args).pipe(
+      dashboardSWR("60 seconds"),
+      Atom.setIdleTTL("5 minutes")
+    )
+);
+
+export type WorkspaceTraffic = Atom.Success<
+  ReturnType<typeof workspaceTrafficAtom>
+>;
+
 export type InsightsSummary = WorkspaceInsights["summary"];
 export type InsightsPoint = WorkspaceInsights["volume"][number];
 export type InsightsStatusSlice = WorkspaceInsights["statusMix"][number];

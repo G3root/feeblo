@@ -35,6 +35,7 @@ import { Route as SLlmsDottxtRouteImport } from "./routes/s/llms[.]txt"
 import { Route as SRobotsDottxtRouteImport } from "./routes/s/robots[.]txt"
 import { Route as SSitemapDotxmlRouteImport } from "./routes/s/sitemap[.]xml"
 import { Route as TelemetrySignalRouteImport } from "./routes/telemetry/$signal"
+import { Route as TrafficViewRouteImport } from "./routes/traffic/view"
 import { Route as DashboardOrganizationIdDashboardLayoutRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout"
 import { Route as DashboardOrganizationIdOverPlanRouteImport } from "./routes/_dashboard/$organizationId/over-plan"
 import { Route as DashboardOrganizationIdSettingsRouteImport } from "./routes/_dashboard/$organizationId/settings"
@@ -220,6 +221,11 @@ const SSitemapDotxmlRoute = SSitemapDotxmlRouteImport.update({
 const TelemetrySignalRoute = TelemetrySignalRouteImport.update({
   id: "/telemetry/$signal",
   path: "/telemetry/$signal",
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrafficViewRoute = TrafficViewRouteImport.update({
+  id: "/traffic/view",
+  path: "/traffic/view",
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardOrganizationIdDashboardLayoutRoute =
@@ -590,6 +596,7 @@ export interface FileRoutesByFullPath {
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/telemetry/$signal": typeof TelemetrySignalRoute
+  "/traffic/view": typeof TrafficViewRoute
   "/s/": typeof SIndexRoute
   "/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
   "/$organizationId/settings": typeof DashboardOrganizationIdSettingsRouteWithChildren
@@ -672,6 +679,7 @@ export interface FileRoutesByTo {
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/telemetry/$signal": typeof TelemetrySignalRoute
+  "/traffic/view": typeof TrafficViewRoute
   "/s": typeof SIndexRoute
   "/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
   "/invitation/$invitationId": typeof DashboardInvitationInvitationIdRoute
@@ -755,6 +763,7 @@ export interface FileRoutesById {
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/telemetry/$signal": typeof TelemetrySignalRoute
+  "/traffic/view": typeof TrafficViewRoute
   "/s/": typeof SIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout": typeof DashboardOrganizationIdDashboardLayoutRouteWithChildren
   "/_dashboard/$organizationId/over-plan": typeof DashboardOrganizationIdOverPlanRoute
@@ -841,6 +850,7 @@ export interface FileRouteTypes {
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/telemetry/$signal"
+    | "/traffic/view"
     | "/s/"
     | "/$organizationId/over-plan"
     | "/$organizationId/settings"
@@ -923,6 +933,7 @@ export interface FileRouteTypes {
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/telemetry/$signal"
+    | "/traffic/view"
     | "/s"
     | "/$organizationId/over-plan"
     | "/invitation/$invitationId"
@@ -1005,6 +1016,7 @@ export interface FileRouteTypes {
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/telemetry/$signal"
+    | "/traffic/view"
     | "/s/"
     | "/_dashboard/$organizationId/_dashboard-layout"
     | "/_dashboard/$organizationId/over-plan"
@@ -1077,6 +1089,7 @@ export interface RootRouteChildren {
   DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
   FeedbackWidgetOrganizationIdRoute: typeof FeedbackWidgetOrganizationIdRoute
   TelemetrySignalRoute: typeof TelemetrySignalRoute
+  TrafficViewRoute: typeof TrafficViewRoute
 }
 
 declare module "@tanstack/react-router" {
@@ -1261,6 +1274,13 @@ declare module "@tanstack/react-router" {
       path: "/telemetry/$signal"
       fullPath: "/telemetry/$signal"
       preLoaderRoute: typeof TelemetrySignalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    "/traffic/view": {
+      id: "/traffic/view"
+      path: "/traffic/view"
+      fullPath: "/traffic/view"
+      preLoaderRoute: typeof TrafficViewRouteImport
       parentRoute: typeof rootRouteImport
     }
     "/_dashboard/$organizationId/_dashboard-layout": {
@@ -1940,7 +1960,17 @@ const rootRouteChildren: RootRouteChildren = {
   DotwellKnownSplatRoute: DotwellKnownSplatRoute,
   FeedbackWidgetOrganizationIdRoute: FeedbackWidgetOrganizationIdRoute,
   TelemetrySignalRoute: TelemetrySignalRoute,
+  TrafficViewRoute: TrafficViewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from "./router.tsx"
+import type { createStart } from "@tanstack/react-start"
+declare module "@tanstack/react-start" {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

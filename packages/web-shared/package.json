@@ -58,6 +58,10 @@
       "types": "./src/lib/reaction-keys.ts",
       "default": "./src/lib/reaction-keys.ts"
     },
+    "./post-view": {
+      "types": "./src/post-view.ts",
+      "default": "./src/post-view.ts"
+    },
     "./use-policy": {
       "types": "./src/hooks/use-policy.ts",
       "default": "./src/hooks/use-policy.ts"

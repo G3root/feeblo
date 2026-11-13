@@ -65,12 +65,16 @@ function isFeedbackWidgetPath(pathname: string) {
 /**
  * Host routes that are not board pages.
  *
- * The error-reporting and telemetry relays are called from the page itself,
- * so on a customer's custom board domain they must stay at the path the
+ * The error-reporting, telemetry and page-view relays are called from the page
+ * itself, so on a customer's custom board domain they must stay at the path the
  * browser posted to. Folding them under `/s/...`, as every other board path is
  * folded, would turn a relay into a board not-found page.
  */
-const HOST_ROUTE_PREFIXES = ["/sentry-tunnel", "/telemetry"] as const;
+const HOST_ROUTE_PREFIXES = [
+  "/sentry-tunnel",
+  "/telemetry",
+  "/traffic",
+] as const;
 
 function isHostRoute(pathname: string) {
   return HOST_ROUTE_PREFIXES.some(

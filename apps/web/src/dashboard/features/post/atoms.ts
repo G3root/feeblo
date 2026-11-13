@@ -37,3 +37,22 @@ export const postSuggestionsAtom = Atom.family((args: PostSuggestionsArgs) =>
 
 export const postMergeAtom = DashboardClient.mutation("MergePost");
 export const postUnmergeAtom = DashboardClient.mutation("UnmergePost");
+
+export type PostViewCountArgs = {
+  readonly organizationId: string;
+  readonly postId: string;
+};
+
+/**
+ * The post's all-time view count, for the detail sidebar.
+ *
+ * Deliberately only the counter: the breakdowns are the analytics tab's read,
+ * fetched when that tab is opened or prefetched. A count is an aggregate over
+ * the workspace's history, so it is not part of the post's collections either
+ * (ADR 0026).
+ */
+export const postViewCountAtom = Atom.family((args: PostViewCountArgs) =>
+  DashboardClient.query("GetPostViewCount", args).pipe(
+    Atom.setIdleTTL("1 minute")
+  )
+);

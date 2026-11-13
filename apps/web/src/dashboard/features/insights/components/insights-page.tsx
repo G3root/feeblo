@@ -31,6 +31,7 @@ import {
   type InsightsSummary,
   type WorkspaceInsights,
   workspaceInsightsAtom,
+  workspaceTrafficAtom,
 } from "../atoms";
 import {
   InsightsStat,
@@ -41,6 +42,11 @@ import {
   InsightsTopVoters,
   InsightsVolumeChart,
 } from "./insights-sections";
+import {
+  InsightsTraffic,
+  InsightsTrafficFailure,
+  InsightsTrafficSkeleton,
+} from "./insights-traffic";
 
 const numberFormatter = new Intl.NumberFormat();
 
@@ -101,6 +107,18 @@ export function InsightsPage({
   const atom = workspaceInsightsAtom(args);
   const result = useAtomValue(atom);
   const refresh = useAtomRefresh(atom);
+  // Started next to the insights read, not after it: the two are independent
+  // sources, and a second round trip behind the first would be a waterfall.
+  const trafficAtom = workspaceTrafficAtom(args);
+  const trafficResult = useAtomValue(trafficAtom);
+  const refreshTraffic = useAtomRefresh(trafficAtom);
+  const trafficSection = Result.builder(trafficResult)
+    .onInitial(() => <InsightsTrafficSkeleton />)
+    .onFailure(() => <InsightsTrafficFailure onRetry={refreshTraffic} />)
+    .onSuccess((traffic) => (
+      <InsightsTraffic rangeLabel={RANGE_LABELS[range]} traffic={traffic} />
+    ))
+    .exhaustive();
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
@@ -139,6 +157,7 @@ export function InsightsPage({
             insights={insights}
             organizationId={organizationId}
             range={range}
+            trafficSection={trafficSection}
           />
         ))
         .exhaustive()}
@@ -150,10 +169,12 @@ function InsightsContent({
   insights,
   organizationId,
   range,
+  trafficSection,
 }: {
   readonly insights: WorkspaceInsights;
   readonly organizationId: string;
   readonly range: TInsightsRange;
+  readonly trafficSection: React.ReactNode;
 }) {
   const { summary, subscriptions } = insights;
   const days = INSIGHTS_RANGE_DAYS[range];
@@ -173,18 +194,23 @@ function InsightsContent({
 
   if (!hasActivity) {
     return (
-      <Empty className="border">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <HugeiconsIcon icon={ChartLineData01Icon} />
-          </EmptyMedia>
-          <EmptyTitle>No feedback to measure yet</EmptyTitle>
-          <EmptyDescription>
-            Once people post and vote, this page shows volume, response time,
-            the status mix, and the posts waiting for an owner.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <>
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={ChartLineData01Icon} />
+            </EmptyMedia>
+            <EmptyTitle>No feedback to measure yet</EmptyTitle>
+            <EmptyDescription>
+              Once people post and vote, this page shows volume, response time,
+              the status mix, and the posts waiting for an owner.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+        {/* Traffic is independent of the feedback activity above; a workspace
+            whose posts were archived still has views worth showing. */}
+        {trafficSection}
+      </>
     );
   }
 
@@ -215,6 +241,8 @@ function InsightsContent({
           title="Votes per day"
         />
       </section>
+
+      {trafficSection}
 
       <section className="grid gap-3 lg:grid-cols-2">
         <InsightsStatusMix

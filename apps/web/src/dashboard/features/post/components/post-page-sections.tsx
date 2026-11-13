@@ -59,7 +59,7 @@ export function PostPageSkeleton() {
  * max width as the author and created values, which is what turns the old
  * full-width toolbar buttons into metadata rather than a second toolbar.
  */
-function PostDetailRow({
+export function PostDetailRow({
   children,
   icon,
   label,
@@ -84,7 +84,13 @@ function PostDetailRow({
   );
 }
 
-export function PostDetails({ createdAt }: { createdAt: Date | string }) {
+export function PostDetails({
+  children,
+  createdAt,
+}: {
+  createdAt: Date | string;
+  children?: ReactNode;
+}) {
   return (
     <section aria-labelledby="post-details-heading" className="space-y-2.5">
       <h2 className="sr-only" id="post-details-heading">
@@ -115,6 +121,7 @@ export function PostDetails({ createdAt }: { createdAt: Date | string }) {
         <PostDetailRow icon={Calendar03Icon} label="Created">
           <span className="truncate">{dayjs.default(createdAt).fromNow()}</span>
         </PostDetailRow>
+        {children}
       </dl>
     </section>
   );
