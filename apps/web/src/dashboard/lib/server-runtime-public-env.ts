@@ -22,14 +22,18 @@ const serverEnvSchema = z.object({
   APP_ROOT_DOMAIN: z.string().min(1),
   APP_RELEASE: z.string().optional(),
   // The deployment environment name (`APP_ENV`, defaulting to `NODE_ENV` on
-  // the server). The browser uses it for Sentry and PostHog when
+  // the server). The browser uses it for Sentry and Databuddy when
   // `SENTRY_ENVIRONMENT` is unset, so an event's environment matches the
   // server's instead of Vite's build mode.
   APP_ENV: z.string().optional(),
   TURNSTILE_SITE_KEY: z.string().optional(),
   NO_INDEX: z.string().optional(),
-  POSTHOG_KEY: z.string().optional(),
-  POSTHOG_HOST: z.string().optional(),
+  // Databuddy identifies a website by its public client id; the API origin is
+  // only set when the deployment proxies ingestion through its own domain.
+  // Databuddy is hosted only — there is no collector to point this at — and
+  // both values reach the browser by design.
+  DATABUDDY_CLIENT_ID: z.string().optional(),
+  DATABUDDY_API_URL: z.string().optional(),
   // Public by design: a Sentry DSN identifies a project, it does not
   // authorize ingestion of another. The server-side `SENTRY_ENVIRONMENT`
   // keeps test and production events apart.
@@ -49,8 +53,8 @@ export function getPublicEnvServer(): ServerPublicEnv {
     APP_ENV: process.env.APP_ENV,
     TURNSTILE_SITE_KEY: process.env.TURNSTILE_SITE_KEY,
     NO_INDEX: process.env.NO_INDEX,
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
+    DATABUDDY_CLIENT_ID: process.env.DATABUDDY_CLIENT_ID,
+    DATABUDDY_API_URL: process.env.DATABUDDY_API_URL,
     SENTRY_DSN: process.env.SENTRY_DSN,
     SENTRY_ENVIRONMENT: process.env.SENTRY_ENVIRONMENT,
   });
@@ -66,8 +70,8 @@ export function getServerRuntimePublicEnv() {
     appRelease: env.APP_RELEASE,
     appEnv: env.APP_ENV,
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
-    posthogKey: env.POSTHOG_KEY,
-    posthogHost: env.POSTHOG_HOST,
+    databuddyClientId: env.DATABUDDY_CLIENT_ID,
+    databuddyApiUrl: env.DATABUDDY_API_URL,
     sentryDsn: env.SENTRY_DSN,
     sentryEnvironment: env.SENTRY_ENVIRONMENT,
   };
@@ -108,8 +112,8 @@ export function getBrowserPublicEnv() {
     APP_RELEASE: env.APP_RELEASE,
     APP_ENV: env.APP_ENV,
     TURNSTILE_SITE_KEY: env.TURNSTILE_SITE_KEY,
-    POSTHOG_KEY: env.POSTHOG_KEY,
-    POSTHOG_HOST: env.POSTHOG_HOST,
+    DATABUDDY_CLIENT_ID: env.DATABUDDY_CLIENT_ID,
+    DATABUDDY_API_URL: env.DATABUDDY_API_URL,
     SENTRY_DSN: env.SENTRY_DSN,
     SENTRY_ENVIRONMENT: env.SENTRY_ENVIRONMENT,
   };

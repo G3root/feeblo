@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
+    "@databuddy/sdk": "catalog:",
     "@dnd-kit/abstract": "^0.5.3",
     "@dnd-kit/dom": "^0.5.3",
     "@dnd-kit/react": "^0.5.3",
@@ -56,7 +57,6 @@
     "@xstate/store-react": "^2.1.0",
     "class-variance-authority": "catalog:",
     "effect": "catalog:",
-    "posthog-js": "catalog:",
     "react": "catalog:",
     "react-avatar-editor": "^16.0.0",
     "react-dom": "catalog:",

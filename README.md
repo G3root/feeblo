@@ -60,7 +60,7 @@ docs/                   Topic docs and docs/adr/ decision records
 - **Web:** TanStack Start, React 19, TanStack Router/DB/Query/Form, Tailwind v4
 - **Widget:** SolidJS, Vite-built, Floating UI positioning
 - **State:** XState 6
-- **Observability:** OpenTelemetry over OTLP, Sentry for errors, PostHog for product analytics
+- **Observability:** OpenTelemetry over OTLP, Sentry for errors, Databuddy for product analytics
 - **Tooling:** pnpm 11, Turborepo, tsrs (a Rust port of TypeScript 7), Oxlint + Oxfmt (type-aware via `@effect/tsgo`), Knip, Vitest, Playwright
 - **Infra/Deploy:** Docker, Cloudflare via Wrangler
 

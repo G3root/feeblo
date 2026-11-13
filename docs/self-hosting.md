@@ -58,7 +58,7 @@ Every variable in `.env.example` is read from this file; the example file keeps 
 
 - Social login: register `<API_URL>/api/auth/callback/github` and `<API_URL>/api/auth/callback/google`.
 - GitHub App: callback `<API_URL>/github/app/installations/callback`, webhook `<API_URL>/github/app/webhooks`.
-- Sentry, PostHog, embeddings and OTLP are off unless their keys are uncommented.
+- Sentry, Databuddy, embeddings and OTLP are off unless their keys are uncommented. Databuddy has no self-hosted deployment: uncommenting `DATABUDDY_CLIENT_ID` sends pageviews and product events to databuddy.cc, so leave it unset unless that is the processor you intend.
 - `AUTH_SIGN_UP_ENABLED`, `AUTH_EMAIL_VERIFICATION_REQUIRED`, `ALLOWED_EMAILS` and `TURNSTILE_*` control who can register.
 
 `DATABASE_URL` and `REDIS_URL` must use the compose service names `pg` and `redis`, which the self-host example already does.
@@ -73,7 +73,7 @@ docker compose --env-file docker/.env.selfhost up -d
 
 `--env-file` replaces the default `.env`, so the dev file is never read. The server image runs the migrator before it starts listening; on a new database the first boot takes as long as the migrations need.
 
-The server receives the operator file through `env_file`, so the optional integrations are not dropped by a hand-written allow-list. The web service gets an explicit allow-list of only the public settings it needs (its origins, the Sentry DSN, PostHog and Turnstile site keys, and the media/CSP origins); the database, mail, auth and object-storage secrets never enter that container.
+The server receives the operator file through `env_file`, so the optional integrations are not dropped by a hand-written allow-list. The web service gets an explicit allow-list of only the public settings it needs (its origins, the Sentry DSN, the Databuddy client id and Turnstile site key, and the media/CSP origins); the database, mail, auth and object-storage secrets never enter that container.
 
 ## 4. Verify
 

@@ -167,8 +167,8 @@ services:
       # project; it does not authorize ingestion. Both are injected into the
       # page, so they are public by design.
       TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
-      POSTHOG_KEY: ${POSTHOG_KEY:-}
-      POSTHOG_HOST: ${POSTHOG_HOST:-}
+      DATABUDDY_CLIENT_ID: ${DATABUDDY_CLIENT_ID:-}
+      DATABUDDY_API_URL: ${DATABUDDY_API_URL:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       # The web process attaches the page security headers, and its `img-src`

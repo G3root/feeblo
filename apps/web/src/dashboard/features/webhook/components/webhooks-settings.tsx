@@ -86,11 +86,11 @@ function WebhooksSettingsContent({
               This secret for {oneTimeSecret.endpointName} will not be shown
               again.
             </p>
-            {/* `data-ph-block` keeps the one-time secret out of session
-                replays even if the blanket text mask is ever relaxed. */}
+            {/* `data-replay-block` keeps the one-time secret out of Databuddy
+                session replays if recording is ever enabled for this surface. */}
             <code
               className="bg-background mt-3 block rounded-md border p-3 text-sm break-all"
-              data-ph-block
+              data-replay-block
             >
               {oneTimeSecret.value}
             </code>

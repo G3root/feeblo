@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { pageContext } from "./posthog-provider";
+import { pageContext } from "./databuddy-provider";
 
 /**
- * `pageContext` is the only route information PostHog receives. These cases
- * pin that the tenant id in the first URL segment never becomes a property,
- * that settings sub-pages collapse to a fixed vocabulary, and that a resource
- * slug is reduced to "detail".
+ * `pageContext` is the route information explicit product events carry.
+ *
+ * These cases pin that the tenant id in the first URL segment never becomes a
+ * property, that settings sub-pages collapse to a fixed vocabulary, and that a
+ * resource slug is reduced to "detail". Automatic pageviews go out with a path
+ * of their own; `maskedPaths` in `./databuddy-provider` is what keeps the same
+ * segments out of those.
  */
 describe("pageContext", () => {
   const organizationId = "org_01abcdef";

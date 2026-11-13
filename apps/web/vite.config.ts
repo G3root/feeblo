@@ -388,8 +388,8 @@ export default defineConfig({
             return "better-auth-vendor";
           }
 
-          if (id.includes("/posthog-js/")) {
-            return "posthog-vendor";
+          if (id.includes("/@databuddy/")) {
+            return "databuddy-vendor";
           }
 
           if (id.includes("/dompurify/")) {

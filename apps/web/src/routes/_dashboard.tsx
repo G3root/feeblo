@@ -11,11 +11,9 @@ import { getClientOnlyDocumentCacheControl } from "@/lib/document-cache-control"
 import { getLocale, setLocale } from "@/paraglide/runtime.js";
 import { DashboardPendingShell } from "~/components/dashboard-pending-shell";
 import {
-  PostHogIdentify,
-  PostHogPageviews,
-  PostHogProvider,
-  posthogAnalyticsClient,
-} from "~/components/posthog-provider";
+  DashboardAnalytics,
+  databuddyAnalyticsClient,
+} from "~/components/databuddy-provider";
 import { getContext } from "~/integrations/tanstack-query/root-provider";
 import { dashboardAuthBeforeLoad } from "~/lib/auth-redirects";
 import { startDashboardShellPreload } from "~/lib/preloads";
@@ -77,11 +75,9 @@ function DashboardBoundary() {
   const { queryClient } = getContext();
 
   return (
-    <AnalyticsProvider client={posthogAnalyticsClient}>
-      <PostHogProvider>
-        <AuthProvider>
-          <PostHogIdentify />
-          <PostHogPageviews />
+    <AnalyticsProvider client={databuddyAnalyticsClient}>
+      <AuthProvider>
+        <DashboardAnalytics>
           <ThemeProvider>
             <ToastProvider>
               <AnchoredToastProvider>
@@ -93,8 +89,8 @@ function DashboardBoundary() {
               </AnchoredToastProvider>
             </ToastProvider>
           </ThemeProvider>
-        </AuthProvider>
-      </PostHogProvider>
+        </DashboardAnalytics>
+      </AuthProvider>
     </AnalyticsProvider>
   );
 }

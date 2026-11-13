@@ -3,7 +3,7 @@ import { useAuth } from "@feeblo/web-shared/auth-context";
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import { groupPostHogOrganization } from "~/components/posthog-provider";
+import { setAnalyticsOrganization } from "~/components/databuddy-provider";
 import { AuthGate } from "~/features/auth/components/organization-auth-gate";
 import { isOverPlanPathAllowed } from "~/features/plan-compliance/lib/over-plan-routes";
 import { planComplianceCollectionFor } from "~/lib/collections";
@@ -60,24 +60,24 @@ export const Route = createFileRoute("/_dashboard/$organizationId")({
 function OrganizationLayoutRoute() {
   return (
     <AuthGate>
-      <PostHogOrganizationGroup />
+      <AnalyticsOrganization />
       <Outlet />
     </AuthGate>
   );
 }
 
-function PostHogOrganizationGroup() {
+function AnalyticsOrganization() {
   const auth = useAuth();
   const { organizationId } = Route.useParams();
-  const canGroup = auth.status === "authenticated" && auth.data !== null;
+  const canAttribute = auth.status === "authenticated" && auth.data !== null;
 
   useEffect(() => {
-    if (!canGroup) {
+    if (!canAttribute) {
       return;
     }
 
-    groupPostHogOrganization(organizationId);
-  }, [canGroup, organizationId]);
+    setAnalyticsOrganization(organizationId);
+  }, [canAttribute, organizationId]);
 
   return null;
 }

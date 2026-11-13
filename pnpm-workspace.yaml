@@ -44,6 +44,7 @@ catalog:
   "@better-auth/oauth-provider": 1.7.18
   "@bufbuild/protobuf": 2.17.0
   "@cloudflare/workers-types": ^5.20261104.1
+  "@databuddy/sdk": ^3.5.1
   "@dotenvx/dotenvx": ^2.38.2
   "@effect-aws/client-s3": 2.0.0
   "@effect/ai-openai": 4.1.2
@@ -109,7 +110,6 @@ catalog:
   jose: ^6.2.15
   knip: ^6.44.1
   postgres: ^4.0.0
-  posthog-js: ^1.446.3
   rangi: ^2.2.0
   # React 19.3 breaks two comment flows the e2e suite pins, reproduced on this
   # tree with every other bump in the batch applied: the Comments/Activity tab

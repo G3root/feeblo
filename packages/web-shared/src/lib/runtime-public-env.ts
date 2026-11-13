@@ -9,8 +9,8 @@ function parseRuntimePublicEnv(env: ProcessEnv) {
     appRootDomain: env.APP_ROOT_DOMAIN,
     appRelease: env.APP_RELEASE ?? "unknown",
     turnstileSiteKey: env.TURNSTILE_SITE_KEY,
-    posthogKey: env.POSTHOG_KEY,
-    posthogHost: env.POSTHOG_HOST,
+    databuddyClientId: env.DATABUDDY_CLIENT_ID,
+    databuddyApiUrl: env.DATABUDDY_API_URL,
     sentryDsn: env.SENTRY_DSN,
     // `.env.example` leaves these blank, and an empty label is not a useful
     // environment; treat it as unset so the app-env and mode fallbacks run.
