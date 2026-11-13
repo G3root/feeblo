@@ -4,6 +4,7 @@ import * as RpcServer from "effect/rpc/RpcServer";
 
 import { ApiKeyRpcHandlers } from "./api-key/handlers";
 import { AttributeDefinitionRpcHandlers } from "./attribute-definition/handlers";
+import { AuditLogRpcHandlers } from "./audit-log/handlers";
 import { BillingRpcHandlers } from "./billing/handlers";
 import { BoardRpcHandlers } from "./board/handlers";
 import { ChangelogCategoryRpcHandlers } from "./changelog-category/handlers";
@@ -66,6 +67,7 @@ import { WorkspaceRpcHandlers } from "./workspace/handlers";
  */
 export const RpcHandlerRegistrations = {
   Post: PostRpcHandlers,
+  AuditLog: AuditLogRpcHandlers,
   PostActivity: PostActivityRpcHandlers,
   AttributeDefinition: AttributeDefinitionRpcHandlers,
   Billing: BillingRpcHandlers,

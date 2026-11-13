@@ -15,6 +15,7 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -167,7 +168,8 @@ describe("TagRpcHandlers", () => {
     TagRepository.layer,
     SiteRepository.layer,
     WorkspaceRepository.layer,
-    PostActivityRepository.layer
+    PostActivityRepository.layer,
+    AuditLogRecorder.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)

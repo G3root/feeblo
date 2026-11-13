@@ -2,6 +2,8 @@ import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import { PostActivityRepository } from "../post-activity/repository";
@@ -154,6 +156,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
     SetPostTags: (args: TPostTagSet) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
         const membership = Policy.getMembership(session, args.organizationId);
         const tagIds = normalizeTagIds(args.tagIds);
         // The post and the tags are validated by the same repository and
@@ -201,6 +204,23 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
                 actor,
               })
             );
+
+            // In the same transaction as the write it describes: the tags and
+            // the audit entry commit together or not at all. The recorder is
+            // intentionally not wrapped — inside a transaction a swallowed
+            // failure would leave the transaction aborted with no explanation.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post.updated",
+              resourceId: args.postId,
+              changes: {
+                fields: ["tagIds"],
+                before: { tagIds: previousTagIds },
+                after: { tagIds },
+              },
+            });
           })
         );
       }).pipe(
@@ -215,5 +235,6 @@ export const TagRpcHandlers = TagRpcs.toLayer(TagRpcHandlersEffect).pipe(
   Layer.provide(TagPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(PostActivityRepository.layer),
-  Layer.provide(TagRepository.layer)
+  Layer.provide(TagRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );
