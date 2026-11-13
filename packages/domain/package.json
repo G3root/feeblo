@@ -415,6 +415,9 @@
     "./post-traffic/retention": {
       "default": "./src/post-traffic/retention.ts"
     },
+    "./post-traffic/schema": {
+      "default": "./src/post-traffic/schema.ts"
+    },
     "./post/embedding-service": {
       "default": "./src/post/embedding-service.ts"
     },

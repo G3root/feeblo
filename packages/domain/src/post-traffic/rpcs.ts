@@ -3,7 +3,7 @@ import * as RpcGroup from "effect/rpc/RpcGroup";
 
 import { AuthMiddleware } from "../session-middleware";
 import { PostTrafficServiceErrors } from "./errors";
-import { PostTraffic, PostTrafficPayload } from "./schema";
+import { PostTraffic, PostTrafficPayload, PostViewCount } from "./schema";
 
 /**
  * The dashboard's per-post traffic read.
@@ -16,6 +16,11 @@ import { PostTraffic, PostTrafficPayload } from "./schema";
 export class PostTrafficRpcs extends RpcGroup.make(
   Rpc.make("GetPostTraffic", {
     success: PostTraffic,
+    payload: PostTrafficPayload,
+    error: PostTrafficServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("GetPostViewCount", {
+    success: PostViewCount,
     payload: PostTrafficPayload,
     error: PostTrafficServiceErrors,
   }).middleware(AuthMiddleware)

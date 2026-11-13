@@ -19,6 +19,22 @@ export const PostTrafficRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostTrafficRepository;
 
   return {
+    GetPostViewCount: (args: TPostTrafficPayload) =>
+      Effect.gen(function* () {
+        const views = yield* repository.getPostViewCount({
+          organizationId: args.organizationId,
+          postId: args.postId,
+        });
+
+        if (Option.isNone(views)) {
+          return yield* new PostNotFoundError({ message: "Post not found" });
+        }
+
+        return { postId: args.postId, views: views.value };
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("PostTraffic", "select")
+      ),
     GetPostTraffic: (args: TPostTrafficPayload) =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;

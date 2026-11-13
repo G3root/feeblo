@@ -49,6 +49,18 @@ export const PostTraffic = S.Struct({
 export type TPostTraffic = S.Schema.Type<typeof PostTraffic>;
 
 /**
+ * The sidebar's headline number. It is a separate operation from
+ * `GetPostTraffic` so opening a post does not read four breakdowns the reader
+ * has not asked for; the analytics tab owns that read.
+ */
+export const PostViewCount = S.Struct({
+  postId: S.String,
+  views: S.Finite,
+});
+
+export type TPostViewCount = S.Schema.Type<typeof PostViewCount>;
+
+/**
  * What the browser could tell about its own form factor.
  *
  * The hint exists for the one case a user agent cannot answer: iPadOS 13+

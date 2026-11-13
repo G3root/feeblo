@@ -150,6 +150,33 @@ layer(TestLayer)("PostTrafficRepository", (it) => {
     );
   });
 
+  describe("getPostViewCount", () => {
+    it.effect("returns the counter and scopes it to the workspace", () =>
+      Effect.gen(function* () {
+        const { organizationId, postId } = yield* makeFixture();
+        const other = yield* makeFixture();
+        const repository = yield* PostTrafficRepository;
+
+        yield* repository.recordView(view(postId, `${postId}:view-1`));
+        yield* repository.recordView(view(postId, `${postId}:view-2`));
+
+        const count = Option.getOrThrow(
+          yield* repository.getPostViewCount({ organizationId, postId })
+        );
+        expect(count).toBe(2);
+
+        expect(
+          Option.isNone(
+            yield* repository.getPostViewCount({
+              organizationId: other.organizationId,
+              postId,
+            })
+          )
+        ).toBe(true);
+      })
+    );
+  });
+
   describe("getPostTraffic", () => {
     it.effect("breaks the window down by country and device", () =>
       Effect.gen(function* () {

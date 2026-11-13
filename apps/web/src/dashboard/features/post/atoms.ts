@@ -38,21 +38,21 @@ export const postSuggestionsAtom = Atom.family((args: PostSuggestionsArgs) =>
 export const postMergeAtom = DashboardClient.mutation("MergePost");
 export const postUnmergeAtom = DashboardClient.mutation("UnmergePost");
 
-export type PostTrafficArgs = {
+export type PostViewCountArgs = {
   readonly organizationId: string;
   readonly postId: string;
 };
 
 /**
- * The post's all-time view count and last-30-days breakdown.
+ * The post's all-time view count, for the detail sidebar.
  *
- * Separate from the post's collections on purpose: a view count is an aggregate
- * over the whole workspace's history, and the dashboard's collections are row
- * lists the browser filters (ADR 0026). The idle TTL keeps a re-opened post
- * from re-reading on every mount; the number is not expected to be live.
+ * Deliberately only the counter: the breakdowns are the analytics tab's read,
+ * fetched when that tab is opened or prefetched. A count is an aggregate over
+ * the workspace's history, so it is not part of the post's collections either
+ * (ADR 0026).
  */
-export const postTrafficAtom = Atom.family((args: PostTrafficArgs) =>
-  DashboardClient.query("GetPostTraffic", args).pipe(
+export const postViewCountAtom = Atom.family((args: PostViewCountArgs) =>
+  DashboardClient.query("GetPostViewCount", args).pipe(
     Atom.setIdleTTL("1 minute")
   )
 );

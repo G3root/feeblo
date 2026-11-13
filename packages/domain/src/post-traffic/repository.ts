@@ -137,6 +137,41 @@ const makePostTrafficRepository = Effect.gen(function* () {
       }),
 
     /**
+     * The counter alone, for the post detail's sidebar.
+     *
+     * One statement: the post scopes the read to the workspace and the left
+     * join yields zero when the post has never been viewed.
+     */
+    getPostViewCount: ({
+      organizationId,
+      postId,
+    }: Pick<TPostTrafficRead, "organizationId" | "postId">) =>
+      Effect.gen(function* () {
+        const posts = yield* db
+          .select({ id: schema.postTable.id })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, postId),
+              eq(schema.postTable.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (posts.length === 0) {
+          return Option.none<number>();
+        }
+
+        const totals = yield* db
+          .select({ views: schema.postViewTotalTable.views })
+          .from(schema.postViewTotalTable)
+          .where(eq(schema.postViewTotalTable.postId, postId))
+          .limit(1);
+
+        return Option.some(totals[0]?.views ?? 0);
+      }),
+
+    /**
      * The all-time count and the last-30-days breakdown for one post.
      *
      * The post is resolved first and scoped by organization, so the read cannot
