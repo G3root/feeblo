@@ -148,21 +148,29 @@ export const streamPostCsv = (input: {
       // streamed to the client after this effect returns. Failing a completed
       // read because its log entry could not be written would deny a download
       // that already happened, so a recorder failure is logged and given up.
-      yield* audit.recordBestEffort({
-        organizationId: input.organizationId,
-        actor,
-        source: "dashboard",
-        action: "data_transfer.exported",
-        metadata,
-      });
-      yield* audit.recordBestEffort({
-        organizationId: input.organizationId,
-        actor,
-        source: "dashboard",
-        action: "board.exported",
-        ...(input.boardId !== null && { resourceId: input.boardId }),
-        metadata,
-      });
+      // One entry per export, not two. `board.exported` names the board it
+      // read; an export of every board has no single board to name, so it is a
+      // `data_transfer.exported` instead of a board entry without a board.
+      // Two rows for one download would double every export in the access view
+      // and report a board scope the caller never asked for.
+      if (input.boardId === null) {
+        yield* audit.recordBestEffort({
+          organizationId: input.organizationId,
+          actor,
+          source: "dashboard",
+          action: "data_transfer.exported",
+          metadata,
+        });
+      } else {
+        yield* audit.recordBestEffort({
+          organizationId: input.organizationId,
+          actor,
+          source: "dashboard",
+          action: "board.exported",
+          resourceId: input.boardId,
+          metadata,
+        });
+      }
     }
 
     const mapRow = toCsvRow({
