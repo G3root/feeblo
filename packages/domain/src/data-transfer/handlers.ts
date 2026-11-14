@@ -1,7 +1,12 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
+import { withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { DataImportService } from "./import-service";
 import { toDataImportJobDetail, toDataImportJobSummary } from "./mappers";
 import { DataTransferRpcs } from "./rpcs";
@@ -32,16 +37,40 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* DataImportService;
 
   return {
+    // Canceling stops a job but moves no customer data and removes nothing,
+    // and the catalog declares no verb for it: the two entries this feature
+    // writes for a transfer are the import it released and the export it
+    // produced. Deliberately not recorded.
     CancelDataImport: (args: TDataImportCancel) =>
       service.cancelImport({
         id: args.id,
         organizationId: args.organizationId,
       }),
     ConfirmDataImport: (args: TDataImportConfirm) =>
-      service.confirmImport({
-        id: args.id,
-        organizationId: args.organizationId,
-      }),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* service.confirmImport({
+              id: args.id,
+              organizationId: args.organizationId,
+            });
+            // In the confirm's transaction, so the job moving to `queued` and
+            // the entry commit together. `data_transfer` is a singleton
+            // resource (the catalog marks it so), which is why the job id goes
+            // in `metadata` rather than a resource id; the job row expires and
+            // the entry is what remains to say which import was released.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "data_transfer.imported",
+              metadata: { jobId: args.id },
+            });
+          })
+        );
+      }).pipe(withRemapDbErrors("DataTransfer", "update")),
     GetDataImport: (args: TDataImportGet) =>
       service
         .describeImport(toDescribeInput(args))
@@ -63,4 +92,7 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
 
 export const DataTransferRpcHandlers = DataTransferRpcs.toLayer(
   DataTransferRpcHandlersEffect
-).pipe(Layer.provide(DataImportService.layer));
+).pipe(
+  Layer.provide(DataImportService.layer),
+  Layer.provide(AuditLogRecorder.layer)
+);

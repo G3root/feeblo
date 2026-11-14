@@ -3,11 +3,14 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
 import { statusDisplayName } from "../post-status/display-name";
 import { PublicApiConfig } from "../public-api/config";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import {
   BOARD_POST_CSV_HEADER,
   type BoardPostCsvRow,
@@ -125,6 +128,40 @@ export const streamPostCsv = (input: {
       return yield* new DataExportTooLargeError({
         maxRows: DATA_EXPORT_MAX_ROWS,
         message: `This export has ${total} rows; the export limit is ${DATA_EXPORT_MAX_ROWS}. Narrow the export with the archived setting.`,
+      });
+    }
+
+    if (total > 0) {
+      const session = yield* CurrentSession;
+      const audit = yield* AuditLogRecorder;
+      const actor = actorFromSession(session, input.organizationId);
+      // The row count is what makes this a bulk read rather than a page view,
+      // and it is known before the first byte is streamed. An export of every
+      // board carries no single resource id, so `allBoards` says which shape
+      // the entry describes.
+      const metadata = {
+        allBoards: input.boardId === null,
+        includeArchived: input.includeArchived,
+        rowCount: total,
+      };
+      // This is a read with no transaction behind it, and the bytes are
+      // streamed to the client after this effect returns. Failing a completed
+      // read because its log entry could not be written would deny a download
+      // that already happened, so a recorder failure is logged and given up.
+      yield* audit.recordBestEffort({
+        organizationId: input.organizationId,
+        actor,
+        source: "dashboard",
+        action: "data_transfer.exported",
+        metadata,
+      });
+      yield* audit.recordBestEffort({
+        organizationId: input.organizationId,
+        actor,
+        source: "dashboard",
+        action: "board.exported",
+        ...(input.boardId !== null && { resourceId: input.boardId }),
+        metadata,
       });
     }
 
