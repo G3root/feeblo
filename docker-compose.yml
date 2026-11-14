@@ -42,6 +42,12 @@ services:
       args:
         APP_RELEASE: ${APP_RELEASE:-dev}
     restart: always
+    # Code-mode programs run in child processes, and Node has no portable
+    # per-child OS memory limit; the container is the hard bound. The child
+    # additionally stops itself when its resident memory passes
+    # SANDBOX maxRssBytes, so this is the backstop rather than the first line.
+    # Raise it if the server legitimately needs more.
+    mem_limit: ${SERVER_MEMORY_LIMIT:-2g}
     depends_on:
       pg:
         condition: service_healthy
