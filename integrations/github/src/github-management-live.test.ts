@@ -1,7 +1,9 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { IntegrationProviderKey } from "@feeblo/domain-contracts/integration";
+import { AuditLogEnabled } from "@feeblo/domain/audit-log/flag";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { withProviderAudit } from "@feeblo/domain/integration/audit";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import { GitHubManagementService } from "@feeblo/domain/integration/github/management-service";
@@ -10,6 +12,10 @@ import {
   BadRequestError,
   InternalServerError,
 } from "@feeblo/domain/rpc-errors";
+import {
+  CurrentSession,
+  type Session,
+} from "@feeblo/domain/session-middleware";
 import {
   BoardId,
   GitHubSyncRuleId,
@@ -396,6 +402,72 @@ describe("GitHub management service", () => {
   });
 
   layer(test.layer)("rule builder", (it) => {
+    it.effect(
+      "records a rule creation as an integration change against its operator",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const service = yield* GitHubManagementService;
+          const seeded = yield* seedRuleFixtures;
+          const session: Session = {
+            user: {
+              id: `user_${seeded.organizationId}`,
+              email: "owner@example.com",
+              name: "Owner",
+              restrictedToOrganizationId: null,
+            },
+            session: {
+              userId: `user_${seeded.organizationId}`,
+              token: "test-token",
+            },
+            organizations: [{ id: seeded.organizationId }],
+            memberships: [
+              {
+                membershipId: `member_${seeded.organizationId}`,
+                organizationId: seeded.organizationId,
+                role: "owner",
+              },
+            ],
+          };
+
+          // `withProviderAudit` is what the GitHub RPC handler wraps a
+          // configuration write in; the entry is written by the service inside
+          // the transaction that inserts the rule.
+          const created = yield* withProviderAudit(
+            seeded.organizationId,
+            service.createRule(ruleCreateInput(seeded))
+          ).pipe(
+            Effect.provideService(CurrentSession, session),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              eq(schema.auditLogTable.organizationId, seeded.organizationId)
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            action: "integration.updated",
+            actorRole: "owner",
+            actorType: "user",
+            actorUserId: `user_${seeded.organizationId}`,
+            outcome: "allowed",
+            resourceId: seeded.connectionId,
+            resourceType: "integration",
+            source: "dashboard",
+          });
+          expect(rows[0]?.metadata).toMatchObject({
+            provider: "github",
+            rule: "created",
+            ruleId: created.id,
+            setting: "sync_rule",
+          });
+        })
+    );
+
     it.effect("creates a rule and lists it for its connection", () =>
       Effect.gen(function* () {
         const service = yield* GitHubManagementService;

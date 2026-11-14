@@ -1,7 +1,9 @@
 import { currentDb, schema } from "@feeblo/db";
 import { isGitHubSyncRuleCombination } from "@feeblo/domain-contracts/github-integration";
 import { IntegrationProviderKey } from "@feeblo/domain-contracts/integration";
+import { AuditLogRecorder } from "@feeblo/domain/audit-log/recorder";
 import { EmailOutboxConfig } from "@feeblo/domain/email-outbox/config";
+import { recordProviderChange } from "@feeblo/domain/integration/audit";
 import type {
   ExternalResourceRecord,
   PostExternalResourceLink,
@@ -63,7 +65,18 @@ const shouldReleaseCreation = <E>(cause: Cause.Cause<E>): boolean =>
 /** Database-backed GitHub management service. GitHubProvider owns App installation and GitHub API I/O. */
 const makeGitHubManagementService = Effect.gen(function* () {
   const db = yield* currentDb;
+  const audit = yield* AuditLogRecorder;
   const provider = yield* GitHubProvider;
+  /**
+   * `recordProviderChange` narrowed to this service's error type. The entry is
+   * never swallowed: a failed insert still aborts the transaction it runs in,
+   * it is only reported as an internal failure like any other database
+   * problem here.
+   */
+  const recordChange = (input: Parameters<typeof recordProviderChange>[1]) =>
+    recordProviderChange(audit, input).pipe(
+      Effect.mapError(databaseError("audit entry"))
+    );
   const config = yield* GitHubIntegrationConfig;
   const emailConfig = yield* EmailOutboxConfig;
   const externalResources = yield* ExternalResourceService;
@@ -316,6 +329,16 @@ const makeGitHubManagementService = Effect.gen(function* () {
                   )
                 )
                 .pipe(Effect.mapError(databaseError("delivery cancellation")));
+              // Inside the transaction that takes the connection out of use:
+              // the disconnect entry and the routes it disabled commit
+              // together. The archived early return above records nothing,
+              // because a disconnect on a tombstone changes no configuration.
+              yield* recordChange({
+                organizationId: input.organizationId,
+                action: "integration.disconnected",
+                connectionId: input.connectionId,
+                metadata: { provider: "github" },
+              });
               return connection;
             })
           )
@@ -522,27 +545,51 @@ const makeGitHubManagementService = Effect.gen(function* () {
           }),
         };
         yield* db
-          .insert(schema.integrationRouteTable)
-          .values({
-            id: routeId,
-            organizationId: input.organizationId,
-            connectionId: input.connectionId,
-            capabilityKey: githubIssueCreateCapabilityKey,
-            routeKey: "",
-            configVersion: 1,
-            enabled: input.enabled,
-            eventTypes: ["post.created"],
-            providerConfig,
-            safeDisplayMetadata: {},
-          })
-          .onConflictDoUpdate({
-            target: [
-              schema.integrationRouteTable.connectionId,
-              schema.integrationRouteTable.capabilityKey,
-              schema.integrationRouteTable.routeKey,
-            ],
-            set: { enabled: input.enabled, providerConfig },
-          })
+          .transaction(() =>
+            Effect.gen(function* () {
+              yield* db
+                .insert(schema.integrationRouteTable)
+                .values({
+                  id: routeId,
+                  organizationId: input.organizationId,
+                  connectionId: input.connectionId,
+                  capabilityKey: githubIssueCreateCapabilityKey,
+                  routeKey: "",
+                  configVersion: 1,
+                  enabled: input.enabled,
+                  eventTypes: ["post.created"],
+                  providerConfig,
+                  safeDisplayMetadata: {},
+                })
+                .onConflictDoUpdate({
+                  target: [
+                    schema.integrationRouteTable.connectionId,
+                    schema.integrationRouteTable.capabilityKey,
+                    schema.integrationRouteTable.routeKey,
+                  ],
+                  set: { enabled: input.enabled, providerConfig },
+                })
+                .pipe(Effect.mapError(databaseError("settings upsert")));
+              // Recorded inside the upsert's transaction so the entry and the
+              // settings commit together. The previous configuration is not
+              // read here, so the new values go in `metadata` rather than posing
+              // as a diff with an empty `before`.
+              yield* recordChange({
+                organizationId: input.organizationId,
+                action: "integration.updated",
+                connectionId: input.connectionId,
+                metadata: {
+                  boardId: input.boardId,
+                  boardScope: input.boardScope,
+                  enabled: input.enabled,
+                  provider: "github",
+                  repositoryName: input.repositoryName,
+                  repositoryOwner: input.repositoryOwner,
+                  setting: "publish_settings",
+                },
+              });
+            })
+          )
           .pipe(Effect.mapError(databaseError("settings upsert")));
         return {
           enabled: input.enabled,
@@ -620,36 +667,85 @@ const makeGitHubManagementService = Effect.gen(function* () {
         const id = yield* GitHubSyncRuleId.generate.pipe(
           Effect.mapError(databaseError("rule identifier generation"))
         );
+        // The write and the entry share one transaction: a rule nobody can
+        // attribute is worse than a rule that was not created.
         yield* db
-          .insert(schema.githubSyncRuleTable)
-          .values({ ...input, id })
+          .transaction(() =>
+            Effect.gen(function* () {
+              yield* db
+                .insert(schema.githubSyncRuleTable)
+                .values({ ...input, id })
+                .pipe(Effect.mapError(databaseError("rule creation")));
+              yield* recordChange({
+                organizationId: input.organizationId,
+                action: "integration.updated",
+                connectionId: input.connectionId,
+                metadata: {
+                  issueMatchMode: input.issueMatchMode,
+                  issueState: input.issueState,
+                  postStatusId: input.postStatusId,
+                  provider: "github",
+                  rule: "created",
+                  ruleId: id,
+                  setting: "sync_rule",
+                },
+              });
+            })
+          )
           .pipe(Effect.mapError(databaseError("rule creation")));
         return { ...input, id };
       }),
     updateRule: (input) =>
       Effect.gen(function* () {
         const rows = yield* db
-          .update(schema.githubSyncRuleTable)
-          .set({
-            enabled: input.enabled,
-            postStatusId: input.postStatusId,
-            upvoterNotificationPolicy: input.upvoterNotificationPolicy,
-          })
-          .where(
-            and(
-              eq(schema.githubSyncRuleTable.id, input.id),
-              eq(
-                schema.githubSyncRuleTable.organizationId,
-                input.organizationId
-              ),
-              eq(schema.githubSyncRuleTable.connectionId, input.connectionId)
-            )
+          .transaction(() =>
+            Effect.gen(function* () {
+              const updated = yield* db
+                .update(schema.githubSyncRuleTable)
+                .set({
+                  enabled: input.enabled,
+                  postStatusId: input.postStatusId,
+                  upvoterNotificationPolicy: input.upvoterNotificationPolicy,
+                })
+                .where(
+                  and(
+                    eq(schema.githubSyncRuleTable.id, input.id),
+                    eq(
+                      schema.githubSyncRuleTable.organizationId,
+                      input.organizationId
+                    ),
+                    eq(
+                      schema.githubSyncRuleTable.connectionId,
+                      input.connectionId
+                    )
+                  )
+                )
+                .returning({
+                  connectionId: schema.githubSyncRuleTable.connectionId,
+                  issueMatchMode: schema.githubSyncRuleTable.issueMatchMode,
+                  issueState: schema.githubSyncRuleTable.issueState,
+                })
+                .pipe(Effect.mapError(databaseError("rule update")));
+              if (updated[0] === undefined) {
+                return updated;
+              }
+              yield* recordChange({
+                organizationId: input.organizationId,
+                action: "integration.updated",
+                connectionId: input.connectionId,
+                metadata: {
+                  enabled: input.enabled,
+                  postStatusId: input.postStatusId,
+                  provider: "github",
+                  rule: "updated",
+                  ruleId: input.id,
+                  setting: "sync_rule",
+                  upvoterNotificationPolicy: input.upvoterNotificationPolicy,
+                },
+              });
+              return updated;
+            })
           )
-          .returning({
-            connectionId: schema.githubSyncRuleTable.connectionId,
-            issueMatchMode: schema.githubSyncRuleTable.issueMatchMode,
-            issueState: schema.githubSyncRuleTable.issueState,
-          })
           .pipe(Effect.mapError(databaseError("rule update")));
         if (rows[0] === undefined) {
           return yield* new NotFoundError({
@@ -668,19 +764,46 @@ const makeGitHubManagementService = Effect.gen(function* () {
       }),
     deleteRule: (input) =>
       db
-        .delete(schema.githubSyncRuleTable)
-        .where(
-          and(
-            eq(schema.githubSyncRuleTable.id, input.id),
-            eq(schema.githubSyncRuleTable.organizationId, input.organizationId),
-            eq(schema.githubSyncRuleTable.connectionId, input.connectionId)
-          )
+        .transaction(() =>
+          Effect.gen(function* () {
+            const deleted = yield* db
+              .delete(schema.githubSyncRuleTable)
+              .where(
+                and(
+                  eq(schema.githubSyncRuleTable.id, input.id),
+                  eq(
+                    schema.githubSyncRuleTable.organizationId,
+                    input.organizationId
+                  ),
+                  eq(
+                    schema.githubSyncRuleTable.connectionId,
+                    input.connectionId
+                  )
+                )
+              )
+              .returning({ id: schema.githubSyncRuleTable.id })
+              .pipe(Effect.mapError(databaseError("rule deletion")));
+            if (deleted[0] === undefined) {
+              return deleted;
+            }
+            yield* recordChange({
+              organizationId: input.organizationId,
+              action: "integration.updated",
+              connectionId: input.connectionId,
+              metadata: {
+                provider: "github",
+                rule: "deleted",
+                ruleId: input.id,
+                setting: "sync_rule",
+              },
+            });
+            return deleted;
+          })
         )
-        .returning({ id: schema.githubSyncRuleTable.id })
         .pipe(
           Effect.mapError(databaseError("rule deletion")),
-          Effect.flatMap((rows) =>
-            rows[0] === undefined
+          Effect.flatMap((deleted) =>
+            deleted[0] === undefined
               ? new NotFoundError({
                   message: "GitHub synchronization rule was not found.",
                 })
@@ -786,4 +909,4 @@ const makeGitHubManagementService = Effect.gen(function* () {
 export const GitHubManagementServiceLive = Layer.effect(
   GitHubManagementService,
   makeGitHubManagementService
-);
+).pipe(Layer.provide(AuditLogRecorder.layer));
