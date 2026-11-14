@@ -14,10 +14,10 @@ import type {
 import {
   createDataTableConfig,
   DataTable,
+  DataTableAdvancedToolbar,
   DataTableColumnHeader,
   DataTableFilterMenu,
   DataTableSortMenu,
-  DataTableToolbar,
   getDataTableActionsColumn,
   useDataTable,
 } from "@feeblo/ui/data-table";
@@ -218,6 +218,7 @@ export function ContactTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} label="Email" />
         ),
+        enableGlobalFilter: false,
         id: "email",
         meta: {
           label: "Email",
@@ -240,6 +241,7 @@ export function ContactTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} label="Account" />
         ),
+        enableGlobalFilter: false,
         id: "account",
         meta: {
           label: "Account",
@@ -254,6 +256,7 @@ export function ContactTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} label="Phone" />
         ),
+        enableGlobalFilter: false,
         id: "phone",
         meta: {
           label: "Phone",
@@ -268,6 +271,7 @@ export function ContactTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} label="External ID" />
         ),
+        enableGlobalFilter: false,
         id: "externalId",
         meta: {
           label: "External ID",
@@ -282,6 +286,7 @@ export function ContactTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} label="Source" />
         ),
+        enableGlobalFilter: false,
         id: "source",
         meta: { label: "Source", options: sourceOptions, variant: "select" },
         size: 130,
@@ -314,6 +319,7 @@ export function ContactTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} label="Company" />
         ),
+        enableGlobalFilter: false,
         id: "company",
         meta: {
           label: "Company",
@@ -342,6 +348,7 @@ export function ContactTable({
         header: ({ column }) => (
           <DataTableColumnHeader column={column} label="Updated" />
         ),
+        enableGlobalFilter: false,
         id: "updatedAt",
         meta: { label: "Updated", variant: "date" },
         size: 150,
@@ -397,13 +404,16 @@ export function ContactTable({
   return (
     <ContactAttributeValuesProvider value={attributeValueState}>
       <DataTable table={table}>
-        <DataTableToolbar
-          globalFilterPlaceholder="Search contacts…"
+        <DataTableAdvancedToolbar
+          // Search is name-only: every other column sets
+          // `enableGlobalFilter: false`, and the Filter menu is where the
+          // remaining columns are narrowed down.
+          globalFilterPlaceholder="Search by name…"
           table={table}
         >
           <DataTableFilterMenu table={table} />
           <DataTableSortMenu table={table} />
-        </DataTableToolbar>
+        </DataTableAdvancedToolbar>
       </DataTable>
     </ContactAttributeValuesProvider>
   );
