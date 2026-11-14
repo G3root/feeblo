@@ -16,6 +16,7 @@
  */
 
 export * from "./common";
+export * from "../audit-log/public-api/schema";
 export * from "../board/public-api/schema";
 export * from "../changelog/public-api/schema";
 export * from "../comments/public-api/schema";

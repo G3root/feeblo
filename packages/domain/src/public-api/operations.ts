@@ -1,5 +1,6 @@
 import type * as Effect from "effect/Effect";
 
+import { auditLogOperations } from "../audit-log/public-api/operations";
 import { boardOperations } from "../board/public-api/operations";
 import { changelogOperations } from "../changelog/public-api/operations";
 import { commentOperations } from "../comments/public-api/operations";
@@ -27,6 +28,7 @@ import type { PublicApiCaller } from "./middleware";
  * See `docs/adr/0007` and `docs/adr/0008`.
  */
 export const PublicApiOperations = [
+  ...auditLogOperations,
   ...boardOperations,
   ...changelogOperations,
   ...commentOperations,

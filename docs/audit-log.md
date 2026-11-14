@@ -171,10 +171,17 @@ Most writers record inside the transaction that performs the write. Three do not
 
 `auditLogRetention` is the loop (pass + `Schedule.spaced("24 hours")`); `runAuditLogRetentionPass` is one sweep, exported so a test can run exactly one.
 
+## The Public API
+
+`GET /api/v1/audit-log`, gated on the `audit_log.read` scope. It is appended to the scope vocabulary and deliberately left out of `PUBLIC_API_DEFAULT_SCOPES`: a key that can read the log can read every member's activity and every refused request.
+
+The DTO is hand-written per `docs/adr/0004` and does not import the dashboard RPC schema. It omits `originIp`, `originCountry`, `userAgent` and `requestId` — administrator forensics, not something to hand a key — and collapses the actor columns into one `actorId` (the credential when one acted, the session user otherwise).
+
+Because `public-api/mcp.ts` derives the MCP toolkit from the operation registry, this endpoint is also an MCP tool. That is accepted: the scope gates it, and reading the workspace's own audit log is a legitimate agent task. A future surface that should not be agent-callable needs an explicit opt-out on `defineOperation`, not an exception here.
+
 ## Not built yet
 
 - **The dashboard page and its filters.** The only product surface left: the RPC has no client, so the feature is unreachable from the app. It is also what makes the flag flippable, so it belongs to the same release as the pricing plan.
-- **The Public API read surface** (`GET /api/v1/audit-log`, `audit_log.read`, hand-written DTO per ADR 0004). It is the next PR of this stack.
 - **Plan-based retention.** Flat at a year today; a shorter window for a lower tier is a product decision with a data-loss consequence.
 - **Partitioning.** Revisit at roughly 20M live rows or when a retention sweep takes minutes; the primary key would have to include `occurred_at`, so the decision is a rewrite, made with numbers rather than a hunch.
 
@@ -182,4 +189,4 @@ Most writers record inside the transaction that performs the write. Three do not
 
 `packages/domain/src/audit-log/` covers the catalog's shape, the repository's paging and filters, the check constraints, the append-only trigger and the workspace-deletion contract (an entry outlives its workspace), the recorder's flag, derivation and redaction, the read RPC's role gate, and the retention pass — including a run that drains two batches and leaves the fresh row behind.
 
-Every wired module also has one test that drives the audited mutation with `AuditLogEnabled` provided as true and reads the entry back from `audit_log` scoped to its own organization — board, tag, post-status, roadmap, membership, post, comments, contact, company, user-ban, data-transfer, changelog, changelog-category, changelog-post, attribute-definition, site, jwt-secret, email-suppression, api-key — plus the provider suites under `integrations/`. The flag is off by default, so a test that forgets to turn it on still passes; that is why each assertion provides it explicitly.
+Every wired module also has one test that drives the audited mutation with `AuditLogEnabled` provided as true and reads the entry back from `audit_log` scoped to its own organization — board, tag, post-status, roadmap, membership, post, comments, contact, company, user-ban, data-transfer, changelog, changelog-category, changelog-post, attribute-definition, site, jwt-secret, email-suppression, api-key — plus the provider suites under `integrations/` and the Public API's own contract and live tests. The flag is off by default, so a test that forgets to turn it on still passes; that is why each assertion provides it explicitly.
