@@ -1,4 +1,8 @@
-import { describe, expect, it } from "@effect/vitest";
+import { NodeCrypto } from "@effect/platform-node";
+import { describe, expect, it, layer } from "@effect/vitest";
+import { currentDb, Database, schema } from "@feeblo/db";
+import { AuditLogEnabled } from "@feeblo/domain/audit-log/flag";
+import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import {
   WebhookDeliveryHistoryPage,
   WebhookEndpoint,
@@ -9,9 +13,14 @@ import {
   type Session,
 } from "@feeblo/domain/session-middleware";
 import { IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
+import { and, eq } from "drizzle-orm";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 
+import { WebhookManagementServiceLive } from "./webhook-management-live";
 import { WebhookManagementRpcHandlersEffect } from "./webhook-rpc-handlers";
 
 const sessionFor = (
@@ -192,5 +201,98 @@ describe("WebhookManagementRpcHandlers", () => {
     });
     expect(page.items[0]?.attempts[0]?.retryDecision).toBeNull();
     expect(page.items[0]?.attempts[1]?.retryDecision).toBe("retry");
+  });
+});
+
+/**
+ * The audit test runs the real management service: the entry is written by the
+ * service inside the transaction that creates the endpoint, not by the handler,
+ * so a stubbed service could not prove it.
+ */
+const AuditTestLayer = Layer.mergeAll(
+  WebhookManagementServiceLive.pipe(
+    Layer.provide(
+      Layer.succeed(
+        WebhookIntegrationConfig,
+        WebhookIntegrationConfig.of({
+          encryptionKey: Redacted.make("0123456789abcdef0123456789abcdef"),
+          endpointSecurityPolicy: {
+            allowPrivateNetworkInDevelopment: true,
+            environment: "development",
+          },
+        })
+      )
+    ),
+    Layer.provide(Database.PgliteDatabaseLive)
+  ),
+  Database.PgliteDatabaseLive,
+  NodeCrypto.layer
+);
+
+describe("WebhookManagementRpcHandlers audit", () => {
+  layer(AuditTestLayer)("writing", (it) => {
+    it.effect(
+      "records the endpoint creation against the admin who made it, without the secret",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const organizationId = yield* WorkspaceId.generate;
+          yield* db.insert(schema.organizationTable).values({
+            createdAt: yield* DateTime.nowAsDate,
+            id: organizationId,
+            name: "Webhook audit test",
+            slug: organizationId,
+          });
+          const handlers = yield* WebhookManagementRpcHandlersEffect;
+
+          const created = yield* handlers
+            .CreateWebhookEndpoint({
+              endpointUrl: "https://127.0.0.1:8080/hook",
+              eventTypes: ["post.created"],
+              name: "Product events",
+              organizationId,
+            })
+            .pipe(
+              Effect.provideService(
+                CurrentSession,
+                sessionFor(organizationId, "admin")
+              ),
+              Effect.provideService(AuditLogEnabled, true)
+            );
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, organizationId),
+                eq(schema.auditLogTable.action, "webhook.created")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            actorRole: "admin",
+            actorType: "user",
+            actorUserId: "user_test",
+            outcome: "allowed",
+            resourceId: created.endpoint.id,
+            resourceType: "webhook",
+            source: "dashboard",
+          });
+          expect(rows[0]?.metadata).toMatchObject({
+            hostname: "127.0.0.1",
+            name: "Product events",
+          });
+          // The one-time signing secret handed to the operator is the only
+          // credential this action returns, and the entry must not repeat it.
+          expect(
+            JSON.stringify({
+              changes: rows[0]?.changes,
+              metadata: rows[0]?.metadata,
+            })
+          ).not.toContain(created.signingSecret);
+        })
+    );
   });
 });

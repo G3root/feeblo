@@ -1,4 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { AuditLogRecorder } from "@feeblo/domain/audit-log/recorder";
+import { recordProviderChange } from "@feeblo/domain/integration/audit";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import type { SlackConnectionServiceContract } from "@feeblo/domain/integration/slack/management-service";
 import type * as S from "@feeblo/domain/integration/slack/schema";
@@ -84,6 +86,7 @@ export const makeSlackConnectionServiceLive = (
     SlackConnectionService,
     Effect.gen(function* () {
       const db = yield* currentDb;
+      const audit = yield* AuditLogRecorder;
       const config = yield* SlackIntegrationConfig;
       const secureRandom = yield* SecureRandom.SecureRandom;
 
@@ -141,6 +144,16 @@ export const makeSlackConnectionServiceLive = (
                 organizationId,
                 provider: slackProviderKey,
                 safeDisplayMetadata: {},
+              });
+              // The round trip starts here and the callback completes it, so
+              // this records the *started* connect against the connecting row
+              // the same transaction just created. The OAuth nonce is never
+              // named: it is credential material the state carries.
+              yield* recordProviderChange(audit, {
+                organizationId,
+                action: "integration.connected",
+                connectionId,
+                metadata: { flow: "started", provider: "slack" },
               });
             })
           );
@@ -469,6 +482,16 @@ export const makeSlackConnectionServiceLive = (
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
+              // Inside the transaction that moves the connection out of use:
+              // the disconnect entry and the routes it disabled commit
+              // together. The archived early return above records nothing,
+              // because a disconnect on a tombstone changes no configuration.
+              yield* recordProviderChange(audit, {
+                organizationId,
+                action: "integration.disconnected",
+                connectionId,
+                metadata: { name: connection.name, provider: "slack" },
+              });
             })
           )
           .pipe(
@@ -540,4 +563,4 @@ export const makeSlackConnectionServiceLive = (
         listConnections,
       });
     })
-  );
+  ).pipe(Layer.provide(AuditLogRecorder.layer));
