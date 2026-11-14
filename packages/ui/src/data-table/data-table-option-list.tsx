@@ -83,36 +83,52 @@ export function DataTableOptionList({
           visibleItems.map((item) => {
             const isSelected = selectedValues.includes(item.value);
             const Icon = item.icon;
+            const rowClassName = cn(
+              "hover:bg-accent flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+              isSelected && "bg-accent/60"
+            );
+            const rowContent = (
+              <>
+                {Icon ? (
+                  <Icon aria-hidden="true" className="size-4 shrink-0" />
+                ) : null}
+                <span className="min-w-0 flex-1 truncate" title={item.label}>
+                  {item.label}
+                </span>
+                {isNumber(item.count) ? (
+                  <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                    {item.count.toLocaleString()}
+                  </span>
+                ) : null}
+              </>
+            );
             return (
               <li key={item.value}>
-                <label
-                  className={cn(
-                    "hover:bg-accent flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
-                    isSelected && "bg-accent/60"
-                  )}
-                >
-                  {multiple ? (
+                {multiple ? (
+                  <label className={rowClassName}>
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => onToggle(item.value)}
                     />
-                  ) : (
+                    {rowContent}
+                  </label>
+                ) : (
+                  // A single-choice row has no form control of its own, so it
+                  // is the button: a `<label>` wrapping nothing is inert to
+                  // pointer and keyboard alike.
+                  <button
+                    aria-label={item.label}
+                    aria-pressed={isSelected}
+                    className={rowClassName}
+                    onClick={() => onToggle(item.value)}
+                    type="button"
+                  >
                     <span className="flex size-4 shrink-0 items-center justify-center">
                       {isSelected ? <HugeiconsIcon icon={Tick02Icon} /> : null}
                     </span>
-                  )}
-                  {Icon ? (
-                    <Icon aria-hidden="true" className="size-4 shrink-0" />
-                  ) : null}
-                  <span className="min-w-0 flex-1 truncate" title={item.label}>
-                    {item.label}
-                  </span>
-                  {isNumber(item.count) ? (
-                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                      {item.count.toLocaleString()}
-                    </span>
-                  ) : null}
-                </label>
+                    {rowContent}
+                  </button>
+                )}
               </li>
             );
           })

@@ -94,10 +94,11 @@ function DataTableFilterMenuContent<TData extends RowData>({
   const [open, setOpen] = React.useState(false);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
-  const columns = React.useMemo(
-    () => table.getAllLeafColumns().filter((column) => column.getCanFilter()),
-    [table]
-  );
+  // Not memoized on `table`: the instance is stable while its columns are
+  // not. A column added or removed later has to show up in the field list.
+  const columns = table
+    .getAllLeafColumns()
+    .filter((column) => column.getCanFilter());
 
   const onFilterAdd = React.useCallback(() => {
     const firstColumn = columns[0];

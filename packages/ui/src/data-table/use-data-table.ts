@@ -27,6 +27,7 @@ import {
 } from "./lib/data-table-features";
 import {
   type DataTableSearchRecord,
+  getColumnFiltersKey,
   getSearchStrings,
 } from "./lib/data-table-parsers";
 import type {
@@ -156,6 +157,18 @@ function useDataTable<TData extends RowData>({
     );
   }, [hasInlineColumns, builtConfig, columns]);
 
+  const navigate = useNavigate();
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = React.useRef<SearchDraft | null>(null);
+
+  const cancelPendingWrite = React.useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    pendingRef.current = null;
+  }, []);
+
   const location = useLocation();
   // SAFETY: `location.search` is the router's `parseSearch` output, which is
   // exactly a record of strings, numbers, booleans and arrays of those.
@@ -164,23 +177,27 @@ function useDataTable<TData extends RowData>({
 
   const [draft, setDraft] = React.useState<SearchDraft | null>(null);
 
-  // Drop the optimistic copy once the router reflects it, or once the URL has
-  // moved somewhere the write did not ask for (back/forward, a link).
   React.useEffect(() => {
-    setDraft((current) => {
-      if (!current) return current;
-      if (getSearchKey(current.search) === locationSearchKey) return null;
-      if (current.baseKey !== locationSearchKey) return null;
-      return current;
-    });
-  }, [locationSearchKey]);
+    if (!draft) return;
+
+    // The router caught up with the write.
+    if (getSearchKey(draft.search) === locationSearchKey) {
+      setDraft(null);
+      return;
+    }
+
+    // The URL moved somewhere the write did not ask for (back/forward, a
+    // link). The optimistic copy is dropped, and so is the scheduled write:
+    // left in place it would navigate back over the new location a moment
+    // after the reader chose it.
+    if (draft.baseKey !== locationSearchKey) {
+      cancelPendingWrite();
+      setDraft(null);
+    }
+  }, [cancelPendingWrite, draft, locationSearchKey]);
 
   const search = draft?.search ?? locationSearch;
   const query = config.parse(search);
-
-  const navigate = useNavigate();
-  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = React.useRef<DataTableSearchRecord | null>(null);
 
   const flush = React.useCallback(() => {
     if (timerRef.current !== null) {
@@ -188,13 +205,13 @@ function useDataTable<TData extends RowData>({
       timerRef.current = null;
     }
 
-    const next = pendingRef.current;
+    const pending = pendingRef.current;
     pendingRef.current = null;
-    if (!next) return;
+    if (!pending) return;
 
     void navigate({
       to: ".",
-      search: next,
+      search: pending.search,
       replace,
       resetScroll,
     });
@@ -212,15 +229,25 @@ function useDataTable<TData extends RowData>({
       patch: Partial<typeof query>,
       { debounce }: { debounce: boolean } = { debounce: true }
     ) => {
-      const nextSearch = config.apply(search, { ...query, ...patch });
+      // A second write inside the debounce window has to build on the first
+      // one, not on the render's `search`, which predates it. `baseKey` stays
+      // the URL the chain started from, so an outside navigation is still
+      // recognized as one.
+      const base = pendingRef.current?.search ?? search;
+      const baseKey =
+        pendingRef.current?.baseKey ?? draft?.baseKey ?? locationSearchKey;
+      const nextSearch = config.apply(base, {
+        ...config.parse(base),
+        ...patch,
+      });
 
       // A write that changes nothing must not push a history entry: a
       // controlled input that re-emits its current value would otherwise
       // navigate on every render.
-      if (getSearchKey(nextSearch) === getSearchKey(search)) return;
+      if (getSearchKey(nextSearch) === getSearchKey(base)) return;
 
-      setDraft({ baseKey: getSearchKey(search), search: nextSearch });
-      pendingRef.current = nextSearch;
+      setDraft({ baseKey, search: nextSearch });
+      pendingRef.current = { baseKey, search: nextSearch };
 
       if (!debounce) {
         flush();
@@ -232,7 +259,7 @@ function useDataTable<TData extends RowData>({
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(flush, debounceMs);
     },
-    [config, debounceMs, flush, query, search]
+    [config, debounceMs, draft, flush, locationSearchKey, query, search]
   );
 
   const pagination = React.useMemo<PaginationState>(
@@ -290,7 +317,22 @@ function useDataTable<TData extends RowData>({
     );
   }
 
-  const columnFilters = query.filters;
+  const urlColumnFilters = query.filters;
+  const urlColumnFiltersKey = getColumnFiltersKey(urlColumnFilters);
+
+  // A filter row that has been added but not filled in is not active, so it
+  // never reaches the URL. Without this draft it would therefore never render,
+  // and "Add filter" would look like it did nothing. The draft holds the full
+  // list — empty rows included — and applies only while its active set matches
+  // the URL's, so an outside navigation still wins.
+  const [filtersDraft, setFiltersDraft] = React.useState<FiltersDraft | null>(
+    null
+  );
+  const columnFilters =
+    filtersDraft?.urlFiltersKey === urlColumnFiltersKey
+      ? filtersDraft.filters
+      : urlColumnFilters;
+
   const getNextColumnFilters = useChainedUpdate<ColumnFiltersState>(
     // SAFETY: every `ColumnFilterItem` is a `ColumnFilter`, which is all the
     // table's own `onColumnFiltersChange` needs to see.
@@ -303,9 +345,14 @@ function useDataTable<TData extends RowData>({
       (filter) => Object.hasOwn(filterVariants, filter.id)
     );
 
+    setFiltersDraft({
+      filters,
+      urlFiltersKey: getColumnFiltersKey(activeFilters),
+    });
+
     writeQuery(
       { filters: activeFilters, page: 1 },
-      { debounce: isServer && activeFilters.length >= columnFilters.length }
+      { debounce: isServer && activeFilters.length >= urlColumnFilters.length }
     );
   }
 
@@ -346,9 +393,15 @@ function useDataTable<TData extends RowData>({
   return { table };
 }
 
+interface FiltersDraft {
+  readonly filters: ColumnFiltersState;
+  /** The active set this draft describes, so the URL can supersede it. */
+  readonly urlFiltersKey: string;
+}
+
 interface SearchDraft {
   readonly search: DataTableSearchRecord;
-  /** The URL the write was computed from, so an outside navigation wins. */
+  /** The URL the chain of writes started from, so an outside navigation wins. */
   readonly baseKey: string;
 }
 

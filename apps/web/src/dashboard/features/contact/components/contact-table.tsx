@@ -22,12 +22,14 @@ import {
   useDataTable,
 } from "@feeblo/ui/data-table";
 import { MenuItem } from "@feeblo/ui/menu";
+import { Skeleton } from "@feeblo/ui/skeleton";
 import {
   anyPolicy,
   hasPermission,
   PolicyGuard,
 } from "@feeblo/web-shared/use-policy";
 import {
+  Alert02Icon,
   ArrowUpRight01Icon,
   BellOffIcon,
   Delete02Icon,
@@ -51,7 +53,15 @@ import {
   useContactUnsubscribeDialogContext,
 } from "../dialog-stores";
 
-type ContactRow = TContactWithAccount;
+/**
+ * The contact plus the derived value the table sorts and filters on.
+ *
+ * The company name is folded into the row rather than read from a map in the
+ * accessor: the table caches its sorted and filtered row models on the row
+ * data, so a company rename has to arrive as new row data or the cached order
+ * and filter results keep the old name.
+ */
+type ContactRow = TContactWithAccount & { companyName: string };
 
 const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -104,7 +114,7 @@ const dataTableConfig = createDataTableConfig({
 });
 
 interface ContactTableProps {
-  contacts: readonly ContactRow[];
+  contacts: readonly TContactWithAccount[];
   companies: readonly TCompany[];
   definitions: readonly CustomAttributeDefinition[];
   organizationId: string;
@@ -142,8 +152,20 @@ export function ContactTable({
     [companies]
   );
 
+  const rows = React.useMemo<ContactRow[]>(
+    () =>
+      contacts.map((contact) => ({
+        ...contact,
+        companyName:
+          contact.companyId === null
+            ? ""
+            : (companiesById.get(contact.companyId)?.name ?? ""),
+      })),
+    [companiesById, contacts]
+  );
+
   const attributeValues = useOrgContactAttributeValues(organizationId);
-  const valuesByContact = React.useMemo(() => {
+  const attributeValueState = React.useMemo<ContactAttributeValuesState>(() => {
     const byContact = new Map<string, Map<string, CustomAttributeValue>>();
 
     for (const value of attributeValues.data) {
@@ -154,8 +176,16 @@ export function ContactTable({
       byContact.set(value.contactId, values);
     }
 
-    return byContact;
-  }, [attributeValues.data]);
+    return {
+      byContact,
+      isError: attributeValues.isLoadingError,
+      isLoading: attributeValues.isLoading,
+    };
+  }, [
+    attributeValues.data,
+    attributeValues.isLoading,
+    attributeValues.isLoadingError,
+  ]);
 
   const columns = React.useMemo<
     ColumnDef<DataTableFeatures, ContactRow>[]
@@ -257,30 +287,26 @@ export function ContactTable({
         size: 130,
       },
       {
-        accessorFn: (row) =>
-          row.companyId === null
-            ? ""
-            : (companiesById.get(row.companyId)?.name ?? ""),
+        accessorFn: (row) => row.companyName,
         cell: ({ row }) => {
-          const company =
-            row.original.companyId === null
-              ? undefined
-              : companiesById.get(row.original.companyId);
+          const companyId = row.original.companyId;
 
-          if (!company) return "—";
+          if (companyId === null || row.original.companyName === "") {
+            return "—";
+          }
 
           return (
             <Button
               onClick={() =>
                 companyEditDialogStore.send({
-                  data: { companyId: company.id, mode: "display" },
+                  data: { companyId, mode: "display" },
                   type: "toggle",
                 })
               }
               type="button"
               variant="link"
             >
-              {company.name}
+              {row.original.companyName}
               <HugeiconsIcon icon={ArrowUpRight01Icon} />
             </Button>
           );
@@ -351,7 +377,6 @@ export function ContactTable({
       }),
     ];
   }, [
-    companiesById,
     companyOptions,
     companyEditDialogStore,
     definitions,
@@ -364,13 +389,13 @@ export function ContactTable({
   const { table } = useDataTable({
     columns,
     config: dataTableConfig,
-    data: contacts,
+    data: rows,
     getRowId: (row) => row.id,
     mode: "client",
   });
 
   return (
-    <ContactAttributeValuesProvider value={valuesByContact}>
+    <ContactAttributeValuesProvider value={attributeValueState}>
       <DataTable table={table}>
         <DataTableToolbar
           globalFilterPlaceholder="Search contacts…"
@@ -384,17 +409,23 @@ export function ContactTable({
   );
 }
 
-const ContactAttributeValuesContext = React.createContext<ReadonlyMap<
-  string,
-  ReadonlyMap<string, CustomAttributeValue>
-> | null>(null);
+interface ContactAttributeValuesState {
+  byContact: ReadonlyMap<string, ReadonlyMap<string, CustomAttributeValue>>;
+  /** The first load is still in flight; nothing is known yet. */
+  isLoading: boolean;
+  /** The first load failed; there is nothing to show. */
+  isError: boolean;
+}
+
+const ContactAttributeValuesContext =
+  React.createContext<ContactAttributeValuesState | null>(null);
 
 function ContactAttributeValuesProvider({
   children,
   value,
 }: {
   children: React.ReactNode;
-  value: ReadonlyMap<string, ReadonlyMap<string, CustomAttributeValue>>;
+  value: ContactAttributeValuesState;
 }) {
   return (
     <ContactAttributeValuesContext value={value}>
@@ -403,6 +434,13 @@ function ContactAttributeValuesProvider({
   );
 }
 
+/**
+ * One attribute value cell.
+ *
+ * "—" is reserved for a load that succeeded and has no value for this contact:
+ * showing it while the query is still running would claim the attribute is
+ * empty, and showing it on failure would hide that the value could not be read.
+ */
 function ContactAttributeCell({
   attributeId,
   contactId,
@@ -410,12 +448,26 @@ function ContactAttributeCell({
   attributeId: string;
   contactId: string;
 }) {
-  const valuesByContact = React.use(ContactAttributeValuesContext);
+  const state = React.use(ContactAttributeValuesContext);
+
+  if (state?.isError) {
+    return (
+      <HugeiconsIcon
+        aria-label="Attribute values could not be loaded"
+        className="text-destructive size-4"
+        icon={Alert02Icon}
+      />
+    );
+  }
+
+  if (state?.isLoading) {
+    return <Skeleton className="h-4 w-16" />;
+  }
 
   return (
     <>
       {formatCustomAttributeValue(
-        valuesByContact?.get(contactId)?.get(attributeId)
+        state?.byContact.get(contactId)?.get(attributeId)
       )}
     </>
   );

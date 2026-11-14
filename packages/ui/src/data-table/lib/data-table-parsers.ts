@@ -74,6 +74,11 @@ export function getSearchStrings(value: DataTableRawValue): string[] {
  * The form is `title.asc,createdAt.desc`: ids are percent-encoded, so an id
  * containing a comma or a dot still round-trips, and the direction is the
  * segment after the final dot.
+ *
+ * An absent key yields `null` so the config's `defaultSorting` applies; an
+ * empty key yields `[]`, which is a deliberate "no sorting" that survives a
+ * round trip. Folding the two together would make "clear the sort" snap back to
+ * the default.
  */
 export function parseSorting(
   value: DataTableRawValue,
@@ -88,10 +93,10 @@ export function parseSorting(
     : null;
 }
 
-export function serializeSorting(
-  sorting: ColumnSortItem[]
-): string | undefined {
-  if (sorting.length === 0) return undefined;
+export function serializeSorting(sorting: ColumnSortItem[]): string {
+  // An empty string is written rather than deleted: the key's presence is what
+  // records "no sorting" against a config that has a default.
+  if (sorting.length === 0) return "";
 
   return sorting
     .map(
@@ -128,6 +133,19 @@ export function parseColumnFilter<TColumnId extends string>(
  * Parses every value of one filter key. A value that is not a usable filter is
  * dropped rather than kept, so `?title=` reads as no filter.
  */
+/**
+ * A stable key for the filters the URL carries. Two lists with the same key
+ * describe the same query, which is what lets the hook keep an unsaved filter
+ * row out of the URL without losing it.
+ */
+export function getColumnFiltersKey(filters: ColumnFilterItem[]): string {
+  return filters
+    .filter((filter) => getIsActiveFilter(filter))
+    .map((filter) => `${filter.id}=${serializeColumnFilter(filter)}`)
+    .sort()
+    .join("&");
+}
+
 export function parseColumnFilters<TColumnId extends string>(
   id: TColumnId,
   variant: FilterVariant,
@@ -161,7 +179,8 @@ export function serializeColumnFilter(filter: ColumnFilterItem): string {
 }
 
 function parseSortingValue(value: string | undefined): ColumnSortItem[] | null {
-  if (value === undefined || value === "") return [];
+  if (value === undefined) return null;
+  if (value === "") return [];
 
   const sorting: ColumnSortItem[] = [];
 

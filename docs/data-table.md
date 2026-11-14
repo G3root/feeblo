@@ -25,7 +25,7 @@ The table keeps its state in the route's search params, which is what `useDataTa
 | --- | --- |
 | `page` | `1`-based integer, omitted at `1` |
 | `perPage` | integer, omitted at the config default |
-| `sort` | `name.asc,points.desc`; ids are percent-encoded so a comma or dot survives |
+| `sort` | `name.asc,points.desc`; ids are percent-encoded so a comma or dot survives. Absent means the config's default sorting, an empty key means no sorting |
 | `joinOperator` | `and` or `or`, omitted at `and` |
 | `search` | the global filter, omitted when empty |
 | one key per filterable column | repeated values, e.g. `?status=active&status=in.invited` |

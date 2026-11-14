@@ -1,5 +1,5 @@
 import { isString } from "@feeblo/utils/runtime-kind";
-import { Cancel01Icon, PlusSignCircleIcon } from "@hugeicons/core-free-icons";
+import { FilterIcon, PlusSignCircleIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type Column, type RowData, Subscribe } from "@tanstack/react-table";
 import * as React from "react";
@@ -109,7 +109,7 @@ function DataTableFacetedFilterContent<TData extends RowData, TValue>({
           />
         }
       >
-        <FilterIcon hasSelection={hasSelection} />
+        <FilterTriggerIcon hasSelection={hasSelection} />
         <bdi className="truncate">{title}</bdi>
         {hasSelection ? (
           <>
@@ -163,19 +163,11 @@ function DataTableFacetedFilterContent<TData extends RowData, TValue>({
   );
 }
 
-function FilterIcon({ hasSelection }: { hasSelection: boolean }) {
-  if (!hasSelection) {
-    return <HugeiconsIcon icon={PlusSignCircleIcon} />;
-  }
-
-  // The clear affordance sits where the "add" icon was, so the trigger keeps
-  // one width whether or not a filter is applied.
+function FilterTriggerIcon({ hasSelection }: { hasSelection: boolean }) {
+  // A neutral icon, never a cancel glyph: clicking it opens the popup, so an
+  // "x" would promise a clear the press does not perform. Clearing lives on the
+  // popup's own button.
   return (
-    <span
-      aria-hidden="true"
-      className="rounded-sm opacity-70 transition-opacity hover:opacity-100"
-    >
-      <HugeiconsIcon icon={Cancel01Icon} />
-    </span>
+    <HugeiconsIcon icon={hasSelection ? FilterIcon : PlusSignCircleIcon} />
   );
 }

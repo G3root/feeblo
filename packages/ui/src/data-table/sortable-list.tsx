@@ -1,6 +1,6 @@
 import type { DragDropEventHandlers } from "@dnd-kit/react";
 import { DragDropProvider } from "@dnd-kit/react";
-import { useSortable } from "@dnd-kit/react/sortable";
+import { isSortable, useSortable } from "@dnd-kit/react/sortable";
 import * as React from "react";
 
 import { cn } from "../utils";
@@ -39,17 +39,18 @@ export function SortableList<TItem>({
   children,
 }: SortableListProps<TItem>) {
   const onDragEnd: DragDropEventHandlers["onDragEnd"] = (event) => {
-    const { source, target } = event.operation;
-    if (event.canceled || !source || !target) return;
-    if (source.id === target.id) return;
+    const { source } = event.operation;
+    if (event.canceled || !source) return;
 
-    const from = items.findIndex(
-      (item) => getItemId(item) === String(source.id)
-    );
-    const to = items.findIndex((item) => getItemId(item) === String(target.id));
-    if (from < 0 || to < 0) return;
+    // The sortable source carries where the row started and where the drop
+    // put it, which stays right even if the list re-renders mid-drag. Matching
+    // ids to rows only works while the rows cannot move underneath the drag.
+    if (!isSortable(source)) return;
 
-    onReorder(moveItem(items, from, to));
+    const { initialIndex, index } = source;
+    if (initialIndex === index) return;
+
+    onReorder(moveItem(items, initialIndex, index));
   };
 
   return (

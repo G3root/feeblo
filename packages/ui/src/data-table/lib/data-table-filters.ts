@@ -189,8 +189,17 @@ function getLowercaseText(value: DataTableRawValue) {
   return stringifyFilterValue(value).toLowerCase();
 }
 
-function getBooleanString(value: DataTableRawValue) {
-  return value === true || value === "true" ? "true" : "false";
+/**
+ * The string a boolean filter compares against, or `undefined` when the cell
+ * holds no boolean at all.
+ *
+ * `null` and `undefined` must stay distinct from `false`: collapsing them to
+ * "false" makes an "is false" filter match every contact whose column is empty.
+ */
+function getBooleanString(value: DataTableRawValue): string | undefined {
+  if (value === true || value === "true") return "true";
+  if (value === false || value === "false") return "false";
+  return undefined;
 }
 
 function getIsSameDay(cellValue: DataTableRawValue, value: DataTableRawValue) {
