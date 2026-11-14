@@ -1,10 +1,14 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -66,31 +70,84 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CreateChangelogCategory: (args: TChangelogCategoryCreate) =>
-      repository
-        .create(args)
-        .pipe(
-          Policy.withPolicy(categoryPolicy.canCreate(args.organizationId)),
-          withRemapDbErrors("ChangelogCategory", "create")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.create(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "changelog_category.created",
+              resourceId: args.id,
+              metadata: {
+                name: args.name,
+                iconType: args.iconType,
+                icon: args.icon,
+              },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(categoryPolicy.canCreate(args.organizationId)),
+        withRemapDbErrors("ChangelogCategory", "create")
+      ),
 
     UpdateChangelogCategory: (args: TChangelogCategoryUpdate) =>
-      repository
-        .update(args)
-        .pipe(
-          Policy.withPolicy(categoryPolicy.canUpdate(args.organizationId)),
-          withRemapDbErrors("ChangelogCategory", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.update(args);
+            // The update returns nothing, so the new values go in `metadata`
+            // rather than posing as a diff with an empty `before`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "changelog_category.updated",
+              resourceId: args.id,
+              metadata: {
+                name: args.name,
+                iconType: args.iconType,
+                icon: args.icon,
+              },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(categoryPolicy.canUpdate(args.organizationId)),
+        withRemapDbErrors("ChangelogCategory", "update")
+      ),
 
     DeleteChangelogCategory: (args: TChangelogCategoryDelete) =>
-      repository
-        .delete(args)
-        .pipe(
-          Policy.withPolicy(categoryPolicy.canDelete(args.organizationId)),
-          withRemapDbErrors("ChangelogCategory", "delete")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.delete(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "changelog_category.deleted",
+              resourceId: args.id,
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(categoryPolicy.canDelete(args.organizationId)),
+        withRemapDbErrors("ChangelogCategory", "delete")
+      ),
 
     SetChangelogCategories: (args: TChangelogCategorySet) =>
       Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
         const categoryIds = [...new Set(args.categoryIds)];
         // Two independent checks against the same workspace, run together as
         // one round trip. The verdicts are collected rather than raced, so the
@@ -111,7 +168,24 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         yield* Effect.fromResult(changelogCheck);
         yield* Effect.fromResult(categoryCheck);
 
-        yield* repository.setChangelogCategories({ ...args, categoryIds });
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.setChangelogCategories({ ...args, categoryIds });
+            // Filing an entry under categories changes the entry, not the
+            // category rows, so this is `changelog.updated` with the changelog
+            // as the resource: `changelog_category.updated` would name a
+            // category id that did not change. Same shape as `SetPostTags`
+            // recording `post.updated`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "changelog.updated",
+              resourceId: args.changelogId,
+              metadata: { categoryIds },
+            });
+          })
+        );
       }).pipe(
         Policy.withPolicy(
           categoryPolicy.canSetChangelogCategories({
@@ -174,5 +248,6 @@ export const ChangelogCategoryRpcHandlers = ChangelogCategoryRpcs.toLayer(
   Layer.provide(ChangelogCategoryPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
-  Layer.provide(ChangelogCategoryRepository.layer)
+  Layer.provide(ChangelogCategoryRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );
