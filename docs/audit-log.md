@@ -125,18 +125,56 @@ Do not record end-user actions (the portal and widget are `post_activity`), deli
 
 The audited-read list is the sizing decision, not a detail: it is the difference between a table that needs no partitioning for years and one that does.
 
-### Shipped call sites
+### What is recorded
 
-`SetPostTags` (`packages/domain/src/tag/handlers.ts`) is the first in-transaction writer. Further call sites are additive: add the action to the catalog, call `record` inside the handler's transaction, and provide `AuditLogRecorder.layer` where the handler layer is built.
+Sixty-seven actions, every one of them declared in the catalog and every declared action written by at least one call site:
+
+| Module | Actions |
+| --- | --- |
+| `board` | created, updated, deleted, exported |
+| `post` | created, updated, status_changed, moved, locked, archived, merged, unmerged, deleted |
+| `comments` | created, updated, deleted, pinned |
+| `tag` | created, updated, deleted, and `post.updated` from `SetPostTags` |
+| `post-status` | created, updated (update, set-default, reorder), deleted |
+| `roadmap` | created, updated, deleted |
+| `changelog` | created, updated, published, deleted |
+| `changelog-category` | created, updated, deleted |
+| `attribute-definition` | created, updated, deleted, value_updated |
+| `membership` | role_changed, removed, invite_cancelled |
+| `site` | `workspace.updated` |
+| `jwt-secret` | `jwt_secret.revoked` |
+| `api-key` | created, revoked |
+| `contact` | created, updated, deleted, read |
+| `company` | created, updated, deleted |
+| `user-ban` | created, removed |
+| `data-transfer` | imported, exported |
+| `email-suppression` | added, removed |
+| `webhook` | created, updated, deleted, paused, resumed, secret_rotated |
+| `integration` (Slack, Discord, GitHub) | connected, updated, disconnected |
+| `public-api` | `api.request` |
+
+The invariant is easy to re-check: `AUDIT_ACTIONS` in the contracts package and a grep for `action: "…"` across `packages/domain/src` and `integrations/*/src` should name the same set. Adding a verb and its writer in one change is what keeps that true; removing a writer means removing its verb.
+
+Deliberately not recorded: portal and widget writes (the `*Public` twins are end-user actions, which `post_activity` covers), votes and reactions, saved views, webhook delivery attempts and retries, the billing portal, and workspace creation (there is no workspace yet to scope the entry to).
+
+Most writers record inside the transaction that performs the write. Three do not, and each says why at the call site: the API key lifecycle (the credential call is the plugin's own), the Public API scope refusal (the request is already being refused), and the bulk export (the bytes are streamed after the effect returns, so failing a completed download would be worse than a missing row). The post create/edit paths record best effort for a different reason: they fork a fiber that would inherit the outer transaction's connection, and holding a pooled connection across an embedding call is how one request's write lands on another's transaction.
+
+## The Public API
+
+`GET /api/v1/audit-log`, gated on the `audit_log.read` scope. It is appended to the scope vocabulary and deliberately left out of `PUBLIC_API_DEFAULT_SCOPES`: a key that can read the log can read every member's activity and every refused request.
+
+The DTO is hand-written per `docs/adr/0004` and does not import the dashboard RPC schema. It omits `originIp`, `originCountry`, `userAgent` and `requestId` — administrator forensics, not something to hand a key — and collapses the actor columns into one `actorId` (the credential when one acted, the session user otherwise).
+
+Because `public-api/mcp.ts` derives the MCP toolkit from the operation registry, this endpoint is also an MCP tool. That is accepted: the scope gates it, and reading the workspace's own audit log is a legitimate agent task. A future surface that should not be agent-callable needs an explicit opt-out on `defineOperation`, not an exception here.
 
 ## Not built yet
 
-- The dashboard page and its filters; the RPC has no client.
-- The Public API surface (`audit_log.read` scope, hand-written DTO per ADR 0004).
-- The retention sweep (`packages/db` script) and any plan-based retention.
-- Denial recording: `api.request` is declared but nothing writes it.
-- Partitioning. Revisit at roughly 20M live rows or when a retention sweep takes minutes; the primary key would have to include `occurred_at`, so the decision is a rewrite, made with numbers rather than a hunch.
+- **The dashboard page and its filters.** The only product surface left: the RPC has no client, so the feature is unreachable from the app. It is also what makes the flag flippable, so it belongs to the same release as the pricing plan.
+- **Plan-based retention.** Flat at a year today; a shorter window for a lower tier is a product decision with a data-loss consequence.
+- **Partitioning.** Revisit at roughly 20M live rows or when a retention sweep takes minutes; the primary key would have to include `occurred_at`, so the decision is a rewrite, made with numbers rather than a hunch.
 
 ## Tests
 
-`packages/domain/src/audit-log/` — catalog integrity, repository paging and filters, the check constraints and the append-only trigger, the recorder's flag, derivation and redaction, and the handler's role gate.
+`packages/domain/src/audit-log/` covers the catalog's shape, the repository's paging and filters, the check constraints and the append-only trigger, the recorder's flag, derivation and redaction, and the read RPC's role gate.
+
+Every wired module also has one test that drives the audited mutation with `AuditLogEnabled` provided as true and reads the entry back from `audit_log` scoped to its own organization — board, tag, post-status, roadmap, membership, post, comments, contact, company, user-ban, data-transfer, changelog, changelog-category, changelog-post, attribute-definition, site, jwt-secret, email-suppression, api-key — plus the provider suites under `integrations/` and the Public API's own contract and live tests. The flag is off by default, so a test that forgets to turn it on still passes; that is why each assertion provides it explicitly.
