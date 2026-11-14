@@ -1,3 +1,4 @@
+import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -87,6 +88,39 @@ const CGROUP_MEMORY_PATHS = [
 
 /** How often the wall clock is sampled while the program runs. */
 const WALL_CLOCK_TICK_MS = 100;
+
+/**
+ * The monotonic clock in milliseconds.
+ *
+ * Monotonic, not `Clock.currentTimeMillis`: a host wall-clock correction must
+ * not refund or spend a budget, and elapsed time is the only thing this reads.
+ */
+const monotonicMillis = Effect.map(
+  Clock.monotonicTimeNanos,
+  (nanos) => Number(nanos) / 1_000_000
+);
+
+/**
+ * The approval waits one run has taken, as the union of their intervals.
+ *
+ * `depth` counts the waits in flight so only the outermost opens the interval:
+ * two overlapping waits excluded twice would refund the program time it never
+ * spent. One record, rather than separate refs, so the sampler reads the open
+ * interval and the closed total together.
+ */
+interface ApprovalWaits {
+  /** How many waits are in flight. */
+  readonly depth: number;
+  /** When the open interval started, if one is open. */
+  readonly since: Option.Option<number>;
+  /** The durations of the intervals that have closed. */
+  readonly closed: number;
+}
+
+/** The time a run spent waiting on people, the open interval included. */
+const waitedFor = (state: ApprovalWaits, now: number): number =>
+  state.closed +
+  (Option.isNone(state.since) ? 0 : Math.max(0, now - state.since.value));
 
 /**
  * The child's side of the protocol.
@@ -487,29 +521,60 @@ export const NodeSandboxLive = Layer.effect(
       const admitted = yield* concurrentRuns.withPermitsIfAvailable(1)(
         Effect.scoped(
           Effect.gen(function* () {
-            // The wall clock is sampled while the program is not held: a call
-            // that waits on a person pauses it, every other call and all of the
-            // program's own compute count. It is armed before the child spawns
-            // so a caller can advance a test clock without racing the start.
-            const holds = yield* Ref.make(0);
-            const spent = yield* Ref.make(0);
-            const overrun = yield* Deferred.make<void>();
+            // The budget is armed before the child spawns so a caller can
+            // advance a test clock without racing the start. It charges real
+            // elapsed monotonic time, and the intervals a call spends waiting
+            // on a person are subtracted, the open one included: a human is not
+            // the program, so a slow approval is not charged to it.
+            const startedAt = yield* monotonicMillis;
+            const waits = yield* Ref.make<ApprovalWaits>({
+              closed: 0,
+              depth: 0,
+              since: Option.none(),
+            });
+            const overrun = yield* Deferred.make<SandboxError>();
 
             /**
-             * The controls a call may use, and the only way to pause the clock.
+             * The controls a call may use, and the only way to pause the budget.
              *
-             * `waitForPerson` holds the wall clock for the duration of the
-             * effect, so an MCP approval that waits on a human does not spend
-             * the program's budget; the hold is counted, so concurrent waits
-             * nest correctly.
+             * `waitForPerson` excludes the effect's real duration, so an MCP
+             * approval that waits on a human does not spend the program's
+             * budget. Only the outermost of overlapping waits opens the
+             * interval, so the budget excludes the union of the waits rather
+             * than their sum: summing them would let two concurrent approvals
+             * refund budget the program never had.
              */
             const controls: SandboxCallControls = {
               waitForPerson: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
                 Effect.gen(function* () {
-                  yield* Ref.update(holds, (count) => count + 1);
+                  const openedAt = yield* monotonicMillis;
+                  yield* Ref.update(waits, (state) =>
+                    state.depth > 0
+                      ? { ...state, depth: state.depth + 1 }
+                      : {
+                          closed: state.closed,
+                          depth: 1,
+                          since: Option.some(openedAt),
+                        }
+                  );
                   return yield* effect.pipe(
                     Effect.ensuring(
-                      Ref.update(holds, (count) => Math.max(0, count - 1))
+                      Effect.gen(function* () {
+                        const closedAt = yield* monotonicMillis;
+                        yield* Ref.update(waits, (state) => {
+                          const depth = Math.max(0, state.depth - 1);
+                          if (depth > 0 || Option.isNone(state.since)) {
+                            return { ...state, depth };
+                          }
+                          return {
+                            closed:
+                              state.closed +
+                              Math.max(0, closedAt - state.since.value),
+                            depth,
+                            since: Option.none(),
+                          };
+                        });
+                      })
                     )
                   );
                 }),
@@ -519,13 +584,28 @@ export const NodeSandboxLive = Layer.effect(
               Effect.gen(function* () {
                 for (;;) {
                   yield* Effect.sleep(Duration.millis(WALL_CLOCK_TICK_MS));
-                  if ((yield* Ref.get(holds)) > 0) continue;
-                  const elapsed = yield* Ref.updateAndGet(
-                    spent,
-                    (total) => total + WALL_CLOCK_TICK_MS
-                  );
-                  if (elapsed >= limits.wallClockMs) {
-                    yield* Deferred.succeed(overrun, undefined);
+                  const now = yield* monotonicMillis;
+                  const paused = waitedFor(yield* Ref.get(waits), now);
+                  if (now - startedAt - paused >= limits.wallClockMs) {
+                    yield* Deferred.succeed(
+                      overrun,
+                      limitExceeded(
+                        `The program exceeded its ${limits.wallClockMs} ms budget.`
+                      )
+                    );
+                    return;
+                  }
+                  // Waiting is not charged, but it is not unbounded either:
+                  // the child keeps running and the run keeps its concurrency
+                  // permit while the answer is pending, so waits whose union
+                  // reaches this limit end the run.
+                  if (paused >= limits.maxApprovalWaitMs) {
+                    yield* Deferred.succeed(
+                      overrun,
+                      limitExceeded(
+                        `The program waited more than ${limits.maxApprovalWaitMs} ms for a person.`
+                      )
+                    );
                     return;
                   }
                 }
@@ -708,19 +788,19 @@ export const NodeSandboxLive = Layer.effect(
               )
             );
 
-            // The race is between the pump and the deadline alone; the kill
-            // happens after the pump loses, so the pump cannot observe the
-            // child's death and win the race with an empty result.
-            const timedOut = yield* Effect.raceFirst(
-              Effect.as(pump, false),
-              Effect.as(Deferred.await(overrun), true)
+            // The race is between the pump and a limit alone; the kill happens
+            // after the pump loses, so the pump cannot observe the child's
+            // death and win the race with an empty result. The limit carries
+            // the failure it hit, so an exhausted budget and an abandoned
+            // approval are told apart.
+            const exceeded = yield* Effect.raceFirst(
+              Effect.as(pump, Option.none<SandboxError>()),
+              Deferred.await(overrun).pipe(Effect.asSome)
             );
 
-            if (timedOut) {
+            if (Option.isSome(exceeded)) {
               yield* child.kill({ forceKillAfter: "250 millis" });
-              return yield* limitExceeded(
-                `The program exceeded its ${limits.wallClockMs} ms budget.`
-              );
+              return yield* exceeded.value;
             }
 
             const outcome = yield* Ref.get(state);

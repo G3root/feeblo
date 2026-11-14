@@ -342,6 +342,126 @@ layer(SandboxLive)("sandbox", (it) => {
     })
   );
 
+  it.effect("charges a wait on a person only for the time it held", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+      const approving = yield* Deferred.make<void>();
+      const working = yield* Deferred.make<void>();
+
+      // 350 ms of wall time against a 200 ms budget: 150 ms waiting on a
+      // person, then 200 ms executing. The wait is excluded for exactly its
+      // own interval, so the run still answers; charging the tick the wait
+      // ended in would have spent the budget before the program got there.
+      const fiber = yield* sandbox
+        .run({
+          call: (call, controls) =>
+            call.name === "approve"
+              ? controls
+                  .waitForPerson(
+                    Deferred.succeed(approving, undefined).pipe(
+                      Effect.andThen(Effect.sleep("150 millis"))
+                    )
+                  )
+                  .pipe(Effect.as({ approved: true }))
+              : Deferred.succeed(working, undefined).pipe(
+                  Effect.andThen(Effect.sleep("200 millis")),
+                  Effect.as({ slow: true })
+                ),
+          code: `
+            await tools.approve({});
+            return await tools.slow({});
+          `,
+          limits: { wallClockMs: 200 },
+        })
+        .pipe(Effect.forkChild);
+
+      yield* Deferred.await(approving);
+      yield* TestClock.adjust("150 millis");
+      yield* Deferred.await(working);
+      yield* TestClock.adjust("200 millis");
+
+      const outcome = yield* Fiber.join(fiber);
+      expect(outcome.result).toEqual({ slow: true });
+    })
+  );
+
+  it.effect("stops a program whose wait on a person outlives the limit", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+      const waiting = yield* Deferred.make<void>();
+
+      // A wait is excluded from the execution budget, not from every bound: a
+      // run waiting on a person still holds its permit and its child keeps
+      // running, so an answer that never comes ends the run instead.
+      const fiber = yield* sandbox
+        .run({
+          call: (_call, controls) =>
+            controls.waitForPerson(
+              Deferred.succeed(waiting, undefined).pipe(
+                Effect.andThen(Effect.sleep("5 minutes")),
+                Effect.as({ approved: true })
+              )
+            ),
+          code: "return await tools.approve({});",
+          limits: { maxApprovalWaitMs: 1_000, wallClockMs: 200 },
+        })
+        .pipe(Effect.flip, Effect.forkChild);
+
+      yield* Deferred.await(waiting);
+      yield* TestClock.adjust("5 minutes");
+
+      const failure = yield* Fiber.join(fiber);
+      expect(Schema.is(SandboxError)(failure)).toBe(true);
+      if (!Schema.is(SandboxError)(failure)) return;
+      expect(failure.code).toBe("LIMIT_EXCEEDED");
+      expect(failure.message).toContain("for a person");
+    })
+  );
+
+  it.effect(
+    "bounds a program that keeps working while an approval is pending",
+    () =>
+      Effect.gen(function* () {
+        const sandbox = yield* Sandbox;
+        const waiting = yield* Deferred.make<void>();
+
+        // The program starts an approval but keeps the child working instead
+        // of waiting for the answer itself. Excluding the approval from the
+        // wall clock must not turn into a second deadline-free budget: the run
+        // still holds its permit, so the approval limit ends it.
+        const fiber = yield* sandbox
+          .run({
+            call: (call, controls) =>
+              call.name === "approve"
+                ? controls.waitForPerson(
+                    Deferred.succeed(waiting, undefined).pipe(
+                      Effect.andThen(Effect.never)
+                    )
+                  )
+                : Effect.succeed({}),
+            code: `
+            tools.approve({});
+            for (;;) { await tools.tick({}); }
+          `,
+            limits: {
+              maxApprovalWaitMs: 300,
+              maxCalls: 1_000_000,
+              wallClockMs: 10_000,
+            },
+          })
+          .pipe(Effect.flip, Effect.forkChild);
+
+        yield* Deferred.await(waiting);
+        yield* TestClock.adjust("300 millis");
+
+        const failure = yield* Fiber.join(fiber);
+        expect(Schema.is(SandboxError)(failure)).toBe(true);
+        if (!Schema.is(SandboxError)(failure)) return;
+        expect(failure.code).toBe("LIMIT_EXCEEDED");
+        expect(failure.message).toContain("for a person");
+      })
+  );
+
   it.effect("refuses a result larger than the budget", () =>
     Effect.gen(function* () {
       const failure = yield* failureOf('return "x".repeat(100);', {

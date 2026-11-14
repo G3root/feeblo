@@ -21,8 +21,19 @@ import * as Schema from "effect/Schema";
 
 /** What an implementation enforces, overridable per run by the caller. */
 export interface SandboxLimits {
-  /** The whole program, including every tool call it waits on. */
+  /**
+   * The program's own execution: real elapsed time less the time a call spends
+   * waiting on a person.
+   */
   readonly wallClockMs: number;
+  /**
+   * The most time one run may spend waiting on a person.
+   *
+   * An approval wait is not charged to `wallClockMs` — a human is not the
+   * program — but the child keeps executing and the run keeps its concurrency
+   * permit while the answer is pending, so the excluded wait is bounded too.
+   */
+  readonly maxApprovalWaitMs: number;
   /** One synchronous evaluation, which is what a runaway loop trips. */
   readonly evaluationMs: number;
   /** The most tool calls one program may make. */
@@ -51,6 +62,7 @@ export interface SandboxLimits {
  */
 export const DEFAULT_SANDBOX_LIMITS: SandboxLimits = {
   evaluationMs: 1_000,
+  maxApprovalWaitMs: 5 * 60_000,
   maxCalls: 100,
   maxLogs: 200,
   maxResultChars: 100_000,
@@ -113,8 +125,8 @@ export class SandboxToolFailure extends Schema.TaggedError<SandboxToolFailure>()
  *
  * `waitForPerson` is the approval exception: an MCP elicitation waits for a
  * human, and that wait must not be charged to the program's execution budget.
- * The sandbox pauses its wall clock for the effect's duration and resumes it
- * afterwards; nothing else about the run changes.
+ * The sandbox excludes the effect's real duration from the wall clock, up to
+ * the run's `maxApprovalWaitMs`; nothing else about the run changes.
  */
 export interface SandboxCallControls {
   readonly waitForPerson: <A, E, R>(
