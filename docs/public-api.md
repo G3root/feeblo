@@ -79,8 +79,9 @@ Keys are **organization-owned machine credentials**. A key reads only the worksp
 | `end_users.read` | Read the workspace's end users through the `/end-users` endpoints. |
 | `end_users.write` | Create or update an end user. The upsert is keyed by the workspace's own `externalId` or by email. |
 | `boards.read` | Read the workspace's boards through the `/boards` endpoints. Required by every board endpoint, and every key receives it. |
+| `audit_log.read` | Read the workspace's audit log through `/audit-log`: what members and machine credentials did, and which requests were refused. Not granted by default. |
 
-A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies` and `end_users` ones; the `posts`, `comments`, `votes`, `tags`, and `changelog` write scopes, and all four `companies` scopes and both `end_users` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, remove its votes, broadcast a release note, or learn the customer roster. The CRM and end-user grants are opt-in as a whole, reads included, because a company and an end user are records about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
+A key is created with a fixed set of scopes and never gains one afterwards. Every key starts with the read scopes above except the `companies`, `end_users`, and `audit_log` ones; the `posts`, `comments`, `votes`, `tags`, and `changelog` write scopes, and all four `companies` scopes and both `end_users` scopes, are granted only when the key is created with them — so a key that was minted to read feedback cannot delete a workspace's posts, comments, or tags, remove its votes, broadcast a release note, learn the customer roster, or read the audit log. The CRM and end-user grants are opt-in as a whole, reads included, because a company and an end user are records about the workspace's own customers rather than the workspace's content. That is also why a key created before a scope existed keeps its narrower grant: rotate the key if an integration needs more than it was issued.
 
 `comments.pin` is separate from `comments.update` for the same reason the dashboard keeps moderation apart from authorship: editing a comment's words and deciding which one sits at the top of a post are different authorities.
 
@@ -949,9 +950,64 @@ The record is looked up by `externalId` and by `email` — the two identifiers a
 
 When `externalId` and `email` name **different** end users, the request is `409 CONFLICT` rather than a silent merge: the caller's own data disagrees with itself, and picking one would fold two customers into one record. An `externalId` or `email` already held by a different end user is refused the same way. A record created here is written with `API` as its source, and it is the customer a later post, comment, or vote on their behalf attaches to — the two write paths share one row.
 
+### List audit log entries
+
+```http
+GET /api/v1/audit-log
+```
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `25` | 1–100. |
+| `cursor` | — | Opaque; pass the `nextCursor` from the previous page. |
+| `kind` | — | `changes` omits data access unless it was denied; `access` returns only data access. Omit for both. |
+| `action` | — | A declared audit action, such as `post.updated`. An action this build does not declare is `400 INVALID_REQUEST` rather than an empty page. |
+| `outcome` | — | `allowed` or `denied`. |
+| `actorType` | — | `user`, `api_key`, `oauth_client`, or `system`. |
+| `since` | — | An ISO 8601 date or timestamp; keeps entries that occurred at or after it. |
+| `until` | — | An ISO 8601 date or timestamp; keeps entries that occurred at or before it. |
+
+```json
+{
+  "data": [
+    {
+      "id": "alog_example",
+      "action": "post.updated",
+      "actionLabel": "Updated post",
+      "outcome": "allowed",
+      "denialReason": null,
+      "actorType": "user",
+      "actorId": "usr_example",
+      "actorLabel": null,
+      "source": "dashboard",
+      "resourceType": "post",
+      "resourceId": "pst_example",
+      "changes": {
+        "fields": ["title"],
+        "before": { "title": "Dark mode" },
+        "after": { "title": "Dark mode please" }
+      },
+      "metadata": null,
+      "occurredAt": "2026-08-11T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Requires `audit_log.read`, which is not part of a key's default grant. The log is an administrator's view of every member's activity, of the credentials that acted, and of the workspace's refused requests, so a key minted to read feedback does not learn it.
+
+An entry records what an operator did — a member's session, an API key, an OAuth client, or the product acting on its own — to a workspace-scoped record, plus every request refused at the credential boundary (`api.request` with `outcome: "denied"` and the missing scope in `metadata`). End-user activity is not here — votes, comments, and portal reads belong to a post's [timeline](#list-a-posts-timeline) instead.
+
+`action` is the stored `<resource>.<verb>`, and `actionLabel` is the name the answering build knows. An action recorded by a newer build reads as `null` in `actionLabel` rather than failing the page, so a client deployed before a new verb still renders the entries around it. `changes` is the strict before/after diff of an update — `fields` is authoritative, and a value missing from both maps was not captured — and `metadata` is the action-specific context: the endpoint and status of an audited read, the subject of a member action, or the scope a request was refused for. Both are absent when the action has nothing to record, and both are otherwise opaque.
+
+`actorId` is the credential that acted — an API key or OAuth client id — or the account behind a dashboard session, and a `system` entry names nobody. This is the one endpoint that returns an account identifier, and it is what makes the record accountable: an entry that could not say who acted would answer nothing. `actorLabel` is the credential's name frozen when it acted; a member's name is resolved from the directory by the dashboard and is never stored on the entry, so it is `null` for a person. The request's origin address, origin country, user agent, and request id are deliberately **not** fields: they are administrator forensics, not data an integration exports.
+
+Pages are keyed on `(occurredAt, id)` rather than on the creation-time tuple the other lists use, because the log is ordered by when each action happened and is append-only: a page read after a new entry arrived continues in the same place. `actorType` narrows a page that has already been read in that order, so a filtered page can carry fewer than `limit` entries while `nextCursor` is still set — keep paging until `nextCursor` is `null` instead of counting entries.
+
 ## Pagination
 
-Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, comments, tags, changelog entries, companies, and end users are inserted continuously and offset paging skips and repeats rows.
+Pagination is cursor-based. A response carries `nextCursor`; `null` means the last page. Cursors are opaque — do not construct or parse them — and are invalidated by the API without notice if they are malformed, in which case the API returns `400 INVALID_REQUEST`. Do not poll with offsets: posts, comments, tags, changelog entries, companies, end users, and audit log entries are inserted continuously and offset paging skips and repeats rows.
 
 The one list that is not a page is [`GET /statuses`](#list-statuses): the status catalog is small and ordered by the workspace's own `orderIndex`, so it is returned whole, with no cursor.
 
@@ -1008,10 +1064,10 @@ On downgrade, keys are **kept and not disabled**. They start working again when 
 The Public API never returns:
 
 - end-user email addresses or phone numbers;
-- account identifiers — `usr_*` and `mem_*`;
+- account identifiers — `usr_*` and `mem_*` — with the one exception of an audit log entry's `actorId`, which is the point of that record (see [List audit log entries](#list-audit-log-entries));
 - IP addresses, credentials, webhook secrets, or API keys.
 
-The one identifier that is published is a contact id (`cnt_*`), and only where it addresses a customer: the `id` of an end user and the `voterId` on a vote. It is an opaque handle to the workspace's own record of one of its customers — the same kind of handle as a `boardId` or a `statusId` — and it grants nothing on its own: the record behind it, and the email on it, still need `end_users.read`. Account identifiers are a different thing: they are shared across the workspaces an account can reach, which is why they stay out of every payload.
+The one customer identifier that is published is a contact id (`cnt_*`), and only where it addresses a customer: the `id` of an end user and the `voterId` on a vote. It is an opaque handle to the workspace's own record of one of its customers — the same kind of handle as a `boardId` or a `statusId` — and it grants nothing on its own: the record behind it, and the email on it, still need `end_users.read`. Account identifiers are a different thing: they are shared across the workspaces an account can reach, so outside an audit entry's `actorId` — which exists to name the actor — they stay out of the payloads.
 
 `author` is always `{ type, displayName, avatarUrl }`: `type` is `member` or `end_user` and distinguishes workspace staff from end users. Display names are included because the workspace already sees them on public boards and the dashboard; they are the workspace's own data. Emails are deliberately excluded — a key travels into third-party infrastructure (an integration platform, a partner's backend, a CI log), and that is a different blast radius from a signed-in session.
 

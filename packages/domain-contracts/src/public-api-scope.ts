@@ -64,6 +64,7 @@ export const PUBLIC_API_SCOPES = [
   "changelog.update",
   "changelog.delete",
   "changelog.publish",
+  "audit_log.read",
 ] as const;
 
 export type PublicApiScope = (typeof PUBLIC_API_SCOPES)[number];

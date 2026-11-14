@@ -2,6 +2,7 @@ import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as OpenApi from "effect/http-api/OpenApi";
 
+import { auditLogEndpoints } from "../audit-log/public-api/http";
 import { boardEndpoints } from "../board/public-api/http";
 import { changelogEndpoints } from "../changelog/public-api/http";
 import { commentEndpoints } from "../comments/public-api/http";
@@ -46,6 +47,15 @@ import {
  * identifier otherwise — and this annotation is what puts a one-line summary
  * under the section in the published reference rather than leaving it bare.
  */
+export class PublicApiAuditLogGroup extends HttpApiGroup.make("Audit log")
+  .annotate(
+    OpenApi.Description,
+    "Read the workspace's audit log: what members, API keys, OAuth clients, and the product itself did, and which requests were refused."
+  )
+  .add(...auditLogEndpoints)
+  .middleware(PublicApiSchemaErrorHandler)
+  .middleware(ApiKeyAuthMiddleware) {}
+
 export class PublicApiBoardGroup extends HttpApiGroup.make("Boards")
   .annotate(
     OpenApi.Description,
@@ -135,6 +145,7 @@ export class PublicApiVoteGroup extends HttpApiGroup.make("Votes")
  * to them.
  */
 export const PublicApiGroups = [
+  PublicApiAuditLogGroup,
   PublicApiBoardGroup,
   PublicApiChangelogGroup,
   PublicApiCommentGroup,
@@ -165,7 +176,7 @@ export class PublicApi extends HttpApi.make("PublicApi")
   .annotate(OpenApi.Title, "Feeblo Public API")
   .annotate(
     OpenApi.Description,
-    "Read and manage a workspace's posts, comments, votes, tags, changelog entries, companies, and end users. Every request is authenticated with an API key presented in the x-api-key header; the response is always JSON and errors carry a machine-readable code in `_tag`."
+    "Read and manage a workspace's posts, comments, votes, tags, changelog entries, companies, and end users, and read its audit log. Every request is authenticated with an API key presented in the x-api-key header; the response is always JSON and errors carry a machine-readable code in `_tag`."
   )
   .annotate(OpenApi.Version, "1.0.0")
   .add(...PublicApiGroups)
