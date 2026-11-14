@@ -16,6 +16,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { CommentRepository } from "../comments/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PostRepository } from "../post/repository";
@@ -37,6 +39,7 @@ describe("UserBanRpcHandlers", () => {
   const TestLayer = Layer.mergeAll(
     DatabaseLayer,
     UserBanRpcHandlers.pipe(Layer.provide(DatabaseLayer)),
+    AuditLogRecorder.layer.pipe(Layer.provide(DatabaseLayer)),
     UserBanRepository.layer.pipe(Layer.provide(DatabaseLayer)),
     WorkspaceRepository.layer.pipe(Layer.provide(DatabaseLayer)),
     PostRepository.layer.pipe(Layer.provide(DatabaseLayer)),
@@ -1092,6 +1095,94 @@ describe("UserBanRpcHandlers", () => {
             organizationId: fixture.organizationId,
           });
           expect(row?.authorIsBanned).toBe(true);
+        })
+    );
+
+    it.effect(
+      "records the ban against the banned person and the unban only when a row was removed",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* UserBanRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const withSession = Effect.provideService(
+            CurrentSession,
+            session(fixture)
+          );
+          const audited = Effect.provideService(AuditLogEnabled, true);
+          // A portal account, so the target resolves to an account the entry
+          // can name as the affected user.
+          const author = yield* createEndUser({
+            organizationId: fixture.organizationId,
+            suffix: "audit",
+          });
+          const target = { _tag: "user", userId: author.id } as const;
+
+          yield* handlers
+            .BanUser({
+              organizationId: fixture.organizationId,
+              reason: "Abuse report",
+              target,
+            })
+            .pipe(withSession, audited);
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              eq(schema.auditLogTable.organizationId, fixture.organizationId)
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            action: "user_ban.created",
+            actorType: "user",
+            actorUserId: fixture.userId,
+            affectedUserId: author.id,
+            metadata: { email: author.email, reason: "Abuse report" },
+            outcome: "allowed",
+            resourceType: "user_ban",
+            source: "dashboard",
+          });
+
+          yield* handlers
+            .UnbanUser({
+              _tag: "author",
+              organizationId: fixture.organizationId,
+              target,
+            })
+            .pipe(withSession, audited);
+
+          // Lifting a ban that is already gone writes nothing: only a delete
+          // that matched a row is an event.
+          const stale = yield* Effect.flip(
+            handlers
+              .UnbanUser({
+                _tag: "author",
+                organizationId: fixture.organizationId,
+                target,
+              })
+              .pipe(withSession, audited)
+          );
+          expect(stale._tag).toBe("NotFoundError");
+
+          const after = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              eq(schema.auditLogTable.organizationId, fixture.organizationId)
+            );
+          expect(after).toHaveLength(2);
+          expect(
+            after.find((row) => row.action === "user_ban.removed")
+          ).toMatchObject({
+            action: "user_ban.removed",
+            actorUserId: fixture.userId,
+            affectedUserId: author.id,
+            outcome: "allowed",
+            resourceType: "user_ban",
+            source: "dashboard",
+          });
         })
     );
   });
