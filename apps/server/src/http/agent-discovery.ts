@@ -1,3 +1,4 @@
+import { PUBLIC_API_CODE_MODE_MCP_PATH } from "@feeblo/domain/public-api/code-mode";
 import { PUBLIC_API_MCP_PATH } from "@feeblo/domain/public-api/mcp";
 import { PUBLIC_API_KEY_HEADER } from "@feeblo/domain/public-api/middleware";
 import * as Effect from "effect/Effect";
@@ -158,6 +159,7 @@ export const apiMarkdown = (origin: string) => `# Feeblo Public API
 - OpenAPI 3.1 document: ${origin}${API_OPENAPI_PATH}
 - Reference page: ${origin}${API_REFERENCE_PATH} (readable without a key)
 - MCP endpoint: ${origin}${PUBLIC_API_MCP_PATH} (streamable HTTP)
+- MCP code mode: ${origin}${PUBLIC_API_CODE_MODE_MCP_PATH} (two tools: search and execute)
 - Authentication guide: ${origin}${AGENT_AUTH_PATH}
 - API catalog: ${origin}${API_CATALOG_PATH}
 - MCP server card: ${origin}${MCP_SERVER_CARD_PATH}
@@ -197,6 +199,14 @@ header can instead discover the OAuth authorization server at
 ${origin}/.well-known/oauth-protected-resource; the member signs in, picks a
 workspace, and approves scopes. The transport refuses requests carrying an
 \`Origin\` header; a browser client needs a same-origin proxy.
+
+\`${PUBLIC_API_CODE_MODE_MCP_PATH}\` serves the same operations as two tools.
+\`search\` returns the operations a task needs with the TypeScript signature
+each one has, and \`execute\` runs one JavaScript program that calls them as
+\`await tools.<name>(input)\`. A program is cheaper than several tool calls, and
+one failed call throws so the program can catch it and continue. It runs in a
+sandbox with no file system, network, or process access, and a destructive call
+asks for approval exactly as it does on the per-operation endpoint.
 
 ## Read the docs
 
@@ -418,6 +428,22 @@ export const mcpServerCard = (origin: string) => ({
         scheme: PUBLIC_API_KEY_HEADER,
         // A hosted MCP client authenticates with OAuth instead; the provider
         // serves this document at the API origin (docs/adr/0024).
+        oauth: {
+          resource_metadata: `${origin}/.well-known/oauth-protected-resource`,
+        },
+        documentation: `${origin}${AGENT_AUTH_PATH}`,
+      },
+      documentation: "https://docs.feeblo.com/developers/mcp",
+    },
+    {
+      name: "Feeblo Public API (code mode)",
+      description:
+        "The same operations as two MCP tools: `search` finds them with their TypeScript signatures, and `execute` runs one JavaScript program that calls them. Same credential, same scopes, same approval gate.",
+      transport: "streamable-http",
+      url: `${origin}${PUBLIC_API_CODE_MODE_MCP_PATH}`,
+      authentication: {
+        required: true,
+        scheme: PUBLIC_API_KEY_HEADER,
         oauth: {
           resource_metadata: `${origin}/.well-known/oauth-protected-resource`,
         },

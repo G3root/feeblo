@@ -1,5 +1,6 @@
 import { makeClientIpGlobalMiddleware } from "@feeblo/domain/client-ip";
 import { HttpRoute } from "@feeblo/domain/http/router";
+import { PublicApiCodeModeRoute } from "@feeblo/domain/public-api/code-mode";
 import { PublicApiMcpRoute } from "@feeblo/domain/public-api/mcp";
 import { PublicApiRoute } from "@feeblo/domain/public-api/router";
 import {
@@ -180,6 +181,10 @@ export const makeMergedRoutes = ({
     // serves, gated by the same key: mounting one without the other would let
     // a key that pays for the Public API reach only half of it.
     PublicApiMcpRoute,
+    // Code mode is the second projection of the same operations: `search` and
+    // one `execute` call replace the per-operation tool list, and its programs
+    // reach the same handlers, scopes, and approval gate.
+    PublicApiCodeModeRoute,
     BetterAuthRouterLive,
     makeSlackRouters({
       appUrl,

@@ -23,6 +23,15 @@ import {
   type PublicApiKeyBudget,
   publicApiRateLimitHeaders,
 } from "./api-key-auth";
+import {
+  Approval,
+  ApprovalDenied,
+  APPROVAL_MODES,
+  approvalLayer,
+  DEFAULT_APPROVAL_MODE,
+  type ApprovalEnvironment,
+  type ApprovalMode,
+} from "./approval";
 import { PublicApiConfig } from "./config";
 import {
   InternalError,
@@ -86,7 +95,7 @@ const MCP_SERVER_INSTRUCTIONS =
  * not name one, and every revision a current client might offer is present so a
  * connection is not refused for a version mismatch that has a schema for it.
  */
-const MCP_PROTOCOLS = [
+export const MCP_PROTOCOLS = [
   McpProtocol.v2026_07_28,
   McpProtocol.v2025_11_25,
   McpProtocol.v2025_06_18,
@@ -113,11 +122,19 @@ type PublicApiOperationUnion = (typeof PublicApiOperations)[number];
  * reads, so the HTTP endpoint and the tool cannot disagree about any of them,
  * and the toolkit decodes a call's parameters and encodes its success and
  * declared failures without a line of surface-specific code.
+ *
+ * A destructive operation's declared failures are the operation's plus the
+ * approval gate's refusal. The extra schema is surface-local on purpose: no
+ * `/api/v1` endpoint can answer `APPROVAL_DENIED`, so adding it to the
+ * operation's own failure union would publish a code that surface never
+ * produces in the frozen vocabulary of ADR 0004.
  */
 const toMcpTool = (operation: PublicApiOperationUnion) =>
   Tool.make(operation.name, {
     description: operation.description,
-    failure: operation.failure,
+    failure: operation.annotations.destructive
+      ? Schema.Union([operation.failure, ApprovalDenied])
+      : operation.failure,
     parameters: operation.input,
     success: operation.output,
   })
@@ -150,34 +167,69 @@ type PublicApiMcpTools = typeof PublicApiMcpToolkit.tools;
  * so what is left is the operation's handler, keyed by its tool name. The
  * operation's stable dependencies are captured here, when the toolkit layer is
  * built; the only requirement a handler still declares is the key
- * middleware's request-scoped caller.
+ * middleware's request-scoped caller, plus the request-scoped services an
+ * approval gate may read from the connection.
  */
 const buildPublicApiMcpHandlers = () =>
   Effect.gen(function* () {
     const context = yield* Effect.context<PublicApiDependencies>();
+    const approval = yield* Approval;
 
     const handlers: Record<
       string,
-      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The registry erases each operation's input to `unknown` (ADR 0007), and a record keyed by tool name cannot name one input type per key; the toolkit decodes a call's parameters with the operation's own schema before this handler runs, which is what turns the erased input back into the operation's input type.
-      (parameters: unknown) => Effect.Effect<unknown, unknown, PublicApiCaller>
+      (
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The registry erases each operation's input to `unknown` (ADR 0007), and a record keyed by tool name cannot name one input type per key; the toolkit decodes a call's parameters with the operation's own schema before this handler runs, which is what turns the erased input back into the operation's input type.
+        parameters: unknown
+      ) => Effect.Effect<
+        unknown,
+        unknown,
+        PublicApiCaller | ApprovalEnvironment
+      >
     > = {};
 
     for (const operation of PublicApiOperations) {
       handlers[operation.name] = (parameters) =>
-        // SAFETY: the erasure above, narrowed back for the cast. The handler
-        // is the operation's own, so the value the toolkit decodes with
-        // `operation.input` is exactly what it accepts.
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- the erased handler is `Effect<unknown, unknown, ...>` by design (ADR 0007); the toolkit decodes a call's parameters with the operation's own schema before this runs.
-        (
-          operation.handler as (
-            // oxlint-disable-next-line anti-slop/no-unknown-parameters -- See the record's comment: this is the erased view of the operation's own input type.
-            input: unknown
-          ) => Effect.Effect<
-            unknown,
-            unknown,
-            PublicApiDependencies | PublicApiCaller
-          >
-        )(parameters).pipe(Effect.provideContext(context));
+        Effect.gen(function* () {
+          // A destructive call is the gate's to allow before the operation's
+          // own scope check runs: asking after the caller has already paid for
+          // the work would let a refusal look like a partial write.
+          if (operation.annotations.destructive) {
+            // The toolkit decoded this value with `operation.input`; encoding
+            // it back with the same codec is what gives the approval prompt
+            // the declared fields in the schema's order and nothing else, so a
+            // caller cannot add keys or reorder them to hide what it is about
+            // to change. A failure here is our own schema bug, not the
+            // caller's.
+            const approvalInput = yield* Schema.encodeUnknownEffect(
+              Schema.toCodecJson(operation.input)
+            )(parameters).pipe(
+              Effect.andThen(Schema.decodeUnknownEffect(Schema.Json)),
+              Effect.orDie
+            );
+
+            yield* approval.approve({
+              input: approvalInput,
+              operation: operation.name,
+            });
+          }
+
+          return yield* (
+            // SAFETY: the erasure above, narrowed back for the cast. The handler
+            // is the operation's own, so the value the toolkit decodes with
+            // `operation.input` is exactly what it accepts.
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- the erased handler is `Effect<unknown, unknown, ...>` by design (ADR 0007); the toolkit decodes a call's parameters with the operation's own schema before this runs.
+            (
+              operation.handler as (
+                // oxlint-disable-next-line anti-slop/no-unknown-parameters -- See the record's comment: this is the erased view of the operation's own input type.
+                input: unknown
+              ) => Effect.Effect<
+                unknown,
+                unknown,
+                PublicApiDependencies | PublicApiCaller
+              >
+            )(parameters).pipe(Effect.provideContext(context))
+          );
+        });
     }
 
     // SAFETY: the record is built from the same registry that produced the
@@ -318,7 +370,7 @@ const mcpChallengeResponse = (rejection: {
  * responsible for origin and protocol checks; authentication runs first, so an
  * unauthenticated request never reaches JSON-RPC parsing.
  */
-const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
+export const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
   HttpRouter.middleware(
     Effect.gen(function* () {
       // The services the checks need are resolved once, when the route is
@@ -463,18 +515,33 @@ const PublicApiMcpRepositories = PublicApiProjections.pipe(
  *
  * The budget is a parameter so a test can exhaust it in two calls instead of
  * three hundred, mirroring `makePublicApiRoute`.
+ *
+ * The approval gate is read from `MCP_APPROVAL` rather than passed as a layer:
+ * the choice belongs to the deployment, an unset variable has to mean the
+ * behaviour that predates the gate, and a test that wants `deny` should drive
+ * the same config path production does. See `approval.ts` for the modes. The
+ * second parameter is the test seam for that config: passing a mode is exactly
+ * what reading `MCP_APPROVAL` would produce, and a suite that runs every
+ * destructive test through a `deny` route needs no second server.
  */
 export const makePublicApiMcpRoute = (
-  budget: PublicApiKeyBudget = PUBLIC_API_KEY_RATE_LIMIT
+  budget: PublicApiKeyBudget = PUBLIC_API_KEY_RATE_LIMIT,
+  configuredApproval?: ApprovalMode
 ) =>
   Layer.unwrap(
     Effect.gen(function* () {
       const version = yield* Config.String("APP_RELEASE").pipe(
         Config.withDefault("dev")
       );
+      const approvalMode =
+        configuredApproval ??
+        (yield* Config.Literals(APPROVAL_MODES, "MCP_APPROVAL").pipe(
+          Config.withDefault(DEFAULT_APPROVAL_MODE)
+        ));
 
       return McpServer.toolkit(PublicApiMcpToolkit).pipe(
         Layer.provide(PublicApiMcpHandlers),
+        Layer.provide(approvalLayer(approvalMode)),
         Layer.provide(
           McpServer.layerHttp({
             description:
