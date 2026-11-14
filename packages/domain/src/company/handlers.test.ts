@@ -5,11 +5,14 @@ import {
   CompanyId,
   WorkspaceId,
 } from "@feeblo/id";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { ContactRepository } from "../contact/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -96,6 +99,7 @@ describe("CompanyRpcHandlers", () => {
     ),
     Repositories,
     Entitlements,
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
@@ -325,6 +329,54 @@ describe("CompanyRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
           expect(companies).toHaveLength(0);
         })
+    );
+
+    it.effect("records the deletion against the person who made it", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* CompanyRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const companyId = yield* CompanyId.generate;
+        const now = yield* DateTime.nowAsDate;
+        yield* db.insert(schema.companyTable).values({
+          id: companyId,
+          organizationId: fixture.organizationId,
+          name: "Acme",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        yield* handlers
+          .DeleteCompany({
+            id: companyId,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture)),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            and(
+              eq(schema.auditLogTable.organizationId, fixture.organizationId),
+              eq(schema.auditLogTable.action, "company.deleted")
+            )
+          );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          action: "company.deleted",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceId: companyId,
+          resourceType: "company",
+          source: "dashboard",
+        });
+      })
     );
   });
 });

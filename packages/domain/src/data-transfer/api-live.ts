@@ -5,6 +5,7 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import { Api } from "../http/api";
 import { PublicApiConfig } from "../public-api/config";
@@ -54,7 +55,8 @@ const HandlerDependencies = Layer.mergeAll(
   DataImportService.layer,
   DataTransferRepository.layer,
   BoardRepository.layer,
-  PublicApiConfig.layer
+  PublicApiConfig.layer,
+  AuditLogRecorder.layer
 ).pipe(Layer.orDie);
 
 /** Control characters and separators that must not reach the header. */

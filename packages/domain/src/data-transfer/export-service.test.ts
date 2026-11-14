@@ -9,12 +9,14 @@ import {
   TagId,
   WorkspaceId,
 } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import { PublicApiConfig } from "../public-api/config";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -119,7 +121,8 @@ const makeSession = (
 
 const TestLayer = Layer.mergeAll(
   DataTransferRepository.layer,
-  BoardRepository.layer
+  BoardRepository.layer,
+  AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
 ).pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive),
   Layer.provideMerge(NodeCrypto.layer),
@@ -403,5 +406,82 @@ layer(TestLayer)("streamPostCsv", (it) => {
 
       expect(error._tag).toBe("DataTransferBoardNotFoundError");
     })
+  );
+
+  it.effect("records the export only when it moves rows", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const db = yield* currentDb;
+
+      // An export of an empty workspace is a header and nothing else: no
+      // customer data moved, so there is nothing to record.
+      yield* exportPosts(fixture, { boardId: null });
+
+      const postId = yield* PostId.generate;
+      const now = yield* DateTime.nowAsDate;
+      yield* db.insert(schema.postTable).values({
+        boardId: fixture.boardId,
+        content: "A body",
+        createdAt: now,
+        id: postId,
+        organizationId: fixture.organizationId,
+        slug: `slug-${postId}`,
+        statusId: fixture.statusId,
+        title: "Exported post",
+        updatedAt: now,
+      });
+
+      yield* exportPosts(fixture, { boardId: null });
+
+      const rows = yield* db
+        .select()
+        .from(schema.auditLogTable)
+        .where(eq(schema.auditLogTable.organizationId, fixture.organizationId));
+
+      expect(rows).toHaveLength(2);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: "board.exported",
+            actorType: "user",
+            actorUserId: fixture.userId,
+            metadata: { allBoards: true, includeArchived: false, rowCount: 1 },
+            outcome: "allowed",
+            resourceType: "board",
+            source: "dashboard",
+          }),
+          expect.objectContaining({
+            action: "data_transfer.exported",
+            actorType: "user",
+            actorUserId: fixture.userId,
+            metadata: { allBoards: true, includeArchived: false, rowCount: 1 },
+            outcome: "allowed",
+            resourceType: "data_transfer",
+            source: "dashboard",
+          }),
+        ])
+      );
+
+      // A named board is the resource the entry describes, so the id is on the
+      // row rather than only in the metadata.
+      yield* exportPosts(fixture, { boardId: fixture.boardId });
+
+      const named = yield* db
+        .select()
+        .from(schema.auditLogTable)
+        .where(
+          and(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId),
+            eq(schema.auditLogTable.action, "board.exported"),
+            eq(schema.auditLogTable.resourceId, fixture.boardId)
+          )
+        );
+
+      expect(named).toHaveLength(1);
+      expect(named[0]?.metadata).toMatchObject({
+        allBoards: false,
+        rowCount: 1,
+      });
+    }).pipe(Effect.provideService(AuditLogEnabled, true))
   );
 });
