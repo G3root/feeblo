@@ -82,9 +82,9 @@ interface AuditResourceDefinition {
  * the reader knows how to build.
  */
 export const AuditResources = {
-  workspace: { singleton: true, verbs: ["updated", "deleted"] },
-  member: { verbs: ["invited", "joined", "role_changed", "removed"] },
-  board: { verbs: ["created", "updated", "deleted", "imported", "exported"] },
+  workspace: { singleton: true, verbs: ["updated"] },
+  member: { verbs: ["role_changed", "removed", "invite_cancelled"] },
+  board: { verbs: ["created", "updated", "deleted", "exported"] },
   post: {
     verbs: [
       "created",
@@ -99,12 +99,11 @@ export const AuditResources = {
     ],
   },
   comment: { verbs: ["created", "updated", "deleted", "pinned"] },
-  vote: { verbs: ["added", "removed", "on_behalf_added"] },
   changelog: { verbs: ["created", "updated", "published", "deleted"] },
   changelog_category: { verbs: ["created", "updated", "deleted"] },
   roadmap: { verbs: ["created", "updated", "deleted"] },
   post_status: { verbs: ["created", "updated", "deleted"] },
-  tag: { verbs: ["created", "updated", "deleted", "assigned", "unassigned"] },
+  tag: { verbs: ["created", "updated", "deleted"] },
   contact: { verbs: ["created", "updated", "deleted", "read"] },
   company: { verbs: ["created", "updated", "deleted"] },
   attribute_definition: {
@@ -215,15 +214,12 @@ export const isAuditAccessAction = (action: string): boolean =>
  */
 export const AuditActionLabels = {
   "workspace.updated": "Updated workspace settings",
-  "workspace.deleted": "Deleted workspace",
-  "member.invited": "Invited member",
-  "member.joined": "Member joined",
   "member.role_changed": "Changed member role",
   "member.removed": "Removed member",
+  "member.invite_cancelled": "Cancelled an invitation",
   "board.created": "Created board",
   "board.updated": "Updated board",
   "board.deleted": "Deleted board",
-  "board.imported": "Imported board",
   "board.exported": "Exported board",
   "post.created": "Created post",
   "post.updated": "Updated post",
@@ -238,9 +234,6 @@ export const AuditActionLabels = {
   "comment.updated": "Updated comment",
   "comment.deleted": "Deleted comment",
   "comment.pinned": "Pinned comment",
-  "vote.added": "Added vote",
-  "vote.removed": "Removed vote",
-  "vote.on_behalf_added": "Added vote on behalf of a customer",
   "changelog.created": "Created changelog entry",
   "changelog.updated": "Updated changelog entry",
   "changelog.published": "Published changelog entry",
@@ -257,8 +250,6 @@ export const AuditActionLabels = {
   "tag.created": "Created tag",
   "tag.updated": "Updated tag",
   "tag.deleted": "Deleted tag",
-  "tag.assigned": "Assigned tag",
-  "tag.unassigned": "Unassigned tag",
   "contact.created": "Created contact",
   "contact.updated": "Updated contact",
   "contact.deleted": "Deleted contact",
@@ -298,7 +289,6 @@ export const AuditResourceLabels = {
   board: "Board",
   post: "Post",
   comment: "Comment",
-  vote: "Vote",
   changelog: "Changelog entry",
   changelog_category: "Changelog category",
   roadmap: "Roadmap",
