@@ -1,17 +1,21 @@
+import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
 import {
   DEFAULT_SANDBOX_LIMITS,
   Sandbox,
   SandboxError,
+  type SandboxCallControls,
   type SandboxLimits,
   type SandboxOutcome,
   type SandboxProgram,
@@ -64,6 +68,25 @@ import {
  * told to the program as a caught error.
  */
 const MAX_FRAME_CHARS = 1_048_576;
+
+/**
+ * How many sandboxed programs a deployment with no discoverable memory budget
+ * may run at once.
+ *
+ * A container publishes its limit through cgroups; when it does not (a laptop,
+ * a platform that bounds the container another way) this is the conservative
+ * default, and the container limit the deployment does set remains the backstop.
+ */
+const DEFAULT_MAX_CONCURRENT_RUNS = 4;
+
+/** Where a container's memory limit is published: cgroup v2, then v1. */
+const CGROUP_MEMORY_PATHS = [
+  "/sys/fs/cgroup/memory.max",
+  "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+] as const;
+
+/** How often the wall clock is sampled while the program runs. */
+const WALL_CLOCK_TICK_MS = 100;
 
 /**
  * The child's side of the protocol.
@@ -399,6 +422,41 @@ type HostMessage =
 
 const encodeLine = (message: HostMessage) => `${JSON.stringify(message)}\n`;
 
+/**
+ * The memory a container says it has, when the kernel publishes it.
+ *
+ * Read once, when the layer is built: a limit that changes under a running
+ * server is a reconfiguration, not something one request should notice.
+ */
+const containerMemoryBytes = Effect.gen(function* () {
+  const fileSystem = yield* FileSystem.FileSystem;
+
+  for (const path of CGROUP_MEMORY_PATHS) {
+    const contents = yield* fileSystem.readFileString(path).pipe(Effect.option);
+    if (Option.isSome(contents)) {
+      const bytes = Number(contents.value.trim());
+      if (Number.isSafeInteger(bytes) && bytes > 0) return bytes;
+    }
+  }
+  return undefined;
+});
+
+/**
+ * How many runs the memory budget allows.
+ *
+ * The per-child bound is the watchdog threshold, so a 2 GB container admits
+ * eight 256 MB children. A program that overrides `maxRssBytes` does not change
+ * this global count: the permit is a property of the deployment, not of one
+ * request.
+ */
+const maxConcurrentRuns = (containerBytes: number | undefined): number =>
+  containerBytes === undefined
+    ? DEFAULT_MAX_CONCURRENT_RUNS
+    : Math.max(
+        1,
+        Math.floor(containerBytes / DEFAULT_SANDBOX_LIMITS.maxRssBytes)
+      );
+
 const crash = (message: string) =>
   new SandboxError({ code: "CRASHED", message });
 
@@ -410,6 +468,14 @@ export const NodeSandboxLive = Layer.effect(
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
+    // One permit per child the container's memory budget can hold; the
+    // semaphore is per process, so two requests that arrive together cannot
+    // both spawn when only one child fits.
+    const permits = yield* containerMemoryBytes.pipe(
+      Effect.map(maxConcurrentRuns)
+    );
+    const concurrentRuns = yield* Semaphore.make(permits);
+
     const run = Effect.fn("NodeSandbox.run")(function* (
       program: SandboxProgram
     ) {
@@ -418,204 +484,269 @@ export const NodeSandboxLive = Layer.effect(
         ...program.limits,
       };
 
-      return yield* Effect.scoped(
-        Effect.gen(function* () {
-          const child = yield* spawner.spawn(
-            // A fixed argv, a fresh interpreter per request, and the
-            // permission model on: the child cannot read a file, spawn a
-            // process, spawn a worker, add a native addon, or open a socket.
-            // An empty environment keeps the server's own variables — a
-            // `NODE_OPTIONS` that preloads a module included — out of it.
-            ChildProcess.make(
-              process.execPath,
-              [
-                "--permission",
-                // A program that allocates without bound dies on its own heap
-                // rather than through the host's wall clock. The child's RSS
-                // watchdog covers memory outside the V8 heap.
-                "--max-old-space-size=128",
-                "--input-type=module",
-                "--no-warnings",
-                "-e",
-                RUNNER_SOURCE,
-              ],
-              { env: {} }
-            )
-          );
-          yield* Effect.addFinalizer(() =>
-            // A program that starves its own event loop cannot act on SIGTERM,
-            // so the forced kill is the only termination the sandbox promises.
-            child.kill({ forceKillAfter: "250 millis" }).pipe(Effect.ignore)
-          );
+      const admitted = yield* concurrentRuns.withPermitsIfAvailable(1)(
+        Effect.scoped(
+          Effect.gen(function* () {
+            // The wall clock is sampled while the program is not held: a call
+            // that waits on a person pauses it, every other call and all of the
+            // program's own compute count. It is armed before the child spawns
+            // so a caller can advance a test clock without racing the start.
+            const holds = yield* Ref.make(0);
+            const spent = yield* Ref.make(0);
+            const overrun = yield* Deferred.make<void>();
 
-          const input = yield* Queue.unbounded<Uint8Array>();
-          yield* Stream.fromQueue(input).pipe(
-            Stream.run(child.stdin),
-            Effect.forkScoped
-          );
-
-          const encoder = new TextEncoder();
-          const write = (message: HostMessage) =>
-            Queue.offer(input, encoder.encode(encodeLine(message)));
-
-          const state = yield* Ref.make<Option.Option<SandboxOutcome>>(
-            Option.none()
-          );
-          const calls = yield* Ref.make<ReadonlyArray<string>>([]);
-          const callCount = yield* Ref.make(0);
-
-          /**
-           * One tool call, forked rather than awaited.
-           *
-           * The child sends at most one call at a time and waits for its
-           * answer, so the stream never needs to block on the operation: a
-           * forked call lets the pump keep reading, which is what lets a
-           * child that dies — the memory watchdog, a crash — still deliver
-           * its terminal message before the scope closes and interrupts the
-           * in-flight call.
-           */
-          const handleCall = (message: typeof CallMessage.Type) =>
-            Effect.gen(function* () {
-              if ((yield* Ref.get(callCount)) >= limits.maxCalls) {
-                return yield* limitExceeded(
-                  "The program exceeded its tool-call budget."
-                );
-              }
-              yield* Ref.update(callCount, (count) => count + 1);
-              yield* Ref.update(calls, (names) => [...names, message.name]);
-
-              yield* Effect.forkScoped(
+            /**
+             * The controls a call may use, and the only way to pause the clock.
+             *
+             * `waitForPerson` holds the wall clock for the duration of the
+             * effect, so an MCP approval that waits on a human does not spend
+             * the program's budget; the hold is counted, so concurrent waits
+             * nest correctly.
+             */
+            const controls: SandboxCallControls = {
+              waitForPerson: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
                 Effect.gen(function* () {
-                  const answer = yield* program
-                    .call({ input: message.input, name: message.name })
-                    .pipe(
-                      Effect.map((value) => ({ ok: true as const, value })),
-                      Effect.catch((failure) =>
-                        Effect.succeed({
-                          error: failure.message,
-                          ok: false as const,
-                        })
-                      )
-                    );
+                  yield* Ref.update(holds, (count) => count + 1);
+                  return yield* effect.pipe(
+                    Effect.ensuring(
+                      Ref.update(holds, (count) => Math.max(0, count - 1))
+                    )
+                  );
+                }),
+            };
 
-                  yield* write({ id: message.id, type: "result", ...answer });
-                })
-              );
-            });
-
-          const handleDone = (message: typeof DoneMessage.Type) =>
-            Effect.gen(function* () {
-              if (message.result.length > limits.maxResultChars) {
-                return yield* limitExceeded(
-                  `The program's result is larger than ${limits.maxResultChars} characters.`
-                );
-              }
-              const result = yield* Effect.fromOption(
-                decodeResult(message.result),
-                () =>
-                  new SandboxError({
-                    code: "UNREPRESENTABLE_RESULT",
-                    message: "The program's result is not JSON.",
-                  })
-              );
-              const called = yield* Ref.get(calls);
-              yield* Ref.set(
-                state,
-                Option.some({ calls: called, logs: message.logs, result })
-              );
-            });
-
-          const handle = Effect.fnUntraced(function* (line: string) {
-            const message = decodeChildMessage(line);
-            if (Option.isNone(message)) {
-              return yield* crash(
-                "The sandbox wrote a message it cannot mean."
-              );
-            }
-            switch (message.value.type) {
-              case "call":
-                return yield* handleCall(message.value);
-              case "done":
-                return yield* handleDone(message.value);
-              case "error":
-                return message.value.code === "MEMORY"
-                  ? yield* limitExceeded(message.value.message)
-                  : yield* crash(message.value.message);
-            }
-          });
-
-          yield* write({
-            code: program.code,
-            evaluationMs: limits.evaluationMs,
-            maxCalls: limits.maxCalls,
-            maxFrameChars: MAX_FRAME_CHARS,
-            maxLogs: limits.maxLogs,
-            maxRssBytes: limits.maxRssBytes,
-            type: "program",
-          });
-
-          // `Stream.splitLines` would buffer a line of any length before the
-          // first handler sees it; this splitter carries the partial line
-          // itself and refuses a frame that crosses the bound, so an oversized
-          // message is never decoded and never accumulates.
-          const pending = yield* Ref.make("");
-          const pump = Stream.decodeText(child.stdout).pipe(
-            Stream.runForEach((chunk) =>
+            yield* Effect.forkScoped(
               Effect.gen(function* () {
-                const combined = (yield* Ref.get(pending)) + chunk;
-                const lines = combined.split("\n");
-                const rest = lines.pop() ?? "";
-                yield* Ref.set(pending, rest);
+                for (;;) {
+                  yield* Effect.sleep(Duration.millis(WALL_CLOCK_TICK_MS));
+                  if ((yield* Ref.get(holds)) > 0) continue;
+                  const elapsed = yield* Ref.updateAndGet(
+                    spent,
+                    (total) => total + WALL_CLOCK_TICK_MS
+                  );
+                  if (elapsed >= limits.wallClockMs) {
+                    yield* Deferred.succeed(overrun, undefined);
+                    return;
+                  }
+                }
+              })
+            );
 
-                if (rest.length > MAX_FRAME_CHARS) {
+            const child = yield* spawner.spawn(
+              // A fixed argv, a fresh interpreter per request, and the
+              // permission model on: the child cannot read a file, spawn a
+              // process, spawn a worker, add a native addon, or open a socket.
+              // An empty environment keeps the server's own variables — a
+              // `NODE_OPTIONS` that preloads a module included — out of it.
+              ChildProcess.make(
+                process.execPath,
+                [
+                  "--permission",
+                  // A program that allocates without bound dies on its own heap
+                  // rather than through the host's wall clock. The child's RSS
+                  // watchdog covers memory outside the V8 heap.
+                  "--max-old-space-size=128",
+                  "--input-type=module",
+                  "--no-warnings",
+                  "-e",
+                  RUNNER_SOURCE,
+                ],
+                { env: {} }
+              )
+            );
+            yield* Effect.addFinalizer(() =>
+              // A program that starves its own event loop cannot act on SIGTERM,
+              // so the forced kill is the only termination the sandbox promises.
+              child.kill({ forceKillAfter: "250 millis" }).pipe(Effect.ignore)
+            );
+
+            const input = yield* Queue.unbounded<Uint8Array>();
+            yield* Stream.fromQueue(input).pipe(
+              Stream.run(child.stdin),
+              Effect.forkScoped
+            );
+
+            const encoder = new TextEncoder();
+            const write = (message: HostMessage) =>
+              Queue.offer(input, encoder.encode(encodeLine(message)));
+
+            const state = yield* Ref.make<Option.Option<SandboxOutcome>>(
+              Option.none()
+            );
+            const calls = yield* Ref.make<ReadonlyArray<string>>([]);
+            const callCount = yield* Ref.make(0);
+
+            /**
+             * One tool call, forked rather than awaited.
+             *
+             * The child may queue several calls in one drain batch — a program
+             * can start calls without awaiting them — and each is forked, so up
+             * to `maxCalls` can run concurrently. Forking also keeps the stream
+             * reading while calls are in flight, which is what lets a child that
+             * dies — the memory watchdog, a crash — still deliver its terminal
+             * message before the scope closes and interrupts the calls.
+             */
+            const handleCall = (message: typeof CallMessage.Type) =>
+              Effect.gen(function* () {
+                if ((yield* Ref.get(callCount)) >= limits.maxCalls) {
                   return yield* limitExceeded(
-                    `The sandbox wrote a frame larger than ${MAX_FRAME_CHARS} characters.`
+                    "The program exceeded its tool-call budget."
                   );
                 }
-                for (const line of lines) {
-                  if (line.length > MAX_FRAME_CHARS) {
+                yield* Ref.update(callCount, (count) => count + 1);
+                yield* Ref.update(calls, (names) => [...names, message.name]);
+
+                yield* Effect.forkScoped(
+                  Effect.gen(function* () {
+                    const answer = yield* program
+                      .call(
+                        { input: message.input, name: message.name },
+                        controls
+                      )
+                      .pipe(
+                        Effect.map((value) => ({ ok: true as const, value })),
+                        Effect.catch((failure) =>
+                          Effect.succeed({
+                            error: failure.message,
+                            ok: false as const,
+                          })
+                        ),
+                        // A defect would otherwise kill the forked fiber and
+                        // leave the child waiting for an answer that never
+                        // comes; the program can catch this like any refusal.
+                        Effect.catchDefect(() =>
+                          Effect.succeed({
+                            error: `The tool call "${message.name}" failed unexpectedly.`,
+                            ok: false as const,
+                          })
+                        )
+                      );
+
+                    yield* write({ id: message.id, type: "result", ...answer });
+                  })
+                );
+              });
+
+            const handleDone = (message: typeof DoneMessage.Type) =>
+              Effect.gen(function* () {
+                if (message.result.length > limits.maxResultChars) {
+                  return yield* limitExceeded(
+                    `The program's result is larger than ${limits.maxResultChars} characters.`
+                  );
+                }
+                const result = yield* Effect.fromOption(
+                  decodeResult(message.result),
+                  () =>
+                    new SandboxError({
+                      code: "UNREPRESENTABLE_RESULT",
+                      message: "The program's result is not JSON.",
+                    })
+                );
+                const called = yield* Ref.get(calls);
+                yield* Ref.set(
+                  state,
+                  Option.some({ calls: called, logs: message.logs, result })
+                );
+              });
+
+            const handle = Effect.fnUntraced(function* (line: string) {
+              const message = decodeChildMessage(line);
+              if (Option.isNone(message)) {
+                return yield* crash(
+                  "The sandbox wrote a message it cannot mean."
+                );
+              }
+              switch (message.value.type) {
+                case "call":
+                  return yield* handleCall(message.value);
+                case "done":
+                  return yield* handleDone(message.value);
+                case "error":
+                  return message.value.code === "MEMORY"
+                    ? yield* limitExceeded(message.value.message)
+                    : yield* crash(message.value.message);
+              }
+            });
+
+            yield* write({
+              code: program.code,
+              evaluationMs: limits.evaluationMs,
+              maxCalls: limits.maxCalls,
+              maxFrameChars: MAX_FRAME_CHARS,
+              maxLogs: limits.maxLogs,
+              maxRssBytes: limits.maxRssBytes,
+              type: "program",
+            });
+
+            // `Stream.splitLines` would buffer a line of any length before the
+            // first handler sees it; this splitter carries the partial line
+            // itself and refuses a frame that crosses the bound, so an oversized
+            // message is never decoded and never accumulates.
+            const pending = yield* Ref.make("");
+            const pump = Stream.decodeText(child.stdout).pipe(
+              Stream.runForEach((chunk) =>
+                Effect.gen(function* () {
+                  const combined = (yield* Ref.get(pending)) + chunk;
+                  const lines = combined.split("\n");
+                  const rest = lines.pop() ?? "";
+                  yield* Ref.set(pending, rest);
+
+                  if (rest.length > MAX_FRAME_CHARS) {
                     return yield* limitExceeded(
                       `The sandbox wrote a frame larger than ${MAX_FRAME_CHARS} characters.`
                     );
                   }
-                  if (line.length > 0) yield* handle(line);
-                }
-              })
-            )
-          );
+                  for (const line of lines) {
+                    if (line.length > MAX_FRAME_CHARS) {
+                      return yield* limitExceeded(
+                        `The sandbox wrote a frame larger than ${MAX_FRAME_CHARS} characters.`
+                      );
+                    }
+                    if (line.length > 0) yield* handle(line);
+                  }
+                })
+              )
+            );
 
-          const outcome = yield* Effect.andThen(
-            // The wall clock includes every tool call the program awaited, not
-            // only its own compute: a program that spends its budget on calls
-            // it did not need is the failure this bounds.
-            Effect.timeoutOrElse(pump, {
-              duration: Duration.millis(limits.wallClockMs),
-              orElse: () =>
-                child
-                  .kill({ forceKillAfter: "250 millis" })
-                  .pipe(
-                    Effect.andThen(
-                      limitExceeded(
-                        `The program exceeded its ${limits.wallClockMs} ms budget.`
-                      )
-                    )
-                  ),
-            }),
-            Ref.get(state)
-          );
+            // The race is between the pump and the deadline alone; the kill
+            // happens after the pump loses, so the pump cannot observe the
+            // child's death and win the race with an empty result.
+            const timedOut = yield* Effect.raceFirst(
+              Effect.as(pump, false),
+              Effect.as(Deferred.await(overrun), true)
+            );
 
-          if (Option.isNone(outcome)) {
-            return yield* crash("The program ended without returning a value.");
-          }
-          return outcome.value;
-        })
-      ).pipe(
-        // A spawner failure is the host's problem, not the program's: the
-        // caller still reads one typed failure, and one tag to switch on.
-        Effect.catchTag("PlatformError", (error) =>
-          Effect.fail(crash(`The sandbox could not run: ${error.message}`))
+            if (timedOut) {
+              yield* child.kill({ forceKillAfter: "250 millis" });
+              return yield* limitExceeded(
+                `The program exceeded its ${limits.wallClockMs} ms budget.`
+              );
+            }
+
+            const outcome = yield* Ref.get(state);
+
+            if (Option.isNone(outcome)) {
+              return yield* crash(
+                "The program ended without returning a value."
+              );
+            }
+            return outcome.value;
+          })
+        ).pipe(
+          // A spawner failure is the host's problem, not the program's: the
+          // caller still reads one typed failure, and one tag to switch on.
+          Effect.catchTag("PlatformError", (error) =>
+            Effect.fail(crash(`The sandbox could not run: ${error.message}`))
+          )
         )
       );
+
+      if (Option.isNone(admitted)) {
+        return yield* limitExceeded(
+          "The sandbox is already running as many programs as this deployment's memory budget allows; retry shortly."
+        );
+      }
+      return admitted.value;
     });
 
     return Sandbox.of({ run });

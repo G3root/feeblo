@@ -206,9 +206,11 @@ it.effect("bounds the input it shows", () =>
 
     const message = shownRequest(yield* Ref.get(seen)).message;
 
-    // A dialog that scrolls is a dialog people approve without reading.
+    // A dialog that scrolls is a dialog people approve without reading: the
+    // long field is cut, but the field is still visible.
     expect(message.length).toBeLessThan(400);
-    expect(message.endsWith("...?")).toBe(true);
+    expect(message).toContain('"content"');
+    expect(message).toContain("...");
   })
 );
 

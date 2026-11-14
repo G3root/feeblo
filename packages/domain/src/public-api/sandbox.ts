@@ -108,6 +108,20 @@ export class SandboxToolFailure extends Schema.TaggedError<SandboxToolFailure>()
   { message: Schema.String }
 ) {}
 
+/**
+ * What a tool call may ask of the run it belongs to.
+ *
+ * `waitForPerson` is the approval exception: an MCP elicitation waits for a
+ * human, and that wait must not be charged to the program's execution budget.
+ * The sandbox pauses its wall clock for the effect's duration and resumes it
+ * afterwards; nothing else about the run changes.
+ */
+export interface SandboxCallControls {
+  readonly waitForPerson: <A, E, R>(
+    effect: Effect.Effect<A, E, R>
+  ) => Effect.Effect<A, E, R>;
+}
+
 /** What a caller supplies for one run. */
 export interface SandboxProgram {
   /** JavaScript to evaluate as the body of an `async` function. */
@@ -122,7 +136,8 @@ export interface SandboxProgram {
    * decision all happen behind this function, in the caller's own types.
    */
   readonly call: (
-    call: SandboxToolCall
+    call: SandboxToolCall,
+    controls: SandboxCallControls
   ) => Effect.Effect<Schema.Json, SandboxToolFailure>;
 }
 

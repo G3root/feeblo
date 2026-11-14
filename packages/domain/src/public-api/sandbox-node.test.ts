@@ -1,5 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
@@ -80,6 +81,30 @@ layer(SandboxLive)("sandbox", (it) => {
         });
         expect(outcome.calls).toEqual(["echo", "explode"]);
       })
+  );
+
+  it.effect("answers a tool call that dies with a failure frame", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+      const outcome = yield* sandbox.run({
+        // A defect is not a typed refusal; without a recovery it kills the
+        // forked call and the child waits for an answer that never comes.
+        call: () => Effect.die("boom"),
+        code: `
+          try {
+            await tools.explode({});
+            return { message: "not caught" };
+          } catch (error) {
+            return { message: error.message };
+          }
+        `,
+      });
+
+      expect(outcome.result).toEqual({
+        message: 'The tool call "explode" failed unexpectedly.',
+      });
+      expect(outcome.calls).toEqual(["explode"]);
+    })
   );
 
   it.effect("hides the host's globals and blocks generated code", () =>
@@ -234,18 +259,23 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("stops a program waiting on a tool at the wall clock", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+      const called = yield* Deferred.make<void>();
 
-      // `it.effect` runs on the `TestClock`, so the wall clock only passes when
-      // the test advances it. The run is forked first and the clock advanced
-      // once the timer is certainly armed; the program itself is genuinely
-      // stuck, so nothing but the timeout can end it.
+      // `it.effect` runs on the `TestClock`, so the wall clock only passes
+      // when the test advances it. The handshake makes sure the run is live
+      // and the clock is armed before the advance; the program itself is
+      // genuinely stuck, so nothing but the timeout can end it.
       const fiber = yield* sandbox
         .run({
-          call: () => Effect.never,
+          call: () =>
+            Deferred.succeed(called, undefined).pipe(
+              Effect.andThen(Effect.never)
+            ),
           code: "return await tools.slow({});",
           limits: { wallClockMs: 200 },
         })
         .pipe(Effect.flip, Effect.forkChild);
+      yield* Deferred.await(called);
       yield* TestClock.adjust("200 millis");
       const failure = yield* Fiber.join(fiber);
 
@@ -258,23 +288,57 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("stops a program that starves the child's own event loop", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+      const called = yield* Deferred.make<void>();
 
-      // The program keeps resolving promises, so the child's event loop never
-      // processes the signal handler a graceful kill would rely on; only the
-      // forced kill ends it.
+      // The program calls once, then keeps resolving promises, so the child's
+      // event loop never processes the signal handler a graceful kill would
+      // rely on; only the forced kill ends it.
       const fiber = yield* sandbox
         .run({
-          call: noCalls,
-          code: "for (;;) { await Promise.resolve(); }",
+          call: () => Deferred.succeed(called, undefined).pipe(Effect.as({})),
+          code: `
+            await tools.ready({});
+            for (;;) { await Promise.resolve(); }
+          `,
           limits: { wallClockMs: 200 },
         })
         .pipe(Effect.flip, Effect.forkChild);
+      yield* Deferred.await(called);
       yield* TestClock.adjust("200 millis");
       const failure = yield* Fiber.join(fiber);
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("LIMIT_EXCEEDED");
+    })
+  );
+
+  it.effect("does not charge a wait on a person to the wall clock", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+      const waiting = yield* Deferred.make<void>();
+
+      const fiber = yield* sandbox
+        .run({
+          call: (_call, controls) =>
+            controls.waitForPerson(
+              Deferred.succeed(waiting, undefined).pipe(
+                Effect.andThen(Effect.sleep("5 seconds")),
+                Effect.as({ approved: true })
+              )
+            ),
+          code: "return await tools.approve({});",
+          limits: { wallClockMs: 200 },
+        })
+        .pipe(Effect.forkChild);
+
+      // The hold is taken before the effect runs, so once the test sees this
+      // the clock is paused and the 5 s sleep cannot spend the 200 ms budget.
+      yield* Deferred.await(waiting);
+      yield* TestClock.adjust("5 seconds");
+
+      const outcome = yield* Fiber.join(fiber);
+      expect(outcome.result).toEqual({ approved: true });
     })
   );
 

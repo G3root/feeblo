@@ -1,3 +1,4 @@
+import { isString } from "@feeblo/utils/runtime-kind";
 import { McpServer } from "effect/ai";
 import type { McpSchema } from "effect/ai";
 import * as Context from "effect/Context";
@@ -93,20 +94,48 @@ const ApprovalAnswer = Schema.Struct({
 /**
  * The most of a call's input the prompt shows.
  *
- * A person approving a delete needs to see which record it targets, not the
- * whole body: a post's content or a merge's comment list can be long, and a
- * dialog that scrolls is a dialog people approve without reading. The prefix is
- * enough to tell two calls apart, and the call is shown in full in the
- * dashboard the prompt links to.
+ * Every field the schema declares stays visible — the person needs to see which
+ * record the call targets and which fields it changes — but each string value
+ * is cut at 80 characters and each array keeps its first five entries. A post
+ * body or a merge's comment list would otherwise turn the dialog into a wall of
+ * text that people approve without reading.
  */
-const MAX_PROMPT_INPUT_CHARS = 200;
+const MAX_PROMPT_STRING_CHARS = 80;
+const MAX_PROMPT_ARRAY_ITEMS = 5;
+const MAX_PROMPT_DEPTH = 4;
 
-const describeInput = (input: Schema.Json): string => {
-  const encoded = JSON.stringify(input) ?? "{}";
-  return encoded.length > MAX_PROMPT_INPUT_CHARS
-    ? `${encoded.slice(0, MAX_PROMPT_INPUT_CHARS - 3)}...`
-    : encoded;
+const isJsonArray = Schema.is(Schema.Array(Schema.Json));
+const isJsonObject = Schema.is(Schema.Record(Schema.String, Schema.Json));
+
+const truncate = (value: Schema.Json, depth: number): Schema.Json => {
+  if (isString(value)) {
+    const text = String(value);
+    return text.length > MAX_PROMPT_STRING_CHARS
+      ? `${text.slice(0, MAX_PROMPT_STRING_CHARS - 3)}...`
+      : text;
+  }
+  if (isJsonArray(value)) {
+    const items = value
+      .slice(0, MAX_PROMPT_ARRAY_ITEMS)
+      .map((item) => truncate(item, depth + 1));
+    return value.length > MAX_PROMPT_ARRAY_ITEMS
+      ? [...items, `... ${value.length - MAX_PROMPT_ARRAY_ITEMS} more`]
+      : items;
+  }
+  if (isJsonObject(value)) {
+    if (depth >= MAX_PROMPT_DEPTH) return "...";
+    return Object.fromEntries(
+      Object.entries(value).map(([key, member]) => [
+        key,
+        truncate(member, depth + 1),
+      ])
+    );
+  }
+  return value;
 };
+
+const describeInput = (input: Schema.Json): string =>
+  JSON.stringify(truncate(input, 0)) ?? "{}";
 
 const denied = (request: ApprovalRequest, message: string) =>
   new ApprovalDenied({ message, operation: request.operation });

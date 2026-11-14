@@ -23,6 +23,7 @@ import {
   Sandbox,
   SandboxError,
   SandboxToolFailure,
+  type SandboxCallControls,
   type SandboxToolCall,
 } from "./sandbox";
 
@@ -187,7 +188,8 @@ const buildPublicApiCodeModeHandlers = () =>
       );
 
     const invoke = Effect.fn("CodeMode.invoke")(function* (
-      call: SandboxToolCall
+      call: SandboxToolCall,
+      controls: SandboxCallControls
     ) {
       const operation = operations.get(call.name);
       if (operation === undefined) {
@@ -207,10 +209,30 @@ const buildPublicApiCodeModeHandlers = () =>
       );
 
       // The same gate `/mcp` uses, on the same annotation: a program is not a
-      // way around a deployment that refuses destructive calls.
+      // way around a deployment that refuses destructive calls. The form is
+      // built from the *decoded* input re-encoded with the operation's own
+      // codec, so undeclared keys and the caller's key order cannot hide the
+      // declared fields from the person approving. The wait on that person is
+      // not charged to the program's wall clock.
       if (operation.annotations.destructive) {
-        yield* approval
-          .approve({ input: call.input, operation: operation.name })
+        const approvalInput = yield* Schema.encodeUnknownEffect(
+          Schema.toCodecJson(operation.input)
+        )(input).pipe(
+          Effect.andThen(Schema.decodeUnknownEffect(Schema.Json)),
+          Effect.mapError(() =>
+            toolFailure(
+              `The input for "${call.name}" could not be shown for approval.`
+            )
+          )
+        );
+
+        yield* controls
+          .waitForPerson(
+            approval.approve({
+              input: approvalInput,
+              operation: operation.name,
+            })
+          )
           .pipe(Effect.mapError((failure) => toolFailure(failure.message)));
       }
 
@@ -258,7 +280,8 @@ const buildPublicApiCodeModeHandlers = () =>
       >();
 
       const outcome = yield* sandbox.run({
-        call: (call) => invoke(call).pipe(Effect.provideContext(request)),
+        call: (call, controls) =>
+          invoke(call, controls).pipe(Effect.provideContext(request)),
         code: input.code,
       });
 

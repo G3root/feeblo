@@ -194,13 +194,21 @@ const buildPublicApiMcpHandlers = () =>
           // own scope check runs: asking after the caller has already paid for
           // the work would let a refusal look like a partial write.
           if (operation.annotations.destructive) {
+            // The toolkit decoded this value with `operation.input`; encoding
+            // it back with the same codec is what gives the approval prompt
+            // the declared fields in the schema's order and nothing else, so a
+            // caller cannot add keys or reorder them to hide what it is about
+            // to change. A failure here is our own schema bug, not the
+            // caller's.
+            const approvalInput = yield* Schema.encodeUnknownEffect(
+              Schema.toCodecJson(operation.input)
+            )(parameters).pipe(
+              Effect.andThen(Schema.decodeUnknownEffect(Schema.Json)),
+              Effect.orDie
+            );
+
             yield* approval.approve({
-              // SAFETY: the toolkit decoded this value with `operation.input`,
-              // whose JSON form is the operation's published input shape;
-              // `Schema.Json` is the type that form has on the wire (the
-              // Public API's DTOs are JSON by ADR 0004).
-              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See the SAFETY comment: the value arrived decoded by a JSON-rooted schema, so the assertion only restates that shape.
-              input: parameters as Schema.Json,
+              input: approvalInput,
               operation: operation.name,
             });
           }
