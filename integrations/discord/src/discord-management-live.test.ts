@@ -1,8 +1,14 @@
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
+import { AuditLogEnabled } from "@feeblo/domain/audit-log/flag";
+import { withProviderAudit } from "@feeblo/domain/integration/audit";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { DiscordManagementService } from "@feeblo/domain/integration/discord/management-service";
+import {
+  CurrentSession,
+  type Session,
+} from "@feeblo/domain/session-middleware";
 import { asLegid, IntegrationConnectionId, WorkspaceId } from "@feeblo/id";
 import {
   type DiscordApiClient,
@@ -162,6 +168,25 @@ const decodeState = (authorizeUrl: URL) => {
 const urlState = (authorizeUrl: URL) =>
   authorizeUrl.searchParams.get("state") ?? "";
 
+/** The dashboard session the RPC handler would hold when it calls the service. */
+const sessionFor = (organizationId: string): Session => ({
+  user: {
+    id: `user_${organizationId}`,
+    email: "owner@example.com",
+    name: "Owner",
+    restrictedToOrganizationId: null,
+  },
+  session: { userId: `user_${organizationId}`, token: "test-token" },
+  organizations: [{ id: organizationId }],
+  memberships: [
+    {
+      membershipId: `member_${organizationId}`,
+      organizationId,
+      role: "owner",
+    },
+  ],
+});
+
 describe("discord management service", () => {
   const connectFlow = makeTestLayer();
   layer(connectFlow.layer)("connect flow", (it) => {
@@ -200,6 +225,50 @@ describe("discord management service", () => {
             );
           expect(connection?.lifecycle).toBe("connecting");
           expect(connection?.credentialsCiphertext).not.toBeNull();
+        })
+    );
+
+    it.effect(
+      "records the started connect against the operator who began it",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const organizationId = yield* seedOrganization;
+          const service = yield* DiscordManagementService;
+
+          // `withProviderAudit` is the wrapper the Discord RPC handler puts
+          // around a management write; the entry itself is written by the
+          // connection service inside the transaction that creates the
+          // connecting row.
+          const { authorizeUrl } = yield* withProviderAudit(
+            organizationId,
+            service.connectStart({ organizationId })
+          ).pipe(
+            Effect.provideService(CurrentSession, sessionFor(organizationId)),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+          const state = decodeState(authorizeUrl);
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(eq(schema.auditLogTable.organizationId, organizationId));
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            action: "integration.connected",
+            actorRole: "owner",
+            actorType: "user",
+            actorUserId: `user_${organizationId}`,
+            outcome: "allowed",
+            resourceId: state.connectionId,
+            resourceType: "integration",
+            source: "dashboard",
+          });
+          expect(rows[0]?.metadata).toMatchObject({
+            flow: "started",
+            provider: "discord",
+          });
         })
     );
 

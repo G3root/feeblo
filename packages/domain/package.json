@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./audit-log/flag": {
+      "default": "./src/audit-log/flag.ts"
+    },
+    "./audit-log/recorder": {
+      "default": "./src/audit-log/recorder.ts"
+    },
     "./audit-log/repository": {
       "default": "./src/audit-log/repository.ts"
     },
@@ -228,6 +234,9 @@
     },
     "./integration/chat/rpc-handlers": {
       "default": "./src/integration/chat/rpc-handlers.ts"
+    },
+    "./integration/audit": {
+      "default": "./src/integration/audit.ts"
     },
     "./integration/config": {
       "default": "./src/integration/config.ts"
