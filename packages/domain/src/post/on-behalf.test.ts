@@ -17,6 +17,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
@@ -173,6 +174,7 @@ describe("PostRpcHandlers on-behalf", () => {
     });
 
   const RepositoriesTest = Layer.mergeAll(
+    AuditLogRecorder.layer,
     BoardRepository.layer,
     PostRepository.layer,
     PostActivityRepository.layer,

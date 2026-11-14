@@ -16,6 +16,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
@@ -192,6 +194,7 @@ describe("CommentRpcHandlers", () => {
     });
 
   const RepositoriesTest = Layer.mergeAll(
+    AuditLogRecorder.layer,
     BoardRepository.layer,
     CommentRepository.layer,
     EmailOutboxRepository.layer,
@@ -618,6 +621,49 @@ describe("CommentRpcHandlers", () => {
             memberId: fixture.membershipId,
           });
           expect(comments[0]?.content).toContain("Member comment");
+        })
+      );
+
+      it.effect("records the creation against the member who wrote it", () =>
+        Effect.gen(function* () {
+          const handlers = yield* CommentRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const commentId = yield* CommentId.generate;
+
+          yield* handlers
+            .CreateComment(
+              commentCreateInput(fixture, commentId, "Audited comment")
+            )
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(AuditLogEnabled, true)
+            );
+
+          const db = yield* currentDb;
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.action, "comment.created")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            actorType: "user",
+            actorUserId: fixture.userId,
+            outcome: "allowed",
+            resourceId: commentId,
+            resourceType: "comment",
+            source: "dashboard",
+          });
+          expect(rows[0]?.metadata).toMatchObject({
+            parentCommentId: null,
+            postId: fixture.postId,
+            visibility: "PUBLIC",
+          });
         })
       );
 

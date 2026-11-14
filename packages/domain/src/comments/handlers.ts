@@ -1,6 +1,9 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { ResolvePrincipalService } from "../identity/service";
@@ -115,18 +118,40 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     },
   });
 
-  const removeComment = deleteWrite.handlers((_surface, args) =>
+  const removeComment = deleteWrite.handlers((surface, args) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+      const audit = yield* AuditLogRecorder;
 
-      yield* comments.remove({
-        actor: actorOf(session, args.organizationId),
-        target: {
-          id: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-        },
-      });
+      // The shared write path's transaction nests as a savepoint here, so the
+      // entry and the deletion commit together. The portal half is an
+      // end-user action — the post's timeline records it — and writes no
+      // workspace audit entry.
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* comments.remove({
+            actor: actorOf(session, args.organizationId),
+            target: {
+              id: args.id,
+              organizationId: args.organizationId,
+              postId: args.postId,
+            },
+          });
+
+          if (surface !== "dashboard") {
+            return;
+          }
+
+          yield* audit.record({
+            organizationId: args.organizationId,
+            actor: actorFromSession(session, args.organizationId),
+            source: "dashboard",
+            action: "comment.deleted",
+            resourceId: args.id,
+            metadata: { postId: args.postId },
+          });
+        })
+      );
 
       return {
         message: "Comment deleted successfully",
@@ -134,23 +159,48 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     })
   );
 
-  const modifyComment = updateWrite.handlers((_surface, args) =>
+  const modifyComment = updateWrite.handlers((surface, args) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
+      const audit = yield* AuditLogRecorder;
 
-      yield* comments.update({
-        actor: actorOf(session, args.organizationId),
-        edit: {
-          authorUserId: session.session.userId,
-          content: args.content,
-          id: args.id,
-          organizationId: args.organizationId,
-          postId: args.postId,
-          // Only members can update visibility.
-          visibility: membership ? args.visibility : undefined,
-        },
-      });
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* comments.update({
+            actor: actorOf(session, args.organizationId),
+            edit: {
+              authorUserId: session.session.userId,
+              content: args.content,
+              id: args.id,
+              organizationId: args.organizationId,
+              postId: args.postId,
+              // Only members can update visibility.
+              visibility: membership ? args.visibility : undefined,
+            },
+          });
+
+          if (surface !== "dashboard") {
+            return;
+          }
+
+          // The service stores the sanitized body and returns nothing, so the
+          // edit is described rather than diffed: the body is not what an
+          // audit entry should keep a copy of.
+          yield* audit.record({
+            organizationId: args.organizationId,
+            actor: actorFromSession(session, args.organizationId),
+            source: "dashboard",
+            action: "comment.updated",
+            resourceId: args.id,
+            metadata: {
+              field: "content",
+              postId: args.postId,
+              ...(membership !== undefined && { visibility: args.visibility }),
+            },
+          });
+        })
+      );
 
       return {
         message: "Comment updated successfully",
@@ -194,6 +244,7 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
       const session = yield* CurrentSession;
       const membership = Policy.getMembership(session, args.organizationId);
+      const audit = yield* AuditLogRecorder;
 
       if (args.author !== undefined) {
         // Per-member abuse bound for on-behalf creations (see
@@ -206,26 +257,50 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
 
       const actor = actorOf(session, args.organizationId);
 
-      const outboxId = yield* comments.create({
-        actor,
-        author:
-          args.author === undefined
-            ? {
-                kind: "self",
-                memberId: membership?.membershipId ?? null,
-                userId: session.session.userId,
-              }
-            : { kind: "on_behalf", subject: args.author },
-        draft: {
-          content: args.content,
-          id: args.id,
-          organizationId: args.organizationId,
-          parentCommentId: args.parentCommentId,
-          postId: args.postId,
-          visibility: args.visibility,
-        },
-        statusUpdate: applyCommentStatusUpdate(args, actor),
-      });
+      // The write, the entry it produces, and the dispatcher wake all run in
+      // one transaction — the shared write path's own transaction nests as a
+      // savepoint — so a comment cannot commit without its audit entry.
+      const outboxId = yield* transaction(
+        Effect.gen(function* () {
+          const intentId = yield* comments.create({
+            actor,
+            author:
+              args.author === undefined
+                ? {
+                    kind: "self",
+                    memberId: membership?.membershipId ?? null,
+                    userId: session.session.userId,
+                  }
+                : { kind: "on_behalf", subject: args.author },
+            draft: {
+              content: args.content,
+              id: args.id,
+              organizationId: args.organizationId,
+              parentCommentId: args.parentCommentId,
+              postId: args.postId,
+              visibility: args.visibility,
+            },
+            statusUpdate: applyCommentStatusUpdate(args, actor),
+          });
+
+          if (surface === "dashboard") {
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "comment.created",
+              resourceId: args.id,
+              metadata: {
+                parentCommentId: args.parentCommentId,
+                postId: args.postId,
+                visibility: args.visibility,
+              },
+            });
+          }
+
+          return intentId;
+        })
+      );
 
       // Post-commit wake for the status email intent the status-update comment
       // recorded; reconciliation closes any lost wake. Both RPC surfaces
@@ -277,15 +352,29 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     PinComment: (args: TCommentPin) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
 
-        yield* comments.pin({
-          actor: actorOf(session, args.organizationId),
-          target: {
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-          },
-        });
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* comments.pin({
+              actor: actorOf(session, args.organizationId),
+              target: {
+                id: args.id,
+                organizationId: args.organizationId,
+                postId: args.postId,
+              },
+            });
+
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "comment.pinned",
+              resourceId: args.id,
+              metadata: { postId: args.postId },
+            });
+          })
+        );
 
         return {
           message: "Comment pinned successfully",
@@ -305,15 +394,32 @@ export const CommentRpcHandlersEffect = Effect.gen(function* () {
     UnpinComment: (args: TCommentUnpin) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
 
-        yield* comments.unpin({
-          actor: actorOf(session, args.organizationId),
-          target: {
-            id: args.id,
-            organizationId: args.organizationId,
-            postId: args.postId,
-          },
-        });
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* comments.unpin({
+              actor: actorOf(session, args.organizationId),
+              target: {
+                id: args.id,
+                organizationId: args.organizationId,
+                postId: args.postId,
+              },
+            });
+
+            // The catalog declares `comment.pinned` and nothing for the way
+            // back, so an unpin is recorded as the update it is and the pin
+            // state that moved rides in `metadata`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "comment.updated",
+              resourceId: args.id,
+              metadata: { field: "pinned", pinned: false, postId: args.postId },
+            });
+          })
+        );
 
         return {
           message: "Comment unpinned successfully",
@@ -344,5 +450,6 @@ export const CommentRpcHandlers = CommentRpcs.toLayer(
   Layer.provide(ResolvePrincipalService.layer),
   Layer.provide(NotificationService.layer),
   Layer.provide(EmailOutboxConfig.layer),
-  Layer.provide(ParticipationPolicy.layer)
+  Layer.provide(ParticipationPolicy.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );

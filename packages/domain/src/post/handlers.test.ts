@@ -22,6 +22,8 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
@@ -263,6 +265,7 @@ describe("PostRpcHandlers", () => {
     });
 
   const RepositoriesTest = Layer.mergeAll(
+    AuditLogRecorder.layer,
     BoardRepository.layer,
     PostRepository.layer,
     PostActivityRepository.layer,
@@ -2242,6 +2245,71 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(post?.lockedAt).toBeInstanceOf(Date);
+        })
+      );
+
+      it.effect("records the lock and the archive it actually changed", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .CreatePost(postCreateInput(fixture, postId, "Moderated feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .AdminUpdatePost({
+              archived: true,
+              id: postId,
+              locked: true,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(AuditLogEnabled, true)
+            );
+
+          const db = yield* currentDb;
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.resourceId, postId)
+              )
+            )
+            .orderBy(schema.auditLogTable.action);
+
+          expect(rows.map((row) => row.action)).toEqual([
+            "post.archived",
+            "post.locked",
+          ]);
+          for (const row of rows) {
+            expect(row).toMatchObject({
+              actorType: "user",
+              actorUserId: fixture.userId,
+              outcome: "allowed",
+              resourceId: postId,
+              resourceType: "post",
+              source: "dashboard",
+            });
+          }
+          expect(
+            rows.find((row) => row.action === "post.locked")?.changes
+          ).toEqual({
+            fields: ["locked"],
+            before: { locked: false },
+            after: { locked: true },
+          });
+          expect(
+            rows.find((row) => row.action === "post.archived")?.changes
+          ).toEqual({
+            fields: ["archived"],
+            before: { archived: false },
+            after: { archived: true },
+          });
         })
       );
     });
