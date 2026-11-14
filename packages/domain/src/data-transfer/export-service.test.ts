@@ -438,29 +438,19 @@ layer(TestLayer)("streamPostCsv", (it) => {
         .from(schema.auditLogTable)
         .where(eq(schema.auditLogTable.organizationId, fixture.organizationId));
 
-      expect(rows).toHaveLength(2);
-      expect(rows).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            action: "board.exported",
-            actorType: "user",
-            actorUserId: fixture.userId,
-            metadata: { allBoards: true, includeArchived: false, rowCount: 1 },
-            outcome: "allowed",
-            resourceType: "board",
-            source: "dashboard",
-          }),
-          expect.objectContaining({
-            action: "data_transfer.exported",
-            actorType: "user",
-            actorUserId: fixture.userId,
-            metadata: { allBoards: true, includeArchived: false, rowCount: 1 },
-            outcome: "allowed",
-            resourceType: "data_transfer",
-            source: "dashboard",
-          }),
-        ])
-      );
+      // One export is one entry: an export of every board is a transfer, not a
+      // board entry with no board to name.
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        action: "data_transfer.exported",
+        actorType: "user",
+        actorUserId: fixture.userId,
+        metadata: { allBoards: true, includeArchived: false, rowCount: 1 },
+        outcome: "allowed",
+        resourceType: "data_transfer",
+        resourceId: null,
+        source: "dashboard",
+      });
 
       // A named board is the resource the entry describes, so the id is on the
       // row rather than only in the metadata.
