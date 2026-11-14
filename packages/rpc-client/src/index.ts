@@ -31,12 +31,13 @@ function normalizeApiUrl(apiUrl: string) {
  * Whether a tag's frames may share one HTTP request: a read may, unless it
  * streams.
  *
- * A stream is sent alone on purpose. Its response stays open for as long as the
- * stream, and a batch's response is pumped by the resolver's fiber, which
- * Effect does not interrupt once the run has started — so closing the stream's
- * scope (disposing an atom, leaving a route) would leave the HTTP request open.
- * `batch-protocol.ts` posts everything this rules out from the caller's own
- * fiber, where interruption aborts the request.
+ * A stream is sent alone on purpose. Every caller of a batch waits for the whole
+ * response to end, so batching a stream would hold the page's reads until the
+ * stream did; and the batch runs in the client's scope rather than in a
+ * caller's fiber, so closing the stream's scope (disposing an atom, leaving a
+ * route) would leave the HTTP request open. `batch-protocol.ts` posts
+ * everything this rules out through the unbatched protocol, from the caller's
+ * own fiber, where interruption aborts the request.
  */
 export const sharesRpcBatch = (tag: string): boolean => {
   if (!isReadRpc(tag)) return false;

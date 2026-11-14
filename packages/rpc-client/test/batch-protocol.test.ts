@@ -3,6 +3,7 @@ import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as HttpClient from "effect/http/HttpClient";
 import { HttpClientError, TransportError } from "effect/http/HttpClientError";
 import type * as HttpClientRequest from "effect/http/HttpClientRequest";
@@ -10,6 +11,7 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
+import * as Result from "effect/Result";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcClient from "effect/rpc/RpcClient";
 import type { RpcClientError } from "effect/rpc/RpcClientError";
@@ -143,6 +145,65 @@ const answeringClient = (
     })
   );
 
+/**
+ * A transport that answers each unary frame and then ends the response, the way
+ * the API ends a batch once every request in it is answered. A body carrying a
+ * `Watch` frame instead stays open, the way a stream's response does, after
+ * delivering the chunk the stream produced.
+ */
+const streamingClient = (
+  posts: Ref.Ref<ReadonlyArray<string>>,
+  cancels: { count: number }
+): Layer.Layer<
+  HttpClient.HttpClient,
+  never,
+  RpcSerialization.RpcSerialization
+> =>
+  Layer.effect(
+    HttpClient.HttpClient,
+    Effect.gen(function* () {
+      const serialization = yield* RpcSerialization.RpcSerialization;
+      return HttpClient.make((request) =>
+        Effect.gen(function* () {
+          const body = bodyOf(request);
+          yield* Ref.update(posts, (all) => [...all, body]);
+          const frames = framesIn(body);
+          const answers = yield* Effect.forEach(frames, (frame) =>
+            frame.tag === "Watch"
+              ? Effect.succeed(
+                  JSON.stringify({
+                    _tag: "Chunk",
+                    requestId: frame.id,
+                    values: ["tick"],
+                  }) + "\n"
+                )
+              : answerOf(frame).pipe(
+                  Effect.map((answer) => JSON.stringify(answer) + "\n")
+                )
+          );
+          const encoded = answers.join("");
+          const headers = { "content-type": serialization.contentType };
+          return HttpClientResponse.fromWeb(
+            request,
+            frames.some((frame) => frame.tag === "Watch")
+              ? new Response(
+                  new ReadableStream({
+                    start(controller) {
+                      controller.enqueue(new TextEncoder().encode(encoded));
+                    },
+                    cancel() {
+                      cancels.count += 1;
+                    },
+                  }),
+                  { status: 200, headers }
+                )
+              : new Response(encoded, { status: 200, headers })
+          );
+        })
+      );
+    })
+  );
+
 /** A transport that never reaches the API. */
 const failingClient = (): Layer.Layer<HttpClient.HttpClient> =>
   Layer.succeed(
@@ -256,7 +317,7 @@ const testLayer = (
   >,
   options?: {
     readonly batchWindow?: Duration.Duration;
-    readonly maxBatchBytes?: number;
+    readonly maxSingleFrameBytes?: number;
     readonly sharesBatch?: (tag: string) => boolean;
   }
 ): Layer.Layer<RpcClient.Protocol> =>
@@ -417,11 +478,11 @@ describe("batched RPC protocol", () => {
     })
   );
 
-  it.live("splits a batch at its byte budget", () =>
+  it.live("sends a frame larger than the ceiling alone", () =>
     Effect.gen(function* () {
       const posts = yield* Ref.make<ReadonlyArray<string>>([]);
       const context = yield* Layer.build(
-        testLayer(answeringClient(posts), { maxBatchBytes: 1 })
+        testLayer(answeringClient(posts), { maxSingleFrameBytes: 1 })
       );
 
       const results = yield* Effect.gen(function* () {
@@ -434,10 +495,53 @@ describe("batched RPC protocol", () => {
 
       expect(results).toEqual(["one", "two"]);
 
-      // Every frame is over a one-byte budget, so each is a group of one and
-      // fails, if it fails, on its own.
+      // Both frames are over a one-byte ceiling, so neither can take the
+      // other down with it when the API refuses the body.
       const bodies = yield* Ref.get(posts);
       expect(bodies.map((body) => framesIn(body).length)).toEqual([1, 1]);
+    })
+  );
+
+  it.live("answers a batched read while a stream stays open", () =>
+    Effect.gen(function* () {
+      const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+      const cancels = { count: 0 };
+      const context = yield* Layer.build(
+        testLayer(streamingClient(posts, cancels), {
+          sharesBatch: (tag) => tag !== "Watch",
+        })
+      );
+
+      const total = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+        // A watch the dashboard keeps open, started in the same render as the
+        // read. It must not share the read's request: every caller of a batch
+        // waits for the whole response to end, and this response ends when the
+        // caller stops watching.
+        const watching = yield* Stream.runDrain(client.Watch({})).pipe(
+          Effect.forkChild
+        );
+        const sum = yield* client.Add({ a: 40, b: 2 });
+        yield* Fiber.interrupt(watching);
+        return sum;
+      }).pipe(
+        Effect.timeout(Duration.seconds(5)),
+        Effect.provideContext(context)
+      );
+
+      expect(total).toBe(42);
+
+      // Two requests, one frame each: the watch left from its own fiber and the
+      // read waited out the window alone rather than with it.
+      const bodies = yield* Ref.get(posts);
+      const posted = bodies.map((body) => framesIn(body).map((f) => f.tag));
+      expect(posted.map((tags) => tags.length)).toEqual([1, 1]);
+      expect(posted.flat().sort()).toEqual(["Add", "Watch"]);
+
+      // The watch's response is held open until its caller is interrupted, and
+      // interrupting it has to abort the request rather than leave it pumping.
+      yield* Effect.sleep(Duration.millis(100));
+      expect(cancels.count).toBe(1);
     })
   );
 
@@ -491,19 +595,15 @@ describe("batched RPC protocol", () => {
         );
       }).pipe(Effect.provideContext(context));
 
-      const failures = outcomes.map((outcome) =>
-        Exit.isFailure(outcome)
-          ? Cause.findErrorOption(outcome.cause)
-          : Option.none()
-      );
-
-      for (const failure of failures) {
-        expect(Option.isSome(failure)).toBe(true);
-        const error = Option.getOrThrow(failure);
-        expect(error.reason._tag).toBe("RpcClientDefect");
-        if (error.reason._tag === "RpcClientDefect") {
-          expect(String(error.reason.cause)).toContain("server exploded");
-        }
+      // A connection-level defect is a die, not a declared failure: the server
+      // never read the body, so no request in it has an answer coming. This is
+      // the same shape a single, unbatched call already had.
+      for (const outcome of outcomes) {
+        expect(Exit.isFailure(outcome)).toBe(true);
+        const cause = Exit.isFailure(outcome) ? outcome.cause : Cause.empty;
+        const defect = Cause.findDefect(cause);
+        expect(Result.isSuccess(defect)).toBe(true);
+        expect(String(Result.getOrThrow(defect))).toContain("server exploded");
       }
     })
   );
@@ -532,7 +632,6 @@ describe("batched RPC protocol", () => {
             ? Cause.findErrorOption(outcome.cause)
             : Option.none()
         );
-
         // The status survives: without the client's status filter the plain-text
         // body would reach the frame decoder, and the callers would see a decode
         // defect with no idea the API said 503.
