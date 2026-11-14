@@ -8,26 +8,18 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@feeblo/ui/table";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import { UserAdd01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
 
 import { useUpgradePlanDialogContext } from "~/features/billing/dialog-stores";
 import { CompanyEditDialog } from "~/features/contact/components/company-edit-dialog";
 import { ContactCreateDialog } from "~/features/contact/components/contact-create-dialog";
 import { ContactDeleteDialog } from "~/features/contact/components/contact-delete-dialog";
 import { ContactEditDialog } from "~/features/contact/components/contact-edit-dialog";
-import { ContactTableRow } from "~/features/contact/components/contact-table-row";
+import { ContactTable } from "~/features/contact/components/contact-table";
 import { ContactUnsubscribeDialog } from "~/features/contact/components/contact-unsubscribe-dialog";
 import { CrmEntriesUsage } from "~/features/contact/components/crm-entries-usage";
 import {
@@ -36,11 +28,7 @@ import {
   ContactDeleteDialogProvider,
   ContactEditDialogProvider,
   ContactUnsubscribeDialogProvider,
-  useCompanyEditDialogContext,
   useContactCreateDialogContext,
-  useContactDeleteDialogContext,
-  useContactEditDialogContext,
-  useContactUnsubscribeDialogContext,
 } from "~/features/contact/dialog-stores";
 import { useContactAttributeDefinitions } from "~/hooks/use-attribute-definitions";
 import { useEntitlements } from "~/hooks/use-entitlements";
@@ -82,25 +70,10 @@ function RouteComponent() {
 function ContactPage() {
   const { organizationId } = Route.useParams();
   const createDialogStore = useContactCreateDialogContext();
-  const editDialogStore = useContactEditDialogContext();
-  const deleteDialogStore = useContactDeleteDialogContext();
-  const unsubscribeDialogStore = useContactUnsubscribeDialogContext();
-  const companyEditDialogStore = useCompanyEditDialogContext();
   const contactsQuery = useOrgContacts(organizationId);
-  // The shared org-contacts query is unordered; this table keeps its
-  // most-recently-updated-first order locally.
-  const contacts = useMemo(
-    () =>
-      contactsQuery.data.toSorted(
-        (left, right) =>
-          new Date(right.updatedAt).getTime() -
-          new Date(left.updatedAt).getTime()
-      ),
-    [contactsQuery.data]
-  );
+  const contacts = contactsQuery.data;
   const { data: definitions } = useContactAttributeDefinitions(organizationId);
   const { data: companies } = useOrgCompanies(organizationId);
-  const companiesById = new Map(companies.map((c) => [c.id, c]));
 
   const { entitlements } = useEntitlements();
   const crmLimit = entitlements.limits.crmEntries;
@@ -218,66 +191,12 @@ function ContactPage() {
           )}
         </PolicyGuard>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Account</TableHead>
-            <TableHead>Phone</TableHead>
-            <TableHead>External ID</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead>Company</TableHead>
-            {definitions.map((definition) => (
-              <TableHead key={definition.id}>{definition.name}</TableHead>
-            ))}
-            <TableHead>Updated</TableHead>
-            <TableHead className="w-16 text-right">
-              <span className="sr-only">Actions</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {contacts.map((contact) => (
-            <ContactTableRow
-              company={
-                contact.companyId
-                  ? companiesById.get(contact.companyId)
-                  : undefined
-              }
-              contact={contact}
-              definitions={definitions}
-              key={contact.id}
-              managePolicy={hasPermission(organizationId, "contacts.*")}
-              onCompanyClick={(companyId) =>
-                companyEditDialogStore.send({
-                  type: "toggle",
-                  data: { companyId, mode: "display" },
-                })
-              }
-              onDelete={() =>
-                deleteDialogStore.send({
-                  type: "toggle",
-                  data: { contactId: contact.id },
-                })
-              }
-              onEdit={() =>
-                editDialogStore.send({
-                  type: "toggle",
-                  data: { contactId: contact.id },
-                })
-              }
-              onUnsubscribe={() =>
-                unsubscribeDialogStore.send({
-                  type: "toggle",
-                  data: { contactId: contact.id },
-                })
-              }
-              updatePolicy={hasPermission(organizationId, "contacts.update")}
-            />
-          ))}
-        </TableBody>
-      </Table>
+      <ContactTable
+        companies={companies}
+        contacts={contacts}
+        definitions={definitions}
+        organizationId={organizationId}
+      />
     </div>
   );
 }
