@@ -123,6 +123,51 @@ layer(SandboxLive)("sandbox", (it) => {
     })
   );
 
+  it.effect(
+    "settles through captured intrinsics, not program-replaceable ones",
+    () =>
+      Effect.gen(function* () {
+        const sandbox = yield* Sandbox;
+        const outcome = yield* sandbox.run({
+          call: noCalls,
+          code: `
+          let escape = "not called";
+          // A host-side settlement called this with the host's resolve and
+          // reject functions; capturing them was the escape, and calling the
+          // host's resolve kept the sandbox answering while it happened.
+          Promise.prototype.then = function (onFulfilled) {
+            try {
+              escape = "allowed: " + onFulfilled.constructor("return process.version")();
+            } catch (error) {
+              escape = "blocked: " + error.name;
+            }
+            onFulfilled({ escape });
+            return undefined;
+          };
+          return { escape };
+        `,
+        });
+
+        // Settlement used the realm's captured intrinsic, so the override ran
+        // nowhere and the result is the program's own return value.
+        expect(outcome.result).toEqual({ escape: "not called" });
+      })
+  );
+
+  it.effect("encodes the result with the captured JSON.stringify", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* Sandbox;
+      const outcome = yield* sandbox.run({
+        call: noCalls,
+        // A replaced stringify would hijack every message the realm sends if
+        // the bridge looked it up at call time.
+        code: 'JSON.stringify = () => "hijacked"; return { ok: true };',
+      });
+
+      expect(outcome.result).toEqual({ ok: true });
+    })
+  );
+
   it.effect("refuses a frame larger than the protocol allows", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;

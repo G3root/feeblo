@@ -31,8 +31,13 @@ import {
  * boundary at all: `console.log` and `tools.<name>` are realm functions, not
  * host callbacks, so the classic `console.log.constructor("return process")()`
  * escape resolves the *realm's* `Function` constructor and is refused by
- * `codeGeneration: { strings: false }`. Only JSON strings cross from the host
- * into the realm.
+ * `codeGeneration: { strings: false }`. JSON strings and primitives are the
+ * only values that cross either way: the host hands the program its code and
+ * its tool results as strings, and the realm answers with JSON strings for
+ * calls, logs, and settlement. The host never adopts the program's promise
+ * with its own `then` — settlement uses promise intrinsics captured before the
+ * program runs — because that would pass host functions into the realm and
+ * read a property the program can replace.
  *
  * The parent talks to the child over newline-delimited JSON on stdin/stdout:
  * the parent sends the program, the child answers each `tools.<name>(input)`
@@ -86,6 +91,9 @@ const BOOTSTRAP = [
   "delete globalThis.__sandboxMaxLogs;",
   "delete globalThis.__sandboxMaxCalls;",
   "delete globalThis.__sandboxMaxFrameChars;",
+  "const promiseThen = Promise.prototype.then;",
+  "const reflectApply = Reflect.apply;",
+  "const jsonStringify = JSON.stringify;",
   "const logLines = [];",
   "const format = (value) => {",
   "  if (typeof value === 'string') return value;",
@@ -130,6 +138,29 @@ const BOOTSTRAP = [
   "    return (input) => callTool(property, input);",
   "  },",
   "});",
+  "let settlement;",
+  "const messageOf = (error) => {",
+  "  if (error !== null && error !== undefined && typeof error.message === 'string') return error.message;",
+  "  return 'The program failed.';",
+  "};",
+  "// Settlement happens in the realm with intrinsics captured before the",
+  "// program runs: the host must not adopt the program's promise through a",
+  "// host-side then, because that would pass host functions into the realm and",
+  "// read a property the program can replace.",
+  "const settle = (promise) => {",
+  "  reflectApply(promiseThen, promise, [",
+  "    (value) => {",
+  "      if (settlement !== undefined) return;",
+  "      try { settlement = { ok: true, result: jsonStringify(value === undefined ? null : value) }; }",
+  "      catch { settlement = { ok: false, message: 'The result is not representable as JSON.' }; }",
+  "    },",
+  "    (error) => {",
+  "      if (settlement !== undefined) return;",
+  "      settlement = { ok: false, message: messageOf(error) };",
+  "    },",
+  "  ]);",
+  "};",
+  "const settled = () => settlement === undefined ? null : jsonStringify(settlement);",
   "const bridge = {",
   "  deliver: (encoded) => {",
   "    const message = JSON.parse(encoded);",
@@ -139,9 +170,10 @@ const BOOTSTRAP = [
   "    if (message.ok === true) entry.resolve(message.value);",
   "    else entry.reject(new Error(String(message.error)));",
   "  },",
-  "  drain: () => outbox.splice(0, outbox.length),",
-  "  logs: () => logLines,",
-  "  result: (value) => JSON.stringify(value === undefined ? null : value),",
+  "  drain: () => jsonStringify(outbox.splice(0, outbox.length)),",
+  "  logs: () => jsonStringify(logLines),",
+  "  settle,",
+  "  settled,",
   "};",
   "// The host takes its references and deletes this global before the program",
   "// runs, so the program cannot reach the bridge at all.",
@@ -152,8 +184,9 @@ const BOOTSTRAP = [
 let context;
 let drain;
 let deliver;
-let encodeResult;
 let readLogs;
+let settle;
+let settled;
 let poll;
 let timer;
 let finished = false;
@@ -167,14 +200,9 @@ const send = (message) =>
     );
   });
 
-const copyLogs = () => {
-  const realmLogs = readLogs();
-  const logs = [];
-  for (let index = 0; index < realmLogs.length; index += 1) {
-    logs.push(String(realmLogs[index]));
-  }
-  return logs;
-};
+// The realm hands over JSON strings and nothing else; parsing them here is
+// what keeps every object in the host on the host's side of the boundary.
+const copyLogs = () => JSON.parse(readLogs());
 
 const finish = (message) => {
   if (finished) return;
@@ -188,8 +216,9 @@ const finish = (message) => {
 };
 
 const drainCalls = () => {
-  if (drain === undefined) return;
-  const calls = drain();
+  if (finished || drain === undefined) return;
+
+  const calls = JSON.parse(drain());
   for (let index = 0; index < calls.length; index += 1) {
     const call = calls[index];
     send({
@@ -199,6 +228,15 @@ const drainCalls = () => {
       input: JSON.parse(call.input),
     }).catch(() => process.exit(1));
   }
+
+  const raw = settled();
+  if (raw === null) return;
+  const outcome = JSON.parse(raw);
+  if (outcome.ok === true) {
+    finish({ type: "done", logs: copyLogs(), result: String(outcome.result) });
+    return;
+  }
+  finish({ type: "error", logs: copyLogs(), message: String(outcome.message) });
 };
 
 const start = (message) => {
@@ -228,8 +266,9 @@ const start = (message) => {
   // bridge global is deleted, and none of them is a host function.
   drain = runInContext("__sandbox.drain", context);
   deliver = runInContext("__sandbox.deliver", context);
-  encodeResult = runInContext("__sandbox.result", context);
   readLogs = runInContext("__sandbox.logs", context);
+  settle = runInContext("__sandbox.settle", context);
+  settled = runInContext("__sandbox.settled", context);
   runInContext("delete globalThis.__sandbox", context);
 
   timer = setInterval(() => {
@@ -261,36 +300,14 @@ const start = (message) => {
     return;
   }
 
+  // Settlement stays in the realm: settle is a realm function the host holds a
+  // reference to, it adopts the program's promise with the realm's captured
+  // then, and it records the outcome as JSON for the poll below.
+  settle(evaluation);
+
   // Calls queued before the program's first await are picked up by the first
   // tick; the program itself cannot observe an interval it did not create.
   poll = setInterval(drainCalls, 5);
-
-  Promise.resolve(evaluation).then(
-    (value) => {
-      let result;
-      try {
-        result = String(encodeResult(value));
-      } catch {
-        finish({
-          type: "error",
-          logs: copyLogs(),
-          message: "The program's result is not representable as JSON.",
-        });
-        return;
-      }
-      finish({ type: "done", logs: copyLogs(), result });
-    },
-    (error) => {
-      finish({
-        type: "error",
-        logs: copyLogs(),
-        message:
-          error && typeof error.message === "string"
-            ? error.message
-            : "The program failed.",
-      });
-    }
-  );
 };
 
 const connection = createInterface({ input: process.stdin });
