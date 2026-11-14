@@ -12,6 +12,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { CurrentSession, type Session } from "../session-middleware";
 import { AttributeDefinitionRpcHandlersEffect } from "./handlers";
 import { AttributeDefinitionPolicy } from "./policies";
@@ -63,11 +65,12 @@ describe("AttributeDefinitionRpcHandlers", () => {
   const RepositoryLayer = AttributeDefinitionRepository.layer.pipe(
     Layer.provide(Database.PgliteDatabaseLive)
   );
-  const TestLayer = Layer.merge(
+  const TestLayer = Layer.mergeAll(
     Layer.merge(
       RepositoryLayer,
       AttributeDefinitionPolicy.layer.pipe(Layer.provide(RepositoryLayer))
     ),
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
@@ -385,6 +388,82 @@ describe("AttributeDefinitionRpcHandlers", () => {
           });
           expect(inserted?.id).toBe(unusedId);
         })
+    );
+    it.effect("records a definition create and a value update", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* AttributeDefinitionRpcHandlersEffect;
+        const { organizationId, session } = yield* makeFixture();
+        const provideSession = Effect.provideService(CurrentSession, session);
+        const auditOn = Effect.provideService(AuditLogEnabled, true);
+        const definitionId = yield* ContactAttributeDefinitionId.generate;
+
+        yield* handlers
+          .CreateContactAttributeDefinition({
+            id: definitionId,
+            organizationId,
+            name: "Job title",
+            key: "jobTitle",
+            description: null,
+            type: "TEXT",
+            isRequired: false,
+          })
+          .pipe(provideSession, auditOn);
+
+        const contactId = yield* ContactId.generate;
+        const valueId = yield* ContactAttributeValueId.generate;
+        const now = yield* DateTime.nowAsDate;
+        yield* db.insert(schema.contactTable).values({
+          id: contactId,
+          organizationId,
+          name: "Ada",
+          email: "ada@example.com",
+          createdAt: now,
+          updatedAt: now,
+        });
+        yield* db.insert(schema.contactAttributeValueTable).values({
+          id: valueId,
+          organizationId,
+          contactId,
+          attributeId: definitionId,
+          valueText: "Engineer",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        yield* handlers
+          .UpdateContactAttributeValue({
+            id: valueId,
+            organizationId,
+            contactId,
+            attributeId: definitionId,
+            value: "Manager",
+          })
+          .pipe(provideSession, auditOn);
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(eq(schema.auditLogTable.organizationId, organizationId));
+
+        expect(rows.map((row) => row.action).sort()).toEqual([
+          "attribute_definition.created",
+          "attribute_definition.value_updated",
+        ]);
+        expect(
+          rows.find(
+            (row) => row.action === "attribute_definition.value_updated"
+          )
+        ).toMatchObject({
+          actorType: "user",
+          actorUserId: session.user.id,
+          outcome: "allowed",
+          resourceId: definitionId,
+          resourceType: "attribute_definition",
+          source: "dashboard",
+          metadata: { target: "contact", contactId, valueId },
+        });
+      })
     );
   });
 });

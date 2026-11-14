@@ -1,12 +1,15 @@
 import { NodeCrypto } from "@effect/platform-node";
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { WorkspaceId } from "@feeblo/id";
+import { JwtSecretId, WorkspaceId } from "@feeblo/id";
 import type { Role } from "@feeblo/permissions";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { CurrentSession, type Session } from "../session-middleware";
 import { JwtSecretRpcHandlersEffect } from "./handlers";
 import { JwtSecretRepository } from "./repository";
@@ -64,10 +67,11 @@ describe("JwtSecretRpcHandlers", () => {
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
-  const TestLayer = Layer.merge(
+  const TestLayer = Layer.mergeAll(
     JwtSecretRepository.layer.pipe(
       Layer.provideMerge(Database.PgliteDatabaseLive)
     ),
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     NodeCrypto.layer
   );
 
@@ -147,6 +151,56 @@ describe("JwtSecretRpcHandlers", () => {
         expect(
           rotated.find((secret) => secret.revokedAt === null)?.id
         ).not.toBe(initial[0]?.id);
+      })
+    );
+
+    it.effect("records a revocation without the secret value", () =>
+      Effect.gen(function* () {
+        const handlers = yield* JwtSecretRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+        const session = makeSession(fixture);
+
+        yield* handlers
+          .RotateJwtSecret({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        const secrets = yield* handlers
+          .ListJwtSecrets({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+        const active = secrets.find((secret) => secret.revokedAt === null);
+        if (active === undefined) {
+          return yield* Effect.die("expected an active secret");
+        }
+
+        yield* handlers
+          .RevokeJwtSecret({
+            organizationId: fixture.organizationId,
+            secretId: yield* JwtSecretId.parse(active.id),
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, session),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          action: "jwt_secret.revoked",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceType: "jwt_secret",
+          source: "dashboard",
+        });
+        // The entry names the secret by id only; the generated value must not
+        // appear anywhere in the stored row.
+        expect(JSON.stringify(rows[0])).not.toContain(active.secret);
       })
     );
   });

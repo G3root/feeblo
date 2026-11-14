@@ -1,8 +1,12 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { AttributeDefinitionPolicy } from "./policies";
 import { AttributeDefinitionRepository } from "./repository";
 import { AttributeDefinitionRpcs } from "./rpcs";
@@ -37,32 +41,86 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
     CreateContactAttributeDefinition: (
       args: TContactAttributeDefinitionCreate
     ) =>
-      repository
-        .createContactAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(
-            attributeDefinitionPolicy.canCreateContact(args.organizationId)
-          ),
-          withRemapDbErrors("ContactAttributeDefinition", "create")
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.createContactAttributeDefinition(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.created",
+              resourceId: args.id,
+              // Both definition tables store the same resource type, so
+              // `target` says which one the id belongs to.
+              metadata: {
+                target: "contact",
+                name: args.name,
+                type: args.type,
+              },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(
+          attributeDefinitionPolicy.canCreateContact(args.organizationId)
         ),
+        withRemapDbErrors("ContactAttributeDefinition", "create")
+      ),
     UpdateContactAttributeDefinition: (
       args: TContactAttributeDefinitionUpdate
     ) =>
-      repository
-        .updateContactAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(attributeDefinitionPolicy.canUpdateContact(args)),
-          withRemapDbErrors("ContactAttributeDefinition", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.updateContactAttributeDefinition(args);
+            // The update returns nothing, so the new values go in `metadata`
+            // rather than posing as a diff with an empty `before`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.updated",
+              resourceId: args.id,
+              metadata: {
+                target: "contact",
+                name: args.name,
+                isRequired: args.isRequired,
+              },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(attributeDefinitionPolicy.canUpdateContact(args)),
+        withRemapDbErrors("ContactAttributeDefinition", "update")
+      ),
     DeleteContactAttributeDefinition: (
       args: TContactAttributeDefinitionDelete
     ) =>
-      repository
-        .deleteContactAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(attributeDefinitionPolicy.canDeleteContact(args)),
-          withRemapDbErrors("ContactAttributeDefinition", "delete")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.deleteContactAttributeDefinition(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.deleted",
+              resourceId: args.id,
+              metadata: { target: "contact" },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(attributeDefinitionPolicy.canDeleteContact(args)),
+        withRemapDbErrors("ContactAttributeDefinition", "delete")
+      ),
     ListCompanyAttributeDefinitions: (args: TCompanyAttributeDefinitionList) =>
       repository
         .findCompanyAttributeDefinitions(args.organizationId)
@@ -73,32 +131,82 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
     CreateCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionCreate
     ) =>
-      repository
-        .createCompanyAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(
-            attributeDefinitionPolicy.canCreateCompany(args.organizationId)
-          ),
-          withRemapDbErrors("CompanyAttributeDefinition", "create")
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.createCompanyAttributeDefinition(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.created",
+              resourceId: args.id,
+              metadata: {
+                target: "company",
+                name: args.name,
+                type: args.type,
+              },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(
+          attributeDefinitionPolicy.canCreateCompany(args.organizationId)
         ),
+        withRemapDbErrors("CompanyAttributeDefinition", "create")
+      ),
     UpdateCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionUpdate
     ) =>
-      repository
-        .updateCompanyAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(attributeDefinitionPolicy.canUpdateCompany(args)),
-          withRemapDbErrors("CompanyAttributeDefinition", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.updateCompanyAttributeDefinition(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.updated",
+              resourceId: args.id,
+              metadata: {
+                target: "company",
+                name: args.name,
+                isRequired: args.isRequired,
+              },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(attributeDefinitionPolicy.canUpdateCompany(args)),
+        withRemapDbErrors("CompanyAttributeDefinition", "update")
+      ),
     DeleteCompanyAttributeDefinition: (
       args: TCompanyAttributeDefinitionDelete
     ) =>
-      repository
-        .deleteCompanyAttributeDefinition(args)
-        .pipe(
-          Policy.withPolicy(attributeDefinitionPolicy.canDeleteCompany(args)),
-          withRemapDbErrors("CompanyAttributeDefinition", "delete")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.deleteCompanyAttributeDefinition(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.deleted",
+              resourceId: args.id,
+              metadata: { target: "company" },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(attributeDefinitionPolicy.canDeleteCompany(args)),
+        withRemapDbErrors("CompanyAttributeDefinition", "delete")
+      ),
     ListContactAttributeValues: (args: TContactAttributeValueList) =>
       repository
         .findContactAttributeValues(args.organizationId)
@@ -108,6 +216,8 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         ),
     UpdateContactAttributeValue: (args: TContactAttributeValueUpdate) =>
       Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
         const definition = yield* repository.findContactAttributeDefinitionById(
           contactAttributeDefinitionReference(args)
         );
@@ -117,15 +227,41 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           });
         }
         yield* validateAttributeValueEffect(definition, args.value);
-        return yield* repository.updateContactAttributeValue(args).pipe(
-          // A strict update that matched nothing means the id names no value
-          // row of this contact under this attribute — a stale or mismatched
-          // caller id, not a server fault.
-          Effect.catchTag("FailedToUpsertAttributeValueError", () =>
-            Effect.fail(
-              new BadRequestError({ message: "Attribute value not found" })
-            )
-          )
+        return yield* transaction(
+          Effect.gen(function* () {
+            const updated = yield* repository
+              .updateContactAttributeValue(args)
+              .pipe(
+                // A strict update that matched nothing means the id names no
+                // value row of this contact under this attribute — a stale or
+                // mismatched caller id, not a server fault.
+                Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+                  Effect.fail(
+                    new BadRequestError({
+                      message: "Attribute value not found",
+                    })
+                  )
+                )
+              );
+            // The catalog's resource is the definition, so `resourceId` is the
+            // attribute and the contact rides in `metadata`. The value itself
+            // stays out: this table is append-only, so a customer value
+            // written here could never be corrected or removed — the value
+            // row remains the record of the value.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.value_updated",
+              resourceId: args.attributeId,
+              metadata: {
+                target: "contact",
+                contactId: args.contactId,
+                valueId: args.id,
+              },
+            });
+            return updated;
+          })
         );
       }).pipe(
         Policy.withPolicy(
@@ -156,6 +292,8 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         ),
     UpdateCompanyAttributeValue: (args: TCompanyAttributeValueUpdate) =>
       Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
         const definition = yield* repository.findCompanyAttributeDefinitionById(
           companyAttributeDefinitionReference(args)
         );
@@ -165,15 +303,36 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
           });
         }
         yield* validateAttributeValueEffect(definition, args.value);
-        return yield* repository.updateCompanyAttributeValue(args).pipe(
-          // A strict update that matched nothing means the id names no value
-          // row of this company under this attribute — a stale or mismatched
-          // caller id, not a server fault.
-          Effect.catchTag("FailedToUpsertAttributeValueError", () =>
-            Effect.fail(
-              new BadRequestError({ message: "Attribute value not found" })
-            )
-          )
+        return yield* transaction(
+          Effect.gen(function* () {
+            const updated = yield* repository
+              .updateCompanyAttributeValue(args)
+              .pipe(
+                // A strict update that matched nothing means the id names no
+                // value row of this company under this attribute — a stale or
+                // mismatched caller id, not a server fault.
+                Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+                  Effect.fail(
+                    new BadRequestError({
+                      message: "Attribute value not found",
+                    })
+                  )
+                )
+              );
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "attribute_definition.value_updated",
+              resourceId: args.attributeId,
+              metadata: {
+                target: "company",
+                companyId: args.companyId,
+                valueId: args.id,
+              },
+            });
+            return updated;
+          })
         );
       }).pipe(
         Policy.withPolicy(
@@ -223,5 +382,6 @@ export const AttributeDefinitionRpcHandlers = AttributeDefinitionRpcs.toLayer(
     AttributeDefinitionPolicy.layer.pipe(
       Layer.provideMerge(AttributeDefinitionRepository.layer)
     )
-  )
+  ),
+  Layer.provide(AuditLogRecorder.layer)
 );

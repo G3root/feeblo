@@ -1,13 +1,15 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { ChangelogId, WorkspaceId } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { ChangelogPostRepository } from "../changelog-post/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -111,7 +113,8 @@ describe("ChangelogRpcHandlers", () => {
     ChangelogPostRepository.layer,
     EmailOutboxRepository.layer,
     SiteRepository.layer,
-    WorkspaceRepository.layer
+    WorkspaceRepository.layer,
+    AuditLogRecorder.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
@@ -732,6 +735,71 @@ describe("ChangelogRpcHandlers", () => {
             "changelog.published",
           ]);
         })
+    );
+    it.effect("records create, update and publish against the editor", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const db = yield* currentDb;
+        const id = yield* ChangelogId.generate;
+        const auditOn = Effect.provideService(AuditLogEnabled, true);
+
+        yield* handlers
+          .CreateChangelog({
+            assetIds: [],
+            coverImage: null,
+            id,
+            organizationId: fixture.organizationId,
+            title: "Release",
+            slug: "release",
+            content: "Body",
+            status: "draft",
+            scheduledAt: null,
+            publishedAt: null,
+          })
+          .pipe(Effect.provideService(CurrentSession, session), auditOn);
+
+        yield* handlers
+          .UpdateChangelog({
+            assetIds: [],
+            coverImage: null,
+            id,
+            organizationId: fixture.organizationId,
+            title: "Release",
+            slug: "release",
+            content: "Body",
+            status: "published",
+            scheduledAt: null,
+            publishedAt: yield* DateTime.nowAsDate,
+          })
+          .pipe(Effect.provideService(CurrentSession, session), auditOn);
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            and(
+              eq(schema.auditLogTable.organizationId, fixture.organizationId),
+              eq(schema.auditLogTable.resourceId, id)
+            )
+          );
+
+        expect(rows.map((row) => row.action).sort()).toEqual([
+          "changelog.created",
+          "changelog.published",
+          "changelog.updated",
+        ]);
+        expect(
+          rows.find((row) => row.action === "changelog.published")
+        ).toMatchObject({
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceType: "changelog",
+          source: "dashboard",
+        });
+      })
     );
   });
 });
