@@ -26,12 +26,20 @@
  *   where it would pay the window and share a transport failure with them, and
  *   gain nothing — writes are not started in parallel the way a render's reads
  *   are.
- * - Batching a stream would hold the response open for as long as the stream.
- *   Every caller of a batch waits for the whole response to end, so the page's
- *   reads would not resolve until the stream did; and upstream runs the batch
- *   in the client's scope rather than in a caller's fiber, so closing the
- *   stream's scope would leave the HTTP request open. Sent alone, interruption
- *   aborts it.
+ * - Batching a stream leaks the connection. Upstream runs a batch in the
+ *   client's scope rather than in a caller's fiber, and it only forwards
+ *   `Request` frames, so interrupting a stream's caller neither ends the batch
+ *   nor cancels its HTTP request: the response keeps pumping until the client
+ *   itself shuts down. The data-transfer page is where that shows — its watch
+ *   atoms are keyed by filter, so every filter change abandons a stream — and
+ *   the browser's per-origin connection limit turns a handful of abandoned
+ *   watches into a stalled tab. Sent alone, interruption aborts the request.
+ *
+ *   Interrupting a *batched* stream does not stall the page's reads: answers are
+ *   written as their frames arrive, not when the response ends. The leak is the
+ *   whole difference, and `batch-protocol.test.ts` pins both halves so that a
+ *   future Effect release that cancels batched streams says so by failing it, at
+ *   which point this module can go.
  *
  * A frame that alone exceeds `maxSingleFrameBytes` is sent alone too: the
  * server refuses a body past its own limit, so one oversized frame must not

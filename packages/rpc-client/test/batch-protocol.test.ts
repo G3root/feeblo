@@ -515,9 +515,9 @@ describe("batched RPC protocol", () => {
       const total = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
         // A watch the dashboard keeps open, started in the same render as the
-        // read. It must not share the read's request: every caller of a batch
-        // waits for the whole response to end, and this response ends when the
-        // caller stops watching.
+        // read. It must not share the read's request: interrupting a batched
+        // stream does not cancel its HTTP request, so this one would keep
+        // pumping long after its atom was disposed.
         const watching = yield* Stream.runDrain(client.Watch({})).pipe(
           Effect.forkChild
         );
@@ -543,6 +543,44 @@ describe("batched RPC protocol", () => {
       yield* Effect.sleep(Duration.millis(100));
       expect(cancels.count).toBe(1);
     })
+  );
+
+  /**
+   * The canary for this module's reason to exist.
+   *
+   * It asserts what upstream does *not* do: a stream that shares a batch keeps
+   * its HTTP request pumping after its caller is interrupted, because the batch
+   * runs in the client's scope and only `Request` frames are forwarded. If this
+   * test starts failing, a release of `effect` learned to cancel a batched
+   * stream — at which point `sharesBatch`, `rpc-kind.ts` and this dispatcher can
+   * all be deleted and `layerProtocolHttp({ batch })` used directly.
+   */
+  it.live(
+    "leaks a batched stream's request when its caller is interrupted",
+    () =>
+      Effect.gen(function* () {
+        const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+        const cancels = { count: 0 };
+        const context = yield* Layer.build(
+          testLayer(streamingClient(posts, cancels), {
+            sharesBatch: () => true,
+          })
+        );
+
+        yield* Effect.gen(function* () {
+          const client = yield* RpcClient.make(TestRpcs);
+          const watching = yield* Stream.runDrain(client.Watch({})).pipe(
+            Effect.forkChild
+          );
+          yield* Effect.sleep(Duration.millis(50));
+          yield* Fiber.interrupt(watching);
+          yield* Effect.sleep(Duration.millis(200));
+        }).pipe(Effect.provideContext(context));
+
+        // Batched: one request, still open after the caller went away.
+        expect(yield* Ref.get(posts)).toHaveLength(1);
+        expect(cancels.count).toBe(0);
+      })
   );
 
   it.live("fails every caller in a batch when the transport drops", () =>
