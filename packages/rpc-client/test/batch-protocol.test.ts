@@ -11,7 +11,6 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
-import * as Result from "effect/Result";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcClient from "effect/rpc/RpcClient";
 import type { RpcClientError } from "effect/rpc/RpcClientError";
@@ -198,6 +197,65 @@ const streamingClient = (
                   { status: 200, headers }
                 )
               : new Response(encoded, { status: 200, headers })
+          );
+        })
+      );
+    })
+  );
+
+/**
+ * Answers a body that carries a `Watch` with one chunk and leaves the response
+ * open, the way a real watch does. Any other body gets the connection-level
+ * `Defect` the server writes when it cannot read a request body.
+ */
+const defectBesideStreamClient = (
+  posts: Ref.Ref<ReadonlyArray<string>>
+): Layer.Layer<
+  HttpClient.HttpClient,
+  never,
+  RpcSerialization.RpcSerialization
+> =>
+  Layer.effect(
+    HttpClient.HttpClient,
+    Effect.gen(function* () {
+      const serialization = yield* RpcSerialization.RpcSerialization;
+      return HttpClient.make((request) =>
+        Effect.gen(function* () {
+          const body = bodyOf(request);
+          yield* Ref.update(posts, (all) => [...all, body]);
+          const frames = framesIn(body);
+          const headers = { "content-type": serialization.contentType };
+          const watching = frames.find((frame) => frame.tag === "Watch");
+          if (watching === undefined) {
+            return HttpClientResponse.fromWeb(
+              request,
+              new Response(
+                JSON.stringify({
+                  _tag: "Defect",
+                  defect: { message: "server exploded" },
+                }) + "\n",
+                { status: 200, headers }
+              )
+            );
+          }
+          return HttpClientResponse.fromWeb(
+            request,
+            new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.enqueue(
+                    new TextEncoder().encode(
+                      JSON.stringify({
+                        _tag: "Chunk",
+                        requestId: watching.id,
+                        values: ["tick"],
+                      }) + "\n"
+                    )
+                  );
+                },
+              }),
+              { status: 200, headers }
+            )
           );
         })
       );
@@ -545,6 +603,59 @@ describe("batched RPC protocol", () => {
     })
   );
 
+  it.live("fails only the exchanges the defect-carrying POST carried", () =>
+    Effect.gen(function* () {
+      const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+      const context = yield* Layer.build(
+        testLayer(defectBesideStreamClient(posts), {
+          sharesBatch: (tag) => tag !== "Watch",
+        })
+      );
+
+      const { outcome, watching } = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+        // An open watch on one protocol and a read on the other: a defect in the
+        // read's body used to die every pending request of the client.
+        const fiber = yield* Stream.runDrain(client.Watch({})).pipe(
+          Effect.forkChild
+        );
+        yield* Effect.sleep(Duration.millis(50));
+        const read = yield* client.Add({ a: 1, b: 2 }).pipe(Effect.exit);
+        // A fiber that is still running has not finished within the window; a
+        // defect that reached the watch would have ended it with a failure.
+        const finished = yield* Fiber.await(fiber).pipe(
+          Effect.timeoutOption(Duration.millis(200))
+        );
+        yield* Fiber.interrupt(fiber);
+        return { outcome: read, watching: finished };
+      }).pipe(
+        Effect.timeout(Duration.seconds(5)),
+        Effect.provideContext(context)
+      );
+
+      // The read sees the cause the server sent...
+      expect(Exit.isFailure(outcome)).toBe(true);
+      const failure = Exit.isFailure(outcome)
+        ? Cause.findErrorOption(outcome.cause)
+        : Option.none();
+      expect(Option.isSome(failure)).toBe(true);
+      const error = Option.getOrThrow(failure);
+      expect(error.reason._tag).toBe("RpcClientDefect");
+      if (error.reason._tag === "RpcClientDefect") {
+        expect(String(error.reason.cause)).toContain("server exploded");
+      }
+
+      // ...and the watch never saw it.
+      expect(Option.isNone(watching)).toBe(true);
+
+      const bodies = yield* Ref.get(posts);
+      expect(bodies.map((body) => framesIn(body).map((f) => f.tag))).toEqual([
+        ["Watch"],
+        ["Add"],
+      ]);
+    })
+  );
+
   /**
    * The canary for this module's reason to exist.
    *
@@ -633,15 +744,21 @@ describe("batched RPC protocol", () => {
         );
       }).pipe(Effect.provideContext(context));
 
-      // A connection-level defect is a die, not a declared failure: the server
-      // never read the body, so no request in it has an answer coming. This is
-      // the same shape a single, unbatched call already had.
-      for (const outcome of outcomes) {
-        expect(Exit.isFailure(outcome)).toBe(true);
-        const cause = Exit.isFailure(outcome) ? outcome.cause : Cause.empty;
-        const defect = Cause.findDefect(cause);
-        expect(Result.isSuccess(defect)).toBe(true);
-        expect(String(Result.getOrThrow(defect))).toContain("server exploded");
+      // The server could not read this body, so every request it carried fails
+      // with the cause the server sent.
+      const failures = outcomes.map((outcome) =>
+        Exit.isFailure(outcome)
+          ? Cause.findErrorOption(outcome.cause)
+          : Option.none()
+      );
+
+      for (const failure of failures) {
+        expect(Option.isSome(failure)).toBe(true);
+        const error = Option.getOrThrow(failure);
+        expect(error.reason._tag).toBe("RpcClientDefect");
+        if (error.reason._tag === "RpcClientDefect") {
+          expect(String(error.reason.cause)).toContain("server exploded");
+        }
       }
     })
   );

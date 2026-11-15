@@ -46,6 +46,12 @@
  * take the batch's other reads down with it. The batch itself is bounded by
  * upstream's `maxSize` frame count, not by a byte budget this module keeps.
  *
+ * A `Defect` frame is the one response this module rewrites. Upstream's client
+ * treats it as connection-level and dies every pending request of the client,
+ * so a body the server could not read would kill an unrelated open `Watch` on
+ * the other protocol. It is re-expressed as a `ClientProtocolError` naming the
+ * requests its protocol still owes an answer to.
+ *
  * Call it only where the runtime belongs to one request: a batch carries one
  * set of request headers, so a runtime shared by concurrent requests (the
  * server's `ManagedRuntime`) must keep sending one request per call, or one
@@ -59,8 +65,14 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Layer from "effect/Layer";
 import * as RpcClient from "effect/rpc/RpcClient";
-import type { FromClientEncoded } from "effect/rpc/RpcMessage";
+import { RpcClientDefect, RpcClientError } from "effect/rpc/RpcClientError";
+import type {
+  FromClientEncoded,
+  FromServerEncoded,
+  ResponseDefectEncoded,
+} from "effect/rpc/RpcMessage";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
+import * as Schema from "effect/Schema";
 
 /** The frames one POST may carry; a burst past it is split across POSTs. */
 const defaultMaxBatchFrames = 32;
@@ -70,6 +82,19 @@ const defaultMaxSingleFrameBytes = 64 * 1024;
 
 /** How long a flush waits for the frames that start behind the first one. */
 const defaultBatchWindow = Duration.millis(2);
+
+/** The response writer the client binds to one client id for `run`. */
+type WriteResponse = (message: FromServerEncoded) => Effect.Effect<void>;
+
+/**
+ * One protocol and the requests it has sent but not yet seen answered. The
+ * client ids are shared, so pinning a failure to a protocol is the only scope
+ * available: upstream reports nothing about which POST a frame arrived on.
+ */
+interface Routed {
+  readonly protocol: RpcClient.Protocol["Service"];
+  readonly pending: Set<string | number>;
+}
 
 interface ProtocolHttpBatchOptions {
   readonly url: string;
@@ -118,19 +143,102 @@ const makeProtocolHttpBatch = (
     // in whether the frames they are handed leave together. Upstream keeps one
     // batch queue per client id inside each, which is what `run` below hands
     // both of them.
-    const batched = yield* RpcClient.makeProtocolHttp(client, {
-      batch: {
-        window: options.batchWindow ?? defaultBatchWindow,
-        maxSize: Math.max(1, options.maxBatchFrames ?? defaultMaxBatchFrames),
-      },
-    }).pipe(
-      Effect.provideService(RpcSerialization.RpcSerialization, serialization)
-    );
-    const alone = yield* RpcClient.makeProtocolHttp(client).pipe(
-      Effect.provideService(RpcSerialization.RpcSerialization, serialization)
-    );
+    const batched: Routed = {
+      pending: new Set(),
+      protocol: yield* RpcClient.makeProtocolHttp(client, {
+        batch: {
+          window: options.batchWindow ?? defaultBatchWindow,
+          maxSize: Math.max(1, options.maxBatchFrames ?? defaultMaxBatchFrames),
+        },
+      }).pipe(
+        Effect.provideService(RpcSerialization.RpcSerialization, serialization)
+      ),
+    };
+    const alone: Routed = {
+      pending: new Set(),
+      protocol: yield* RpcClient.makeProtocolHttp(client).pipe(
+        Effect.provideService(RpcSerialization.RpcSerialization, serialization)
+      ),
+    };
 
     const encodeText = new TextEncoder();
+    const decodeDefect = Schema.decodeUnknownEffect(
+      serialization.codecFor(Schema.Defect())
+    );
+
+    /**
+     * The cause the server reported, as the failure a caller sees. Decoded with
+     * the protocol's own codec so the caller gets the error the server meant
+     * rather than the frame that carried it; a frame the codec cannot read
+     * stays as it came.
+     */
+    const serverDefect = (
+      frame: ResponseDefectEncoded
+    ): Effect.Effect<RpcClientError> =>
+      decodeDefect(frame.defect).pipe(
+        Effect.match({
+          onFailure: () =>
+            new RpcClientError({
+              reason: new RpcClientDefect({
+                message: "The RPC server reported a defect",
+                cause: frame.defect,
+              }),
+            }),
+          onSuccess: (decoded) =>
+            new RpcClientError({
+              reason: new RpcClientDefect({
+                message: "The RPC server reported a defect",
+                cause: decoded,
+              }),
+            }),
+        })
+      );
+
+    /**
+     * The writer one protocol's responses go through.
+     *
+     * A `Defect` frame is connection-level in the client's model: receiving one
+     * dies *every* pending request for the client, including an open `Watch`
+     * that this POST had nothing to do with. Over HTTP a defect only says the
+     * server could not read the body that carried it, so it is re-expressed as
+     * a `ClientProtocolError` — the frame clients create locally to fail the
+     * requests it names — limited to the exchanges this protocol still owes an
+     * answer to. Every other frame goes through untouched.
+     */
+    const writerFor =
+      (routed: Routed, writeResponse: WriteResponse): WriteResponse =>
+      (message) => {
+        switch (message._tag) {
+          case "Exit": {
+            routed.pending.delete(message.requestId);
+            return writeResponse(message);
+          }
+          case "Defect": {
+            const requestIds = [...routed.pending];
+            routed.pending.clear();
+            return Effect.flatMap(serverDefect(message), (error) =>
+              writeResponse({
+                _tag: "ClientProtocolError",
+                error,
+                requestIds,
+              })
+            );
+          }
+          case "ClientProtocolError": {
+            if (message.requestIds === undefined) {
+              routed.pending.clear();
+            } else {
+              for (const requestId of message.requestIds) {
+                routed.pending.delete(requestId);
+              }
+            }
+            return writeResponse(message);
+          }
+          default: {
+            return writeResponse(message);
+          }
+        }
+      };
 
     /**
      * The frame's own body in bytes, the unit the ceiling is written in.
@@ -152,9 +260,7 @@ const makeProtocolHttpBatch = (
      * sender's fiber. A non-request frame goes to the unbatched protocol too:
      * both drop it, and that is the one that does not encode first.
      */
-    const protocolFor = (
-      request: FromClientEncoded
-    ): Effect.Effect<RpcClient.Protocol["Service"]> =>
+    const protocolFor = (request: FromClientEncoded): Effect.Effect<Routed> =>
       request._tag !== "Request" || !sharesBatch(request.tag)
         ? Effect.succeed(alone)
         : bodyBytes(request).pipe(
@@ -170,16 +276,30 @@ const makeProtocolHttpBatch = (
       // promises: the client's writer lives as long as the client does.
       run: (clientId, writeResponse) =>
         Effect.raceAll([
-          batched.run(clientId, writeResponse),
-          alone.run(clientId, writeResponse),
+          batched.protocol.run(clientId, writerFor(batched, writeResponse)),
+          alone.protocol.run(clientId, writerFor(alone, writeResponse)),
         ]),
       send: (clientId, request, transferables) =>
-        Effect.flatMap(protocolFor(request), (protocol) =>
-          protocol.send(clientId, request, transferables)
-        ),
-      supportsAck: batched.supportsAck,
-      supportsTransferables: batched.supportsTransferables,
-      codecFor: batched.codecFor,
+        Effect.flatMap(protocolFor(request), (routed) => {
+          if (request._tag !== "Request") {
+            return routed.protocol.send(clientId, request, transferables);
+          }
+          // Registered before the frame leaves, so an answer that arrives
+          // during `send` still has its request in the set the writer scopes a
+          // defect to, and released when `send` ends — including when an
+          // interrupted caller ends it early, which no frame will report.
+          routed.pending.add(request.id);
+          return routed.protocol
+            .send(clientId, request, transferables)
+            .pipe(
+              Effect.ensuring(
+                Effect.sync(() => routed.pending.delete(request.id))
+              )
+            );
+        }),
+      supportsAck: batched.protocol.supportsAck,
+      supportsTransferables: batched.protocol.supportsTransferables,
+      codecFor: batched.protocol.codecFor,
     };
   });
 
