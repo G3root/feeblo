@@ -1,6 +1,6 @@
 import { expect, layer } from "@effect/vitest";
 import { currentDb, schema } from "@feeblo/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { McpSchema } from "effect/ai";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -12,8 +12,11 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { makePublicApiCodeModeRoute } from "./code-mode";
 import { makePublicApiMcpRoute } from "./mcp";
+import { PUBLIC_API_KEY_RATE_LIMIT } from "./middleware";
 import { PublicApiOperations } from "./operations";
+import { NodeSandboxLive } from "./sandbox-node";
 import {
   PublicApiPostTags,
   PublicApiStatusList,
@@ -50,6 +53,7 @@ const executeMcp = (options: {
   readonly apiKey?: string;
   readonly authorization?: string;
   readonly body: unknown;
+  readonly path?: string;
   readonly protocolVersion?: string;
   readonly sessionId?: string;
 }) =>
@@ -72,7 +76,7 @@ const executeMcp = (options: {
     }
 
     const request = HttpServerRequest.fromWeb(
-      new Request("http://localhost/mcp", {
+      new Request(`http://localhost${options.path ?? "/mcp"}`, {
         body: JSON.stringify(options.body),
         headers,
         method: "POST",
@@ -156,9 +160,13 @@ const MCP_INITIALIZE = {
 } as const;
 
 /** Runs the handshake and returns the session a client would keep sending. */
-const openMcpSession = (apiKey: string) =>
+const openMcpSession = (apiKey: string, path = "/mcp") =>
   Effect.gen(function* () {
-    const initialized = yield* executeMcp({ apiKey, body: MCP_INITIALIZE });
+    const initialized = yield* executeMcp({
+      apiKey,
+      body: MCP_INITIALIZE,
+      path,
+    });
     const sessionId = initialized.headers["mcp-session-id"];
     if (sessionId === undefined) {
       return yield* Effect.die("the MCP handshake did not open a session");
@@ -171,7 +179,8 @@ const callTool = (
   sessionId: string,
   apiKey: string,
   name: string,
-  toolArguments: Schema.JsonObject
+  toolArguments: Schema.JsonObject,
+  path = "/mcp"
 ) =>
   Effect.gen(function* () {
     const response = yield* executeMcp({
@@ -182,6 +191,7 @@ const callTool = (
         method: "tools/call",
         params: { arguments: toolArguments, name },
       },
+      path,
       protocolVersion: MCP_PROTOCOL_VERSION,
       sessionId,
     });
@@ -634,6 +644,291 @@ layer(
       // headers, so a client pacing itself reads one contract on both.
       expect(refused.headers["x-ratelimit-limit"]).toBe("1");
       expect(refused.headers["x-ratelimit-remaining"]).toBe("0");
+    })
+  );
+});
+
+/**
+ * The server-side approval gate over the live transport.
+ *
+ * The projection test pins that a destructive tool declares the refusal; this
+ * one pins that the route actually asks, that a `deny` deployment cannot be
+ * talked past the web client's own approval prompt, and that the refusal leaves
+ * the record the call would have deleted exactly where it was.
+ */
+layer(
+  makePublicApiMcpRoute(PUBLIC_API_KEY_RATE_LIMIT, "deny").pipe(
+    Layer.provideMerge(PublicApiDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api mcp approval", (it) => {
+  it.effect("refuses a destructive call the gate denies", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_mcp_gated", "Gated");
+      registerKey(
+        "fbk_mcp_gated",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession("fbk_mcp_gated");
+      const refused = yield* callTool(sessionId, "fbk_mcp_gated", "deleteTag", {
+        tagId: "tag_mcp_gated",
+      });
+
+      // A declared failure, not a protocol error: the call reached the tool,
+      // and the client reads the gate's own message instead of a transport
+      // fault. The MTK toolkit answers a declared failure that is an `Error`
+      // with its message, which is the shape every Public API refusal already
+      // arrives in on this surface.
+      expect(refused.isError).toBe(true);
+      const [content] = refused.content;
+      if (content?.type !== "text") {
+        return yield* Effect.die("the refusal carried no text content");
+      }
+      expect(content.text).toContain("refuses destructive MCP calls");
+
+      // The point of a server-side gate is that the record survives a client
+      // that never asked its user: the tag is still there.
+      const db = yield* currentDb;
+      const remaining = yield* db
+        .select()
+        .from(schema.tagTable)
+        .where(eq(schema.tagTable.id, "tag_mcp_gated"));
+      expect(remaining).toHaveLength(1);
+    })
+  );
+
+  it.effect("leaves a read-only call alone", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(
+        workspace.organizationId,
+        "tag_mcp_gated_read",
+        "Readable"
+      );
+      registerKey(
+        "fbk_mcp_readonly",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession("fbk_mcp_readonly");
+      const listed = yield* callTool(
+        sessionId,
+        "fbk_mcp_readonly",
+        "listTags",
+        {}
+      );
+
+      expect(listed.isError).toBe(false);
+      const page = yield* Schema.decodeUnknownEffect(PublicApiTagPage)(
+        listed.structuredContent
+      );
+      expect(page.data.map((tag) => tag.name)).toEqual(["Readable"]);
+    })
+  );
+});
+
+/**
+ * Code mode, over the live transport.
+ *
+ * The unit suite (`catalog.test.ts`) pins the ranking and the signatures; what
+ * this covers is the property the surface exists for: one `execute` call runs a
+ * program that calls two operations through the same handlers, scopes, and
+ * approval gate `/mcp` uses, and the sandbox is the production subprocess one.
+ */
+layer(
+  makePublicApiCodeModeRoute().pipe(
+    Layer.provide(NodeSandboxLive),
+    Layer.provideMerge(PublicApiDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api mcp code mode", (it) => {
+  it.effect("lists only search and execute", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_code_mode_list", workspace.organizationId);
+
+      const sessionId = yield* openMcpSession(
+        "fbk_code_mode_list",
+        "/mcp/code"
+      );
+      const listed = yield* executeMcp({
+        apiKey: "fbk_code_mode_list",
+        body: { id: 2, jsonrpc: "2.0", method: "tools/list", params: {} },
+        path: "/mcp/code",
+        protocolVersion: MCP_PROTOCOL_VERSION,
+        sessionId,
+      });
+      expect(listed.status).toBe(200);
+
+      const message = decodeMcpMessage(yield* mcpMessage(listed));
+      const tools = decodeToolList(message.result);
+      expect(tools.tools.map((tool) => tool.name).sort()).toEqual([
+        "execute",
+        "search",
+      ]);
+    })
+  );
+
+  it.effect("searches the catalog for a task's operations", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey(
+        "fbk_code_mode_search",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession(
+        "fbk_code_mode_search",
+        "/mcp/code"
+      );
+      const found = yield* callTool(
+        sessionId,
+        "fbk_code_mode_search",
+        "search",
+        { query: "create a tag" },
+        "/mcp/code"
+      );
+
+      expect(found.isError).toBe(false);
+      const page = yield* Schema.decodeUnknownEffect(
+        Schema.Struct({
+          limit: Schema.Int,
+          matches: Schema.Array(
+            Schema.Struct({
+              destructive: Schema.Boolean,
+              name: Schema.String,
+              signature: Schema.String,
+            })
+          ),
+          offset: Schema.Int,
+          total: Schema.Int,
+        })
+      )(found.structuredContent);
+      expect(page.matches.map((match) => match.name)).toContain("createTag");
+      expect(page.matches[0]?.signature).toContain("(input: {");
+    })
+  );
+
+  it.effect("runs one program that calls two operations", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_code_mode", "Live");
+      registerKey(
+        "fbk_code_mode_execute",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession(
+        "fbk_code_mode_execute",
+        "/mcp/code"
+      );
+      const executed = yield* callTool(
+        sessionId,
+        "fbk_code_mode_execute",
+        "execute",
+        {
+          code: `
+            const tags = await tools.listTags({});
+            const created = await tools.createTag({ name: "From a program" });
+            console.log("tags", tags.data.length);
+            return { created: created.name, names: tags.data.map((tag) => tag.name) };
+          `,
+        },
+        "/mcp/code"
+      );
+
+      expect(executed.isError).toBe(false);
+      const result = yield* Schema.decodeUnknownEffect(
+        Schema.Struct({
+          calls: Schema.Array(Schema.String),
+          logs: Schema.Array(Schema.String),
+          result: Schema.Json,
+        })
+      )(executed.structuredContent);
+
+      expect(result.calls).toEqual(["listTags", "createTag"]);
+      expect(result.logs).toEqual(["log: tags 1"]);
+      expect(result.result).toEqual({
+        created: "From a program",
+        names: ["Live"],
+      });
+
+      // The write landed through the same service the endpoint uses: the
+      // created tag — not the seeded one the program read — is in this
+      // workspace.
+      const db = yield* currentDb;
+      const created = yield* db
+        .select()
+        .from(schema.tagTable)
+        .where(
+          and(
+            eq(schema.tagTable.organizationId, workspace.organizationId),
+            eq(schema.tagTable.name, "From a program")
+          )
+        );
+      expect(created).toHaveLength(1);
+    })
+  );
+});
+
+layer(
+  makePublicApiCodeModeRoute(PUBLIC_API_KEY_RATE_LIMIT, "deny").pipe(
+    Layer.provide(NodeSandboxLive),
+    Layer.provideMerge(PublicApiDependencies),
+    Layer.provideMerge(HttpRouter.layer)
+  )
+)("public api mcp code mode approval", (it) => {
+  it.effect("refuses a destructive call a program makes", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      yield* seedTag(workspace.organizationId, "tag_code_mode_gated", "Gated");
+      registerKey(
+        "fbk_code_mode_gated",
+        workspace.organizationId,
+        TAG_MANAGEMENT_KEY_SCOPES
+      );
+
+      const sessionId = yield* openMcpSession(
+        "fbk_code_mode_gated",
+        "/mcp/code"
+      );
+      const executed = yield* callTool(
+        sessionId,
+        "fbk_code_mode_gated",
+        "execute",
+        {
+          code: `
+            try {
+              await tools.deleteTag({ tagId: "tag_code_mode_gated" });
+              return { message: "not refused" };
+            } catch (error) {
+              return { message: error.message };
+            }
+          `,
+        },
+        "/mcp/code"
+      );
+
+      expect(executed.isError).toBe(false);
+      const result = yield* Schema.decodeUnknownEffect(
+        Schema.Struct({ result: Schema.Json })
+      )(executed.structuredContent);
+      expect(result.result).toEqual({
+        message: "This deployment refuses destructive MCP calls.",
+      });
+
+      const db = yield* currentDb;
+      const remaining = yield* db
+        .select()
+        .from(schema.tagTable)
+        .where(eq(schema.tagTable.id, "tag_code_mode_gated"));
+      expect(remaining).toHaveLength(1);
     })
   );
 });
