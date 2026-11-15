@@ -49,8 +49,18 @@
  * A `Defect` frame is the one response this module rewrites. Upstream's client
  * treats it as connection-level and dies every pending request of the client,
  * so a body the server could not read would kill an unrelated open `Watch` on
- * the other protocol. It is re-expressed as a `ClientProtocolError` naming the
- * requests its protocol still owes an answer to.
+ * the other protocol — and, because two clients can share this layer, another
+ * client's calls too. It is re-expressed as a `ClientProtocolError` naming the
+ * requests that protocol and client still owe an answer to.
+ *
+ * That scope is accepted, not ideal: two `Watch`s, or a watch and a write, both
+ * travel on the unbatched protocol, and a defect in one of their bodies fails
+ * the other as well. `makeHttpExchange` hands the writer a bare frame — the
+ * `Defect` message carries no POST identity and the protocol exposes no hook —
+ * so per-body scope would mean re-implementing the exchange this module exists
+ * to stop maintaining. Nothing is left pending: every affected caller fails
+ * with the cause the server sent. `batch-protocol.test.ts` pins the boundary, so
+ * the day upstream reports which body a frame came from, the test says so.
  *
  * Call it only where the runtime belongs to one request: a batch carries one
  * set of request headers, so a runtime shared by concurrent requests (the

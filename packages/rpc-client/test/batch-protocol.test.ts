@@ -682,6 +682,59 @@ describe("batched RPC protocol", () => {
     })
   );
 
+  it.live(
+    "fails the exchanges in flight on a protocol when one POST reports a defect",
+    () =>
+      Effect.gen(function* () {
+        const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+        const context = yield* Layer.build(
+          // Both the watch and the write travel on the unbatched protocol: one
+          // frame per POST, no batch between them.
+          testLayer(defectBesideStreamClient(posts), {
+            sharesBatch: () => false,
+          })
+        );
+
+        const { outcome, watching } = yield* Effect.gen(function* () {
+          const client = yield* RpcClient.make(TestRpcs);
+          const fiber = yield* Stream.runDrain(client.Watch({})).pipe(
+            Effect.forkChild
+          );
+          yield* Effect.sleep(Duration.millis(50));
+          const read = yield* client.Add({ a: 1, b: 2 }).pipe(Effect.exit);
+          const watched = yield* Fiber.await(fiber).pipe(
+            Effect.timeoutOption(Duration.millis(500))
+          );
+          return { outcome: read, watching: watched };
+        }).pipe(
+          Effect.timeout(Duration.seconds(5)),
+          Effect.provideContext(context)
+        );
+
+        // Accepted limit: `makeHttpExchange` reports no POST identity, so a
+        // defect fails every exchange in flight on that protocol and client, not
+        // only the one whose body it came from. Both callers fail — with the
+        // cause the server sent — and neither is left pending.
+        expect(Option.isSome(watching)).toBe(true);
+        const causes: ReadonlyArray<Exit.Exit<unknown, RpcClientError>> = [
+          outcome,
+          ...Option.toArray(watching),
+        ];
+        for (const exit of causes) {
+          expect(Exit.isFailure(exit)).toBe(true);
+          const failure = Exit.isFailure(exit)
+            ? Cause.findErrorOption(exit.cause)
+            : Option.none();
+          expect(Option.isSome(failure)).toBe(true);
+          const error = Option.getOrThrow(failure);
+          expect(error.reason._tag).toBe("RpcClientDefect");
+          if (error.reason._tag === "RpcClientDefect") {
+            expect(String(error.reason.cause)).toContain("server exploded");
+          }
+        }
+      })
+  );
+
   it.live("keeps each client's pending requests apart", () =>
     Effect.gen(function* () {
       const context = yield* Layer.build(testLayer(delayedDefectClient()));
