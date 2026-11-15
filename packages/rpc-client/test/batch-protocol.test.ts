@@ -204,6 +204,32 @@ const streamingClient = (
   );
 
 /**
+ * Answers every body with the connection-level `Defect` the server writes when
+ * it cannot read a request body, after a delay long enough that a second
+ * client's request has been sent and is still in flight.
+ */
+const delayedDefectClient = (): Layer.Layer<HttpClient.HttpClient> =>
+  Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      Effect.sleep(Duration.millis(50)).pipe(
+        Effect.as(
+          HttpClientResponse.fromWeb(
+            request,
+            new Response(
+              JSON.stringify({
+                _tag: "Defect",
+                defect: { message: "server exploded" },
+              }) + "\n",
+              { status: 200, headers: { "content-type": "application/ndjson" } }
+            )
+          )
+        )
+      )
+    )
+  );
+
+/**
  * Answers a body that carries a `Watch` with one chunk and leaves the response
  * open, the way a real watch does. Any other body gets the connection-level
  * `Defect` the server writes when it cannot read a request body.
@@ -653,6 +679,49 @@ describe("batched RPC protocol", () => {
         ["Watch"],
         ["Add"],
       ]);
+    })
+  );
+
+  it.live("keeps each client's pending requests apart", () =>
+    Effect.gen(function* () {
+      const context = yield* Layer.build(testLayer(delayedDefectClient()));
+
+      // Two clients over one protocol layer, the way the dashboard's promise
+      // runtime and its `AtomRpc` runtimes share `rpcProtocolFor`'s layer. Each
+      // gets its own client id, so a defect that names one client's requests
+      // must not consume the other's tracking.
+      const outcomes = yield* Effect.gen(function* () {
+        const a = yield* RpcClient.make(TestRpcs);
+        const b = yield* RpcClient.make(TestRpcs);
+        // Both in flight before either defect lands: that is the window in
+        // which a shared tracker lets one client's defect clear the other's.
+        return yield* Effect.all(
+          [
+            a.Add({ a: 1, b: 2 }).pipe(Effect.exit),
+            b.Add({ a: 1, b: 2 }).pipe(Effect.exit),
+          ],
+          { concurrency: "unbounded" }
+        );
+      }).pipe(
+        Effect.timeout(Duration.seconds(5)),
+        Effect.provideContext(context)
+      );
+
+      // Both see the cause the server sent. Without per-client tracking the
+      // first defect consumes the second client's id, and its call fails with
+      // the synthesized "HTTP response ended before RPC request completed".
+      for (const outcome of outcomes) {
+        expect(Exit.isFailure(outcome)).toBe(true);
+        const failure = Exit.isFailure(outcome)
+          ? Cause.findErrorOption(outcome.cause)
+          : Option.none();
+        expect(Option.isSome(failure)).toBe(true);
+        const error = Option.getOrThrow(failure);
+        expect(error.reason._tag).toBe("RpcClientDefect");
+        if (error.reason._tag === "RpcClientDefect") {
+          expect(String(error.reason.cause)).toContain("server exploded");
+        }
+      }
     })
   );
 

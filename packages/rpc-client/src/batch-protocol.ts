@@ -87,13 +87,19 @@ const defaultBatchWindow = Duration.millis(2);
 type WriteResponse = (message: FromServerEncoded) => Effect.Effect<void>;
 
 /**
- * One protocol and the requests it has sent but not yet seen answered. The
- * client ids are shared, so pinning a failure to a protocol is the only scope
- * available: upstream reports nothing about which POST a frame arrived on.
+ * One protocol and, per client id, the requests it has sent and not yet seen
+ * answered.
+ *
+ * The scope is the protocol *and* the client because neither is enough on its
+ * own. Two clients share one protocol whenever they share the runtime layer —
+ * the dashboard's promise runtime and its `AtomRpc` runtimes do — and a failure
+ * that names one client's requests clears the other's tracking if they share a
+ * set. Within a client, the protocol is the finest scope upstream offers: it
+ * reports nothing about which POST a frame arrived on.
  */
 interface Routed {
   readonly protocol: RpcClient.Protocol["Service"];
-  readonly pending: Set<string | number>;
+  readonly pending: Map<number, Set<string | number>>;
 }
 
 interface ProtocolHttpBatchOptions {
@@ -144,7 +150,7 @@ const makeProtocolHttpBatch = (
     // batch queue per client id inside each, which is what `run` below hands
     // both of them.
     const batched: Routed = {
-      pending: new Set(),
+      pending: new Map(),
       protocol: yield* RpcClient.makeProtocolHttp(client, {
         batch: {
           window: options.batchWindow ?? defaultBatchWindow,
@@ -155,10 +161,27 @@ const makeProtocolHttpBatch = (
       ),
     };
     const alone: Routed = {
-      pending: new Set(),
+      pending: new Map(),
       protocol: yield* RpcClient.makeProtocolHttp(client).pipe(
         Effect.provideService(RpcSerialization.RpcSerialization, serialization)
       ),
+    };
+
+    /**
+     * The requests `clientId` has in flight through `routed`, created on first
+     * use and dropped when that client's `run` ends.
+     */
+    const pendingFor = (
+      routed: Routed,
+      clientId: number
+    ): Set<string | number> => {
+      const existing = routed.pending.get(clientId);
+      if (existing !== undefined) {
+        return existing;
+      }
+      const created = new Set<string | number>();
+      routed.pending.set(clientId, created);
+      return created;
     };
 
     const encodeText = new TextEncoder();
@@ -205,17 +228,21 @@ const makeProtocolHttpBatch = (
      * requests it names — limited to the exchanges this protocol still owes an
      * answer to. Every other frame goes through untouched.
      */
-    const writerFor =
-      (routed: Routed, writeResponse: WriteResponse): WriteResponse =>
-      (message) => {
+    const writerFor = (
+      routed: Routed,
+      clientId: number,
+      writeResponse: WriteResponse
+    ): WriteResponse => {
+      const pending = pendingFor(routed, clientId);
+      return (message) => {
         switch (message._tag) {
           case "Exit": {
-            routed.pending.delete(message.requestId);
+            pending.delete(message.requestId);
             return writeResponse(message);
           }
           case "Defect": {
-            const requestIds = [...routed.pending];
-            routed.pending.clear();
+            const requestIds = [...pending];
+            pending.clear();
             return Effect.flatMap(serverDefect(message), (error) =>
               writeResponse({
                 _tag: "ClientProtocolError",
@@ -226,10 +253,10 @@ const makeProtocolHttpBatch = (
           }
           case "ClientProtocolError": {
             if (message.requestIds === undefined) {
-              routed.pending.clear();
+              pending.clear();
             } else {
               for (const requestId of message.requestIds) {
-                routed.pending.delete(requestId);
+                pending.delete(requestId);
               }
             }
             return writeResponse(message);
@@ -239,6 +266,7 @@ const makeProtocolHttpBatch = (
           }
         }
       };
+    };
 
     /**
      * The frame's own body in bytes, the unit the ceiling is written in.
@@ -276,9 +304,23 @@ const makeProtocolHttpBatch = (
       // promises: the client's writer lives as long as the client does.
       run: (clientId, writeResponse) =>
         Effect.raceAll([
-          batched.protocol.run(clientId, writerFor(batched, writeResponse)),
-          alone.protocol.run(clientId, writerFor(alone, writeResponse)),
-        ]),
+          batched.protocol.run(
+            clientId,
+            writerFor(batched, clientId, writeResponse)
+          ),
+          alone.protocol.run(
+            clientId,
+            writerFor(alone, clientId, writeResponse)
+          ),
+        ]).pipe(
+          // A client's tracker lives exactly as long as that client's run.
+          Effect.ensuring(
+            Effect.sync(() => {
+              batched.pending.delete(clientId);
+              alone.pending.delete(clientId);
+            })
+          )
+        ),
       send: (clientId, request, transferables) =>
         Effect.flatMap(protocolFor(request), (routed) => {
           if (request._tag !== "Request") {
@@ -288,13 +330,12 @@ const makeProtocolHttpBatch = (
           // during `send` still has its request in the set the writer scopes a
           // defect to, and released when `send` ends — including when an
           // interrupted caller ends it early, which no frame will report.
-          routed.pending.add(request.id);
+          const pending = pendingFor(routed, clientId);
+          pending.add(request.id);
           return routed.protocol
             .send(clientId, request, transferables)
             .pipe(
-              Effect.ensuring(
-                Effect.sync(() => routed.pending.delete(request.id))
-              )
+              Effect.ensuring(Effect.sync(() => pending.delete(request.id)))
             );
         }),
       supportsAck: batched.protocol.supportsAck,
