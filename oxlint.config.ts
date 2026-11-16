@@ -82,6 +82,14 @@ export default defineConfig({
 
   jsPlugins: [
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
+    {
+      name: "anti-slop-effect",
+      specifier: "./tools/oxlint/anti-slop/effect/index.ts",
+    },
+    {
+      name: "anti-slop-martinfowler",
+      specifier: "./tools/oxlint/anti-slop/martinfowler/index.ts",
+    },
     { name: "effect-tests", specifier: "./tools/oxlint/effect-tests/index.ts" },
     { name: "react-doctor", specifier: "oxlint-plugin-react-doctor" },
   ],
@@ -310,14 +318,26 @@ export default defineConfig({
     // schema that silently lost its fields — fails the gate.
     "typescript/no-generated-empty-object-type": "error",
 
-    // anti-slop
+    // anti-slop, vendored at `tools/oxlint/anti-slop` from
+    // github.com/k-mistele/anti-slop (see its `UPSTREAM.md`). These reject the
+    // low-evidence TypeScript that is easy to write and hard to review: an `as`
+    // with no stated invariant, an `unknown` leaking out of a boundary, a
+    // conditional spread that hides which fields are present. `error` rather
+    // than `warn` because each diagnostic names the fix, so the shape of the
+    // tree is a decision instead of a preference.
+    "oxc/no-accumulating-spread": "error",
+    "anti-slop/max-ternary-depth": ["error", { maxDepth: 2 }],
+    "anti-slop/no-array-filter-map": "error",
     "anti-slop/no-chained-type-assertions": "error",
-    "anti-slop/no-conditional-empty-object-spread": "error",
+    "anti-slop/no-conditional-spread": "error",
+    "anti-slop/no-disabled-type-assertion-rules": "error",
     "anti-slop/no-known-value-widening": "error",
     "anti-slop/no-module-mocking": "error",
     "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reduce-accumulator-copy": "error",
     "anti-slop/no-reflect-apply": "error",
     "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-reprovide-ambient-service": "error",
     "anti-slop/no-runtime-typeof": "error",
     "anti-slop/no-shape-in-symbol-names": "error",
     "anti-slop/no-unknown-parameters": "error",
@@ -325,7 +345,38 @@ export default defineConfig({
     "anti-slop/no-unknown-type-aliases": "error",
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-readable-spacing": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
+
+    // The Effect half of the same plugin. They encode the service and Layer
+    // rules this repo already follows by convention — a tagged error is
+    // matched by tag, a mapping keeps its cause, a service is built by `make`
+    // and advertised by one layer, and every operation is traced — so a new
+    // exception is a finding instead of a review comment.
+    "anti-slop-effect/no-manual-effect-error-tag": "error",
+    "anti-slop-effect/no-manual-tag-comparison": "error",
+    "anti-slop-effect/no-manual-tagged-construction": "error",
+    "anti-slop-effect/no-manual-tagged-type": "error",
+    "anti-slop-effect/no-ordie-in-service-construction": "error",
+    "anti-slop-effect/no-service-constructor-imports": "error",
+    "anti-slop-effect/no-service-parameters": "error",
+    "anti-slop-effect/no-test-code-in-src": "error",
+    "anti-slop-effect/prefer-effect-match": "error",
+    "anti-slop-effect/prefer-tagged-error-handling": "error",
+    "anti-slop-effect/prefer-yield-service": "error",
+    "anti-slop-effect/require-cause-when-narrowing": "error",
+    "anti-slop-effect/require-operation-span": "error",
+    "anti-slop-effect/require-service-make-layer": "error",
+
+    // Martin Fowler's code smells from *Refactoring*. They are prompts to look
+    // at a function, not defects on their own, so they warn.
+    "anti-slop-martinfowler/global-data": "warn",
+    "anti-slop-martinfowler/long-function": "warn",
+    "anti-slop-martinfowler/long-parameter-list": "warn",
+    "anti-slop-martinfowler/loops": "warn",
+    "anti-slop-martinfowler/mutable-data": "warn",
+    "anti-slop-martinfowler/mysterious-name": "warn",
+    "anti-slop-martinfowler/repeated-switches": "warn",
   },
 
   // Architecture boundary: client-side packages consume domain schemas, never
@@ -397,6 +448,19 @@ export default defineConfig({
       ],
       rules: {
         "typescript/no-generated-empty-object-type": "off",
+      },
+    },
+    {
+      // Colocated tests are the shape of every module in this tree: a
+      // `packages/domain/src/<entity>/handlers.test.ts` sits beside the layer it
+      // covers, which is what AGENTS.md's "follow the shape of a neighbouring
+      // module" asks for. The rule wants a separate `test/` tree, so its
+      // file-location half cannot apply; the valuable half (a production module
+      // exporting test-only helpers such as `layerTest`) stays `error` for
+      // every other file.
+      files: ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"],
+      rules: {
+        "anti-slop-effect/no-test-code-in-src": "off",
       },
     },
     {
