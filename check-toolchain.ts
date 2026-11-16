@@ -119,14 +119,23 @@ const readManifests = (): ReadonlyArray<Manifest> => {
     .split("\0")
     .filter(Boolean);
 
-  return tracked
-    .filter((file) => file === "package.json" || file.endsWith("/package.json"))
-    .map((file) => ({
-      file,
-      // SAFETY: package.json is JSON by definition. Only the dependency maps
-      // above are read, and a field of any other shape reads as absent.
-      json: JSON.parse(source(file)) as ManifestJson,
-    }));
+  return (
+    tracked
+      .filter(
+        (file) => file === "package.json" || file.endsWith("/package.json")
+      )
+      // Installed agent skills carry their own `package.json` — the anti-slop
+      // installer ships a copy of the plugin it vendors, with upstream's peer
+      // ranges — and none of them is a workspace package. Their versions are the
+      // skill's business, not the train this file guards.
+      .filter((file) => !file.startsWith(".agents/"))
+      .map((file) => ({
+        file,
+        // SAFETY: package.json is JSON by definition. Only the dependency maps
+        // above are read, and a field of any other shape reads as absent.
+        json: JSON.parse(source(file)) as ManifestJson,
+      }))
+  );
 };
 
 const dependencies = (
