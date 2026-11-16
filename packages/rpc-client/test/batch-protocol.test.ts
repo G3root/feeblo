@@ -111,7 +111,8 @@ const answerOf = (
  * matched by `requestId` rather than by position.
  */
 const answeringClient = (
-  posts: Ref.Ref<ReadonlyArray<string>>
+  posts: Ref.Ref<ReadonlyArray<string>>,
+  urls?: Ref.Ref<ReadonlyArray<string>>
 ): Layer.Layer<
   HttpClient.HttpClient,
   never,
@@ -125,6 +126,9 @@ const answeringClient = (
         Effect.gen(function* () {
           const body = bodyOf(request);
           yield* Ref.update(posts, (all) => [...all, body]);
+          if (urls !== undefined) {
+            yield* Ref.update(urls, (all) => [...all, request.url]);
+          }
           const answers = yield* Effect.forEach(
             framesIn(body).toReversed(),
             (frame) =>
@@ -415,7 +419,10 @@ describe("batched RPC protocol", () => {
   it.live("posts calls that start together as one request", () =>
     Effect.gen(function* () {
       const posts = yield* Ref.make<ReadonlyArray<string>>([]);
-      const context = yield* Layer.build(testLayer(answeringClient(posts)));
+      const urls = yield* Ref.make<ReadonlyArray<string>>([]);
+      const context = yield* Layer.build(
+        testLayer(answeringClient(posts, urls))
+      );
 
       const results = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
@@ -438,6 +445,10 @@ describe("batched RPC protocol", () => {
         "Echo",
         "Add",
       ]);
+
+      // The layer prepends its configured URL to every request it posts; the
+      // protocol posts to the empty path, which resolves against it.
+      expect(yield* Ref.get(urls)).toEqual(["http://rpc.test/rpc/"]);
     })
   );
 
