@@ -53,6 +53,17 @@ A flip is an `UPDATE` of the same row. Flipping to helpful clears `reason`, beca
 
 **Portal routes.** `/s/help` and `/s/help/articles/$articleSlug`, which render the stored Markdown, offer "Copy as Markdown", fire the view beacon, and collect the verdict.
 
+## Rollout
+
+The feature ships behind `HELP_CENTER` in `packages/domain/src/feature-flags.ts`, default **off**. Unlike the audit log — where only the recorder is gated, since a read of an empty table is harmless — every operation is gated, because a read is as much a launch as a write when the tables are new and empty.
+
+- `help-center/flag.ts` exposes `HelpCenterEnabled`, a `Context.Reference` defaulting to the flag. Tests provide `true`; production reads the default.
+- `helpCenterFeatureGate` is a **public** policy (the portal has no session to check) that fails with `PolicyDeniedError`, which every operation already declares — so the flag adds no new error vocabulary at the RPC boundary. It is applied **last** in each handler's pipe, which makes it the outermost check: a deployment with the feature off refuses before it reads a row or spends a rate-limit token.
+- The raw-event retention loop is forked only when the flag is on, matching the audit sweep: with the feature off nothing writes a read event, so a daily pass would only wake the worker to delete nothing.
+- Every surface asks the same flag: the dashboard nav entry, the mobile tab, the settings section, the three dashboard routes and the settings route (an "unavailable" state for a deep link, not a 404), the portal pages, the portal nav tab, `sitemap.xml`, `llms.txt`, and the article page's SSR metadata.
+
+Turning it on is therefore a single-line change with no migration: no article can exist while the gate is closed, so `site.help_center_visibility` defaulting to `PUBLIC` cannot publish anything on the day the flag flips.
+
 ## Plan
 
 `helpCenterArticles` is a `LimitFeatureKey`: free is **25**, Starter and Professional are `null` (uncapped). The feature is on every plan; the paid tiers remove the ceiling. Sections are not counted — a workspace at its article ceiling can still reorganise what it has.

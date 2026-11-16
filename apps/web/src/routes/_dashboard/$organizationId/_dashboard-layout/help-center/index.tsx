@@ -1,6 +1,8 @@
+import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { HelpCenterIndex } from "~/features/help-center/components/help-center-index";
+import { HelpCenterUnavailable } from "~/features/help-center/components/help-center-unavailable";
 import { preloadHelpCenter } from "~/lib/preloads";
 
 export const Route = createFileRoute(

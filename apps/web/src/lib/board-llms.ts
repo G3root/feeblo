@@ -1,5 +1,6 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { THelpCenterArticlePublicSummary } from "@feeblo/domain/help-center-article/schema";
 import type { TPostListItem } from "@feeblo/domain/post/schema";
 import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
@@ -93,7 +94,8 @@ export function renderBoardLlmsTxt(
     "",
     `- Home: ${origin}/`,
     `- Every public page: ${origin}/sitemap.xml`,
-    ...(site.helpCenterVisibility === "PUBLIC"
+    ...(isFeatureEnabled("HELP_CENTER") &&
+    site.helpCenterVisibility === "PUBLIC"
       ? [`- Help center: ${origin}/help`]
       : []),
     ...(site.changelogVisibility === "PUBLIC"
@@ -144,6 +146,7 @@ export function renderBoardLlmsTxt(
   }
 
   if (
+    isFeatureEnabled("HELP_CENTER") &&
     site.helpCenterVisibility === "PUBLIC" &&
     content.helpArticles.length > 0
   ) {

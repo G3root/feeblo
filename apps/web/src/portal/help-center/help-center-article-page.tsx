@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Button } from "@feeblo/ui/button";
 import { CopyButton } from "@feeblo/ui/copy-button";
@@ -51,8 +52,10 @@ export function HelpCenterArticlePage({
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
   const [showReason, setShowReason] = useState(false);
+  const enabled = isFeatureEnabled("HELP_CENTER");
 
   const articleQuery = useQuery({
+    enabled,
     queryKey: ["portal-help-center-article", organizationId, articleSlug],
     queryFn: () =>
       fetchRpc((rpc) =>
@@ -72,7 +75,7 @@ export function HelpCenterArticlePage({
       articleId,
       visitorId,
     ],
-    enabled: articleId !== undefined,
+    enabled: enabled && articleId !== undefined,
     queryFn: () =>
       fetchRpc((rpc) =>
         rpc.GetHelpCenterArticleFeedbackPublic({
@@ -105,6 +108,17 @@ export function HelpCenterArticlePage({
       }
     },
   });
+
+  if (!enabled) {
+    return (
+      <Empty className="py-16">
+        <EmptyHeader>
+          <EmptyTitle>Not found</EmptyTitle>
+          <EmptyDescription>This page is not available.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
 
   if (articleQuery.isError) {
     return (
@@ -318,7 +332,7 @@ function useViewBeacon({
   visitorId: string | undefined;
 }) {
   useEffect(() => {
-    if (articleId === undefined) {
+    if (!isFeatureEnabled("HELP_CENTER") || articleId === undefined) {
       return;
     }
 

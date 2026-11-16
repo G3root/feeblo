@@ -15,6 +15,7 @@ import * as Option from "effect/Option";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterArticleRepository } from "../help-center-article/repository";
+import { HelpCenterEnabled } from "../help-center/flag";
 import {
   CurrentSession,
   OptionalCurrentSession,
@@ -150,11 +151,14 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
     Layer.provide(Repositories)
   );
 
+  // The flag is on for these suites: they exercise the feature, and a separate
+  // case below proves the gate refuses when it is off.
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
     Policies,
-    Database.PgliteDatabaseLive
+    Database.PgliteDatabaseLive,
+    Layer.succeed(HelpCenterEnabled, true)
   );
 
   /** The stored verdict rows for one article. */
@@ -389,6 +393,28 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
             })
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture, false))
+            )
+        );
+
+        expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("refuses the portal read while the flag is off", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+
+        const error = yield* Effect.flip(
+          handlers
+            .GetHelpCenterArticleFeedbackPublic({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              visitorId: visitorIdFor(fixture),
+            })
+            .pipe(
+              Effect.provideService(OptionalCurrentSession, Option.none()),
+              Effect.provideService(HelpCenterEnabled, false)
             )
         );
 

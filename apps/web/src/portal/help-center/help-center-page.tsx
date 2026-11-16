@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Badge } from "@feeblo/ui/badge";
 import {
@@ -23,18 +24,32 @@ import { Link } from "@tanstack/react-router";
 export function HelpCenterPage() {
   const site = useSite();
   const organizationId = site.organizationId;
+  const enabled = isFeatureEnabled("HELP_CENTER");
 
   const topicsQuery = useQuery({
+    enabled,
     queryKey: ["portal-help-center-topics", organizationId],
     queryFn: () =>
       fetchRpc((rpc) => rpc.ListHelpCenterTopicsPublic({ organizationId })),
   });
 
   const articlesQuery = useQuery({
+    enabled,
     queryKey: ["portal-help-center-articles", organizationId],
     queryFn: () =>
       fetchRpc((rpc) => rpc.ListHelpCenterArticlesPublic({ organizationId })),
   });
+
+  if (!enabled) {
+    return (
+      <Empty className="py-16">
+        <EmptyHeader>
+          <EmptyTitle>Not found</EmptyTitle>
+          <EmptyDescription>This page is not available.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
 
   if (topicsQuery.isPending || articlesQuery.isPending) {
     return (

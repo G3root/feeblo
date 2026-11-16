@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { EntitlementPolicy } from "../entitlement/policies";
+import { helpCenterFeatureGate } from "../help-center/flag";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
@@ -57,7 +58,8 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
         .findMany(args)
         .pipe(
           Policy.withPolicy(Policy.hasMembership(args.organizationId)),
-          withRemapDbErrors("HelpCenterTopic", "select")
+          withRemapDbErrors("HelpCenterTopic", "select"),
+          Policy.withPublicPolicy(helpCenterFeatureGate)
         ),
 
     ListHelpCenterTopicsPublic: (args: THelpCenterTopicList) =>
@@ -69,7 +71,8 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPublicPolicy(
           sitePolicy.canViewHelpCenter(args.organizationId)
         ),
-        withRemapDbErrors("HelpCenterTopic", "select")
+        withRemapDbErrors("HelpCenterTopic", "select"),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
       ),
 
     CreateHelpCenterTopic: (args: THelpCenterTopicCreate) =>
@@ -90,7 +93,8 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
           entity: "HelpCenterTopic",
           onUniqueViolation: () =>
             new HelpCenterTopicSlugTakenError({ slug: args.slug ?? args.name }),
-        })
+        }),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
       ),
 
     UpdateHelpCenterTopic: (args: THelpCenterTopicUpdate) =>
@@ -104,7 +108,8 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
           entity: "HelpCenterTopic",
           onUniqueViolation: () =>
             new HelpCenterTopicSlugTakenError({ slug: args.slug }),
-        })
+        }),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
       ),
 
     DeleteHelpCenterTopic: (args: THelpCenterTopicDelete) =>
@@ -135,7 +140,8 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
         yield* repository.remove(args);
       }).pipe(
         Policy.withPolicy(topicPolicy.canDelete(args.organizationId)),
-        withRemapDbErrors("HelpCenterTopic", "delete")
+        withRemapDbErrors("HelpCenterTopic", "delete"),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
       ),
 
     ReorderHelpCenterTopics: (args: THelpCenterTopicReorder) =>
@@ -155,7 +161,8 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
         yield* repository.setOrder(args);
       }).pipe(
         Policy.withPolicy(topicPolicy.canReorder(args.organizationId)),
-        withRemapDbErrors("HelpCenterTopic", "update")
+        withRemapDbErrors("HelpCenterTopic", "update"),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
       ),
   };
 });

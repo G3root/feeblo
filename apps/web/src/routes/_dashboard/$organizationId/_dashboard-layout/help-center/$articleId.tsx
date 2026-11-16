@@ -4,10 +4,12 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { HelpCenterArticleEditor } from "~/features/help-center/components/help-center-article-editor";
+import { HelpCenterUnavailable } from "~/features/help-center/components/help-center-unavailable";
 import { preloadHelpCenterEditor } from "~/lib/preloads";
 import { fetchRpc } from "~/lib/runtime";
 
@@ -32,14 +34,22 @@ export const Route = createFileRoute(
  */
 function RouteComponent() {
   const { organizationId, articleId } = Route.useParams();
+  const enabled = useFeatureFlag("HELP_CENTER");
 
   const articleQuery = useQuery({
+    // Disabled while the feature is off, so a deep link does not fire a request
+    // the server would refuse anyway.
+    enabled,
     queryKey: ["help-center-article", organizationId, articleId],
     queryFn: () =>
       fetchRpc((rpc) =>
         rpc.GetHelpCenterArticle({ organizationId, id: articleId })
       ),
   });
+
+  if (!enabled) {
+    return <HelpCenterUnavailable />;
+  }
 
   if (articleQuery.isError) {
     return (

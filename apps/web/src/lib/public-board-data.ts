@@ -1,4 +1,5 @@
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TSite } from "@feeblo/domain/site/schema";
@@ -129,7 +130,10 @@ async function resolvePageContent(
     }
 
     if (helpArticleMatch) {
-      if (site.helpCenterVisibility !== "PUBLIC") {
+      if (
+        !isFeatureEnabled("HELP_CENTER") ||
+        site.helpCenterVisibility !== "PUBLIC"
+      ) {
         // The article is only reachable through a hidden help center.
         return { kind: "not-found" };
       }

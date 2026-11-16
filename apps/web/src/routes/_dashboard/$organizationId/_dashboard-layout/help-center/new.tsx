@@ -1,6 +1,8 @@
+import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { HelpCenterArticleEditor } from "~/features/help-center/components/help-center-article-editor";
+import { HelpCenterUnavailable } from "~/features/help-center/components/help-center-unavailable";
 import { preloadHelpCenterEditor } from "~/lib/preloads";
 
 export const Route = createFileRoute(
@@ -16,6 +18,10 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId } = Route.useParams();
+
+  if (!useFeatureFlag("HELP_CENTER")) {
+    return <HelpCenterUnavailable />;
+  }
 
   return <HelpCenterArticleEditor organizationId={organizationId} />;
 }

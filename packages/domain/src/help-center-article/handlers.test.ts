@@ -13,6 +13,7 @@ import * as Layer from "effect/Layer";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
+import { HelpCenterEnabled } from "../help-center/flag";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -150,11 +151,14 @@ describe("HelpCenterArticleRpcHandlers", () => {
     SitePolicy.layer
   ).pipe(Layer.provide(Entitlements), Layer.provide(Repositories));
 
+  // The flag is on for these suites: they exercise the feature, and a separate
+  // case below proves the gate refuses when it is off.
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
     Policies,
-    Database.PgliteDatabaseLive
+    Database.PgliteDatabaseLive,
+    Layer.succeed(HelpCenterEnabled, true)
   );
 
   /**
@@ -512,6 +516,24 @@ describe("HelpCenterArticleRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, session));
 
         expect(article.viewCount).toBe(0);
+      })
+    );
+
+    it.effect("refuses every operation while the flag is off", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+
+        const error = yield* Effect.flip(
+          handlers
+            .ListHelpCenterArticles({ organizationId: fixture.organizationId })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(HelpCenterEnabled, false)
+            )
+        );
+
+        expect(error._tag).toBe("PolicyDenied");
       })
     );
   });
