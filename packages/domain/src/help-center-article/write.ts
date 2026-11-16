@@ -56,11 +56,13 @@ export const normalizeArticleWrite = (args: {
 }) =>
   Effect.gen(function* () {
     const title = args.title.trim();
+
     if (title.length === 0) {
       return yield* fail("title must not be empty.");
     }
 
     const slug = slugify((args.slug ?? "").trim() || title);
+
     if (slug.length === 0) {
       return yield* fail("slug must contain at least one letter or number.");
     }

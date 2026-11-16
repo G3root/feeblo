@@ -58,6 +58,7 @@ import { Route as DashboardOrganizationIdSettingsCustomAttributesRouteImport } f
 import { Route as DashboardOrganizationIdSettingsCustomizeRouteImport } from "./routes/_dashboard/$organizationId/settings/customize"
 import { Route as DashboardOrganizationIdSettingsDevelopersRouteImport } from "./routes/_dashboard/$organizationId/settings/developers"
 import { Route as DashboardOrganizationIdSettingsFeedbackTagsRouteImport } from "./routes/_dashboard/$organizationId/settings/feedback-tags"
+import { Route as DashboardOrganizationIdSettingsHelpCenterPrivacyRouteImport } from "./routes/_dashboard/$organizationId/settings/help-center-privacy"
 import { Route as DashboardOrganizationIdSettingsMembersRouteImport } from "./routes/_dashboard/$organizationId/settings/members"
 import { Route as DashboardOrganizationIdSettingsNotificationsRouteImport } from "./routes/_dashboard/$organizationId/settings/notifications"
 import { Route as DashboardOrganizationIdSettingsPreferencesRouteImport } from "./routes/_dashboard/$organizationId/settings/preferences"
@@ -356,6 +357,12 @@ const DashboardOrganizationIdSettingsFeedbackTagsRoute =
     path: "/feedback-tags",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
+const DashboardOrganizationIdSettingsHelpCenterPrivacyRoute =
+  DashboardOrganizationIdSettingsHelpCenterPrivacyRouteImport.update({
+    id: "/help-center-privacy",
+    path: "/help-center-privacy",
+    getParentRoute: () => DashboardOrganizationIdSettingsRoute,
+  } as any)
 const DashboardOrganizationIdSettingsMembersRoute =
   DashboardOrganizationIdSettingsMembersRouteImport.update({
     id: "/members",
@@ -651,6 +658,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/settings/customize": typeof DashboardOrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
+  "/$organizationId/settings/help-center-privacy": typeof DashboardOrganizationIdSettingsHelpCenterPrivacyRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -738,6 +746,7 @@ export interface FileRoutesByTo {
   "/$organizationId/settings/customize": typeof DashboardOrganizationIdSettingsCustomizeRoute
   "/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
+  "/$organizationId/settings/help-center-privacy": typeof DashboardOrganizationIdSettingsHelpCenterPrivacyRoute
   "/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
   "/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -829,6 +838,7 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/settings/customize": typeof DashboardOrganizationIdSettingsCustomizeRoute
   "/_dashboard/$organizationId/settings/developers": typeof DashboardOrganizationIdSettingsDevelopersRoute
   "/_dashboard/$organizationId/settings/feedback-tags": typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
+  "/_dashboard/$organizationId/settings/help-center-privacy": typeof DashboardOrganizationIdSettingsHelpCenterPrivacyRoute
   "/_dashboard/$organizationId/settings/members": typeof DashboardOrganizationIdSettingsMembersRoute
   "/_dashboard/$organizationId/settings/notifications": typeof DashboardOrganizationIdSettingsNotificationsRoute
   "/_dashboard/$organizationId/settings/preferences": typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -920,6 +930,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/customize"
     | "/$organizationId/settings/developers"
     | "/$organizationId/settings/feedback-tags"
+    | "/$organizationId/settings/help-center-privacy"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/notifications"
     | "/$organizationId/settings/preferences"
@@ -1007,6 +1018,7 @@ export interface FileRouteTypes {
     | "/$organizationId/settings/customize"
     | "/$organizationId/settings/developers"
     | "/$organizationId/settings/feedback-tags"
+    | "/$organizationId/settings/help-center-privacy"
     | "/$organizationId/settings/members"
     | "/$organizationId/settings/notifications"
     | "/$organizationId/settings/preferences"
@@ -1097,6 +1109,7 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/settings/customize"
     | "/_dashboard/$organizationId/settings/developers"
     | "/_dashboard/$organizationId/settings/feedback-tags"
+    | "/_dashboard/$organizationId/settings/help-center-privacy"
     | "/_dashboard/$organizationId/settings/members"
     | "/_dashboard/$organizationId/settings/notifications"
     | "/_dashboard/$organizationId/settings/preferences"
@@ -1499,6 +1512,13 @@ declare module "@tanstack/react-router" {
       path: "/feedback-tags"
       fullPath: "/$organizationId/settings/feedback-tags"
       preLoaderRoute: typeof DashboardOrganizationIdSettingsFeedbackTagsRouteImport
+      parentRoute: typeof DashboardOrganizationIdSettingsRoute
+    }
+    "/_dashboard/$organizationId/settings/help-center-privacy": {
+      id: "/_dashboard/$organizationId/settings/help-center-privacy"
+      path: "/help-center-privacy"
+      fullPath: "/$organizationId/settings/help-center-privacy"
+      preLoaderRoute: typeof DashboardOrganizationIdSettingsHelpCenterPrivacyRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
     "/_dashboard/$organizationId/settings/members": {
@@ -1927,6 +1947,7 @@ interface DashboardOrganizationIdSettingsRouteChildren {
   DashboardOrganizationIdSettingsCustomizeRoute: typeof DashboardOrganizationIdSettingsCustomizeRoute
   DashboardOrganizationIdSettingsDevelopersRoute: typeof DashboardOrganizationIdSettingsDevelopersRoute
   DashboardOrganizationIdSettingsFeedbackTagsRoute: typeof DashboardOrganizationIdSettingsFeedbackTagsRoute
+  DashboardOrganizationIdSettingsHelpCenterPrivacyRoute: typeof DashboardOrganizationIdSettingsHelpCenterPrivacyRoute
   DashboardOrganizationIdSettingsMembersRoute: typeof DashboardOrganizationIdSettingsMembersRoute
   DashboardOrganizationIdSettingsNotificationsRoute: typeof DashboardOrganizationIdSettingsNotificationsRoute
   DashboardOrganizationIdSettingsPreferencesRoute: typeof DashboardOrganizationIdSettingsPreferencesRoute
@@ -1963,6 +1984,8 @@ const DashboardOrganizationIdSettingsRouteChildren: DashboardOrganizationIdSetti
       DashboardOrganizationIdSettingsDevelopersRoute,
     DashboardOrganizationIdSettingsFeedbackTagsRoute:
       DashboardOrganizationIdSettingsFeedbackTagsRoute,
+    DashboardOrganizationIdSettingsHelpCenterPrivacyRoute:
+      DashboardOrganizationIdSettingsHelpCenterPrivacyRoute,
     DashboardOrganizationIdSettingsMembersRoute:
       DashboardOrganizationIdSettingsMembersRoute,
     DashboardOrganizationIdSettingsNotificationsRoute:

@@ -16,5 +16,6 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId } = Route.useParams();
+
   return <HelpCenterIndex organizationId={organizationId} />;
 }

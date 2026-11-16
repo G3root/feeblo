@@ -74,6 +74,7 @@ export function HelpCenterTopicDialog({
   // edited rather than reset by an effect that would also clobber typing.
   const [seededFor, setSeededFor] = useState<string | null>(null);
   const seedKey = topic?.id ?? "new";
+
   if (open && seededFor !== seedKey) {
     setSeededFor(seedKey);
     setDraft(
@@ -88,19 +89,23 @@ export function HelpCenterTopicDialog({
         : emptyDraft()
     );
   }
+
   if (!open && seededFor !== null) {
     setSeededFor(null);
   }
 
   const submit = async () => {
     const name = draft.name.trim();
+
     if (name.length === 0) {
       setError("A section needs a name.");
+
       return;
     }
 
     setPending(true);
     setError(null);
+
     try {
       const description =
         draft.description.trim().length === 0 ? null : draft.description.trim();

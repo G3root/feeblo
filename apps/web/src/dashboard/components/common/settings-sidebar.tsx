@@ -176,6 +176,17 @@ const settingsItems = [
       },
     ],
   },
+  {
+    group: "Help center",
+    subItems: [
+      {
+        label: "Privacy",
+        icon: Shield01Icon,
+        permission: "site.update" as const,
+        to: "/$organizationId/settings/help-center-privacy" as const,
+      },
+    ],
+  },
 ];
 
 export function SettingsSidebar({

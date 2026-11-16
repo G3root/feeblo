@@ -2,7 +2,7 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "8b6da222-4862-4141-bc65-129f0397f916",
+  "id": "0232ecf1-4ea1-4e4c-8943-f7ed7397b886",
   "prevIds": [
     "a3d9fbeb-985c-4b84-a575-fe8ccc2c0874"
   ],
@@ -2156,7 +2156,7 @@
         "schema": "public",
         "table": "help_center_article_feedback",
         "name": "help_center_article_feedback_reason_chk",
-        "value": "\"helpful\" or \"reason\" is null",
+        "value": "not \"helpful\" or \"reason\" is null",
         "entityType": "checks"
       }
     },

@@ -60,6 +60,17 @@ export function changelogJsonLd(input: JsonLdArticleInput): JsonLdNode {
   return articleJsonLd(input, "Article");
 }
 
+/**
+ * A `TechArticle` node for a help center article.
+ *
+ * The subtype is the difference that matters to a crawler: documentation is
+ * reference material a reader consults while doing something, not a post in a
+ * feed, and `TechArticle` is what schema.org has for exactly that.
+ */
+export function helpArticleJsonLd(input: JsonLdArticleInput): JsonLdNode {
+  return articleJsonLd(input, "TechArticle");
+}
+
 function articleJsonLd(
   {
     headline,
@@ -69,7 +80,7 @@ function articleJsonLd(
     dateModified,
     authorName,
   }: JsonLdArticleInput,
-  type: "Article" | "SocialMediaPosting"
+  type: "Article" | "SocialMediaPosting" | "TechArticle"
 ): JsonLdNode {
   const base: JsonLdNode = {
     "@context": "https://schema.org",

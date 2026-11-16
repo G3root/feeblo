@@ -57,6 +57,7 @@ function RouteComponent() {
   }
 
   const article = articleQuery.data;
+
   if (article === undefined) {
     return (
       <Empty>

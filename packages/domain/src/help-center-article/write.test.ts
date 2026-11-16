@@ -4,7 +4,9 @@ import * as Effect from "effect/Effect";
 import { normalizeArticleWrite } from "./write";
 
 const now = new Date("2026-01-01T00:00:00.000Z");
+
 const earlier = new Date("2025-06-01T00:00:00.000Z");
+
 const explicit = new Date("2025-09-09T00:00:00.000Z");
 
 const write = (overrides: {

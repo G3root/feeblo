@@ -202,6 +202,12 @@
     "./help-center-article/machine": {
       "default": "./src/help-center-article/machine.ts"
     },
+    "./help-center-article/repository": {
+      "default": "./src/help-center-article/repository.ts"
+    },
+    "./help-center-article/retention": {
+      "default": "./src/help-center-article/retention.ts"
+    },
     "./help-center-article/schema": {
       "default": "./src/help-center-article/schema.ts"
     },

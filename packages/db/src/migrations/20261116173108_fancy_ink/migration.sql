@@ -10,7 +10,7 @@ CREATE TABLE "help_center_article_feedback" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "help_center_article_feedback_identity_chk" CHECK (("user_id" is not null) <> ("visitor_id" is not null)),
-	CONSTRAINT "help_center_article_feedback_reason_chk" CHECK ("helpful" or "reason" is null)
+	CONSTRAINT "help_center_article_feedback_reason_chk" CHECK (not "helpful" or "reason" is null)
 );
 --> statement-breakpoint
 CREATE TABLE "help_center_article" (

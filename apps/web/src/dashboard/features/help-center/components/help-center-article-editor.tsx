@@ -55,6 +55,7 @@ export function HelpCenterArticleEditor({
 }) {
   const { helpCenterArticleCollection, helpCenterTopicCollection } =
     useDashboardCollections();
+
   const navigate = useNavigate();
 
   const topicsQuery = useLiveQuery({
@@ -70,17 +71,21 @@ export function HelpCenterArticleEditor({
         .orderBy(({ topic }) => topic.position, "asc")
         .orderBy(({ topic }) => topic.name, "asc"),
   });
+
   const topics = topicsQuery.data ?? [];
 
   const [title, setTitle] = useState(article?.title ?? "");
   const [slug, setSlug] = useState(article?.slug ?? "");
   const [content, setContent] = useState(article?.content ?? "");
+
   const [topicId, setTopicId] = useState(
     article?.topicId ?? defaultTopicId ?? ""
   );
+
   const [status, setStatus] = useState<ArticleStatus>(
     isArticleStatus(article?.status) ? article.status : "draft"
   );
+
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,17 +93,22 @@ export function HelpCenterArticleEditor({
 
   const save = async () => {
     const trimmedTitle = title.trim();
+
     if (trimmedTitle.length === 0) {
       setError("An article needs a title.");
+
       return;
     }
+
     if (topicId.length === 0) {
       setError("Choose a section for this article.");
+
       return;
     }
 
     setPending(true);
     setError(null);
+
     try {
       if (article === undefined) {
         const id = await HelpCenterArticleId.unsafeGenerate();
@@ -124,6 +134,7 @@ export function HelpCenterArticleEditor({
           params: { organizationId },
           to: "/$organizationId/help-center",
         });
+
         return;
       }
 
@@ -162,7 +173,9 @@ export function HelpCenterArticleEditor({
     if (article === undefined) {
       return;
     }
+
     setPending(true);
+
     try {
       helpCenterArticleCollection.delete(article.id);
       await navigate({

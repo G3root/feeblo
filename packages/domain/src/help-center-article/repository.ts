@@ -1,6 +1,6 @@
 import { currentDb, schema, withTransactionAbortRetry } from "@feeblo/db";
 import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-center-article";
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -13,9 +13,13 @@ import {
 import type { NormalizedHelpCenterArticleWrite } from "./write";
 
 const article = schema.helpCenterArticleTable;
+
 const topic = schema.helpCenterTopicTable;
+
 const viewTotal = schema.helpCenterArticleViewTotalTable;
+
 const viewEvent = schema.helpCenterArticleViewEventTable;
+
 const feedback = schema.helpCenterArticleFeedbackTable;
 
 const articleColumns = {
@@ -328,6 +332,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
   }) =>
     Effect.gen(function* () {
       const now = yield* DateTime.nowAsDate;
+
       const accepted = yield* db
         .transaction(() =>
           Effect.gen(function* () {
@@ -377,7 +382,18 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
       return { accepted };
     });
 
+  /**
+   * Drop the raw events older than `before`.
+   *
+   * The counter is untouched: it is the all-time number and outlives the
+   * events by design. Only the windowed reads lose history, which is the
+   * whole reason the two tables exist separately.
+   */
+  const deleteEventsBefore = (before: Date) =>
+    db.delete(viewEvent).where(lt(viewEvent.occurredAt, before));
+
   return {
+    deleteEventsBefore,
     findMany,
     findManyPublic,
     findById,

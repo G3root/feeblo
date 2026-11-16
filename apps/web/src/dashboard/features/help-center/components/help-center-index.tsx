@@ -64,6 +64,7 @@ export function HelpCenterIndex({
 }) {
   const { helpCenterTopicCollection, helpCenterArticleCollection } =
     useDashboardCollections();
+
   const { allowed: canManage } = usePolicy(
     hasPermission(organizationId, "helpCenterArticles.*")
   );
@@ -116,8 +117,10 @@ export function HelpCenterIndex({
   const isLoading = topicsQuery.isLoading || articlesQuery.isLoading;
 
   const articlesByTopic = new Map<string, typeof articles>();
+
   for (const article of articles) {
     const bucket = articlesByTopic.get(article.topicId);
+
     if (bucket === undefined) {
       articlesByTopic.set(article.topicId, [article]);
     } else {
@@ -335,6 +338,7 @@ function TopicCard({
         <ul className="divide-y">
           {articles.map((article) => {
             const votes = article.helpfulCount + article.notHelpfulCount;
+
             return (
               <li key={article.id}>
                 <Link
@@ -391,5 +395,6 @@ function formatCount(value: number): string {
   if (value < 1000) {
     return String(value);
   }
+
   return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)}k`;
 }

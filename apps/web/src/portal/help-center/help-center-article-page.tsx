@@ -24,6 +24,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 const VISITOR_KEY = "feeblo_help_visitor_id";
+
 const VIEWED_PREFIX = "feeblo_help_viewed:";
 
 /**
@@ -98,6 +99,7 @@ export function HelpCenterArticlePage({
         ["portal-help-center-feedback", organizationId, articleId, visitorId],
         tally
       );
+
       if (tally.mine === true) {
         setShowReason(false);
       }
@@ -284,10 +286,13 @@ function useVisitorId(): string | undefined {
 
   useEffect(() => {
     const existing = window.localStorage.getItem(VISITOR_KEY);
+
     if (existing !== null) {
       setVisitorId(existing);
+
       return;
     }
+
     const generated = crypto.randomUUID();
     window.localStorage.setItem(VISITOR_KEY, generated);
     setVisitorId(generated);
@@ -318,9 +323,11 @@ function useViewBeacon({
     }
 
     const key = `${VIEWED_PREFIX}${articleId}`;
+
     if (window.sessionStorage.getItem(key) !== null) {
       return;
     }
+
     window.sessionStorage.setItem(key, "1");
 
     void fetchRpc((rpc) =>
@@ -338,6 +345,7 @@ function useViewBeacon({
 
 const formatDate = (value: Date | string): string => {
   const date = value instanceof Date ? value : new Date(value);
+
   return date.toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",

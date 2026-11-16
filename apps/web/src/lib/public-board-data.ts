@@ -1,4 +1,5 @@
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
+import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import type { TPost } from "@feeblo/domain/post/schema";
 import type { TSite } from "@feeblo/domain/site/schema";
 import { extractSubdomain } from "@feeblo/utils/url";
@@ -16,6 +17,9 @@ const postDetailPathPattern = /^\/p\/([^/]+)$/;
 /** `/changelog/<slug>`, the board's changelog detail path. */
 const changelogDetailPathPattern = /^\/changelog\/([^/]+)$/;
 
+/** `/help/articles/<slug>`, the help center's article path. */
+const helpArticlePathPattern = /^\/help\/articles\/([^/]+)$/;
+
 /**
  * The public board's server-resolved page metadata.
  *
@@ -30,6 +34,7 @@ export type PublicBoardPage =
       readonly site: TSite;
       readonly post: TPost | null;
       readonly changelog: TChangelog | null;
+      readonly helpArticle: THelpCenterArticlePublic | null;
       readonly canonicalUrl: string;
       readonly siteUrl: string;
       readonly ogImageUrl: string;
@@ -63,6 +68,7 @@ type DetailContent =
       readonly kind: "found";
       readonly post: TPost | null;
       readonly changelog: TChangelog | null;
+      readonly helpArticle: THelpCenterArticlePublic | null;
     }
   | { readonly kind: "not-found" }
   | { readonly kind: "redirect"; readonly to: string }
@@ -80,9 +86,10 @@ async function resolvePageContent(
 ): Promise<DetailContent> {
   const postMatch = postDetailPathPattern.exec(publicPath);
   const changelogMatch = changelogDetailPathPattern.exec(publicPath);
+  const helpArticleMatch = helpArticlePathPattern.exec(publicPath);
 
-  if (!postMatch && !changelogMatch) {
-    return { kind: "found", post: null, changelog: null };
+  if (!postMatch && !changelogMatch && !helpArticleMatch) {
+    return { kind: "found", post: null, changelog: null, helpArticle: null };
   }
 
   try {
@@ -118,7 +125,32 @@ async function resolvePageContent(
           : { kind: "redirect", to: `/p/${mergedTargetSlug}` };
       }
 
-      return { kind: "found", post, changelog: null };
+      return { kind: "found", post, changelog: null, helpArticle: null };
+    }
+
+    if (helpArticleMatch) {
+      if (site.helpCenterVisibility !== "PUBLIC") {
+        // The article is only reachable through a hidden help center.
+        return { kind: "not-found" };
+      }
+
+      // SAFETY: the capture group matched, so the index is present.
+      const helpArticleSlug = helpArticleMatch[1]!;
+
+      const helpArticle = await fetchRpcServer((rpc) =>
+        rpc
+          .GetHelpCenterArticlePublic({
+            organizationId: site.organizationId,
+            slug: helpArticleSlug,
+          })
+          // A draft and a missing article answer the same way on purpose: a
+          // crawler must not learn that an unpublished page exists.
+          .pipe(Effect.catchTag("NotFoundError", () => Effect.succeed(null)))
+      );
+
+      return helpArticle === null
+        ? { kind: "not-found" }
+        : { kind: "found", post: null, changelog: null, helpArticle };
     }
 
     if (site.changelogVisibility !== "PUBLIC") {
@@ -145,7 +177,7 @@ async function resolvePageContent(
 
     return changelog === null
       ? { kind: "not-found" }
-      : { kind: "found", post: null, changelog };
+      : { kind: "found", post: null, changelog, helpArticle: null };
   } catch {
     // Anything other than the translated not-found tag (transport errors,
     // rate limits, internal server errors) is an unexpected RPC failure.
@@ -238,6 +270,7 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
       site,
       post: detail.post,
       changelog: detail.changelog,
+      helpArticle: detail.helpArticle,
       canonicalUrl: new URL(url.pathname, url.origin).toString(),
       siteUrl: new URL("/", url.origin).toString(),
       ogImageUrl,

@@ -83,6 +83,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         yield* articlePolicy.topicBelongsToWorkspace(args);
 
         const now = yield* DateTime.nowAsDate;
+
         const write = yield* normalizeArticleWrite({
           content: args.content,
           now,
@@ -118,11 +119,13 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         yield* articlePolicy.topicBelongsToWorkspace(args);
 
         const previous = yield* repository.findStateById(args);
+
         if (previous === undefined) {
           return yield* notFound();
         }
 
         const now = yield* DateTime.nowAsDate;
+
         // The previous date is what keeps a typo fix from looking like a new
         // release: a republish keeps the date the article first went live
         // unless the caller names a new one.

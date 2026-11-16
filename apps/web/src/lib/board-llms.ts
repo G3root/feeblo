@@ -1,5 +1,6 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
+import type { THelpCenterArticlePublicSummary } from "@feeblo/domain/help-center-article/schema";
 import type { TPostListItem } from "@feeblo/domain/post/schema";
 import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
 import type { TSite } from "@feeblo/domain/site/schema";
@@ -14,6 +15,7 @@ import type { TSite } from "@feeblo/domain/site/schema";
 export interface BoardContent {
   readonly boards: ReadonlyArray<TBoard>;
   readonly entries: ReadonlyArray<TChangelog>;
+  readonly helpArticles: ReadonlyArray<THelpCenterArticlePublicSummary>;
   readonly posts: ReadonlyArray<TPostListItem>;
   readonly roadmaps: ReadonlyArray<TRoadmap>;
 }
@@ -29,6 +31,16 @@ export interface BoardContent {
 const BOARD_LLMS_POST_LIMIT = 50;
 
 const BOARD_LLMS_EXCERPT_LIMIT = 180;
+
+/**
+ * How many articles the help center section lists.
+ *
+ * Documentation is the part of a board an agent is most likely to be asked
+ * about, so the list is longer than the post list — but still bounded, because
+ * the sitemap carries every URL and an unbounded index is a response nobody
+ * finishes reading.
+ */
+const BOARD_LLMS_ARTICLE_LIMIT = 200;
 
 /** Any run of whitespace, collapsed so a line stays one line. */
 const whitespaceRunPattern = /\s+/gu;
@@ -81,6 +93,9 @@ export function renderBoardLlmsTxt(
     "",
     `- Home: ${origin}/`,
     `- Every public page: ${origin}/sitemap.xml`,
+    ...(site.helpCenterVisibility === "PUBLIC"
+      ? [`- Help center: ${origin}/help`]
+      : []),
     ...(site.changelogVisibility === "PUBLIC"
       ? [`- Changelog feed: ${origin}/changelog/rss.xml`]
       : []),
@@ -123,6 +138,31 @@ export function renderBoardLlmsTxt(
           post.title,
           `${origin}/p/${post.slug}`,
           clampLine(post.excerpt, BOARD_LLMS_EXCERPT_LIMIT)
+        )
+      );
+    }
+  }
+
+  if (
+    site.helpCenterVisibility === "PUBLIC" &&
+    content.helpArticles.length > 0
+  ) {
+    const articles = content.helpArticles.slice(0, BOARD_LLMS_ARTICLE_LIMIT);
+
+    lines.push(
+      "",
+      "## Help center",
+      "",
+      `${articles.length === 1 ? "The published article." : `The ${articles.length} published articles.`} The sitemap lists every article URL.`,
+      ""
+    );
+
+    for (const article of articles) {
+      lines.push(
+        markdownLine(
+          article.title,
+          `${origin}/help/articles/${article.slug}`,
+          clampLine(article.excerpt, BOARD_LLMS_EXCERPT_LIMIT)
         )
       );
     }

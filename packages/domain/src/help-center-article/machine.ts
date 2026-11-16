@@ -104,6 +104,7 @@ const stateAfter = (
   const [next] = transition(helpCenterArticleMachine, snapshotFor(state), {
     type: event,
   });
+
   // SAFETY: the machine is flat — every state is a top-level string and every
   // target is one of the three declared states — so a `StateValue` read from it
   // is always a status. `machine.test.ts` walks the whole graph rather than
@@ -117,6 +118,7 @@ const handles = (
   event: THelpCenterArticleEvent
 ): boolean => {
   const before = snapshotFor(state);
+
   return !isUnhandled(
     before,
     transition(helpCenterArticleMachine, before, { type: event })
@@ -163,8 +165,10 @@ export const targetStateFor = (
   event: THelpCenterArticleEvent
 ): THelpCenterArticleState => {
   const targets = new Set<THelpCenterArticleState>();
+
   for (const from of HELP_CENTER_ARTICLE_STATES) {
     const next = stateAfter(from, event);
+
     // Only a move counts: an event a state does not handle returns that state,
     // and counting it would make the target ambiguous.
     if (next !== from) {

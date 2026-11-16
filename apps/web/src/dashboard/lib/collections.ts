@@ -602,6 +602,7 @@ export function helpCenterTopicCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListHelpCenterTopics({ organizationId }),
           { signal: ctx.signal }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -683,6 +684,7 @@ export function helpCenterArticleCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListHelpCenterArticles({ organizationId }),
           { signal: ctx.signal }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,

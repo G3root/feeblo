@@ -295,9 +295,13 @@ export const helpCenterArticleFeedbackTable = pgTable(
     ),
     // A reason belongs to the unhelpful vote it explains, so a helpful vote
     // cannot hold one. Flipping to helpful clears the column.
+    //
+    // `not helpful or reason is null`, not `helpful or reason is null`: the
+    // latter is the same predicate with the two sides swapped, and it forbids
+    // the one row this column exists for — an unhelpful vote that says why.
     check(
       "help_center_article_feedback_reason_chk",
-      sql`${table.helpful} or ${table.reason} is null`
+      sql`not ${table.helpful} or ${table.reason} is null`
     ),
     uniqueIndex("help_center_article_feedback_articleId_userId_uidx")
       .on(table.articleId, table.userId)
@@ -321,6 +325,8 @@ export const helpCenterArticleFeedbackTable = pgTable(
 );
 
 export type HelpCenterTopicRow = typeof helpCenterTopicTable.$inferSelect;
+
 export type HelpCenterArticleRow = typeof helpCenterArticleTable.$inferSelect;
+
 export type HelpCenterArticleFeedbackRow =
   typeof helpCenterArticleFeedbackTable.$inferSelect;

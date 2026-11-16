@@ -97,6 +97,7 @@ const changelog = (overrides: Partial<TChangelog> = {}): TChangelog => ({
 
 const content = (overrides: Partial<BoardContent> = {}): BoardContent => ({
   boards: [board()],
+  helpArticles: [],
   entries: [changelog()],
   posts: [post()],
   roadmaps: [roadmap()],

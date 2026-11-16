@@ -26,6 +26,7 @@ import {
 } from "@feeblo/web-shared/auth-session";
 import {
   changelogJsonLd,
+  helpArticleJsonLd,
   postJsonLd,
   websiteJsonLd,
   type JsonLdNode,
@@ -215,8 +216,15 @@ export const Route = createFileRoute("/s")({
       };
     }
 
-    const { site, post, changelog, canonicalUrl, siteUrl, ogImageUrl } =
-      boardPage;
+    const {
+      site,
+      post,
+      changelog,
+      helpArticle,
+      canonicalUrl,
+      siteUrl,
+      ogImageUrl,
+    } = boardPage;
 
     const jsonLd: JsonLdNode[] = [
       websiteJsonLd({ name: site.name, url: siteUrl }),
@@ -249,6 +257,23 @@ export const Route = createFileRoute("/s")({
           datePublished: changelog.publishedAt ?? changelog.createdAt,
           dateModified: changelog.updatedAt,
           authorName: changelog.user.name,
+        })
+      );
+    } else if (helpArticle) {
+      // Documentation is the page most likely to be the search result a
+      // customer wanted, so its title leads with the article and its
+      // description is the derived excerpt rather than the board's generic
+      // one.
+      pageTitle = `${helpArticle.title} — ${site.name} help center`;
+      pageDescription = helpArticle.excerpt;
+      jsonLd.push(
+        helpArticleJsonLd({
+          headline: helpArticle.title,
+          description: helpArticle.excerpt,
+          url: canonicalUrl,
+          datePublished: helpArticle.publishedAt ?? helpArticle.updatedAt,
+          dateModified: helpArticle.updatedAt,
+          authorName: helpArticle.authorName,
         })
       );
     }

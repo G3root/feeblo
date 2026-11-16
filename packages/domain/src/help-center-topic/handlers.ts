@@ -5,16 +5,11 @@ import * as Layer from "effect/Layer";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
-import {
-  BadRequestError,
-  isForeignKeyViolation,
-  withRemapDbErrors,
-} from "../rpc-errors";
+import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
-  FailedToDeleteHelpCenterTopicError,
   HelpCenterTopicNotEmptyError,
   HelpCenterTopicSlugTakenError,
 } from "./errors";
@@ -83,6 +78,7 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
           slug: args.slug ?? "",
           name: args.name,
         });
+
         const position =
           args.position ?? (yield* repository.nextPosition(args));
 
@@ -112,35 +108,34 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     DeleteHelpCenterTopic: (args: THelpCenterTopicDelete) =>
-      repository.remove(args).pipe(
+      Effect.gen(function* () {
         /**
-         * A topic that still holds articles is refused by
-         * `help_center_article_topic_organization_fk` (`ON DELETE RESTRICT`).
-         * The refusal is expected — the editor has to move or delete the
-         * articles first — so it is answered as a typed conflict carrying the
-         * count, not as a server fault. The count is read after the refusal
-         * rather than before the delete so the guard cannot race a concurrent
-         * create: whichever order the two land in, the answer comes from the
-         * database's own verdict.
+         * A section that still holds articles is refused by
+         * `help_center_article_topic_organization_fk` (`ON DELETE RESTRICT`),
+         * and that refusal is an expected editing outcome rather than a fault:
+         * the editor has to move or delete the articles first. Counting before
+         * the delete is what turns it into a message naming the count.
+         *
+         * The count is a separate statement, so an article created between the
+         * two lands as the constraint's refusal and surfaces as a server
+         * fault. That is the right trade: the constraint is what guarantees
+         * the data, and this guard exists to give the editor a sentence, not
+         * to be a serialization point on a page nobody has open at the same
+         * time.
          */
-        Effect.catchIf(isForeignKeyViolation, () =>
-          repository
-            .countArticlesByTopic({
-              organizationId: args.organizationId,
-              topicId: args.id,
-            })
-            .pipe(
-              Effect.flatMap((articleCount) =>
-                Effect.fail(new HelpCenterTopicNotEmptyError({ articleCount }))
-              )
-            )
-        ),
+        const articleCount = yield* repository.countArticlesByTopic({
+          organizationId: args.organizationId,
+          topicId: args.id,
+        });
+
+        if (articleCount > 0) {
+          return yield* new HelpCenterTopicNotEmptyError({ articleCount });
+        }
+
+        yield* repository.remove(args);
+      }).pipe(
         Policy.withPolicy(topicPolicy.canDelete(args.organizationId)),
-        withRemapDbErrors({
-          action: "delete",
-          entity: "HelpCenterTopic",
-          onUniqueViolation: () => new FailedToDeleteHelpCenterTopicError(),
-        })
+        withRemapDbErrors("HelpCenterTopic", "delete")
       ),
 
     ReorderHelpCenterTopics: (args: THelpCenterTopicReorder) =>

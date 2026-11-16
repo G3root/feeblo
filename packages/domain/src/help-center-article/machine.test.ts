@@ -139,6 +139,7 @@ describe("help center article machine", () => {
     const contractStates: readonly THelpCenterArticleState[] = [
       ...HELP_CENTER_ARTICLE_STATES,
     ];
+
     expect([...ALL]).toStrictEqual(contractStates);
   });
 });

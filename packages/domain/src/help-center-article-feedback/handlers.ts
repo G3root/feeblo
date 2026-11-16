@@ -103,6 +103,7 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
           yield* requireReadableArticle(args);
 
           const identity = yield* resolveIdentity(args.visitorId);
+
           const reason =
             args.helpful || args.reason === null || args.reason === undefined
               ? null

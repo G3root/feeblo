@@ -247,7 +247,7 @@ async function collectBoardContent(site: TSite): Promise<BoardContent> {
   // The four list fetches are independent, so fire them together and pay
   // one RPC round-trip instead of four sequential ones. Visibility-gated
   // lists resolve to empty without a request.
-  const [roadmaps, entries, boards, posts] = await Promise.all([
+  const [roadmaps, entries, boards, posts, helpArticles] = await Promise.all([
     site.roadmapVisibility === "PUBLIC"
       ? fetchRpcServer((rpc) =>
           rpc.ListRoadmapsPublic({ organizationId: site.organizationId })
@@ -267,9 +267,16 @@ async function collectBoardContent(site: TSite): Promise<BoardContent> {
         boardId: null,
       })
     ),
+    site.helpCenterVisibility === "PUBLIC"
+      ? fetchRpcServer((rpc) =>
+          rpc.ListHelpCenterArticlesPublic({
+            organizationId: site.organizationId,
+          })
+        )
+      : Promise.resolve([]),
   ]);
 
-  return { boards, entries, posts, roadmaps };
+  return { boards, entries, helpArticles, posts, roadmaps };
 }
 
 async function collectUrls(
@@ -277,7 +284,9 @@ async function collectUrls(
   origin: string
 ): Promise<ReadonlyArray<SitemapUrl>> {
   const urls: SitemapUrl[] = [{ loc: `${origin}/` }];
-  const { boards, entries, posts, roadmaps } = await collectBoardContent(site);
+
+  const { boards, entries, helpArticles, posts, roadmaps } =
+    await collectBoardContent(site);
 
   if (site.roadmapVisibility === "PUBLIC") {
     urls.push({ loc: `${origin}/roadmap` });
@@ -286,6 +295,17 @@ async function collectUrls(
       urls.push({
         loc: `${origin}/roadmap/${roadmap.slug}`,
         lastmod: toIsoDateOnly(roadmap.updatedAt),
+      });
+    }
+  }
+
+  if (site.helpCenterVisibility === "PUBLIC") {
+    urls.push({ loc: `${origin}/help` });
+
+    for (const article of helpArticles) {
+      urls.push({
+        loc: `${origin}/help/articles/${article.slug}`,
+        lastmod: toIsoDateOnly(article.updatedAt),
       });
     }
   }

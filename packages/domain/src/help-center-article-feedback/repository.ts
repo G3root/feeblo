@@ -9,7 +9,9 @@ import * as Layer from "effect/Layer";
 import type { THelpCenterArticleFeedbackPublic } from "./schema";
 
 const feedback = schema.helpCenterArticleFeedbackTable;
+
 const article = schema.helpCenterArticleTable;
+
 const viewTotal = schema.helpCenterArticleViewTotalTable;
 
 /** The two counts plus this reader's verdict, for the widget. */
