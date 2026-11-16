@@ -40,11 +40,24 @@ import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
 import { usePostUpvotes } from "./use-post-upvotes";
 
+/**
+ * How many faces the stack shows before the "+N" chip closes it.
+ *
+ * Four, matching the public board's voter stack: the faces are a sample of who
+ * voted rather than a list, and one shared number keeps the two post-detail
+ * surfaces saying the same thing. Five faces plus a count was both wider and no
+ * more informative — at eighty-five votes you are being told "a crowd", not
+ * "these five people".
+ */
+const visibleVoterCount = 4;
+
 function VoterAvatar({
   className,
+  size = "sm",
   upvote,
 }: {
   className?: string;
+  size?: "sm" | "default";
   upvote: TUpvote;
 }) {
   return (
@@ -52,7 +65,7 @@ function VoterAvatar({
       className={cn("shrink-0", className)}
       image={upvote.user.image}
       name={upvote.user.name}
-      size="sm"
+      size={size}
     />
   );
 }
@@ -227,15 +240,13 @@ export function VoterPanel() {
             type="button"
           >
             <AvatarGroup>
-              {upvotes.slice(0, 5).map((upvote) => (
-                <VoterAvatar
-                  className="ring-background ring-2"
-                  key={upvote.id}
-                  upvote={upvote}
-                />
+              {upvotes.slice(0, visibleVoterCount).map((upvote) => (
+                <VoterAvatar key={upvote.id} size="default" upvote={upvote} />
               ))}
-              {upvotes.length > 5 ? (
-                <AvatarGroupCount>+{upvotes.length - 5}</AvatarGroupCount>
+              {upvotes.length > visibleVoterCount ? (
+                <AvatarGroupCount>
+                  +{upvotes.length - visibleVoterCount}
+                </AvatarGroupCount>
               ) : null}
             </AvatarGroup>
           </button>

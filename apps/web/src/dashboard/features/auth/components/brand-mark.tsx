@@ -1,26 +1,31 @@
 import { cn } from "@feeblo/ui/utils";
 
 /**
- * The mark from `public/favicon.svg`, traced back to the pixel grid it is
- * drawn on: 20 columns by 21 rows, one unit per cell, so every cell is exactly
- * one pixel at `size-6` (and two at `size-12`). The favicon draws it as a
- * white glyph on a black square; here it is `currentColor` with the square
- * dropped, because the surface it sits on already supplies both.
+ * The mark from `apps/web/public/favicon.svg`, traced back to the pixel grid it
+ * is drawn on: **19 columns by 19 rows**, one unit per cell, so its edges land
+ * on whole pixels rather than being smeared by scaling.
  *
- * The `viewBox` is offset by half a unit so the 20x21 grid sits centred in a
- * square 24-unit box — a square box is what makes the size utilities above
- * land on whole pixels instead of a fraction of one.
+ * The grid is sampled from the asset's own path — the 19x19 shape above is what
+ * a browser paints for `favicon.svg`, not a re-derivation of its coordinates.
+ * An earlier attempt reconstructed the grid from the path's relative `m` offsets
+ * and drifted a row and a column wide, which made the mark look lopsided
+ * against the real one; sampling the raster is the version that cannot disagree
+ * with the file.
+ *
+ * `viewBox` is the grid exactly, so the default size is 19px (one pixel per
+ * cell) and 38px is two. Anything between is fine, it just antialiases the way
+ * the favicon does at any non-multiple.
  */
 const markPath =
-  "M7 0h2v1h-2zM12 0h2v1h-2zM6 1h4v1h-4zM11 1h4v1h-4zM6 2h4v1h-4zM11 2h4v1h-4zM6 3h4v1h-4zM11 3h4v1h-4zM6 4h4v1h-4zM11 4h4v1h-4zM2 5h2v1h-2zM5 5h1v1h-1zM7 5h3v1h-3zM11 5h3v1h-3zM15 5h3v1h-3zM1 6h1v1h-1zM18 6h1v1h-1zM0 7h4v1h-4zM5 7h2v1h-2zM8 7h5v1h-5zM14 7h6v1h-6zM0 8h4v1h-4zM5 8h4v1h-4zM12 8h8v1h-8zM1 9h4v1h-4zM6 9h2v1h-2zM13 9h6v1h-6zM7 10h1v1h-1zM13 10h1v1h-1zM1 11h4v1h-4zM6 11h2v1h-2zM13 11h6v1h-6zM0 12h5v1h-5zM6 12h3v1h-3zM12 12h8v1h-8zM0 13h5v1h-5zM6 13h1v1h-1zM8 13h5v1h-5zM14 13h6v1h-6zM1 14h4v1h-4zM7 14h3v1h-3zM11 14h3v1h-3zM15 14h4v1h-4zM7 15h3v1h-3zM11 15h4v1h-4zM6 16h1v1h-1zM6 17h4v1h-4zM11 17h4v1h-4zM6 18h4v1h-4zM11 18h4v1h-4zM6 19h4v1h-4zM11 19h4v1h-4zM7 20h2v1h-2zM12 20h2v1h-2z";
+  "M6 0h2v1h-2zM11 0h2v1h-2zM5 1h4v1h-4zM10 1h4v1h-4zM5 2h4v1h-4zM10 2h4v1h-4zM5 3h4v1h-4zM10 3h4v1h-4zM5 4h4v1h-4zM10 4h4v1h-4zM1 5h4v1h-4zM6 5h3v1h-3zM10 5h3v1h-3zM14 5h4v1h-4zM0 6h6v1h-6zM7 6h5v1h-5zM13 6h6v1h-6zM0 7h8v1h-8zM11 7h8v1h-8zM1 8h6v1h-6zM12 8h6v1h-6zM6 9h1v1h-1zM12 9h1v1h-1zM1 10h6v1h-6zM12 10h6v1h-6zM0 11h8v1h-8zM11 11h8v1h-8zM0 12h6v1h-6zM7 12h5v1h-5zM13 12h6v1h-6zM1 13h4v1h-4zM6 13h3v1h-3zM10 13h3v1h-3zM14 13h4v1h-4zM5 14h4v1h-4zM10 14h4v1h-4zM5 15h4v1h-4zM10 15h4v1h-4zM5 16h4v1h-4zM10 16h4v1h-4zM5 17h4v1h-4zM10 17h4v1h-4zM6 18h2v1h-2zM11 18h2v1h-2z";
 
 export function BrandMark({ className }: { className?: string }) {
   return (
     <svg
       aria-hidden
-      className={cn("size-6 shrink-0", className)}
+      className={cn("size-[19px] shrink-0", className)}
       fill="currentColor"
-      viewBox="-2 -1.5 24 24"
+      viewBox="0 0 19 19"
       xmlns="http://www.w3.org/2000/svg"
     >
       <path d={markPath} />
