@@ -68,6 +68,7 @@ const seedPost = (suffix: string) =>
       createdAt: now,
       updatedAt: now,
     });
+
     return { organizationId, postId, boardId, statusId };
   });
 
@@ -92,6 +93,7 @@ const seedPostInOrganization = (
       createdAt: now,
       updatedAt: now,
     });
+
     return { organizationId, postId };
   });
 
@@ -109,6 +111,7 @@ const seedConnection = (
       name: `${provider} connection`,
       lifecycle: "active",
     });
+
     return connectionId;
   });
 
@@ -135,12 +138,14 @@ describe("external resource service", () => {
         Effect.gen(function* () {
           const service = yield* ExternalResourceService;
           const first = yield* seedPost("first");
+
           const second = yield* seedPostInOrganization(
             first.organizationId,
             first.boardId,
             first.statusId,
             "second"
           );
+
           const github = yield* seedConnection(first.organizationId, "github");
           const linear = yield* seedConnection(first.organizationId, "linear");
 
@@ -148,6 +153,7 @@ describe("external resource service", () => {
             postId: first.postId,
             resource: resource(first.organizationId, github),
           });
+
           const githubDuplicate = yield* service.recordPostLink({
             postId: first.postId,
             resource: {
@@ -155,6 +161,7 @@ describe("external resource service", () => {
               title: "Updated title",
             },
           });
+
           expect(githubDuplicate.externalResourceId).toBe(
             githubFirst.externalResourceId
           );
@@ -195,28 +202,34 @@ describe("external resource service", () => {
             postId: first.postId,
             idempotencyKey: "create-github-issue",
           });
+
           const duplicate = yield* service.reserveCreation({
             connectionId: github,
             organizationId: first.organizationId,
             postId: first.postId,
             idempotencyKey: "create-github-issue",
           });
+
           expect(reserved.reserved).toBe(true);
           expect(duplicate.reserved).toBe(false);
           expect(duplicate.id).toBe(reserved.id);
+
           if (!reserved.reserved) {
             return yield* Effect.die("Expected the first reservation to win");
           }
+
           yield* service.failCreation({
             requestId: reserved.id,
             reservedAt: reserved.reservedAt,
           });
+
           const retried = yield* service.reserveCreation({
             connectionId: github,
             organizationId: first.organizationId,
             postId: first.postId,
             idempotencyKey: "create-github-issue",
           });
+
           expect(retried.reserved).toBe(true);
         })
     );
@@ -240,6 +253,7 @@ describe("external resource service", () => {
       Effect.gen(function* () {
         const post = yield* seedPost(suffix);
         const connection = yield* seedConnection(post.organizationId, "github");
+
         return {
           connectionId: connection,
           idempotencyKey: `create-issue-${suffix}`,
@@ -255,9 +269,11 @@ describe("external resource service", () => {
 
         const held = yield* service.reserveCreation(input);
         expect(held.reserved).toBe(true);
+
         if (!held.reserved) {
           return yield* Effect.die("Expected the reservation to be taken");
         }
+
         yield* service.failCreation({
           requestId: held.id,
           reservedAt: held.reservedAt,
@@ -317,10 +333,12 @@ describe("external resource service", () => {
           const db = yield* currentDb;
           const service = yield* ExternalResourceService;
           const post = yield* seedPost("claim-fence");
+
           const connection = yield* seedConnection(
             post.organizationId,
             "github"
           );
+
           const input = {
             connectionId: connection,
             idempotencyKey: "create-issue-claim-fence",
@@ -329,6 +347,7 @@ describe("external resource service", () => {
           };
 
           const expired = yield* service.reserveCreation(input);
+
           if (!expired.reserved) {
             return yield* Effect.die(
               "Expected the first reservation to be taken"
@@ -340,6 +359,7 @@ describe("external resource service", () => {
           // relies on that stamp only ever moving forward.
           yield* TestClock.adjust("2 hours");
           const current = yield* service.reserveCreation(input);
+
           if (!current.reserved) {
             return yield* Effect.die(
               "Expected the reservation to be re-claimed"
@@ -381,6 +401,7 @@ describe("external resource service", () => {
             .where(
               eq(schema.externalResourceCreateRequestTable.id, expired.id)
             );
+
           expect(afterExpired?.state).toBe("pending");
           expect(afterExpired?.postExternalResourceLinkId).toBeNull();
 

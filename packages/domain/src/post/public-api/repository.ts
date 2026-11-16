@@ -215,25 +215,34 @@ const toPublicPostWriteError = (
   | ConflictError
   | PlanRequiresUpgradeError => {
   if (Schema.is(NotFoundError)(cause)) return cause;
+
   if (Schema.is(InvalidRequestError)(cause)) return cause;
+
   if (Schema.is(ConflictError)(cause)) return cause;
+
   if (Schema.is(InternalError)(cause)) return cause;
+
   if (Schema.is(PlanRequiresUpgradeError)(cause)) return cause;
+
   // Naming an author with no contact yet makes the write provision one, which
   // is a CRM entry like any other and is capped like any other. Same remedy as
   // the company create's limit, so it answers with that code.
   if (Schema.is(CrmEntryLimitReachedError)(cause)) {
     return planRequiresUpgradeError(crmLimitMessage);
   }
+
   if (Schema.is(BadRequestError)(cause)) {
     return invalidRequestError(cause.message ?? "The request is not valid.");
   }
+
   if (Schema.is(PostAlreadyExistsError)(cause)) {
     return conflictError("A post with this slug already exists.");
   }
+
   if (Schema.is(PostNotFoundError)(cause)) {
     return notFoundError("Post not found.");
   }
+
   // The on-behalf subject a create or an update names can fail to resolve;
   // that is the caller's input, and the message is fixed because the identity
   // failures carry the subject id in their detail.
@@ -242,23 +251,27 @@ const toPublicPostWriteError = (
       "The post's author could not be resolved in this workspace."
     );
   }
+
   if (Schema.is(SubjectNotFoundError)(cause)) {
     return invalidRequestError(
       "The post's author could not be found in this workspace."
     );
   }
+
   if (
     Schema.is(FailedToCreatePostError)(cause) ||
     Schema.is(FailedToDeletePostError)(cause)
   ) {
     return internalError();
   }
+
   if (Schema.is(FailedToUpdatePostError)(cause)) {
     // The shared update path fails this way when the row it locked to read the
     // post's previous state is gone: the post was deleted between the request
     // and the write. A missing resource is what the endpoint documents.
     return notFoundError("Post not found.");
   }
+
   if (Schema.is(Policy.PolicyDeniedError)(cause)) {
     // The only policy the shared write path applies to a machine key is the
     // merged-post guard: a merged post is readable, so this is a request the
@@ -267,6 +280,7 @@ const toPublicPostWriteError = (
       "This post has been merged into another post and cannot be changed."
     );
   }
+
   return internalError();
 };
 
@@ -283,6 +297,7 @@ const mapPostCreateFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
     Effect.catch((cause) => {
       const mapped = toPublicPostWriteError(cause);
+
       return Effect.fail(
         Schema.is(NotFoundError)(mapped) ? internalError() : mapped
       );
@@ -299,6 +314,7 @@ const mapPostWriteFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
     Effect.catch((cause) => {
       const mapped = toPublicPostWriteError(cause);
+
       return Effect.fail(
         Schema.is(ConflictError)(mapped) ? internalError() : mapped
       );
@@ -365,6 +381,7 @@ const mapPostMergeFailure = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
       const mapped = Schema.is(FailedToMergePostError)(cause)
         ? toPublicMergeFailure(cause)
         : toPublicPostWriteError(cause);
+
       return Effect.fail(
         Schema.is(PlanRequiresUpgradeError)(mapped) ? internalError() : mapped
       );
@@ -486,15 +503,19 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       eq(schema.postTable.organizationId, organizationId),
       isNull(schema.postTable.mergedIntoPostId),
     ];
+
     if (!includeArchived) {
       conditions.push(isNull(schema.postTable.archivedAt));
     }
+
     if (boardId !== null) {
       conditions.push(eq(schema.postTable.boardId, boardId));
     }
+
     if (statusId !== null) {
       conditions.push(eq(schema.postTable.statusId, statusId));
     }
+
     if (tagIds !== null && tagIds.length > 0) {
       conditions.push(
         exists(
@@ -510,17 +531,20 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         )
       );
     }
+
     // `>` rather than `>=`: a caller polls with the timestamp of the last row
     // it saw, and a row it has already read must not come back and be applied
     // twice.
     if (updatedAfter !== null) {
       conditions.push(gt(schema.postTable.updatedAt, updatedAfter));
     }
+
     if (cursor !== null) {
       conditions.push(
         sql`(${schema.postTable.createdAt}, ${schema.postTable.id}) < (${cursor.createdAt}, ${cursor.id})`
       );
     }
+
     return conditions;
   };
 
@@ -569,11 +593,13 @@ const makePublicApiPostRepository = Effect.gen(function* () {
 
       const hasMore = rows.length > limit;
       const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
       if (pageRows.length === 0) {
         return { posts: [], nextCursor: null } satisfies PublicApiPostPage;
       }
 
       const postIds = pageRows.map((row) => row.id);
+
       // Counts and tags are keyed by the same ids and depend on nothing else,
       // so the page pays one round trip for its enrichment instead of two.
       const [counts, tagRows] = yield* Effect.all(
@@ -582,6 +608,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       );
 
       const tagsByPost = new Map<string, { id: string; name: string }[]>();
+
       for (const tag of tagRows) {
         const existing = tagsByPost.get(tag.postId) ?? [];
         existing.push({ id: tag.id, name: tag.name });
@@ -637,12 +664,15 @@ const makePublicApiPostRepository = Effect.gen(function* () {
       const conditions: SQL[] = [
         eq(schema.postTable.organizationId, organizationId),
       ];
+
       if (postId !== undefined) {
         conditions.push(eq(schema.postTable.id, postId));
       }
+
       if (boardId !== undefined) {
         conditions.push(eq(schema.postTable.boardId, boardId));
       }
+
       if (slug !== undefined) {
         conditions.push(eq(schema.postTable.slug, slug));
       }
@@ -670,6 +700,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         .limit(1);
 
       const row = rows.at(0);
+
       if (row === undefined) {
         return Option.none();
       }
@@ -867,6 +898,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         );
 
         const created = yield* readPost({ organizationId, postId });
+
         // An insert that committed is readable a moment later; an empty read
         // means the row was removed between the two statements, which is a
         // race this API can only report as its own failure.
@@ -993,6 +1025,7 @@ const makePublicApiPostRepository = Effect.gen(function* () {
             // allowance is unreachable here and the endpoint publishes no such
             // status — the same reasoning as `mapPostMergeFailure`.
             const mapped = toPublicPostWriteError(cause);
+
             return Effect.fail(
               Schema.is(ConflictError)(mapped) ||
                 Schema.is(PlanRequiresUpgradeError)(mapped)

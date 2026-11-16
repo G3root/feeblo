@@ -108,6 +108,7 @@ it.live("serves an RFC 9727 API catalog for the HTTP and MCP surfaces", () =>
       expect(response.headers.get("content-type")).toContain(
         "https://www.rfc-editor.org/info/rfc9727"
       );
+
       // SAFETY: The route serializes the `apiCatalog` value this module
       // builds; the assertion below is its declared shape.
       const parsed = JSON.parse(
@@ -122,6 +123,7 @@ it.live("serves an RFC 9727 API catalog for the HTTP and MCP surfaces", () =>
       const api = parsed.linkset.find(
         (entry) => entry.anchor === "https://api.feeblo.com/api/v1"
       );
+
       expect(api?.["service-desc"]).toContainEqual({
         href: "https://api.feeblo.com/api/v1/openapi.json",
         type: "application/json",
@@ -130,6 +132,7 @@ it.live("serves an RFC 9727 API catalog for the HTTP and MCP surfaces", () =>
       const mcp = parsed.linkset.find(
         (entry) => entry.anchor === "https://api.feeblo.com/mcp"
       );
+
       expect(mcp?.["service-desc"]).toContainEqual({
         href: "https://api.feeblo.com/.well-known/mcp/server-card.json",
         type: "application/json",
@@ -143,6 +146,7 @@ it.live("serves an MCP server card that states the key requirement", () =>
     Effect.gen(function* () {
       const response = yield* get(app, "/.well-known/mcp.json");
       expectOk(response, "application/json");
+
       // SAFETY: The route serializes the `mcpServerCard` value this module
       // builds; the assertion below is its declared shape.
       const parsed = JSON.parse(
@@ -177,6 +181,7 @@ it.live("serves a SEP-1649 server card next to the multi-origin list", () =>
     Effect.gen(function* () {
       const response = yield* get(app, "/.well-known/mcp/server-card.json");
       expectOk(response, "application/json");
+
       // SAFETY: The route serializes the `mcpServerCardDocument` value this
       // module builds; the assertion below is its declared shape.
       const parsed = JSON.parse(
@@ -269,6 +274,7 @@ it.live(
           "x-forwarded-host": "feedback.example.test",
           "x-forwarded-proto": "https",
         });
+
         expectOk(response, "application/xml");
         const body = yield* Effect.promise(() => response.text());
 
@@ -288,6 +294,7 @@ it.live("serves an ARD manifest whose entries are dereferenceable", () =>
       const response = yield* get(app, "/.well-known/ai-catalog.json");
       expectOk(response, "application/json");
       expect(response.headers.get("access-control-allow-origin")).toBe("*");
+
       // SAFETY: The route serializes the `agentCatalog` value this module
       // builds; the assertion below is its declared shape.
       const parsed = JSON.parse(
@@ -337,6 +344,7 @@ it.live("advertises the origin the request arrived on", () =>
         "x-forwarded-host": "feedback.example.test",
         "x-forwarded-proto": "https",
       });
+
       const body = yield* Effect.promise(() => response.text());
 
       expect(body).toContain("https://feedback.example.test/api/v1");
@@ -353,6 +361,7 @@ it.live("uses the configured API URL's scheme when no proxy supplies one", () =>
         const response = yield* get(app, "/auth.md", {
           "x-forwarded-host": "192.168.1.20:8080",
         });
+
         const body = yield* Effect.promise(() => response.text());
 
         expect(body).toContain("http://192.168.1.20:8080/api/v1");

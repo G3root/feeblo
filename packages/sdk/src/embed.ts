@@ -78,12 +78,14 @@ export class Embed {
     const existing = document.getElementById(
       CONTAINER_ID
     ) as CleanupContainer | null;
+
     existing?._feebloCleanup?.();
     existing?.remove();
 
     const container = document.createElement("div");
     container.id = CONTAINER_ID;
     Object.assign(container.style, CONTAINER_STYLES, containerStyles);
+
     if (this.config.placement) {
       container.style.top = "auto";
       container.style.bottom = "84px";
@@ -96,6 +98,7 @@ export class Embed {
         this.config.placement === "bottom-left" ? "right" : "left"
       ] = "auto";
     }
+
     container.appendChild(this.iframe);
 
     const handleMessage = (event: MessageEvent<unknown>) => {
@@ -105,6 +108,7 @@ export class Embed {
 
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const message = event.data as IncomingMessage;
+
       if (this.logger.enabled) {
         this.logger(
           "message",
@@ -127,33 +131,42 @@ export class Embed {
           break;
         case "PAGE_HEIGHT": {
           const height = message.data?.height;
+
           if (height !== undefined && height > 80) {
             container.style.height = `${height}px`;
             onHeightChange?.(height);
           }
+
           break;
         }
+
         case "CLOSE": {
           const wasOpen = this.isOpen;
           this.close();
+
           if (wasOpen) {
             onClose?.();
           }
+
           break;
         }
+
         case "READY":
           this.markReady();
+
           if (this.isOpen && !this.openAcknowledged) {
             // A SHOW sent before the widget finished loading may have been
             // lost; re-send it so the widget confirms WIDGET_OPENED and the
             // host can emit widgetOpened.
             this.post({ event: "SHOW" });
           }
+
           break;
         case "WIDGET_OPENED":
           if (!this.isOpen || this.openAcknowledged) {
             break;
           }
+
           this.openAcknowledged = true;
           emitWidgetEvent("widgetOpened", message.data, this.logger);
           break;
@@ -163,8 +176,10 @@ export class Embed {
             // SAFETY: The upstream contract guarantees this value here.
             const { token: _token, ...publicIdentity } =
               message.data as UserIdentity;
+
             emitWidgetEvent("identityChanged", publicIdentity, this.logger);
           }
+
           break;
         case "FEEDBACK_SUBMITTED":
           emitWidgetEvent("feedbackSubmitted", message.data?.post, this.logger);
@@ -194,6 +209,7 @@ export class Embed {
     };
 
     (root ?? document.body).appendChild(container);
+
     return container;
   }
 
@@ -201,6 +217,7 @@ export class Embed {
     if (!this.config.placement) {
       return null;
     }
+
     document.getElementById(LAUNCHER_ID)?.remove();
     const launcher = document.createElement("button");
     launcher.id = LAUNCHER_ID;
@@ -235,6 +252,7 @@ export class Embed {
       }
     });
     (this.options.root ?? document.body).appendChild(launcher);
+
     return launcher;
   }
 
@@ -243,8 +261,10 @@ export class Embed {
       // The widget (re)loaded; re-assert state in case the load-time flush
       // raced with the widget's message subscription.
       this.syncState();
+
       return;
     }
+
     this.isLoaded = true;
     this.syncState();
     emitWidgetEvent("widgetReady", undefined, this.logger);
@@ -259,6 +279,7 @@ export class Embed {
 
   private post(message: OutgoingMessage): void {
     this.iframe.contentWindow?.postMessage(message, iframeOrigin(this.iframe));
+
     if (this.logger.enabled) {
       // SAFETY: The endpoint/API contract guarantees this response shape.
       this.logger(
@@ -274,14 +295,19 @@ export class Embed {
     if (trigger && this.config.modules.includes("feedback")) {
       this.module = "feedback";
     }
+
     this.context = { ...this.context, ...metadata };
+
     if (metadata.board) {
       this.board = metadata.board;
     }
+
     if (trigger || metadata.board) {
       this.syncNavigation();
     }
+
     this.sendContext();
+
     if (this.isOpen) {
       return;
     }
@@ -336,6 +362,7 @@ export class Embed {
     if (!supportsBoardSelection(this.config)) {
       return;
     }
+
     this.board = board;
     this.syncNavigation();
   }
@@ -344,6 +371,7 @@ export class Embed {
     if (!this.config.modules.includes(module)) {
       return;
     }
+
     this.module = module;
     this.syncNavigation();
     this.open();
@@ -353,7 +381,9 @@ export class Embed {
     if (!this.isLoaded) {
       return;
     }
+
     this.post({ event: "SET_MODULE", data: { module: this.module } });
+
     if (this.module === "feedback" && this.board) {
       this.post({ event: "SET_BOARD", data: { board: this.board } });
     }
@@ -371,6 +401,7 @@ export class Embed {
         this.context[key] = value;
       }
     }
+
     this.sendContext();
   }
 
@@ -388,9 +419,11 @@ export class Embed {
 
   identify(user: UserIdentity): void {
     this.identity = normalizeUserIdentity(user);
+
     if (this.logger.enabled) {
       this.logger("identity", this.identity.id);
     }
+
     if (this.isLoaded) {
       this.sendIdentify();
     }
@@ -408,6 +441,7 @@ export class Embed {
     if (!this.identity) {
       return;
     }
+
     this.post({
       event: "IDENTIFY",
       data: compact(this.identity),
@@ -422,10 +456,12 @@ export class Embed {
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       }
     };
+
     // SAFETY: The event target is the expected DOM element type for this handler.
     this.outsideClickHandler = (e: MouseEvent) => {
       // SAFETY: The event target is the expected DOM element type for this handler.
       const target = e.target as HTMLElement;
+
       if (
         (this.currentTrigger || this.launcher) &&
         !this.container.contains(target) &&
@@ -435,6 +471,7 @@ export class Embed {
         this.close();
       }
     };
+
     document.addEventListener("keydown", this.escHandler);
     document.addEventListener("click", this.outsideClickHandler, {
       capture: true,
@@ -446,6 +483,7 @@ export class Embed {
       document.removeEventListener("keydown", this.escHandler);
       this.escHandler = null;
     }
+
     if (this.outsideClickHandler) {
       document.removeEventListener("click", this.outsideClickHandler, {
         capture: true,
@@ -468,9 +506,11 @@ export class Embed {
     const container = document.getElementById(
       CONTAINER_ID
     ) as CleanupContainer | null;
+
     container?._feebloCleanup?.();
     container?.remove();
     this.launcher?.remove();
+
     if (this.logger.enabled) {
       this.logger("lifecycle", "destroy");
     }

@@ -23,13 +23,16 @@ export function PostCommentComposer({
   showVisibilityPicker = false,
 }: PostCommentComposerProps) {
   const { data: session } = useAuthState();
+
   const { isLocked, isMember, isMerged, organizationId } =
     usePostCollectionData();
+
   // Status updates move the post, so the picker is a manager+ privilege
   // (posts.status) everywhere — mirroring the post editor and backend policy.
   const { allowed: canStatusUpdate } = usePolicy(
     hasPermission(organizationId, "posts.status")
   );
+
   // A merged post is read-only until unmerged; its comments live on the
   // survivor, so the composer is disabled without pretending it is locked.
   const disabled = isLocked || isMerged || !session;

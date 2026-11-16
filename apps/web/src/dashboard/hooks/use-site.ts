@@ -33,8 +33,10 @@ const getSiteUrl = (subdomain: string) => {
 
 export const usePublicSiteUrl = () => {
   const site = useSite();
+
   if (!site?.subdomain) {
     return undefined;
   }
+
   return getSiteUrl(site.subdomain);
 };

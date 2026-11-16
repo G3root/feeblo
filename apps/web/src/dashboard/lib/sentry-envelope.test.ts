@@ -7,6 +7,7 @@ import {
 } from "./sentry-envelope";
 
 const dsn = "https://public@o123.ingest.sentry.io/456";
+
 const envelope = (body: string, value = dsn) =>
   `${JSON.stringify({ dsn: value })}\n${body}`;
 

@@ -41,6 +41,7 @@ export const Route = createFileRoute("/feedback-widget/$organizationId")({
         const organizationId = Option.getOrUndefined(
           decodeWidgetOrganizationIdOption(params.organizationId)
         );
+
         if (!organizationId) {
           return new Response("Not found", { status: 404 });
         }
@@ -51,20 +52,25 @@ export const Route = createFileRoute("/feedback-widget/$organizationId")({
 
         const theme = url.searchParams.get("theme") ?? "light";
         const requestedLocale = url.searchParams.get("locale");
+
         const locale = isSupportedLocale(requestedLocale)
           ? requestedLocale
           : "en";
+
         const requestedMode = url.searchParams.get("mode");
+
         const mode: WidgetMode =
           requestedMode === "updates" || requestedMode === "hub"
             ? requestedMode
             : "feedback";
+
         const requestedModules = (url.searchParams.get("modules") ?? "")
           .split(",")
           .filter(
             (module): module is WidgetModule =>
               module === "feedback" || module === "updates"
           );
+
         const modules: WidgetModule[] =
           mode === "hub"
             ? [
@@ -87,6 +93,7 @@ export const Route = createFileRoute("/feedback-widget/$organizationId")({
 
         const isDev = import.meta.env.DEV;
         const assetOrigin = isDev ? "http://localhost:5174" : "";
+
         const scriptTags = isDev
           ? `<script type="module" src="${assetOrigin}/@vite/client"></script>
     <script type="module" src="${assetOrigin}/src/iframe-entry.tsx"></script>`

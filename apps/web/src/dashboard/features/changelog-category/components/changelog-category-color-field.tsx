@@ -67,5 +67,6 @@ function isLightOklch(color: string) {
   const lightness = Number.parseFloat(
     color.match(oklchLightnessPattern)?.[1] ?? "0"
   );
+
   return lightness > 0.7;
 }

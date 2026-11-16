@@ -197,6 +197,7 @@ const readWrittenComment = (args: {
 }) =>
   Effect.gen(function* () {
     const repository = yield* PublicApiCommentRepository;
+
     const found = yield* repository
       .findComment(args)
       .pipe(Effect.catchTag("InternalServerError", () => onInternalError));

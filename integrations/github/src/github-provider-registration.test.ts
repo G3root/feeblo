@@ -129,6 +129,7 @@ describe("GitHub provider registration", () => {
     () =>
       Effect.gen(function* () {
         const secret = Redacted.make("webhook-secret");
+
         const registration = makeGitHubProviderRegistration({
           apiClient,
           credentialResolver: {
@@ -137,13 +138,18 @@ describe("GitHub provider registration", () => {
           },
           webhookSecret: secret,
         });
+
         const handler = registration.inboundHandlers[0];
+
         if (handler === undefined) {
           return;
         }
+
         const rawBody =
           '{"action":"closed","installation":{"id":42},"issue":{"html_url":"https://github.com/acme/feedback/issues/7","id":7,"node_id":"I_7","number":7,"state":"closed","title":"Dark mode"},"repository":{"full_name":"acme/feedback","id":1,"name":"feedback","owner":{"login":"acme"}},"sender":{"id":2,"login":"octocat"}}';
+
         const signature = `sha256=${createHmac("sha256", Redacted.value(secret)).update(rawBody).digest("hex")}`;
+
         const response = yield* handler.handle({
           headers: {
             "x-github-delivery": "delivery_issue_7",
@@ -154,9 +160,11 @@ describe("GitHub provider registration", () => {
         });
 
         expect(response.status).toBe(200);
+
         const parsed = yield* Schema.decodeUnknownEffect(
           Schema.toType(ParsedGitHubInboundRequest)
         )(response.body);
+
         expect(parsed.kind).toBe("issue");
       })
   );
@@ -167,18 +175,22 @@ describe("GitHub provider registration", () => {
       Effect.gen(function* () {
         let issueBody = "";
         let commentedBacklinkUrl: URL | undefined;
+
         let externalResourceDrafts:
           | readonly IntegrationExternalResourceDraft[]
           | undefined;
+
         const registration = makeGitHubProviderRegistration({
           apiClient: {
             ...apiClient,
             createIssue: (input) => {
               issueBody = input.body;
+
               return apiClient.createIssue(input);
             },
             createIssueBacklinkComment: (input) => {
               commentedBacklinkUrl = input.backlinkUrl;
+
               return Effect.void;
             },
           },
@@ -188,15 +200,20 @@ describe("GitHub provider registration", () => {
           },
           webhookSecret: Redacted.make("webhook-secret"),
         });
+
         const handler = registration.handlers[0];
+
         if (handler === undefined) {
           return;
         }
+
         const result = yield* Effect.exit(handler.deliver(deliveryInput));
         expect(Exit.isSuccess(result)).toBe(true);
+
         if (Exit.isSuccess(result)) {
           externalResourceDrafts = result.value.externalResourceDrafts;
         }
+
         expect(issueBody).toBe("Dark mode hurts my eyes at night.");
         expect(commentedBacklinkUrl?.href).toBe(
           "https://feeblo.example/org/post/ideas/dark-mode"
@@ -215,6 +232,7 @@ describe("GitHub provider registration", () => {
     () =>
       Effect.gen(function* () {
         const secret = Redacted.make("webhook-secret");
+
         const registration = makeGitHubProviderRegistration({
           apiClient,
           credentialResolver: {
@@ -223,12 +241,16 @@ describe("GitHub provider registration", () => {
           },
           webhookSecret: secret,
         });
+
         const handler = registration.inboundHandlers[0];
+
         if (handler === undefined) {
           return;
         }
+
         const rawBody = '{"action":"created","installation":{"id":42}}';
         const signature = `sha256=${createHmac("sha256", Redacted.value(secret)).update(rawBody).digest("hex")}`;
+
         const response = yield* handler.handle({
           headers: {
             "x-github-delivery": "delivery_42",
@@ -237,11 +259,15 @@ describe("GitHub provider registration", () => {
           },
           rawBody,
         });
+
         expect(response.status).toBe(200);
+
         const parsed = yield* Schema.decodeUnknownEffect(
           ParsedGitHubInboundRequest
         )(response.body);
+
         expect(parsed.kind).toBe("installation");
+
         if (parsed.kind === "installation") {
           expect(parsed.payload.installation.id).toBe(42);
         }
@@ -259,6 +285,7 @@ describe("makeGitHubIssueExternalResourceDraft", () => {
       state: "open",
       title: "Dark mode",
     };
+
     const draft = makeGitHubIssueExternalResourceDraft({
       issueNumber: issue.number,
       postId: asLegid(PostId)("pst_1"),
@@ -381,6 +408,7 @@ describe("GitHub provider credential resolver", () => {
 
 describe("GitHub App webhook handler", () => {
   const webhookSecret = Redacted.make("webhook-secret");
+
   const signatureFor = (rawBody: string) =>
     `sha256=${createHmac("sha256", Redacted.value(webhookSecret))
       .update(rawBody)
@@ -395,15 +423,18 @@ describe("GitHub App webhook handler", () => {
       },
       webhookSecret,
     });
+
     return registration.inboundHandlers[0];
   };
 
   it.effect("rejects a delivery with an invalid signature", () =>
     Effect.gen(function* () {
       const handler = makeHandler();
+
       if (handler === undefined) {
         return;
       }
+
       const response = yield* handler.handle({
         headers: {
           "x-github-delivery": "delivery_1",
@@ -421,10 +452,13 @@ describe("GitHub App webhook handler", () => {
   it.effect("acknowledges an unsupported GitHub event without retrying", () =>
     Effect.gen(function* () {
       const handler = makeHandler();
+
       if (handler === undefined) {
         return;
       }
+
       const rawBody = '{"ref":"refs/heads/main"}';
+
       const response = yield* handler.handle({
         headers: {
           "x-github-delivery": "delivery_push_1",
@@ -442,10 +476,13 @@ describe("GitHub App webhook handler", () => {
   it.effect("rejects a malformed issue payload", () =>
     Effect.gen(function* () {
       const handler = makeHandler();
+
       if (handler === undefined) {
         return;
       }
+
       const rawBody = '{"action":"opened"}';
+
       const response = yield* handler.handle({
         headers: {
           "x-github-delivery": "delivery_bad_1",
@@ -463,10 +500,13 @@ describe("GitHub App webhook handler", () => {
   it.effect("rejects a signed delivery that is missing its delivery id", () =>
     Effect.gen(function* () {
       const handler = makeHandler();
+
       if (handler === undefined) {
         return;
       }
+
       const rawBody = '{"action":"opened"}';
+
       const response = yield* handler.handle({
         headers: {
           "x-github-event": "issues",
@@ -491,15 +531,18 @@ describe("GitHub issue-create handler", () => {
       },
       webhookSecret: Redacted.make("webhook-secret"),
     });
+
     return registration.handlers[0];
   };
 
   it.effect("rejects events that are not new posts", () =>
     Effect.gen(function* () {
       const handler = makeHandler();
+
       if (handler === undefined) {
         return;
       }
+
       const tag = yield* handler
         .deliver({
           ...deliveryInput,
@@ -525,9 +568,11 @@ describe("GitHub issue-create handler", () => {
     () =>
       Effect.gen(function* () {
         const handler = makeHandler();
+
         if (handler === undefined) {
           return;
         }
+
         const result = yield* handler.deliver({
           ...deliveryInput,
           route: {

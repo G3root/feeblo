@@ -45,24 +45,30 @@ function* issueSummaries(issue: Issue, path: string): Generator<string> {
         issue.issue,
         path + issue.path.map(segment).join("")
       );
+
       return;
     case "Encoding":
       yield* issueSummaries(issue.issue, path);
+
       return;
     case "Composite":
       for (const inner of issue.issues) {
         yield* issueSummaries(inner, path);
       }
+
       return;
     // A union lists why each member rejected the value.
     case "AnyOf":
       if (issue.issues.length === 0) {
         yield `${path}: AnyOf`;
+
         return;
       }
+
       for (const inner of issue.issues) {
         yield* issueSummaries(inner, path);
       }
+
       return;
     default:
       yield `${path}: ${issue._tag}`;
@@ -78,16 +84,21 @@ interface CollectedIssues {
 const collectIssues = (issue: Issue): CollectedIssues => {
   const issues: string[] = [];
   const seen = new Set<string>();
+
   for (const summary of issueSummaries(issue, "$")) {
     if (seen.has(summary)) {
       continue;
     }
+
     seen.add(summary);
+
     if (issues.length === maxIssues) {
       return { issues, truncated: true };
     }
+
     issues.push(summary);
   }
+
   return { issues, truncated: false };
 };
 
@@ -102,13 +113,17 @@ const reporter: ErrorReporter.ErrorReporter = {
           : reason._tag === "Die"
             ? reason.defect
             : undefined;
+
       if (!isRequestRejection(error)) {
         continue;
       }
+
       const span = Context.getOption(fiber.context, Tracer.ParentSpan);
+
       if (Option.isNone(span) || span.value._tag !== "Span") {
         return;
       }
+
       const { issues, truncated } = collectIssues(error.cause.issue);
       span.value.attribute("error.type", "HttpApiSchemaError");
       span.value.attribute("feeblo.request.rejection.kind", error.kind);
@@ -116,6 +131,7 @@ const reporter: ErrorReporter.ErrorReporter = {
         "feeblo.request.rejection.issues",
         [...issues, ...(truncated ? ["+more"] : [])].join(", ")
       );
+
       return;
     }
   },

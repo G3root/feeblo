@@ -32,6 +32,7 @@ import {
 import type { EmailSubscriptionTokenError } from "./tokens";
 
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
 const EMAIL_SUBSCRIPTION_VERIFICATION_WINDOW = "24 hours";
 
 const verificationExpiration = (now: Date): Date =>
@@ -49,6 +50,7 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
   }) =>
     Effect.gen(function* () {
       const rateLimitService = yield* RateLimitService;
+
       return yield* rateLimitService.consume({
         key: `email-subscription:verification-request:${args.organizationId}:${args.email}`,
         limit: 3,
@@ -78,17 +80,21 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
       yield* entitlementPolicy.mayCreatePublicEmailSubscriptions(
         organizationId
       );
+
     if (!maySubscribe) {
       return yield* new Policy.PolicyDeniedError({
         reason:
           "Changelog email subscriptions require the Starter plan or higher.",
       });
     }
+
     const email = yield* parseEmailAddress(
       requestedEmail,
       "requestChangelogSubscription"
     );
+
     yield* consumeVerificationRequest({ email, organizationId });
+
     // A suppressed address can never complete double opt-in, so no verification
     // mail is recorded for it. The request still answers with the same generic
     // shape an already-active subscriber receives: the endpoint must not become
@@ -99,8 +105,10 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
       email,
       organizationId,
     });
+
     const now = yield* DateTime.nowAsDate;
     const verificationExpiresAt = verificationExpiration(now);
+
     const { outboxId, subscription } = yield* transaction(
       Effect.gen(function* () {
         const requested = yield* repository.requestSubscription({
@@ -111,9 +119,11 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
           topic: { topicId: null, topicType: "changelog" },
           verificationExpiresAt,
         });
+
         if (suppressed || Option.isNone(requested.verificationToken)) {
           return { outboxId: undefined, subscription: requested };
         }
+
         const recorded = yield* emailOutbox.recordIntent({
           aggregateId: requested.subscription.id,
           aggregateType: "email_subscription",
@@ -127,6 +137,7 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
           },
           scheduledAt: now,
         });
+
         return {
           outboxId:
             recorded._tag === "Inserted" ? recorded.intent.id : undefined,
@@ -134,7 +145,9 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
         };
       })
     );
+
     yield* wakeEmailOutboxBestEffort(outboxId, organizationId);
+
     return {
       ...subscription,
       verificationRequired:
@@ -147,6 +160,7 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
   )(function* ({ verificationToken }: { readonly verificationToken: string }) {
     const now = yield* DateTime.nowAsDate;
     yield* repository.verifySubscription({ now, verificationToken });
+
     // Do not turn this public endpoint into a token-validity oracle.
     return { verified: true };
   });
@@ -155,6 +169,7 @@ export const EmailSubscriptionConsentHandlersEffect = Effect.gen(function* () {
     function* ({ unsubscribeToken }: { readonly unsubscribeToken: string }) {
       const now = yield* DateTime.nowAsDate;
       yield* repository.unsubscribe({ now, unsubscribeToken });
+
       // This is intentionally idempotent and equally successful for unknown tokens.
       return { unsubscribed: true };
     }

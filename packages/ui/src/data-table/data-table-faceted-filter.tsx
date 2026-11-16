@@ -71,6 +71,7 @@ function DataTableFacetedFilterContent<TData extends RowData, TValue>({
         : [],
     [columnFilterValue]
   );
+
   const hasSelection = selectedValues.length > 0;
 
   const setValues = React.useCallback(
@@ -83,6 +84,7 @@ function DataTableFacetedFilterContent<TData extends RowData, TValue>({
   function onToggle(value: string) {
     if (!multiple) {
       setValues(selectedValues.includes(value) ? [] : [value]);
+
       return;
     }
 
@@ -95,6 +97,7 @@ function DataTableFacetedFilterContent<TData extends RowData, TValue>({
 
   const selectedOptions = selectedValues.flatMap((value) => {
     const option = options.find((item) => item.value === value);
+
     return option ? [option] : [];
   });
 

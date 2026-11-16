@@ -10,29 +10,34 @@ export const SlackConnection = Schema.Struct({
   lifecycle: IntegrationConnectionLifecycleStatus,
   createdAt: Schema.DateFromString,
 });
+
 export type TSlackConnection = typeof SlackConnection.Type;
 
 /** List connections scoped to one organization. */
 export const SlackConnectionList = Schema.Struct({
   organizationId: WorkspaceId.schema,
 });
+
 export type TSlackConnectionList = typeof SlackConnectionList.Type;
 
 /** Starts the OAuth install flow and returns the Slack authorize URL. */
 export const SlackConnectStart = Schema.Struct({
   organizationId: WorkspaceId.schema,
 });
+
 export type TSlackConnectStart = typeof SlackConnectStart.Type;
 
 export const SlackConnectStarted = Schema.Struct({
   authorizeUrl: Schema.URLFromString,
 });
+
 export type TSlackConnectStarted = typeof SlackConnectStarted.Type;
 
 /** Whether the Slack integration is configured for this deployment. */
 export const SlackIntegrationStatus = Schema.Struct({
   configured: Schema.Boolean,
 });
+
 export type TSlackIntegrationStatus = typeof SlackIntegrationStatus.Type;
 
 /** One Slack channel the bot can post into, with its notification state. */
@@ -46,6 +51,7 @@ export const SlackChannel = Schema.Struct({
   /** True when a `channel.notifications` route already exists for this channel. */
   notificationsEnabled: Schema.Boolean,
 });
+
 export type TSlackChannel = typeof SlackChannel.Type;
 
 /** Lists channels the bot belongs to for one connection. */
@@ -53,6 +59,7 @@ export const SlackChannelList = Schema.Struct({
   connectionId: IntegrationConnectionId.schema,
   organizationId: WorkspaceId.schema,
 });
+
 export type TSlackChannelList = typeof SlackChannelList.Type;
 
 /** Toggles new-post notifications for one channel of one connection. */
@@ -64,6 +71,7 @@ export const SlackChannelNotificationsUpdate = Schema.Struct({
   enabled: Schema.Boolean,
   organizationId: WorkspaceId.schema,
 });
+
 export type TSlackChannelNotificationsUpdate =
   typeof SlackChannelNotificationsUpdate.Type;
 
@@ -72,4 +80,5 @@ export const SlackConnectionDisconnect = Schema.Struct({
   connectionId: IntegrationConnectionId.schema,
   organizationId: WorkspaceId.schema,
 });
+
 export type TSlackConnectionDisconnect = typeof SlackConnectionDisconnect.Type;

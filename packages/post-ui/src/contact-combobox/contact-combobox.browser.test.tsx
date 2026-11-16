@@ -70,11 +70,13 @@ function Harness({
       search={(input) => {
         void onSearch(input);
         const query = input.query.toLowerCase();
+
         const fixtures = [member, voter, deferred].filter((contact) =>
           `${contact.name ?? ""} ${contact.email ?? ""}`
             .toLowerCase()
             .includes(query)
         );
+
         return Promise.resolve(fixtures);
       }}
       value={null}
@@ -98,6 +100,7 @@ describe("ContactCombobox", () => {
 
   it("debounces the search until at least two characters are typed", async () => {
     const onSearch = vi.fn().mockResolvedValue([]);
+
     const screen = await render(
       <Harness onSearch={onSearch} onSelect={() => {}} />
     );
@@ -122,6 +125,7 @@ describe("ContactCombobox", () => {
   it("renders contact rows with badges and selects one", async () => {
     const onSearch = vi.fn().mockResolvedValue([member]);
     const onSelect = vi.fn();
+
     const screen = await render(
       <Harness onSearch={onSearch} onSelect={onSelect} />
     );
@@ -145,6 +149,7 @@ describe("ContactCombobox", () => {
   it("disables rows that already voted and shows the no-access hint", async () => {
     const onSearch = vi.fn().mockResolvedValue([voter, deferred]);
     const onSelect = vi.fn();
+
     const screen = await render(
       <Harness onSearch={onSearch} onSelect={onSelect} />
     );
@@ -164,6 +169,7 @@ describe("ContactCombobox", () => {
   it("allows picking voted contacts when disableAlreadyVoted is false", async () => {
     const onSearch = vi.fn().mockResolvedValue([voter]);
     const onSelect = vi.fn();
+
     const screen = await render(
       <ContactCombobox
         disableAlreadyVoted={false}
@@ -173,6 +179,7 @@ describe("ContactCombobox", () => {
         postId="post-1"
         search={(input) => {
           onSearch(input);
+
           return Promise.resolve([voter]);
         }}
         value={null}
@@ -197,6 +204,7 @@ describe("ContactCombobox", () => {
   it("offers to create a new customer when nothing matches", async () => {
     const onSearch = vi.fn().mockResolvedValue([]);
     const onSelect = vi.fn();
+
     const screen = await render(
       <Harness onSearch={onSearch} onSelect={onSelect} />
     );
@@ -217,6 +225,7 @@ describe("ContactCombobox", () => {
   it("offers to create alongside results, except on an exact email hit", async () => {
     const onSearch = vi.fn().mockResolvedValue([member]);
     const onSelect = vi.fn();
+
     const screen = await render(
       <Harness onSearch={onSearch} onSelect={onSelect} />
     );
@@ -233,6 +242,7 @@ describe("ContactCombobox", () => {
 
   it("disables the create entry when the plan has no room", async () => {
     const onSelect = vi.fn();
+
     const screen = await render(
       <ContactCombobox
         createEligibility={() => Promise.resolve({ canCreate: false })}
@@ -260,7 +270,9 @@ describe("ContactCombobox", () => {
       ({ organizationId }: { organizationId: string }) =>
         Promise.resolve({ canCreate: organizationId === "org-b" })
     );
+
     const onSelect = vi.fn();
+
     const renderCombobox = (organizationId: string) => (
       <ContactCombobox
         createEligibility={createEligibility}
@@ -298,7 +310,9 @@ describe("ContactCombobox", () => {
       )
       .mockResolvedValueOnce({ canCreate: true })
       .mockResolvedValueOnce({ canCreate: false });
+
     const onSelect = vi.fn();
+
     const screen = await render(
       <ContactCombobox
         createEligibility={createEligibility}
@@ -331,6 +345,7 @@ describe("ContactCombobox", () => {
 
   it("keeps the create entry selectable while the plan has room", async () => {
     const onSelect = vi.fn();
+
     const screen = await render(
       <ContactCombobox
         createEligibility={() => Promise.resolve({ canCreate: true })}
@@ -356,6 +371,7 @@ describe("ContactCombobox", () => {
   it("hides the create entry on an exact email hit", async () => {
     const onSearch = vi.fn().mockResolvedValue([member]);
     const onSelect = vi.fn();
+
     const screen = await render(
       <Harness onSearch={onSearch} onSelect={onSelect} />
     );
@@ -370,9 +386,11 @@ describe("ContactCombobox", () => {
   it("selects a visible result and clears the selection", async () => {
     const onSearch = vi.fn().mockResolvedValue([member]);
     let selection: ContactComboboxSelection | null = null;
+
     const onSelect = vi.fn((next: ContactComboboxSelection | null) => {
       selection = next;
     });
+
     const screen = await render(
       <Harness onSearch={onSearch} onSelect={onSelect} />
     );

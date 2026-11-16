@@ -42,6 +42,7 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await preloadContacts();
+
     return null;
   },
 });
@@ -84,8 +85,10 @@ function ContactPage() {
   const openCreateDialog = () => {
     if (hasReachedCrmLimit) {
       upgradePlanStore.send({ type: "toggle" });
+
       return;
     }
+
     createDialogStore.send({ type: "toggle" });
   };
 

@@ -7,8 +7,11 @@ import type { DiscordEmbed } from "./discord-embeds";
 import type { DiscordInteractionCallback } from "./discord-inbound-schema";
 
 const TITLE_MAX_LENGTH = 200;
+
 const DETAILS_MAX_LENGTH = 3000;
+
 const BOARD_SELECT_MAX_OPTIONS = 25;
+
 const FEEDBACK_MODAL_TITLE = "Send feedback to Feeblo";
 
 /**
@@ -27,6 +30,7 @@ export const DiscordFeedbackModalMetadata = Schema.Struct({
   channelId: Schema.String,
   messageId: Schema.optionalKey(Schema.String),
 });
+
 export type DiscordFeedbackModalMetadata = Schema.Schema.Type<
   typeof DiscordFeedbackModalMetadata
 >;
@@ -48,6 +52,7 @@ export const decodeModalMetadata = (
   customId: string
 ): Effect.Effect<DiscordFeedbackModalMetadata, ChatInboundFailure> => {
   const parts = customId.split(":");
+
   if (
     parts[0] !== DISCORD_FEEDBACK_MODAL_CUSTOM_ID_PREFIX ||
     parts.length < 4 ||
@@ -59,12 +64,14 @@ export const decodeModalMetadata = (
       })
     );
   }
+
   const [organizationId, guildId, channelId, messageId] = [
     parts[1],
     parts[2],
     parts[3],
     parts[4],
   ];
+
   if (
     organizationId === undefined ||
     guildId === undefined ||
@@ -76,6 +83,7 @@ export const decodeModalMetadata = (
       })
     );
   }
+
   return Schema.decodeEffect(DiscordFeedbackModalMetadata)({
     ...(messageId === undefined ? undefined : { messageId }),
     channelId,
@@ -108,6 +116,7 @@ export const readModalValue = (
   const value = components
     .map(({ component }) => component)
     .find((component) => component.custom_id === customId);
+
   return value?.type === 4 ? value.value : value?.values[0];
 };
 

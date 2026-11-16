@@ -14,6 +14,7 @@ import * as Effect from "effect/Effect";
 export const SlackManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* SlackManagementService;
   const handlers = yield* makeChatManagementRpcHandlers(service);
+
   return {
     ListSlackChannels: handlers.channelList,
     UpdateSlackChannelNotifications: handlers.channelNotificationsUpdate,

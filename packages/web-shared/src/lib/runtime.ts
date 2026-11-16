@@ -18,6 +18,7 @@ function getServerApiUrl(): string {
 
 /** Browser- and server-scoped runtimes, created on first use. */
 let browserRuntime: ReturnType<typeof createRuntime> | null = null;
+
 let serverRuntime: ReturnType<typeof createRuntime> | null = null;
 
 /**
@@ -34,10 +35,12 @@ let serverRuntime: ReturnType<typeof createRuntime> | null = null;
 function getRuntime() {
   if (hasWindow()) {
     browserRuntime ??= createRuntime(getRuntimePublicEnv().apiUrl);
+
     return browserRuntime;
   }
 
   serverRuntime ??= createRuntime(getServerApiUrl());
+
   return serverRuntime;
 }
 
@@ -60,9 +63,11 @@ export async function runEffect<A, E, R>(
     effect as Effect.Effect<A, E, never>,
     { signal: options?.signal }
   );
+
   if (Exit.isFailure(result)) {
     throw new RpcError(result.cause);
   }
+
   return result.value;
 }
 

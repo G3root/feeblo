@@ -48,6 +48,7 @@ type AttributeType = (typeof attributeTypes)[number]["value"];
 export function CustomAttributeCreateDialog() {
   const store = useCustomAttributeCreateDialogContext();
   const open = useSelector(store, (state) => state.context.open);
+
   const entityType = useSelector(
     store,
     (state) => state.context.data.entityType
@@ -74,10 +75,12 @@ function CustomAttributeCreateForm({
   entityType: CustomAttributeEntityType;
 }) {
   const organizationId = useOrganizationId();
+
   const {
     companyAttributeDefinitionCollection,
     contactAttributeDefinitionCollection,
   } = useDashboardCollections();
+
   const store = useCustomAttributeCreateDialogContext();
 
   const form = useAppForm({
@@ -100,6 +103,7 @@ function CustomAttributeCreateForm({
     },
     onSubmit: async ({ value }) => {
       const now = new Date();
+
       const commonDefinition = {
         config: null,
         createdAt: now,

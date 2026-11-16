@@ -22,6 +22,7 @@ export const WebhookEncryptedCredentialMaterial = Schema.Struct({
     ),
   }),
 });
+
 export type WebhookEncryptedCredentialMaterial = Schema.Schema.Type<
   typeof WebhookEncryptedCredentialMaterial
 >;
@@ -50,6 +51,7 @@ export const encryptWebhookCredentialMaterial = (
 > =>
   Effect.gen(function* () {
     const key = yield* validateWebhookEncryptionKey(encryptionKey);
+
     const encoded = yield* Schema.encodeEffect(
       Schema.fromJsonString(WebhookEncryptedCredentialMaterial)
     )(credentials).pipe(
@@ -61,6 +63,7 @@ export const encryptWebhookCredentialMaterial = (
           })
       )
     );
+
     return yield* encryptWebhookCredential(key, Redacted.make(encoded));
   });
 

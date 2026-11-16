@@ -73,6 +73,7 @@ function GitHubPostResourceActionsContent({
   readonly organizationId: string;
 }) {
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
+
   const hasActiveConnection = Result.builder(connectionsResult)
     .onInitial(
       // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
@@ -95,6 +96,7 @@ function GitHubPostResourceActionsContent({
   if (hasActiveConnection === null) {
     return null;
   }
+
   // Without an active installation the issue actions would dead-end in an
   // empty dialog, so surface a single muted status row instead.
   if (!hasActiveConnection) {
@@ -105,6 +107,7 @@ function GitHubPostResourceActionsContent({
       </MenuItem>
     );
   }
+
   return (
     <>
       <MenuItem onClick={() => onSelectAction("create")}>
@@ -137,6 +140,7 @@ export function GitHubPostIssueDialog({
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
+
   const connections = Result.builder(connectionsResult)
     .onInitial(
       // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
@@ -197,12 +201,15 @@ function GitHubPostIssueForm({
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const [idempotencyKey] = useState(() => crypto.randomUUID());
+
   const createIssue = useAtomSet(createGitHubPostIssueAtom, {
     mode: "promise",
   });
+
   const linkIssue = useAtomSet(linkGitHubPostIssueAtom, {
     mode: "promise",
   });
+
   const form = useAppForm({
     ...githubPostIssueFormOpts,
     defaultValues: {
@@ -214,6 +221,7 @@ function GitHubPostIssueForm({
     onSubmit: async ({ value }) => {
       const [repositoryOwner, repositoryName] =
         value.repositoryFullName.split("/");
+
       const input = {
         organizationId,
         postId,
@@ -222,6 +230,7 @@ function GitHubPostIssueForm({
         repositoryName: repositoryName ?? "",
         idempotencyKey,
       };
+
       try {
         if (value.action === "create") {
           await createIssue({
@@ -243,6 +252,7 @@ function GitHubPostIssueForm({
             },
           });
         }
+
         onOpenChange(false);
         toastManager.add({
           title:
@@ -267,9 +277,11 @@ function GitHubPostIssueForm({
     form.store,
     (state) => state.values.connectionId
   );
+
   const repositoriesResult = useAtomValue(
     gitHubRepositoriesAtom({ organizationId, connectionId })
   );
+
   const repositories = Result.builder(repositoriesResult)
     .onInitial(() => ({
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.

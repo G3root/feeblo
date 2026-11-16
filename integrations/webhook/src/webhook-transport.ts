@@ -17,6 +17,7 @@ import type { WebhookSigningHeaders } from "./webhook-signing";
 
 /** Maximum outbound webhook payload bytes, enforced before a socket can be opened. */
 export const WEBHOOK_MAX_PAYLOAD_BYTES = 256 * 1024;
+
 /** Maximum outbound webhook request duration. */
 export const WEBHOOK_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -46,20 +47,27 @@ export const parseWebhookRetryAfter = (
   if (value === undefined) {
     return undefined;
   }
+
   // Number() alone would accept empty, hexadecimal, exponent, and sign forms;
   // RFC 7231 only permits plain nonnegative decimal digits here.
   const seconds = delaySecondsPattern.test(value) ? Number(value) : undefined;
+
   if (seconds !== undefined && Number.isSafeInteger(seconds)) {
     return Duration.min(Duration.seconds(seconds), Duration.days(1));
   }
+
   if (!httpDatePattern.test(value)) {
     return undefined;
   }
+
   const retryAt = Date.parse(value);
+
   if (Number.isNaN(retryAt)) {
     return undefined;
   }
+
   const delta = Math.ceil((retryAt - now.epochMilliseconds) / 1000);
+
   return Duration.min(Duration.seconds(Math.max(0, delta)), Duration.days(1));
 };
 
@@ -86,12 +94,14 @@ export const makeWebhookPinnedLookup =
     const requestedFamily = isString(options.family)
       ? familyLabelToNumber[options.family]
       : options.family;
+
     const matchingAddresses = pinnedAddresses.filter(
       (address) =>
         requestedFamily === undefined ||
         requestedFamily === 0 ||
         isIP(address) === requestedFamily
     );
+
     if (options.all === true) {
       callback(
         null,
@@ -100,13 +110,18 @@ export const makeWebhookPinnedLookup =
           family: isIP(address),
         }))
       );
+
       return;
     }
+
     const pinnedAddress = matchingAddresses[0];
+
     if (pinnedAddress === undefined) {
       callback(null, []);
+
       return;
     }
+
     callback(null, pinnedAddress, isIP(pinnedAddress));
   };
 
@@ -131,6 +146,7 @@ export const sendWebhookDelivery = Effect.fn(
   readonly signingHeaders: WebhookSigningHeaders;
 }) {
   const contentLength = Buffer.byteLength(rawBody, "utf8");
+
   if (contentLength > WEBHOOK_MAX_PAYLOAD_BYTES) {
     return yield* new WebhookTransportError({
       kind: "payload_too_large",
@@ -138,6 +154,7 @@ export const sendWebhookDelivery = Effect.fn(
         "WebhookTransportError: webhook payload exceeds the 256 KiB limit",
     });
   }
+
   // The client error cause is intentionally dropped when mapping transport
   // failures: it can carry the endpoint URL and request metadata that must
   // stay out of persisted and logged failures.
@@ -147,7 +164,9 @@ export const sendWebhookDelivery = Effect.fn(
       message:
         "WebhookTransportError: network failure while sending the webhook delivery",
     });
+
   const pinnedAddress = endpoint.pinnedAddresses[0];
+
   if (pinnedAddress === undefined) {
     return yield* networkFailure();
   }
@@ -161,6 +180,7 @@ export const sendWebhookDelivery = Effect.fn(
         keepAlive: false,
         lookup: pinnedLookup,
       });
+
       const client = yield* NodeHttpClient.makeNodeHttp.pipe(
         Effect.provideService(NodeHttpClient.HttpAgent, agent)
       );
@@ -188,15 +208,18 @@ export const sendWebhookDelivery = Effect.fn(
       );
 
       const now = yield* DateTime.now;
+
       const retryAfterHeader = Option.getOrUndefined(
         Headers.get(response.headers, "retry-after")
       );
+
       // Parse before the spread so an invalid header value (or an absent one)
       // never materializes an explicit `retryAfter: undefined` key.
       const retryAfter =
         retryAfterHeader === undefined
           ? undefined
           : parseWebhookRetryAfter(retryAfterHeader, now);
+
       return {
         status: response.status,
         ...(retryAfter === undefined ? undefined : { retryAfter }),

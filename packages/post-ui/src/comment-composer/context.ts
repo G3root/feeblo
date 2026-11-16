@@ -99,6 +99,7 @@ export function useCommentComposer() {
  */
 export function useCommentComposerIsDisabled(): boolean {
   const { state } = useCommentComposer();
+
   const isStoreSubmitting = useCommentComposerState(
     (context) => context.isSubmitting
   );

@@ -79,6 +79,7 @@ export const makeOriginCheckMiddleware = (config: AllowedOriginConfig) => {
       const origin = Option.getOrUndefined(
         Headers.get(request.headers, "origin")
       );
+
       if (origin !== undefined) {
         // A literal "null" origin (sandboxed frame, file://, opaque origin) is
         // never a trusted Feeblo origin.
@@ -88,6 +89,7 @@ export const makeOriginCheckMiddleware = (config: AllowedOriginConfig) => {
       const fetchSite = Option.getOrUndefined(
         Headers.get(request.headers, "sec-fetch-site")
       );
+
       if (fetchSite !== undefined) {
         return SAFE_FETCH_SITES.has(fetchSite)
           ? httpApp
@@ -97,8 +99,10 @@ export const makeOriginCheckMiddleware = (config: AllowedOriginConfig) => {
       const cookie = Option.getOrUndefined(
         Headers.get(request.headers, "cookie")
       );
+
       const carriesSession =
         cookie !== undefined && SESSION_COOKIE_PATTERN.test(cookie);
+
       if (
         carriesSession &&
         isCookieAuthenticatedEffectPath(requestPath(request))

@@ -17,6 +17,7 @@ export function CurrentPlanStat({
     </div>
   );
 }
+
 export function PlanGridSkeleton() {
   return (
     <div className="grid gap-4 xl:grid-cols-3">

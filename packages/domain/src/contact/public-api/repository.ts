@@ -129,10 +129,12 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
               args.organizationId,
               args.externalId
             );
+
       const byEmail =
         args.email === null || args.email === undefined
           ? Option.none<ContactRow>()
           : yield* findContactByEmail(args.organizationId, args.email);
+
       return { byEmail, byExternalId };
     });
 
@@ -178,17 +180,21 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
         const conditions: SQL[] = [
           eq(schema.contactTable.organizationId, organizationId),
         ];
+
         if (externalId !== null) {
           conditions.push(eq(schema.contactTable.externalId, externalId));
         }
+
         if (email !== null) {
           conditions.push(
             sql`lower(${schema.contactTable.email}) = ${normalizeEmail(email)}`
           );
         }
+
         if (companyId !== null) {
           conditions.push(eq(schema.contactTable.companyId, companyId));
         }
+
         if (cursor !== null) {
           conditions.push(
             sql`(${schema.contactTable.createdAt}, ${schema.contactTable.id}) < (${cursor.createdAt}, ${cursor.id})`
@@ -273,6 +279,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
     }) =>
       Effect.gen(function* () {
         const wantedExternalId = externalId ?? null;
+
         const wantedEmail =
           email === null || email === undefined ? email : normalizeEmail(email);
 
@@ -280,6 +287,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
         // create-versus-update; neither needs the other's answer, so they run
         // together and the company verdict is applied after both resolve.
         const checksCompany = companyId !== undefined && companyId !== null;
+
         const [company, found] = yield* Effect.all(
           [
             checksCompany
@@ -356,6 +364,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
             insert: Effect.gen(function* () {
               const id = yield* ContactId.generate;
               const now = yield* DateTime.nowAsDate;
+
               const [created = null] = yield* db
                 .insert(schema.contactTable)
                 .values({
@@ -372,6 +381,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
                 })
                 .onConflictDoNothing()
                 .returning();
+
               return Option.fromNullishOr(created);
             }),
             onLostRace: Effect.fail(
@@ -392,6 +402,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
         }
 
         const now = yield* DateTime.nowAsDate;
+
         return yield* db.transaction((tx) =>
           Effect.gen(function* () {
             const [updated = null] = yield* tx
@@ -430,6 +441,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
                 userId: updated.userId,
               });
             }
+
             return toEndUserSource(updated);
           })
         );
@@ -449,6 +461,7 @@ const makePublicApiEndUserRepository = Effect.gen(function* () {
       ),
   };
 });
+
 export class PublicApiEndUserRepository extends Context.Service<PublicApiEndUserRepository>()(
   "PublicApiEndUserRepository",
   {

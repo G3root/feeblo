@@ -131,6 +131,7 @@ const makeUserBanRepository = Effect.gen(function* () {
           )
         )
         .limit(1);
+
       return row !== undefined;
     });
 
@@ -219,6 +220,7 @@ const makeUserBanRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         if (contact !== undefined) {
           userId ??= contact.userId;
           email ??= normalizedEmail(contact.email);
@@ -239,10 +241,12 @@ const makeUserBanRepository = Effect.gen(function* () {
     input: UserBanLookup
   ) {
     const { email, userId } = yield* resolveLookup(input);
+
     const facets = [
       ...(userId === null ? [] : [eq(table.userId, userId)]),
       ...(email === null ? [] : [eq(table.email, email)]),
     ];
+
     if (facets.length === 0) {
       return false;
     }
@@ -252,6 +256,7 @@ const makeUserBanRepository = Effect.gen(function* () {
       .from(table)
       .where(and(eq(table.organizationId, input.organizationId), or(...facets)))
       .limit(1);
+
     return row !== undefined;
   });
 
@@ -267,15 +272,18 @@ const makeUserBanRepository = Effect.gen(function* () {
     input: UserBanLookup
   ) {
     const { email, userId } = yield* resolveLookup(input);
+
     if (userId !== null) {
       return yield* isWorkspaceMember({
         organizationId: input.organizationId,
         userId,
       });
     }
+
     if (email === null) {
       return false;
     }
+
     return yield* emailBelongsToMember({
       email,
       organizationId: input.organizationId,
@@ -312,13 +320,16 @@ const makeUserBanRepository = Effect.gen(function* () {
         .from(schema.userTable)
         .where(eq(schema.userTable.id, input.userId))
         .limit(1);
+
       if (user === undefined) {
         return { status: "not_found" } as const;
       }
+
       const member = yield* isWorkspaceMember({
         organizationId: input.organizationId,
         userId: user.id,
       });
+
       if (member) {
         return { status: "member" } as const;
       }
@@ -327,9 +338,11 @@ const makeUserBanRepository = Effect.gen(function* () {
         organizationId: input.organizationId,
         userId: user.id,
       });
+
       const related =
         user.restrictedToOrganizationId === input.organizationId ||
         contact !== undefined;
+
       if (input.requireRelated && !related) {
         return { status: "not_found" } as const;
       }
@@ -375,9 +388,11 @@ const makeUserBanRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         if (comment === undefined) {
           return { status: "not_found" } as const;
         }
+
         return yield* resolveUserTarget({
           organizationId: input.organizationId,
           requireRelated: false,
@@ -398,9 +413,11 @@ const makeUserBanRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         if (post === undefined || post.creatorId === null) {
           return { status: "not_found" } as const;
         }
+
         return yield* resolveUserTarget({
           organizationId: input.organizationId,
           requireRelated: false,
@@ -433,6 +450,7 @@ const makeUserBanRepository = Effect.gen(function* () {
           // stronger relationship, so it wins the arbitrary-order tie.
           .orderBy(asc(sql`${schema.contactTable.userId} is null`))
           .limit(1);
+
         if (contact !== undefined) {
           if (contact.userId === null) {
             // The contact is unlinked, but its address may still belong to a
@@ -446,6 +464,7 @@ const makeUserBanRepository = Effect.gen(function* () {
             ) {
               return { status: "member" } as const;
             }
+
             return {
               email,
               name: contact.name,
@@ -453,13 +472,16 @@ const makeUserBanRepository = Effect.gen(function* () {
               userId: null,
             } as const;
           }
+
           const member = yield* isWorkspaceMember({
             organizationId: input.organizationId,
             userId: contact.userId,
           });
+
           if (member) {
             return { status: "member" } as const;
           }
+
           // The contact's own account is not a member, but the address it
           // carries may still be a member's; banning that address would claim
           // to ban staff.
@@ -471,11 +493,13 @@ const makeUserBanRepository = Effect.gen(function* () {
           ) {
             return { status: "member" } as const;
           }
+
           const [user] = yield* db
             .select({ name: schema.userTable.name })
             .from(schema.userTable)
             .where(eq(schema.userTable.id, contact.userId))
             .limit(1);
+
           return {
             email,
             name: contact.name ?? user?.name ?? null,
@@ -499,14 +523,17 @@ const makeUserBanRepository = Effect.gen(function* () {
         // workspace through a restricted identity or a contact row. An
         // unrelated global account is not adopted by address.
         const user = yield* findUserByEmail(email);
+
         if (user !== undefined) {
           const contact = yield* findContactByUserId({
             organizationId: input.organizationId,
             userId: user.id,
           });
+
           const related =
             user.restrictedToOrganizationId === input.organizationId ||
             contact !== undefined;
+
           if (related) {
             return {
               email,
@@ -542,11 +569,13 @@ const makeUserBanRepository = Effect.gen(function* () {
           )
         )
         .limit(1);
+
       if (contact === undefined) {
         return { status: "not_found" } as const;
       }
 
       let user: { email: string; name: string | null } | undefined;
+
       if (contact.userId) {
         const [row] = yield* db
           .select({
@@ -556,12 +585,15 @@ const makeUserBanRepository = Effect.gen(function* () {
           .from(schema.userTable)
           .where(eq(schema.userTable.id, contact.userId))
           .limit(1);
+
         user = row;
+
         if (user !== undefined) {
           const member = yield* isWorkspaceMember({
             organizationId: input.organizationId,
             userId: contact.userId,
           });
+
           if (member) {
             return { status: "member" } as const;
           }
@@ -570,9 +602,11 @@ const makeUserBanRepository = Effect.gen(function* () {
 
       const email = normalizedEmail(contact.email ?? user?.email);
       const userId = contact.userId ?? null;
+
       if (email === null && userId === null) {
         return { status: "unresolvable" } as const;
       }
+
       // The contact's address may belong to a member even when the contact is
       // linked to somebody else. The email target refuses that case for the
       // same reason; naming the contact must not be a way around it.
@@ -585,6 +619,7 @@ const makeUserBanRepository = Effect.gen(function* () {
       ) {
         return { status: "member" } as const;
       }
+
       return {
         email,
         name: contact.name ?? user?.name ?? null,
@@ -615,10 +650,12 @@ const makeUserBanRepository = Effect.gen(function* () {
     input: UpsertUserBanInput
   ) {
     let resolvedEmail = normalizedEmail(input.email);
+
     if (resolvedEmail === null && input.userId !== null) {
       const user = yield* findUserEmail(input.userId);
       resolvedEmail = normalizedEmail(user?.email);
     }
+
     if (resolvedEmail === null) {
       return yield* dataError(
         "upsert",
@@ -627,6 +664,7 @@ const makeUserBanRepository = Effect.gen(function* () {
           : "The banned account does not exist"
       );
     }
+
     const email = resolvedEmail;
 
     return yield* transaction(
@@ -645,6 +683,7 @@ const makeUserBanRepository = Effect.gen(function* () {
           })
           .onConflictDoNothing()
           .returning();
+
         if (inserted !== undefined) {
           return inserted;
         }
@@ -663,7 +702,9 @@ const makeUserBanRepository = Effect.gen(function* () {
                 )
                 .limit(1)
                 .for("update");
+
         const [ownRow] = ownRows;
+
         const [emailRow] = yield* db
           .select()
           .from(table)
@@ -691,9 +732,11 @@ const makeUserBanRepository = Effect.gen(function* () {
             emailRow !== undefined &&
             emailRow.id !== ownRow.id &&
             emailRow.userId === null;
+
           if (addressOnlyDuplicate) {
             yield* db.delete(table).where(eq(table.id, emailRow.id));
           }
+
           // An address owned by another account is already banned for the
           // workspace. That row keeps it: the unique index allows one row per
           // address, and moving it here would leave the other account unowned.
@@ -701,24 +744,29 @@ const makeUserBanRepository = Effect.gen(function* () {
             emailRow === undefined ||
             addressOnlyDuplicate ||
             emailRow.id === ownRow.id;
+
           const updateValues: UserBanRowUpdate = {
             reason: input.reason ?? ownRow.reason,
             updatedAt: input.now,
           };
+
           if (takesAddress) {
             updateValues.email = email;
           }
+
           const [updated] = yield* db
             .update(table)
             .set(updateValues)
             .where(eq(table.id, ownRow.id))
             .returning();
+
           if (updated === undefined) {
             return yield* dataError(
               "upsert",
               "A ban update did not resolve to a stored row"
             );
           }
+
           return updated;
         }
 
@@ -737,20 +785,24 @@ const makeUserBanRepository = Effect.gen(function* () {
             reason: input.reason ?? emailRow.reason,
             updatedAt: input.now,
           };
+
           if (input.userId !== null) {
             updateValues.userId = input.userId;
           }
+
           const [updated] = yield* db
             .update(table)
             .set(updateValues)
             .where(eq(table.id, emailRow.id))
             .returning();
+
           if (updated === undefined) {
             return yield* dataError(
               "upsert",
               "A ban update did not resolve to a stored row"
             );
           }
+
           return updated;
         }
 
@@ -759,12 +811,14 @@ const makeUserBanRepository = Effect.gen(function* () {
         const accountEmail = normalizedEmail(
           (yield* findUserEmail(input.userId))?.email
         );
+
         if (accountEmail === null) {
           return yield* dataError(
             "upsert",
             "The banned account does not exist"
           );
         }
+
         const [accountEmailRow] = yield* db
           .select()
           .from(table)
@@ -776,6 +830,7 @@ const makeUserBanRepository = Effect.gen(function* () {
           )
           .limit(1)
           .for("update");
+
         if (accountEmailRow !== undefined) {
           if (accountEmailRow.userId !== null) {
             return yield* dataError(
@@ -783,6 +838,7 @@ const makeUserBanRepository = Effect.gen(function* () {
               "The address is already banned for another account"
             );
           }
+
           const [updated] = yield* db
             .update(table)
             .set({
@@ -792,12 +848,14 @@ const makeUserBanRepository = Effect.gen(function* () {
             })
             .where(eq(table.id, accountEmailRow.id))
             .returning();
+
           if (updated === undefined) {
             return yield* dataError(
               "upsert",
               "A ban update did not resolve to a stored row"
             );
           }
+
           return updated;
         }
 
@@ -815,12 +873,14 @@ const makeUserBanRepository = Effect.gen(function* () {
           })
           .onConflictDoNothing()
           .returning();
+
         if (created === undefined) {
           return yield* dataError(
             "upsert",
             "A ban insert did not resolve to a stored row"
           );
         }
+
         return created;
       })
     );
@@ -884,6 +944,7 @@ const makeUserBanRepository = Effect.gen(function* () {
     // account, so a contact linked to the account or carrying the same
     // normalized address is the same person here.
     const email = normalizedEmail(input.email);
+
     const contactIds = yield* db
       .select({ id: schema.emailContactTable.id })
       .from(schema.emailContactTable)
@@ -952,6 +1013,7 @@ const makeUserBanRepository = Effect.gen(function* () {
     }) {
       const comments = schema.commentTable;
       const posts = schema.postTable;
+
       const ownComments = and(
         eq(comments.organizationId, input.organizationId),
         eq(comments.userId, input.userId)
@@ -971,6 +1033,7 @@ const makeUserBanRepository = Effect.gen(function* () {
             and reply.user_id <> ${input.userId}
           returning reply.id
         `);
+
         if (reanchored.rows.length === 0) {
           break;
         }
@@ -1042,6 +1105,7 @@ const makeUserBanRepository = Effect.gen(function* () {
   ) {
     const creator = alias(schema.userTable, "user_ban_creator");
     const search = input.search?.trim();
+
     const searchCondition =
       search === undefined || search === ""
         ? undefined
@@ -1049,6 +1113,7 @@ const makeUserBanRepository = Effect.gen(function* () {
             ilike(table.email, `%${escapeLikePattern(search)}%`),
             ilike(schema.userTable.name, `%${escapeLikePattern(search)}%`)
           );
+
     const condition = and(
       eq(table.organizationId, input.organizationId),
       searchCondition
@@ -1105,6 +1170,7 @@ const makeUserBanRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: table.id });
+
     return { removed: removed !== undefined };
   });
 
@@ -1146,6 +1212,7 @@ const makeUserBanRepository = Effect.gen(function* () {
                   )
                 )
               );
+
       const facets = [
         ...(input.userId === null ? [] : [eq(table.userId, input.userId)]),
         // The address the caller named is the person being unbanned. A row
@@ -1169,15 +1236,18 @@ const makeUserBanRepository = Effect.gen(function* () {
           ? []
           : [and(inArray(table.email, contactEmails), isNull(table.userId))]),
       ];
+
       if (facets.length === 0) {
         return { removed: false };
       }
+
       const [removed] = yield* db
         .delete(table)
         .where(
           and(eq(table.organizationId, input.organizationId), or(...facets))
         )
         .returning({ id: table.id });
+
       return { removed: removed !== undefined };
     }
   );

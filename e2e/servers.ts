@@ -21,12 +21,19 @@ import { isString } from "@feeblo/utils/runtime-kind";
 const execFileAsync = promisify(execFile);
 
 const e2eDirectory = path.dirname(fileURLToPath(import.meta.url));
+
 const repositoryRoot = path.resolve(e2eDirectory, "..");
+
 const serverDirectory = path.join(repositoryRoot, "apps", "server");
+
 const tsxBinary = path.join(repositoryRoot, "node_modules", ".bin", "tsx");
+
 const migrateScript = path.join(e2eDirectory, "scripts", "migrate-pglite.ts");
+
 const serverEntry = path.join(serverDirectory, "src", "index.ts");
+
 const webEntry = path.join(repositoryRoot, "apps", "web", "server.mjs");
+
 const parentWatchdogUrl = pathToFileURL(
   path.join(e2eDirectory, "scripts", "parent-watchdog.mjs")
 ).href;
@@ -73,15 +80,20 @@ const freePort = (): Promise<number> =>
     probe.once("error", reject);
     probe.listen(0, "127.0.0.1", () => {
       const address = probe.address();
+
       if (address === null || isString(address)) {
         reject(new Error("Port probe did not return a TCP address"));
+
         return;
       }
+
       probe.close((error) => {
         if (error) {
           reject(error);
+
           return;
         }
+
         resolve(address.port);
       });
     });
@@ -155,6 +167,7 @@ const pipeToFile = (child: ChildProcess, logPath: string): void => {
 
 const readLogTail = async (logPath: string): Promise<string> => {
   const output = await readFile(logPath, "utf8").catch(() => "");
+
   return output.split("\n").slice(-40).join("\n").trim();
 };
 
@@ -180,17 +193,21 @@ const waitForHttp = async (input: {
         )}`
       );
     }
+
     try {
       const response = await fetch(input.url, {
         signal: AbortSignal.timeout(5_000),
       });
+
       if (response.ok) {
         await response.body?.cancel();
+
         return;
       }
     } catch {
       // The server is still starting; the deadline decides when that is a failure.
     }
+
     await delay(250);
   }
 
@@ -204,6 +221,7 @@ const waitForHttp = async (input: {
 const processGroupExists = (pid: number): boolean => {
   try {
     process.kill(-pid, 0);
+
     return true;
   } catch {
     return false;
@@ -226,9 +244,11 @@ const stopProcessGroup = async (pid: number | undefined): Promise<void> => {
 
   signalGroup("SIGTERM");
   const deadline = Date.now() + gracefulShutdownMs;
+
   while (Date.now() < deadline && processGroupExists(pid)) {
     await delay(200);
   }
+
   if (processGroupExists(pid)) {
     signalGroup("SIGKILL");
   }
@@ -252,13 +272,16 @@ const startWorkerServer = async (
 
   const apiPort = await freePort();
   let webPort = await freePort();
+
   while (webPort === apiPort) {
     webPort = await freePort();
   }
+
   const apiURL = `http://localhost:${apiPort}`;
   const webURL = `http://localhost:${webPort}`;
 
   const inheritedNodeOptions = process.env.NODE_OPTIONS;
+
   const env = {
     ...process.env,
     ...serverEnvironment({ apiPort, apiURL, databaseURL, webPort, webURL }),
@@ -286,6 +309,7 @@ const startWorkerServer = async (
     cwd: serverDirectory,
     env,
   });
+
   pipeToFile(api, apiLogPath);
 
   const web = startProcess({
@@ -294,6 +318,7 @@ const startWorkerServer = async (
     cwd: repositoryRoot,
     env,
   });
+
   pipeToFile(web, webLogPath);
 
   try {
@@ -337,6 +362,7 @@ const pruneAbandonedRunDirectories = async (): Promise<void> => {
   const entries = await readdir(tmpdir(), { withFileTypes: true }).catch(
     () => []
   );
+
   const removableBefore = Date.now() - staleRunAgeMs;
 
   await Promise.all(
@@ -348,6 +374,7 @@ const pruneAbandonedRunDirectories = async (): Promise<void> => {
       .map(async (entry) => {
         const directory = path.join(tmpdir(), entry.name);
         const info = await stat(directory).catch(() => null);
+
         if (info !== null && info.mtimeMs < removableBefore) {
           await rm(directory, { force: true, recursive: true }).catch(
             () => undefined
@@ -375,6 +402,7 @@ export const startWorkerServers = async (
   await pruneAbandonedRunDirectories();
   const runDirectory = mkdtempSync(path.join(tmpdir(), runDirectoryPrefix));
   const servers: WorkerServer[] = [];
+
   try {
     for (let worker = 0; worker < workerCount; worker += 1) {
       servers.push(await startWorkerServer(worker, runDirectory));
@@ -384,6 +412,7 @@ export const startWorkerServers = async (
     await stopWorkerServers({ runDirectory, servers });
     throw error;
   }
+
   return { runDirectory, servers };
 };
 
@@ -394,6 +423,7 @@ export const stopWorkerServers = async (
     await stopProcessGroup(server.webPid);
     await stopProcessGroup(server.apiPid);
   }
+
   await rm(manifest.runDirectory, { force: true, recursive: true });
 };
 
@@ -405,6 +435,7 @@ export const writeServerManifest = async (
 ): Promise<string> => {
   const file = serverManifestPath(manifest.runDirectory);
   await writeFile(file, JSON.stringify(manifest, null, 2), { mode: 0o600 });
+
   return file;
 };
 
@@ -414,5 +445,6 @@ export const readServerManifest = async (
   // SAFETY: The file is written by `writeServerManifest` earlier in this same
   // run, so its shape is the one this process serialized.
   const manifest = JSON.parse(await readFile(file, "utf8")) as ServerManifest;
+
   return manifest;
 };

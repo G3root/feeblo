@@ -65,6 +65,7 @@ const parseInteraction = (
   rawBody: string
 ): Effect.Effect<ParsedDiscordInboundRequest, DiscordInboundPayloadError> => {
   let json: unknown;
+
   try {
     json = JSON.parse(rawBody);
   } catch {
@@ -74,6 +75,7 @@ const parseInteraction = (
       })
     );
   }
+
   return Schema.decodeUnknownEffect(DiscordInteraction)(json).pipe(
     Effect.map((interaction): ParsedDiscordInboundRequest => {
       switch (interaction.type) {
@@ -118,25 +120,31 @@ const makeDiscordInteractionsHandler = ({
           timestampHeader: input.headers["x-signature-timestamp"] ?? "",
         })
       );
+
       if (Result.isFailure(verified)) {
         yield* Effect.logWarning(
           "Discord interaction signature validation failed"
         ).pipe(Effect.annotateLogs("reason", verified.failure.reason));
+
         return {
           body: "invalid request signature",
           status: 401,
         } satisfies IntegrationInboundResponse;
       }
+
       const parsed = yield* Effect.result(parseInteraction(input.rawBody));
+
       if (Result.isFailure(parsed)) {
         yield* Effect.logWarning(
           "Discord interaction payload validation failed"
         ).pipe(Effect.annotateLogs("reason", parsed.failure.reason));
+
         return {
           body: "invalid request payload",
           status: 400,
         } satisfies IntegrationInboundResponse;
       }
+
       return {
         body: parsed.success,
         status: 200,
@@ -164,8 +172,10 @@ export const makeDiscordProviderRegistration = ({
             provider: discordProviderKey,
           });
         }
+
         const credentials =
           yield* credentialResolver.loadDiscordCredentials(input);
+
         const routeConfig = yield* Schema.decodeUnknownEffect(
           DiscordChannelNotificationRouteConfiguration
         )(input.route.providerConfig).pipe(
@@ -177,6 +187,7 @@ export const makeDiscordProviderRegistration = ({
               })
           )
         );
+
         const eventData = yield* Schema.decodeUnknownEffect(
           IntegrationPostEventData
         )(input.event.data).pipe(
@@ -188,6 +199,7 @@ export const makeDiscordProviderRegistration = ({
               })
           )
         );
+
         const embed = renderChannelUpdateMessageEmbed({
           actionUrl: eventData.post.url.toString(),
           ...(eventData.actor.kind === "member" &&
@@ -204,6 +216,7 @@ export const makeDiscordProviderRegistration = ({
           ],
           title: eventData.post.title,
         });
+
         // Unlike Slack, Discord has no join step: the bot's channel access is
         // granted at install time through the OAuth permissions bitfield and
         // may be overridden per channel by the server. Post the embed and let

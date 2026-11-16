@@ -26,9 +26,11 @@ import { PAID_PLAN_KEYS } from "../plan-entitlements";
 import { PolarService } from "./service";
 
 type SubscriptionPayload = webhooks.WebhookSubscriptionCreatedPayload["data"];
+
 type ProductPayload = webhooks.WebhookProductCreatedPayload["data"];
 
 type SubscriptionInsert = typeof schema.subscriptionTable.$inferInsert;
+
 type ProductInsert = typeof schema.productTable.$inferInsert;
 
 interface TFindSubscriptionByOrganizationId {
@@ -126,24 +128,30 @@ const SubscriptionOrganizationIdFromPolar = Schema.Unknown.pipe(
 // database column cannot hold is garbage, not a value to coerce.
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeString = Schema.decodeUnknownSync(Schema.String);
+
 const decodeTimestamp = Schema.decodeUnknownSync(Schema.DateFromString);
+
 const decodeOptionalTimestamp = Schema.decodeUnknownSync(
   Schema.NullOr(Schema.DateFromString)
 );
+
 // Never fails: SubscriptionOrganizationIdFromPolar is total and returns an
 // Option. Reported only because the rule cannot see that.
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeSubscriptionOrganizationId = Schema.decodeUnknownSync(
   SubscriptionOrganizationIdFromPolar
 );
+
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeSubscriptionStatus = Schema.decodeUnknownSync(
   SubscriptionStatusFromPolar
 );
+
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
 const decodeProductRecurringInterval = Schema.decodeUnknownSync(
   ProductRecurringIntervalFromPolar
 );
+
 // Never throws: the ProductMetadataFromPolar transformation is total
 // (Option.getOrNull). Reported only because the rule cannot see that.
 // eslint-disable-next-line effecttsgo/schema-sync -- see block comment above
@@ -230,6 +238,7 @@ const makeBillingRepository = Effect.gen(function* () {
         const organizationId = decodeSubscriptionOrganizationId(
           payload.metadata
         );
+
         if (Option.isNone(organizationId)) {
           yield* Effect.logWarning(
             "Ignoring a Polar subscription that carries no workspace id",
@@ -238,6 +247,7 @@ const makeBillingRepository = Effect.gen(function* () {
               status: payload.status,
             }
           );
+
           return;
         }
 
@@ -246,6 +256,7 @@ const makeBillingRepository = Effect.gen(function* () {
           .from(schema.organizationTable)
           .where(eq(schema.organizationTable.id, organizationId.value))
           .limit(1);
+
         if (organization.length === 0) {
           // The workspace is gone, but this event still describes a live
           // subscription on the target whose webhook just verified against
@@ -302,11 +313,13 @@ const makeBillingRepository = Effect.gen(function* () {
               }
             );
           }
+
           return;
         }
 
         const id = yield* SubscriptionId.generate;
         const now = yield* DateTime.nowAsDate;
+
         const values = toSubscriptionValues(
           payload,
           id,
@@ -314,6 +327,7 @@ const makeBillingRepository = Effect.gen(function* () {
           eventTimestamp,
           polarService.target
         );
+
         const { id: _id, ...updateValues } = values;
         yield* db
           .insert(schema.subscriptionTable)
@@ -380,6 +394,7 @@ const makeBillingRepository = Effect.gen(function* () {
     }: TFindSubscriptionByOrganizationId) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .select({
             id: schema.subscriptionTable.id,
@@ -446,6 +461,7 @@ const makeBillingRepository = Effect.gen(function* () {
     }: TEnqueueSubscriptionRevocations) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         const subscriptions = yield* db
           .select({
             externalId: schema.subscriptionTable.externalId,
@@ -453,9 +469,11 @@ const makeBillingRepository = Effect.gen(function* () {
           })
           .from(schema.subscriptionTable)
           .where(eq(schema.subscriptionTable.organizationId, organizationId));
+
         if (subscriptions.length === 0) {
           return;
         }
+
         yield* db
           .insert(schema.subscriptionRevocationTable)
           .values(
@@ -501,16 +519,19 @@ const makeBillingRepository = Effect.gen(function* () {
             )
         ),
       ];
+
       if (organizationId !== undefined) {
         conditions.push(
           eq(schema.subscriptionRevocationTable.organizationId, organizationId)
         );
       }
+
       if (polarServer !== undefined) {
         conditions.push(
           eq(schema.subscriptionRevocationTable.polarServer, polarServer)
         );
       }
+
       return db
         .select({
           externalSubscriptionId:

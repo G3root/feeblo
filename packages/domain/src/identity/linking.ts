@@ -119,7 +119,9 @@ export const linkShadowUser = ({
           .from(schema.userTable)
           .where(eq(schema.userTable.id, realUserId))
           .limit(1);
+
         const realUser = realUsers[0];
+
         if (!realUser) {
           return yield* new SubjectNotFoundError({
             message:
@@ -222,6 +224,7 @@ export const linkShadowUser = ({
           string,
           { contactEmail: string; organizationId: string }
         >();
+
         for (const contact of healedContacts) {
           if (contact.email && !isSyntheticEmail(contact.email)) {
             activationAddresses.set(
@@ -233,6 +236,7 @@ export const linkShadowUser = ({
             );
           }
         }
+
         for (const moved of movedEmailContacts) {
           if (!isSyntheticEmail(moved.email)) {
             activationAddresses.set(
@@ -246,6 +250,7 @@ export const linkShadowUser = ({
         }
 
         let subscriptionsActivated = 0;
+
         for (const {
           contactEmail,
           organizationId,
@@ -288,6 +293,7 @@ export const linkShadowUser = ({
 const isOrganizationMember = (userId: string, organizationId: string) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
+
     const rows = yield* db
       .select({ id: schema.memberTable.id })
       .from(schema.memberTable)
@@ -298,6 +304,7 @@ const isOrganizationMember = (userId: string, organizationId: string) =>
         )
       )
       .limit(1);
+
     return rows.length > 0;
   });
 
@@ -345,6 +352,7 @@ const activateDeferredSubscriptionsForContact = (args: {
     const isSsoBound = realUser.restrictedToOrganizationId === organizationId;
     const isUnrestrictedGlobal = realUser.restrictedToOrganizationId === null;
     const eligibleDirect = isMember || isSsoBound;
+
     const eligibleGlobalDeferred =
       !isMember && !isSsoBound && isUnrestrictedGlobal;
 
@@ -358,7 +366,9 @@ const activateDeferredSubscriptionsForContact = (args: {
         )
       )
       .limit(1);
+
     const emailContact = emailContacts[0];
+
     if (!emailContact) {
       return 0;
     }
@@ -394,6 +404,7 @@ const activateDeferredSubscriptionsForContact = (args: {
           updatedAt: now,
         })
         .where(eq(schema.emailContactTable.id, emailContact.id));
+
       return activated.length;
     }
 
@@ -418,12 +429,15 @@ const activateDeferredSubscriptionsForContact = (args: {
           eq(schema.emailSubscriptionTable.state, "deferred_no_access")
         )
       );
+
     const postIds = deferred.flatMap((row) =>
       row.topicType === "post" && row.topicId !== null ? [row.topicId] : []
     );
+
     if (postIds.length === 0) {
       return 0;
     }
+
     const publicPosts = yield* db
       .select({ id: schema.postTable.id })
       .from(schema.postTable)
@@ -444,13 +458,17 @@ const activateDeferredSubscriptionsForContact = (args: {
           eq(schema.boardTable.visibility, "PUBLIC")
         )
       );
+
     const publicIds = new Set(publicPosts.map((row) => row.id));
+
     const activatable = deferred
       .filter((row) => row.topicId !== null && publicIds.has(row.topicId))
       .map((row) => row.id);
+
     if (activatable.length === 0) {
       return 0;
     }
+
     const activated = yield* db
       .update(schema.emailSubscriptionTable)
       .set({
@@ -469,6 +487,7 @@ const activateDeferredSubscriptionsForContact = (args: {
         )
       )
       .returning({ id: schema.emailSubscriptionTable.id });
+
     if (activated.length > 0) {
       yield* db
         .update(schema.emailContactTable)
@@ -480,6 +499,7 @@ const activateDeferredSubscriptionsForContact = (args: {
         })
         .where(eq(schema.emailContactTable.id, emailContact.id));
     }
+
     return activated.length;
   });
 
@@ -510,7 +530,9 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
       .from(schema.userTable)
       .where(eq(schema.userTable.id, userId))
       .limit(1);
+
     const user = users[0];
+
     if (!user || !user.emailVerified) {
       return {
         organizationIds: [],
@@ -553,12 +575,15 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
         if (!candidate.userId || candidate.userId === userId) {
           continue;
         }
+
         const linkedUsers = yield* db
           .select({ email: schema.userTable.email })
           .from(schema.userTable)
           .where(eq(schema.userTable.id, candidate.userId))
           .limit(1);
+
         const linked = linkedUsers[0];
+
         if (!(linked && isShadowUserEmail(linked.email))) {
           continue;
         }
@@ -568,6 +593,7 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
           realUserId: userId,
           deleteShadowUser: true,
         });
+
         organizationIds.push(organizationId);
         totals = addCounts(totals, counts);
       }
@@ -586,6 +612,7 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
     // the shadow's content — or its contact link — to whoever controls the
     // superseded address.
     const currentEmailHash = yield* hashEmail(user.email);
+
     const survivingShadows = yield* db
       .select({
         email: schema.userTable.email,
@@ -610,15 +637,19 @@ export const healShadowsForVerifiedUser = ({ userId }: { userId: string }) =>
       if (!isShadowUserEmail(shadow.email)) {
         continue;
       }
+
       const organizationId = shadow.organizationId;
+
       if (organizationId === null) {
         continue;
       }
+
       const counts = yield* linkShadowUser({
         shadowUserId: shadow.id,
         realUserId: userId,
         deleteShadowUser: true,
       });
+
       organizationIds.push(organizationId);
       totals = addCounts(totals, counts);
     }
@@ -668,7 +699,9 @@ export const activateDeferredSubscriptionsForVerifiedUser = ({
       .from(schema.userTable)
       .where(eq(schema.userTable.id, userId))
       .limit(1);
+
     const user = users[0];
+
     // A synthetic inbox (`behalf-*`, `sso-*`) never proves an address by
     // itself, but an SSO-bound account is proved by the workspace's own
     // identity provider and its contact link carries the address.
@@ -677,6 +710,7 @@ export const activateDeferredSubscriptionsForVerifiedUser = ({
         organizationIds: [],
         subscriptionsActivated: 0,
       };
+
       return nothingActivated;
     }
 
@@ -700,23 +734,28 @@ export const activateDeferredSubscriptionsForVerifiedUser = ({
     const organizationIds: Array<string> = [];
     let subscriptionsActivated = 0;
     const now = yield* DateTime.nowAsDate;
+
     // An address match is evidence only when it is the account's own real
     // address; a synthetic inbox proves nothing by string comparison.
     const accountEmail = isSyntheticEmail(user.email)
       ? null
       : user.email.toLowerCase();
+
     for (const contact of contacts) {
       if (!contact.email || isSyntheticEmail(contact.email)) {
         continue;
       }
+
       const provedByEmail =
         accountEmail !== null && accountEmail === contact.email.toLowerCase();
+
       // The portal identity was created from the workspace's signed token and
       // the contact link came from the same token, so the address is proved by
       // the identity provider rather than by an email match.
       const provedBySso =
         contact.userId === userId &&
         user.restrictedToOrganizationId === contact.organizationId;
+
       const activated = yield* activateDeferredSubscriptionsForContact({
         addressProved: provedByEmail || provedBySso,
         contactEmail: contact.email,
@@ -724,6 +763,7 @@ export const activateDeferredSubscriptionsForVerifiedUser = ({
         organizationId: contact.organizationId,
         realUser: user,
       });
+
       if (activated > 0) {
         subscriptionsActivated += activated;
         organizationIds.push(contact.organizationId);

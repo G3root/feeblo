@@ -19,9 +19,11 @@ export function PostBoardField({
 }) {
   const { post, board, organizationId, isLocked, isMerged } =
     usePostCollectionData();
+
   const { allowed: canMovePost } = usePolicy(
     hasPermission(organizationId, "posts.move")
   );
+
   const isDisabled = disabled || isLocked || isMerged || !canMovePost;
   const navigate = useNavigate();
   const { postCollection } = useDashboardCollections();
@@ -43,9 +45,11 @@ export function PostBoardField({
         if (!boardId || isDisabled) {
           return;
         }
+
         try {
           const nextBoard = allBoards.find((item) => item.id === boardId);
           const nextBoardSlug = nextBoard?.slug;
+
           const tx = postCollection.update(
             post.id,
             {
@@ -55,6 +59,7 @@ export function PostBoardField({
               draft.boardId = boardId;
             }
           );
+
           await tx.when("settled");
           trackEvent("post_updated", { field: "board", success: true });
 

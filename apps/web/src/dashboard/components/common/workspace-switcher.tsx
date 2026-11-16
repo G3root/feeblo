@@ -30,6 +30,7 @@ export function WorkspaceSwitcher() {
   const organizationId = useOrganizationId();
   const creationState = useAtomValue(workspaceCreationStateAtom);
   const { organizationCollection } = useDashboardCollections();
+
   const organizationsQuery = useLiveQuery({
     // Sidebar-level query that re-renders with every dashboard navigation;
     // the explicit key skips re-deriving identity from the IR.
@@ -95,8 +96,10 @@ export function WorkspaceSwitcher() {
                         "You cannot create another workspace right now.",
                       type: "error",
                     });
+
                     return;
                   }
+
                   void navigate({
                     to: "/register",
                   });
@@ -116,6 +119,7 @@ export function WorkspaceSwitcher() {
 function WorkspacePlan() {
   const organizationId = useOrganizationId();
   const { workspacePlanCollection } = useDashboardCollections();
+
   const workspacePlan = useLiveQuery({
     queryKey: ["workspace-plan", workspacePlanCollection.id, organizationId],
     query: (q) =>

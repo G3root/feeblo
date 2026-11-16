@@ -54,6 +54,7 @@ describe("UserRepository", () => {
           name: "First",
           restrictedToOrganizationId: "org-a",
         });
+
         const second = yield* repository.upsertSsoUser({
           email: "widget@example.com",
           name: "Second",
@@ -76,6 +77,7 @@ describe("UserRepository", () => {
             name: "Org A",
             restrictedToOrganizationId: "org-a",
           });
+
           const orgB = yield* repository.upsertSsoUser({
             email: "widget@example.com",
             name: "Org B",
@@ -143,6 +145,7 @@ describe("UserRepository", () => {
           name: "First",
           restrictedToOrganizationId: "org-a",
         });
+
         const second = yield* repository.provisionShadowUser({
           email: "jane-reuse@example.com",
           name: "Second",
@@ -164,6 +167,7 @@ describe("UserRepository", () => {
           name: "Org A",
           restrictedToOrganizationId: "org-a",
         });
+
         const orgB = yield* repository.provisionShadowUser({
           email: "jane-orgs@example.com",
           name: "Org B",
@@ -219,6 +223,7 @@ describe("UserRepository", () => {
             emailHash,
             emailVerified: true,
           });
+
           const orgUser = yield* repository.upsertSsoUser({
             email,
             name: "Portal",
@@ -231,11 +236,13 @@ describe("UserRepository", () => {
           });
 
           expect(Option.isSome(adoptable)).toBe(true);
+
           if (Option.isSome(adoptable)) {
             // Attribution must use the org-scoped session identity, matching
             // `upsertSsoUser` (which never returns a global account).
             expect(adoptable.value.id).toBe(orgUser.id);
             expect(adoptable.value.restrictedToOrganizationId).toBe("org-both");
+
             // Notification access evaluated for the same preferred ID stays
             // sso-eligible even on PRIVATE boards.
             const verdict = evaluateOrganizationAccess({
@@ -249,6 +256,7 @@ describe("UserRepository", () => {
               boardVisibility: "PRIVATE",
               organizationId: "org-both",
             });
+
             expect(verdict).toEqual({
               eligible: true,
               recipientClass: "sso",

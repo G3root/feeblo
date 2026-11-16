@@ -66,12 +66,15 @@ export function IntegrationCard<C extends IntegrationConnection>({
   const router = useRouter();
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
   const [connecting, setConnecting] = useState(false);
+
   const startConnect = useAtomSet(config.startConnectAtom, {
     mode: "promise",
   });
+
   const connectionsResult = useAtomValue(
     config.connectionsAtom(organizationId)
   );
+
   const statusResult = useAtomValue(config.statusAtom);
 
   const configured = Result.builder(statusResult)
@@ -118,15 +121,18 @@ export function IntegrationCard<C extends IntegrationConnection>({
     (connection) =>
       connection.lifecycle === "active" || connection.lifecycle === "connecting"
   );
+
   const connected = activeConnections.length > 0;
 
   const handleConnect = async () => {
     setConnecting(true);
+
     try {
       const { authorizeUrl } = await startConnect({
         payload: { organizationId },
         reactivityKeys: { [config.reactivityKey]: [organizationId] },
       });
+
       window.location.assign(authorizeUrl.toString());
     } catch {
       setConnecting(false);
@@ -148,6 +154,7 @@ export function IntegrationCard<C extends IntegrationConnection>({
       </Card>
     );
   }
+
   if (!configured) {
     return null;
   }
@@ -210,9 +217,11 @@ function resolveActionMode(
   if (connected) {
     return "configure";
   }
+
   if (entitled) {
     return "connect";
   }
+
   return "locked";
 }
 
@@ -233,6 +242,7 @@ function IntegrationCardAction(props: IntegrationCardActionProps) {
   if (props.mode === "configure") {
     return <Button onClick={props.onConfigure}>Configure</Button>;
   }
+
   if (props.mode === "connect") {
     return (
       <Button
@@ -244,6 +254,7 @@ function IntegrationCardAction(props: IntegrationCardActionProps) {
       </Button>
     );
   }
+
   return <ProLockedButton entitlementsLoading={props.entitlementsLoading} />;
 }
 
@@ -253,6 +264,7 @@ function ProLockedButton({
   entitlementsLoading: boolean;
 }) {
   const upgradePlanStore = useUpgradePlanDialogContext();
+
   return (
     <Button
       disabled={entitlementsLoading}
@@ -277,9 +289,11 @@ function ConnectionStatusBadge({
   if (isLoading) {
     return <span className="text-muted-foreground text-xs">Checking…</span>;
   }
+
   if (loadFailed) {
     return <span className="text-destructive text-xs">Could not load</span>;
   }
+
   return connected ? (
     <span className="bg-success/10 text-success rounded-full px-2 py-0.5 text-xs font-medium">
       Connected

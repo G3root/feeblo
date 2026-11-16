@@ -51,6 +51,7 @@ export function PostPageSkeleton() {
     </div>
   );
 }
+
 /**
  * One label/value row in the post's details list.
  *
@@ -126,6 +127,7 @@ export function PostDetails({
     </section>
   );
 }
+
 export function PostStatusAlerts() {
   return (
     <PostPage.Locked>

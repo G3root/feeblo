@@ -285,6 +285,7 @@ const failureStatus = (failure: PublicApiAuthenticationError): number => {
       );
     }
   }
+
   return 500;
 };
 
@@ -314,11 +315,13 @@ const publicApiFailureResponse = (
   failure: PublicApiAuthenticationFailure
 ): HttpServerResponse.HttpServerResponse => {
   const withHeaders = decodeWithHeadersFailure(failure);
+
   const body = Option.isSome(withHeaders)
     ? withHeaders.value.body
     : Option.getOrElse(decodeAuthenticationError(failure), () =>
         internalError()
       );
+
   const headers = Option.isSome(withHeaders) ? withHeaders.value.headers : {};
 
   return HttpServerResponse.jsonUnsafe(
@@ -396,6 +399,7 @@ export const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
           // budget from a 429.
           const now = yield* Clock.currentTimeMillis;
           const headers = publicApiRateLimitHeaders(call.rateLimit, now);
+
           return yield* httpEffect.pipe(
             Effect.provideService(PublicApiCaller, call),
             Effect.map((response) =>
@@ -422,6 +426,7 @@ export const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
       ) =>
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest;
+
           const presented = (
             request.headers[PUBLIC_API_KEY_HEADER] ?? ""
           ).trim();
@@ -456,13 +461,16 @@ export const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
               })
             )
           );
+
           if (Exit.isFailure(outcome)) {
             yield* Effect.logError(
               "MCP access token verification failed",
               outcome.cause
             );
+
             return publicApiFailureResponse(internalError());
           }
+
           const verification = outcome.value;
 
           if (verification._tag === "Rejected") {
@@ -479,6 +487,7 @@ export const makePublicApiMcpAuthMiddleware = (budget: PublicApiKeyBudget) =>
                 verification.headers
               );
             }
+
             return mcpChallengeResponse(verification);
           }
 
@@ -533,6 +542,7 @@ export const makePublicApiMcpRoute = (
       const version = yield* Config.String("APP_RELEASE").pipe(
         Config.withDefault("dev")
       );
+
       const approvalMode =
         configuredApproval ??
         (yield* Config.Literals(APPROVAL_MODES, "MCP_APPROVAL").pipe(

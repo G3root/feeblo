@@ -16,6 +16,7 @@ export const GitHubEncryptedCredentialMaterial = Schema.Struct({
   /** One-time state generated before redirecting an administrator to GitHub. */
   installationState: Schema.optionalKey(Schema.NonEmptyString),
 });
+
 export type GitHubEncryptedCredentialMaterial = Schema.Schema.Type<
   typeof GitHubEncryptedCredentialMaterial
 >;

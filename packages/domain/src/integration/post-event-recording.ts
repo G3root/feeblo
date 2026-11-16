@@ -90,22 +90,26 @@ export const recordPostIntegrationEvent = Effect.fn(
         )
       )
       .limit(1);
+
     if (board === undefined) {
       return yield* new PostIntegrationEventRecordingError({
         kind: "lookup",
         message: "Post board was not found",
       });
     }
+
     const status = yield* postRepository.findStatus({
       id: input.statusId,
       organizationId: input.organizationId,
     });
+
     if (status === undefined) {
       return yield* new PostIntegrationEventRecordingError({
         kind: "lookup",
         message: "Post status was not found",
       });
     }
+
     const previousStatus =
       input.previousStatusId === undefined
         ? undefined
@@ -113,6 +117,7 @@ export const recordPostIntegrationEvent = Effect.fn(
             id: input.previousStatusId,
             organizationId: input.organizationId,
           });
+
     // Every event carries the post's own snapshot, so the author and the body
     // are read here rather than re-derived at delivery time: a retry runs up
     // to 24 hours later, when the row may say something else.
@@ -145,12 +150,14 @@ export const recordPostIntegrationEvent = Effect.fn(
         )
       )
       .limit(1);
+
     if (post === undefined) {
       return yield* new PostIntegrationEventRecordingError({
         kind: "lookup",
         message: "Post was not found",
       });
     }
+
     // `creatorMemberId` is the same column the Public API classifies authors
     // by: a member id present means workspace staff, absent means an outside
     // end user. The column itself never leaves this function.
@@ -171,14 +178,17 @@ export const recordPostIntegrationEvent = Effect.fn(
     const id = yield* IntegrationEventId.generate;
     const correlationId = yield* IntegrationEventId.generate;
     const occurredAt = yield* DateTime.now;
+
     const url = new URL(
       `/${encodeURIComponent(input.organizationId)}/post/${encodeURIComponent(board.slug)}/${encodeURIComponent(input.postSlug)}`,
       appUrl
     ).href;
+
     const boardUrl = new URL(
       `/${encodeURIComponent(input.organizationId)}/board/${encodeURIComponent(board.slug)}`,
       appUrl
     ).href;
+
     return yield* recorder
       .recordIntegrationEvent({
         event: {

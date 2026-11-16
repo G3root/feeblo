@@ -209,6 +209,7 @@ const makeUpvoteRepository = Effect.gen(function* () {
           .pipe(Effect.map(EffectArray.get(0)));
 
         const upvoteId = yield* UpvoteId.generate;
+
         const inserted = yield* db
           .insert(schema.upvoteTable)
           .values({

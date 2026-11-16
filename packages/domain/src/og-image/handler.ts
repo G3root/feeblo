@@ -20,7 +20,9 @@ import { OgImageRequest, type OgImageData } from "./schema";
 import { OgImageService } from "./service";
 
 const browserCacheDuration = Duration.hours(1);
+
 const staleCacheDuration = Duration.days(1);
+
 const cacheControl = [
   "public",
   `max-age=${Duration.toSeconds(browserCacheDuration)}`,
@@ -49,7 +51,9 @@ const imageResponse = (image: Uint8Array) =>
 // (hundreds of KB each), so the cap stays far below worker/server memory
 // pressure (~15MB worst case) while covering the hot set.
 const RENDER_CACHE_MAX_ENTRIES = 50;
+
 const MAIN_IMAGE_TTL_MS = 60 * 60 * 1_000;
+
 const POST_DETAIL_TTL_MS = 5 * 60 * 1_000;
 
 const ogImageCache = new TTLCache<string, Uint8Array>({
@@ -60,6 +64,7 @@ const decodeRequest = (
   request: HttpServerRequest.HttpServerRequest
 ): Effect.Effect<OgImageRequest, OgImageRequestValidationError> => {
   const params = new URL(request.url, "http://localhost").searchParams;
+
   return Schema.decodeUnknownEffect(OgImageRequest)(
     Object.fromEntries(params.entries())
   ).pipe(
@@ -89,20 +94,25 @@ const handleOgImageEffect = (
   Effect.gen(function* () {
     const service = yield* OgImageService;
     const input = yield* decodeRequest(request);
+
     const cacheKey =
       input.type === "post-detail"
         ? `post-detail:${input.siteId}:${input.post}`
         : `${input.type}:${input.siteId}`;
+
     const cached = ogImageCache.get(cacheKey);
+
     if (cached !== undefined) {
       return imageResponse(cached);
     }
+
     const imageData: OgImageData = yield* service.getData(input);
     const image = yield* generateOgImage(imageData);
     ogImageCache.set(cacheKey, image, {
       ttl:
         input.type === "post-detail" ? POST_DETAIL_TTL_MS : MAIN_IMAGE_TTL_MS,
     });
+
     return imageResponse(image);
   });
 
@@ -115,6 +125,7 @@ export const handleOgImage = (
 > =>
   Effect.gen(function* () {
     const rateLimitService = yield* RateLimitService;
+
     // The render is CPU-bound and this route is unauthenticated; an attacker
     // can bypass the browser/CDN cache headers by varying query parameters, so
     // consume a per-IP quota before touching the database or the renderer.

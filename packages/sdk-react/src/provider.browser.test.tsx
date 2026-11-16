@@ -93,6 +93,7 @@ describe("FeebloProvider", () => {
 
   it("calls onClose when the widget closes itself", async () => {
     const onClose = vi.fn();
+
     const screen = await render(
       <TestProvider onClose={onClose} organizationId="org_self_close">
         <StateProbe />
@@ -114,6 +115,7 @@ describe("FeebloProvider", () => {
     const onCloseFirst = vi.fn();
     const onErrorFirst = vi.fn();
     const onHeightFirst = vi.fn();
+
     const screen = await render(
       <TestProvider
         onClose={onCloseFirst}
@@ -169,6 +171,7 @@ describe("FeebloProvider", () => {
         <StateProbe />
       </TestProvider>
     );
+
     const firstIframe = document.querySelector("iframe");
     expect(firstIframe?.src).toContain("theme=dark");
 
@@ -202,6 +205,7 @@ describe("FeebloProvider", () => {
           <StateProbe />
         </TestProvider>
       );
+
       const firstContainer = document.getElementById("feeblo-embed-container");
       expect(firstContainer?.parentElement).toBe(firstRoot);
 
@@ -232,6 +236,7 @@ describe("FeebloProvider", () => {
         <StateProbe />
       </TestProvider>
     );
+
     postFromWidget({ event: "READY" });
 
     const firstIframe = document.querySelector("iframe");
@@ -259,6 +264,7 @@ describe("FeebloProvider", () => {
         <StateProbe />
       </TestProvider>
     );
+
     postFromWidget({ event: "READY" });
     await expect.element(screen.getByText("ready:yes")).toBeVisible();
 

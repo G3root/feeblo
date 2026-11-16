@@ -32,11 +32,14 @@ export function formatRelativeTime(value: Date | string) {
   if (Math.abs(diffSeconds) < 60) {
     return rtf.format(diffSeconds, "second");
   }
+
   if (Math.abs(diffMinutes) < 60) {
     return rtf.format(diffMinutes, "minute");
   }
+
   if (Math.abs(diffHours) < 24) {
     return rtf.format(diffHours, "hour");
   }
+
   return rtf.format(diffDays, "day");
 }

@@ -111,6 +111,7 @@ export const makeIntegrationLayers: Effect.Effect<
                 })
             )
           );
+
         if (
           connection?.ciphertext === null ||
           connection?.ciphertext === undefined
@@ -120,6 +121,7 @@ export const makeIntegrationLayers: Effect.Effect<
             provider: webhookProviderKey,
           });
         }
+
         return yield* decryptWebhookCredentialMaterial(
           encryptionKey,
           connection.ciphertext
@@ -134,15 +136,18 @@ export const makeIntegrationLayers: Effect.Effect<
         );
       }),
   };
+
   const registration = makeWebhookProviderRegistration({
     credentialResolver,
     endpointSecurityPolicy,
   });
+
   const {
     configured: slackConfigured,
     encryptionKey: slackEncryptionKey,
     signingSecret,
   } = yield* SlackIntegrationConfig;
+
   const slackCredentialResolver = makeSlackCredentialResolver({
     encryptionKey: slackEncryptionKey,
     loadCiphertext: (input) =>
@@ -163,35 +168,44 @@ export const makeIntegrationLayers: Effect.Effect<
                 })
             )
           );
+
         return connection?.ciphertext ?? null;
       }),
   });
+
   const slackRegistration = makeSlackProviderRegistration({
     credentialResolver: slackCredentialResolver,
     signingSecret,
   });
+
   const {
     botToken: discordBotToken,
     configured: discordConfigured,
     publicKey: discordPublicKey,
   } = yield* DiscordIntegrationConfig;
+
   const discordCredentialResolver = makeDiscordCredentialResolver({
     botToken: discordBotToken,
   });
+
   const discordRegistration = makeDiscordProviderRegistration({
     credentialResolver: discordCredentialResolver,
     publicKey: discordPublicKey,
   });
+
   const githubConfigured =
     config.githubAppId !== undefined &&
     Redacted.value(config.githubPrivateKey) !== "" &&
     Redacted.value(config.githubWebhookSecret) !== "";
+
   const githubApi = makeGitHubApiClient();
+
   const githubInstallationTokens = yield* makeGitHubInstallationTokenResolver({
     apiClient: githubApi,
     appId: config.githubAppId ?? "",
     privateKey: config.githubPrivateKey,
   });
+
   const githubCredentialResolver = makeGitHubCredentialResolver({
     installationTokenResolver: githubInstallationTokens,
     loadInstallationId: (input) =>
@@ -214,14 +228,17 @@ export const makeIntegrationLayers: Effect.Effect<
                 })
             )
           );
+
         return connection?.installationId ?? null;
       }),
   });
+
   const githubRegistration = makeGitHubProviderRegistration({
     apiClient: githubApi,
     credentialResolver: githubCredentialResolver,
     webhookSecret: config.githubWebhookSecret,
   });
+
   // Providers are only exposed when their credentials are configured;
   // otherwise the server runs with the remaining providers only.
   const registry = yield* makeIntegrationProviderRegistry([
@@ -238,6 +255,7 @@ export const makeIntegrationLayers: Effect.Effect<
     string,
     readonly string[]
   >();
+
   for (const manifest of registry.manifests) {
     claimableCapabilityKeysByProvider.set(
       manifest.provider,
@@ -246,6 +264,7 @@ export const makeIntegrationLayers: Effect.Effect<
         .map((capability) => capability.key)
     );
   }
+
   const workerRepository = yield* makeIntegrationDeliveryWorkerRepository(
     claimableCapabilityKeysByProvider,
     {
@@ -279,9 +298,11 @@ export const makeIntegrationLayers: Effect.Effect<
         ),
     }
   );
+
   const lifecycleRepository = yield* makeIntegrationManagementRepository;
   const secureRandom = yield* SecureRandom.SecureRandom;
   const leaseOwner = `server-${yield* secureRandom.uuidV4()}`;
+
   const worker = runIntegrationDeliveryWorker({
     connectionConcurrency: config.integrationConnectionConcurrency,
     globalConcurrency: config.integrationGlobalConcurrency,
@@ -289,6 +310,7 @@ export const makeIntegrationLayers: Effect.Effect<
     registry,
     repository: workerRepository,
   });
+
   return {
     layer: Layer.mergeAll(
       // The management service's config requirement is resolved here so the

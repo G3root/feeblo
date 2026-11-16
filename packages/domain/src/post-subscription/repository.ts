@@ -47,6 +47,7 @@ const makePostSubscriptionRepository = Effect.gen(function* () {
     subscribe: ({ organizationId, postId, userId, memberId }: TSubscribe) =>
       Effect.gen(function* () {
         const id = yield* PostSubscriptionId.generate;
+
         return yield* db
           .insert(schema.postSubscriptionTable)
           .values({

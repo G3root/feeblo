@@ -11,6 +11,7 @@ export const parseGitHubAppInstallationCallbackUrl = (
   url: string
 ): Effect.Effect<GitHubAppInstallationCallbackType, BadRequestError> => {
   const parsed = new URL(url, "http://localhost");
+
   return Schema.decodeUnknownEffect(GitHubAppInstallationCallback)({
     code: parsed.searchParams.get("code"),
     state: parsed.searchParams.get("state"),

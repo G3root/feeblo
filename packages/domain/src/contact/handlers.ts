@@ -53,9 +53,11 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         organizationId: args.organizationId,
         query: args.query.trim(),
       };
+
       if (args.postId !== undefined) {
         searchArgs.postId = args.postId;
       }
+
       if (args.limit !== undefined) {
         searchArgs.limit = args.limit;
       }
@@ -66,6 +68,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         if (searchArgs.query.length < 2) {
           return [];
         }
+
         const session = yield* CurrentSession;
         // Dashboard read-level rate limit for the picker (see
         // plan-on-behalf.md); keyed by the searching member.
@@ -73,6 +76,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           key: `contact-search:${args.organizationId}:${session.session.userId}`,
           name: "contact-search",
         });
+
         return yield* repository.search(searchArgs);
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -94,6 +98,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           key: `contact-search:${args.organizationId}:${session.session.userId}`,
           name: "contact-search",
         });
+
         // Same count the write path reads: contacts and companies are two
         // independent aggregates, so they resolve together rather than one
         // after the other.
@@ -104,6 +109,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
           ],
           { concurrency: "unbounded" }
         );
+
         const canCreate = yield* entitlementPolicy
           .canCreateCrmEntry({
             organizationId: args.organizationId,
@@ -113,6 +119,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
             Effect.as(true),
             Effect.catchTag("PolicyDenied", () => Effect.succeed(false))
           );
+
         return { canCreate };
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -124,6 +131,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         organizationId: args.organizationId,
         insert: Effect.gen(function* () {
           const attributeValues = args.attributeValues ?? [];
+
           // Share-locked for this transaction, like the company create: the
           // required-value check, the per-value validation and the upserts
           // below all read one snapshot, so a definition that becomes required
@@ -132,9 +140,11 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
             yield* attributeDefinitionRepository.findContactAttributeDefinitionsForShare(
               args.organizationId
             );
+
           const definitionsById = new Map(
             definitions.map((definition) => [definition.id, definition])
           );
+
           yield* Effect.forEach(
             definitions.filter(
               (definition) =>
@@ -153,6 +163,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
               const definition = definitionsById.get(
                 attributeValue.attributeId
               );
+
               if (definition === undefined) {
                 return yield* new Policy.PolicyDeniedError();
               }
@@ -174,6 +185,7 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
                 );
             })
           );
+
           return contact;
         }),
       }).pipe(
@@ -184,11 +196,13 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
     UpdateContact: (args: TContactUpdate) =>
       Effect.gen(function* () {
         const contact = yield* repository.update(args);
+
         if (Option.isNone(contact)) {
           return yield* new ContactNotFoundError({
             message: "Contact not found",
           });
         }
+
         return contact.value;
       }).pipe(
         Policy.withPolicy(contactPolicy.canUpdate(args)),
@@ -198,12 +212,15 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
     UnsubscribeContact: (args: TContactUnsubscribe) =>
       Effect.gen(function* () {
         const contact = yield* repository.findById(args);
+
         if (Option.isNone(contact)) {
           return yield* new ContactNotFoundError({
             message: "Contact not found",
           });
         }
+
         const email = contact.value.email;
+
         if (email !== null) {
           yield* emailSubscriptions.unsubscribeAllForEmail({
             email,
@@ -221,9 +238,11 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         const deleted = yield* transaction(
           Effect.gen(function* () {
             const contact = yield* repository.delete(args);
+
             if (Option.isNone(contact)) {
               return contact;
             }
+
             // The linked synthetic account goes with the contact when nothing
             // refers to it any more; attributed content keeps it alive.
             if (contact.value.userId !== null) {
@@ -231,9 +250,11 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
                 contact.value.userId
               );
             }
+
             return contact;
           })
         );
+
         if (Option.isNone(deleted)) {
           return yield* new ContactNotFoundError({
             message: "Contact not found",

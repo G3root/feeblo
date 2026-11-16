@@ -30,4 +30,5 @@ export const ChatIntegrationErrors = Schema.Union([
   PolicyDeniedError,
   UnauthorizedError,
 ]);
+
 export type ChatIntegrationError = typeof ChatIntegrationErrors.Type;

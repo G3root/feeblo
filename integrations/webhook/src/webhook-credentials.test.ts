@@ -11,12 +11,14 @@ import {
 
 describe("webhook credential material", () => {
   const key = Redacted.make("0123456789abcdef0123456789abcdef");
+
   const material = {
     endpointUrl: "https://hooks.example.com/a",
     signingKeyring: {
       current: "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=",
     },
   };
+
   it.effect(
     "encrypts the whole structured credential and returns redacted decrypted secrets",
     () =>
@@ -25,6 +27,7 @@ describe("webhook credential material", () => {
           key,
           material
         );
+
         expect(encrypted).not.toContain(material.endpointUrl);
         const decoded = yield* decryptWebhookCredentialMaterial(key, encrypted);
         expect(decoded.endpointUrl).not.toContain(material.endpointUrl);
@@ -38,11 +41,13 @@ describe("webhook credential material", () => {
         const shortKeyExit = yield* Effect.exit(
           validateWebhookEncryptionKey(Redacted.make("short"))
         );
+
         expect(Exit.isFailure(shortKeyExit)).toBe(true);
 
         const ciphertextExit = yield* Effect.exit(
           decryptWebhookCredentialMaterial(key, "not-ciphertext")
         );
+
         expect(Exit.isFailure(ciphertextExit)).toBe(true);
       })
   );

@@ -51,6 +51,7 @@ function WebhooksSettingsContent({
   organizationId: string;
 }) {
   const createDialogStore = useWebhookCreateDialogContext();
+
   const [oneTimeSecret, setOneTimeSecret] = useState<{
     readonly endpointName: string;
     readonly value: string;
@@ -204,6 +205,7 @@ function WebhookEndpointCard({
   readonly organizationId: string;
 }) {
   const registry = useContext(RegistryContext);
+
   return (
     <Card render={<article />}>
       <CardHeader>

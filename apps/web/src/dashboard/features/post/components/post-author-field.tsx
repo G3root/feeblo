@@ -33,6 +33,7 @@ import { GHOST_PROPERTY_TRIGGER } from "../lib/property-trigger";
 export function PostAuthorField() {
   const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
   const { postCollection, postActivityCollection } = useDashboardCollections();
+
   // Backend mirror: PostPolicy.canUpdateAuthor lets `posts.createOnBehalf`
   // holders (managers and above) reattribute a post via UpdatePostAuthor.
   const { allowed: canUpdateAuthor } = usePolicy(
@@ -73,6 +74,7 @@ export function PostAuthorField() {
     if (!selection) {
       return;
     }
+
     await updateAuthor(toOnBehalfAuthor(selection));
   };
 

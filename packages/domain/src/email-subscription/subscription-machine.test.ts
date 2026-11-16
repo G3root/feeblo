@@ -25,10 +25,13 @@ import {
  */
 
 const ALL = EMAIL_SUBSCRIPTION_STATES;
+
 const pairs = ALL.flatMap((from) => ALL.map((to) => [from, to] as const));
 
 const verified = { alreadyVerified: true, deferredNoAccess: false };
+
 const deferred = { alreadyVerified: false, deferredNoAccess: true };
+
 const plain = { alreadyVerified: false, deferredNoAccess: false };
 
 describe("email subscription machine", () => {
@@ -108,14 +111,17 @@ describe("email subscription machine", () => {
       nextStateForRequest(undefined, deferred),
       nextStateForRequest(undefined, verified),
     ]);
+
     let grew = true;
 
     while (grew) {
       grew = false;
+
       for (const from of ALL) {
         if (!reached.has(from)) {
           continue;
         }
+
         for (const to of ALL) {
           if (!reached.has(to) && canTransitionSubscription(from, to)) {
             reached.add(to);

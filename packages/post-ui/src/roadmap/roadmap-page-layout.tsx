@@ -59,9 +59,11 @@ const RoadmapContext = createContext<RoadmapContextValue | null>(null);
 
 function useRoadmapContext() {
   const ctx = use(RoadmapContext);
+
   if (!ctx) {
     throw new Error("Roadmap components must be used within Roadmap.Provider");
   }
+
   return ctx;
 }
 
@@ -142,6 +144,7 @@ function RoadmapTitle({ children }: { children?: React.ReactNode }) {
   const {
     state: { title },
   } = useRoadmapContext();
+
   return <h1 className="text-xl font-semibold">{children ?? title}</h1>;
 }
 
@@ -149,8 +152,11 @@ function RoadmapDescription({ children }: { children?: React.ReactNode }) {
   const {
     state: { description },
   } = useRoadmapContext();
+
   const content = children ?? description;
+
   if (!content) return null;
+
   return <p className="text-muted-foreground mt-1 text-sm">{content}</p>;
 }
 

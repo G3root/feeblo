@@ -14,9 +14,11 @@ import { usePostCollections } from "../providers/post-collections-provider";
 export function PostDeleteDialog() {
   const store = usePostDeleteDialogContext();
   const { collections, organizationId } = usePostCollections();
+
   const { allowed: canManageAllPosts } = usePolicy(
     hasPermission(organizationId, "posts.*")
   );
+
   const open = useSelector(store, (state) => state.context.open);
   const navigate = useNavigate();
 
@@ -37,6 +39,7 @@ export function PostDeleteDialog() {
           // backend remains authoritative either way.
           if (!canManageAllPosts && collections.deleteEligibilityCollection) {
             const { deleteEligibilityCollection } = collections;
+
             const fresh = await queryOnce((q) =>
               q
                 .from({ eligibility: deleteEligibilityCollection })
@@ -50,6 +53,7 @@ export function PostDeleteDialog() {
                   postId: eligibility.postId,
                 }))
             );
+
             if (fresh.length === 0) {
               trackEvent("post_deleted", {
                 mode: "single",
@@ -60,6 +64,7 @@ export function PostDeleteDialog() {
                 type: "error",
               });
               store.send({ type: "setOpen", open: false });
+
               return;
             }
           }
@@ -67,9 +72,11 @@ export function PostDeleteDialog() {
           // The row is removed optimistically; close and redirect now so
           // high-latency networks don't hold the confirm open.
           store.send({ type: "setOpen", open: false });
+
           if (redirectOptions) {
             void navigate(redirectOptions);
           }
+
           settleOptimisticMutation(
             () => collections.postCollection.delete(id),
             () => {

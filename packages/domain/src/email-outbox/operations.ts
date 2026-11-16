@@ -62,6 +62,7 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
       .from(schema.emailOutboxTable)
       .where(eq(schema.emailOutboxTable.organizationId, organizationId))
       .groupBy(schema.emailOutboxTable.state);
+
     const deliveries = yield* db
       .select({
         oldestCreatedAt: min(schema.emailDeliveryTable.createdAt),
@@ -77,6 +78,7 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
       .groupBy(schema.emailDeliveryTable.state);
 
     const intentStates = emptyIntentStates();
+
     for (const row of intents) {
       const state = yield* Schema.decodeEffect(EmailOutboxState)(
         row.state
@@ -88,11 +90,13 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
             })
         )
       );
+
       intentStates[state] += row.total;
     }
 
     const deliveryStates = emptyDeliveryStates();
     let oldestQueuedAt: Date | undefined;
+
     for (const row of deliveries) {
       const state = yield* Schema.decodeEffect(EmailDeliveryState)(
         row.state
@@ -104,7 +108,9 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
             })
         )
       );
+
       deliveryStates[state] += row.total;
+
       if (
         deliveryInFlightStates.includes(state) &&
         row.oldestCreatedAt !== null
@@ -119,6 +125,7 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
               })
           )
         );
+
         if (oldestQueuedAt === undefined || oldestCreatedAt < oldestQueuedAt) {
           oldestQueuedAt = oldestCreatedAt;
         }

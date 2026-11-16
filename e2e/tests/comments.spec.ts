@@ -51,12 +51,14 @@ async function addComment(
 
   if (options.status) {
     await page.getByRole("button", { name: "Comment options" }).click();
+
     // The options popover hosts a status combobox (role combobox, empty name
     // until a status is chosen) inside the status section — not menu radios.
     const statusTrigger = page
       .locator('section[aria-label="Comment as status update"]')
       .getByRole("combobox")
       .first();
+
     await expect(statusTrigger).toBeVisible();
     await statusTrigger.click();
     await page
@@ -404,9 +406,11 @@ test.describe("comment management", () => {
 
       // Dialog Cancel leaves the comment intact.
       await clickCommentMenuItem(page, doomedCard, "Delete");
+
       const dialog = page.getByRole("alertdialog", {
         name: "Delete Comment",
       });
+
       await expect(dialog).toBeVisible();
       await expect(dialog.getByText(/permanently delete/)).toBeVisible();
       await dialog.getByRole("button", { name: "Cancel" }).click();
@@ -451,14 +455,17 @@ test.describe("comment management", () => {
         if (route.request().postData()?.includes("DeleteComment")) {
           await new Promise((resolve) => setTimeout(resolve, 3_000));
         }
+
         await route.continue();
       }
     );
 
     await clickCommentMenuItem(page, card, "Delete");
+
     const dialog = page.getByRole("alertdialog", {
       name: "Delete Comment",
     });
+
     await expect(dialog).toBeVisible();
 
     const deleted = waitForRpc(page, "DeleteComment");
@@ -492,6 +499,7 @@ test.describe("comment management", () => {
         if (route.request().postData()?.includes("CreateComment")) {
           await new Promise((resolve) => setTimeout(resolve, 3_000));
         }
+
         await route.continue();
       }
     );
@@ -525,9 +533,11 @@ test.describe("comment management", () => {
 
       // Dialog Cancel keeps the comment public.
       await clickCommentMenuItem(page, card, "Make internal");
+
       const dialog = page.getByRole("alertdialog", {
         name: "Make comment internal",
       });
+
       await expect(dialog).toBeVisible();
       await expect(
         dialog.getByText(/only be visible to members/)
@@ -633,9 +643,11 @@ test.describe("comment replies", () => {
       // The thread structure survives a reload. Threads collapse back to
       // the accordion on reload, so expand the parent's replies first.
       await page.reload();
+
       const parentThread = page
         .locator('[data-slot="comment-thread"]')
         .filter({ hasText: parentText });
+
       await parentThread
         .getByRole("button", { name: /^Show \d+ repl(y|ies)$/ })
         .click();

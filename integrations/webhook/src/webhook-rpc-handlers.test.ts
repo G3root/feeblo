@@ -39,6 +39,7 @@ describe("WebhookManagementRpcHandlers", () => {
         const organizationId = yield* WorkspaceId.generate;
         const connectionId = yield* IntegrationConnectionId.generate;
         const forwardedOrganizationIds: string[] = [];
+
         const endpoint = {
           eventTypes: ["post.created"] as const,
           health: "healthy" as const,
@@ -49,6 +50,7 @@ describe("WebhookManagementRpcHandlers", () => {
           lifecycle: "active" as const,
           name: "Test endpoint",
         };
+
         const service = WebhookManagementService.of({
           createEndpoint: () => Effect.die("not used"),
           getDeliveryHistory: () => Effect.die("not used"),
@@ -64,6 +66,7 @@ describe("WebhookManagementRpcHandlers", () => {
           sendTestDelivery: () => Effect.die("not used"),
           updateEndpoint: () => Effect.die("not used"),
         });
+
         const handlers = yield* WebhookManagementRpcHandlersEffect.pipe(
           Effect.provideService(WebhookManagementService, service)
         );
@@ -76,6 +79,7 @@ describe("WebhookManagementRpcHandlers", () => {
               sessionFor(organizationId, "admin")
             )
           );
+
         expect(allowed).toEqual([endpoint]);
         expect(forwardedOrganizationIds).toEqual([organizationId]);
 
@@ -89,6 +93,7 @@ describe("WebhookManagementRpcHandlers", () => {
               )
             )
         );
+
         expect(denied._tag).toBe("PolicyDenied");
         expect(forwardedOrganizationIds).toEqual([organizationId]);
       })
@@ -101,6 +106,7 @@ describe("WebhookManagementRpcHandlers", () => {
         const allowedOrganizationId = yield* WorkspaceId.generate;
         const foreignOrganizationId = yield* WorkspaceId.generate;
         const calls: string[] = [];
+
         const service = WebhookManagementService.of({
           createEndpoint: () => Effect.die("not used"),
           getDeliveryHistory: () => Effect.die("not used"),
@@ -114,9 +120,11 @@ describe("WebhookManagementRpcHandlers", () => {
           sendTestDelivery: () => Effect.die("not used"),
           updateEndpoint: () => Effect.die("not used"),
         });
+
         const handlers = yield* WebhookManagementRpcHandlersEffect.pipe(
           Effect.provideService(WebhookManagementService, service)
         );
+
         const error = yield* Effect.flip(
           handlers
             .ListWebhookEndpoints({ organizationId: foreignOrganizationId })
@@ -127,6 +135,7 @@ describe("WebhookManagementRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
         expect(calls).toEqual([]);
       })
@@ -145,6 +154,7 @@ describe("WebhookManagementRpcHandlers", () => {
       name: "Safe",
       signingSecret: "whsec_secret",
     });
+
     expect(endpoint).not.toHaveProperty("endpointUrl");
     expect(endpoint).not.toHaveProperty("signingSecret");
     expect(
@@ -190,6 +200,7 @@ describe("WebhookManagementRpcHandlers", () => {
       ],
       nextCursor: null,
     });
+
     expect(page.items[0]?.attempts[0]?.retryDecision).toBeNull();
     expect(page.items[0]?.attempts[1]?.retryDecision).toBe("retry");
   });

@@ -34,12 +34,14 @@ export function PostStatusDeleteDialog() {
   const store = usePostStatusDeleteDialogContext();
   const organizationId = useOrganizationId();
   const queryClient = useQueryClient();
+
   const {
     postCollection,
     postDetailCollection,
     postStatusCollection,
     roadmapColumnCollection,
   } = useDashboardCollections();
+
   const open = useSelector(store, (state) => state.context.open);
   const statusId = useSelector(store, (state) => state.context.data.statusId);
   const [preview, setPreview] = useState<DeletePreview | null>(null);
@@ -67,6 +69,7 @@ export function PostStatusDeleteDialog() {
     if (!open) {
       setPreview(null);
       setPreviewError(false);
+
       return;
     }
 

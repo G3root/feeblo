@@ -58,6 +58,7 @@ export function createBoardScope(options: {
   return {
     getChangelogSlug: () => {
       const currentPathname = pathname();
+
       return currentPathname === undefined
         ? undefined
         : postSlugFromPath(currentPathname, "changelog", 1);
@@ -69,6 +70,7 @@ export function createBoardScope(options: {
     },
     getPostSlug: () => {
       const currentPathname = pathname();
+
       return currentPathname === undefined
         ? undefined
         : postSlugFromPath(currentPathname, "p", 1);

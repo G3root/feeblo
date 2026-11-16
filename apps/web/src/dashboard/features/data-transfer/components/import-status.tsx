@@ -60,6 +60,7 @@ export function ImportProgressBar({
   readonly job: TDataImportJobSummary;
 }) {
   const percent = progressPercent(job);
+
   return (
     <Progress value={percent}>
       <div className="flex items-center justify-between gap-2">
@@ -89,9 +90,11 @@ export function ImportResultText({
   if (job.status === "awaiting_confirmation") {
     return <span>—</span>;
   }
+
   if (job.status === "queued") {
     return <span>{statusLabel(job.status)}</span>;
   }
+
   if (job.status === "running") {
     return (
       <span className="tabular-nums">
@@ -99,6 +102,7 @@ export function ImportResultText({
       </span>
     );
   }
+
   return (
     <span className="tabular-nums">
       {m.witty_loyal_bee({

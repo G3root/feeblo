@@ -22,6 +22,7 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   const listNotificationsEffect = (args: TNotificationList) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+
       return yield* notifications.list({
         ...(args.cursor === undefined ? undefined : { cursor: args.cursor }),
         ...(args.limit === undefined ? undefined : { limit: args.limit }),
@@ -33,10 +34,12 @@ export const NotificationRpcHandlersEffect = Effect.gen(function* () {
   const unreadCountEffect = ({ organizationId }: { organizationId: string }) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+
       const count = yield* notifications.unreadCount({
         organizationId,
         recipientUserId: session.session.userId,
       });
+
       return { count };
     });
 

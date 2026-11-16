@@ -89,6 +89,7 @@ export function getServerRuntimePublicEnv() {
 export function getServerApiBaseUrl(): string {
   const env = getPublicEnvServer();
   const internal = env.API_URL_INTERNAL?.trim();
+
   return internal === undefined || internal.length === 0
     ? env.API_URL
     : internal;
@@ -127,9 +128,11 @@ export function getBrowserPublicEnv() {
  */
 export function apiPreconnectOrigins(): string[] {
   const apiUrl = getServerRuntimePublicEnv().apiUrl;
+
   if (!apiUrl.startsWith("http://") && !apiUrl.startsWith("https://")) {
     return [];
   }
+
   try {
     return [new URL(apiUrl).origin];
   } catch {

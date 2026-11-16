@@ -14,6 +14,7 @@ export const Route = createFileRoute(
       dashboardCollections.membershipCollection.preload(),
       dashboardCollections.organizationCollection.preload(),
     ]);
+
     return null;
   },
 });

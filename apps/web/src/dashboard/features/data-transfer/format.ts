@@ -56,7 +56,9 @@ export const progressPercent = (job: TDataImportJobSummary): number => {
   if (job.rowCount === 0) {
     return 0;
   }
+
   const processed = job.createdCount + job.errorCount;
+
   return Math.max(
     0,
     Math.min(100, Math.round((processed / job.rowCount) * 100))

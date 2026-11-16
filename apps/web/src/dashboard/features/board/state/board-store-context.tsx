@@ -26,13 +26,21 @@ import { useSelector } from "@xstate/store-react";
  * `setActiveView` accepts a stored query with no translation.
  */
 export type BoardDisplayMode = "list" | "grid";
+
 export type BoardGroupBy = TBoardGroupBy;
+
 export type BoardGrouping = TBoardGrouping;
+
 export type BoardOrderDirection = TBoardOrderDirection;
+
 export type BoardOrderField = TBoardOrderField;
+
 export type BoardOrdering = TBoardOrdering;
+
 export type BoardStatusOperator = TBoardStatusOperator;
+
 export type BoardTagOperator = TBoardTagOperator;
+
 export type BoardFilters = TBoardFilters;
 
 const DEFAULT_ORDERING: BoardOrdering = {
@@ -167,6 +175,7 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       },
       syncAvailablePostIds: (context, event: { postIds: string[] }) => {
         const available = new Set(event.postIds);
+
         return {
           ...context,
           selectedPosts: context.selectedPosts.filter(({ postId }) =>
@@ -176,6 +185,7 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
       },
       deselectPosts: (context, event: { postIds: string[] }) => {
         const idsToRemove = new Set(event.postIds);
+
         return {
           ...context,
           selectedPosts: context.selectedPosts.filter(
@@ -204,6 +214,7 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
         const selected = new Map(
           context.selectedPosts.map((entry) => [entry.postId, entry])
         );
+
         const isSelected = selected.has(event.postId);
         const shouldSelect = event.checked ?? !isSelected;
 
@@ -236,30 +247,36 @@ export const [BoardStoreProvider, useBoardStore] = createStoreContext<
 
 export function useSelectedPosts() {
   const store = useBoardStore();
+
   return useSelector(store, (state) => state.context.selectedPosts);
 }
 
 export function useSelectedPostIds() {
   const selectedPosts = useSelectedPosts();
+
   return selectedPosts.map((post) => post.postId);
 }
 
 export function useBoardDisplayMode() {
   const store = useBoardStore();
+
   return useSelector(store, (state) => state.context.displayMode);
 }
 
 export function useBoardOrdering() {
   const store = useBoardStore();
+
   return useSelector(store, (state) => state.context.ordering);
 }
 
 export function useBoardGrouping() {
   const store = useBoardStore();
+
   return useSelector(store, (state) => state.context.grouping);
 }
 
 export function useActiveBoardView() {
   const store = useBoardStore();
+
   return useSelector(store, (state) => state.context.activeView);
 }

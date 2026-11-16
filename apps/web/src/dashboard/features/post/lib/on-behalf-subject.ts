@@ -35,9 +35,11 @@ export function getOnBehalfMetadata(
   // Metadata is decoded by the PostActivity RPC schema; absent for every
   // pre-on-behalf activity row.
   const onBehalfOf = activity.metadata?.onBehalfOf ?? null;
+
   if (!onBehalfOf) {
     return null;
   }
+
   return { onBehalfOf };
 }
 
@@ -68,9 +70,11 @@ export function resolveOnBehalfSubject(
 ): OnBehalfSubjectLabel {
   const contactId = metadata.onBehalfOf?.contactId;
   const userId = metadata.onBehalfOf?.userId;
+
   const contact =
     (contactId ? contactsById.get(contactId) : undefined) ??
     (userId ? contactsByUserId.get(userId) : undefined);
+
   if (contact) {
     return {
       name: contact.name ?? contact.email ?? "a customer",
@@ -79,6 +83,7 @@ export function resolveOnBehalfSubject(
   }
 
   const member = userId ? membersByUserId.get(userId) : undefined;
+
   if (member) {
     return { name: member.user.name, isMember: true };
   }
@@ -87,6 +92,7 @@ export function resolveOnBehalfSubject(
   // identity captured when the action was recorded.
   const snapshot = metadata.onBehalfOf?.name ?? metadata.onBehalfOf?.email;
   const wasMember = metadata.onBehalfOf?.kind === "member";
+
   if (snapshot) {
     return { name: snapshot, isMember: wasMember };
   }

@@ -86,11 +86,13 @@ function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
     onSubmit: async (data) => {
       try {
         const boardSlug = slugify(data.value.name);
+
         const tx = boardCollection.update(boardId, (draft) => {
           draft.name = data.value.name;
           draft.visibility = data.value.visibility;
           draft.slug = boardSlug;
         });
+
         await tx.when("settled");
         toastManager.add({
           title: "Board renamed successfully",

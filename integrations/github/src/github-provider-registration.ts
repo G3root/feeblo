@@ -61,12 +61,14 @@ export const makeGitHubCredentialResolver = ({
   loadGitHubCredentials: (input) =>
     Effect.gen(function* () {
       const installationId = yield* loadInstallationId(input);
+
       if (installationId === null) {
         return yield* new IntegrationProviderInvalidConfigurationError({
           message: "GitHub credentials are unavailable",
           provider: githubProviderKey,
         });
       }
+
       const accessToken = yield* installationTokenResolver
         .getInstallationAccessToken({
           installationId,
@@ -81,6 +83,7 @@ export const makeGitHubCredentialResolver = ({
                 })
           )
         );
+
       return { accessToken };
     }),
 });
@@ -101,6 +104,7 @@ const parseGitHubAppWebhook = ({
       })
     );
   }
+
   switch (eventName) {
     case "issues":
       return Schema.decodeEffect(
@@ -175,12 +179,14 @@ const makeGitHubAppWebhookHandler = ({
           webhookSecret,
         })
       );
+
       if (Result.isFailure(verified)) {
         return {
           body: "invalid request signature",
           status: 401,
         } satisfies IntegrationInboundResponse;
       }
+
       const parsed = yield* Effect.result(
         parseGitHubAppWebhook({
           deliveryId: input.headers["x-github-delivery"],
@@ -188,6 +194,7 @@ const makeGitHubAppWebhookHandler = ({
           rawBody: input.rawBody,
         })
       );
+
       if (Result.isFailure(parsed)) {
         return parsed.failure.reason ===
           "GitHub App webhook event is unsupported"
@@ -200,6 +207,7 @@ const makeGitHubAppWebhookHandler = ({
               status: 400,
             } satisfies IntegrationInboundResponse);
       }
+
       return {
         body: parsed.success,
         status: 200,
@@ -227,6 +235,7 @@ export const makeGitHubProviderRegistration = ({
             provider: githubProviderKey,
           });
         }
+
         const routeConfig = yield* Schema.decodeUnknownEffect(
           GitHubIssueCreateRouteConfiguration
         )(input.route.providerConfig).pipe(
@@ -238,6 +247,7 @@ export const makeGitHubProviderRegistration = ({
               })
           )
         );
+
         const eventData = yield* Schema.decodeUnknownEffect(
           IntegrationPostEventData
         )(input.event.data).pipe(
@@ -249,6 +259,7 @@ export const makeGitHubProviderRegistration = ({
               })
           )
         );
+
         // The route's board selection is intentionally checked by the provider
         // rather than broadening the kernel event selection model.
         if (
@@ -257,8 +268,10 @@ export const makeGitHubProviderRegistration = ({
         ) {
           return {};
         }
+
         const credentials =
           yield* credentialResolver.loadGitHubCredentials(input);
+
         const issue = yield* apiClient.createIssue({
           accessToken: credentials.accessToken,
           body: renderGitHubIssueBody({
@@ -269,6 +282,7 @@ export const makeGitHubProviderRegistration = ({
           repositoryOwner: routeConfig.repositoryOwner,
           title: renderGitHubIssueTitle({ title: eventData.post.title }),
         });
+
         // The bot backlink comment is part of the delivery so a retry after a
         // crash before acknowledgement re-runs both calls (at-least-once).
         yield* apiClient.createIssueBacklinkComment({
@@ -278,6 +292,7 @@ export const makeGitHubProviderRegistration = ({
           repositoryName: routeConfig.repositoryName,
           repositoryOwner: routeConfig.repositoryOwner,
         });
+
         return {
           externalResourceDrafts: [
             makeGitHubIssueExternalResourceDraft({
@@ -295,6 +310,7 @@ export const makeGitHubProviderRegistration = ({
         };
       }),
   };
+
   return {
     connectionConfigurationSchema: GitHubConnectionConfiguration,
     handlers: [issueCreateHandler],

@@ -42,9 +42,11 @@ const dateAt = (instant: string | number | Date): Date =>
  * depending on the wall clock.
  */
 const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
+
 const fixtureNowSeconds = Math.floor(fixtureNow.getTime() / 1000);
 
 const futureExp = fixtureNowSeconds + 3600;
+
 const pastExp = fixtureNowSeconds - 3600;
 
 const TestLayer = Layer.mergeAll(
@@ -147,10 +149,12 @@ describe("createSsoSession", () => {
         expect(result.name).toBe("Ada Lovelace");
 
         const db = yield* currentDb;
+
         const [user] = yield* db
           .select()
           .from(schema.userTable)
           .where(eq(schema.userTable.id, result.userId));
+
         expect(user?.restrictedToOrganizationId).toBe(fixture.organizationId);
 
         // The token's real identity lands on the linked contact.
@@ -158,6 +162,7 @@ describe("createSsoSession", () => {
           .select()
           .from(schema.contactTable)
           .where(eq(schema.contactTable.email, "ada@example.com"));
+
         expect(contact?.email).toBe("ada@example.com");
         expect(contact?.userId).toBe(result.userId);
       })
@@ -175,6 +180,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("WIDGET_SSO_NOT_ENTITLED");
       })
     );
@@ -182,6 +188,7 @@ describe("createSsoSession", () => {
     it.effect("rejects a token bound to a different organization", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture(true);
+
         const token = yield* signToken(
           {
             ...validPayload(fixture),
@@ -197,6 +204,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("INVALID_JWT");
       })
     );
@@ -214,6 +222,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("INVALID_JWT");
       })
     );
@@ -231,6 +240,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("INVALID_JWT");
       })
     );
@@ -238,6 +248,7 @@ describe("createSsoSession", () => {
     it.effect("rejects an expired token when exp is present", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture(true);
+
         const token = yield* signToken(
           {
             ...validPayload(fixture),
@@ -253,6 +264,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("INVALID_JWT");
       })
     );
@@ -262,6 +274,7 @@ describe("createSsoSession", () => {
       () =>
         Effect.gen(function* () {
           const fixture = yield* makeFixture(true);
+
           const token = yield* signToken(
             {
               ...validPayload(fixture),
@@ -278,6 +291,7 @@ describe("createSsoSession", () => {
               token,
             })
           );
+
           expect(error.code).toBe("INVALID_JWT");
         })
     );
@@ -308,6 +322,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("INVALID_JWT");
       })
     );
@@ -338,6 +353,7 @@ describe("createSsoSession", () => {
             organizationId: fixture.organizationId,
             token,
           });
+
           expect(result.name).toBe("Ada Lovelace");
         })
     );
@@ -354,6 +370,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("INVALID_JWT");
       })
     );
@@ -379,6 +396,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("SSO_RATE_LIMITED");
       })
     );
@@ -389,6 +407,7 @@ describe("createSsoSession", () => {
         Effect.gen(function* () {
           yield* TestClock.setTime(fixtureNow.getTime());
           const fixture = yield* makeFixture(true);
+
           const validToken = yield* signToken(
             validPayload(fixture),
             fixture.secret
@@ -402,6 +421,7 @@ describe("createSsoSession", () => {
                 clientIp: "198.51.100.24",
               })
             );
+
             expect(error.code).toBe("INVALID_JWT");
           }
 
@@ -412,6 +432,7 @@ describe("createSsoSession", () => {
               clientIp: "198.51.100.24",
             })
           );
+
           expect(limitedError.code).toBe("SSO_RATE_LIMITED");
 
           const result = yield* createSsoSession({
@@ -419,6 +440,7 @@ describe("createSsoSession", () => {
             organizationId: fixture.organizationId,
             token: validToken,
           });
+
           expect(result.name).toBe("Ada Lovelace");
         })
     );
@@ -435,6 +457,7 @@ describe("createSsoSession", () => {
             token,
           })
         );
+
         expect(error.code).toBe("ORGANIZATION_HAS_NO_JWT_SECRET");
       })
     );
@@ -500,6 +523,7 @@ describe("createSsoSession", () => {
           });
 
           const token = yield* signToken(validPayload(fixture), fixture.secret);
+
           const result = yield* createSsoSession({
             clientIp: fixture.clientIp,
             organizationId: fixture.organizationId,
@@ -508,10 +532,12 @@ describe("createSsoSession", () => {
 
           // The portal session lands on the same (now clean) identity.
           expect(result.userId).toBe("user_shadow");
+
           const [user] = yield* db
             .select()
             .from(schema.userTable)
             .where(eq(schema.userTable.id, result.userId));
+
           expect(user?.email).toMatch(/^sso-[0-9a-f]{16}@feeblo\.com$/);
           expect(user?.emailVerified).toBe(true);
           expect(user?.restrictedToOrganizationId).toBe(fixture.organizationId);
@@ -521,11 +547,14 @@ describe("createSsoSession", () => {
             .select()
             .from(schema.contactTable)
             .where(eq(schema.contactTable.id, "contact_ada"));
+
           expect(contact?.userId).toBe("user_shadow");
+
           const [post] = yield* db
             .select()
             .from(schema.postTable)
             .where(eq(schema.postTable.id, "post_on_behalf"));
+
           expect(post?.creatorId).toBe("user_shadow");
         })
     );
@@ -541,6 +570,7 @@ describe("createSsoSession", () => {
           organizationId: fixture.organizationId,
           token,
         });
+
         const second = yield* createSsoSession({
           clientIp: `${fixture.clientIp}-2`,
           organizationId: fixture.organizationId,
@@ -549,10 +579,12 @@ describe("createSsoSession", () => {
 
         expect(second.userId).toBe(first.userId);
         const db = yield* currentDb;
+
         const [user] = yield* db
           .select()
           .from(schema.userTable)
           .where(eq(schema.userTable.id, second.userId));
+
         expect(user?.email).toMatch(/^sso-[0-9a-f]{16}@feeblo\.com$/);
       })
     );
@@ -600,10 +632,12 @@ describe("linkAnonymousAccount", () => {
   const contactOwner = (contactId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const rows = yield* db
         .select({ userId: schema.contactTable.userId })
         .from(schema.contactTable)
         .where(eq(schema.contactTable.id, contactId));
+
       return rows[0]?.userId ?? null;
     });
 
@@ -636,6 +670,7 @@ describe("linkAnonymousAccount", () => {
       Effect.gen(function* () {
         const { anonymousUserId, contactId, newUserId } =
           yield* makeLinkFixture();
+
         const db = yield* currentDb;
         const attackerId = yield* WorkspaceId.generate;
         yield* db.insert(schema.userTable).values({
@@ -647,6 +682,7 @@ describe("linkAnonymousAccount", () => {
         const error = yield* Effect.flip(
           linkAnonymousAccount({ anonymousUserId: attackerId, newUserId })
         );
+
         expect(error.code).toBe("ANONYMOUS_USER_NOT_RESTRICTED");
         expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
       })
@@ -656,6 +692,7 @@ describe("linkAnonymousAccount", () => {
       Effect.gen(function* () {
         const { anonymousUserId, contactId, newUserId } =
           yield* makeLinkFixture();
+
         const db = yield* currentDb;
         yield* db
           .update(schema.userTable)
@@ -665,6 +702,7 @@ describe("linkAnonymousAccount", () => {
         const error = yield* Effect.flip(
           linkAnonymousAccount({ anonymousUserId, newUserId })
         );
+
         expect(error.code).toBe("NEW_USER_IS_ANONYMOUS");
         expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
       })
@@ -678,6 +716,7 @@ describe("linkAnonymousAccount", () => {
         const error = yield* Effect.flip(
           linkAnonymousAccount({ anonymousUserId: "does-not-exist", newUserId })
         );
+
         expect(error.code).toBe("ANONYMOUS_USER_NOT_FOUND");
         expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
       })
@@ -693,6 +732,7 @@ describe("linkAnonymousAccount", () => {
             newUserId: "does-not-exist",
           })
         );
+
         expect(error.code).toBe("NEW_USER_NOT_FOUND");
         expect(yield* contactOwner(contactId)).toBe(anonymousUserId);
       })

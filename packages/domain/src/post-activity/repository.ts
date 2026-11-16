@@ -240,6 +240,7 @@ const makePostActivityRepository = Effect.gen(function* () {
   const makeRow = (input: PostActivityInput) =>
     Effect.gen(function* () {
       const id = input.id ?? (yield* PostActivityId.generate);
+
       return {
         id,
         organizationId: input.organizationId,

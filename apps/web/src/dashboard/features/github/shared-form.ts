@@ -18,16 +18,21 @@ export const githubPostIssueFormSchema = z
     if (value.action !== "link") {
       return;
     }
+
     const trimmed = value.issueNumber.trim();
+
     if (trimmed === "") {
       ctx.addIssue({
         code: "custom",
         message: "Enter an issue number",
         path: ["issueNumber"],
       });
+
       return;
     }
+
     const parsed = Number(trimmed);
+
     if (!Number.isInteger(parsed) || parsed <= 0) {
       ctx.addIssue({
         code: "custom",

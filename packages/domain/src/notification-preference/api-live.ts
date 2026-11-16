@@ -27,12 +27,15 @@ const verifyUnsubscribeToken = (
 > =>
   Effect.gen(function* () {
     const tokens = yield* NotificationPreferenceTokenService;
+
     const claims = yield* tokens
       .verifyToken(token)
       .pipe(Effect.mapError(invalidLink));
+
     if (Option.isNone(claims)) {
       return yield* invalidLink();
     }
+
     return claims.value;
   });
 
@@ -65,6 +68,7 @@ export const unsubscribeNotificationPreference = (token: string) =>
         userId: claims.userId,
       })
       .pipe(withRemapDbErrors("NotificationPreference", "update"));
+
     return { unsubscribed: true };
   });
 

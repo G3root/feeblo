@@ -74,6 +74,7 @@ const TEST_USER = {
 
 /** Anything that cannot survive in a slug. */
 const nonSlugCharacterPattern = /[^a-z0-9\s-]/g;
+
 /** Runs of whitespace, which become the slug's hyphens. */
 const whitespaceRunPattern = /\s+/g;
 
@@ -135,6 +136,7 @@ const TEAM_USERS = [
 ] as const;
 
 const MAIN_POST_COUNT = 40;
+
 const EXTERNAL_POST_COUNT = 12;
 
 const REACTIONS = [
@@ -149,6 +151,7 @@ const REACTIONS = [
 ] as const;
 
 type SeedPlan = "starter" | "professional";
+
 type SeedVariant = "monthly" | "yearly";
 
 /**
@@ -427,6 +430,7 @@ const seedEmailHash = (email: string) =>
 const addDays = (date: Date, days: number) => {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
+
   return result;
 };
 
@@ -642,6 +646,7 @@ const ensureOrganization = (userId: string, name = "Personal") =>
         .select({ id: postStatusTable.id, type: postStatusTable.type })
         .from(postStatusTable)
         .where(eq(postStatusTable.organizationId, org.id));
+
       const statusByType = new Map(
         roadmapStatuses.map((status) => [status.type, status.id])
       );
@@ -650,9 +655,11 @@ const ensureOrganization = (userId: string, name = "Personal") =>
         ["PLANNED", "IN_PROGRESS", "COMPLETED"] as const
       ).entries()) {
         const statusId = statusByType.get(type);
+
         if (!statusId) {
           continue;
         }
+
         const columnId = yield* RoadmapColumnId.generate;
         yield* db.insert(roadmapColumnTable).values({
           id: columnId,
@@ -795,6 +802,7 @@ const ensureBoards = ({
 const ensureProducts = () =>
   Effect.gen(function* () {
     const db = yield* Database.Database;
+
     const products: Array<{
       id: string;
       plan: SeedPlan;
@@ -878,9 +886,11 @@ const ensureSubscription = ({
     const isCanceled = scenario.status === "canceled";
     const trialStart = isTrialing ? addDays(now, -9) : null;
     const trialEnd = isTrialing ? addDays(now, 5) : null;
+
     const currentPeriodStart = isTrialing
       ? addDays(now, -9)
       : addDays(now, -35);
+
     // past_due keeps an open period so the plan still resolves while the
     // dashboard shows the payment-failed state.
     const currentPeriodEnd =
@@ -945,6 +955,7 @@ const ensurePosts = ({
   Effect.gen(function* () {
     const db = yield* Database.Database;
     const now = new Date();
+
     const postStatuses = yield* db
       .select({ id: postStatusTable.id, type: postStatusTable.type })
       .from(postStatusTable)
@@ -1051,6 +1062,7 @@ const seedEngagement = ({
       console.log(
         "   Engagement already exists, skipping comments/likes/reactions"
       );
+
       return;
     }
 
@@ -1153,6 +1165,7 @@ const seedEngagement = ({
         min: 1,
         max: Math.min(3, actorIds.length),
       });
+
       const reactors = faker.helpers.arrayElements(actorIds, reactionCount);
 
       for (const reactorId of reactors) {
@@ -1220,12 +1233,15 @@ const seedBans = ({
       .from(userBanTable)
       .where(eq(userBanTable.organizationId, organizationId))
       .limit(1);
+
     if (existing) {
       console.log("   Bans already exist, skipping");
+
       return;
     }
 
     const now = new Date();
+
     for (const target of targets) {
       yield* db.insert(userBanTable).values({
         id: yield* UserBanId.generate,
@@ -1295,10 +1311,12 @@ const seedChangelogs = ({
 
     if (existing) {
       console.log("   Changelogs already exist, skipping");
+
       return;
     }
 
     const now = new Date();
+
     const categoryRows = yield* db
       .select({
         id: changelogCategoryTable.id,
@@ -1306,6 +1324,7 @@ const seedChangelogs = ({
       })
       .from(changelogCategoryTable)
       .where(eq(changelogCategoryTable.organizationId, organizationId));
+
     const categoryIdsByName = new Map(
       categoryRows.map((category) => [category.name, category.id])
     );
@@ -1314,10 +1333,12 @@ const seedChangelogs = ({
 
     for (const definition of CHANGELOG_SEEDS) {
       const changelogId = yield* ChangelogId.generate;
+
       const publishedAt =
         definition.publishedDaysAgo !== null
           ? addDays(now, -definition.publishedDaysAgo)
           : null;
+
       const scheduledAt =
         definition.scheduledDaysAhead !== null
           ? addDays(now, definition.scheduledDaysAhead)
@@ -1343,6 +1364,7 @@ const seedChangelogs = ({
         nextPostIndex,
         nextPostIndex + definition.linkPostCount
       );
+
       nextPostIndex += definition.linkPostCount;
 
       for (const postItem of linkedPosts) {
@@ -1356,6 +1378,7 @@ const seedChangelogs = ({
 
       for (const categoryName of definition.categories) {
         const categoryId = categoryIdsByName.get(categoryName);
+
         if (!categoryId) {
           continue;
         }
@@ -1425,6 +1448,7 @@ const seedCrmOnBehalf = ({
       .from(postStatusTable)
       .where(eq(postStatusTable.organizationId, organizationId))
       .limit(1);
+
     const [board] = yield* db
       .select({ id: boardTable.id })
       .from(boardTable)
@@ -1458,6 +1482,7 @@ const seedCrmOnBehalf = ({
 
     const contactMember = yield* findMemberByEmail("sam@feeblo.dev");
     const attributingMember = yield* findMemberByEmail("alex@feeblo.dev");
+
     if (!contactMember || !attributingMember) {
       return yield* new SeedDataError({
         message: "The CRM cases need the seeded team members",
@@ -1588,6 +1613,7 @@ const seedCrmOnBehalf = ({
     ]);
 
     let postIndex = 0;
+
     const createPost = ({
       title,
       authorName,
@@ -1624,6 +1650,7 @@ const seedCrmOnBehalf = ({
           createdAt: now,
           updatedAt: now,
         });
+
         return id;
       });
 
@@ -1659,6 +1686,7 @@ const seedCrmOnBehalf = ({
       creatorId: null,
       creatorMemberId: null,
     });
+
     yield* recordOnBehalf({
       postId: nedPostId,
       kind: "POST_CREATED",
@@ -1679,6 +1707,7 @@ const seedCrmOnBehalf = ({
       creatorId: shadowAccountId,
       creatorMemberId: null,
     });
+
     yield* recordOnBehalf({
       postId: sallyPostId,
       kind: "POST_CREATED",
@@ -1727,6 +1756,7 @@ const seedCrmOnBehalf = ({
       creatorId: unverifiedAccountId,
       creatorMemberId: null,
     });
+
     yield* recordOnBehalf({
       postId: umaPostId,
       kind: "POST_CREATED",
@@ -1747,6 +1777,7 @@ const seedCrmOnBehalf = ({
       creatorId: verifiedAccountId,
       creatorMemberId: null,
     });
+
     yield* recordOnBehalf({
       postId: veraPostId,
       kind: "POST_CREATED",
@@ -1767,6 +1798,7 @@ const seedCrmOnBehalf = ({
       creatorId: portalAccountId,
       creatorMemberId: null,
     });
+
     yield* recordOnBehalf({
       postId: patPostId,
       kind: "POST_CREATED",
@@ -1788,6 +1820,7 @@ const seedCrmOnBehalf = ({
       creatorId: contactMember.userId,
       creatorMemberId: null,
     });
+
     yield* recordOnBehalf({
       postId: moPostId,
       kind: "POST_CREATED",
@@ -1822,6 +1855,7 @@ const seedCrmOnBehalf = ({
       role: "contributor",
       createdAt: now,
     });
+
     const formerPostId = yield* createPost({
       title: "Recorded from a customer call",
       authorName: "Former Member",
@@ -1829,6 +1863,7 @@ const seedCrmOnBehalf = ({
       creatorId: formerMemberUserId,
       creatorMemberId: formerMemberId,
     });
+
     yield* recordOnBehalf({
       postId: formerPostId,
       kind: "POST_CREATED",
@@ -1854,6 +1889,7 @@ const seedCrmOnBehalf = ({
       createdAt: now,
       updatedAt: now,
     });
+
     const orphanPostId = yield* createPost({
       title: "Custom fields on the roadmap card",
       authorName: "Dana Deleted",
@@ -1861,6 +1897,7 @@ const seedCrmOnBehalf = ({
       creatorId: orphanAccountId,
       creatorMemberId: null,
     });
+
     yield* recordOnBehalf({
       postId: orphanPostId,
       kind: "POST_CREATED",
@@ -1897,6 +1934,7 @@ const seedOverPlanWorkspace = (auth: SeedAuth) =>
     const now = new Date();
     const user = yield* ensureUser(OVER_PLAN_USER, auth);
     const org = yield* ensureOrganization(user.id, "Over Plan Demo");
+
     const ownerMember = yield* ensureMember({
       organizationId: org.id,
       userId: user.id,
@@ -1938,6 +1976,7 @@ const seedOverPlanWorkspace = (auth: SeedAuth) =>
         { email, name: email, password: TEST_USER.password },
         auth
       );
+
       yield* ensureMember({
         organizationId: org.id,
         userId: member.id,
@@ -2017,6 +2056,7 @@ const seed = (auth: SeedAuth) =>
     console.log("1) Creating test user and organization");
     const primaryUser = yield* ensureUser(TEST_USER, auth);
     const primaryOrg = yield* ensureOrganization(primaryUser.id);
+
     const primaryMember = yield* ensureMember({
       organizationId: primaryOrg.id,
       userId: primaryUser.id,
@@ -2030,6 +2070,7 @@ const seed = (auth: SeedAuth) =>
     }
 
     const primaryScenario = ORGANIZATION_PLANS[TEST_USER.email];
+
     if (primaryScenario) {
       yield* ensureSubscription({
         organizationId: primaryOrg.id,
@@ -2097,6 +2138,7 @@ const seed = (auth: SeedAuth) =>
         const personalOrg = yield* ensureOrganization(userRecord.id);
 
         const planScenario = ORGANIZATION_PLANS[candidate.email];
+
         if (planScenario) {
           yield* ensureSubscription({
             organizationId: personalOrg.id,
@@ -2129,6 +2171,7 @@ const seed = (auth: SeedAuth) =>
         externalUser.id,
         faker.company.name()
       );
+
       const externalMember = yield* ensureMember({
         organizationId: externalOrg.id,
         userId: externalUser.id,
@@ -2136,6 +2179,7 @@ const seed = (auth: SeedAuth) =>
       });
 
       const planScenario = ORGANIZATION_PLANS[externalUser.email];
+
       if (planScenario) {
         yield* ensureSubscription({
           organizationId: externalOrg.id,
@@ -2236,6 +2280,7 @@ const seed = (auth: SeedAuth) =>
 const SeedLayer = Database.DatabaseContextLive;
 
 const seedEnv = parseSeedAuthOptions(process.env);
+
 if (seedEnv instanceof SeedConfigError) {
   console.error(`Seed failed: ${seedEnv.message}`);
   process.exit(1);

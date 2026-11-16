@@ -82,27 +82,37 @@ export const runIntegrationDeliveryWorkerPoll = ({
       if (outcome._tag === "Succeeded") {
         return "succeeded" as const;
       }
+
       if (outcome._tag === "Retry") {
         return "retry" as const;
       }
+
       return "exhausted" as const;
     };
+
     const semaphores = new Map<string, Semaphore.Semaphore>();
+
     const connectionSemaphore = (connectionId: string) => {
       const existing = semaphores.get(connectionId);
+
       if (existing !== undefined) {
         return existing;
       }
+
       const created = Semaphore.makeUnsafe(connectionConcurrency);
       semaphores.set(connectionId, created);
+
       return created;
     };
+
     yield* repository.recoverExpiredLeases;
+
     const claimed = yield* repository.claimDueDeliveries({
       leaseDurationMs: integrationDeliveryWorkerDefaults.leaseDurationMs,
       leaseOwner,
       limit: integrationDeliveryWorkerDefaults.batchSize,
     });
+
     yield* recordIntegrationClaimedBacklog(claimed.length);
     yield* Effect.forEach(
       claimed,
@@ -116,13 +126,17 @@ export const runIntegrationDeliveryWorkerPoll = ({
                     yield* repository.cancelClaimedDelivery({
                       claimed: delivery,
                     });
+
                     return;
                   }
+
                   const startedAt = yield* DateTime.nowAsDate;
+
                   const handler = registry.getHandler({
                     capabilityKey: delivery.input.route.capabilityKey,
                     provider: delivery.input.route.provider,
                   });
+
                   const result: {
                     readonly errorTag?: string;
                     readonly externalResourceDrafts?: readonly IntegrationExternalResourceDraft[];
@@ -173,6 +187,7 @@ export const runIntegrationDeliveryWorkerPoll = ({
                             }),
                           })
                         );
+
                   yield* repository.persistDeliveryResult({
                     claimed: delivery,
                     ...(result.errorTag !== undefined && {

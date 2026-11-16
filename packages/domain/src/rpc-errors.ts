@@ -150,10 +150,12 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
   options?: RemapDbErrorsOptions
 ) {
   let config: RemapDbErrorsConfig<UniqueViolationError>;
+
   if (isString(entityOrConfig)) {
     if (action === undefined) {
       throw new TypeError("withRemapDbErrors requires a database action");
     }
+
     config = {
       action,
       entity: entityOrConfig,
@@ -216,12 +218,15 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
           if (Predicate.isTagged(err, "SchemaError")) {
             return toInternalError("There was an error in parsing when");
           }
+
           if (Predicate.isTagged(err, "LegidError")) {
             return toInternalError("There was an error generating an id when");
           }
+
           if (isUniqueViolation(err)) {
             return toUniqueViolationError();
           }
+
           return toInternalError("There was a database error when");
         }
       )

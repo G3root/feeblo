@@ -36,6 +36,7 @@ describe("preload outcomes", () => {
       organizationId: "org_1",
       pathname: () => "/",
     });
+
     const client = createClient(scope);
 
     expect(isBoardPreloadDegraded(client)).toBe(false);
@@ -51,6 +52,7 @@ describe("preload outcomes", () => {
       organizationId: "org_1",
       pathname: () => "/",
     });
+
     const other = createBoardScope({
       organizationId: "org_2",
       pathname: () => "/",

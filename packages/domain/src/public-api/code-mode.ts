@@ -147,7 +147,9 @@ const failureMessage = <Failure>(error: Failure): string => {
   if (Schema.is(TaggedFailure)(error)) {
     return `${error._tag}: ${error.message}`;
   }
+
   if (Schema.is(MessageFailure)(error)) return error.message;
+
   return "The call failed.";
 };
 
@@ -175,6 +177,7 @@ const buildPublicApiCodeModeHandlers = () =>
     // Built once, when the toolkit's layer is, so a request pays only for the
     // page it reads.
     const catalog = makeOperationCatalog();
+
     const operations = new Map<string, (typeof PublicApiOperations)[number]>(
       PublicApiOperations.map((operation) => [operation.name, operation])
     );
@@ -192,6 +195,7 @@ const buildPublicApiCodeModeHandlers = () =>
       controls: SandboxCallControls
     ) {
       const operation = operations.get(call.name);
+
       if (operation === undefined) {
         return yield* toolFailure(
           `Unknown tool "${call.name}". Call search first and use one of the names it returns.`
@@ -335,6 +339,7 @@ export const makePublicApiCodeModeRoute = (
       const version = yield* Config.String("APP_RELEASE").pipe(
         Config.withDefault("dev")
       );
+
       const approvalMode =
         configuredApproval ??
         (yield* Config.Literals(APPROVAL_MODES, "MCP_APPROVAL").pipe(

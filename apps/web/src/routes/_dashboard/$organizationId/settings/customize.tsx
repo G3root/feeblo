@@ -22,21 +22,25 @@ export const Route = createFileRoute(
       dashboardCollections.siteCollection.preload(),
       dashboardCollections.workspacePlanCollection.preload(),
     ]);
+
     return null;
   },
 });
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
+
   // Same permission as the sidebar entry and the UpdateSite mutation
   // (`site.*`) — keep all three spellings aligned.
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "site.update")
   );
+
   const plan = usePlan();
 
   const canEditSite = allowed && !isPending;
   const isPaidPlan_ = isPaidPlan(plan.data?.plan);
+
   return (
     <SettingsLayout.Root>
       <SettingsLayout.Header>

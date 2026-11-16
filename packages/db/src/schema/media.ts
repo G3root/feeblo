@@ -84,4 +84,5 @@ export const changelogAssetTable = pgTable(
 );
 
 export type Asset = typeof assetTable.$inferSelect;
+
 export type NewAsset = typeof assetTable.$inferInsert;

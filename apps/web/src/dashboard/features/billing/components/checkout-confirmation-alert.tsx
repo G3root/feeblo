@@ -30,6 +30,7 @@ export function CheckoutConfirmationAlert({
   const [snapshot, send] = useMachine(checkoutConfirmationMachine, {
     input: { checkoutId, organizationId, plan },
   });
+
   const status = toCheckoutConfirmationStatus(snapshot);
 
   if (status === "hidden") {

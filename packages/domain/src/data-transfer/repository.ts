@@ -50,7 +50,9 @@ import type { TDataImportRowFilter, TDataImportRowSort } from "./schema";
  * for a different reason: a terminal job no longer holds the slot.
  */
 const CANCELABLE_STATUSES = sourceStatesFor("cancel");
+
 const ACTIVE_STATUSES = DATA_IMPORT_JOB_STATES.filter(isActiveDataImportStatus);
+
 /**
  * The state a pass runs in, and therefore the only one its endings may leave.
  * `complete` and `fail` share their sources by construction; `machine.test.ts`
@@ -431,6 +433,7 @@ const rowFilterCondition = (filter: TDataImportRowFilter | undefined) => {
   if (filter === undefined) {
     return undefined;
   }
+
   return filter === "warned"
     ? rowHasWarnings
     : eq(schema.dataImportRowTable.outcome, filter);
@@ -491,13 +494,16 @@ const makeDataTransferRepository = Effect.gen(function* () {
         .transaction(() =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             const retentionExpiresAt = DateTime.fromDateUnsafe(now).pipe(
               DateTime.addDuration(Duration.millis(DATA_IMPORT_RETENTION_MS)),
               DateTime.toDate
             );
+
             const errorCount = input.rows.filter(
               (row) => row.outcome === "failed"
             ).length;
+
             const warningCount = input.rows.filter(
               (row) =>
                 row.outcome === "pending" &&
@@ -529,12 +535,14 @@ const makeDataTransferRepository = Effect.gen(function* () {
 
             // Batched so one upload does not build a 20k-row statement.
             const INSERT_CHUNK = 500;
+
             for (
               let offset = 0;
               offset < input.rows.length;
               offset += INSERT_CHUNK
             ) {
               const chunk = input.rows.slice(offset, offset + INSERT_CHUNK);
+
               const values = yield* Effect.forEach(chunk, (row) =>
                 DataImportRowId.generate.pipe(
                   Effect.map((id) => ({
@@ -547,6 +555,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
                   }))
                 )
               );
+
               yield* db.insert(schema.dataImportRowTable).values(values);
             }
 
@@ -599,10 +608,12 @@ const makeDataTransferRepository = Effect.gen(function* () {
               ? undefined
               : sql`${schema.dataImportRowTable.payload} ->> 'boardName' = ${board}`
           );
+
           const [totals] = yield* db
             .select({ total: sql<string | number>`count(*)` })
             .from(schema.dataImportRowTable)
             .where(where);
+
           const stored = yield* db
             .select({
               boardSlug: schema.boardTable.slug,
@@ -631,6 +642,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
             )
             .limit(limit)
             .offset(offset);
+
           // The payload holds the plan a preview renders; it is narrowed to
           // the fields the report shows and never leaves the module whole.
           const rows = yield* Effect.forEach(stored, (row) =>
@@ -654,6 +666,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
               }))
             )
           );
+
           return { rows, total: Number(totals?.total ?? 0) };
         })
       ),
@@ -729,6 +742,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
             ],
             { concurrency: "unbounded" }
           );
+
           return {
             boardGroups: boardRows.flatMap((row) =>
               row.name === null
@@ -799,6 +813,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .orderBy(asc(schema.dataImportRowTable.rowNumber))
             .limit(limit)
             .offset(offset);
+
           return yield* Effect.forEach(stored, (row) =>
             decodeStagedRow(row.payload).pipe(
               Effect.orElseSucceed((): null => null),
@@ -923,7 +938,9 @@ const makeDataTransferRepository = Effect.gen(function* () {
               )
             )
             .orderBy(asc(schema.tagTable.name));
+
           const tagsByPost = new Map<string, string[]>();
+
           for (const tag of tagRows) {
             const names = tagsByPost.get(tag.postId) ?? [];
             names.push(tag.name);
@@ -955,6 +972,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
         "markQueued",
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+
           const [job] = yield* db
             .update(schema.dataImportJobTable)
             .set({ confirmedAt: now, status: "queued", updatedAt: now })
@@ -968,6 +986,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
               )
             )
             .returning(JOB_FIELDS);
+
           return Option.fromNullishOr(job);
         })
       ),
@@ -977,6 +996,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
         "cancelJob",
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+
           const updated = yield* db
             .update(schema.dataImportJobTable)
             .set({
@@ -999,6 +1019,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
               )
             )
             .returning({ id: schema.dataImportJobTable.id });
+
           return updated.length > 0;
         })
       ),
@@ -1009,6 +1030,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
         db.transaction(() =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             const [candidate] = yield* db
               .select({ id: schema.dataImportJobTable.id })
               .from(schema.dataImportJobTable)
@@ -1035,6 +1057,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
               DateTime.addDuration(Duration.millis(leaseDurationMs)),
               DateTime.toDate
             );
+
             const [job] = yield* db
               .update(schema.dataImportJobTable)
               .set({
@@ -1088,6 +1111,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
         "markRowCreated",
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+
           const updated = yield* db
             .update(schema.dataImportRowTable)
             .set({
@@ -1121,6 +1145,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
               )
             )
             .returning({ id: schema.dataImportRowTable.id });
+
           if (updated.length === 0) {
             return yield* repositoryError("markRowCreated");
           }
@@ -1156,13 +1181,16 @@ const makeDataTransferRepository = Effect.gen(function* () {
             .from(schema.dataImportRowTable)
             .where(eq(schema.dataImportRowTable.jobId, jobId))
             .groupBy(schema.dataImportRowTable.outcome);
+
           const byOutcome = new Map(
             grouped.map((row) => [row.outcome, Number(row.total)])
           );
+
           const counts: DataImportCounts = {
             createdCount: byOutcome.get("created") ?? 0,
             errorCount: byOutcome.get("failed") ?? 0,
           };
+
           const now = yield* DateTime.nowAsDate;
           yield* db
             .update(schema.dataImportJobTable)
@@ -1177,6 +1205,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
                 eq(schema.dataImportJobTable.leaseOwner, leaseOwner)
               )
             );
+
           return counts;
         })
       ),
@@ -1213,10 +1242,12 @@ const makeDataTransferRepository = Effect.gen(function* () {
         "renewLease",
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+
           const leaseExpiresAt = DateTime.fromDateUnsafe(now).pipe(
             DateTime.addDuration(Duration.millis(leaseDurationMs)),
             DateTime.toDate
           );
+
           const updated = yield* db
             .update(schema.dataImportJobTable)
             .set({ leaseExpiresAt, updatedAt: now })
@@ -1228,6 +1259,7 @@ const makeDataTransferRepository = Effect.gen(function* () {
               )
             )
             .returning({ id: schema.dataImportJobTable.id });
+
           return updated.length > 0;
         })
       ),

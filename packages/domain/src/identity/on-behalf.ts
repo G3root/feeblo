@@ -41,6 +41,7 @@ export const resolveOnBehalfSubject = (args: {
 }) =>
   Effect.gen(function* () {
     const resolvePrincipal = yield* ResolvePrincipalService;
+
     return yield* resolvePrincipal
       .resolve({
         organizationId: args.organizationId,
@@ -121,6 +122,7 @@ export const subscribeOnBehalfSubject = (args: {
       args.subject.userId === null
         ? Option.none()
         : yield* userRepository.getById(args.subject.userId);
+
     const verifiedEmail =
       Option.isSome(subjectUser) &&
       subjectUser.value.emailVerified &&
@@ -156,6 +158,7 @@ export const subscribeOnBehalfSubject = (args: {
     // above is the only subscription a member can hold, and a member whose
     // address is unverified is refused at the delivery gate anyway.
     const contactId = args.subject.contactId;
+
     if (contactId === null) {
       return;
     }
@@ -165,7 +168,9 @@ export const subscribeOnBehalfSubject = (args: {
       .from(schema.contactTable)
       .where(eq(schema.contactTable.id, contactId))
       .limit(1);
+
     const contactEmail = contact?.email;
+
     if (
       contactEmail !== null &&
       contactEmail !== undefined &&

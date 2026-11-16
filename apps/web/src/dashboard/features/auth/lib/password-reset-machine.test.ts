@@ -43,6 +43,7 @@ describe("password reset machine", () => {
     // UI rather than a reachable event: a second verification must not swap the
     // code out from under a submit that is already in flight.
     const before = at("password", "123456");
+
     const [next] = transition(passwordResetMachine, before, {
       type: "VERIFIED",
       otp: "999999",
@@ -63,6 +64,7 @@ describe("password reset machine", () => {
 
   it("does not leave the code step when there is nothing to reject", () => {
     const before = at("otp");
+
     const [next] = transition(passwordResetMachine, before, {
       type: "CODE_REJECTED",
     });

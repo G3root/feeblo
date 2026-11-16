@@ -50,8 +50,11 @@ const LIST_OPERATORS = new Set<FilterOperator>([
  */
 export function getSearchString(value: DataTableRawValue): string | undefined {
   if (isString(value)) return value;
+
   if (isNumber(value) && Number.isFinite(value)) return String(value);
+
   if (isBoolean(value)) return String(value);
+
   return undefined;
 }
 
@@ -60,11 +63,13 @@ export function getSearchStrings(value: DataTableRawValue): string[] {
   if (Array.isArray(value)) {
     return value.flatMap((item) => {
       const text = getSearchString(item);
+
       return text === undefined ? [] : [text];
     });
   }
 
   const text = getSearchString(value);
+
   return text === undefined ? [] : [text];
 }
 
@@ -85,9 +90,11 @@ export function parseSorting(
   columnIds?: readonly string[] | Set<string>
 ): ColumnSortItem[] | null {
   const sorting = parseSortingValue(getSearchString(value));
+
   if (!sorting) return null;
 
   const knownIds = columnIds === undefined ? null : new Set(columnIds);
+
   return knownIds === null || sorting.every((item) => knownIds.has(item.id))
     ? sorting
     : null;
@@ -153,6 +160,7 @@ export function parseColumnFilters<TColumnId extends string>(
 ): ColumnFilterItem<TColumnId>[] {
   return getSearchStrings(value).flatMap((param) => {
     const filter = parseColumnFilter(id, variant, param);
+
     return getIsActiveFilter(filter) && getIsValidFilterValue(filter)
       ? [filter]
       : [];
@@ -161,6 +169,7 @@ export function parseColumnFilters<TColumnId extends string>(
 
 export function serializeColumnFilter(filter: ColumnFilterItem): string {
   const name = FILTER_OPERATORS[filter.operator];
+
   if (getIsValuelessOperator(filter.operator)) return name;
 
   const rawValue = Array.isArray(filter.value)
@@ -172,6 +181,7 @@ export function serializeColumnFilter(filter: ColumnFilterItem): string {
     getPlainFilterOperator(filter.variant, Array.isArray(filter.value))
   ) {
     const implicit = parseColumnFilter(filter.id, filter.variant, rawValue);
+
     if (getIsSameFilter(implicit, filter)) return rawValue;
   }
 
@@ -180,6 +190,7 @@ export function serializeColumnFilter(filter: ColumnFilterItem): string {
 
 function parseSortingValue(value: string | undefined): ColumnSortItem[] | null {
   if (value === undefined) return null;
+
   if (value === "") return [];
 
   const sorting: ColumnSortItem[] = [];
@@ -191,6 +202,7 @@ function parseSortingValue(value: string | undefined): ColumnSortItem[] | null {
     if (index <= 0 || (order !== "asc" && order !== "desc")) return null;
 
     const decoded = decodeComponent(part.slice(0, index));
+
     if (decoded === undefined) return null;
 
     sorting.push({ id: decoded, desc: order === "desc" });
@@ -222,7 +234,9 @@ function splitFilterOperator(param: string, variant: FilterVariant) {
     const operator = OPERATORS_BY_NAME.get(
       parts.slice(0, count).join(".").toLowerCase()
     );
+
     if (!operator || !getIsVariantOperator(variant, operator)) continue;
+
     if (count === parts.length && !getIsValuelessOperator(operator)) continue;
 
     return { operator, rawValue: parts.slice(count).join(".") };
@@ -268,9 +282,11 @@ function parseListValue(rawValue: string, operator: FilterOperator) {
       item += char;
     }
   }
+
   if (rawValue !== "") items.push(wasQuoted ? item : item.trim());
 
   if (operator === "isBetween") return [items[0] ?? "", items[1] ?? ""];
+
   return items.filter((value) => value !== "");
 }
 
@@ -286,10 +302,13 @@ function joinListValue(values: string[]) {
 
 function getIsSameFilter(a: ColumnFilterItem, b: ColumnFilterItem) {
   if (a.operator !== b.operator) return false;
+
   if (!Array.isArray(a.value) || !Array.isArray(b.value)) {
     return a.value === b.value;
   }
+
   const otherValue = b.value;
+
   return (
     a.value.length === otherValue.length &&
     a.value.every((item, index) => item === otherValue[index])

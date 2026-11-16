@@ -41,21 +41,33 @@ import type * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 export const IntegrationCapabilityDirection = DbIntegrationCapabilityDirection;
+
 export const IntegrationCapabilityKey = DbIntegrationCapabilityKey;
+
 export const IntegrationConnectionLifecycleStatus =
   DbIntegrationConnectionLifecycleStatus;
+
 export const IntegrationConnectionMode = DbIntegrationConnectionMode;
+
 export const IntegrationDeliveryRetryDecision =
   DbIntegrationDeliveryRetryDecision;
+
 export const IntegrationDeliveryState = DbIntegrationDeliveryState;
+
 export const IntegrationExternalResourceType =
   DbIntegrationExternalResourceType;
+
 export const IntegrationEventType = DbIntegrationEventType;
+
 export const IntegrationProviderKey = DbIntegrationProviderKey;
+
 export const IntegrationRouteEventSelection = DbIntegrationRouteEventSelection;
+
 export const IntegrationSafeDisplayMetadata = DbIntegrationSafeDisplayMetadata;
+
 export const SubscribableIntegrationEventType =
   DbSubscribableIntegrationEventType;
+
 export const IntegrationPostStatusType = PostStatusType;
 
 /** Extensible, browser-safe identifier for an integration provider family. */
@@ -73,6 +85,7 @@ export const IntegrationCapabilityManifest = Schema.Struct({
   direction: IntegrationCapabilityDirection,
   key: IntegrationCapabilityKey,
 });
+
 export interface IntegrationCapabilityManifest extends Schema.Schema.Type<
   typeof IntegrationCapabilityManifest
 > {}
@@ -84,6 +97,7 @@ export const IntegrationProviderManifest = Schema.Struct({
   displayName: Schema.NonEmptyString,
   provider: IntegrationProviderKey,
 });
+
 export interface IntegrationProviderManifest extends Schema.Schema.Type<
   typeof IntegrationProviderManifest
 > {}
@@ -94,6 +108,7 @@ export type SubscribableIntegrationEventType =
 
 /** Synthetic test events traverse delivery but can never be selected by a route. */
 export type IntegrationEventType = TIntegrationEventType;
+
 export type IntegrationPostStatusType = typeof IntegrationPostStatusType.Type;
 
 /** Provenance retained with an event to support future loop prevention. */
@@ -103,6 +118,7 @@ export const IntegrationEventOrigin = Schema.Struct({
   connectionId: Schema.optionalKey(IntegrationConnectionId.schema),
   routeId: Schema.optionalKey(IntegrationRouteId.schema),
 });
+
 export interface IntegrationEventOrigin extends Schema.Schema.Type<
   typeof IntegrationEventOrigin
 > {}
@@ -123,6 +139,7 @@ export const IntegrationEventEnvelopeV1 = Schema.Struct({
   type: IntegrationEventType,
   version: Schema.Literal(1),
 });
+
 export interface IntegrationEventEnvelopeV1 extends Schema.Schema.Type<
   typeof IntegrationEventEnvelopeV1
 > {}
@@ -147,6 +164,7 @@ export const IntegrationEventIdentity = Schema.Union([
     externalId: Schema.optionalKey(Schema.String),
   }),
 ]);
+
 export type IntegrationEventIdentity = Schema.Schema.Type<
   typeof IntegrationEventIdentity
 >;
@@ -158,6 +176,7 @@ export const IntegrationPostStatus = Schema.Struct({
   name: Schema.String,
   type: PostStatusType,
 });
+
 export interface IntegrationPostStatus extends Schema.Schema.Type<
   typeof IntegrationPostStatus
 > {}
@@ -187,6 +206,7 @@ export const IntegrationPostEventData = Schema.Struct({
   }),
   previousStatus: Schema.optionalKey(IntegrationPostStatus),
 });
+
 export interface IntegrationPostEventData extends Schema.Schema.Type<
   typeof IntegrationPostEventData
 > {}
@@ -197,6 +217,7 @@ export type IntegrationConnectionLifecycleStatus =
 
 /** Durable delivery lifecycle; a lease is never an external request by itself. */
 export type IntegrationDeliveryState = TIntegrationDeliveryState;
+
 export type IntegrationExternalResourceType = TIntegrationExternalResourceType;
 
 /** Immutable route record fields needed for matching and delivery persistence. */
@@ -212,6 +233,7 @@ export const IntegrationRoute = Schema.Struct({
   providerConfig: Schema.Json,
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
+
 export interface IntegrationRoute extends Schema.Schema.Type<
   typeof IntegrationRoute
 > {}
@@ -226,6 +248,7 @@ export const IntegrationConnection = Schema.Struct({
   provider: IntegrationProviderKey,
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
+
 export interface IntegrationConnection extends Schema.Schema.Type<
   typeof IntegrationConnection
 > {}
@@ -243,6 +266,7 @@ export const IntegrationDelivery = Schema.Struct({
   routeId: IntegrationRouteId.schema,
   state: IntegrationDeliveryState,
 });
+
 export interface IntegrationDelivery extends Schema.Schema.Type<
   typeof IntegrationDelivery
 > {}
@@ -261,6 +285,7 @@ export const IntegrationDeliveryAttempt = Schema.Struct({
   retryDecision: Schema.NullOr(IntegrationDeliveryRetryDecision),
   startedAt: Schema.DateTimeUtcFromString,
 });
+
 export interface IntegrationDeliveryAttempt extends Schema.Schema.Type<
   typeof IntegrationDeliveryAttempt
 > {}
@@ -389,6 +414,7 @@ export const IntegrationExternalResourceDraft = Schema.Struct({
   safeMetadata: IntegrationSafeDisplayMetadata,
   title: Schema.optionalKey(Schema.String),
 });
+
 export interface IntegrationExternalResourceDraft extends Schema.Schema.Type<
   typeof IntegrationExternalResourceDraft
 > {}

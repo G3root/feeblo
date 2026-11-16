@@ -37,9 +37,11 @@ export function setup(project: TestProject): void {
   }
 
   const deadlineMs = explicit ? Number(configured) : defaultDeadlineMs;
+
   if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
     return;
   }
+
   if (deadlineMs > maxTimerMs) {
     throw new Error(
       `FEEBLO_TEST_DEADLINE_MS must be at most ${maxTimerMs}ms: setTimeout cannot represent a longer delay and would fire after 1ms instead.`

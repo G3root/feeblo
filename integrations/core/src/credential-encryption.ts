@@ -86,6 +86,7 @@ export const encryptIntegrationCredentialMaterial = <Material, Encoded>(
 > =>
   Effect.gen(function* () {
     const key = yield* validateIntegrationEncryptionKey(encryptionKey);
+
     const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(schema))(
       material
     ).pipe(
@@ -97,6 +98,7 @@ export const encryptIntegrationCredentialMaterial = <Material, Encoded>(
           })
       )
     );
+
     return yield* encryptIntegrationCredential(key, Redacted.make(encoded));
   });
 

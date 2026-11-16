@@ -58,6 +58,7 @@ export function LocaleSwitcher() {
         <MenuRadioGroup
           onValueChange={(nextLocale) => {
             const locale = toLocale(nextLocale);
+
             if (locale && locale !== currentLocale) {
               void setLocale(locale);
             }

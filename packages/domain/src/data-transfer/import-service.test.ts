@@ -42,6 +42,7 @@ type Fixture = {
 };
 
 const encoder = new TextEncoder();
+
 const textDecoder = new TextDecoder();
 
 const makeFixture = (role: Role = "manager") =>
@@ -129,6 +130,7 @@ const stage = (
 ) =>
   Effect.gen(function* () {
     const service = yield* DataImportService;
+
     return yield* service
       .stageBoardImport({
         bytes,
@@ -159,6 +161,7 @@ layer(TestLayer)("DataImportService", (it) => {
   it.effect("stages a file, keeping failed rows and warnings", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
+
       const job = yield* stage(
         fixture,
         encoder.encode(
@@ -183,11 +186,13 @@ layer(TestLayer)("DataImportService", (it) => {
       ]);
 
       const repository = yield* DataTransferRepository;
+
       const report = yield* repository.listRows({
         jobId: job.id,
         limit: 10,
         offset: 0,
       });
+
       expect(report.total).toBe(3);
       expect(report.rows[0]).toMatchObject({
         boardName: "Another board",
@@ -219,6 +224,7 @@ layer(TestLayer)("DataImportService", (it) => {
   it.effect("summarizes a report by outcome, warning and board", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
+
       const job = yield* stage(
         fixture,
         encoder.encode(
@@ -230,11 +236,14 @@ layer(TestLayer)("DataImportService", (it) => {
           ].join("\n")
         )
       );
+
       const service = yield* DataImportService;
+
       const session = Effect.provideService(
         CurrentSession,
         makeSession(fixture, "manager")
       );
+
       const describe = (input: {
         readonly board?: string;
         readonly filter?: "failed" | "warned" | "pending" | "created";
@@ -285,6 +294,7 @@ layer(TestLayer)("DataImportService", (it) => {
         filter: "failed",
         message: "The title is required.",
       });
+
       expect(byMessage.report.total).toBe(1);
 
       const byBoard = yield* describe({ board: "Another board" });
@@ -299,11 +309,14 @@ layer(TestLayer)("DataImportService", (it) => {
   it.effect("bounds a substitution message before it leaves the report", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
+
       const job = yield* stage(
         fixture,
         encoder.encode(`title,eta\nLong,${"x".repeat(300)}\n`)
       );
+
       const service = yield* DataImportService;
+
       const detail = yield* service
         .describeImport({ id: job.id, organizationId: fixture.organizationId })
         .pipe(
@@ -313,6 +326,7 @@ layer(TestLayer)("DataImportService", (it) => {
       const long = detail.report.rows[0]?.warnings.find(
         (warning) => warning.length > 240
       );
+
       expect(long).toHaveLength(241);
       expect(long?.endsWith("…")).toBe(true);
     })
@@ -321,26 +335,33 @@ layer(TestLayer)("DataImportService", (it) => {
   it.effect("stops naming new boards once a job leaves staging", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
+
       const job = yield* stage(
         fixture,
         encoder.encode("title,board\nNew,Another board\n")
       );
+
       const service = yield* DataImportService;
+
       const session = Effect.provideService(
         CurrentSession,
         makeSession(fixture, "manager")
       );
+
       const before = yield* service
         .describeImport({ id: job.id, organizationId: fixture.organizationId })
         .pipe(session);
+
       expect(before.newBoards).toEqual(["Another board"]);
 
       yield* service
         .cancelImport({ id: job.id, organizationId: fixture.organizationId })
         .pipe(session);
+
       const after = yield* service
         .describeImport({ id: job.id, organizationId: fixture.organizationId })
         .pipe(session);
+
       expect(after.newBoards).toEqual([]);
     })
   );
@@ -348,6 +369,7 @@ layer(TestLayer)("DataImportService", (it) => {
   it.effect("streams the problem rows as a repair sheet", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
+
       const job = yield* stage(
         fixture,
         encoder.encode(
@@ -359,14 +381,17 @@ layer(TestLayer)("DataImportService", (it) => {
           ].join("\n")
         )
       );
+
       const session = Effect.provideService(
         CurrentSession,
         makeSession(fixture, "manager")
       );
+
       const report = yield* streamImportProblemsCsv({
         id: job.id,
         organizationId: fixture.organizationId,
       }).pipe(session);
+
       const chunks = yield* Stream.runCollect(report.stream);
       const csv = chunks.map((chunk) => textDecoder.decode(chunk)).join("");
 
@@ -387,6 +412,7 @@ layer(TestLayer)("DataImportService", (it) => {
           organizationId: fixture.organizationId,
         }).pipe(session)
       );
+
       expect(error._tag).toBe("DataImportNotFoundError");
     })
   );
@@ -395,11 +421,14 @@ layer(TestLayer)("DataImportService", (it) => {
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
       const fixtureContent = "x".repeat(300);
+
       const job = yield* stage(
         fixture,
         encoder.encode(`title,content\nLong,${fixtureContent}\n`)
       );
+
       const repository = yield* DataTransferRepository;
+
       const report = yield* repository.listRows({
         jobId: job.id,
         limit: 10,
@@ -419,6 +448,7 @@ layer(TestLayer)("DataImportService", (it) => {
         const repository = yield* DataTransferRepository;
         const notices: readonly string[] = [];
         const rows: readonly NewStagedImportRow[] = [];
+
         const base = {
           createdByMemberId: fixture.membershipId,
           createdByUserId: fixture.userId,
@@ -433,6 +463,7 @@ layer(TestLayer)("DataImportService", (it) => {
           fileHash: "first",
           id: yield* DataImportJobId.generate,
         });
+
         const error = yield* Effect.flip(
           repository.insertStagedJob({
             ...base,
@@ -449,6 +480,7 @@ layer(TestLayer)("DataImportService", (it) => {
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
       yield* stage(fixture, encoder.encode("title\nFirst\n"));
+
       const error = yield* Effect.flip(
         stage(fixture, encoder.encode("title\nSecond\n"))
       );
@@ -462,10 +494,12 @@ layer(TestLayer)("DataImportService", (it) => {
       const fixture = yield* makeFixture();
       const repository = yield* DataTransferRepository;
       const service = yield* DataImportService;
+
       const session = Effect.provideService(
         CurrentSession,
         makeSession(fixture, "manager")
       );
+
       const bytes = encoder.encode("title\nFirst\n");
       const first = yield* stage(fixture, bytes);
       yield* service
@@ -508,6 +542,7 @@ layer(TestLayer)("DataImportService", (it) => {
     Effect.gen(function* () {
       const fixture = yield* makeFixture();
       const rows = Array.from({ length: 20_001 }, (_, index) => `Row ${index}`);
+
       const error = yield* Effect.flip(
         stage(fixture, encoder.encode(`title\n${rows.join("\n")}\n`))
       );
@@ -519,6 +554,7 @@ layer(TestLayer)("DataImportService", (it) => {
   it.effect("refuses a contributor without boards.importPosts", () =>
     Effect.gen(function* () {
       const fixture = yield* makeFixture("contributor");
+
       const error = yield* Effect.flip(
         stage(fixture, encoder.encode("title\nFirst\n"), {
           role: "contributor",
@@ -545,11 +581,13 @@ layer(TestLayer)("DataImportService", (it) => {
       );
 
       const repository = yield* DataTransferRepository;
+
       const report = yield* repository.listRows({
         jobId: job.id,
         limit: 10,
         offset: 0,
       });
+
       expect(report.rows[0]).toMatchObject({
         boardName: "Bugs",
         outcome: "pending",
@@ -570,6 +608,7 @@ layer(TestLayer)("DataImportService", (it) => {
       const fixture = yield* makeFixture();
       const job = yield* stage(fixture, encoder.encode("title\nFirst\n"));
       const service = yield* DataImportService;
+
       const session = Effect.provideService(
         CurrentSession,
         makeSession(fixture, "manager")
@@ -582,11 +621,14 @@ layer(TestLayer)("DataImportService", (it) => {
         })
         .pipe(session);
       const repository = yield* DataTransferRepository;
+
       const queued = yield* repository.findJob({
         id: job.id,
         organizationId: fixture.organizationId,
       });
+
       expect(Option.isSome(queued)).toBe(true);
+
       if (Option.isSome(queued)) {
         expect(queued.value.status).toBe("queued");
       }
@@ -599,6 +641,7 @@ layer(TestLayer)("DataImportService", (it) => {
           })
           .pipe(session)
       );
+
       expect(error._tag).toBe("DataImportNotConfirmableError");
     })
   );
@@ -608,6 +651,7 @@ layer(TestLayer)("DataImportService", (it) => {
       const fixture = yield* makeFixture();
       const job = yield* stage(fixture, encoder.encode("title\nFirst\n"));
       const service = yield* DataImportService;
+
       const session = Effect.provideService(
         CurrentSession,
         makeSession(fixture, "manager")
@@ -634,6 +678,7 @@ layer(TestLayer)("DataImportService", (it) => {
           offset: 0,
         })
         .pipe(session);
+
       expect(detail.job.status).toBe("canceled");
       expect(detail.report.total).toBe(1);
       expect(detail.report.rows).toHaveLength(1);
@@ -646,6 +691,7 @@ layer(TestLayer)("DataImportService", (it) => {
           })
           .pipe(session)
       );
+
       expect(error._tag).toBe("DataImportNotFoundError");
     })
   );
@@ -655,6 +701,7 @@ layer(TestLayer)("DataImportService", (it) => {
       const fixture = yield* makeFixture();
       yield* stage(fixture, encoder.encode("title\nFirst\n"));
       const service = yield* DataImportService;
+
       const jobs = yield* service
         .listImports({ organizationId: fixture.organizationId })
         .pipe(
@@ -713,6 +760,7 @@ layer(TestLayer)("DataImportService", (it) => {
         const job = yield* stage(fixture, encoder.encode("title\nFirst\n"));
         const service = yield* DataImportService;
         const session = makeSession(fixture, "manager");
+
         const emissions =
           yield* Queue.unbounded<readonly DataImportJobRecord[]>();
 

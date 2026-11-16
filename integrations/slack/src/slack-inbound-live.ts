@@ -155,11 +155,13 @@ export const makeSlackInboundServiceLive = (
       }) =>
         Effect.gen(function* () {
           const boards = yield* boardRepository.findMany({ organizationId });
+
           if (boards.length === 0) {
             return ephemeralResponse(
               "Feeblo has no boards configured yet. Ask an admin to create one."
             );
           }
+
           const metadata = yield* Schema.encodeEffect(
             Schema.fromJsonString(FeedbackModalMetadata)
           )({
@@ -177,11 +179,13 @@ export const makeSlackInboundServiceLive = (
                 })
             )
           );
+
           const view = buildFeedbackModal({
             boards,
             initialTitle,
             metadata,
           });
+
           // Open the modal through views.open with the invocation's
           // trigger_id: this is the response path every Slack surface
           // supports (slash commands and shortcuts alike). The HTTP
@@ -195,6 +199,7 @@ export const makeSlackInboundServiceLive = (
                 })
             )
           );
+
           return emptyResponse();
         });
 
@@ -210,18 +215,25 @@ export const makeSlackInboundServiceLive = (
                 })
             )
           );
+
           const connection = yield* findActiveConnection(metadata.teamId);
+
           if (connection._tag === "None") {
             return clearResponse();
           }
+
           const botTokenOption = yield* loadBotToken(connection.value);
+
           if (botTokenOption._tag === "None") {
             return clearResponse();
           }
+
           const botToken = botTokenOption.value;
           const values = payload.view.state.values;
+
           const title =
             readModalTextValue(values, "feeblo_title", "title")?.trim() ?? "";
+
           if (title.length === 0) {
             return {
               body: {
@@ -233,14 +245,17 @@ export const makeSlackInboundServiceLive = (
               status: 200,
             };
           }
+
           const details =
             readModalTextValue(values, "feeblo_details", "details")?.trim() ??
             "";
+
           const boardId = readModalSelectedOption(
             values,
             "feeblo_board",
             "board"
           );
+
           if (boardId === undefined) {
             return {
               body: {
@@ -252,12 +267,14 @@ export const makeSlackInboundServiceLive = (
               status: 200,
             };
           }
+
           const userId = yield* slackUserService.resolveUser({
             botToken,
             organizationId: metadata.organizationId,
             slackTeamId: metadata.teamId,
             slackUserId: payload.user.id,
           });
+
           const created = yield* chatFeedbackService.createPost({
             boardId,
             content: details,
@@ -266,6 +283,7 @@ export const makeSlackInboundServiceLive = (
             title,
             userId,
           });
+
           // Swap the form modal for a success dialog. response_action:
           // "update" replaces the current view, so the user gets a clear
           // confirmation instead of the modal silently closing.
@@ -273,6 +291,7 @@ export const makeSlackInboundServiceLive = (
             created.boardSlug.length > 0
               ? `${emailOutboxConfig.appUrl}/${encodeURIComponent(metadata.organizationId)}/post/${encodeURIComponent(created.boardSlug)}/${encodeURIComponent(created.slug)}`
               : undefined;
+
           return {
             body: {
               response_action: "update",
@@ -293,18 +312,23 @@ export const makeSlackInboundServiceLive = (
       const handleMessageAction = (payload: SlackMessageActionPayload) =>
         Effect.gen(function* () {
           const connection = yield* findActiveConnection(payload.team.id);
+
           if (connection._tag === "None") {
             return ephemeralResponse(
               "Feeblo is not connected to this Slack workspace yet."
             );
           }
+
           const botTokenOption = yield* loadBotToken(connection.value);
+
           if (botTokenOption._tag === "None") {
             return ephemeralResponse(
               "Feeblo is not connected to this Slack workspace yet."
             );
           }
+
           const messageText = payload.message.text.trim();
+
           return yield* openFeedbackModal({
             botToken: botTokenOption.value,
             channelId: payload.channel.id,
@@ -321,18 +345,23 @@ export const makeSlackInboundServiceLive = (
       const handleSlashCommand = (payload: SlackSlashCommandPayload) =>
         Effect.gen(function* () {
           const connection = yield* findActiveConnection(payload.team_id);
+
           if (connection._tag === "None") {
             return ephemeralResponse(
               "Feeblo is not connected to this Slack workspace yet. Ask an admin to connect it in the Feeblo dashboard."
             );
           }
+
           const botTokenOption = yield* loadBotToken(connection.value);
+
           if (botTokenOption._tag === "None") {
             return ephemeralResponse(
               "Feeblo is not connected to this Slack workspace yet. Ask an admin to connect it in the Feeblo dashboard."
             );
           }
+
           const text = payload.text.trim();
+
           return yield* openFeedbackModal({
             botToken: botTokenOption.value,
             channelId: payload.channel_id,

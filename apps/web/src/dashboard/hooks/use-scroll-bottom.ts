@@ -53,8 +53,10 @@ export function useScrollBottom(f: () => void): void {
     };
 
     window.addEventListener("scroll", onscroll, { passive: true });
+
     return () => {
       window.removeEventListener("scroll", onscroll);
+
       if (frame !== null) {
         cancelAnimationFrame(frame);
       }

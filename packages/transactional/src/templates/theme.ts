@@ -71,9 +71,11 @@ export const ditherTailwindConfig: TailwindConfig = {
     plugin((api) => {
       api.addVariant("mobile", "@media (max-width: 600px)");
       const utilities: Record<string, Record<string, string>> = {};
+
       for (const [step, token] of Object.entries(fontScale)) {
         utilities[`.font-${step}`] = token;
       }
+
       api.addUtilities(utilities);
     }),
   ],

@@ -8,8 +8,10 @@ import * as Schema from "effect/Schema";
 
 /** Provider key owned by the Discord adapter, outside the provider-neutral kernel. */
 export const discordProviderKey = IntegrationProviderKey.make("discord");
+
 export const discordChannelNotificationsCapabilityKey =
   IntegrationCapabilityKey.make("channel.notifications");
+
 export const discordInteractionsCapabilityKey =
   IntegrationCapabilityKey.make("interactions");
 
@@ -80,6 +82,7 @@ export const DiscordChannelNotificationRouteConfiguration = Schema.Struct({
   version: Schema.Literal(1),
   channelId: Schema.NonEmptyString,
 });
+
 export type DiscordChannelNotificationRouteConfiguration = Schema.Schema.Type<
   typeof DiscordChannelNotificationRouteConfiguration
 >;
@@ -111,6 +114,7 @@ export const discordProviderManifest = IntegrationProviderManifest.make({
 export type DiscordConnectionConfiguration = Schema.Schema.Type<
   typeof DiscordConnectionConfiguration
 >;
+
 export type DiscordInboundRouteConfiguration = Schema.Schema.Type<
   typeof DiscordInboundRouteConfiguration
 >;

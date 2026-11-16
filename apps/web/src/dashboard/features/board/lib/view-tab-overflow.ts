@@ -54,6 +54,7 @@ export const countFittingTabs = ({
     if (right > available + 0.5) {
       break;
     }
+
     count += 1;
     edge = right;
   }

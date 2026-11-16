@@ -13,6 +13,7 @@ export function commonmarkEscape(str: string): string {
 
   while (i < str.length) {
     const char = str[i];
+
     if (char === undefined) {
       break;
     }
@@ -28,6 +29,7 @@ export function commonmarkEscape(str: string): string {
 
       // Check if the next character is escapable (a punctuation character)
       const nextChar = str[i + 1];
+
       if (
         nextChar !== undefined &&
         markdownSyntaxCharacters.includes(nextChar)
@@ -60,6 +62,7 @@ class MarkdownSanitizer {
   sanitize(markdown: string) {
     // DoS protection: limit input size
     const maxLength = 100_000;
+
     if (maxLength > 0 && markdown.length > maxLength) {
       // Truncate instead of throwing
       markdown = markdown.substring(0, maxLength);
@@ -85,6 +88,7 @@ class MarkdownSanitizer {
     } catch (error) {
       // Fallback: return empty string if processing fails
       console.error("Markdown sanitization failed:", error);
+
       return { sanitizedMarkdown: "", sanitizedHtml: "" };
     }
   }
@@ -93,5 +97,6 @@ class MarkdownSanitizer {
 // Convenience function for one-shot sanitization
 export function sanitizeMarkdown(markdown: string) {
   const sanitizer = new MarkdownSanitizer();
+
   return sanitizer.sanitize(markdown);
 }

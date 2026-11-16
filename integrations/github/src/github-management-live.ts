@@ -67,6 +67,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
   const config = yield* GitHubIntegrationConfig;
   const emailConfig = yield* EmailOutboxConfig;
   const externalResources = yield* ExternalResourceService;
+
   const requireConnection = (organizationId: string, connectionId: string) =>
     db
       .select({ id: schema.integrationConnectionTable.id })
@@ -93,6 +94,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             : Effect.succeed(rows[0])
         )
       );
+
   const lockConnection = (organizationId: string, connectionId: string) =>
     db
       .select({ lifecycle: schema.integrationConnectionTable.lifecycle })
@@ -109,6 +111,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
       )
       .limit(1)
       .for("update");
+
   const loadCanonicalPostUrl = (organizationId: string, postId: string) =>
     db
       .select({
@@ -146,6 +149,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
               })
         )
       );
+
   const recordGitHubIssueExternalResource = (input: {
     readonly issue: import("@feeblo/domain/integration/github/schema").GitHubResolvedIssue;
     readonly organizationId: ExternalResourceRecord["organizationId"];
@@ -170,6 +174,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
         state: input.issue.issueState,
         title: input.issue.title,
       });
+
       const resource: ExternalResourceRecord = {
         connectionId: input.issue.connectionId,
         displayKey: draft.displayKey ?? null,
@@ -181,25 +186,31 @@ const makeGitHubManagementService = Effect.gen(function* () {
         stateKey: draft.stateKey ?? null,
         title: draft.title ?? null,
       };
+
       const recorded = yield* externalResources.recordPostLink({
         postId: input.postId,
         resource,
       });
+
       const links = yield* externalResources.listPostLinks({
         organizationId: input.organizationId,
         postId: input.postId,
       });
+
       const link = links.find(
         (item) => item.id === recorded.postExternalResourceLinkId
       );
+
       if (link === undefined) {
         return yield* new InternalServerError({
           message:
             "GitHub external resource link was not found after recording.",
         });
       }
+
       return { externalResourceId: recorded.externalResourceId, link };
     });
+
   const service: GitHubManagementServiceContract = {
     status: Effect.sync(() => ({ configured: config.configured })),
     connectStart: (input) => provider.startInstallation(input.organizationId),
@@ -213,11 +224,13 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 input.organizationId,
                 input.connectionId
               ).pipe(Effect.mapError(databaseError("connection lookup")));
+
               if (connection === undefined) {
                 return yield* new NotFoundError({
                   message: "GitHub integration connection was not found.",
                 });
               }
+
               if (connection.lifecycle === "archived") {
                 // A GitHub deletion webhook archives the row without touching
                 // its credentials, and this early return used to leave them
@@ -248,13 +261,16 @@ const makeGitHubManagementService = Effect.gen(function* () {
                   .pipe(
                     Effect.mapError(databaseError("archived credential scrub"))
                   );
+
                 return undefined;
               }
+
               if (connection.lifecycle === "connecting") {
                 return yield* new NotFoundError({
                   message: "GitHub integration connection was not found.",
                 });
               }
+
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
@@ -316,6 +332,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
                   )
                 )
                 .pipe(Effect.mapError(databaseError("delivery cancellation")));
+
               return connection;
             })
           )
@@ -330,6 +347,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             connectionId: input.connectionId,
           })
         );
+
         if (Exit.isFailure(uninstall)) {
           yield* db
             .update(schema.integrationConnectionTable)
@@ -346,6 +364,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
               )
             )
             .pipe(Effect.mapError(databaseError("disconnect state update")));
+
           return yield* Effect.failCause(uninstall.cause);
         }
 
@@ -451,6 +470,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
         Effect.mapError(databaseError("settings read")),
         Effect.map((rows) => {
           const row = rows[0];
+
           const config = Schema.decodeUnknownOption(
             GitHubIssueCreateRouteConfiguration
           )(row?.config).pipe(
@@ -458,6 +478,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
               GitHubIssueCreateRouteConfiguration.make({ version: 1 })
             )
           );
+
           return {
             enabled: row?.enabled ?? false,
             boardScope:
@@ -473,6 +494,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
     updateSettings: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);
+
         if (
           input.enabled &&
           (input.repositoryOwner === null || input.repositoryName === null)
@@ -482,12 +504,14 @@ const makeGitHubManagementService = Effect.gen(function* () {
               "GitHub integration enabled settings require a repository.",
           });
         }
+
         if (input.boardScope === "specific_board" && input.boardId === null) {
           return yield* new BadRequestError({
             message:
               "GitHub integration specific board settings require a board.",
           });
         }
+
         if (
           input.enabled &&
           input.repositoryOwner !== null &&
@@ -496,11 +520,13 @@ const makeGitHubManagementService = Effect.gen(function* () {
           const repositories = yield* provider.listRepositories({
             connectionId: input.connectionId,
           });
+
           const selectedRepository = repositories.some(
             (repository) =>
               repository.owner === input.repositoryOwner &&
               repository.name === input.repositoryName
           );
+
           if (!selectedRepository) {
             return yield* new NotFoundError({
               message:
@@ -508,9 +534,11 @@ const makeGitHubManagementService = Effect.gen(function* () {
             });
           }
         }
+
         const routeId = yield* IntegrationRouteId.generate.pipe(
           Effect.mapError(databaseError("route identifier generation"))
         );
+
         const providerConfig = {
           version: 1,
           ...(input.boardId === null ? undefined : { boardId: input.boardId }),
@@ -521,6 +549,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             repositoryName: input.repositoryName,
           }),
         };
+
         yield* db
           .insert(schema.integrationRouteTable)
           .values({
@@ -544,6 +573,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
             set: { enabled: input.enabled, providerConfig },
           })
           .pipe(Effect.mapError(databaseError("settings upsert")));
+
         return {
           enabled: input.enabled,
           boardScope: input.boardScope,
@@ -584,6 +614,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
     createRule: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);
+
         if (
           !isGitHubSyncRuleCombination(input.issueMatchMode, input.issueState)
         ) {
@@ -592,6 +623,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
               'Only "any open" and "all closed" GitHub synchronization rules are supported.',
           });
         }
+
         const existing = yield* db
           .select({ id: schema.githubSyncRuleTable.id })
           .from(schema.githubSyncRuleTable)
@@ -611,19 +643,23 @@ const makeGitHubManagementService = Effect.gen(function* () {
           )
           .limit(1)
           .pipe(Effect.mapError(databaseError("rule duplicate lookup")));
+
         if (existing[0] !== undefined) {
           return yield* new BadRequestError({
             message:
               "A GitHub synchronization rule for these issue states already exists.",
           });
         }
+
         const id = yield* GitHubSyncRuleId.generate.pipe(
           Effect.mapError(databaseError("rule identifier generation"))
         );
+
         yield* db
           .insert(schema.githubSyncRuleTable)
           .values({ ...input, id })
           .pipe(Effect.mapError(databaseError("rule creation")));
+
         return { ...input, id };
       }),
     updateRule: (input) =>
@@ -651,11 +687,13 @@ const makeGitHubManagementService = Effect.gen(function* () {
             issueState: schema.githubSyncRuleTable.issueState,
           })
           .pipe(Effect.mapError(databaseError("rule update")));
+
         if (rows[0] === undefined) {
           return yield* new NotFoundError({
             message: "GitHub synchronization rule was not found.",
           });
         }
+
         return {
           id: input.id,
           connectionId: asLegid(IntegrationConnectionId)(rows[0].connectionId),
@@ -690,49 +728,59 @@ const makeGitHubManagementService = Effect.gen(function* () {
     createPostIssue: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);
+
         const request = yield* externalResources.reserveCreation({
           connectionId: input.connectionId,
           idempotencyKey: input.idempotencyKey,
           organizationId: input.organizationId,
           postId: input.postId,
         });
+
         if (!request.reserved) {
           const links = yield* externalResources.listPostLinks({
             organizationId: input.organizationId,
             postId: input.postId,
           });
+
           const completed = links.find(
             (link) => link.id === request.postExternalResourceLinkId
           );
+
           if (completed !== undefined) {
             return completed;
           }
+
           return yield* new InternalServerError({
             message: "GitHub issue creation is already pending.",
           });
         }
+
         return yield* Effect.gen(function* () {
           const post = yield* loadCanonicalPostUrl(
             input.organizationId,
             input.postId
           );
+
           const issue = yield* provider.createIssue({
             ...input,
             postDescription: post.postDescription,
             postTitle: post.postTitle,
             postUrl: post.postUrl,
           });
+
           const recorded = yield* recordGitHubIssueExternalResource({
             issue,
             organizationId: input.organizationId,
             postId: input.postId,
           });
+
           const completed = yield* externalResources.completeCreation({
             externalResourceId: recorded.externalResourceId,
             postExternalResourceLinkId: recorded.link.id,
             requestId: request.id,
             reservedAt: request.reservedAt,
           });
+
           if (!completed) {
             // The lease expired while the provider call was in flight and
             // another caller took the reservation over, so the row now belongs
@@ -749,6 +797,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
               })
             );
           }
+
           return recorded.link;
         }).pipe(
           Effect.onErrorIf(shouldReleaseCreation, () =>
@@ -764,14 +813,17 @@ const makeGitHubManagementService = Effect.gen(function* () {
     linkPostIssue: (input) =>
       Effect.gen(function* () {
         yield* requireConnection(input.organizationId, input.connectionId);
+
         const post = yield* loadCanonicalPostUrl(
           input.organizationId,
           input.postId
         );
+
         const issue = yield* provider.resolveIssue({
           ...input,
           postUrl: post.postUrl,
         });
+
         return (yield* recordGitHubIssueExternalResource({
           issue,
           organizationId: input.organizationId,
@@ -779,6 +831,7 @@ const makeGitHubManagementService = Effect.gen(function* () {
         })).link;
       }),
   };
+
   return GitHubManagementService.of(service);
 });
 

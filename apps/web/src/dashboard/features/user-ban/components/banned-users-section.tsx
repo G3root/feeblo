@@ -103,21 +103,25 @@ export function BannedUsersSection({
   userBansAvailable: boolean;
 }) {
   const organizationId = useOrganizationId();
+
   const {
     commentCollection,
     postCollection,
     postSubscriptionCollection,
     upvoteCollection,
   } = useDashboardCollections();
+
   const [search, setSearch] = React.useState("");
   const [banOpen, setBanOpen] = React.useState(false);
   const [unbanningId, setUnbanningId] = React.useState<string | null>(null);
 
   const trimmedSearch = search.trim();
+
   const listArgs = React.useMemo(
     () => ({ organizationId, search: trimmedSearch }),
     [organizationId, trimmedSearch]
   );
+
   const bansResult = useAtomValue(userBansAtom(listArgs));
   const refreshBans = useAtomRefresh(userBansAtom(listArgs));
   const unban = useAtomSet(unbanUserAtom, { mode: "promise" });
@@ -174,6 +178,7 @@ export function BannedUsersSection({
 
   const handleUnban = async (id: string) => {
     setUnbanningId(id);
+
     try {
       await unban({
         payload: {
@@ -415,6 +420,7 @@ function BanUserDialog({
       setReason("");
       setDeleteContent(false);
     }
+
     onOpenChange(nextOpen);
   };
 
@@ -424,8 +430,10 @@ function BanUserDialog({
     if (!canBan) {
       return;
     }
+
     const draft = draftRef.current;
     setPendingDraft(draft);
+
     try {
       await ban({
         payload: {
@@ -438,11 +446,13 @@ function BanUserDialog({
       });
       toastManager.add({ title: "User banned", type: "success" });
       refreshBanBadges(collections);
+
       // A dismissal and reopen while this ran means the fields on screen
       // belong to somebody else; the ban still lands, the form stays.
       if (draft !== draftRef.current) {
         return;
       }
+
       setEmail("");
       setReason("");
       setDeleteContent(false);

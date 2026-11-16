@@ -38,6 +38,7 @@ export const getClientOnlyDocumentCacheControl = createIsomorphicFn()
   .client(() => undefined)
   .server(() => {
     const cookieHeader = getRequest().headers.get("cookie") ?? "";
+
     const hasLocaleCookie = cookieHeader
       .split(";")
       .some((entry) => entry.trim().startsWith(`${cookieName}=`));

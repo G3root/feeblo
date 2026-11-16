@@ -65,11 +65,14 @@ export const makeIsAllowedOrigin =
     // parsed per request.
     const appUrl = parseUrl(config.appUrl);
     const apiUrl = parseUrl(config.apiUrl);
+
     const appRootDomainHost = config.appRootDomain.includes(":")
       ? (config.appRootDomain.split(":")[0] ?? "")
       : config.appRootDomain;
+
     const allowLocalDevHost =
       config.nodeEnv === "development" && isLocalDevHost(appRootDomainHost);
+
     const trustedOriginMatchers = compileTrustedOriginMatchers(
       config.authTrustedOrigins ?? []
     );
@@ -83,6 +86,7 @@ export const makeIsAllowedOrigin =
     }
 
     const originUrl = parseUrl(origin);
+
     if (!(originUrl && appUrl && apiUrl)) {
       return false;
     }
@@ -92,6 +96,7 @@ export const makeIsAllowedOrigin =
     if (originUrl.origin === apiUrl.origin) {
       return true;
     }
+
     if (originUrl.origin === appUrl.origin) {
       return true;
     }

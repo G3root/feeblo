@@ -63,9 +63,11 @@ export function NotificationPreferenceSettings() {
   const organizationId = useOrganizationId();
   const { data: session } = useAuthState();
   const queryClient = useQueryClient();
+
   const [pendingTarget, setPendingTarget] = useState<PreferenceTarget | null>(
     null
   );
+
   const preferenceQuery = useQuery({
     queryKey: preferenceQueryKey(organizationId),
     queryFn: () =>
@@ -77,12 +79,14 @@ export function NotificationPreferenceSettings() {
 
   const setPreference = async (target: PreferenceTarget, enabled: boolean) => {
     setPendingTarget(target);
+
     try {
       // The write answers with the state it committed, so the switches render
       // the server's resolution instead of a second read of it.
       const next = await fetchRpc((rpc) =>
         rpc.SetNotificationPreference({ enabled, organizationId, target })
       );
+
       queryClient.setQueryData(preferenceQueryKey(organizationId), next);
     } catch {
       toastManager.add({
@@ -109,6 +113,7 @@ export function NotificationPreferenceSettings() {
 
   const categorySwitch = (category: PreferenceCategory) => {
     const copy = categoryCopy[category];
+
     return (
       <SwitchCard key={category}>
         <SwitchCardContent>

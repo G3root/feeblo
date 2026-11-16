@@ -106,6 +106,7 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
         // A status that changes section is appended to the end of its new one,
         // mirroring what the server does with its position.
         const movesSection = data.value.type !== status.type;
+
         const orderIndex = movesSection
           ? Math.max(
               -1,

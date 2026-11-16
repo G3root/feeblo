@@ -17,11 +17,14 @@ describe("GitHub credential material", () => {
         installationId: "1234",
         installationState: "state-nonce",
       });
+
       expect(ciphertext).not.toContain("state-nonce");
+
       const credentials = yield* decryptGitHubCredentialMaterial(
         encryptionKey,
         ciphertext
       );
+
       expect(credentials.installationState).toBe("state-nonce");
       expect(credentials.installationId).toBe("1234");
     })
@@ -32,6 +35,7 @@ describe("GitHub credential material", () => {
       const result = yield* Effect.exit(
         decryptGitHubCredentialMaterial(encryptionKey, "not-ciphertext")
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );

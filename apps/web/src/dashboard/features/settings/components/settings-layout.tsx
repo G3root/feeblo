@@ -4,6 +4,7 @@ interface RootProps extends React.ComponentProps<"div"> {
   children: React.ReactNode;
   size?: "default" | "large";
 }
+
 function Root({ children, className, size = "default", ...props }: RootProps) {
   return (
     <div

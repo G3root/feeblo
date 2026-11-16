@@ -182,6 +182,7 @@ const makeTagRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const tagId = id ?? (yield* TagId.generate);
         const now = yield* DateTime.nowAsDate;
+
         const [created] = yield* db
           .insert(schema.tagTable)
           .values({
@@ -208,6 +209,7 @@ const makeTagRepository = Effect.gen(function* () {
     update: ({ id, name, organizationId }: TTagUpdate) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         const [updated] = yield* db
           .update(schema.tagTable)
           .set({
@@ -464,11 +466,13 @@ const makeTagRepository = Effect.gen(function* () {
               eq(schema.postTagTable.organizationId, organizationId)
             )
           );
+
         const previousTagIds = previous.map((row) => row.tagId);
         const previousSet = new Set(previousTagIds);
         const nextSet = new Set(wanted);
 
         const removed = previousTagIds.filter((tagId) => !nextSet.has(tagId));
+
         if (removed.length > 0) {
           yield* db
             .delete(schema.postTagTable)
@@ -483,6 +487,7 @@ const makeTagRepository = Effect.gen(function* () {
         }
 
         const added = wanted.filter((tagId) => !previousSet.has(tagId));
+
         if (added.length > 0) {
           const rows = yield* Effect.forEach(added, (tagId) =>
             PostTagId.generate.pipe(
@@ -572,7 +577,9 @@ const makeTagRepository = Effect.gen(function* () {
                   inArray(schema.tagTable.id, tagIds)
                 )
               );
+
             const rows = yield* lock === undefined ? query : query.for(lock);
+
             return rows.length;
           }),
 
@@ -587,6 +594,7 @@ const makeTagRepository = Effect.gen(function* () {
               eq(schema.postTable.organizationId, organizationId)
             )
           );
+
         return rows.length > 0;
       }),
 
@@ -606,6 +614,7 @@ const makeTagRepository = Effect.gen(function* () {
               eq(schema.postTable.creatorId, userId)
             )
           );
+
         return rows.length > 0;
       }),
 

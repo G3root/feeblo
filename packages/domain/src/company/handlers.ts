@@ -39,6 +39,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
         organizationId: args.organizationId,
         insert: Effect.gen(function* () {
           const attributeValues = args.attributeValues ?? [];
+
           // Share-locked for this transaction: the required-value check, the
           // per-value validation and the upserts below all read one snapshot,
           // so a definition that becomes required while the create runs cannot
@@ -47,6 +48,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
             yield* attributeDefinitionRepository.findCompanyAttributeDefinitionsForShare(
               args.organizationId
             );
+
           yield* Effect.forEach(
             definitions.filter(
               (definition) =>
@@ -60,6 +62,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
           );
 
           const company = yield* repository.create(args);
+
           // The definitions were just read for this workspace, so the id map is
           // the existence check: looking each attribute id up again (twice —
           // once as a policy check, once for the row) cost this create two extra
@@ -67,11 +70,13 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
           const definitionsById = new Map(
             definitions.map((definition) => [definition.id, definition])
           );
+
           yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
             Effect.gen(function* () {
               const definition = definitionsById.get(
                 attributeValue.attributeId
               );
+
               if (definition === undefined) {
                 return yield* new Policy.PolicyDeniedError();
               }
@@ -93,6 +98,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
                 );
             })
           );
+
           return company;
         }),
       }).pipe(
@@ -102,11 +108,13 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
     UpdateCompany: (args: TCompanyUpdate) =>
       Effect.gen(function* () {
         const company = yield* repository.update(args);
+
         if (Option.isNone(company)) {
           return yield* new CompanyNotFoundError({
             message: "Company not found",
           });
         }
+
         return company.value;
       }).pipe(
         Policy.withPolicy(companyPolicy.canUpdate(args)),
@@ -115,6 +123,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
     DeleteCompany: (args: TCompanyDelete) =>
       Effect.gen(function* () {
         const company = yield* repository.delete(args);
+
         if (Option.isNone(company)) {
           return yield* new CompanyNotFoundError({
             message: "Company not found",

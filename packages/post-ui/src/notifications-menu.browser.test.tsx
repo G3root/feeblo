@@ -81,6 +81,7 @@ describe("NotificationsMenu", () => {
     const unread = screen.getByRole("menuitem", {
       name: /New comment on feedback/,
     });
+
     await expect.element(unread).toBeVisible();
     // Initials come from the actor the list RPC resolved. The inbox does not
     // draw the member tick; that stays on comments and post lists.
@@ -100,11 +101,14 @@ describe("NotificationsMenu", () => {
     const read = screen.getByRole("menuitem", {
       name: /New feedback submission/,
     });
+
     await expect.element(read).toBeVisible();
+
     // A read row carries no mark at all; the empty box only reserves the space.
     const readMark = read
       .element()
       .querySelector('[data-slot="notification-read-state"]');
+
     expect(readMark?.textContent).toBe("");
     expect(readMark?.querySelector("svg")).toBeNull();
     // A row with no actor shows its event kind's icon, not `??` initials.
@@ -118,6 +122,7 @@ describe("NotificationsMenu", () => {
     const markAll = screen.getByRole("button", {
       name: m.tasty_loose_lizard(),
     });
+
     await expect.element(markAll).toBeVisible();
     expect(markAll.element().querySelector("svg")).not.toBeNull();
   });

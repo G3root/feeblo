@@ -40,10 +40,12 @@ export function DataTableRangeFilter<TData extends RowData>({
   const [startValue, endValue] = getRangeFilterValues(filter.value).map(
     getInputValue
   );
+
   const [drafts, setDrafts] = React.useState<[string | null, string | null]>([
     null,
     null,
   ]);
+
   const [startInput, endInput] = getInputValues(drafts);
   const [showInvalid, setShowInvalid] = React.useState(false);
   const invalidTimeoutRef = React.useRef<number | undefined>(undefined);
@@ -55,10 +57,13 @@ export function DataTableRangeFilter<TData extends RowData>({
 
   function onInvalidChange(isInvalid: boolean) {
     window.clearTimeout(invalidTimeoutRef.current);
+
     if (!isInvalid) {
       setShowInvalid(false);
+
       return;
     }
+
     if (showInvalid) return;
     invalidTimeoutRef.current = window.setTimeout(
       () => setShowInvalid(true),
@@ -84,9 +89,11 @@ export function DataTableRangeFilter<TData extends RowData>({
   function onDraftChange(index: 0 | 1, value: string) {
     const nextDrafts: [string | null, string | null] =
       index === 0 ? [value, drafts[1]] : [drafts[0], value];
+
     setDrafts(nextDrafts);
 
     const nextBounds = getValidRangeFilterBounds(getInputValues(nextDrafts));
+
     if (nextBounds) onBoundsUpdate(nextBounds);
     onInvalidChange(!nextBounds);
   }
@@ -101,6 +108,7 @@ export function DataTableRangeFilter<TData extends RowData>({
 
   function onContainerBlur(event: React.FocusEvent<HTMLDivElement>) {
     onBlur?.(event);
+
     if (event.currentTarget.contains(event.relatedTarget)) return;
     onDraftCommit();
   }
@@ -154,6 +162,7 @@ export function DataTableRangeFilter<TData extends RowData>({
 
 function getRangeFilterValues(value: string | string[]): [string, string] {
   if (Array.isArray(value)) return [value[0] ?? "", value[1] ?? ""];
+
   return [value, ""];
 }
 

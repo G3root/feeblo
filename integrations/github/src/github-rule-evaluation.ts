@@ -9,10 +9,12 @@ export const findMatchingGitHubSyncRules = (
   if (issueStates.length === 0) {
     return [];
   }
+
   return rules.filter((rule) => {
     if (!rule.enabled) {
       return false;
     }
+
     return rule.issueMatchMode === "all"
       ? issueStates.every((state) => state === rule.issueState)
       : issueStates.some((state) => state === rule.issueState);

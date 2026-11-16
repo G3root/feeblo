@@ -23,9 +23,11 @@ export const useMemberLimit = () => {
   const { allowed: canListInvitations, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "members.invite")
   );
+
   const { entitlements } = useEntitlements();
 
   const membersQuery = useOrgMembers(organizationId);
+
   const invitationsQuery = useOrgInvitations({
     organizationId,
     enabled: !isPolicyPending && canListInvitations,
@@ -35,6 +37,7 @@ export const useMemberLimit = () => {
   const pendingInvitationCount = (invitationsQuery.data ?? []).length;
 
   const limit = entitlements.limits.members;
+
   const atLimit =
     membersQuery.isLoading ||
     invitationsQuery.isLoading ||

@@ -21,8 +21,10 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
   const columns = yield* RoadmapColumnRepository;
   const sitePolicy = yield* SitePolicy;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
+
   const manage = (organizationId: string) =>
     Policy.canPermission(organizationId, "roadmap.*");
+
   return {
     ListRoadmapColumns: (args: TRoadmapColumnList) =>
       columns
@@ -67,6 +69,7 @@ export const RoadmapColumnRpcHandlersEffect = Effect.gen(function* () {
         ),
   };
 });
+
 export const RoadmapColumnRpcHandlers = RoadmapColumnRpcs.toLayer(
   RoadmapColumnRpcHandlersEffect
 ).pipe(

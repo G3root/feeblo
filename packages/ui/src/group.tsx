@@ -58,6 +58,7 @@ export function GroupText({
     ),
     "data-slot": "group-text",
   };
+
   return useRender({
     defaultTagName: "div",
     props: mergeProps(defaultProps, props),

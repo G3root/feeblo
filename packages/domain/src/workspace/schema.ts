@@ -43,11 +43,15 @@ export const WorkspaceSlugCheckOutput = S.Struct({
 });
 
 export type TCreateWorkspaceInput = S.Schema.Type<typeof CreateWorkspaceInput>;
+
 export type TWorkspaceInput = S.Schema.Type<typeof WorkspaceInput>;
+
 export type TWorkspacePlan = S.Schema.Type<typeof WorkspacePlan>;
+
 export type TWorkspaceSlugCheckInput = S.Schema.Type<
   typeof WorkspaceSlugCheckInput
 >;
+
 export type TWorkspaceSlugCheckOutput = S.Schema.Type<
   typeof WorkspaceSlugCheckOutput
 >;

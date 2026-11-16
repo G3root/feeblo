@@ -63,6 +63,7 @@ const lockWorkspace = (organizationId: string) =>
 export const countCrmEntries = (organizationId: string) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
+
     const [companyRows, contactRows] = yield* Effect.all([
       db
         .select({ total: count(schema.companyTable.id) })
@@ -126,6 +127,7 @@ export const createCrmEntry = <A, E, R>(input: CrmEntryCreate<A, E, R>) =>
     Effect.gen(function* () {
       yield* lockWorkspace(input.organizationId);
       yield* requireRoom(input.organizationId);
+
       return yield* input.insert;
     })
   );
@@ -147,6 +149,7 @@ export const ensureCrmEntry = <A, FindE, InsertE, LostE, R>(
       yield* lockWorkspace(input.organizationId);
 
       const existing = yield* input.find;
+
       if (Option.isSome(existing)) {
         return existing.value;
       }
@@ -154,11 +157,13 @@ export const ensureCrmEntry = <A, FindE, InsertE, LostE, R>(
       yield* requireRoom(input.organizationId);
 
       const inserted = yield* input.insert;
+
       if (Option.isSome(inserted)) {
         return inserted.value;
       }
 
       const winner = yield* input.find;
+
       return yield* Option.match(winner, {
         onNone: () => input.onLostRace,
         onSome: (entry) => Effect.succeed(entry),

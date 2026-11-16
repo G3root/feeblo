@@ -92,6 +92,7 @@ const upsertSsoCompany = (
 ) =>
   Effect.gen(function* () {
     const companyRepository = yield* CompanyRepository;
+
     const args = {
       organizationId,
       externalId: company.commonFields.id,
@@ -101,6 +102,7 @@ const upsertSsoCompany = (
     };
 
     const existing = yield* companyRepository.findUpsertCompany(args);
+
     if (Option.isSome(existing)) {
       return yield* companyRepository.updateUpsertCompany({
         ...args,
@@ -127,6 +129,7 @@ const upsertSsoContact = (args: {
 }) =>
   Effect.gen(function* () {
     const contactRepository = yield* ContactRepository;
+
     // Neither key names a person, so there is nothing to upsert and no row to
     // write: the caller keeps the `None` the old repository upsert returned.
     if (!(args.externalId || args.email)) {
@@ -134,6 +137,7 @@ const upsertSsoContact = (args: {
     }
 
     const existing = yield* contactRepository.findUpsertContact(args);
+
     if (Option.isSome(existing)) {
       return Option.some(
         yield* contactRepository.updateUpsertContact({
@@ -181,6 +185,7 @@ export function upsertContactFromParsed(
         const attributeId = yield* CompanyAttributeDefinitionId.parse(
           attr.definitionId
         );
+
         yield* attributeDefinitionRepository.upsertCompanyAttributeValue({
           companyId: upsertedCompany.id,
           attributeId,
@@ -201,6 +206,7 @@ export function upsertContactFromParsed(
     });
 
     let contactId: string | undefined;
+
     if (Option.isSome(contactOption)) {
       contactId = contactOption.value.id;
 
@@ -208,6 +214,7 @@ export function upsertContactFromParsed(
         const attributeId = yield* ContactAttributeDefinitionId.parse(
           attr.definitionId
         );
+
         yield* attributeDefinitionRepository.upsertContactAttributeValue({
           contactId: contactOption.value.id,
           attributeId,
@@ -308,10 +315,12 @@ export const createSsoSession = ({
     // the FK) falls back to the default; other failures are normalized by the
     // outer catch below.
     const organizationRepository = yield* OrganizationRepository;
+
     const maxTokenLifetimeMinutes =
       yield* organizationRepository.findJwtMaxTokenLifetimeMinutes({
         organizationId,
       });
+
     const maxTokenLifetime = maxTokenLifetimeFromMinutes(
       maxTokenLifetimeMinutes
     );
@@ -347,6 +356,7 @@ export const createSsoSession = ({
       (yield* attributeDefinitionRepository.findContactAttributeDefinitions(
         organizationId
       )) as readonly TContactAttributeDefinition[];
+
     const companyDefs =
       // SAFETY: the repository contract returns company attribute definitions
       // in the canonical domain shape; the cast bridges the DB-row encoding.
@@ -454,6 +464,7 @@ export const linkAnonymousAccount = ({
     }
 
     const db = yield* currentDb;
+
     // Two lookups by id; the transfer below compares them, so they resolve
     // together instead of one after the other.
     const [anonymousUser, newUser] = yield* Effect.all(
@@ -477,6 +488,7 @@ export const linkAnonymousAccount = ({
       ],
       { concurrency: "unbounded" }
     );
+
     const anonymous = anonymousUser[0];
     const target = newUser[0];
 
@@ -485,16 +497,19 @@ export const linkAnonymousAccount = ({
         code: "ANONYMOUS_USER_NOT_FOUND",
       });
     }
+
     if (!anonymous.restrictedToOrganizationId) {
       return yield* new LinkAnonymousAccountError({
         code: "ANONYMOUS_USER_NOT_RESTRICTED",
       });
     }
+
     if (!target) {
       return yield* new LinkAnonymousAccountError({
         code: "NEW_USER_NOT_FOUND",
       });
     }
+
     if (target.restrictedToOrganizationId) {
       return yield* new LinkAnonymousAccountError({
         code: "NEW_USER_IS_ANONYMOUS",

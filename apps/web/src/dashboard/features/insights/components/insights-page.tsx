@@ -61,20 +61,25 @@ function formatDuration(seconds: number | null): string {
   if (seconds === null) {
     return "—";
   }
+
   if (seconds < 60) {
     return "<1m";
   }
+
   if (seconds < 3_600) {
     return `${Math.round(seconds / 60)}m`;
   }
+
   if (seconds < 86_400) {
     const hours = Math.floor(seconds / 3_600);
     const minutes = Math.round((seconds % 3_600) / 60);
+
     return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
   }
 
   const days = Math.floor(seconds / 86_400);
   const hours = Math.round((seconds % 86_400) / 3_600);
+
   return hours === 0 ? `${days}d` : `${days}d ${hours}h`;
 }
 
@@ -82,9 +87,11 @@ function formatPercent(value: number | null): string {
   if (value === null) {
     return "—";
   }
+
   if (value > 0 && value < 0.01) {
     return "<1%";
   }
+
   return `${Math.round(value * 100)}%`;
 }
 
@@ -100,10 +107,12 @@ export function InsightsPage({
   const [range, setRange] = React.useState<TInsightsRange>(
     DEFAULT_INSIGHTS_RANGE
   );
+
   const args = React.useMemo<InsightsAtomArgs>(
     () => ({ organizationId, range }),
     [organizationId, range]
   );
+
   const atom = workspaceInsightsAtom(args);
   const result = useAtomValue(atom);
   const refresh = useAtomRefresh(atom);
@@ -112,6 +121,7 @@ export function InsightsPage({
   const trafficAtom = workspaceTrafficAtom(args);
   const trafficResult = useAtomValue(trafficAtom);
   const refreshTraffic = useAtomRefresh(trafficAtom);
+
   const trafficSection = Result.builder(trafficResult)
     .onInitial(() => <InsightsTrafficSkeleton />)
     .onFailure(() => <InsightsTrafficFailure onRetry={refreshTraffic} />)
@@ -135,6 +145,7 @@ export function InsightsPage({
           aria-label="Window"
           onValueChange={(value) => {
             const next = value[0];
+
             if (next === "7d" || next === "30d" || next === "90d") {
               setRange(next);
             }
@@ -281,6 +292,7 @@ function InsightsSummaryCards({
     summary.respondedPosts === 0
       ? "No post has been answered yet"
       : `median over ${plural(summary.respondedPosts, "answered post")}`;
+
   // Two separate quantities: a post merged in the window may have been
   // created before it, so "N of M new posts" would describe a rate the data
   // does not support.

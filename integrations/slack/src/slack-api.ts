@@ -21,6 +21,7 @@ export const SLACK_API_BASE_URL = "https://slack.com/api";
 
 /** Slack OAuth endpoints. */
 export const SLACK_OAUTH_AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize";
+
 export const SLACK_OAUTH_TOKEN_URL = `${SLACK_API_BASE_URL}/oauth.v2.access`;
 
 /** Maximum Slack Web API request duration. */
@@ -36,6 +37,7 @@ export const SlackApiErrorEnvelope = Schema.Struct({
     })
   ),
 });
+
 export type SlackApiErrorEnvelope = Schema.Schema.Type<
   typeof SlackApiErrorEnvelope
 >;
@@ -44,6 +46,7 @@ export type SlackApiErrorEnvelope = Schema.Schema.Type<
 export const SlackApiSuccessEnvelope = Schema.Struct({
   ok: Schema.Literal(true),
 });
+
 export type SlackApiSuccessEnvelope = Schema.Schema.Type<
   typeof SlackApiSuccessEnvelope
 >;
@@ -58,6 +61,7 @@ export const SlackAuthTestResponse = Schema.Struct({
   user_id: Schema.String,
   bot_id: Schema.optionalKey(Schema.String),
 });
+
 export type SlackAuthTestResponse = Schema.Schema.Type<
   typeof SlackAuthTestResponse
 >;
@@ -70,6 +74,7 @@ export const SlackTeamInfoResponse = Schema.Struct({
     name: Schema.String,
   }),
 });
+
 export type SlackTeamInfoResponse = Schema.Schema.Type<
   typeof SlackTeamInfoResponse
 >;
@@ -82,6 +87,7 @@ export const SlackConversation = Schema.Struct({
   is_private: Schema.optionalKey(Schema.Boolean),
   is_archived: Schema.optionalKey(Schema.Boolean),
 });
+
 export type SlackConversation = Schema.Schema.Type<typeof SlackConversation>;
 
 /** `conversations.list` response. */
@@ -94,6 +100,7 @@ export const SlackConversationsListResponse = Schema.Struct({
     })
   ),
 });
+
 export type SlackConversationsListResponse = Schema.Schema.Type<
   typeof SlackConversationsListResponse
 >;
@@ -114,6 +121,7 @@ export const SlackUsersInfoResponse = Schema.Struct({
     ),
   }),
 });
+
 export type SlackUsersInfoResponse = Schema.Schema.Type<
   typeof SlackUsersInfoResponse
 >;
@@ -142,6 +150,7 @@ export const SlackOAuthAccessResponse = Schema.Struct({
     })
   ),
 });
+
 export type SlackOAuthAccessResponse = Schema.Schema.Type<
   typeof SlackOAuthAccessResponse
 >;
@@ -185,6 +194,7 @@ export const classifySlackApiError = (
   context: string
 ): SlackApiFailure => {
   const status = response.status;
+
   if (status === 401 || status === 403) {
     return new IntegrationProviderAuthenticationError({
       message: `Slack rejected authentication during ${context}`,
@@ -192,13 +202,16 @@ export const classifySlackApiError = (
       ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
+
   if (status === 429) {
     const decoded = Schema.decodeUnknownOption(SlackApiErrorEnvelope)(response);
+
     const retryAfterMs =
       decoded._tag === "Some" &&
       decoded.value.response_metadata?.retry_after !== undefined
         ? decoded.value.response_metadata.retry_after * 1000
         : undefined;
+
     return new IntegrationProviderRateLimitedError({
       message: `Slack rate limited ${context}`,
       provider: slackProviderKey,
@@ -206,6 +219,7 @@ export const classifySlackApiError = (
       ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
+
   if (status !== undefined && status >= 500) {
     return new IntegrationProviderTemporaryFailure({
       message: `Slack temporarily failed during ${context}`,
@@ -213,15 +227,19 @@ export const classifySlackApiError = (
       httpStatus: status,
     });
   }
+
   const decoded = Schema.decodeUnknownOption(SlackApiErrorEnvelope)(response);
+
   if (decoded._tag === "Some") {
     const errorName = decoded.value.error;
+
     if (errorName === "invalid_auth" || errorName === "account_inactive") {
       return new IntegrationProviderAuthenticationError({
         message: `Slack token is invalid during ${context}`,
         provider: slackProviderKey,
       });
     }
+
     if (
       errorName === "not_in_channel" ||
       errorName === "channel_not_found" ||
@@ -234,18 +252,21 @@ export const classifySlackApiError = (
         provider: slackProviderKey,
       });
     }
+
     if (errorName === "missing_scope") {
       return new IntegrationProviderInvalidConfigurationError({
         message: `Slack app is missing a required scope during ${context}`,
         provider: slackProviderKey,
       });
     }
+
     return new IntegrationProviderPermanentRejection({
       message: `Slack rejected ${context}: ${errorName}`,
       provider: slackProviderKey,
       ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
+
   return new IntegrationProviderPermanentRejection({
     message: `Slack returned an unexpected response during ${context}`,
     provider: slackProviderKey,
@@ -328,7 +349,9 @@ export const makeSlackApiClient = (): SlackApiClient => {
           })
       )
     );
+
     const status = response.status;
+
     // Slack signals rate limiting (429) and transient server errors (5xx)
     // through the HTTP status even when the body is not JSON; classify those
     // from the status alone before reading the body so a non-JSON error page
@@ -336,6 +359,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
     if (status === 429 || (status >= 500 && status < 600)) {
       return yield* classifySlackApiError({ status }, input.context);
     }
+
     const body = yield* response.json.pipe(
       Effect.mapError(
         () =>
@@ -346,12 +370,14 @@ export const makeSlackApiClient = (): SlackApiClient => {
           })
       )
     );
+
     // The Slack Web API always answers HTTP 200 and signals failure through
     // the `ok: false` envelope; classify that envelope (and any non-2xx
     // status) into the typed provider failure algebra.
     if (isObject(body) && body !== null && "ok" in body && body.ok === true) {
       return body;
     }
+
     return yield* classifySlackApiError(
       slackErrorResponse(body, status),
       input.context
@@ -373,9 +399,11 @@ export const makeSlackApiClient = (): SlackApiClient => {
       let httpRequest = HttpClientRequest.post(`${SLACK_API_BASE_URL}${path}`, {
         headers: { "content-type": "application/json; charset=utf-8" },
       });
+
       if (botToken !== undefined) {
         httpRequest = HttpClientRequest.bearerToken(httpRequest, botToken);
       }
+
       httpRequest = yield* HttpClientRequest.bodyJson(httpRequest, body).pipe(
         Effect.mapError(
           () =>
@@ -385,6 +413,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
             })
         )
       );
+
       return yield* request({ httpRequest, context });
     });
 

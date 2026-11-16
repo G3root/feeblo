@@ -136,6 +136,7 @@ export const commentHandlers = (
   listPostComments: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       return yield* listPostCommentsOperation.handler({
         ...params,
         cursor: query.cursor,

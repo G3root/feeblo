@@ -43,12 +43,15 @@ export const verifySlackRequestSignature = ({
           })
         );
       }
+
       const expected = createHmac("sha256", Redacted.value(signingSecret))
         .update(`v0:${timestampHeader}:${rawBody}`)
         .digest("hex");
+
       const received = signatureHeader.slice("v0=".length);
       const expectedBuffer = Buffer.from(expected, "hex");
       const receivedBuffer = Buffer.from(received, "hex");
+
       if (
         expectedBuffer.length !== receivedBuffer.length ||
         !timingSafeEqual(expectedBuffer, receivedBuffer)
@@ -59,6 +62,7 @@ export const verifySlackRequestSignature = ({
           })
         );
       }
+
       return Effect.void;
     },
   });

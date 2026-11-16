@@ -47,6 +47,7 @@ const SSO_ERROR_STATUS = {
 >;
 
 export const ID = "jwt-auto-login" as const;
+
 export const SIGN_IN_PATH = `/sign-in/${ID}` as const;
 
 async function resolveAnonymousSession(
@@ -62,6 +63,7 @@ async function resolveAnonymousSession(
   const cookieSession = await deps.getSessionFromCtx<{
     restrictedToOrganizationId: string | null;
   }>(ctx, { disableRefresh: true });
+
   if (cookieSession?.user.restrictedToOrganizationId) {
     return {
       session: cookieSession.session,
@@ -75,23 +77,29 @@ async function resolveAnonymousSession(
 
   const autoLoginUserId = (await deps.getOAuthState())?.serverContext
     ?.autoLoginUserId;
+
   if (!isString(autoLoginUserId)) {
     return null;
   }
+
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const user = (await ctx.context.internalAdapter.findUserById(
     autoLoginUserId
   )) as JwtAutoLoginSession["user"];
+
   if (!user?.restrictedToOrganizationId) {
     return null;
   }
+
   const [anonymousSession] = await ctx.context.internalAdapter.listSessions(
     user.id,
     { onlyActiveSessions: true }
   );
+
   if (!anonymousSession) {
     return null;
   }
+
   return {
     session: anonymousSession,
     user: {
@@ -181,6 +189,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
           const user = await ctx.context.internalAdapter.findUserById(
             result.userId
           );
+
           if (!user) {
             throw APIError.from(
               "INTERNAL_SERVER_ERROR",
@@ -203,6 +212,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             session,
             user,
           });
+
           return ctx.json({
             token: session.token,
             user: parseUserOutput(ctx.context.options, user),
@@ -223,9 +233,11 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             const session = await sessionFromCtx<{
               restrictedToOrganizationId: string | null;
             }>(ctx, { disableRefresh: true });
+
             if (!session?.user.restrictedToOrganizationId) {
               return;
             }
+
             // Carry the anonymous user id across the provider redirect so the
             // callback can link the account even when the session cookie is
             // absent (for example Expo's in-app browser).
@@ -270,6 +282,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             if (!sessionCookie) {
               return;
             }
+
             /**
              * Make sure the user had an anonymous session. Falls back to the
              * server-only OAuth state when the callback arrives without the
@@ -279,6 +292,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
               getSessionFromCtx: sessionFromCtx,
               getOAuthState: oauthState,
             });
+
             if (!session) {
               return;
             }
@@ -289,7 +303,9 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
                 JWT_AUTO_LOGIN_ERROR_CODES.ANONYMOUS_USERS_CANNOT_SIGN_IN_AGAIN_ANONYMOUSLY
               );
             }
+
             const newSession = ctx.context.newSession;
+
             if (!newSession) {
               return;
             }
@@ -303,9 +319,12 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
             const newSessionUser = newSession.user as
               | (UserWithJwtAutoLogin & SessionExtraFields)
               | undefined;
+
             const isSameUser = newSessionUser?.id === session.user.id;
+
             const newSessionIsAnonymous =
               !!newSessionUser?.restrictedToOrganizationId;
+
             if (isSameUser || newSessionIsAnonymous) {
               return;
             }
@@ -331,6 +350,7 @@ export const jwtAutoLogin = (options: JwtAutoLoginOptions) => {
                     error,
                   }
                 );
+
                 return;
               }
             }

@@ -72,9 +72,11 @@ const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3, E4, R4>(
 
     if (args.id !== undefined) {
       const updated = yield* options.update(args.id, valueMap);
+
       if (updated !== undefined) {
         return updated;
       }
+
       if (options.strict) {
         return yield* new FailedToUpsertAttributeValueError();
       }
@@ -83,13 +85,17 @@ const upsertAttributeValue = <T, E1, R1, E2, R2, E3, R3, E4, R4>(
     }
 
     const id = args.id ?? (yield* options.generateId);
+
     if (args.id !== undefined && (yield* options.idExists(id))) {
       return yield* new FailedToUpsertAttributeValueError();
     }
+
     const created = yield* options.insert(id, valueMap);
+
     if (!created) {
       return yield* new FailedToUpsertAttributeValueError();
     }
+
     return created;
   });
 
@@ -376,6 +382,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .update(schema.contactAttributeValueTable)
               .set({ ...valueMap, updatedAt: now })
@@ -405,6 +412,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .insert(schema.contactAttributeValueTable)
               .values({
@@ -439,6 +447,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .update(schema.contactAttributeValueTable)
               .set({ ...valueMap, updatedAt: now })
@@ -467,6 +476,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .insert(schema.contactAttributeValueTable)
               .values({
@@ -519,6 +529,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .update(schema.companyAttributeValueTable)
               .set({ ...valueMap, updatedAt: now })
@@ -548,6 +559,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .insert(schema.companyAttributeValueTable)
               .values({
@@ -582,6 +594,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         update: (rowId, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .update(schema.companyAttributeValueTable)
               .set({ ...valueMap, updatedAt: now })
@@ -610,6 +623,7 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
         insert: (id, valueMap) =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             return yield* db
               .insert(schema.companyAttributeValueTable)
               .values({

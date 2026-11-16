@@ -68,9 +68,11 @@ describe("EmailSubscriptionRepository", () => {
           const db = yield* currentDb;
 
           yield* createOrganization(organizationId);
+
           const created = yield* repository.requestSubscription(
             pendingChangelogSubscription(organizationId)
           );
+
           expect(created.contact.email).toBe("subscriber@example.com");
           expect(created.subscription.state).toBe("pending_verification");
           expect(Option.isSome(created.verificationToken)).toBe(true);
@@ -84,12 +86,15 @@ describe("EmailSubscriptionRepository", () => {
               "A new subscription must issue both link tokens"
             );
           }
+
           const verificationToken = Redacted.value(
             created.verificationToken.value
           );
+
           const unsubscribeToken = Redacted.value(
             created.unsubscribeToken.value
           );
+
           const [stored] = yield* db
             .select({
               unsubscribeTokenHash:
@@ -126,14 +131,17 @@ describe("EmailSubscriptionRepository", () => {
           const repository = yield* EmailSubscriptionRepository;
 
           yield* createOrganization(organizationId);
+
           const created = yield* repository.requestSubscription(
             pendingChangelogSubscription(organizationId)
           );
+
           if (Option.isNone(created.verificationToken)) {
             return expect.fail(
               "A pending subscription must issue a verification token"
             );
           }
+
           const token = Redacted.value(created.verificationToken.value);
 
           expect(
@@ -148,11 +156,13 @@ describe("EmailSubscriptionRepository", () => {
               verificationToken: token,
             })
           ).toEqual({ _tag: "Invalid" });
+
           const subscription = yield* repository.findSubscription({
             email: "subscriber@example.com",
             organizationId,
             topic: { topicId: null, topicType: "changelog" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             state: "active",
           });
@@ -167,15 +177,19 @@ describe("EmailSubscriptionRepository", () => {
           const repository = yield* EmailSubscriptionRepository;
 
           yield* createOrganization(organizationId);
+
           const first = yield* repository.requestSubscription(
             pendingChangelogSubscription(organizationId)
           );
+
           expect(Option.isSome(first.unsubscribeToken)).toBe(true);
+
           if (Option.isNone(first.unsubscribeToken)) {
             return expect.fail(
               "A new subscription must issue an unsubscribe token"
             );
           }
+
           const unsubscribeToken = Redacted.value(first.unsubscribeToken.value);
 
           const repeated = yield* repository.requestSubscription({
@@ -201,14 +215,17 @@ describe("EmailSubscriptionRepository", () => {
           const repository = yield* EmailSubscriptionRepository;
 
           yield* createOrganization(organizationId);
+
           const created = yield* repository.requestSubscription(
             pendingChangelogSubscription(organizationId)
           );
+
           if (Option.isNone(created.unsubscribeToken)) {
             return expect.fail(
               "A new subscription must issue an unsubscribe token"
             );
           }
+
           yield* repository.unsubscribe({
             now: dateAt("2026-08-09T00:01:00.000Z"),
             unsubscribeToken: Redacted.value(created.unsubscribeToken.value),
@@ -233,9 +250,11 @@ describe("EmailSubscriptionRepository", () => {
         const repository = yield* EmailSubscriptionRepository;
 
         yield* createOrganization(organizationId);
+
         const created = yield* repository.requestSubscription(
           pendingChangelogSubscription(organizationId)
         );
+
         if (Option.isNone(created.verificationToken)) {
           return expect.fail(
             "A pending subscription must issue a verification token"
@@ -260,23 +279,28 @@ describe("EmailSubscriptionRepository", () => {
 
           yield* createOrganization(organizationId);
           yield* createVerifiedUser("usr_subscriber");
+
           const changelog = yield* repository.requestSubscription({
             ...pendingChangelogSubscription(organizationId),
             alreadyVerifiedUser: { userId: "usr_subscriber" },
             email: "subscriber@example.com",
           });
+
           const post = yield* repository.requestSubscription({
             ...pendingChangelogSubscription(organizationId),
             alreadyVerifiedUser: { userId: "usr_subscriber" },
             email: "subscriber@example.com",
             topic: { topicId: "pst_1", topicType: "post" },
           });
+
           expect(Option.isSome(changelog.unsubscribeToken)).toBe(true);
+
           if (Option.isNone(changelog.unsubscribeToken)) {
             return expect.fail(
               "A new subscription must issue an unsubscribe token"
             );
           }
+
           const token = Redacted.value(changelog.unsubscribeToken.value);
 
           expect(post.contact.id).toBe(changelog.contact.id);
@@ -298,19 +322,23 @@ describe("EmailSubscriptionRepository", () => {
           });
           expect(changelog.subscription.state).toBe("active");
           expect(post.subscription.state).toBe("active");
+
           const changelogState = yield* repository.findSubscription({
             email: "subscriber@example.com",
             organizationId,
             topic: { topicId: null, topicType: "changelog" },
           });
+
           expect(Option.getOrUndefined(changelogState)).toMatchObject({
             state: "unsubscribed",
           });
+
           const postState = yield* repository.findSubscription({
             email: "subscriber@example.com",
             organizationId,
             topic: { topicId: "pst_1", topicType: "post" },
           });
+
           expect(Option.getOrUndefined(postState)).toMatchObject({
             state: "active",
           });
@@ -345,7 +373,9 @@ describe("EmailSubscriptionRepository", () => {
             topic: { topicId: "post_a", topicType: "post" },
             userId: "usr_post_subscriber",
           });
+
           expect(first).toEqual({ _tag: "Unsubscribed" });
+
           const second = yield* repository.unsubscribeAuthenticatedSubscription(
             {
               now: dateAt("2026-08-09T00:02:00.000Z"),
@@ -354,17 +384,21 @@ describe("EmailSubscriptionRepository", () => {
               userId: "usr_post_subscriber",
             }
           );
+
           expect(second).toEqual({ _tag: "AlreadyUnsubscribed" });
+
           const postA = yield* repository.findSubscription({
             email: "usr_post_subscriber@example.com",
             organizationId,
             topic: { topicId: "post_a", topicType: "post" },
           });
+
           const postB = yield* repository.findSubscription({
             email: "usr_post_subscriber@example.com",
             organizationId,
             topic: { topicId: "post_b", topicType: "post" },
           });
+
           expect(Option.getOrUndefined(postA)).toMatchObject({
             state: "unsubscribed",
           });
@@ -414,6 +448,7 @@ describe("EmailSubscriptionRepository", () => {
                 topic: { topicId: "post_multi", topicType: "post" },
               })
           );
+
           expect(
             subscriptions.map(
               (subscription) => Option.getOrUndefined(subscription)?.state
@@ -457,16 +492,19 @@ describe("EmailSubscriptionRepository", () => {
               organizationId,
             })
           ).toEqual({ paused: 0, resumed: 1 });
+
           const active = yield* repository.findSubscription({
             email: "usr_plan_state@example.com",
             organizationId,
             topic: { topicId: "post_active", topicType: "post" },
           });
+
           const pending = yield* repository.findSubscription({
             email: "pending-plan-state@example.com",
             organizationId,
             topic: { topicId: "post_pending", topicType: "post" },
           });
+
           expect(Option.getOrUndefined(active)).toMatchObject({
             state: "active",
           });

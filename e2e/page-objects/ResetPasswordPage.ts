@@ -27,11 +27,13 @@ export class ResetPasswordPage {
 
   async submitOtp(otp: string) {
     await this.otpInput.fill(otp);
+
     const responsePromise = this.page.waitForResponse(
       (response) =>
         response.url().includes("/api/auth/email-otp/check-verification-otp") &&
         response.request().method() === "POST"
     );
+
     await this.otpSubmitButton.click();
     await responsePromise;
     await expect(this.passwordSubmitButton).toBeVisible();
@@ -40,11 +42,13 @@ export class ResetPasswordPage {
   async resetPassword(password: string) {
     await this.passwordInput.fill(password);
     await this.confirmPasswordInput.fill(password);
+
     const responsePromise = this.page.waitForResponse(
       (response) =>
         response.url().includes("/api/auth/email-otp/reset-password") &&
         response.request().method() === "POST"
     );
+
     await this.passwordSubmitButton.click();
     await responsePromise;
   }

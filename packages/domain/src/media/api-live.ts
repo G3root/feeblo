@@ -51,6 +51,7 @@ export const MediaApiLive = HttpApiBuilder.group(
         });
 
         const kind = getMediaKind(file.contentType);
+
         if (!kind) {
           return yield* new BadRequestError({
             message: "Unsupported file type. Use PNG/JPEG/WEBP/GIF",
@@ -58,6 +59,7 @@ export const MediaApiLive = HttpApiBuilder.group(
         }
 
         const extension = getFileExtension(file.contentType);
+
         if (!extension) {
           return yield* new BadRequestError({
             message: "Unsupported file type. Use PNG/JPEG/WEBP/GIF",
@@ -75,9 +77,12 @@ export const MediaApiLive = HttpApiBuilder.group(
               () => new InternalServerError({ message: "Failed to read file" })
             )
           );
+
         const maxSize = ByteSize.bytes(MAX_IMAGE_BYTES);
+
         if (fileInfo.size === ByteSize.zero || fileInfo.size > maxSize) {
           const maxSizeMb = Math.round(Number(maxSize) / (1024 * 1024));
+
           return yield* new BadRequestError({
             message: `File must be between 1B and ${maxSizeMb}MB`,
           });
@@ -92,6 +97,7 @@ export const MediaApiLive = HttpApiBuilder.group(
           );
 
         const sniffedContentType = sniffMediaType(bytes);
+
         if (
           sniffedContentType === null ||
           sniffedContentType !== file.contentType
@@ -110,11 +116,13 @@ export const MediaApiLive = HttpApiBuilder.group(
             message: "You are not a member of this organization",
           });
         }
+
         // Media storage is a shared requirement supplied by the composition
         // root, not a live layer built inside the request: the root provides
         // the one instance every upload path uses, and a test that supplies a
         // substitute is not overridden here.
         const s3Service = yield* S3UploadService;
+
         const uploaded = yield* s3Service
           .uploadEditorMedia({
             bytes,
@@ -152,6 +160,7 @@ function getMediaKind(contentType: string): MediaKind | null {
   if (CONTENT_TYPE_BY_KIND.image.has(contentType)) {
     return "image";
   }
+
   return null;
 }
 
@@ -174,15 +183,19 @@ export function sniffMediaType(bytes: Uint8Array): SupportedContentType | null {
   if (isPng(bytes)) {
     return "image/png";
   }
+
   if (isJpeg(bytes)) {
     return "image/jpeg";
   }
+
   if (isGif(bytes)) {
     return "image/gif";
   }
+
   if (isWebp(bytes)) {
     return "image/webp";
   }
+
   return null;
 }
 
@@ -194,6 +207,7 @@ function hasBytes(
   if (bytes.length < offset + signature.length) {
     return false;
   }
+
   return signature.every((byte, index) => bytes[offset + index] === byte);
 }
 

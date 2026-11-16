@@ -14,6 +14,7 @@ export class VerificationOtpConfig extends Context.Service<VerificationOtpConfig
           () => new InternalServerError({ message: "Missing APP_URL" })
         )
       );
+
       const nodeEnv = yield* Config.String("NODE_ENV").pipe(
         Config.withDefault("development"),
         Effect.mapError(
@@ -23,6 +24,7 @@ export class VerificationOtpConfig extends Context.Service<VerificationOtpConfig
             })
         )
       );
+
       const secret = yield* Config.String("AUTH_ENCRYPTION_KEY").pipe(
         Effect.mapError(
           () =>

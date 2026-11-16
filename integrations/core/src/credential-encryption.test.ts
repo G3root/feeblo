@@ -28,6 +28,7 @@ describe("integration credential material", () => {
           secret: "provider-secret",
         }
       );
+
       expect(ciphertext).not.toContain("state-nonce");
       expect(ciphertext).not.toContain("provider-secret");
 
@@ -44,10 +45,13 @@ describe("integration credential material", () => {
             : { oauthState: material.oauthState }),
         })
       );
+
       expect(decrypted.oauthState).toBe("state-nonce");
+
       if (decrypted.secret === undefined) {
         throw new Error("expected secret");
       }
+
       expect(Redacted.value(decrypted.secret)).toBe("provider-secret");
     })
   );
@@ -61,6 +65,7 @@ describe("integration credential material", () => {
           {}
         )
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -75,6 +80,7 @@ describe("integration credential material", () => {
           (material) => material
         )
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -90,7 +96,9 @@ describe("integration credential material", () => {
             secret: "provider-secret",
           }
         );
+
         const WrongMaterial = Schema.Struct({ required: Schema.String });
+
         const result = yield* Effect.exit(
           decryptIntegrationCredentialMaterial(
             encryptionKey,
@@ -99,6 +107,7 @@ describe("integration credential material", () => {
             (material) => material
           )
         );
+
         expect(Exit.isFailure(result)).toBe(true);
       })
   );

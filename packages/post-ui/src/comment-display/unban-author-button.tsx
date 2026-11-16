@@ -21,9 +21,11 @@ import { useCommentDisplay } from "./context";
  */
 export function UnbanAuthorButton() {
   const { userBanActions } = usePostCollectionData();
+
   const {
     collections: { commentCollection, postCollection },
   } = usePostCollections();
+
   const { state } = useCommentDisplay();
 
   if (userBanActions === undefined) {

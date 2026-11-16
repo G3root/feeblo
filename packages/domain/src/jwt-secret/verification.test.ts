@@ -8,7 +8,9 @@ import { UnauthorizedError } from "../rpc-errors";
 import { CLOCK_SKEW_LEEWAY_SECONDS, verifyJwt } from "./verification";
 
 const SECRET = "a".repeat(64);
+
 const OTHER_SECRET = "b".repeat(64);
+
 const ORGANIZATION_ID = "org_test";
 
 /**
@@ -20,7 +22,9 @@ const ORGANIZATION_ID = "org_test";
 const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
 
 const nowSeconds = () => Math.floor(fixtureNow.getTime() / 1000);
+
 const futureExp = () => nowSeconds() + 3600;
+
 const pastExp = () => nowSeconds() - 3600;
 
 async function signToken(payload: jose.JWTPayload, secret: string) {
@@ -70,6 +74,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -90,6 +95,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -102,6 +108,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -114,6 +121,7 @@ describe("verifyJwt", () => {
         // ahead that jose must judge it expired. Passes only if `currentDate` is
         // derived from options.nowSeconds rather than the wall clock.
         const now = nowSeconds();
+
         const token = yield* signTokenEffect(
           { ...basePayload(), iat: now, exp: now + 3600 },
           SECRET
@@ -124,6 +132,7 @@ describe("verifyJwt", () => {
             nowSeconds: now + 2 * 3600,
           })
         );
+
         expect(error).toBeInstanceOf(UnauthorizedError);
       })
   );
@@ -138,6 +147,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -145,6 +155,7 @@ describe("verifyJwt", () => {
   it.effect("accepts a token expired within the clock-skew leeway", () =>
     Effect.gen(function* () {
       const now = nowSeconds();
+
       const token = yield* signTokenEffect(
         { ...basePayload(), iat: now - 60, exp: now - 5 },
         SECRET
@@ -153,6 +164,7 @@ describe("verifyJwt", () => {
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID, {
         nowSeconds: now,
       });
+
       expect(payload.exp).toBe(now - 5);
     })
   );
@@ -162,6 +174,7 @@ describe("verifyJwt", () => {
     () =>
       Effect.gen(function* () {
         const now = nowSeconds();
+
         const token = yield* signTokenEffect(
           { ...basePayload(), iat: now + CLOCK_SKEW_LEEWAY_SECONDS + 1 },
           SECRET
@@ -170,6 +183,7 @@ describe("verifyJwt", () => {
         const error = yield* Effect.flip(
           verifyJwt(token, [SECRET], ORGANIZATION_ID, { nowSeconds: now })
         );
+
         expect(error).toBeInstanceOf(UnauthorizedError);
       })
   );
@@ -177,6 +191,7 @@ describe("verifyJwt", () => {
   it.effect("accepts a token with iat within the clock-skew leeway", () =>
     Effect.gen(function* () {
       const now = nowSeconds();
+
       const token = yield* signTokenEffect(
         // Exactly at the boundary is accepted: only strictly beyond the
         // leeway is rejected.
@@ -187,6 +202,7 @@ describe("verifyJwt", () => {
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID, {
         nowSeconds: now,
       });
+
       expect(payload.iat).toBe(now + CLOCK_SKEW_LEEWAY_SECONDS);
     })
   );
@@ -205,6 +221,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -212,6 +229,7 @@ describe("verifyJwt", () => {
   it.effect("accepts a token with a lifetime within the default cap", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(fixtureNow.getTime());
+
       const token = yield* signTokenEffect(
         {
           ...basePayload(),
@@ -244,6 +262,7 @@ describe("verifyJwt", () => {
           maxTokenLifetime: Duration.hours(2),
         })
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -251,6 +270,7 @@ describe("verifyJwt", () => {
   it.effect("accepts a token within a tightened per-workspace cap", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(fixtureNow.getTime());
+
       const token = yield* signTokenEffect(
         { ...basePayload(), iat: nowSeconds(), exp: nowSeconds() + 3600 },
         SECRET
@@ -259,6 +279,7 @@ describe("verifyJwt", () => {
       const payload = yield* verifyJwt(token, [SECRET], ORGANIZATION_ID, {
         maxTokenLifetime: Duration.hours(2),
       });
+
       expect(payload.exp).toBeDefined();
     })
   );
@@ -273,6 +294,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -285,6 +307,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -311,6 +334,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt(token, [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );
@@ -320,6 +344,7 @@ describe("verifyJwt", () => {
       const error = yield* Effect.flip(
         verifyJwt("not-a-token", [SECRET], ORGANIZATION_ID)
       );
+
       expect(error).toBeInstanceOf(UnauthorizedError);
     })
   );

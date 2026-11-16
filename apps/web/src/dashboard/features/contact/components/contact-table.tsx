@@ -144,6 +144,7 @@ export function ContactTable({
     () => new Map(companies.map((company) => [company.id, company])),
     [companies]
   );
+
   const companyOptions = React.useMemo(
     () =>
       companies
@@ -165,6 +166,7 @@ export function ContactTable({
   );
 
   const attributeValues = useOrgContactAttributeValues(organizationId);
+
   const attributeValueState = React.useMemo<ContactAttributeValuesState>(() => {
     const byContact = new Map<string, Map<string, CustomAttributeValue>>();
 
@@ -172,6 +174,7 @@ export function ContactTable({
       const values =
         byContact.get(value.contactId) ??
         new Map<string, CustomAttributeValue>();
+
       values.set(value.attributeId, value);
       byContact.set(value.contactId, values);
     }
@@ -497,6 +500,7 @@ function AccountStatus({
   notifyAccess?: TContactNotifyAccess;
 }) {
   const label = accountKind ? accountKindLabel[accountKind] : NO_ACCOUNT_LABEL;
+
   const hint =
     accountKind === "SHADOW"
       ? "Cannot sign in"

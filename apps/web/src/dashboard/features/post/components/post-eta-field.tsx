@@ -15,10 +15,12 @@ import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 const QUARTERS = [1, 2, 3, 4] as const;
+
 const ETA_PATTERN = /^(\d{4})-Q([1-4])$/;
 
 function parseEtaQuarter(value: string | null) {
   const match = value?.match(ETA_PATTERN);
+
   if (!match) {
     return null;
   }
@@ -31,11 +33,13 @@ function parseEtaQuarter(value: string | null) {
 
 function formatEtaQuarter(value: string | null) {
   const parsed = parseEtaQuarter(value);
+
   return parsed ? `Q${parsed.quarter} ${parsed.year}` : "Set ETA";
 }
 
 function getQuarterDate(value: string | null) {
   const parsed = parseEtaQuarter(value);
+
   return parsed
     ? new Date(parsed.year, (parsed.quarter - 1) * 3, 1)
     : undefined;
@@ -48,11 +52,13 @@ function getQuarterValue(year: number, quarter: number) {
 export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
   const { post, isLocked, isMerged, organizationId } = usePostCollectionData();
   const { postCollection } = useDashboardCollections();
+
   // Backend mirror: PostPolicy.canUpdateEta lets `posts.status` holders
   // (managers and above) set the ETA via UpdatePostEta.
   const { allowed: canUpdateEta } = usePolicy(
     hasPermission(organizationId, "posts.status")
   );
+
   const selectedDate = getQuarterDate(post.etaQuarter);
   const [month, setMonth] = useState(selectedDate ?? new Date());
   const [open, setOpen] = useState(false);
@@ -80,6 +86,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
   const updateEta = async (etaQuarter: string | null) => {
     if (isDisabled || etaQuarter === post.etaQuarter) {
       setOpen(false);
+
       return;
     }
 
@@ -107,6 +114,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
         if (nextOpen) {
           setMonth(selectedDate ?? new Date());
         }
+
         setOpen(nextOpen);
       }}
       open={open}
@@ -141,6 +149,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
               {QUARTERS.map((quarter) => {
                 const value = getQuarterValue(month.getFullYear(), quarter);
                 const selected = value === post.etaQuarter;
+
                 return (
                   <Button
                     aria-pressed={selected}
@@ -187,6 +196,7 @@ export function PostEtaField({ disabled = false }: { disabled?: boolean }) {
                     )
                   );
                 }
+
                 return undefined;
               }}
               selected={selectedDate}

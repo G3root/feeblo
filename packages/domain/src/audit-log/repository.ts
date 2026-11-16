@@ -91,11 +91,15 @@ const kindCondition = (kind: TAuditLogKind | undefined): SQL | undefined => {
   if (kind === undefined) {
     return undefined;
   }
+
   const access = inArray(table.action, [...AUDIT_ACCESS_ACTIONS]);
+
   if (kind === "access") {
     return access;
   }
+
   const deniedAccess = and(access, eq(table.outcome, "denied"));
+
   return or(deniedAccess, notInArray(table.action, [...AUDIT_ACCESS_ACTIONS]));
 };
 
@@ -128,6 +132,7 @@ const makeAuditLogRepository = Effect.gen(function* () {
   ) {
     const after = query.after;
     const changedField = query.changedField;
+
     const rows = yield* db
       .select({
         id: table.id,
@@ -192,6 +197,7 @@ const makeAuditLogRepository = Effect.gen(function* () {
 
     const hasMore = rows.length > query.limit;
     const page = hasMore ? rows.slice(0, query.limit) : rows;
+
     const items = yield* Effect.forEach(page, (row) =>
       Schema.decodeEffect(AuditLogStoredEntry)(row).pipe(
         Effect.mapError(() =>
@@ -199,7 +205,9 @@ const makeAuditLogRepository = Effect.gen(function* () {
         )
       )
     );
+
     const last = items.at(-1);
+
     return {
       items,
       next:
@@ -226,6 +234,7 @@ const makeAuditLogRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const tx = yield* currentDb;
         yield* tx.execute(sql`set local feeblo.audit_retention = 'on'`);
+
         const deleted = yield* tx.execute(sql`
             delete from audit_log
             where ctid in (
@@ -235,6 +244,7 @@ const makeAuditLogRepository = Effect.gen(function* () {
               limit ${batchSize}
             )
           `);
+
         return deleted.rowCount ?? 0;
       })
     );

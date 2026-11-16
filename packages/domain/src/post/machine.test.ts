@@ -138,6 +138,7 @@ describe("post presence machine", () => {
         expect(presenceTargetStateFor(event)).not.toBe(source);
       }
     }
+
     for (const event of POST_ENGAGEMENT_EVENTS) {
       for (const source of engagementSourceStatesFor(event)) {
         expect(engagementTargetStateFor(event)).not.toBe(source);
@@ -149,6 +150,7 @@ describe("post presence machine", () => {
     for (const presence of POST_PRESENCE_STATES) {
       expect(presenceOf(presenceRow(presence))).toBe(presence);
     }
+
     // The one that would be wrong under the obvious ordering: a merged row also
     // carries `archivedAt` (the CHECK constraint requires it), so testing the
     // archive column first would report every merged post as archived.
@@ -165,6 +167,7 @@ describe("post presence machine", () => {
     expect(engagementOf({ lockedAt: new Date(0) })).toBe(
       LOCKED_POST_ENGAGEMENT
     );
+
     for (const locked of [true, false]) {
       expect(engagementOf({ lockedAt: locked ? new Date(0) : null })).toBe(
         engagementForLock(locked)
@@ -187,6 +190,7 @@ describe("post presence machine", () => {
       LISTED_POST_PRESENCE,
       ARCHIVED_POST_PRESENCE,
     ]);
+
     for (const presence of POST_PRESENCE_STATES) {
       expect(isMergedPostPresence(presence)).toBe(
         !UNSUPERSEDED_POST_PRESENCE_STATES.includes(presence)
@@ -211,10 +215,12 @@ describe("post presence machine", () => {
 
     while (grew) {
       grew = false;
+
       for (const from of POST_PRESENCE_STATES) {
         if (!reachedPresence.has(from)) {
           continue;
         }
+
         for (const to of POST_PRESENCE_STATES) {
           if (canTransitionPostPresence(from, to) && !reachedPresence.has(to)) {
             reachedPresence.add(to);
@@ -222,10 +228,12 @@ describe("post presence machine", () => {
           }
         }
       }
+
       for (const from of POST_ENGAGEMENT_STATES) {
         if (!reachedEngagement.has(from)) {
           continue;
         }
+
         for (const to of POST_ENGAGEMENT_STATES) {
           if (
             canTransitionPostEngagement(from, to) &&

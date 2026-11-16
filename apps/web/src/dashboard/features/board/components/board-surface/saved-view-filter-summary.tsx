@@ -83,7 +83,9 @@ export function SavedViewFilterSummary({
       postStatus.label || formatPostStatus(postStatus.type),
     ])
   );
+
   const tagNames = new Map((tags ?? []).map((tag) => [tag.id, tag.name]));
+
   const memberNames = new Map(
     (members ?? []).map((member) => [
       member.id,

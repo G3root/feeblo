@@ -53,6 +53,7 @@ const entries = pair.handlers((_surface, _args) => Effect.succeed("kept"));
 describe("defineSurfacePair", () => {
   it("keeps each surface's channels and the pair's args", () => {
     type DashboardError = Effect.Error<ReturnType<typeof entries.dashboard>>;
+
     type PublicError = Effect.Error<ReturnType<typeof entries.public>>;
 
     // The dashboard entry must not be typed as if it could fail with a
@@ -100,6 +101,7 @@ describe("defineSurfacePair", () => {
         .handlers((_surface, _args) =>
           Effect.sync(() => {
             order.push("body");
+
             return "kept";
           })
         )
@@ -135,6 +137,7 @@ describe("defineSurfacePair", () => {
     Effect.gen(function* () {
       const consumed: Array<PublicRpcRateLimitOptions> = [];
       const bodyRan: Array<string> = [];
+
       const denied = defineSurfacePair<TestArgs, TestTags>()({
         operation: "ThingCreate",
         remap: { action: "create", entity: "Thing" },
@@ -163,6 +166,7 @@ describe("defineSurfacePair", () => {
   it.effect("passes a preset override through to the limiter", () =>
     Effect.gen(function* () {
       const consumed: Array<PublicRpcRateLimitOptions> = [];
+
       const capped = defineSurfacePair<TestArgs, TestTags>()({
         operation: "ThingCreate",
         remap: { action: "create", entity: "Thing" },
@@ -195,6 +199,7 @@ describe("defineSurfacePair", () => {
     () =>
       Effect.gen(function* () {
         const consumed: Array<PublicRpcRateLimitOptions> = [];
+
         const readEntry = definePublicEntry<TestArgs, TestTags>()({
           operation: "ThingCreate",
           remap: { action: "select", entity: "Thing" },

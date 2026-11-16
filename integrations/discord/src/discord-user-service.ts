@@ -58,14 +58,17 @@ export const DiscordUserServiceLive: Layer.Layer<
         // same user, without a dedicated link table. Guild-scoped so the
         // same discord id in two servers can never collide.
         const syntheticEmail = `discord-${guildId.toLowerCase()}-${userId.toLowerCase()}${SYNTHETIC_DISCORD_EMAIL_SUFFIX}`;
+
         const [existing] = yield* db
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
           .where(eq(schema.userTable.email, syntheticEmail))
           .limit(1);
+
         if (existing !== undefined) {
           return existing.id;
         }
+
         // Create the anonymous user. These users never receive transactional
         // email (synthetic address, emailVerified false).
         const createdUserId = yield* UserId.generate;
@@ -78,6 +81,7 @@ export const DiscordUserServiceLive: Layer.Layer<
             name: truncate(displayName, 100),
           })
           .pipe(Effect.catchIf(isUniqueViolation, () => Effect.void));
+
         // Concurrent submissions may create the same user; the insert
         // conflict is ignored and the winner is reused.
         const [winner] = yield* db
@@ -85,11 +89,13 @@ export const DiscordUserServiceLive: Layer.Layer<
           .from(schema.userTable)
           .where(eq(schema.userTable.email, syntheticEmail))
           .limit(1);
+
         if (winner === undefined) {
           return yield* new ChatInboundFailure({
             message: "Could not resolve the created Discord user",
           });
         }
+
         return winner.id;
       }).pipe(
         Effect.mapError((error) =>

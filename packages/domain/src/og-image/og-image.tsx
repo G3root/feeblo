@@ -45,6 +45,7 @@ function ProductLoop({ activeStage }: { activeStage: ProductStage }) {
     <div tw="flex items-center gap-3 text-[13px] font-semibold uppercase tracking-[2px] text-[#697086]">
       {productStages.map(({ label, stage }, index) => {
         const isActive = stage === activeStage;
+
         return (
           <React.Fragment key={stage}>
             {index > 0 ? <div tw="flex h-px w-8 bg-[#34394a]" /> : null}
@@ -161,9 +162,11 @@ const postStage = (status: TPostStatus["type"]): ProductStage => {
   if (status === "PLANNED" || status === "IN_PROGRESS") {
     return "plan";
   }
+
   if (status === "COMPLETED" || status === "CLOSED") {
     return "ship";
   }
+
   return "listen";
 };
 
@@ -221,6 +224,7 @@ export function OgImage(props: OgImageData) {
         </OgFrame>
       );
     }
+
     default:
       return null;
   }

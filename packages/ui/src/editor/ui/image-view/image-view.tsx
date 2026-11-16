@@ -14,9 +14,11 @@ export default function ImageView(props: ReactNodeViewProps) {
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const attrs = props.node.attrs as ImageAttrs;
   const url = attrs.src || "";
+
   const uploadTask = url.startsWith("blob:")
     ? UploadTask.get<string>(url)
     : undefined;
+
   const uploading = Boolean(uploadTask);
 
   const [aspectRatio, setAspectRatio] = useState<number | undefined>();
@@ -38,13 +40,16 @@ export default function ImageView(props: ReactNodeViewProps) {
       if (canceled) {
         return;
       }
+
       setError(String(error));
     });
+
     const unsubscribeProgress = uploadTask.subscribeProgress(
       ({ loaded, total }) => {
         if (canceled) {
           return;
         }
+
         setProgress(total ? loaded / total : 0);
       }
     );
@@ -60,9 +65,11 @@ export default function ImageView(props: ReactNodeViewProps) {
     const img = event.target as HTMLImageElement;
     const { naturalWidth, naturalHeight } = img;
     const ratio = naturalWidth / naturalHeight;
+
     if (ratio && Number.isFinite(ratio)) {
       setAspectRatio(ratio);
     }
+
     if (naturalWidth && naturalHeight && !(attrs.width && attrs.height)) {
       props.setAttrs({ width: naturalWidth, height: naturalHeight });
     }

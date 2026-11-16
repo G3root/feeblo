@@ -46,6 +46,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
         role: "manager",
         createdAt: now,
       });
+
       return { memberId, organizationId, userId } satisfies Fixture;
     });
 
@@ -110,6 +111,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
               enabled: false,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(written.categories.new_feedback).toBe(false);
           expect(written.categories.post_status_changed).toBe(true);
           expect(written.pausedAll).toBe(false);
@@ -119,6 +121,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(read).toEqual(written);
         })
       );
@@ -135,6 +138,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
               enabled: false,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(paused.pausedAll).toBe(true);
           expect(paused.categories.changelog_published).toBe(true);
 
@@ -145,6 +149,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
               enabled: false,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(oneOff.pausedAll).toBe(true);
           expect(oneOff.categories.changelog_published).toBe(false);
         })
@@ -165,6 +170,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
                 enabled: false,
               })
               .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
             const restored = yield* handlers
               .SetNotificationPreference({
                 organizationId: fixture.organizationId,
@@ -172,6 +178,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
                 enabled: true,
               })
               .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
             expect(restored.categories.post_status_changed).toBe(true);
 
             const rows = yield* db
@@ -186,6 +193,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
                   eq(schema.notificationPreferenceTable.userId, fixture.userId)
                 )
               );
+
             expect(rows).toEqual([]);
           })
       );
@@ -206,6 +214,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
                 Effect.provideService(CurrentSession, session(fixture, false))
               )
           );
+
           expect(error._tag).toBe("PolicyDenied");
         })
       );
@@ -239,6 +248,7 @@ describe("NotificationPreferenceRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(read.pausedAll).toBe(false);
         })
       );

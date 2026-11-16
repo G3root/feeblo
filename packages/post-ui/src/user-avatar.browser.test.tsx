@@ -14,9 +14,11 @@ function tickParts(root: Element) {
   const avatar = root.querySelector('[data-slot="avatar"]');
   const tick = root.querySelector('[data-slot="member-tick"]');
   const icon = tick?.querySelector("svg");
+
   if (!avatar || !tick || !icon) {
     throw new Error("expected an avatar with a member tick and its icon");
   }
+
   return {
     avatar: avatar.getBoundingClientRect().width,
     icon: icon.getBoundingClientRect().width,
@@ -55,6 +57,7 @@ describe("UserAvatar member tick", () => {
       const { avatar, icon, tick } = tickParts(
         screen.getByTestId(id).element()
       );
+
       // The tick keeps one proportion of the avatar at every size...
       expect(tick / avatar).toBeCloseTo(0.44, 2);
       // ...and the check inside keeps one proportion of the tick.

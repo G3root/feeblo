@@ -72,9 +72,11 @@ function getInlineMenuItems(editor: Editor<BasicExtension>) {
 function getCurrentLink(state: EditorState): string | undefined {
   const { $from } = state.selection;
   const marks = $from.marksAcross($from);
+
   if (!marks) {
     return;
   }
+
   for (const mark of marks) {
     if (mark.type.name === "link") {
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.

@@ -46,6 +46,7 @@ export const recordExportFailure = (
   records = 0
 ): Effect.Effect<void> => {
   const signal = signalOf(path);
+
   return Metric.update(
     Metric.withAttributes(exportFailures, { signal, reason }),
     1

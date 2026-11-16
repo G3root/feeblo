@@ -30,6 +30,7 @@ import { getIsTableShortcutTarget, SORT_ORDERS } from "./lib/data-table-utils";
 import { SortableList } from "./sortable-list";
 
 const SORT_SHORTCUT_KEY = "s";
+
 const REMOVE_SORT_SHORTCUTS: ReadonlySet<string> = new Set([
   "backspace",
   "delete",
@@ -91,6 +92,7 @@ function DataTableSortMenuContent<TData extends RowData>({
 
   const onSortAdd = React.useCallback(() => {
     const firstColumn = columns[0];
+
     if (!firstColumn) return;
     table.setSorting((previous) => [
       ...previous,
@@ -126,12 +128,14 @@ function DataTableSortMenuContent<TData extends RowData>({
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (disabled) return;
+
       if (
         !open &&
         !getIsTableShortcutTarget(triggerRef.current, event.target)
       ) {
         return;
       }
+
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
@@ -151,6 +155,7 @@ function DataTableSortMenuContent<TData extends RowData>({
     }
 
     window.addEventListener("keydown", onKeyDown);
+
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [disabled, open]);
 
@@ -261,6 +266,7 @@ function SortRow({
   onSortRemove,
 }: SortRowProps) {
   const label = columnLabels.get(sort.id) ?? sort.id;
+
   const items = [...columns, { id: sort.id, label }].map((column) => ({
     label: column.label,
     value: column.id,

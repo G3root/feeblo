@@ -44,6 +44,7 @@ describe("unsubscribeNotificationPreference", () => {
           name: "Member",
           emailVerified: true,
         });
+
         return { organizationId, userId };
       });
 
@@ -53,6 +54,7 @@ describe("unsubscribeNotificationPreference", () => {
         const repository = yield* NotificationPreferenceRepository;
         const db = yield* currentDb;
         const fixture = yield* makeFixture();
+
         const token = yield* tokens.deriveToken({
           category: "changelog_published",
           organizationId: fixture.organizationId,
@@ -78,6 +80,7 @@ describe("unsubscribeNotificationPreference", () => {
               eq(schema.notificationPreferenceTable.userId, fixture.userId)
             )
           );
+
         expect(rows).toEqual([
           { category: "changelog_published", enabled: false },
         ]);
@@ -94,11 +97,13 @@ describe("unsubscribeNotificationPreference", () => {
       Effect.gen(function* () {
         const tokens = yield* NotificationPreferenceTokenService;
         const fixture = yield* makeFixture();
+
         const token = yield* tokens.deriveToken({
           category: "new_feedback",
           organizationId: fixture.organizationId,
           userId: fixture.userId,
         });
+
         const url = Redacted.value(token);
 
         expect(yield* unsubscribeNotificationPreference(url)).toEqual({
@@ -115,6 +120,7 @@ describe("unsubscribeNotificationPreference", () => {
         const tokens = yield* NotificationPreferenceTokenService;
         const db = yield* currentDb;
         const fixture = yield* makeFixture();
+
         const token = yield* tokens.deriveToken({
           category: "new_feedback",
           organizationId: fixture.organizationId,
@@ -137,6 +143,7 @@ describe("unsubscribeNotificationPreference", () => {
               fixture.organizationId
             )
           );
+
         expect(rows).toEqual([]);
       })
     );
@@ -144,6 +151,7 @@ describe("unsubscribeNotificationPreference", () => {
     it.effect("rejects a forged GET link", () =>
       Effect.gen(function* () {
         yield* makeFixture();
+
         const error = yield* Effect.flip(
           validateNotificationPreferenceUnsubscribeToken("forged.token")
         );
@@ -156,11 +164,13 @@ describe("unsubscribeNotificationPreference", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           unsubscribeNotificationPreference("forged.token")
         );
 
         expect(error._tag).toBe("BadRequestError");
+
         const rows = yield* db
           .select({ id: schema.notificationPreferenceTable.id })
           .from(schema.notificationPreferenceTable)
@@ -170,6 +180,7 @@ describe("unsubscribeNotificationPreference", () => {
               fixture.organizationId
             )
           );
+
         expect(rows).toEqual([]);
       })
     );

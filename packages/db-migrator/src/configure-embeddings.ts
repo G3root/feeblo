@@ -13,20 +13,25 @@ const main = async () => {
     },
     strict: true,
   });
+
   if (values.help) {
     console.log(`Usage:
   node ./migrate/configure-embeddings.js --dimensions 1536
   node ./migrate/configure-embeddings.js --dimensions 768 --clear-existing`);
+
     return;
   }
 
   const databaseUrl = process.env.DATABASE_URL;
+
   if (!databaseUrl) {
     throw new TypeError("DATABASE_URL is required.");
   }
+
   const dimensions = Number(
     values.dimensions ?? process.env.EMBEDDING_DIMENSIONS ?? 1536
   );
+
   if (
     !Number.isSafeInteger(dimensions) ||
     dimensions < 1 ||
@@ -38,6 +43,7 @@ const main = async () => {
   }
 
   const sql = postgres(databaseUrl, { max: 1 });
+
   try {
     // `ALTER COLUMN ... TYPE` takes ACCESS EXCLUSIVE on `post` for the whole
     // rewrite, and that lock request queues every later read and write behind
@@ -46,19 +52,23 @@ const main = async () => {
     // (the whole command is inside `sql.begin`), and can be retried.
     await sql`SET lock_timeout = '30s'`;
     await sql`CREATE EXTENSION IF NOT EXISTS vector`;
+
     const [{ count }] = await sql<[{ count: number }]>`
       SELECT count(*)::integer AS count
       FROM post
       WHERE embedding IS NOT NULL
         AND vector_dims(embedding) <> ${dimensions}
     `;
+
     if (count > 0 && !values["clear-existing"]) {
       throw new TypeError(
         `${count} posts have incompatible embeddings. Re-run with --clear-existing.`
       );
     }
+
     await sql.begin(async (tx) => {
       await tx`DROP INDEX IF EXISTS post_embedding_hnsw_idx`;
+
       if (values["clear-existing"]) {
         await tx`
           UPDATE post
@@ -66,6 +76,7 @@ const main = async () => {
           WHERE embedding IS NOT NULL
         `;
       }
+
       await tx.unsafe(`
         ALTER TABLE post
         ALTER COLUMN embedding

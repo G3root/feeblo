@@ -90,6 +90,7 @@ describe("changelog machine", () => {
       ALL.filter((status) => inboundStatesFor(status).length > 0).sort()
     );
     expect(isWritableChangelogStatus("scheduled")).toBe(false);
+
     for (const status of CHANGELOG_WRITE_STATES) {
       expect(isWritableChangelogStatus(status)).toBe(true);
     }
@@ -97,6 +98,7 @@ describe("changelog machine", () => {
 
   it("rewrites a drain-only status to the draft it effectively is", () => {
     expect(writableChangelogStatus("scheduled")).toBe("draft");
+
     for (const status of CHANGELOG_WRITE_STATES) {
       expect(writableChangelogStatus(status)).toBe(status);
     }
@@ -123,10 +125,12 @@ describe("changelog machine", () => {
 
     while (grew) {
       grew = false;
+
       for (const from of ALL) {
         if (!reached.has(from)) {
           continue;
         }
+
         for (const to of targetStatesFor(from)) {
           if (!reached.has(to)) {
             reached.add(to);

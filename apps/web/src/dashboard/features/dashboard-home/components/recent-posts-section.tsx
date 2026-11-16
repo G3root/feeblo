@@ -93,6 +93,7 @@ export function RecentPostsSection({
           {recentPosts.map((post) => {
             const board = boardMap.get(post.boardId);
             const status = statuses.find((s) => s.id === post.statusId);
+
             const description =
               (post.excerpt && post.excerpt.trim().length > 0
                 ? post.excerpt.length > 100
@@ -214,6 +215,7 @@ function EmptyState({ boards }: { boards: Board[] }) {
 
 function RecentPostsSkeleton() {
   const keys = ["a", "b", "c", "d", "e"];
+
   return (
     <div className="divide-border/40 border-border/60 overflow-hidden rounded-xl border">
       {keys.map((key) => (

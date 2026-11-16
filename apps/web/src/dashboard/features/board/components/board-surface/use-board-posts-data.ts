@@ -89,6 +89,7 @@ export function useBoardPostsData({
     postTagCollection,
     upvoteCollection,
   } = useDashboardCollections();
+
   const { filters, ordering } = query;
   const statusFilter = filters.status;
   const tagFilter = filters.tag;
@@ -166,6 +167,7 @@ export function useBoardPostsData({
       // selected this join is an inert no-op rather than a branch.
       const requireAllTags =
         tagOperator === "includeAllOf" || tagOperator === "excludeIfAllOf";
+
       const matchingTags = q
         .from({ postTag: postTagCollection })
         .where(({ postTag }) =>
@@ -263,6 +265,7 @@ export function useBoardPostsData({
               isNull(matchingTags.postId),
               isUndefined(matchingTags.postId)
             );
+
             if (
               tagFilter.operator === "excludeIfAnyOf" ||
               tagFilter.operator === "excludeIfAllOf"

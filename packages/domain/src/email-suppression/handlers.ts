@@ -120,9 +120,11 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
           reason: "administrative_block",
         });
         yield* recordEmailSuppression("administrative_block", "manual");
+
         const record = yield* repository
           .find({ email, organizationId })
           .pipe(Effect.flatMap(failIfMissing));
+
         return toSummary(record);
       }).pipe(
         Effect.catchTags({

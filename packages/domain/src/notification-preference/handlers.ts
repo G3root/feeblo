@@ -25,6 +25,7 @@ export const NotificationPreferenceRpcHandlersEffect = Effect.gen(function* () {
   const get = ({ organizationId }: TNotificationPreferenceQuery) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+
       return yield* readState(organizationId, session.session.userId);
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(organizationId)),
@@ -45,6 +46,7 @@ export const NotificationPreferenceRpcHandlersEffect = Effect.gen(function* () {
         organizationId,
         userId: session.session.userId,
       });
+
       // Answer with the state the write committed, so a caller renders the
       // server's resolution instead of a second read of it.
       return yield* readState(organizationId, session.session.userId);

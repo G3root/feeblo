@@ -15,6 +15,7 @@ export const actorFromSession = (
   organizationId: string
 ): TAuditActorRef => {
   const membership = Policy.getMembership(session, organizationId);
+
   return {
     type: "user",
     userId: session.session.userId,

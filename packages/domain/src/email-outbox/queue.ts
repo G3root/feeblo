@@ -147,6 +147,7 @@ const resolveMemberNotificationRecipients = ({
   Effect.gen(function* () {
     const db = yield* Database.Database;
     const preferences = yield* NotificationPreferenceRepository;
+
     const rows = yield* db
       .select({
         email: schema.userTable.email,
@@ -163,48 +164,63 @@ const resolveMemberNotificationRecipients = ({
           eq(schema.userTable.emailVerified, true)
         )
       );
+
     const candidates = rows.filter((row) => !excludedUserIds.has(row.userId));
+
     if (candidates.length === 0) {
       // SAFETY: An empty recipient list is a valid result of this resolver.
       return [] as readonly MemberNotificationRecipient[];
     }
+
     const disabled = yield* preferences.listDisabledForUsers({
       channel: "email",
       organizationId,
       userIds: candidates.map((candidate) => candidate.userId),
     });
+
     const paused = new Set(
       disabled.filter((row) => row.category === "all").map((row) => row.userId)
     );
+
     const categoryDisabled = new Set(
       disabled
         .filter((row) => row.category === category)
         .map((row) => row.userId)
     );
+
     const enabled = candidates.filter(
       (candidate) =>
         !paused.has(candidate.userId) && !categoryDisabled.has(candidate.userId)
     );
+
     // Suppressed addresses are dropped before a delivery row exists. The send
     // path checks again, so this only saves rows and a claim; the second check
     // is what keeps a suppression written after materialization effective.
     const suppressions = yield* EmailSuppressionRepository;
+
     const suppressed = yield* suppressions.findSuppressedEmails({
       emails: enabled.map((candidate) => candidate.email),
       organizationId,
     });
+
     return enabled.filter(
       (candidate) => !suppressed.has(candidate.email.trim().toLowerCase())
     );
   });
+
 const materializationBatchSize = 100;
+
 const reconciliationBatchSize = 100;
+
 /** Retry delay for a delivery whose `sending` lease has to be reclaimed. */
 const sendingLeaseRecoveryDelay = Duration.minutes(5);
+
 /** Retry delay while the internal circuit breaker has delivery paused. */
 const circuitBreakerRetryDelay = Duration.minutes(5);
+
 /** Retry delay while the provider's monthly send limit is spent. */
 const monthlyVolumeRetryDelay = Duration.hours(1);
+
 /**
  * Backoff before a worker re-enters `take` after a failure.
  *
@@ -221,9 +237,11 @@ const loopbackHostPattern = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
 const retryDelay = (deliveryId: string, attempt: number): Duration.Duration => {
   const exponential = Math.min(60 * 60 * 1000, 1000 * 2 ** (attempt - 1));
   let hash = 0;
+
   for (const character of deliveryId) {
     hash = (hash * 31 + character.charCodeAt(0)) % 10_000;
   }
+
   return Duration.millis(
     exponential + Math.floor((exponential * (hash % 2001)) / 10_000)
   );
@@ -333,16 +351,20 @@ export const materializeEmailIntent = (outboxId: string) =>
     const db = yield* Database.Database;
     const now = yield* DateTime.now;
     const intent = yield* repository.findById(outboxId);
+
     if (!intent) {
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
+
     if (isIntentExpired(intent.expiresAt, now)) {
       yield* repository.transitionIntent({ id: intent.id, event: "expire" });
       yield* recordEmailIntentTransition(intent.kind, "expired");
+
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
+
     if (intent.state !== "pending") {
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
@@ -374,6 +396,7 @@ export const materializeEmailIntent = (outboxId: string) =>
           )
         )
         .limit(1);
+
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       if (recipient === undefined) {
@@ -381,9 +404,11 @@ export const materializeEmailIntent = (outboxId: string) =>
         yield* repository.transitionIntent({ id: intent.id, event: "expire" });
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         yield* recordEmailIntentTransition(intent.kind, "expired");
+
         // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
         return [] as readonly string[];
       }
+
       return yield* transaction(
         Effect.gen(function* () {
           const created = yield* repository.createDelivery({
@@ -394,11 +419,13 @@ export const materializeEmailIntent = (outboxId: string) =>
             templatePayload: { subscriptionId: recipient.subscriptionId },
             templateVersion: 1,
           });
+
           yield* repository.transitionIntent({
             id: intent.id,
             event: "materialize",
           });
           yield* recordEmailIntentTransition(intent.kind, "materialized");
+
           return created._tag === "Inserted" ? [created.delivery.id] : [];
         })
       );
@@ -413,12 +440,15 @@ export const materializeEmailIntent = (outboxId: string) =>
           // through the state flip means a concurrent append either lands in
           // this email or opens the next window; it is never dropped.
           const window = yield* repository.findByIdForUpdate(intent.id);
+
           if (window === undefined || window.state !== "pending") {
             return noDeliveryIds;
           }
+
           if (window.payload.kind !== "submission.created") {
             return noDeliveryIds;
           }
+
           // An append may have slid the window into the future while this
           // element waited for the lock, which is the burst coalescing doing
           // its job. Reconciliation re-offers the window when it comes due.
@@ -432,6 +462,7 @@ export const materializeEmailIntent = (outboxId: string) =>
 
           const postIds = submissionWindowPostIds(window.payload);
           const windowPostCount = submissionWindowPostCount(window.payload);
+
           const rows =
             postIds.length === 0
               ? []
@@ -455,13 +486,16 @@ export const materializeEmailIntent = (outboxId: string) =>
                       eq(schema.postTable.organizationId, window.organizationId)
                     )
                   );
+
           // Posts deleted between submission and send are dropped from the
           // email; a window whose posts are all gone has nothing to say. The
           // window's order is the submission order, so resolve through a map
           // rather than relying on the query's row order.
           const rowsById = new Map(rows.map((row) => [row.id, row]));
+
           const posts = postIds.flatMap((postId) => {
             const row = rowsById.get(postId);
+
             return row === undefined
               ? []
               : [
@@ -481,12 +515,14 @@ export const materializeEmailIntent = (outboxId: string) =>
                   },
                 ];
           });
+
           // A stored post that no longer resolves was deleted, so it stops
           // being a submission worth reporting. Ids the window never stored
           // stay in the count: they are past its cap, and a window cannot
           // observe a deletion it never tracked.
           const submissionCount =
             windowPostCount - (postIds.length - posts.length);
+
           // Expire on the adjusted count, not on the rendered list: a capped
           // window whose stored posts were all deleted still has submissions
           // to report, and must not go silent about them.
@@ -496,6 +532,7 @@ export const materializeEmailIntent = (outboxId: string) =>
               event: "expire",
             });
             yield* recordEmailIntentTransition(window.kind, "expired");
+
             return noDeliveryIds;
           }
 
@@ -505,6 +542,7 @@ export const materializeEmailIntent = (outboxId: string) =>
           // window that mixes authors still reaches each author about the
           // others' posts.
           const creatorCounts = new Map<string, number>();
+
           for (const row of rows) {
             if (row.creatorId !== null) {
               creatorCounts.set(
@@ -513,16 +551,19 @@ export const materializeEmailIntent = (outboxId: string) =>
               );
             }
           }
+
           const soleCreatorUserIds = new Set(
             [...creatorCounts.entries()]
               .filter(([, count]) => count === rows.length)
               .map(([userId]) => userId)
           );
+
           const recipients = yield* resolveMemberNotificationRecipients({
             category: "new_feedback",
             excludedUserIds: soleCreatorUserIds,
             organizationId: window.organizationId,
           });
+
           const templatePayload = makeSubmissionNotificationPayload(
             appUrl,
             window.organizationId,
@@ -547,11 +588,13 @@ export const materializeEmailIntent = (outboxId: string) =>
               },
             })
           );
+
           yield* repository.transitionIntent({
             id: window.id,
             event: "materialize",
           });
           yield* recordEmailIntentTransition(window.kind, "materialized");
+
           return created.flatMap((result) =>
             result._tag === "Inserted" ? [result.delivery.id] : []
           );
@@ -567,23 +610,28 @@ export const materializeEmailIntent = (outboxId: string) =>
       appRootDomain
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     );
+
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     if (!content) {
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       yield* repository.transitionIntent({ id: intent.id, event: "expire" });
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       yield* recordEmailIntentTransition(intent.kind, "expired");
+
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       return [] as readonly string[];
     }
+
     return yield* transaction(
       Effect.gen(function* () {
         const txDb = yield* Database.Database;
+
         // Member notifications are entitlement-free; the paid capability only
         // decides whether the subscriber audience joins them.
         const subscriberEmailsAllowed = yield* policy.mayEmailSubscribers(
           intent.organizationId
         );
+
         const recipients = subscriberEmailsAllowed
           ? yield* txDb
               .select({
@@ -652,6 +700,7 @@ export const materializeEmailIntent = (outboxId: string) =>
               .orderBy(schema.emailSubscriptionTable.id)
               .limit(materializationBatchSize)
           : [];
+
         // Addresses this intent already targeted — an earlier subscriber batch
         // or an earlier member pass — plus the batch about to be created, so a
         // member who is also a subscriber receives exactly one mail and the
@@ -660,17 +709,22 @@ export const materializeEmailIntent = (outboxId: string) =>
           .select({ email: schema.emailDeliveryTable.recipientEmail })
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.outboxId, intent.id));
+
         const existingAddresses = new Set(
           existingDeliveries.map((row) => row.email.toLowerCase())
         );
+
         const subscriberAddresses = new Set(
           recipients.map((recipient) => recipient.email.toLowerCase())
         );
+
         const category = notificationCategoryForIntentKind(intent.kind);
+
         const actorUserId =
           "actorUserId" in intent.payload
             ? (intent.payload.actorUserId ?? null)
             : null;
+
         const memberRecipients =
           category === undefined
             ? []
@@ -681,6 +735,7 @@ export const materializeEmailIntent = (outboxId: string) =>
                 ),
                 organizationId: intent.organizationId,
               });
+
         const memberCreated = yield* Effect.forEach(
           memberRecipients.filter(
             (member) =>
@@ -705,6 +760,7 @@ export const materializeEmailIntent = (outboxId: string) =>
               },
             })
         );
+
         const created = yield* Effect.forEach(recipients, (recipient) => {
           // Persist only the subscription ID. The purpose-bound bearer token
           // is derived immediately before send and remains hash-only at rest.
@@ -724,6 +780,7 @@ export const materializeEmailIntent = (outboxId: string) =>
             },
           });
         });
+
         if (recipients.length < materializationBatchSize) {
           yield* repository.transitionIntent({
             id: intent.id,
@@ -731,6 +788,7 @@ export const materializeEmailIntent = (outboxId: string) =>
           });
           yield* recordEmailIntentTransition(intent.kind, "materialized");
         }
+
         return [...memberCreated, ...created].flatMap((result) =>
           result?._tag === "Inserted" ? [result.delivery.id] : []
         );
@@ -749,6 +807,7 @@ const sendDeliveryAttempt = (
     const db = yield* Database.Database;
     const config = yield* EmailOutboxConfig;
     const { apiUrl, appUrl } = config;
+
     // Builds an API-origin link embedding a purpose-bound token, but only
     // over HTTPS (loopback excepted); otherwise the send fails terminally.
     const deriveTokenizedUrl = (path: string, token: string) =>
@@ -762,22 +821,28 @@ const sendDeliveryAttempt = (
               operation: "derive tokenized link",
             }),
         });
+
         if (url.protocol !== "https:" && !loopbackHostPattern.test(url.host)) {
           return yield* new MailTemplateRenderError({
             message: `Email link derivation failed: API_URL must use HTTPS, got ${url.protocol}`,
             operation: "derive tokenized link",
           });
         }
+
         return `${url.origin}${url.pathname}?token=${encodeURIComponent(token)}`;
       });
+
     const now = yield* DateTime.now;
     const delivery = yield* repository.findDeliveryById(deliveryId);
+
     if (!(delivery && deliveryInFlightStates.includes(delivery.state))) {
       return { _tag: "terminal" as const };
     }
+
     // Remember the version this attempt observed so the infrastructure catch
     // can prove the row still belongs to it before deferring.
     yield* Ref.set(observedVersionRef, Option.some(delivery.transitionVersion));
+
     // A prior activity may have claimed this row and then lost its worker
     // before persisting the result. Do not complete the deterministic workflow
     // in that state: reconciliation will release the lease, after which this
@@ -789,17 +854,22 @@ const sendDeliveryAttempt = (
         infrastructureFailure: true,
       };
     }
+
     const intent = yield* repository.findById(delivery.outboxId);
+
     if (!intent || isIntentExpired(intent.expiresAt, now)) {
       yield* repository.markDeliveryOutcome({
         id: delivery.id,
         state: "expired",
       });
+
       return { _tag: "terminal" as const };
     }
+
     // The cheapest decisive gate first: a suppressed address never reaches the
     // provider, so it must not spend an attempt or the volume queries below.
     const suppressions = yield* EmailSuppressionRepository;
+
     if (
       yield* suppressions.isSuppressed({
         email: delivery.recipientEmail,
@@ -810,8 +880,10 @@ const sendDeliveryAttempt = (
         id: delivery.id,
         state: "suppressed",
       });
+
       return { _tag: "terminal" as const };
     }
+
     if (
       config.globalDeliveryPaused ||
       config.pausedWorkspaceIds.has(intent.organizationId)
@@ -819,6 +891,7 @@ const sendDeliveryAttempt = (
       const reason = config.globalDeliveryPaused
         ? "global_circuit_breaker"
         : "workspace_circuit_breaker";
+
       yield* recordEmailDeliveryThrottle(reason);
       yield* Effect.logWarning(
         "Email delivery paused by internal circuit breaker"
@@ -836,13 +909,16 @@ const sendDeliveryAttempt = (
         ),
         reason,
       });
+
       return {
         _tag: "retry" as const,
         delay: circuitBreakerRetryDelay,
         infrastructureFailure: false,
       };
     }
+
     const monthStart = DateTime.toDateUtc(DateTime.startOf(now, "month"));
+
     /**
      * The month's spend, measured in emails the provider accepted.
      *
@@ -859,6 +935,7 @@ const sendDeliveryAttempt = (
       isNotNull(schema.emailDeliveryTable.acceptedAt),
       gte(schema.emailDeliveryTable.acceptedAt, monthStart)
     );
+
     /**
      * One volume guard, shared by both scopes: record how much of the month is
      * spent, then defer the delivery by the monthly retry delay once the count
@@ -874,6 +951,7 @@ const sendDeliveryAttempt = (
           args.scope === "platform"
             ? "monthly_volume_limit"
             : "workspace_monthly_volume_limit";
+
         // Recorded before the limit check so the ratio reaches 1 exactly when
         // the guard starts deferring, and so a workspace approaching its
         // allowance is visible before any of its mail is delayed.
@@ -882,9 +960,11 @@ const sendDeliveryAttempt = (
           scope: args.scope,
           used: args.used,
         });
+
         if (args.used < args.limit) {
           return undefined;
         }
+
         yield* recordEmailDeliveryThrottle(reason);
         yield* Effect.logWarning(
           "Email delivery paused by monthly volume limit"
@@ -902,6 +982,7 @@ const sendDeliveryAttempt = (
           ),
           reason,
         });
+
         return {
           _tag: "retry" as const,
           delay: monthlyVolumeRetryDelay,
@@ -936,11 +1017,13 @@ const sendDeliveryAttempt = (
           eq(schema.emailOutboxTable.organizationId, intent.organizationId)
         )
       );
+
     const workspaceOutcome = yield* deferOnVolumeLimit({
       limit: config.workspaceMonthlySendLimit,
       scope: "workspace",
       used: workspaceVolume?.used ?? 0,
     });
+
     if (workspaceOutcome !== undefined) {
       return workspaceOutcome;
     }
@@ -949,19 +1032,23 @@ const sendDeliveryAttempt = (
       .select({ used: count() })
       .from(schema.emailDeliveryTable)
       .where(acceptedSinceMonthStart);
+
     const platformOutcome = yield* deferOnVolumeLimit({
       limit: config.monthlySendLimit,
       scope: "platform",
       used: monthlyVolume?.used ?? 0,
     });
+
     if (platformOutcome !== undefined) {
       return platformOutcome;
     }
+
     if (
       delivery.contactId !== null &&
       intent.kind !== "subscription.verification_requested"
     ) {
       const topic = emailSubscriptionTopicForIntent(intent.payload);
+
       const [activeSubscription] =
         topic === undefined
           ? []
@@ -994,14 +1081,17 @@ const sendDeliveryAttempt = (
                 )
               )
               .limit(1);
+
       if (activeSubscription === undefined) {
         yield* repository.markDeliveryOutcome({
           id: delivery.id,
           state: "suppressed",
         });
+
         return { _tag: "terminal" as const };
       }
     }
+
     // Organization-access gate for post-attributed notifications
     // (plan-on-behalf.md, "Notification eligibility"). Runs after consent so
     // verified double-opt-in external subscribers (no feeblo account) keep
@@ -1021,6 +1111,7 @@ const sendDeliveryAttempt = (
         emailVerified: boolean;
         restrictedToOrganizationId: string | null;
       } | null = null;
+
       if (delivery.contactId !== null) {
         const [contactLink] = yield* db
           .select({ userId: schema.emailContactTable.userId })
@@ -1032,6 +1123,7 @@ const sendDeliveryAttempt = (
             )
           )
           .limit(1);
+
         if (contactLink?.userId != null) {
           const [linkedAccount] = yield* db
             .select({
@@ -1044,9 +1136,11 @@ const sendDeliveryAttempt = (
             .from(schema.userTable)
             .where(eq(schema.userTable.id, contactLink.userId))
             .limit(1);
+
           account = linkedAccount ?? null;
         }
       }
+
       if (account === null) {
         const [byEmail] = yield* db
           .select({
@@ -1061,6 +1155,7 @@ const sendDeliveryAttempt = (
             sql`lower(${schema.userTable.email}) = lower(${delivery.recipientEmail})`
           )
           .limit(1);
+
         account = byEmail ?? null;
       }
 
@@ -1078,6 +1173,7 @@ const sendDeliveryAttempt = (
           intent.payload.kind === "submission.created"
             ? submissionWindowPostIds(intent.payload)
             : [intent.aggregateId];
+
         // The rendered email is what the gate proves, and it names fewer posts
         // than a window may hold: the snapshot carries the render-time named
         // set, so a deletion among the unlisted remainder cannot deny a
@@ -1086,10 +1182,13 @@ const sendDeliveryAttempt = (
         const accessSnapshot = Schema.decodeUnknownOption(
           DeliveryAccessSnapshot
         )(delivery.templatePayload);
+
         const snapshot = Option.isSome(accessSnapshot)
           ? accessSnapshot.value
           : undefined;
+
         const namedPostIds = snapshot?.notifiedPostIds ?? notifiedPostIds;
+
         const boardRows =
           namedPostIds.length === 0
             ? []
@@ -1108,12 +1207,14 @@ const sendDeliveryAttempt = (
                     eq(schema.postTable.organizationId, intent.organizationId)
                   )
                 );
+
         const currentBoardVisibility =
           boardRows.length === 0 || boardRows.length < namedPostIds.length
             ? null
             : boardRows.every((row) => row.visibility === "PUBLIC")
               ? "PUBLIC"
               : "PRIVATE";
+
         const boardVisibility = evaluateNotifiedBoardVisibility({
           captured: snapshot?.notifiedBoardVisibility,
           current: currentBoardVisibility,
@@ -1136,6 +1237,7 @@ const sendDeliveryAttempt = (
           boardVisibility,
           organizationId: intent.organizationId,
         });
+
         if (!accessVerdict.eligible) {
           yield* recordEmailDeliveryAccessSkip(accessVerdict.recipientClass);
           yield* Effect.logWarning(
@@ -1151,18 +1253,23 @@ const sendDeliveryAttempt = (
             id: delivery.id,
             state: "no_organization_access",
           });
+
           return { _tag: "terminal" as const };
         }
       }
     }
+
     const claimedVersion = yield* repository.claimDeliveryForSending({
       id: delivery.id,
       now: DateTime.toDateUtc(now),
     });
+
     if (claimedVersion === undefined) {
       return { _tag: "terminal" as const };
     }
+
     yield* Ref.set(observedVersionRef, Option.some(claimedVersion));
+
     // Resolves the unsubscribe target into a rendered mail message: settings
     // targets use their stored URL directly, subscription targets derive a
     // purpose-bound bearer token and add List-Unsubscribe one-click headers.
@@ -1183,20 +1290,24 @@ const sendDeliveryAttempt = (
             headers: { "List-Unsubscribe": `<${unsubscribe.url}>` },
           };
         }
+
         if (unsubscribe.kind === "preference") {
           // The body link stays the settings page — a human should land on a
           // page, not JSON — while the mail client's button gets the
           // one-click endpoint carrying the derived token.
           const preferences = yield* NotificationPreferenceTokenService;
+
           const token = yield* preferences.deriveToken({
             category: unsubscribe.category,
             organizationId: unsubscribe.organizationId,
             userId: unsubscribe.userId,
           });
+
           const oneClickUrl = yield* deriveTokenizedUrl(
             "/api/notification-preferences/unsubscribe",
             Redacted.value(token)
           );
+
           return {
             ...createEmail(
               `${appUrl}/${unsubscribe.organizationId}/settings/notifications`
@@ -1207,14 +1318,17 @@ const sendDeliveryAttempt = (
             },
           };
         }
+
         const token = yield* subscriptions.deriveLinkToken({
           purpose: "unsubscribe",
           subscriptionId: unsubscribe.subscriptionId,
         });
+
         const unsubscribeUrl = yield* deriveTokenizedUrl(
           "/api/email-subscriptions/unsubscribe",
           Redacted.value(token)
         );
+
         return {
           ...createEmail(unsubscribeUrl),
           headers: {
@@ -1223,6 +1337,7 @@ const sendDeliveryAttempt = (
           },
         };
       });
+
     const resolvedMailMessage = yield* Effect.gen(function* () {
       if (delivery.template === "subscription-verification") {
         const payload = yield* Schema.decodeUnknownEffect(
@@ -1238,14 +1353,17 @@ const sendDeliveryAttempt = (
               })
           )
         );
+
         const token = yield* subscriptions.deriveLinkToken({
           purpose: "verification",
           subscriptionId: payload.subscriptionId,
         });
+
         const verificationUrl = yield* deriveTokenizedUrl(
           "/api/email-subscriptions/verify",
           Redacted.value(token)
         );
+
         return createEmailSubscriptionVerificationEmail({ verificationUrl });
       }
 
@@ -1263,8 +1381,10 @@ const sendDeliveryAttempt = (
               })
           )
         );
+
         // Payload minus `unsubscribe` is structurally ChangelogEmailProps.
         const { unsubscribe, ...props } = payload;
+
         return yield* resolveUnsubscribedEmail(unsubscribe, (unsubscribeUrl) =>
           createChangelogEmail({ ...props, unsubscribeUrl })
         );
@@ -1283,6 +1403,7 @@ const sendDeliveryAttempt = (
             })
         )
       );
+
       return yield* resolveUnsubscribedEmail(
         payload.unsubscribe,
         (unsubscribeUrl) =>
@@ -1303,10 +1424,13 @@ const sendDeliveryAttempt = (
           .pipe(Effect.as(Option.none()))
       )
     );
+
     if (Option.isNone(resolvedMailMessage)) {
       return { _tag: "terminal" as const };
     }
+
     const mailer = yield* Mailer;
+
     // The plan label on the provider-submission metric marks whether the
     // workspace has the subscriber-email capability; member notifications are
     // never plan-gated.
@@ -1315,10 +1439,12 @@ const sendDeliveryAttempt = (
     ))
       ? "paid"
       : "free";
+
     const deferAfterRetryableProviderFailure = (
       error: MailTemporaryDeliveryError | MailUncertainDeliveryError
     ) => {
       const attempt = delivery.attemptCount + 1;
+
       if (attempt >= maximumDeliveryAttempts) {
         return repository
           .markDeliveryOutcome({
@@ -1328,7 +1454,9 @@ const sendDeliveryAttempt = (
           })
           .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
       }
+
       const delay = retryDelay(delivery.id, attempt);
+
       return Effect.gen(function* () {
         const deferred = yield* repository.deferSendingDelivery({
           id: delivery.id,
@@ -1336,12 +1464,15 @@ const sendDeliveryAttempt = (
           nextAttemptAt: DateTime.toDateUtc(DateTime.addDuration(now, delay)),
           lastError: { tag: error._tag },
         });
+
         // Zero rows means a newer attempt owns the row; this one must not
         // record a retry it did not schedule.
         if (!deferred) {
           return { _tag: "terminal" as const };
         }
+
         yield* recordEmailDeliveryRetry(error._tag);
+
         return {
           _tag: "retry" as const,
           delay,
@@ -1349,6 +1480,7 @@ const sendDeliveryAttempt = (
         };
       });
     };
+
     // Queued deliveries may wait out throttles and retries; re-check the
     // changelog read boundary as the last step before provider submission so
     // content hidden after materialization is never emailed.
@@ -1366,14 +1498,17 @@ const sendDeliveryAttempt = (
         id: delivery.id,
         state: "suppressed",
       });
+
       return { _tag: "terminal" as const };
     }
+
     // The verification template is the one variant without a `headers` field;
     // the delivery id must ride on every message regardless.
     const existingHeaders =
       "headers" in resolvedMailMessage.value
         ? resolvedMailMessage.value.headers
         : undefined;
+
     const sent = yield* mailer
       .send({
         ...resolvedMailMessage.value,
@@ -1426,11 +1561,13 @@ const sendDeliveryAttempt = (
                     )
                   );
               }
+
               yield* repository.markDeliveryOutcome({
                 id: delivery.id,
                 state: "failed",
                 lastError: { tag: error._tag },
               });
+
               return { _tag: "terminal" as const };
             }),
           MailTemplateRenderError: (error) =>
@@ -1458,6 +1595,7 @@ const sendDeliveryAttempt = (
           if (result._tag !== "accepted") {
             return Effect.succeed(result);
           }
+
           if (result.accepted) {
             return repository
               .markDeliveryAccepted({
@@ -1478,6 +1616,7 @@ const sendDeliveryAttempt = (
                 Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" })
               );
           }
+
           if (result.providerMetadata.rejectedRecipientCount > 0) {
             return repository
               .markDeliveryOutcome({
@@ -1490,6 +1629,7 @@ const sendDeliveryAttempt = (
               })
               .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
           }
+
           return repository
             .markDeliveryOutcome({
               id: delivery.id,
@@ -1502,6 +1642,7 @@ const sendDeliveryAttempt = (
             .pipe(Effect.as<DeliveryAttemptOutcome>({ _tag: "terminal" }));
         })
       );
+
     return sent;
   });
 
@@ -1524,13 +1665,16 @@ const failIntentAfterInfrastructureExhaustion = (outboxId: string) =>
   Effect.gen(function* () {
     const repository = yield* EmailOutboxRepository;
     const intent = yield* repository.findById(outboxId);
+
     if (intent === undefined) {
       return;
     }
+
     const failed = yield* repository.transitionIntent({
       id: outboxId,
       event: "fail",
     });
+
     if (failed) {
       yield* recordEmailIntentTransition(intent.kind, "failed");
     }
@@ -1571,11 +1715,14 @@ export const dispatchEmailOutboxIntent = Effect.fn("dispatchEmailOutboxIntent")(
 
     const materializeDueIntent = Effect.gen(function* () {
       let hasMoreRecipients = true;
+
       while (hasMoreRecipients) {
         const intent = yield* repository.findById(outboxId);
+
         if (intent === undefined || intent.state !== "pending") {
           return;
         }
+
         // The coalescing window belongs to the row. Returning completes this
         // element; reconciliation offers a later bucket once the row is due.
         if (
@@ -1583,6 +1730,7 @@ export const dispatchEmailOutboxIntent = Effect.fn("dispatchEmailOutboxIntent")(
         ) {
           return;
         }
+
         const deliveryIds = yield* materializeEmailIntent(outboxId);
         yield* Effect.forEach(
           deliveryIds,
@@ -1619,6 +1767,7 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
   function* ({ deliveryId }: { readonly deliveryId: string }) {
     const repository = yield* EmailOutboxRepository;
     const delivery = yield* repository.findDeliveryById(deliveryId);
+
     if (delivery === undefined) {
       return;
     }
@@ -1630,6 +1779,7 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
     const retryState = Schema.decodeUnknownOption(EmailDeliveryRetryState)(
       delivery.lastError
     );
+
     const infrastructureFailures = Option.isSome(retryState)
       ? retryState.value.consecutiveInfrastructureFailures
       : 0;
@@ -1638,6 +1788,7 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
     // failure can defer against the version this attempt actually holds
     // rather than clobbering a newer claim.
     const observedVersionRef = yield* Ref.make(Option.none<number>());
+
     const outcome = yield* sendDeliveryAttempt(
       deliveryId,
       observedVersionRef
@@ -1648,12 +1799,15 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
       Effect.catch((error) => {
         const delay = retryDelay(deliveryId, delivery.attemptCount + 1);
         const nextInfrastructureFailures = infrastructureFailures + 1;
+
         return Effect.gen(function* () {
           const observedVersion = yield* Ref.get(observedVersionRef);
+
           const expectedTransitionVersion = Option.getOrElse(
             observedVersion,
             () => delivery.transitionVersion
           );
+
           yield* Effect.logWarning(
             "Email delivery infrastructure failure, deferring"
           ).pipe(
@@ -1665,6 +1819,7 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
             })
           );
           const now = yield* DateTime.now;
+
           const deferred = yield* repository.deferSendingDelivery({
             id: deliveryId,
             expectedTransitionVersion,
@@ -1674,6 +1829,7 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
               tag: "EmailDeliveryActivityError",
             },
           });
+
           // Zero rows means a newer attempt owns the row, so this one is a
           // stale no-op. A deferral that throws still fails the element so
           // the queue retries it under the same id rather than completing
@@ -1688,12 +1844,15 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
         });
       })
     );
+
     if (outcome._tag === "terminal") {
       return;
     }
+
     const nextInfrastructureFailures = outcome.infrastructureFailure
       ? infrastructureFailures + 1
       : 0;
+
     if (nextInfrastructureFailures >= maximumInfrastructureFailures) {
       yield* repository
         .markDeliveryOutcome({
@@ -1712,6 +1871,7 @@ export const deliverEmailDelivery = Effect.fn("deliverEmailDelivery")(
             Effect.logError("Could not persist exhausted email delivery", error)
           )
         );
+
       return;
     }
     // The deferral is on the row; reconciliation is the only scheduler.
@@ -1730,6 +1890,7 @@ export const EmailOutboxWorkerLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const { maxConcurrentSends } = yield* EmailOutboxConfig;
     const queues = yield* EmailOutboxQueues;
+
     const dispatcherWorker = queues.dispatcher
       .take(dispatchEmailOutboxIntent)
       .pipe(
@@ -1741,6 +1902,7 @@ export const EmailOutboxWorkerLayer = Layer.effectDiscard(
         ),
         Effect.forever
       );
+
     const deliveryWorker = queues.delivery.take(deliverEmailDelivery).pipe(
       Effect.catchCause((cause) =>
         Effect.logWarning("Email delivery element failed", cause).pipe(
@@ -1749,6 +1911,7 @@ export const EmailOutboxWorkerLayer = Layer.effectDiscard(
       ),
       Effect.forever
     );
+
     yield* Effect.forEach(
       Array.from({ length: maxConcurrentSends }, (_, index) => index),
       () => dispatcherWorker.pipe(Effect.forkScoped),
@@ -1795,16 +1958,21 @@ export const wakeEmailOutbox = (outboxId: string) =>
   Effect.gen(function* () {
     const queues = yield* Effect.serviceOption(EmailOutboxQueues);
     const repository = yield* Effect.serviceOption(EmailOutboxRepository);
+
     if (Option.isNone(queues) || Option.isNone(repository)) {
       return;
     }
+
     const intent = yield* repository.value.findById(outboxId);
+
     if (intent === undefined || intent.state !== "pending") {
       return;
     }
+
     if (yield* DateTime.isFuture(DateTime.fromDateUnsafe(intent.scheduledAt))) {
       return;
     }
+
     yield* queues.value.dispatcher.offer(
       { outboxId },
       {
@@ -1862,6 +2030,7 @@ export const reconcileEmailOutbox = ({
     const subscriptions = yield* EmailSubscriptionRepository;
     const policy = yield* EntitlementPolicy;
     const { maxConcurrentSends } = yield* EmailOutboxConfig;
+
     // Both sweeps read the same reconciliation instant and neither filters by
     // the other's rows, so they run together. The plan state reconciled here
     // lives on subscription rows; the intent and delivery rows stopped being
@@ -1876,6 +2045,7 @@ export const reconcileEmailOutbox = ({
       ],
       { concurrency: "unbounded" }
     );
+
     yield* Effect.forEach(
       subscriptionOrganizations,
       (organizationId) =>
@@ -1892,17 +2062,21 @@ export const reconcileEmailOutbox = ({
         }),
       { concurrency: maxConcurrentSends, discard: true }
     );
+
     const staleSendingBefore = DateTime.toDateUtc(
       DateTime.subtractDuration(reconciliationNow, staleSendingAfter)
     );
+
     yield* repository.recoverStaleSendingDeliveries({
       before: staleSendingBefore,
     });
+
     const deliveries = yield* repository.findDueDeliveries({
       before: reconciliationNowDate,
       limit: reconciliationBatchSize,
       staleSendingBefore,
     });
+
     const oldestQueuedAt = deliveries[0]?.createdAt;
     yield* recordEmailOldestQueuedAge(
       oldestQueuedAt === undefined

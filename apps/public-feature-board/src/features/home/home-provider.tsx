@@ -48,6 +48,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const deferredSearch = useDeferredValue(normalizedSearch);
 
   const organizationId = site.organizationId;
+
   const {
     publicBoardCollection,
     publicPostCollection,
@@ -71,6 +72,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         .from({ status: publicPostStatusCollection })
         .where(({ status }) => eq(status.organizationId, site.organizationId)),
   });
+
   const statuses = statusesQuery.data ?? [];
   const statusError = isLiveQueryFailed(statusesQuery);
 
@@ -82,6 +84,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
         .where(({ board }) => eq(board.organizationId, site.organizationId))
         .orderBy(({ board }) => board.name, "asc"),
   });
+
   const boards = boardsQuery.data ?? [];
   const boardError = isLiveQueryFailed(boardsQuery);
 
@@ -281,9 +284,11 @@ export function HomeProvider({ children }: { children: ReactNode }) {
 
     for (const bc of boardCounts) {
       const board = boardsById.get(bc.boardId);
+
       if (!board) {
         continue;
       }
+
       countMap.set(board.slug, (countMap.get(board.slug) ?? 0) + bc.count);
     }
 
@@ -302,6 +307,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const activeBoardLabel =
     boardItems.find((item) => item.value === selectedBoard)?.label ??
     m.spry_male_nils();
+
   const activeBoardId =
     selectedBoard === "all"
       ? ""
@@ -310,6 +316,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   const filteredPosts = filteredPostsQuery.data ?? [];
   const filteredPostsLoading = isLiveQueryPending(filteredPostsQuery);
   const isLoading = statusLoading || boardLoading || filteredPostsLoading;
+
   const isError =
     statusError || boardError || isLiveQueryFailed(filteredPostsQuery);
 

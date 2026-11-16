@@ -96,6 +96,7 @@ export function CommentComposerProvider(props: CommentComposerProviderProps) {
  */
 function CommentComposerController(props: CommentComposerProviderProps) {
   const store = useCommentComposerStore();
+
   const {
     authorDisplay = null,
     authorPicker = null,
@@ -227,18 +228,21 @@ function CommentComposerController(props: CommentComposerProviderProps) {
         if (latest.current.content === undefined) {
           store.send({ type: "contentChanged", content: doc });
         }
+
         latest.current.onContentChange?.(doc);
       },
       onStatusUpdateIdChange: (id: string | null) => {
         if (latest.current.statusUpdateId === undefined) {
           store.send({ type: "statusUpdateIdChanged", statusUpdateId: id });
         }
+
         latest.current.onStatusUpdateIdChange?.(id);
       },
       onVisibilityChange: (isPrivate: boolean) => {
         if (latest.current.isPrivate === undefined) {
           store.send({ type: "visibilityChanged", isPrivate });
         }
+
         latest.current.onVisibilityChange?.(isPrivate);
       },
     };

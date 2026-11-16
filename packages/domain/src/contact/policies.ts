@@ -40,6 +40,7 @@ const makeContactPolicy = Effect.gen(function* () {
       if (args.companyId == null) {
         return Effect.succeed(true);
       }
+
       return repository.companyExistsInOrganization({
         id: args.companyId,
         organizationId: args.organizationId,

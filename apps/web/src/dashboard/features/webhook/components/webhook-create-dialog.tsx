@@ -65,6 +65,7 @@ function WebhookCreateForm({
 }) {
   const organizationId = useOrganizationId();
   const store = useWebhookCreateDialogContext();
+
   const createEndpoint = useAtomSet(createWebhookEndpointAtom, {
     mode: "promise",
   });
@@ -82,6 +83,7 @@ function WebhookCreateForm({
           },
           reactivityKeys: webhookReactivityKeys(organizationId),
         });
+
         form.reset();
         store.send({ type: "toggle" });
         await onCreated?.({

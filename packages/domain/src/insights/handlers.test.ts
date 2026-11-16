@@ -132,6 +132,7 @@ describe("InsightsRpcHandlers", () => {
         role,
         createdAt: now,
       });
+
       return { membershipId, userId };
     });
 
@@ -156,6 +157,7 @@ describe("InsightsRpcHandlers", () => {
         updatedAt: now,
         ...overrides,
       });
+
       return id;
     });
 
@@ -208,6 +210,7 @@ describe("InsightsRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* InsightsRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .GetWorkspaceInsights({
@@ -231,15 +234,18 @@ describe("InsightsRpcHandlers", () => {
           const handlers = yield* InsightsRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const now = yield* DateTime.now;
+
           const tenDaysAgo = DateTime.toDate(
             DateTime.subtract({ days: 10 })(now)
           );
 
           const recentPost = yield* addPost(fixture, "recent");
+
           const oldPost = yield* addPost(fixture, "old", {
             createdAt: tenDaysAgo,
             updatedAt: tenDaysAgo,
           });
+
           // Dated after the request's `until`: the window ends now, so a row
           // from the future is not part of it.
           const tomorrow = DateTime.toDate(DateTime.add({ days: 1 })(now));
@@ -256,6 +262,7 @@ describe("InsightsRpcHandlers", () => {
               range: "7d",
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const month = yield* handlers
             .GetWorkspaceInsights({
               organizationId: fixture.organizationId,
@@ -289,10 +296,12 @@ describe("InsightsRpcHandlers", () => {
             createdAt,
             updatedAt: createdAt,
           });
+
           const fast = yield* addPost(fixture, "fast", {
             createdAt,
             updatedAt: createdAt,
           });
+
           yield* addPost(fixture, "silent", {
             createdAt,
             updatedAt: createdAt,
@@ -380,6 +389,7 @@ describe("InsightsRpcHandlers", () => {
           const pending = insights.statusMix.find(
             (slice) => slice.statusId === fixture.defaultStatusId
           );
+
           const neverUsed = insights.statusMix.find(
             (slice) => slice.statusId === fixture.plannedStatusId
           );
@@ -411,19 +421,23 @@ describe("InsightsRpcHandlers", () => {
             createdAt: older,
             updatedAt: newest,
           });
+
           const touchedByStatus = yield* addPost(fixture, "status", {
             createdAt: older,
             updatedAt: older,
           });
+
           const touchedByComment = yield* addPost(fixture, "comment", {
             createdAt: older,
             updatedAt: older,
           });
+
           const assigned = yield* addPost(fixture, "assigned", {
             createdAt: older,
             updatedAt: older,
             assigneeMemberId: fixture.membershipId,
           });
+
           const newer = yield* addPost(fixture, "newer", {
             createdAt: newest,
             updatedAt: newest,
@@ -471,10 +485,12 @@ describe("InsightsRpcHandlers", () => {
           const fourDaysAgo = DateTime.subtract({ days: 4 })(now);
 
           const todayPost = yield* addPost(fixture, "today");
+
           const earlierPost = yield* addPost(fixture, "two-days-ago", {
             createdAt: DateTime.toDate(twoDaysAgo),
             updatedAt: DateTime.toDate(twoDaysAgo),
           });
+
           yield* addPost(fixture, "four-days-ago", {
             createdAt: DateTime.toDate(fourDaysAgo),
             updatedAt: DateTime.toDate(fourDaysAgo),
@@ -494,7 +510,9 @@ describe("InsightsRpcHandlers", () => {
           const byDate = new Map(
             insights.volume.map((point) => [point.date, point])
           );
+
           const today = DateTime.formatIsoDate(now);
+
           const yesterday = DateTime.formatIsoDate(
             DateTime.subtract({ days: 1 })(now)
           );
@@ -544,9 +562,11 @@ describe("InsightsRpcHandlers", () => {
           });
 
           const first = yield* addPost(fixture, "first");
+
           const second = yield* addPost(fixture, "second", {
             boardId: secondBoardId,
           });
+
           yield* addPost(fixture, "third", { boardId: secondBoardId });
           // Past `until`, so it must not move the board's window totals.
           const tomorrow = DateTime.toDate(DateTime.add({ days: 1 })(clock));
@@ -629,11 +649,13 @@ describe("InsightsRpcHandlers", () => {
           const now = yield* DateTime.nowAsDate;
 
           const survivor = yield* addPost(fixture, "survivor");
+
           const duplicate = yield* addPost(fixture, "duplicate", {
             archivedAt: now,
             mergedIntoPostId: survivor,
             mergedAt: now,
           });
+
           yield* db.insert(schema.postActivityTable).values({
             id: `activity_merged_${duplicate}`,
             organizationId: fixture.organizationId,

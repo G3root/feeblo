@@ -78,6 +78,7 @@ describe("HtmlSanitizer", () => {
     const output = sanitize(
       `<h2>Title</h2><p><strong>bold</strong> <em>italic</em> <code>x = 1</code></p><ul><li>one</li></ul><a href="https://example.com" title="ok">link</a><img src="https://example.com/a.png" alt="a" width="10" height="10">`
     );
+
     expect(output).toContain("<h2>Title</h2>");
     expect(output).toContain("<strong>bold</strong>");
     expect(output).toContain("<code>x = 1</code>");
@@ -100,6 +101,7 @@ describe("HtmlSanitizer", () => {
     const output = sanitize(
       `<p><a href="https://example.com" target="_blank" rel="nofollow">x</a></p>`
     );
+
     expect(output).toContain('rel="nofollow noopener noreferrer"');
   });
 
@@ -107,12 +109,14 @@ describe("HtmlSanitizer", () => {
     const named = sanitize(
       `<p><a href="https://example.com" target="account-window">x</a></p>`
     );
+
     expect(named).toContain('rel="noopener noreferrer"');
 
     for (const target of ["_self", "_parent", "_top"]) {
       const output = sanitize(
         `<p><a href="https://example.com" target="${target}">x</a></p>`
       );
+
       expect(output).not.toContain("noopener");
     }
   });
@@ -126,6 +130,7 @@ describe("HtmlSanitizer", () => {
       ["target", "_BLANK"],
       ["rel", "opener nofollow"],
     ]);
+
     const node = {
       tagName: "A",
       getAttribute: (name: string) => attributes.get(name) ?? null,

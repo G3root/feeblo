@@ -121,6 +121,7 @@ const openDashboardPage: Tool<OpenDashboardPageInput> = {
     }
 
     window.location.assign(path);
+
     return { ok: true, detail: `opened ${path}` };
   },
 };
@@ -177,6 +178,7 @@ const modelContext = (): ModelContext | null => {
   // SAFETY: The DOM lib does not declare `modelContext` yet; the value is the
   // page's navigator, and only an existing namespace is returned.
   const navigatorHost = navigator as Navigator & ModelContextHost;
+
   return navigatorHost.modelContext ?? null;
 };
 

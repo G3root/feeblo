@@ -69,6 +69,7 @@ function PostStatusCreateForm({ type }: { type: TPostStatusType }) {
     onSubmit: async (data) => {
       try {
         const id = await PostStatusId.unsafeGenerate();
+
         // Appended to the end of the workspace's list, which is the end of its
         // section: every section's rows are a subset of one ascending sequence.
         const orderIndex =

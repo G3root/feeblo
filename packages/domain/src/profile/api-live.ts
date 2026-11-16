@@ -22,6 +22,7 @@ import {
 } from "../session-middleware";
 
 const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
+
 const ALLOWED_CONTENT_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -43,6 +44,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
         }
 
         const extension = getFileExtension(file.contentType);
+
         if (!extension) {
           return yield* new BadRequestError({
             message: "Unsupported file type. Use JPEG, PNG, or WEBP",
@@ -60,7 +62,9 @@ export const ProfileApiLive = HttpApiBuilder.group(
               () => new InternalServerError({ message: "Failed to read file" })
             )
           );
+
         const maxSize = ByteSize.bytes(MAX_PROFILE_IMAGE_BYTES);
+
         if (fileInfo.size === ByteSize.zero || fileInfo.size > maxSize) {
           return yield* new BadRequestError({
             message: "Profile image must be between 1B and 5MB",
@@ -85,6 +89,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
         // the file's magic bytes so arbitrary payloads are never stored as
         // "images" in the public-read bucket.
         const sniffedContentType = sniffMediaType(bytes);
+
         if (
           sniffedContentType === null ||
           sniffedContentType !== file.contentType
@@ -100,6 +105,7 @@ export const ProfileApiLive = HttpApiBuilder.group(
         // the one instance every upload path uses, and a test that supplies a
         // substitute is not overridden here.
         const s3Service = yield* S3UploadService;
+
         const uploaded = yield* s3Service
           .uploadProfileImage({
             bytes,

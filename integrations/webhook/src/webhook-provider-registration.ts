@@ -62,6 +62,7 @@ export const makeWebhookProviderRegistration = ({
         Effect.gen(function* () {
           const credentials =
             yield* credentialResolver.loadWebhookCredentials(input);
+
           const eventData = yield* Schema.decodeUnknownEffect(
             IntegrationPostEventData
           )(input.event.data).pipe(
@@ -73,6 +74,7 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
+
           // A member actor is a display name only (mem_* is never published);
           // an end-user actor carries no identifiers on the event, so only the
           // classification is sent. The post's author block is where a
@@ -84,6 +86,7 @@ export const makeWebhookProviderRegistration = ({
                   displayName: eventData.actor.displayName ?? null,
                 }
               : { type: "end_user" };
+
           const payload = yield* Schema.decodeEffect(WebhookExternalPayload)({
             actor,
             board: {
@@ -125,6 +128,7 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
+
           const endpoint = yield* resolveAndParseWebhookEndpoint(
             Redacted.value(credentials.endpointUrl),
             endpointSecurityPolicy
@@ -137,6 +141,7 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
+
           const rawBody = yield* Schema.encodeEffect(
             Schema.fromJsonString(WebhookExternalPayload)
           )(payload).pipe(
@@ -148,6 +153,7 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
+
           // Signing is a local, transient crypto operation: a failure here is
           // retryable, not a configuration problem for the endpoint.
           const signingHeaders = yield* signWebhookDelivery({
@@ -163,6 +169,7 @@ export const makeWebhookProviderRegistration = ({
                 })
             )
           );
+
           // The transport enforces the delivery deadline itself, so no second
           // timeout is applied here; its timeout error maps like any other
           // transport failure below.
@@ -184,17 +191,21 @@ export const makeWebhookProviderRegistration = ({
                   })
             )
           );
+
           const retryAfterMs =
             response.retryAfter === undefined
               ? undefined
               : Duration.toMillis(response.retryAfter);
+
           const outcome = classifyIntegrationHttpDeliveryStatus(
             response.status,
             retryAfterMs
           );
+
           if (outcome._tag === "Succeeded") {
             return { httpStatus: response.status };
           }
+
           if (outcome._tag === "Retry" && response.status === 429) {
             return yield* new IntegrationProviderRateLimitedError({
               httpStatus: response.status,
@@ -203,6 +214,7 @@ export const makeWebhookProviderRegistration = ({
               ...(retryAfterMs === undefined ? undefined : { retryAfterMs }),
             });
           }
+
           if (outcome._tag === "Retry") {
             return yield* new IntegrationProviderTemporaryFailure({
               httpStatus: response.status,
@@ -210,6 +222,7 @@ export const makeWebhookProviderRegistration = ({
               provider: webhookProviderKey,
             });
           }
+
           return yield* new IntegrationProviderPermanentRejection({
             httpStatus: response.status,
             message: "Webhook receiver rejected delivery",

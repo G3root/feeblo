@@ -18,6 +18,7 @@ export async function startBillingCheckout({
     );
 
     window.location.href = result.url;
+
     return true;
   } catch {
     toastManager.add({
@@ -42,6 +43,7 @@ export async function startBillingPortal({
     );
 
     window.location.href = result.url;
+
     return true;
   } catch {
     toastManager.add({

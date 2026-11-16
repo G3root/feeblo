@@ -47,6 +47,7 @@ export function buildSitemap(urls: ReadonlyArray<SitemapUrl>): string {
 export function buildSitemapIndex(baseUrl: string, totalPages: number): string {
   const entries = Array.from({ length: totalPages }, (_, index) => {
     const page = index + 1;
+
     return `  <sitemap>\n    <loc>${escapeXml(`${baseUrl}/sitemap.xml?page=${page}`)}</loc>\n  </sitemap>`;
   }).join("\n");
 
@@ -81,6 +82,7 @@ export function renderSitemap(
   }
 
   const start = (page - 1) * MAX_URLS_PER_SITEMAP;
+
   return buildSitemap(urls.slice(start, start + MAX_URLS_PER_SITEMAP));
 }
 

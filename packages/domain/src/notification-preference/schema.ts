@@ -76,6 +76,7 @@ export const resolveNotificationPreferenceState = (
   const disabled = new Set(
     rows.filter((row) => !row.enabled).map((row) => row.category)
   );
+
   return {
     pausedAll: disabled.has("all"),
     categories: {

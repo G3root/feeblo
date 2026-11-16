@@ -21,6 +21,7 @@ export const handleBetterAuthRequest = async ({
   // through to the streaming body-size guard below; only finite lengths above
   // the cap are rejected up front.
   const declaredLength = Number(headers.get("content-length"));
+
   if (
     Number.isFinite(declaredLength) &&
     declaredLength > MAX_REQUEST_BODY_BYTES
@@ -31,15 +32,20 @@ export const handleBetterAuthRequest = async ({
   let bodyLimitExceeded = false;
   let bytesRead = 0;
   const sourceReader = request.body?.getReader();
+
   const body = sourceReader
     ? new ReadableStream<Uint8Array>({
         async pull(controller) {
           const { done, value } = await sourceReader.read();
+
           if (done) {
             controller.close();
+
             return;
           }
+
           bytesRead += value.byteLength;
+
           if (bytesRead > MAX_REQUEST_BODY_BYTES) {
             bodyLimitExceeded = true;
             // Stop reading: after the downstream closes, pull is never called
@@ -54,8 +60,10 @@ export const handleBetterAuthRequest = async ({
             // response with 413 below and Node cleans up the connection when
             // the response is flushed.
             controller.close();
+
             return;
           }
+
           controller.enqueue(value);
         },
         cancel(reason) {
@@ -63,7 +71,9 @@ export const handleBetterAuthRequest = async ({
         },
       })
     : undefined;
+
   let limitedRequest: Request;
+
   if (body) {
     const requestInit = { body, duplex: "half" as const, headers };
     limitedRequest = new Request(request, requestInit);
@@ -73,11 +83,13 @@ export const handleBetterAuthRequest = async ({
 
   try {
     const response = await handler(limitedRequest);
+
     return bodyLimitExceeded ? requestBodyTooLargeResponse() : response;
   } catch (error) {
     if (bodyLimitExceeded) {
       return requestBodyTooLargeResponse();
     }
+
     throw error;
   }
 };

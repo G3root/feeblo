@@ -125,6 +125,7 @@ describe("free workspace limit", () => {
             })
           );
         }
+
         return Effect.succeed({
           valid: true as const,
           message: "Subdomain is valid",
@@ -199,6 +200,7 @@ describe("free workspace limit", () => {
         const organizationIds = yield* Effect.forEach([0, 1, 2], () =>
           createOwnedWorkspace(ownerId)
         );
+
         yield* Effect.forEach(organizationIds, (organizationId) =>
           Effect.gen(function* () {
             yield* db.insert(schema.memberTable).values({
@@ -294,6 +296,7 @@ describe("free workspace limit", () => {
         const handlers = yield* WorkspaceRpcHandlersEffect;
         const userId = "user_creation_state_at_cap";
         yield* seedUser(userId);
+
         const organizationIds = yield* Effect.forEach([0, 1, 2], () =>
           createOwnedWorkspace(userId)
         );

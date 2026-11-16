@@ -28,6 +28,7 @@ import {
 } from "./slack-management-shared";
 
 const CHANNELS_PAGE_SIZE = 200;
+
 const MAX_CHANNEL_PAGES = 25;
 
 const decodeProviderConfig = (value: Schema.Json) =>
@@ -68,25 +69,30 @@ export const makeSlackChannelServiceLive = (
             input.connectionId,
             input.organizationId
           );
+
           if (connection === undefined || connection.lifecycle !== "active") {
             return yield* new NotFoundError({
               message: "Slack connection was not found",
             });
           }
+
           if (connection.credentialsCiphertext === null) {
             return yield* new NotFoundError({
               message: "Slack connection was not found",
             });
           }
+
           const credentials = yield* decryptConnectionCredentials(
             config,
             connection.credentialsCiphertext
           );
+
           if (credentials.botToken === undefined) {
             return yield* new NotFoundError({
               message: "Slack connection was not found",
             });
           }
+
           const routeRows = yield* db
             .select({
               providerConfig: schema.integrationRouteTable.providerConfig,
@@ -105,6 +111,7 @@ export const makeSlackChannelServiceLive = (
                 eq(schema.integrationRouteTable.enabled, true)
               )
             );
+
           const notificationChannels = yield* Effect.forEach(
             routeRows,
             (route) =>
@@ -112,12 +119,14 @@ export const makeSlackChannelServiceLive = (
                 Effect.map((config) => config.channelId)
               )
           );
+
           const enabledChannels = new Set(notificationChannels);
           // Follow `response_metadata.next_cursor` until Slack returns an empty
           // cursor, accumulating channels from every page. A hard page cap
           // bounds the loop against a misbehaving cursor.
           let cursor: string | undefined;
           const channels: S.TSlackChannel[] = [];
+
           for (let page = 0; page < MAX_CHANNEL_PAGES; page++) {
             const pageResult = yield* apiClient
               .conversationsList({
@@ -127,6 +136,7 @@ export const makeSlackChannelServiceLive = (
                 ...(cursor === undefined ? undefined : { cursor }),
               })
               .pipe(mapSlackApiError("channel listing"));
+
             for (const channel of pageResult.channels) {
               if (channel.is_archived !== true) {
                 channels.push({
@@ -138,12 +148,16 @@ export const makeSlackChannelServiceLive = (
                 });
               }
             }
+
             const nextCursor = pageResult.response_metadata?.next_cursor;
+
             if (nextCursor === undefined || nextCursor === "") {
               break;
             }
+
             cursor = nextCursor;
           }
+
           return channels;
         },
         (effect) => effect.pipe(mapManagementError("channel list"))
@@ -160,6 +174,7 @@ export const makeSlackChannelServiceLive = (
                 input.connectionId,
                 input.organizationId
               );
+
               if (
                 connection === undefined ||
                 connection.lifecycle !== "active"
@@ -168,6 +183,7 @@ export const makeSlackChannelServiceLive = (
                   message: "Slack connection was not found",
                 });
               }
+
               // One route per channel: look the target channel's route up by
               // its routeKey (the channel id) instead of decoding every
               // channel.notifications route's providerConfig.
@@ -195,11 +211,13 @@ export const makeSlackChannelServiceLive = (
                   )
                 )
                 .limit(1);
+
               // The channel display name always comes from the caller; the
               // stale name stored on a previous selection must never leak
               // into the new configuration.
               const channelName = input.channelName;
               const now = yield* DateTime.nowAsDate;
+
               if (input.enabled) {
                 if (route === undefined) {
                   yield* db.insert(schema.integrationRouteTable).values({

@@ -95,6 +95,7 @@ function formatPublishedDate(value: Date | string) {
 export function PostPage({ slug }: { readonly slug: string }) {
   const site = useSite();
   const organizationId = site.organizationId;
+
   const {
     publicBoardCollection,
     publicPostDetailCollection,
@@ -151,6 +152,7 @@ export function PostPage({ slug }: { readonly slug: string }) {
         .findOne();
     },
   });
+
   const { data: postStatus } = useLiveQuery({
     queryKey: [
       "portal-post-status",
@@ -225,6 +227,7 @@ export function PostPage({ slug }: { readonly slug: string }) {
     if (isLiveQueryPending(postTagsQuery)) {
       return <RootLayout>{m.good_extra_giraffe()}</RootLayout>;
     }
+
     if (isLiveQueryFailed(postTagsQuery)) {
       return (
         <RootLayout>
@@ -237,6 +240,7 @@ export function PostPage({ slug }: { readonly slug: string }) {
         </RootLayout>
       );
     }
+
     return (
       <ScopedPostUpvoteCollection>
         <PostPageContent
@@ -280,6 +284,7 @@ export function PostPage({ slug }: { readonly slug: string }) {
 function ScopedPostUpvoteCollection({ children }: { children: ReactNode }) {
   const value = usePostCollections();
   const { publicPostUpvoteCollection } = usePublicCollections();
+
   const collections = useMemo(
     () => ({
       ...value.collections,
@@ -318,12 +323,15 @@ function MergedPostResolver({
   readonly slug: string;
 }) {
   const navigate = useNavigate();
+
   const args = useMemo(
     () => ({ organizationId, slug }),
     [organizationId, slug]
   );
+
   const targetResult = useAtomValue(mergedPostTargetAtom(args));
   const refresh = useAtomRefresh(mergedPostTargetAtom(args));
+
   // Derived during render: undefined while loading, string while
   // redirecting, null when the slug is genuinely unknown. A failed lookup is
   // kept apart from a miss: a transient RPC failure must not tell the visitor
@@ -500,6 +508,7 @@ function PostMetaSidebarSection({
 
 function PostMetaSidebarVoters() {
   const { post } = usePostCollectionData();
+
   return (
     <PostVoterDialog.Root postId={post.id}>
       <PostMetaSidebarSection
@@ -515,6 +524,7 @@ function PostMetaSidebarVoters() {
 
 function PostMetaSidebarBoard() {
   const { board } = usePostCollectionData();
+
   return (
     <PostMetaSidebarSection title={m.full_new_vulture()}>
       <BoardNavLink
@@ -568,6 +578,7 @@ function PostMetaSidebarAuthor() {
   const { post } = usePostCollectionData();
   const authorName = post?.user?.name ?? m.blue_clear_flea();
   const authorImage = post?.user?.image ?? undefined;
+
   return (
     <PostMetaSidebarSection title={m.great_trick_jay()}>
       <div className="flex items-center gap-2.5">
@@ -581,6 +592,7 @@ function PostMetaSidebarAuthor() {
 function PostMetaSidebarPublishedOn() {
   const { post } = usePostCollectionData();
   const publishedDate = formatPublishedDate(post.createdAt);
+
   return (
     <PostMetaSidebarSection title={m.last_dry_sheep()}>
       <p className="text-foreground text-sm font-medium">{publishedDate}</p>

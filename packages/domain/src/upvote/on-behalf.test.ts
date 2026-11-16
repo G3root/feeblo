@@ -152,6 +152,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
   const getUpvotes = (postId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       return yield* db
         .select()
         .from(schema.upvoteTable)
@@ -161,6 +162,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
   const getActivities = (postId: string, kind: "VOTE_ADDED" | "VOTE_REMOVED") =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       return yield* db
         .select()
         .from(schema.postActivityTable)
@@ -222,6 +224,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                   makeSession(fixture, "manager")
                 )
               );
+
             expect(result.added).toBe(true);
 
             const upvotes = yield* getUpvotes(postId);
@@ -239,6 +242,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
               .from(schema.userTable)
               .where(eq(schema.userTable.id, shadowUserId))
               .limit(1);
+
             expect(shadow?.email).toMatch(/^behalf-[0-9a-f]+@feeblo\.com$/);
             expect(shadow?.emailVerified).toBe(false);
 
@@ -255,6 +259,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 )
               )
               .limit(1);
+
             expect(contact?.userId).toBe(shadowUserId);
           })
       );
@@ -298,6 +303,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                   makeSession(fixture, "manager")
                 )
               );
+
             expect(result.added).toBe(true);
 
             const upvotes = yield* getUpvotes(postId);
@@ -315,6 +321,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
               .where(
                 eq(schema.contactTable.organizationId, fixture.organizationId)
               );
+
             expect(contacts).toHaveLength(0);
           })
       );
@@ -331,10 +338,13 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             postId,
             author: { email: "sam@example.com" },
           } as const;
+
           const session = makeSession(fixture, "manager");
+
           const first = yield* handlers
             .AddUpvoteOnBehalf(args)
             .pipe(Effect.provideService(CurrentSession, session));
+
           const second = yield* handlers
             .AddUpvoteOnBehalf(args)
             .pipe(Effect.provideService(CurrentSession, session));
@@ -377,6 +387,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                   makeSession(fixture, "manager")
                 )
               );
+
             expect(result.added).toBe(true);
 
             // No shadow was created: the verified account is adopted.
@@ -389,6 +400,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(subscription)).toMatchObject({
               source: "admin_added_voter",
               state: "active",
@@ -423,6 +435,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             source: "admin_added_voter",
             state: "deferred_no_access",
@@ -439,6 +452,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 "subscription.verification_requested"
               )
             );
+
           expect(verificationIntents).toEqual([]);
         })
       );
@@ -482,6 +496,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             source: "admin_added_voter",
             state: "deferred_no_access",
@@ -576,6 +591,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 makeSession(fixture, "contributor")
               )
             );
+
           expect(result.added).toBe(true);
         })
       );
@@ -603,6 +619,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("PolicyDenied");
 
           const upvotes = yield* getUpvotes(postId);
@@ -631,6 +648,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("SubjectNotFoundError");
 
           const upvotes = yield* getUpvotes(postId);
@@ -674,6 +692,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 makeSession(fixture, "manager")
               )
             );
+
           expect(result.removed).toBe(true);
 
           expect((yield* getUpvotes(postId)).map((row) => row.id)).toEqual([]);
@@ -688,6 +707,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
           // provenance keeps its documented `{ contactId, userId }` shape and
           // snapshots the identity the contact carried at removal time.
           const db = yield* currentDb;
+
           const [voterContact] = yield* db
             .select({
               contactId: schema.contactTable.id,
@@ -701,6 +721,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
               )
             )
             .limit(1);
+
           expect(activities[0]?.metadata).toEqual({
             onBehalfOf: {
               contactId: voterContact?.contactId,
@@ -734,6 +755,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 makeSession(fixture, "manager")
               )
             );
+
           expect(result.removed).toBe(false);
 
           const activities = yield* getActivities(postId, "VOTE_REMOVED");
@@ -770,6 +792,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                   makeSession(fixture, "manager")
                 )
               );
+
             expect(result.removed).toBe(true);
 
             const activities = yield* getActivities(postId, "VOTE_REMOVED");
@@ -829,6 +852,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             source: "admin_added_voter",
             state: "active",
@@ -857,6 +881,7 @@ describe("UpvoteRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("PolicyDenied");
         })
       );

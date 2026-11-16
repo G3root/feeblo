@@ -45,6 +45,7 @@ export type AttributeValueColumns = S.Schema.Type<typeof AttributeValueColumns>;
 
 const isStringValue = (value: AttributeSourceValue): value is string =>
   Object(value).constructor === String;
+
 const isBooleanValue = (value: AttributeSourceValue): value is boolean =>
   Object(value).constructor === Boolean;
 
@@ -102,6 +103,7 @@ export function buildAttributeValueColumns(
       valueDate: null,
     };
   }
+
   return {
     valueText: null,
     valueInteger: null,
@@ -122,6 +124,7 @@ export function toMutableConfig(
   if (config === null || config === undefined) {
     return null;
   }
+
   // Throws deliberately and is pinned by a test: an invalid config type is a
   // programming error at the (currently test-only) call sites, not runtime
   // data flow. There is no Effect caller to compose through yet.
@@ -177,6 +180,7 @@ const valueSchemaForDefinition = (
     case "TEXT": {
       let schema: S.Codec<string> = S.String;
       const pattern = definition.config?.pattern;
+
       if (pattern !== undefined) {
         if (isPotentiallyUnsafeRegex(pattern)) {
           // A catastrophic pattern must never be executed against values that
@@ -189,6 +193,7 @@ const valueSchemaForDefinition = (
           );
         } else {
           let expression: RegExp;
+
           try {
             expression = new RegExp(pattern);
           } catch {
@@ -197,10 +202,12 @@ const valueSchemaForDefinition = (
                 message: `configured validation pattern "${pattern}" is invalid`,
               })
             );
+
             // SAFETY: the checked schema still decodes to `string`, which is a
             // member of AttributeValue, so the widening is lossless.
             return schema as S.Codec<AttributeValue>;
           }
+
           schema = schema.check(
             S.isPattern(expression, {
               message: `must match pattern "${pattern}"`,
@@ -208,15 +215,19 @@ const valueSchemaForDefinition = (
           );
         }
       }
+
       // SAFETY: the checked schema still decodes to `string`, which is a
       // member of AttributeValue, so the widening is lossless.
       return schema as S.Codec<AttributeValue>;
     }
+
     case "INTEGER": {
       let schema: S.Codec<number> = S.Number.check(
         S.isInt({ message: "must be an integer" })
       );
+
       const min = definition.config?.min;
+
       if (min !== undefined) {
         schema = schema.check(
           S.isGreaterThanOrEqualTo(min, {
@@ -224,7 +235,9 @@ const valueSchemaForDefinition = (
           })
         );
       }
+
       const max = definition.config?.max;
+
       if (max !== undefined) {
         schema = schema.check(
           S.isLessThanOrEqualTo(max, {
@@ -232,14 +245,18 @@ const valueSchemaForDefinition = (
           })
         );
       }
+
       // SAFETY: the result decodes to `number`, a member of AttributeValue.
       return schema as S.Codec<AttributeValue>;
     }
+
     case "DECIMAL": {
       let schema: S.Codec<number> = S.Number.check(
         S.isFinite({ message: "must be a finite number" })
       );
+
       const min = definition.config?.min;
+
       if (min !== undefined) {
         schema = schema.check(
           S.isGreaterThanOrEqualTo(min, {
@@ -247,7 +264,9 @@ const valueSchemaForDefinition = (
           })
         );
       }
+
       const max = definition.config?.max;
+
       if (max !== undefined) {
         schema = schema.check(
           S.isLessThanOrEqualTo(max, {
@@ -255,13 +274,16 @@ const valueSchemaForDefinition = (
           })
         );
       }
+
       // SAFETY: the result decodes to `number`, a member of AttributeValue.
       return schema as S.Codec<AttributeValue>;
     }
+
     case "BOOLEAN": {
       // SAFETY: the result decodes to `boolean`, a member of AttributeValue.
       return S.Boolean as S.Codec<AttributeValue>;
     }
+
     case "DATE": {
       // S.Date already rejects NaN/invalid Date instances, and S.DateFromString
       // fails to decode garbage strings into a valid date, so no extra
@@ -269,6 +291,7 @@ const valueSchemaForDefinition = (
       // SAFETY: both members decode to `Date`, a member of AttributeValue.
       return S.Union([S.Date, S.DateFromString]) as S.Codec<AttributeValue>;
     }
+
     default: {
       // SAFETY: Never rejects every value, so any target type is sound.
       return S.Never as S.Codec<AttributeValue>;
@@ -287,10 +310,12 @@ const validateSingleAttribute = (
           message: `Missing required attribute "${definition.key}"`,
         });
       }
+
       return null;
     }
 
     const schema = valueSchemaForDefinition(definition);
+
     return yield* S.decodeUnknownEffect(schema)(raw).pipe(
       Effect.mapError(
         (error: S.SchemaError) =>
@@ -308,6 +333,7 @@ const validateRequiredAttributes = (
   const missing = definitions
     .filter((d) => d.isRequired && !(d.key in data))
     .map((d) => `Missing required attribute "${d.key}"`);
+
   return missing.length > 0
     ? Effect.fail(new DataValidationError({ message: missing.join("; ") }))
     : Effect.void;
@@ -338,10 +364,13 @@ const parseCustomAttributes = (
       if (knownFields.has(key)) {
         continue;
       }
+
       const definition = defMap.get(key);
+
       if (!definition) {
         continue;
       }
+
       if (!isJsonScalar(raw)) {
         // Arrays and nested objects are not valid attribute values. Optional
         // ones are ignored instead of persisting or failing the whole payload;
@@ -353,8 +382,10 @@ const parseCustomAttributes = (
             message: `Invalid value for required attribute "${definition.key}": must be a string, number, boolean, or null`,
           });
         }
+
         continue;
       }
+
       effects.push(
         validateSingleAttribute(definition, raw).pipe(
           Effect.map((value): ParsedAttribute => ({
@@ -422,6 +453,7 @@ const asRecord = (
     // object, which is exactly the AttributeSource contract its callers read.
     return raw as AttributeSource;
   }
+
   return {};
 };
 

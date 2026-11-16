@@ -39,6 +39,7 @@ const optionalInteger = (name: string) =>
       }
 
       const parsed = Number(value.value);
+
       return Number.isInteger(parsed)
         ? Effect.succeed(parsed)
         : Effect.fail(
@@ -98,11 +99,13 @@ const formatFromAddress = (
   displayName: Option.Option<string>
 ): string => {
   const mailbox = address.trim();
+
   if (Option.isNone(displayName)) {
     return mailbox;
   }
 
   const name = displayName.value.trim();
+
   if (name === "" || mailbox.includes("<")) {
     return mailbox;
   }
@@ -119,20 +122,26 @@ export class MailerConfig extends Context.Service<MailerConfig>()(
           value._tag === "Some" ? value.value : "127.0.0.1"
         )
       );
+
       const port = yield* optionalInteger("SMTP_PORT").pipe(
         Effect.map((value) => value ?? 2500)
       );
+
       const secure = yield* optionalBoolean("SMTP_SECURE").pipe(
         Effect.map((value) => value ?? false)
       );
+
       const ignoreTLS = yield* optionalBoolean("SMTP_UNSAFE_IGNORE_TLS").pipe(
         Effect.map((value) => value ?? false)
       );
+
       const service = yield* optionalString("SMTP_SERVICE");
       const username = yield* optionalString("SMTP_USERNAME");
+
       const password = yield* Config.Redacted("SMTP_PASSWORD").pipe(
         Config.option
       );
+
       const defaultFromAddress = yield* optionalString(
         "SMTP_FROM_ADDRESS"
       ).pipe(
@@ -140,11 +149,14 @@ export class MailerConfig extends Context.Service<MailerConfig>()(
           value._tag === "Some" ? value.value : "hello@feeblo.com"
         )
       );
+
       const defaultFromName = yield* optionalString("SMTP_FROM_NAME");
+
       const defaultFrom = formatFromAddress(
         defaultFromAddress,
         defaultFromName
       );
+
       // Personal lifecycle emails (user onboarding, user feedback) can use a
       // dedicated sender distinct from SMTP_FROM_ADDRESS. When unset, the
       // defaultFrom is used. Exposed as an Option so senders can decide
@@ -157,10 +169,13 @@ export class MailerConfig extends Context.Service<MailerConfig>()(
       const personalFromAddress = yield* optionalString(
         "SMTP_PERSONAL_FROM_ADDRESS"
       );
+
       const personalFromName = yield* optionalString("SMTP_PERSONAL_FROM_NAME");
+
       const personalFrom = Option.map(personalFromAddress, (address) =>
         formatFromAddress(address, personalFromName)
       );
+
       // Where a reply is delivered. Transactional senders are routinely an
       // address that cannot receive (`noreply@`), so without this a recipient
       // who hits Reply reaches a mailbox nobody reads and the reply is lost

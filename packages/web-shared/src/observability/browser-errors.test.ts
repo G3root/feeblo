@@ -8,6 +8,7 @@ const scripts = "https://app.example.com/assets/";
 const errorWithStack = (stack: string): Error => {
   const error = new Error("boom");
   error.stack = stack;
+
   return error;
 };
 

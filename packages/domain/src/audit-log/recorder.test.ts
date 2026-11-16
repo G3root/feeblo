@@ -28,6 +28,7 @@ describe("AuditLogRecorder", () => {
       slug: organizationId,
       createdAt: now,
     });
+
     return organizationId;
   });
 
@@ -35,6 +36,7 @@ describe("AuditLogRecorder", () => {
   const rowsFor = (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       return yield* db
         .select()
         .from(schema.auditLogTable)
@@ -174,6 +176,7 @@ describe("AuditLogRecorder", () => {
               .record(invalid)
               .pipe(Effect.provideService(AuditLogEnabled, true))
           );
+
           expect(failure._tag).toBe("EffectDrizzleQueryError");
 
           yield* recorder

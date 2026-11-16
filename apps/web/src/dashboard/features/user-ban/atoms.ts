@@ -30,6 +30,7 @@ const listRequest = (args: UserBanListArgs) => {
     offset: 0,
     organizationId: args.organizationId,
   };
+
   return args.search === "" ? request : { ...request, search: args.search };
 };
 
@@ -57,4 +58,5 @@ export type UserBan = Atom.Success<
 >["items"][number];
 
 export const banUserAtom = DashboardClient.mutation("BanUser");
+
 export const unbanUserAtom = DashboardClient.mutation("UnbanUser");

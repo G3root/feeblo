@@ -128,6 +128,7 @@ layer(TestLayer)("PostTrafficRepository", (it) => {
           postId,
           since: DateTime.toDate(DateTime.subtract({ seconds: 1 })(now)),
         });
+
         expect(Option.getOrThrow(traffic).views).toBe(0);
       })
     );
@@ -163,6 +164,7 @@ layer(TestLayer)("PostTrafficRepository", (it) => {
         const count = Option.getOrThrow(
           yield* repository.getPostViewCount({ organizationId, postId })
         );
+
         expect(count).toBe(2);
 
         expect(
@@ -342,6 +344,7 @@ layer(TestLayer)("PostTrafficRepository", (it) => {
           .select()
           .from(schema.postViewEventTable)
           .where(eq(schema.postViewEventTable.postId, postId));
+
         const totals = yield* db
           .select()
           .from(schema.postViewTotalTable)

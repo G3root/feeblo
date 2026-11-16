@@ -66,18 +66,23 @@ function VoterAvatar({
  */
 export function VoterPanel() {
   const { isMerged, post, organizationId } = usePostCollectionData();
+
   const {
     collections: { upvoteCollection },
   } = usePostCollections();
+
   const { data: session } = useAuthState();
+
   const votesOnBehalfPolicy = usePolicy(
     hasPermission(organizationId, "votes.onBehalf")
   );
+
   // Votes carry over to the survivor on merge, so on-behalf management is
   // disabled on a merged post until it is unmerged.
   const canManageVoters = Boolean(
     session && votesOnBehalfPolicy.allowed && !isMerged
   );
+
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -125,6 +130,7 @@ export function VoterPanel() {
     if (!selection) {
       return;
     }
+
     try {
       await addVoter({ author: toOnBehalfAuthor(selection) });
       setIsAddOpen(false);
@@ -242,6 +248,7 @@ export function VoterPanel() {
             <ul className="max-h-80 space-y-1 overflow-y-auto px-6 pb-6">
               {upvotes.map((upvote) => {
                 const canRemove = Boolean(canManageVoters && upvote.userId);
+
                 return (
                   <li
                     className="group flex items-center gap-2 rounded-md px-1 py-1"
@@ -266,6 +273,7 @@ export function VoterPanel() {
                           if (!upvote.userId) {
                             return;
                           }
+
                           void handleRemove(upvote.userId);
                         }}
                         size="icon-xs"

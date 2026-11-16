@@ -33,9 +33,11 @@ export const can = (
   if (!context) {
     return false;
   }
+
   const membership = context.memberships.find(
     (membership) => membership.organizationId === organizationId
   );
+
   return membership != null && roleGrants(membership.role, permission);
 };
 

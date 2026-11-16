@@ -50,6 +50,7 @@ describe("public api parse helpers", () => {
       for (const raw of [undefined, "", "false"]) {
         expect(yield* parseIncludeArchived(raw)).toBe(false);
       }
+
       expect(yield* parseIncludeArchived("true")).toBe(true);
 
       for (const raw of ["TRUE", "1", "yes"]) {
