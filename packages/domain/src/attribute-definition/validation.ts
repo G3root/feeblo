@@ -142,7 +142,13 @@ const validateType = (
     return !definition.isRequired;
   }
 
-  return attributeTypeRules[definition.type].accepts(value);
+  // The `type` columns are plain text rather than a Postgres enum, so a row can
+  // carry a type this build does not know — written by a newer deployment, or
+  // one since removed. That is a validation failure, not a crash: a defect here
+  // would leave the `BadRequestError` channel this module promises.
+  const rules = attributeTypeRules[definition.type];
+
+  return rules !== undefined && rules.accepts(value);
 };
 
 const validateConfig = (
