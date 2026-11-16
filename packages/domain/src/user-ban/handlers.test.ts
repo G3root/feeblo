@@ -1139,7 +1139,7 @@ describe("UserBanRpcHandlers", () => {
             actorType: "user",
             actorUserId: fixture.userId,
             affectedUserId: author.id,
-            metadata: { email: author.email, reason: "Abuse report" },
+            metadata: { reason: "Abuse report" },
             outcome: "allowed",
             resourceType: "user_ban",
             source: "dashboard",

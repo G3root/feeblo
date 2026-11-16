@@ -294,5 +294,65 @@ describe("WebhookManagementRpcHandlers audit", () => {
           ).not.toContain(created.signingSecret);
         })
     );
+
+    it.effect(
+      "names a path-only destination change without recording either URL",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const organizationId = yield* WorkspaceId.generate;
+          yield* db.insert(schema.organizationTable).values({
+            createdAt: yield* DateTime.nowAsDate,
+            id: organizationId,
+            name: "Webhook audit test",
+            slug: organizationId,
+          });
+          const handlers = yield* WebhookManagementRpcHandlersEffect;
+          const audited = Effect.provideService(AuditLogEnabled, true);
+          const withSession = Effect.provideService(
+            CurrentSession,
+            sessionFor(organizationId, "admin")
+          );
+
+          const created = yield* handlers
+            .CreateWebhookEndpoint({
+              endpointUrl: "https://127.0.0.1:8080/hook",
+              eventTypes: ["post.created"],
+              name: "Product events",
+              organizationId,
+            })
+            .pipe(withSession, audited);
+
+          yield* handlers
+            .UpdateWebhookEndpoint({
+              connectionId: created.endpoint.id,
+              endpointUrl: "https://127.0.0.1:8080/another-path",
+              organizationId,
+            })
+            .pipe(withSession, audited);
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, organizationId),
+                eq(schema.auditLogTable.action, "webhook.updated")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          // The hostname did not move, so only the destination marker says the
+          // endpoint changed at all.
+          expect(rows[0]?.changes).toMatchObject({
+            fields: ["destination"],
+          });
+          // Neither URL is stored: the hostname names the endpoint, and a path
+          // can carry a per-endpoint token.
+          const stored = JSON.stringify(rows[0]);
+          expect(stored).not.toContain("/another-path");
+          expect(stored).not.toContain("https://127.0.0.1:8080/hook");
+        })
+    );
   });
 });

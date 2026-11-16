@@ -160,10 +160,13 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
               ...(resolved.userId !== null && {
                 affectedUserId: resolved.userId,
               }),
+              // The address stays in the ban row, which is mutable and
+              // deleted with the ban. The entry is append-only, so it carries
+              // the subject's id and the shape of the action instead: a copy of
+              // the address here would outlive every mechanism that removes it.
               metadata: {
                 deletedComments: purged.comments,
                 deletedPosts: purged.posts,
-                email: resolved.email,
                 reason: args.reason ?? null,
               },
             });
@@ -239,7 +242,8 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
                 ...(resolved.userId !== null && {
                   affectedUserId: resolved.userId,
                 }),
-                metadata: { email: resolved.email },
+                // No address, for the reason given on the ban entry.
+                metadata: {},
               });
             }
             return removed;

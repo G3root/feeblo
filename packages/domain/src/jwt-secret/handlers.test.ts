@@ -198,8 +198,11 @@ describe("JwtSecretRpcHandlers", () => {
           resourceType: "jwt_secret",
           source: "dashboard",
         });
-        // The entry names the secret by id only; the generated value must not
-        // appear anywhere in the stored row.
+        // The entry names the secret by id only, and the recorder's redaction
+        // must not swallow the identifier: `secretId` as a key would have
+        // matched its credential-shaped-name rule and stored `[redacted]`.
+        expect(rows[0]?.metadata).toEqual({ id: active.id });
+        // The generated value must not appear anywhere in the stored row.
         expect(JSON.stringify(rows[0])).not.toContain(active.secret);
       })
     );

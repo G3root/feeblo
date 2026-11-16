@@ -32,13 +32,15 @@ export const JwtSecretRpcHandlersEffect = Effect.gen(function* () {
             // `jwt_secret` is a singleton resource, so no `resourceId`. Only
             // the id of the secret is recorded: the value is never read here,
             // and this module generates it, so nothing credential-shaped can
-            // reach the entry.
+            // reach the entry. The key is `id`, not `secretId`, because the
+            // recorder redacts any field whose name looks like a credential
+            // and would take the identifier with it.
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
               source: "dashboard",
               action: "jwt_secret.revoked",
-              metadata: { secretId: args.secretId },
+              metadata: { id: args.secretId },
             });
           })
         );

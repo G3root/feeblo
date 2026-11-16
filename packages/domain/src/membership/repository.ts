@@ -241,7 +241,8 @@ const makeMembershipRepository = Effect.gen(function* () {
             eq(schema.invitationTable.organizationId, organizationId)
           )
         )
-        .pipe(Effect.asVoid),
+        .returning({ id: schema.invitationTable.id })
+        .pipe(Effect.map((rows) => ({ cancelled: rows.length > 0 }))),
     findMemberByEmailInOrg: ({
       organizationId,
       email,

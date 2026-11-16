@@ -313,8 +313,12 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
             eq(table.organizationId, input.organizationId)
           )
         )
-        .returning({ email: table.email });
-      return { removed: removed.length > 0 };
+        .returning({ email: table.email, reason: table.reason });
+      const [row] = removed;
+      return {
+        removed: row !== undefined,
+        reason: row?.reason ?? null,
+      };
     }
   );
 

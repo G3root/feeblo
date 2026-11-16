@@ -248,6 +248,40 @@ describe("ChangelogCategoryRpcHandlers", () => {
       })
     );
 
+    it.effect("refuses another workspace's category and records nothing", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const mine = yield* makeFixture();
+        const theirs = yield* makeFixture();
+        const id = yield* insertCategory(theirs);
+
+        const failure = yield* Effect.flip(
+          handlers
+            .UpdateChangelogCategory({
+              icon: "#3b82f6",
+              iconType: "color",
+              id,
+              name: "Improved",
+              organizationId: mine.organizationId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(mine)),
+              Effect.provideService(AuditLogEnabled, true)
+            )
+        );
+        expect(failure._tag).toBe("ChangelogCategoryNotFoundError");
+
+        // The category was not touched, and an update that matched nothing
+        // must not leave an entry behind.
+        const db = yield* currentDb;
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(eq(schema.auditLogTable.organizationId, mine.organizationId));
+        expect(rows).toHaveLength(0);
+      })
+    );
+
     it.effect("rejects contributors from creating categories", () =>
       Effect.gen(function* () {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;

@@ -639,5 +639,50 @@ describe("MembershipRpcHandlers", () => {
           });
         }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
+
+    it.effect(
+      "leaves another workspace's invitation alone, and records nothing",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* MembershipRpcHandlersEffect;
+          const db = yield* currentDb;
+          const mine = yield* makeFixture();
+          const theirs = yield* makeFixture();
+          const invitationId = `inv_${theirs.organizationId}`;
+          const now = yield* DateTime.now;
+
+          yield* db.insert(schema.invitationTable).values({
+            id: invitationId,
+            organizationId: theirs.organizationId,
+            email: "invitee@example.com",
+            role: "manager",
+            expiresAt: DateTime.toDate(DateTime.add({ days: 7 })(now)),
+            inviterId: theirs.userId,
+          });
+
+          yield* handlers
+            .CancelOrganizationInvitation({
+              organizationId: mine.organizationId,
+              invitationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(mine)));
+
+          // The update matched nothing, so the invitation is still pending and
+          // no withdrawal was recorded for the workspace that asked.
+          const [invitation] = yield* db
+            .select()
+            .from(schema.invitationTable)
+            .where(eq(schema.invitationTable.id, invitationId));
+          expect(invitation?.status).toBe("pending");
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              eq(schema.auditLogTable.organizationId, mine.organizationId)
+            );
+          expect(rows).toHaveLength(0);
+        }).pipe(Effect.provideService(AuditLogEnabled, true))
+    );
   });
 });

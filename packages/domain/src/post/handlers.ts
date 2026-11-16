@@ -339,18 +339,22 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
       return yield* transaction(
         Effect.gen(function* () {
-          // Read first, in this transaction: the board and status the post
-          // carried are the half of the diff the update no longer knows. Both
-          // are the same two columns the policy already judged, so a move or a
-          // status change is what the entry names, not the whole row.
+          // Read first, in this transaction, and under the row lock the
+          // activity-state read takes: the board and status the post carried
+          // are the half of the diff the update no longer knows, and two
+          // concurrent saves would otherwise diff from the same stale row.
           let previous:
             | { readonly boardId: string; readonly statusId: string }
             | undefined;
           if (surface === "dashboard") {
-            previous = yield* repository.findLocationIds({
+            const state = yield* repository.findActivityState({
               id: args.id,
               organizationId: args.organizationId,
             });
+            previous =
+              state === undefined
+                ? undefined
+                : { boardId: state.boardId, statusId: state.statusId };
           }
 
           yield* writes.update(

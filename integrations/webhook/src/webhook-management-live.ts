@@ -368,6 +368,10 @@ export const WebhookManagementServiceLive = Layer.effect(
               existing.safeDisplayMetadata ?? {}
             );
             const previousHostname = hostname;
+            // Set below, when the submitted URL is decrypted beside the stored
+            // one. The hostname cannot stand in for it: a webhook moved from
+            // `/a` to `/b` on the same host sends to a different place.
+            let destinationChanged = false;
             // Read before the writes below: the diff needs what the endpoint
             // carried before this save, and the read after the update returns
             // the row it wrote.
@@ -408,6 +412,12 @@ export const WebhookManagementServiceLive = Layer.effect(
                     })
                 )
               );
+              // Storage keeps the submitted string verbatim, so a difference
+              // is a real change even when only the path moved. Neither URL
+              // reaches the entry: the hostname already names the endpoint, and
+              // a path can carry a per-endpoint token.
+              destinationChanged =
+                Redacted.value(credentials.endpointUrl) !== input.endpointUrl;
               credentialsCiphertext = yield* encryptWebhookCredentialMaterial(
                 encryptionKey,
                 {
@@ -502,6 +512,7 @@ export const WebhookManagementServiceLive = Layer.effect(
             const fields = [
               ...(existing.name === name ? [] : ["name"]),
               ...(previousHostname === hostname ? [] : ["hostname"]),
+              ...(destinationChanged ? ["destination"] : []),
               ...(previousEventTypes.length === eventTypes.length &&
               previousEventTypes.every((type) => eventTypes.includes(type))
                 ? []

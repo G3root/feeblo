@@ -218,7 +218,7 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
     update: ({ id, name, iconType, icon, organizationId }: TUpdate) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+        return yield* db
           .update(schema.changelogCategoryTable)
           .set({
             name,
@@ -232,7 +232,8 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
               eq(schema.changelogCategoryTable.organizationId, organizationId)
             )
           )
-          .pipe(Effect.asVoid);
+          .returning({ id: schema.changelogCategoryTable.id })
+          .pipe(Effect.map((rows) => ({ updated: rows.length > 0 })));
       }),
 
     delete: ({ id, organizationId }: TDelete) =>
@@ -244,7 +245,8 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
             eq(schema.changelogCategoryTable.organizationId, organizationId)
           )
         )
-        .pipe(Effect.asVoid),
+        .returning({ id: schema.changelogCategoryTable.id })
+        .pipe(Effect.map((rows) => ({ deleted: rows.length > 0 }))),
 
     hasChangelog: ({ changelogId, organizationId }: THasChangelog) =>
       db

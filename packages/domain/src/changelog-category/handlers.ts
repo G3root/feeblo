@@ -12,6 +12,7 @@ import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
+import { ChangelogCategoryNotFoundError } from "./errors";
 import { ChangelogCategoryPolicy } from "./policies";
 import { ChangelogCategoryRepository } from "./repository";
 import { ChangelogCategoryRpcs } from "./rpcs";
@@ -101,9 +102,17 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.update(args);
-            // The update returns nothing, so the new values go in `metadata`
-            // rather than posing as a diff with an empty `before`.
+            const { updated } = yield* repository.update(args);
+            // Another workspace's category, or one deleted since the page
+            // loaded, matches nothing. The RPC answers 404 and the log stays
+            // quiet, because nothing was updated.
+            if (!updated) {
+              return yield* new ChangelogCategoryNotFoundError({
+                message: "Changelog category not found",
+              });
+            }
+            // The update reports only that it matched, so the new values go in
+            // `metadata` rather than posing as a diff with an empty `before`.
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -129,7 +138,14 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.delete(args);
+            const { deleted } = yield* repository.delete(args);
+            // Same as the update: a delete that matched nothing is a 404, not
+            // an entry about a category that still exists.
+            if (!deleted) {
+              return yield* new ChangelogCategoryNotFoundError({
+                message: "Changelog category not found",
+              });
+            }
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
