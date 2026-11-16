@@ -16,10 +16,32 @@ function getServerApiUrl(): string {
   return apiUrl;
 }
 
-/** Browser- and server-scoped runtimes, created on first use. */
-let browserRuntime: ReturnType<typeof createRuntime> | null = null;
+type ClientRuntime = ReturnType<typeof createRuntime>;
 
-let serverRuntime: ReturnType<typeof createRuntime> | null = null;
+/**
+ * Browser- and server-scoped runtimes, created on first use. Each lives in its
+ * own closure so nothing outside this module can read or replace the instance
+ * a request is already using.
+ */
+const browserRuntime = (() => {
+  let runtime: ClientRuntime | null = null;
+
+  return (): ClientRuntime => {
+    runtime ??= createRuntime(getRuntimePublicEnv().apiUrl);
+
+    return runtime;
+  };
+})();
+
+const serverRuntime = (() => {
+  let runtime: ClientRuntime | null = null;
+
+  return (): ClientRuntime => {
+    runtime ??= createRuntime(getServerApiUrl());
+
+    return runtime;
+  };
+})();
 
 /**
  * The environment's runtime, resolved lazily.
@@ -33,15 +55,7 @@ let serverRuntime: ReturnType<typeof createRuntime> | null = null;
  * because that wrapper's server branch is what runs outside the Start runtime.
  */
 function getRuntime() {
-  if (hasWindow()) {
-    browserRuntime ??= createRuntime(getRuntimePublicEnv().apiUrl);
-
-    return browserRuntime;
-  }
-
-  serverRuntime ??= createRuntime(getServerApiUrl());
-
-  return serverRuntime;
+  return hasWindow() ? browserRuntime() : serverRuntime();
 }
 
 /**

@@ -94,10 +94,6 @@ export const strippedBreadcrumb = <
   return crumb;
 };
 
-let started = false;
-
-let scripts = "";
-
 /**
  * The error type recorded on an event and on the product-analytics event.
  *
@@ -132,7 +128,7 @@ export const captureBrowserError = <T>(
 ): void => {
   // Product analytics listens independently of Sentry: a deployment may
   // configure Databuddy without an error tracker, and the event is still useful.
-  if (started) {
+  if (Sentry.getClient() !== undefined) {
     if (tags === undefined) Sentry.captureException(error);
     else Sentry.captureException(error, { tags });
   }
@@ -150,7 +146,7 @@ export const captureBrowserError = <T>(
 export const setErrorReportingUser = (
   user: ErrorReportingUser | null
 ): void => {
-  if (!started) return;
+  if (Sentry.getClient() === undefined) return;
   Sentry.setUser(user === null ? null : { id: user.id });
 };
 
@@ -180,8 +176,10 @@ export const reactErrorHandlers = {
 export const startErrorReporting = (
   settings: BrowserErrorReportingSettings
 ): void => {
-  if (started || settings.dsn.length === 0) return;
-  scripts = settings.scripts;
+  if (Sentry.getClient() !== undefined || settings.dsn.length === 0) return;
+  // Captured by `beforeSend` below: the loader snippet decides which failures
+  // are first-party, and nothing outside this call needs it.
+  const scripts = settings.scripts;
 
   const options: Parameters<typeof Sentry.init>[0] = {
     dsn: settings.dsn,
@@ -233,12 +231,11 @@ export const startErrorReporting = (
 
   if (settings.tunnel !== undefined) options.tunnel = settings.tunnel;
   Sentry.init(options);
-  started = true;
 };
 
 /** Boot failures are reported after early initialization, with no entry data attached. */
 export const reportBootFailure = <T>(error: T): void => {
-  if (started) Sentry.captureException(error);
+  if (Sentry.getClient() !== undefined) Sentry.captureException(error);
 };
 
 export { scriptDirectory };
