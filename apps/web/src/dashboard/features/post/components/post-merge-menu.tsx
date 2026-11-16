@@ -281,7 +281,7 @@ export function PostMergeMenu() {
           )}
         </MenuPopup>
       </Menu>
-      {dialog === null ? null : dialog === "unmerge" ? (
+      {dialog === "unmerge" && (
         <PostUnmergeCommandDialog
           onOpenChange={(open) => {
             if (!open) {
@@ -289,7 +289,8 @@ export function PostMergeMenu() {
             }
           }}
         />
-      ) : (
+      )}
+      {dialog !== null && dialog !== "unmerge" && (
         <PostMergeCommandDialog
           direction={dialog}
           onOpenChange={(open) => {

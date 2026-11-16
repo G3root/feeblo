@@ -37,32 +37,30 @@ export function CheckoutConfirmationAlert({
     return null;
   }
 
+  let variant: "success" | "error" | "info" = "info";
+  let title = "Checkout completed — confirming your subscription";
+
+  let description =
+    "Your checkout may still be processing. Refresh the subscription status to try again.";
+
+  if (status === "confirmed") {
+    variant = "success";
+    title = "Subscription activated";
+    description = `This workspace now has the ${PLAN_COPY[snapshot.context.plan ?? "free"].name} plan.`;
+  } else if (status === "delayed") {
+    title = "Subscription confirmation is taking longer than expected";
+  } else if (status === "error") {
+    variant = "error";
+    title = "Could not refresh subscription status";
+  } else if (status === "pending") {
+    description =
+      "Polar is confirming the subscription. This page will update automatically; it can take a few seconds.";
+  }
+
   return (
-    <Alert
-      variant={
-        status === "confirmed"
-          ? "success"
-          : status === "error"
-            ? "error"
-            : "info"
-      }
-    >
-      <AlertTitle>
-        {status === "confirmed"
-          ? "Subscription activated"
-          : status === "delayed"
-            ? "Subscription confirmation is taking longer than expected"
-            : status === "error"
-              ? "Could not refresh subscription status"
-              : "Checkout completed — confirming your subscription"}
-      </AlertTitle>
-      <AlertDescription>
-        {status === "confirmed"
-          ? `This workspace now has the ${PLAN_COPY[snapshot.context.plan ?? "free"].name} plan.`
-          : status === "pending"
-            ? "Polar is confirming the subscription. This page will update automatically; it can take a few seconds."
-            : "Your checkout may still be processing. Refresh the subscription status to try again."}
-      </AlertDescription>
+    <Alert variant={variant}>
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{description}</AlertDescription>
       {status === "delayed" || status === "error" ? (
         <Button
           className="mt-3"

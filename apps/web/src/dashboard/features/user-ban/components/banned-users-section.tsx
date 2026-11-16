@@ -273,7 +273,7 @@ export function BannedUsersSection({
           </div>
         ) : null}
 
-        {isLoading ? (
+        {isLoading && (
           <SkeletonLoader isLoading>
             <div className="flex flex-col gap-2">
               {[0, 1, 2].map((key) => (
@@ -286,7 +286,9 @@ export function BannedUsersSection({
               ))}
             </div>
           </SkeletonLoader>
-        ) : loadFailed ? (
+        )}
+
+        {!isLoading && loadFailed && (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -301,7 +303,9 @@ export function BannedUsersSection({
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
-        ) : bans.length === 0 ? (
+        )}
+
+        {!isLoading && !loadFailed && bans.length === 0 && (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -319,7 +323,9 @@ export function BannedUsersSection({
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
-        ) : (
+        )}
+
+        {!isLoading && !loadFailed && bans.length > 0 && (
           <div className="flex flex-col gap-2" role="list">
             {bans.map((ban) => (
               <SettingsItem.Item key={ban.id} role="listitem">

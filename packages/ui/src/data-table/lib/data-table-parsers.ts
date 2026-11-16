@@ -147,8 +147,11 @@ export function parseColumnFilter<TColumnId extends string>(
  */
 export function getColumnFiltersKey(filters: ColumnFilterItem[]): string {
   return filters
-    .filter((filter) => getIsActiveFilter(filter))
-    .map((filter) => `${filter.id}=${serializeColumnFilter(filter)}`)
+    .flatMap((filter) =>
+      getIsActiveFilter(filter)
+        ? [`${filter.id}=${serializeColumnFilter(filter)}`]
+        : []
+    )
     .sort()
     .join("&");
 }

@@ -285,14 +285,19 @@ export function ImportReviewPage({
       return;
     }
 
+    let title = m.plain_soft_auk();
+    let type: "success" | "error" = "error";
+
+    if (status === "completed") {
+      title = m.proud_fresh_wren();
+      type = "success";
+    } else if (status === "failed") {
+      title = m.brave_plain_crab();
+    }
+
     toastManager.add({
-      title:
-        status === "completed"
-          ? m.proud_fresh_wren()
-          : status === "failed"
-            ? m.brave_plain_crab()
-            : m.plain_soft_auk(),
-      type: status === "completed" ? "success" : "error",
+      title,
+      type,
     });
   }, [status]);
 

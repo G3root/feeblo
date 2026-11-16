@@ -330,9 +330,11 @@ const validateRequiredAttributes = (
   definitions: readonly AttributeDefinition[],
   data: AttributeSource
 ): Effect.Effect<void, DataValidationError> => {
-  const missing = definitions
-    .filter((d) => d.isRequired && !(d.key in data))
-    .map((d) => `Missing required attribute "${d.key}"`);
+  const missing = definitions.flatMap((d) =>
+    d.isRequired && !(d.key in data)
+      ? [`Missing required attribute "${d.key}"`]
+      : []
+  );
 
   return missing.length > 0
     ? Effect.fail(new DataValidationError({ message: missing.join("; ") }))

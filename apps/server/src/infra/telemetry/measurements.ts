@@ -25,14 +25,15 @@ const rejectedRecords = Metric.counter(
 );
 
 /** The signal an export path belongs to; the endpoint path is the only input. */
-const signalOf = (path: string): string =>
-  path.endsWith("/traces")
-    ? "traces"
-    : path.endsWith("/logs")
-      ? "logs"
-      : path.endsWith("/metrics")
-        ? "metrics"
-        : "other";
+const signalOf = (path: string): string => {
+  if (path.endsWith("/traces")) return "traces";
+
+  if (path.endsWith("/logs")) return "logs";
+
+  if (path.endsWith("/metrics")) return "metrics";
+
+  return "other";
+};
 
 /** Record one export failure on the metrics registry and the local log. */
 export const recordExportFailure = (

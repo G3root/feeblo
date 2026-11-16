@@ -553,9 +553,9 @@ export const materializeEmailIntent = (outboxId: string) =>
           }
 
           const soleCreatorUserIds = new Set(
-            [...creatorCounts.entries()]
-              .filter(([, count]) => count === rows.length)
-              .map(([userId]) => userId)
+            [...creatorCounts.entries()].flatMap(([userId, count]) =>
+              count === rows.length ? [userId] : []
+            )
           );
 
           const recipients = yield* resolveMemberNotificationRecipients({

@@ -82,7 +82,7 @@ export function createWidgetDraft(theme: WidgetTheme): WidgetDraft {
 export function enabledWidgetModules(
   entries: readonly WidgetModuleEntry[]
 ): WidgetModule[] {
-  return entries.filter((entry) => entry.enabled).map((entry) => entry.id);
+  return entries.flatMap((entry) => (entry.enabled ? [entry.id] : []));
 }
 
 /**

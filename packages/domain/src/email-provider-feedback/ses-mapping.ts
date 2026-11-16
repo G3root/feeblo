@@ -76,6 +76,48 @@ const findHeader = (
     ?.value.trim();
 
 /**
+ * The addresses a provider event names as its subject, when it names any.
+ *
+ * Each event type keeps the recipients in a different field, and other types
+ * carry none, which is why the caller falls back to the envelope destination.
+ */
+const reportedRecipients = (
+  notification: SesEventNotification
+): readonly string[] => {
+  switch (notification.eventType) {
+    case "Bounce":
+      return (notification.bounce?.bouncedRecipients ?? []).flatMap(
+        (recipient) =>
+          recipient.emailAddress === undefined ? [] : [recipient.emailAddress]
+      );
+    case "Complaint":
+      return (notification.complaint?.complainedRecipients ?? []).flatMap(
+        (recipient) =>
+          recipient.emailAddress === undefined ? [] : [recipient.emailAddress]
+      );
+    case "Delivery":
+      return notification.delivery?.recipients ?? [];
+    default:
+      return [];
+  }
+};
+
+/**
+ * `Permanent` is a hard bounce and `Transient` a soft one; every other
+ * classification, including a missing bounce block, stays undetermined so the
+ * address is retried rather than suppressed.
+ */
+const hardOrSoftBounceType = (
+  bounceType: string | undefined
+): "hard" | "soft" | "undetermined" => {
+  if (bounceType === "Permanent") return "hard";
+
+  if (bounceType === "Transient") return "soft";
+
+  return "undetermined";
+};
+
+/**
  * The addresses a provider event is about.
  *
  * A bounce names the recipients that failed and a complaint names the ones who
@@ -87,21 +129,7 @@ const findHeader = (
 const findRecipients = (
   notification: SesEventNotification
 ): readonly string[] => {
-  const reported =
-    notification.eventType === "Bounce"
-      ? (notification.bounce?.bouncedRecipients ?? []).flatMap((recipient) =>
-          recipient.emailAddress === undefined ? [] : [recipient.emailAddress]
-        )
-      : notification.eventType === "Complaint"
-        ? (notification.complaint?.complainedRecipients ?? []).flatMap(
-            (recipient) =>
-              recipient.emailAddress === undefined
-                ? []
-                : [recipient.emailAddress]
-          )
-        : notification.eventType === "Delivery"
-          ? (notification.delivery?.recipients ?? [])
-          : [];
+  const reported = reportedRecipients(notification);
 
   const fallback = notification.mail.destination ?? [];
 
@@ -190,12 +218,7 @@ export const toProviderLifecycleEvent = (
       // else — `Undetermined`, or an event with no bounce block at all — is
       // also retried: treating an unknown classification as hard would
       // suppress an address that may still be deliverable.
-      const bounceType =
-        bounce?.bounceType === "Permanent"
-          ? "hard"
-          : bounce?.bounceType === "Transient"
-            ? "soft"
-            : "undetermined";
+      const bounceType = hardOrSoftBounceType(bounce?.bounceType);
 
       const diagnosticCode =
         bounce?.bouncedRecipients?.[0]?.diagnosticCode?.trim();

@@ -2216,7 +2216,7 @@ const seed = (auth: SeedAuth) =>
 
     const actorIds = [
       primaryUser.id,
-      ...extraUsers.filter((item) => item.joinMainOrg).map((item) => item.id),
+      ...extraUsers.flatMap((item) => (item.joinMainOrg ? [item.id] : [])),
       ...extraUsers
         .filter((item) => !item.joinMainOrg)
         .slice(0, 2)

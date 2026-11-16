@@ -724,18 +724,56 @@ export const initAuthHandler = (
       "/email-otp/send-verification-otp",
     ]);
 
+    /**
+     * The flow an OTP request belongs to, or null when its path is not one of
+     * the OTP endpoints this hook rate limits.
+     */
+    const verificationOtpFlowFor = (ctx: {
+      path: string;
+      body?: Record<string, string | number | boolean | null | undefined>;
+    }): VerificationOtpFlow | null => {
+      if (
+        ctx.path === "/email-otp/request-password-reset" ||
+        ctx.path === "/forget-password/email-otp"
+      ) {
+        return "password-reset";
+      }
+
+      if (ctx.path === "/email-otp/request-email-change") {
+        return "email-verification";
+      }
+
+      if (ctx.path !== "/email-otp/send-verification-otp") {
+        return null;
+      }
+
+      if (ctx.body?.type === "sign-in") {
+        return "sign-in";
+      }
+
+      if (ctx.body?.type === "forget-password") {
+        return "password-reset";
+      }
+
+      return "email-verification";
+    };
+
     const consumeVerificationOtpRateLimitForFlow = async (
       flow: VerificationOtpFlow,
       email: string
     ) => {
       await callbackRuntime.runPromise(
-        RateLimitService.use((rateLimiter) =>
-          flow === "password-reset"
-            ? rateLimiter.consumePasswordResetOtp(email)
-            : flow === "sign-in"
-              ? rateLimiter.consumeSignInOtp(email)
-              : rateLimiter.consumeEmailVerificationOtp(email)
-        ).pipe(
+        RateLimitService.use((rateLimiter) => {
+          if (flow === "password-reset") {
+            return rateLimiter.consumePasswordResetOtp(email);
+          }
+
+          if (flow === "sign-in") {
+            return rateLimiter.consumeSignInOtp(email);
+          }
+
+          return rateLimiter.consumeEmailVerificationOtp(email);
+        }).pipe(
           Effect.catchTag("RateLimiterError", (error) =>
             Effect.fail(
               new APIError(
@@ -775,21 +813,9 @@ export const initAuthHandler = (
       path: string;
       body?: Record<string, string | number | boolean | null | undefined>;
     }) => {
-      const flow =
-        ctx.path === "/email-otp/request-password-reset" ||
-        ctx.path === "/forget-password/email-otp"
-          ? ("password-reset" as const)
-          : ctx.path === "/email-otp/request-email-change"
-            ? ("email-verification" as const)
-            : ctx.path === "/email-otp/send-verification-otp"
-              ? ctx.body?.type === "sign-in"
-                ? ("sign-in" as const)
-                : ctx.body?.type === "forget-password"
-                  ? ("password-reset" as const)
-                  : ("email-verification" as const)
-              : null;
+      const flow = verificationOtpFlowFor(ctx);
 
-      if (!flow) {
+      if (flow === null) {
         return;
       }
 
@@ -1266,22 +1292,24 @@ export const initAuthHandler = (
             // Keep those sends rate limited, while avoiding a second consume
             // for paths already handled by the request hook.
             if (!(ctx && verificationOtpRateLimitedPaths.has(ctx.path))) {
-              await consumeVerificationOtpRateLimitForFlow(
-                type === "forget-password"
-                  ? "password-reset"
-                  : type === "sign-in"
-                    ? "sign-in"
-                    : "email-verification",
-                email
-              );
+              let flow: VerificationOtpFlow = "email-verification";
+
+              if (type === "forget-password") {
+                flow = "password-reset";
+              } else if (type === "sign-in") {
+                flow = "sign-in";
+              }
+
+              await consumeVerificationOtpRateLimitForFlow(flow, email);
             }
 
-            const flowLabel =
-              type === "forget-password"
-                ? "password reset"
-                : type === "sign-in"
-                  ? "sign-in"
-                  : "email verification";
+            let flowLabel = "email verification";
+
+            if (type === "forget-password") {
+              flowLabel = "password reset";
+            } else if (type === "sign-in") {
+              flowLabel = "sign-in";
+            }
 
             const { createVerificationOtpEmail } =
               await loadVerificationOtpEmail();

@@ -158,9 +158,13 @@ describe("public API operations registry", () => {
           return expect.fail(`no operation named ${identifier}`);
         }
 
-        const pathParams = [...endpoint.path.matchAll(/:([^/]+)/g)]
-          .map((match) => match[1])
-          .filter((name): name is string => name !== undefined);
+        const pathParams = [...endpoint.path.matchAll(/:([^/]+)/g)].flatMap(
+          (match) => {
+            const name = match[1];
+
+            return name === undefined ? [] : [name];
+          }
+        );
 
         if (pathParams.length === 0) {
           continue;

@@ -160,20 +160,18 @@ function eagerPreloadHints(): Plugin {
       const deduped = next.replace(
         /(preloads:\s*\[)([\s\S]*?)(\])/g,
         (_whole, head: string, body: string, tail: string) => {
-          const kept = [...body.matchAll(/"([^"]+)"/g)]
-            .map(
-              // SAFETY: the pattern captures one group, so index 1 exists.
-              (match) => match[1] as string
-            )
-            .filter((href) => {
-              if (seen.has(href)) {
-                return false;
-              }
+          const kept = [...body.matchAll(/"([^"]+)"/g)].flatMap((match) => {
+            // SAFETY: the pattern captures one group, so index 1 exists.
+            const href = match[1] as string;
 
-              seen.add(href);
+            if (seen.has(href)) {
+              return [];
+            }
 
-              return true;
-            });
+            seen.add(href);
+
+            return [href];
+          });
 
           const entries = kept
             .map((href) => `\n\t\t\t${JSON.stringify(href)},`)

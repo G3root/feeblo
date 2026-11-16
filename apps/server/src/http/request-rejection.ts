@@ -107,12 +107,18 @@ const reporter: ErrorReporter.ErrorReporter = {
   [ErrorReporter.TypeId]: ErrorReporter.TypeId,
   report: ({ cause, fiber }) => {
     for (const reason of cause.reasons) {
-      const error =
-        reason._tag === "Fail"
-          ? reason.error
-          : reason._tag === "Die"
-            ? reason.defect
-            : undefined;
+      let error: unknown;
+
+      switch (reason._tag) {
+        case "Fail":
+          error = reason.error;
+          break;
+        case "Die":
+          error = reason.defect;
+          break;
+        default:
+          error = undefined;
+      }
 
       if (!isRequestRejection(error)) {
         continue;

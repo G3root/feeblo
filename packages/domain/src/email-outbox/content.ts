@@ -367,12 +367,14 @@ export const resolveSubscriptionNotificationContent = (
         // The other post the event names: the merged-away source for a merge,
         // the survivor for an unmerge. Both titles make the email readable
         // without opening either post.
-        const counterpartPostId =
-          intent.payload.kind === "post.merged"
-            ? intent.payload.postId
-            : intent.payload.kind === "post.unmerged"
-              ? intent.payload.targetPostId
-              : undefined;
+        const { payload } = intent;
+        let counterpartPostId: string | undefined;
+
+        if (payload.kind === "post.merged") {
+          counterpartPostId = payload.postId;
+        } else if (payload.kind === "post.unmerged") {
+          counterpartPostId = payload.targetPostId;
+        }
 
         return yield* transaction(
           Effect.gen(function* () {

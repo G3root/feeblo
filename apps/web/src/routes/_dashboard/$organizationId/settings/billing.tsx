@@ -198,15 +198,15 @@ function BillingSettingsContent({
                     const selectedProduct = plan[selectedInterval];
                     const isCurrentPlan = plan.planType === currentPlanType;
 
-                    const ctaLabel = hasPaidPlan
-                      ? "Manage billing"
-                      : isCurrentPlan
-                        ? "Current plan"
-                        : plan.planType === "free"
-                          ? "Unavailable"
-                          : selectedProduct
-                            ? "Upgrade"
-                            : "Unavailable";
+                    let ctaLabel = "Unavailable";
+
+                    if (hasPaidPlan) {
+                      ctaLabel = "Manage billing";
+                    } else if (isCurrentPlan) {
+                      ctaLabel = "Current plan";
+                    } else if (plan.planType !== "free" && selectedProduct) {
+                      ctaLabel = "Upgrade";
+                    }
 
                     return (
                       <Card key={plan.planType} size="sm">

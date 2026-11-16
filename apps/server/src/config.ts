@@ -206,9 +206,9 @@ export class ServerConfig extends Context.Service<ServerConfig>()(
           ["MEDIA_PUBLIC_BASE_URL", mediaPublicBaseUrl],
         ] as const;
 
-        const missingMediaVariables = mediaVariables
-          .filter(([, value]) => value === undefined)
-          .map(([name]) => name);
+        const missingMediaVariables = mediaVariables.flatMap(([name, value]) =>
+          value === undefined ? [name] : []
+        );
 
         if (missingMediaVariables.length > 0) {
           return yield* Effect.fail(

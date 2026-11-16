@@ -347,13 +347,15 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
       total: 0,
     };
 
+    // Every reason the table can hold counts under one of the three classes;
+    // a row whose reason is none of the named two is a hard bounce.
+    const keyByReason = new Map<string, "administrativeBlock" | "complaint">([
+      ["administrative_block", "administrativeBlock"],
+      ["complaint", "complaint"],
+    ]);
+
     for (const row of rows) {
-      const key =
-        row.reason === "complaint"
-          ? "complaint"
-          : row.reason === "administrative_block"
-            ? "administrativeBlock"
-            : "hardBounce";
+      const key = keyByReason.get(row.reason) ?? "hardBounce";
 
       result[key] += row.total;
       result.total += row.total;

@@ -373,6 +373,18 @@ function UpgradePlanButton({
 }) {
   const [loading, setLoading] = useState(false);
 
+  let label = `Upgrade to ${selectedPlan.name}`;
+
+  if (loading) {
+    label = "Redirecting...";
+  } else if (hasPaidPlan) {
+    label = "Manage Billing";
+  } else if (isCurrentPlan) {
+    label = "Current Plan";
+  } else if (selectedPlan.planType === "free") {
+    label = "Unavailable";
+  }
+
   return (
     <Button
       className="w-full"
@@ -421,15 +433,7 @@ function UpgradePlanButton({
       size="lg"
       type="button"
     >
-      {loading
-        ? "Redirecting..."
-        : hasPaidPlan
-          ? "Manage Billing"
-          : isCurrentPlan
-            ? "Current Plan"
-            : selectedPlan.planType === "free"
-              ? "Unavailable"
-              : `Upgrade to ${selectedPlan.name}`}
+      {label}
     </Button>
   );
 }
