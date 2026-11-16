@@ -446,8 +446,13 @@ describe("batched RPC protocol", () => {
         "Add",
       ]);
 
-      // The layer prepends its configured URL to every request it posts; the
-      // protocol posts to the empty path, which resolves against it.
+      // The layer prepends its configured URL to every request it posts, and
+      // the protocol posts to the empty path, so `prependUrl` — which "inserts
+      // or trims one slash as needed" — resolves it to the trailing-slash form.
+      // That is upstream's composition, unchanged from the transport this layer
+      // replaced, and the server routes it: `HttpRouter` runs `FindMyWay` with
+      // `ignoreTrailingSlash: true` (trimming both the registered path and the
+      // request), and `apps/server`'s origin check names `/rpc/` explicitly.
       expect(yield* Ref.get(urls)).toEqual(["http://rpc.test/rpc/"]);
     })
   );
