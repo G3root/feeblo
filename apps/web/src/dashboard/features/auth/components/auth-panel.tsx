@@ -2,7 +2,9 @@ import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status
 import { cn } from "@feeblo/ui/utils";
 import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useState } from "react";
+import { useMachine } from "@xstate/react";
+
+import { authPanelSampleVoteMachine } from "../lib/auth-panel-sample-vote-machine";
 
 /**
  * The panel beside the auth form: a slice of the product, rendered in the DOM
@@ -18,11 +20,12 @@ import { useEffect, useState } from "react";
  * posts, invented counts), and a screen reader announcing "128 votes, Dark mode
  * for the embeddable widget" would be describing a page that does not exist.
  *
- * Motion: one orchestrated entrance — the frame settles, the three rows arrive
- * 90ms apart, and a vote lands on the first row. It then stays still. Nothing
- * here loops, because a looping decoration next to a form competes with typing.
- * Under `prefers-reduced-motion` the whole sequence is skipped and the board
- * renders in its resting state.
+ * Motion: one orchestrated entrance — the frame settles, the rows arrive 90ms
+ * apart, and a vote lands on the first row. It then stays still. Nothing here
+ * loops, because a looping decoration next to a form competes with typing. The
+ * sample vote is a machine (`../lib/auth-panel-sample-vote-machine`), not a
+ * timer in an effect; `prefers-reduced-motion` is handled where the movement
+ * is, by `motion-safe:`/`motion-reduce:` on the two elements that animate.
  */
 
 const samplePosts = [
@@ -56,27 +59,13 @@ const samplePosts = [
   },
 ] as const;
 
-const voteLandingDelayMs = 1500;
-
 export function AuthPanel({ className }: { className?: string }) {
-  // The count the board shows before anyone presses anything, and whether the
-  // sample vote has landed yet. `false` on the server and on the first client
-  // render, so hydration compares two identical documents.
-  const [hasVoted, setHasVoted] = useState(false);
+  // `settling` on the server and on the first client render — the actor starts
+  // in an effect — so hydration compares two identical documents and the vote
+  // lands one state later.
+  const [sampleVote] = useMachine(authPanelSampleVoteMachine);
 
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setHasVoted(true);
-    }, voteLandingDelayMs);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, []);
+  const hasVoted = sampleVote.matches("voted");
 
   return (
     <aside
@@ -169,7 +158,7 @@ function PanelVote({ count, isVoted }: { count: number; isVoted: boolean }) {
       )}
     >
       {isVoted ? (
-        <span className="animate-vote-burst border-brand/60 absolute top-2 left-1/2 size-4 -translate-x-1/2 rounded-full border" />
+        <span className="animate-vote-burst border-brand/60 absolute top-2 left-1/2 size-4 -translate-x-1/2 rounded-full border motion-reduce:hidden" />
       ) : null}
       <HugeiconsIcon
         className="size-3.5"

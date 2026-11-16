@@ -1,10 +1,11 @@
 import { Button } from "@feeblo/ui/button";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 
 import { m } from "../paraglide/messages.js";
-import { type SocialProvider, signInWithSocialProvider } from "./auth-flows";
+import type { SocialProvider } from "./auth-flows";
 import type { AuthMethod } from "./last-auth-method";
 import { LastUsedBadge } from "./last-used-badge";
+import { useSocialAuth } from "./social-auth-machine";
 
 type SocialAuthButtonsProps = {
   redirectTo?: string;
@@ -67,26 +68,17 @@ export function SocialAuthButtons({
   redirectTo,
   lastUsedMethod = null,
 }: SocialAuthButtonsProps) {
-  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(
-    null
-  );
+  const { start, startingProvider } = useSocialAuth(redirectTo);
 
   return (
     <div className="flex flex-col gap-3">
       {providers.map((provider) => (
         <Button
           className="relative w-full overflow-visible"
-          disabled={pendingProvider !== null}
+          disabled={startingProvider !== null}
           key={provider.id}
-          loading={pendingProvider === provider.id}
-          onClick={async () => {
-            setPendingProvider(provider.id);
-            await signInWithSocialProvider({
-              provider: provider.id,
-              redirectTo,
-            });
-            setPendingProvider(null);
-          }}
+          loading={startingProvider === provider.id}
+          onClick={() => start(provider.id)}
           size="lg"
           type="button"
           variant="outline"

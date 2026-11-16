@@ -1,5 +1,5 @@
 import { isString } from "@feeblo/utils/runtime-kind";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 import type { SocialProvider } from "./auth-flows";
 
@@ -47,19 +47,35 @@ export function rememberAuthMethod(method: AuthMethod): void {
 }
 
 /**
- * The recorded method, read after mount.
+ * The recorded method, read as an external store.
  *
- * `localStorage` does not exist while the server renders the document, so the
- * first render cannot know the answer. Returning `null` until the effect runs
- * keeps hydration identical and lets the badge arrive on its own rather than
- * disagree with the markup it was hydrated from.
+ * Not `useState` + `useEffect`: that pattern paints the button without its hint
+ * and then repaints with it, which is an extra render and a visible pop for a
+ * value React can read on the first client render. `useSyncExternalStore` is
+ * the primitive for exactly this — a value that lives outside React — and its
+ * server snapshot is `null`, so hydration compares two identical documents and
+ * the value arrives on the first render after it.
+ *
+ * The subscription is `storage`: signing in on this tab navigates, so the only
+ * way the value changes underneath a mounted page is another tab.
  */
+function subscribe(onStoreChange: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    // `key === null` is `localStorage.clear()`, which drops this key too.
+    if (event.key === storageKey || event.key === null) {
+      onStoreChange();
+    }
+  };
+
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+const getServerSnapshot = (): AuthMethod | null => null;
+
 export function useLastAuthMethod(): AuthMethod | null {
-  const [method, setMethod] = useState<AuthMethod | null>(null);
-
-  useEffect(() => {
-    setMethod(readLastAuthMethod());
-  }, []);
-
-  return method;
+  return useSyncExternalStore(subscribe, readLastAuthMethod, getServerSnapshot);
 }

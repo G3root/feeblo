@@ -10,19 +10,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import NumberFlow from "@number-flow/react";
 import type { Collection } from "@tanstack/react-db";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
-import {
-  createContext,
-  type ReactNode,
-  use,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { createContext, type ReactNode, use, useMemo } from "react";
 
 import { m } from "./paraglide/messages.js";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
+import { useVoteBurst } from "./upvote-burst-machine";
 
 type UpvoteCollection = Collection<TUpvote, string, any, any>;
 
@@ -100,13 +93,15 @@ function useUpvote({
   const upvoteCount = upvotes?.length ?? 0;
   const isUpvoted = !!userUpvoteQuery.data;
 
-  const onToggle = async () => {
-    if (disabled) return;
+  const onToggle = async (): Promise<UpvoteOutcome> => {
+    if (disabled) {
+      return "noop";
+    }
 
     if (!session) {
       onAuthRequired?.();
 
-      return;
+      return "noop";
     }
 
     const userId = session.user.id;
@@ -124,7 +119,7 @@ function useUpvote({
     await upvoteCollection.utils.refetch({ throwOnError: true });
 
     if (upvoteCollection.has(key) === intendedUpvoted) {
-      return;
+      return "noop";
     }
 
     if (intendedUpvoted) {
@@ -147,10 +142,15 @@ function useUpvote({
       });
 
       await tx.when("settled");
-    } else {
-      const tx = upvoteCollection.delete(key);
-      await tx.when("settled");
+
+      return "cast";
     }
+
+    const tx = upvoteCollection.delete(key);
+
+    await tx.when("settled");
+
+    return "cleared";
   };
 
   return { isLoading, isUpvoted, onToggle, upvoteCount };
@@ -161,6 +161,16 @@ function useUpvote({
 // ---------------------------------------------------------------------------
 
 type TriggerVariant = "compact" | "default";
+
+/**
+ * What a press did to the vote.
+ *
+ * The trigger needs this to know whether to confirm the press with the ring:
+ * only a vote that was actually cast is worth confirming. `noop` covers the
+ * presses that change nothing — a locked or merged post, a guest sent to the
+ * sign-in dialog, or a retry that finds the row already in the intended state.
+ */
+export type UpvoteOutcome = "cast" | "cleared" | "noop";
 
 /**
  * Shared trigger geometry and behaviour.
@@ -237,48 +247,17 @@ const spinTiming: EffectTiming = {
   easing: "cubic-bezier(0.23, 1, 0.32, 1)",
 };
 
-/**
- * True for a moment after the visitor's own vote lands.
- *
- * The ring is a one-shot confirmation: it should fire when *they* vote, not
- * when the component mounts already-voted, which is why this compares against
- * the previous value instead of keying off `isUpvoted`. The timer clears
- * itself; the cleanup also clears the flag so un-voting mid-ring cannot leave
- * an element behind.
- */
-function useVoteBurst(isUpvoted: boolean) {
-  const [bursting, setBursting] = useState(false);
-  const wasUpvoted = useRef(isUpvoted);
-
-  useEffect(() => {
-    const justVoted = isUpvoted && !wasUpvoted.current;
-    wasUpvoted.current = isUpvoted;
-
-    if (!justVoted) {
-      return;
-    }
-
-    setBursting(true);
-
-    const timeout = window.setTimeout(() => {
-      setBursting(false);
-    }, 420);
-
-    return () => {
-      window.clearTimeout(timeout);
-      setBursting(false);
-    };
-  }, [isUpvoted]);
-
-  return bursting;
-}
-
 interface UpvoteTriggerProps {
   variant?: TriggerVariant;
   disabled?: boolean;
   isUpvoted: boolean;
   label?: string;
-  onToggle: () => void | Promise<void>;
+  /**
+   * Runs the toggle and reports what it did. Returning `"cast"` is what earns
+   * the ring; returning nothing is allowed for a caller that does not track
+   * the outcome, and then the press simply is not confirmed.
+   */
+  onToggle: () => UpvoteOutcome | void | Promise<UpvoteOutcome | void>;
   upvoteCount: number;
 }
 
@@ -294,7 +273,10 @@ function UpvoteArrow({
       {bursting ? (
         <span
           aria-hidden
-          className="animate-vote-burst border-brand/60 pointer-events-none absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border"
+          // `motion-reduce:hidden`, not `motion-reduce:animate-none`: the
+          // animation's last frame is `opacity: 0`, so removing the animation
+          // without removing the element leaves a solid ring on screen.
+          className="animate-vote-burst border-brand/60 pointer-events-none absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border motion-reduce:hidden"
           data-slot="upvote-burst"
         />
       ) : null}
@@ -322,8 +304,16 @@ function UpvoteTrigger({
   onToggle,
   upvoteCount,
 }: UpvoteTriggerProps) {
-  const bursting = useVoteBurst(isUpvoted);
+  const { bursting, cast } = useVoteBurst();
   const styles = variantStyles[variant];
+
+  const handlePress = async () => {
+    const outcome = await onToggle();
+
+    if (outcome === "cast") {
+      cast();
+    }
+  };
 
   return (
     <button
@@ -337,7 +327,7 @@ function UpvoteTrigger({
       data-slot="upvote-trigger"
       data-state={isUpvoted ? "voted" : "idle"}
       disabled={disabled}
-      onClick={onToggle}
+      onClick={handlePress}
       type="button"
     >
       <UpvoteArrow bursting={bursting} isUpvoted={isUpvoted} />
@@ -471,7 +461,7 @@ type UpvoteToggleState = {
 };
 
 type UpvoteToggleActions = {
-  onToggle: () => void | Promise<void>;
+  onToggle: () => UpvoteOutcome | void | Promise<UpvoteOutcome | void>;
 };
 
 type UpvoteToggleMeta = {
@@ -503,7 +493,7 @@ type UpvoteToggleProviderProps = {
   disabled?: boolean;
   isUpvoted: boolean;
   label?: string;
-  onToggle: () => void | Promise<void>;
+  onToggle: () => UpvoteOutcome | void | Promise<UpvoteOutcome | void>;
   upvoteCount: number;
 };
 
