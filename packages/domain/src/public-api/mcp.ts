@@ -172,6 +172,7 @@ type PublicApiMcpTools = typeof PublicApiMcpToolkit.tools;
  */
 const buildPublicApiMcpHandlers = () =>
   Effect.gen(function* () {
+    // oxlint-disable-next-line anti-slop-effect/prefer-yield-service -- the handler built here is stored and invoked later, outside the effect that built it, so it cannot inherit this environment; the captured context is what supplies the request-scoped services it declares
     const context = yield* Effect.context<PublicApiDependencies>();
     const approval = yield* Approval;
 

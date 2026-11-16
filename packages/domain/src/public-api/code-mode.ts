@@ -170,6 +170,7 @@ Effect.Effect<unknown, unknown, PublicApiDependencies | PublicApiCaller>;
 
 const buildPublicApiCodeModeHandlers = () =>
   Effect.gen(function* () {
+    // oxlint-disable-next-line anti-slop-effect/prefer-yield-service -- the handler built here is stored and invoked later, outside the effect that built it, so it cannot inherit this environment; the captured context is what supplies the request-scoped services it declares
     const context = yield* Effect.context<PublicApiDependencies>();
     const approval = yield* Approval;
     const sandbox = yield* Sandbox;
@@ -279,6 +280,7 @@ const buildPublicApiCodeModeHandlers = () =>
       // context, so the request-scoped services the call needs — the key
       // middleware's caller and, for the approval gate, the MCP client — are
       // captured here and supplied to each call rather than inherited.
+      // oxlint-disable-next-line anti-slop-effect/prefer-yield-service -- the handler built here is stored and invoked later, outside the effect that built it, so it cannot inherit this environment; the captured context is what supplies the request-scoped services it declares
       const request = yield* Effect.context<
         PublicApiCaller | ApprovalEnvironment
       >();

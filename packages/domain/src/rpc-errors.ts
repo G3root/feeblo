@@ -213,14 +213,19 @@ export function withRemapDbErrors<R, E, A, UniqueViolationError = never>(
           | { _tag: "LegidError" }
         > =>
           Schema.is(EffectDrizzleQueryError)(e) ||
+          // oxlint-disable-next-line anti-slop-effect/prefer-tagged-error-handling -- E is generic, so `catchTags` cannot name these tags; the predicate is what narrows it.
           Predicate.isTagged(e, "SqlError") ||
+          // oxlint-disable-next-line anti-slop-effect/prefer-tagged-error-handling -- E is generic, so `catchTags` cannot name these tags; the predicate is what narrows it.
           Predicate.isTagged(e, "SchemaError") ||
+          // oxlint-disable-next-line anti-slop-effect/prefer-tagged-error-handling -- E is generic, so `catchTags` cannot name these tags; the predicate is what narrows it.
           Predicate.isTagged(e, "LegidError"),
         (err) => {
+          // oxlint-disable-next-line anti-slop-effect/prefer-tagged-error-handling -- E is generic, so `catchTags` cannot name these tags; the predicate is what narrows it.
           if (Predicate.isTagged(err, "SchemaError")) {
             return toInternalError("There was an error in parsing when");
           }
 
+          // oxlint-disable-next-line anti-slop-effect/prefer-tagged-error-handling -- E is generic, so `catchTags` cannot name these tags; the predicate is what narrows it.
           if (Predicate.isTagged(err, "LegidError")) {
             return toInternalError("There was an error generating an id when");
           }
