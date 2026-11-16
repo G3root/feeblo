@@ -565,6 +565,135 @@ export function changelogCategoryCollection(scope: DashboardCollectionScope) {
   );
 }
 
+/**
+ * The help center's topics.
+ *
+ * A topic is the article's container and is not plan-limited — the allowance
+ * counts articles (see `helpCenterArticleCollection`), so a workspace at its
+ * ceiling can still reorganise the documentation it already has.
+ */
+export function helpCenterTopicCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId("helpCenterTopicCollection", scope);
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey(scope, "help-center-topic"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ListHelpCenterTopics({ organizationId }),
+          { signal: ctx.signal }
+        );
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      onInsert: async ({ collection, transaction }) => {
+        const { modified } = transaction.mutations[0];
+
+        await fetchRpc((rpc) =>
+          rpc.CreateHelpCenterTopic({
+            id: modified.id,
+            organizationId: modified.organizationId,
+            name: modified.name,
+            slug: modified.slug,
+            description: modified.description,
+            icon: modified.icon,
+            // Omitted rather than sent as `0`: the server appends to the end of
+            // the list, which is what "new section" means and what a blank
+            // client-side position cannot know.
+            position: undefined,
+          })
+        );
+        await collection.utils.refetch({ throwOnError: true });
+      },
+      onUpdate: async ({ collection, transaction }) => {
+        const { modified } = transaction.mutations[0];
+
+        await fetchRpc((rpc) =>
+          rpc.UpdateHelpCenterTopic({
+            id: modified.id,
+            organizationId: modified.organizationId,
+            name: modified.name,
+            slug: modified.slug,
+            description: modified.description,
+            icon: modified.icon,
+          })
+        );
+        await collection.utils.refetch({ throwOnError: true });
+      },
+      onDelete: async ({ collection, transaction }) => {
+        const { original } = transaction.mutations[0];
+
+        await fetchRpc((rpc) =>
+          rpc.DeleteHelpCenterTopic({
+            id: original.id,
+            organizationId: original.organizationId,
+          })
+        );
+        await collection.utils.refetch({ throwOnError: true });
+      },
+    })
+  );
+}
+
+/**
+ * The help center's articles.
+ *
+ * The row carries the three counters, so a list can render "read 1.2k times,
+ * 87% found it helpful" without a second query per row. They are derived
+ * server-side — see the table's own doc comment for why they are not stored.
+ */
+export function helpCenterArticleCollection(scope: DashboardCollectionScope) {
+  const id = organizationScopedCollectionId(
+    "helpCenterArticleCollection",
+    scope
+  );
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () => organizationScopedQueryKey(scope, "help-center-article"),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        const data = await fetchRpc(
+          (rpc) => rpc.ListHelpCenterArticles({ organizationId }),
+          { signal: ctx.signal }
+        );
+        return [...data];
+      },
+      getKey: (item) => item.id,
+      // No `onInsert`/`onUpdate`: a row is a *summary*, and the body lives only
+      // on the single-article read. The editor therefore writes through
+      // `CreateHelpCenterArticle`/`UpdateHelpCenterArticle` and refetches,
+      // rather than asking a collection to round-trip a field it never held.
+      onDelete: async ({ collection, transaction }) => {
+        const { original } = transaction.mutations[0];
+
+        await fetchRpc((rpc) =>
+          rpc.DeleteHelpCenterArticle({
+            id: original.id,
+            organizationId: original.organizationId,
+          })
+        );
+        await collection.utils.refetch({ throwOnError: true });
+      },
+    })
+  );
+}
+
 export const getChangelogPostKey = ({
   changelogId,
   postId,
@@ -1401,6 +1530,7 @@ export function siteCollection(scope: DashboardCollectionScope) {
             organizationId: updatedSite.organizationId,
             changelogVisibility: updatedSite.changelogVisibility,
             roadmapVisibility: updatedSite.roadmapVisibility,
+            helpCenterVisibility: updatedSite.helpCenterVisibility,
             noIndex: updatedSite.noIndex,
             name: updatedSite.name,
           })
@@ -2325,6 +2455,18 @@ const makeDashboardCollections = (
           indexType: BasicIndex,
         });
       }
+    );
+  },
+  get helpCenterTopicCollection() {
+    return materialize(
+      getBrowserDbClient(),
+      helpCenterTopicCollection(getScope())
+    );
+  },
+  get helpCenterArticleCollection() {
+    return materialize(
+      getBrowserDbClient(),
+      helpCenterArticleCollection(getScope())
     );
   },
   get changelogCategoryCollection() {

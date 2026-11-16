@@ -43,6 +43,9 @@ export function Navbar() {
                   label={m.strong_loved_flamingo()}
                 />
               ) : null}
+              {site.helpCenterVisibility === "PUBLIC" ? (
+                <NavTab href={boardPaths.help} label={m.help_center_nav()} />
+              ) : null}
             </nav>
           </div>
 
@@ -64,6 +67,9 @@ export function Navbar() {
               href={boardPaths.changelog}
               label={m.strong_loved_flamingo()}
             />
+          ) : null}
+          {site.helpCenterVisibility === "PUBLIC" ? (
+            <NavTab href={boardPaths.help} label={m.help_center_nav()} />
           ) : null}
         </nav>
       </div>

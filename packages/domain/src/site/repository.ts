@@ -17,6 +17,7 @@ interface findManyArgs {
 
 interface updateArgs {
   changelogVisibility: "PUBLIC" | "HIDDEN";
+  helpCenterVisibility: "PUBLIC" | "HIDDEN";
   id: string;
   name: string;
   noIndex: boolean;
@@ -44,6 +45,7 @@ const makeSiteRepository = Effect.gen(function* () {
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
           roadmapVisibility: schema.siteTable.roadmapVisibility,
+          helpCenterVisibility: schema.siteTable.helpCenterVisibility,
           noIndex: schema.siteTable.noIndex,
           createdAt: schema.siteTable.createdAt,
           updatedAt: schema.siteTable.updatedAt,
@@ -81,6 +83,7 @@ const makeSiteRepository = Effect.gen(function* () {
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
           roadmapVisibility: schema.siteTable.roadmapVisibility,
+          helpCenterVisibility: schema.siteTable.helpCenterVisibility,
           noIndex: schema.siteTable.noIndex,
           createdAt: schema.siteTable.createdAt,
           updatedAt: schema.siteTable.updatedAt,
@@ -97,6 +100,7 @@ const makeSiteRepository = Effect.gen(function* () {
     },
     update: ({
       changelogVisibility,
+      helpCenterVisibility,
       id,
       name,
       noIndex,
@@ -109,6 +113,7 @@ const makeSiteRepository = Effect.gen(function* () {
           .update(schema.siteTable)
           .set({
             changelogVisibility,
+            helpCenterVisibility,
             updatedAt: now,
             roadmapVisibility,
             noIndex,

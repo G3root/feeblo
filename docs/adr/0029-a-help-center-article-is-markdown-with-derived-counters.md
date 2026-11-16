@@ -1,0 +1,38 @@
+# ADR 0029: A help center article is sanitized Markdown with derived counters
+
+## Decision
+
+The help center is five tables: `help_center_topic`, `help_center_article`, `help_center_article_view_event`, `help_center_article_view_total`, and `help_center_article_feedback`, plus a `help_center_visibility` column on `site`. Three of those choices are decisions and not defaults:
+
+- **An article's body is sanitized Markdown, stored once, with the excerpt derived from its rendering.** There is no second, richer representation.
+- **The article's helpful and not-helpful counts are derived from the feedback rows and never stored on the article.** View counts are the exception, and for the opposite reason (see below).
+- **A reader is identified by an account or by a browser-generated id, never both, and never neither**, and each facet has its own partial unique index.
+
+Everything else follows existing decisions: tenancy is a column, ids are legids, slugs are unique per workspace, the lifecycle is an XState machine in `help-center-article/machine.ts`, and view counting reuses ADR 0027's event-plus-total shape.
+
+## Why
+
+**Why one Markdown body.** Three requirements land on the same column. "Copy as Markdown" needs a Markdown source to copy; an assistant-facing surface needs text that can be quoted verbatim; and a future file sync needs a format that round-trips against a `.md` file in a repository. A body stored as editor JSON satisfies the first two by rendering and re-serialising, and cannot satisfy the third at all — the document a customer's repository holds would be a different artefact from the one the database holds, and every sync would be a lossy conversion. `changelog.content` and `post.content` are already sanitized Markdown, so this is also the one choice that adds no new convention.
+
+The cost is stated rather than hidden: the dashboard's editor is a Markdown textarea with a preview, not a block editor. A block editor that serialises back to Markdown on every keystroke is a real piece of work and a separate decision; it is not implied by this one.
+
+**Why derived counts.** The rows a help center votes create are never pruned, so a count is an index-only aggregate over `(article_id, helpful)` — exact, cheap, and correct for a list page in one `GROUP BY`. A stored counter would have to be maintained on insert, on flip, and on delete inside every write path, and a path that forgets drifts silently with nothing to detect it. `post_view_total` accepts that maintenance burden because it has no alternative: its events _are_ pruned, and summing them would make an all-time number shrink. Feedback has no such constraint, so it does not inherit the cost.
+
+**Why view counts keep the two-table shape.** The reasoning is ADR 0027's and is not re-derived here: the event log is pruned, the total must outlive it, and the two answer different questions ("how many ever" and "which lately"). Two deliberate differences from that ADR:
+
+- **No breakdown dimensions.** `post_view_event` carries country, OS, browser and device because the dashboard's Analytics tab breaks traffic down. A help center's question is which articles are read, not from where. Four unused columns would be a privacy surface with no consumer, and they are additive later.
+- **The ingest is an RPC, not an HTTP endpoint.** Post views arrive through a same-origin relay because a board on a custom domain sits outside the API's origin check. The help center lives on the same site host as the board it belongs to, so no relay is needed, and the endpoint's contract — answer the same thing whether the view was stored, deduplicated, or discarded — is expressed by its return type (`accepted: boolean`) instead of by an HTTP status.
+
+**Why two identity facets on a vote.** Most readers of a help center are not signed in. A vote table keyed only to an account would either reject them or force an account, and both are wrong for a documentation page. The dangerous middle ground is a nullable account column with a plain `unique(article_id, user_id)`: Postgres treats every `NULL` as distinct, so that index permits one anonymous vote per request and the number becomes meaningless exactly where most of the traffic is. Two **partial** unique indexes — one per facet, each `WHERE … IS NOT NULL` — are what make "one row per reader" true for both. A table check enforces that exactly one facet is set, the same shape `user_ban` uses for its two ban keys. `visitor_id` is a random id the browser keeps in `localStorage`; it carries no IP, no user agent, and no hash. Under ADR 0027's own words the resulting number is a popularity signal, not a billing fact.
+
+**Why `archived` is a state and not a delete.** An article describing a removed feature has to stop being documentation while its inbound link keeps resolving — a customer's support team has pasted that URL into tickets. A hard delete 404s every one of them. `archived` is reachable only from `published`, and `restore` returns it to `draft` so a withdrawn page has to be re-read before it goes live again. There is no `deleted_at`: posts, changelogs, comments and boards are hard deleted here, and a soft delete beside a non-partial unique slug index reserves a slug forever for a row no editor can find.
+
+## Consequences
+
+- **The free plan allows 25 articles and the paid plans are uncapped.** It is a `LimitFeatureKey`, not a capability: the feature is available on every plan and the paid tiers remove the ceiling instead of unlocking the page. `EntitlementPolicy.canCreateHelpCenterArticle` is the only gate, and topics are deliberately not counted — charging for the container and not the contents would leave a workspace at its ceiling creating empty sections.
+- **The public reads are by slug and see two states.** `published` and `archived` are readable; `draft` is not, and a draft is a 404 rather than a redacted page. `READABLE_STATES` is derived from the lifecycle machine rather than written down in the repository, so a state added to the graph is unreadable until someone says otherwise — the safe direction.
+- **The list row is a summary and does not carry the body.** The editor fetches one article by id and writes through the create/update operations instead of through the collection, because a collection cannot round-trip a field its rows do not hold. The dashboard's collection therefore has `onDelete` only.
+- **Copy as Markdown, `llms.txt` and an MCP projection are routes over this data, not schema changes.** The first is free because of the body decision; the second follows `apps/web/src/routes/s/llms[.]txt.ts`; the third is ADR 0007/0008's operation registry.
+- **The GitHub-sync shape is reserved, not built.** `help_center_article.source` (`EDITOR | API | GITHUB | IMPORT`) exists from the first migration so a sync write is distinguishable from a human edit at the row level — the one thing a column cannot answer retroactively. The link table and the sync rule are additive and belong to that feature; they are _not_ `github_sync_rule`, which maps issue state to post status and has no analogue in a file sync.
+- **Embedding columns ship unused.** `embedding`/`embedding_model`/`embedded_at` follow `post`'s triple with the same all-null-or-all-set check, at the shared 1536 dimensions, so semantic search is an `ALTER`-free follow-up. There is no `tsvector` anywhere in this codebase today and this ADR does not add one.
+- **The `site` read grew a field and the write grew its partner.** `help_center_visibility` defaults to `PUBLIC`, so every existing workspace gets a public help center, and the settings toggle that flips it is part of the dashboard surface.

@@ -2,6 +2,7 @@ import { Button, buttonVariants } from "@feeblo/ui/button";
 import { useSidebar } from "@feeblo/ui/sidebar";
 import { cn } from "@feeblo/ui/utils";
 import {
+  BookOpen01Icon,
   LayoutThreeColumnIcon,
   Megaphone03Icon,
   Menu01Icon,
@@ -32,6 +33,12 @@ const mobileNavItems = [
     label: "Roadmap",
     segment: "roadmap",
     to: "/$organizationId/roadmap",
+  },
+  {
+    icon: BookOpen01Icon,
+    label: "Help",
+    segment: "help-center",
+    to: "/$organizationId/help-center",
   },
 ] as const;
 

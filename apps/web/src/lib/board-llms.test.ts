@@ -17,6 +17,7 @@ const site = (overrides: Partial<TSite> = {}): TSite => ({
   customDomain: null,
   changelogVisibility: "PUBLIC",
   roadmapVisibility: "PUBLIC",
+  helpCenterVisibility: "PUBLIC",
   noIndex: false,
   hidePoweredBy: false,
   createdAt: date("2026-01-01T00:00:00.000Z"),

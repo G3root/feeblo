@@ -96,6 +96,22 @@ export const ChangelogCategoryId = makeId("changelog_category", "chc", {
   approximateLength,
 });
 
+export const HelpCenterTopicId = makeId("help_center_topic", "hct", {
+  approximateLength,
+});
+
+export const HelpCenterArticleId = makeId("help_center_article", "hca", {
+  approximateLength,
+});
+
+export const HelpCenterArticleFeedbackId = makeId(
+  "help_center_article_feedback",
+  "hcf",
+  {
+    approximateLength,
+  }
+);
+
 export const ChangelogCategoryLinkId = makeId(
   "changelog_category_link",
   "ccl",

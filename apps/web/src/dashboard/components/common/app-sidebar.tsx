@@ -37,6 +37,7 @@ import {
   InboxIcon,
   InternetIcon,
   LayoutThreeColumnIcon,
+  BookOpen01Icon,
   Megaphone03Icon,
   MessageMultiple01Icon,
   Plus,
@@ -150,6 +151,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   >
                     <HugeiconsIcon icon={Megaphone03Icon} />
                     <span>Changelog</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/help-center`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/help-center"
+                  >
+                    <HugeiconsIcon icon={BookOpen01Icon} />
+                    <span>Help center</span>
                   </Link>
                 )}
               />

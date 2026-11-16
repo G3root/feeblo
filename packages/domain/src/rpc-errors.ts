@@ -63,6 +63,21 @@ export const isUniqueViolation = <T>(error: T): boolean =>
   getDatabaseErrorField(error.cause, "code") === "23505";
 
 /**
+ * Returns true when the driver refused a delete because a row still
+ * references the target (`ON DELETE RESTRICT`).
+ *
+ * The counterpart to `isUniqueViolation`, and needed for the same reason: a
+ * delete that a foreign key correctly refused is an expected outcome the
+ * caller can explain, not a server fault. `help_center_topic` is the first
+ * table this codebase guards with `RESTRICT` on purpose, so the helper is
+ * what lets its handler answer a typed conflict instead of a 500.
+ */
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
+export const isForeignKeyViolation = <T>(error: T): boolean =>
+  Schema.is(EffectDrizzleQueryError)(error) &&
+  getDatabaseErrorField(error.cause, "code") === "23503";
+
+/**
  * Returns the name of the constraint that triggered a unique violation, when
  * the driver exposes one (e.g. "post_organizationId_slug_uidx"). Lets callers
  * distinguish which unique index rejected an insert instead of treating every

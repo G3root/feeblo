@@ -190,6 +190,27 @@
     "./feature-flags": {
       "default": "./src/feature-flags.ts"
     },
+    "./help-center-article-feedback/errors": {
+      "default": "./src/help-center-article-feedback/errors.ts"
+    },
+    "./help-center-article-feedback/schema": {
+      "default": "./src/help-center-article-feedback/schema.ts"
+    },
+    "./help-center-article/errors": {
+      "default": "./src/help-center-article/errors.ts"
+    },
+    "./help-center-article/machine": {
+      "default": "./src/help-center-article/machine.ts"
+    },
+    "./help-center-article/schema": {
+      "default": "./src/help-center-article/schema.ts"
+    },
+    "./help-center-topic/errors": {
+      "default": "./src/help-center-topic/errors.ts"
+    },
+    "./help-center-topic/schema": {
+      "default": "./src/help-center-topic/schema.ts"
+    },
     "./http/api": {
       "default": "./src/http/api.ts"
     },

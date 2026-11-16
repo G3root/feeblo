@@ -14,6 +14,7 @@ const PlanLimitsFields = {
   feedbackBoards: S.NullOr(S.Finite),
   members: S.NullOr(S.Finite),
   changelogCategories: S.NullOr(S.Finite),
+  helpCenterArticles: S.NullOr(S.Finite),
   crmEntries: S.NullOr(S.Finite),
   workspaces: S.NullOr(S.Finite),
 } satisfies { readonly [K in LimitFeatureKey]: S.Schema<number | null> };
@@ -30,11 +31,19 @@ const PlanLimitsFields = {
  *
  * Both are optional here and reconciled below; their values stay strictly
  * typed, so a malformed limit still fails to decode.
+ *
+ * `helpCenterArticles` follows the `workspaces` treatment for the same reason,
+ * and the generous default is acceptable here for a reason specific to this
+ * endpoint: `/api/plans` is the public pricing table, not the enforcement
+ * surface. A workspace's enforced allowance is read from `GetWorkspacePlan`,
+ * so an hour-old cached body overstating the free ceiling cannot let anyone
+ * create a 26th article.
  */
 const PlanLimitsWire = S.Struct({
   ...PlanLimitsFields,
   members: S.optionalKey(PlanLimitsFields.members),
   privilegedMembers: S.optionalKey(PlanLimitsFields.members),
+  helpCenterArticles: S.optionalKey(PlanLimitsFields.helpCenterArticles),
   workspaces: S.optionalKey(PlanLimitsFields.workspaces),
 });
 
@@ -55,6 +64,7 @@ const PlanLimits = PlanLimitsWire.pipe(
             ? wire.members
             : (wire.privilegedMembers ?? null),
         changelogCategories: wire.changelogCategories,
+        helpCenterArticles: wire.helpCenterArticles ?? null,
         crmEntries: wire.crmEntries,
         workspaces: wire.workspaces ?? null,
       }),
