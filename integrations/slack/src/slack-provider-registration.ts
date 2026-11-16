@@ -77,10 +77,11 @@ export const makeSlackCredentialResolver = ({
         ciphertext
       ).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new IntegrationProviderInvalidConfigurationError({
               message: "Slack credentials are invalid",
               provider: slackProviderKey,
+              cause,
             })
         )
       );
@@ -171,9 +172,10 @@ const parseSlashCommand = (
       payload,
     })),
     Effect.mapError(
-      () =>
+      (cause) =>
         new SlackInboundPayloadError({
           reason: "Slash command payload is invalid",
+          cause,
         })
     )
   );
@@ -205,9 +207,10 @@ const parseInteractive = (
       payload,
     })),
     Effect.mapError(
-      () =>
+      (cause) =>
         new SlackInboundPayloadError({
           reason: "Interactive payload is invalid",
+          cause,
         })
     )
   );
@@ -241,10 +244,11 @@ export const makeSlackProviderRegistration = ({
           SlackChannelNotificationRouteConfiguration
         )(input.route.providerConfig).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "Slack route configuration is invalid",
                 provider: slackProviderKey,
+                cause,
               })
           )
         );
@@ -253,10 +257,11 @@ export const makeSlackProviderRegistration = ({
           IntegrationPostEventData
         )(input.event.data).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "Slack event payload is invalid",
                 provider: slackProviderKey,
+                cause,
               })
           )
         );

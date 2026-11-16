@@ -67,10 +67,11 @@ export const makeWebhookProviderRegistration = ({
             IntegrationPostEventData
           )(input.event.data).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook event payload is invalid",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
@@ -121,10 +122,11 @@ export const makeWebhookProviderRegistration = ({
             version: input.event.version,
           }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook wire payload is invalid",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
@@ -134,10 +136,11 @@ export const makeWebhookProviderRegistration = ({
             endpointSecurityPolicy
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook endpoint is invalid",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
@@ -146,10 +149,11 @@ export const makeWebhookProviderRegistration = ({
             Schema.fromJsonString(WebhookExternalPayload)
           )(payload).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook wire payload could not be serialized",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
@@ -163,6 +167,7 @@ export const makeWebhookProviderRegistration = ({
           }).pipe(
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderTemporaryFailure({
                   message: "Webhook request could not be signed",
                   provider: webhookProviderKey,

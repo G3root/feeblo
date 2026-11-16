@@ -11,24 +11,29 @@ export class VerificationOtpConfig extends Context.Service<VerificationOtpConfig
     make: Effect.gen(function* () {
       const appUrl = yield* Config.String("APP_URL").pipe(
         Effect.mapError(
-          () => new InternalServerError({ message: "Missing APP_URL" })
+          (cause) =>
+            new InternalServerError({ message: "Missing APP_URL", cause })
         )
       );
 
       const nodeEnv = yield* Config.String("NODE_ENV").pipe(
         Config.withDefault("development"),
         Effect.mapError(
-          () =>
+          (cause) =>
             new InternalServerError({
               message: "Invalid NODE_ENV configuration",
+              cause,
             })
         )
       );
 
       const secret = yield* Config.String("AUTH_ENCRYPTION_KEY").pipe(
         Effect.mapError(
-          () =>
-            new InternalServerError({ message: "Missing AUTH_ENCRYPTION_KEY" })
+          (cause) =>
+            new InternalServerError({
+              message: "Missing AUTH_ENCRYPTION_KEY",
+              cause,
+            })
         )
       );
 

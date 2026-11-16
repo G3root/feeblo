@@ -41,7 +41,9 @@ export const generateWebhookSigningSecret: Effect.Effect<
     `${signingSecretPrefix}${Buffer.from(bytes).toString("base64")}`
   );
 }).pipe(
-  Effect.mapError(() => new WebhookSigningError({ operation: "generate" }))
+  Effect.mapError(
+    (cause) => new WebhookSigningError({ operation: "generate", cause })
+  )
 );
 
 /** Replaces the active signing key and retains it for the required 24-hour rotation grace period; the clock (and thus TestClock) drives expiry. */

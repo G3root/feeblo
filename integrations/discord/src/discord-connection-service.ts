@@ -58,9 +58,10 @@ const DiscordSafeDisplayMetadata = Schema.Struct({
 const decodeSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(DiscordSafeDisplayMetadata)(value ?? {}).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored Discord display metadata is invalid",
+          cause,
         })
     )
   );
@@ -104,9 +105,10 @@ export const makeDiscordConnectionServiceLive = (
             { oauthState: nonce }
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Discord credentials could not be encrypted",
+                  cause,
                 })
             )
           );
@@ -154,9 +156,10 @@ export const makeDiscordConnectionServiceLive = (
             organizationId,
           }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Discord OAuth state could not be encoded",
+                  cause,
                 })
             )
           );
@@ -195,9 +198,10 @@ export const makeDiscordConnectionServiceLive = (
             Schema.fromJsonString(DiscordOAuthState)
           )(state).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new BadRequestError({
                   message: "Discord OAuth state is invalid",
+                  cause,
                 })
             )
           );
@@ -206,9 +210,10 @@ export const makeDiscordConnectionServiceLive = (
             WorkspaceId.schema
           )(decoded.organizationId).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new BadRequestError({
                   message: "Discord OAuth state is invalid",
+                  cause,
                 })
             )
           );
@@ -311,9 +316,10 @@ export const makeDiscordConnectionServiceLive = (
             { userToken: oauth.access_token }
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Discord credentials could not be encrypted",
+                  cause,
                 })
             )
           );

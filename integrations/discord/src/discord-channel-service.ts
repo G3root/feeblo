@@ -32,9 +32,10 @@ const decodeProviderConfig = (value: Schema.Json) =>
     value ?? {}
   ).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored Discord route configuration is invalid",
+          cause,
         })
     )
   );

@@ -91,9 +91,10 @@ export const decodeModalMetadata = (
     organizationId,
   }).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new ChatInboundFailure({
           message: "Discord feedback modal custom id is malformed",
+          cause,
         })
     )
   );

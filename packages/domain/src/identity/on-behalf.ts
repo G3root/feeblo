@@ -146,9 +146,10 @@ export const subscribeOnBehalfSubject = (args: {
         })
         .pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new InternalServerError({
                 message: `Could not record the ${args.subjectKind} email subscription.`,
+                cause,
               })
           )
         );
@@ -191,9 +192,10 @@ export const subscribeOnBehalfSubject = (args: {
         })
         .pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new InternalServerError({
                 message: `Could not record the deferred ${args.subjectKind} email subscription.`,
+                cause,
               })
           )
         );

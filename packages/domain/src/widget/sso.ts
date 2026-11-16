@@ -52,6 +52,7 @@ export class SsoError extends S.TaggedError<SsoError>()("SsoError", {
     "SSO_RATE_LIMIT_UNAVAILABLE",
   ]),
   message: S.optional(S.String),
+  cause: S.optional(S.Defect()),
 }) {}
 
 export type SsoErrorCode = S.Schema.Type<(typeof SsoError)["fields"]["code"]>;
@@ -330,7 +331,9 @@ export const createSsoSession = ({
       secrets.map((s) => s.secret),
       organizationId,
       { maxTokenLifetime }
-    ).pipe(Effect.mapError(() => new SsoError({ code: "INVALID_JWT" })));
+    ).pipe(
+      Effect.mapError((cause) => new SsoError({ code: "INVALID_JWT", cause }))
+    );
 
     // Bound contact and user provisioning only after a JWT has proved that
     // this request is authorized for the organization.
@@ -394,7 +397,7 @@ export const createSsoSession = ({
       })
       .pipe(
         Effect.mapError(
-          () => new SsoError({ code: "FAILED_TO_CREATE_SSO_USER" })
+          (cause) => new SsoError({ code: "FAILED_TO_CREATE_SSO_USER", cause })
         )
       );
 
@@ -405,7 +408,7 @@ export const createSsoSession = ({
       // reads the plan decision from the running context.
       Effect.provideService(EntitlementPolicy, entitlementPolicy),
       Effect.mapError(
-        () => new SsoError({ code: "FAILED_TO_CREATE_SSO_CONTACT" })
+        (cause) => new SsoError({ code: "FAILED_TO_CREATE_SSO_CONTACT", cause })
       )
     );
 

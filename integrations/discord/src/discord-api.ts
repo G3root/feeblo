@@ -279,6 +279,7 @@ export const makeDiscordApiClient = (
         ).pipe(
           Effect.mapError(
             () =>
+              // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
               new IntegrationProviderTemporaryFailure({
                 message: `Discord request failed during ${input.context}`,
                 provider: discordProviderKey,
@@ -310,6 +311,7 @@ export const makeDiscordApiClient = (
         return yield* response.json.pipe(
           Effect.mapError(
             () =>
+              // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
               new IntegrationProviderPermanentRejection({
                 message: `Discord returned an unexpected response during ${input.context}`,
                 provider: discordProviderKey,
@@ -359,6 +361,7 @@ export const makeDiscordApiClient = (
         httpRequest = yield* HttpClientRequest.bodyJson(httpRequest, body).pipe(
           Effect.mapError(
             () =>
+              // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
               new IntegrationProviderPermanentRejection({
                 message: `Discord ${context} request could not be encoded`,
                 provider: discordProviderKey,
@@ -380,6 +383,7 @@ export const makeDiscordApiClient = (
           Schema.decodeUnknownEffect(schema)(body).pipe(
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderPermanentRejection({
                   message: `Discord ${context} response was invalid`,
                   provider: discordProviderKey,

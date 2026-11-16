@@ -28,7 +28,7 @@ export interface ClaimedIntegrationDelivery {
 /** Safe persistence failure surfaced by a worker poll without leaking payloads or credentials. */
 export class IntegrationDeliveryWorkerPersistenceError extends Schema.TaggedError<IntegrationDeliveryWorkerPersistenceError>()(
   "IntegrationDeliveryWorkerPersistenceError",
-  { operation: Schema.String }
+  { operation: Schema.String, cause: Schema.optionalKey(Schema.Defect()) }
 ) {}
 
 /** PostgreSQL-backed worker repository boundary. Claim implementations use FOR UPDATE SKIP LOCKED in a short transaction. */

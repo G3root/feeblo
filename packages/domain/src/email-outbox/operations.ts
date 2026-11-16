@@ -19,7 +19,7 @@ const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
 export class EmailOutboxInspectionError extends Schema.TaggedError<EmailOutboxInspectionError>()(
   "EmailOutboxInspectionError",
-  { reason: Schema.String }
+  { reason: Schema.String, cause: Schema.optionalKey(Schema.Defect()) }
 ) {}
 
 const emptyIntentStates = () =>
@@ -84,9 +84,10 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
         row.state
       ).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new EmailOutboxInspectionError({
               reason: "Stored email outbox state is invalid",
+              cause,
             })
         )
       );
@@ -102,9 +103,10 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
         row.state
       ).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new EmailOutboxInspectionError({
               reason: "Stored email delivery state is invalid",
+              cause,
             })
         )
       );
@@ -119,9 +121,10 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
           row.oldestCreatedAt
         ).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new EmailOutboxInspectionError({
                 reason: "Stored email delivery timestamp is invalid",
+                cause,
               })
           )
         );

@@ -55,13 +55,15 @@ export const ProfileApiLive = HttpApiBuilder.group(
 
         // Check the on-disk size before reading the file into memory so an
         // oversized upload cannot exhaust server memory.
-        const fileInfo = yield* fs
-          .stat(file.path)
-          .pipe(
-            Effect.mapError(
-              () => new InternalServerError({ message: "Failed to read file" })
-            )
-          );
+        const fileInfo = yield* fs.stat(file.path).pipe(
+          Effect.mapError(
+            (cause) =>
+              new InternalServerError({
+                message: "Failed to read file",
+                cause,
+              })
+          )
+        );
 
         const maxSize = ByteSize.bytes(MAX_PROFILE_IMAGE_BYTES);
 
@@ -71,13 +73,15 @@ export const ProfileApiLive = HttpApiBuilder.group(
           });
         }
 
-        const bytes = yield* fs
-          .readFile(file.path)
-          .pipe(
-            Effect.mapError(
-              () => new InternalServerError({ message: "Failed to read file" })
-            )
-          );
+        const bytes = yield* fs.readFile(file.path).pipe(
+          Effect.mapError(
+            (cause) =>
+              new InternalServerError({
+                message: "Failed to read file",
+                cause,
+              })
+          )
+        );
 
         if (bytes.length === 0 || bytes.length > MAX_PROFILE_IMAGE_BYTES) {
           return yield* new BadRequestError({
@@ -117,8 +121,11 @@ export const ProfileApiLive = HttpApiBuilder.group(
           })
           .pipe(
             Effect.mapError(
-              () =>
-                new InternalServerError({ message: "Failed to upload image" })
+              (cause) =>
+                new InternalServerError({
+                  message: "Failed to upload image",
+                  cause,
+                })
             )
           );
 

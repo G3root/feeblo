@@ -9,13 +9,20 @@ export class WebhookEndpointSecurityError extends Schema.TaggedError<WebhookEndp
 /** Typed failure produced when encrypted webhook credentials cannot be processed. */
 export class WebhookCredentialEncryptionError extends Schema.TaggedError<WebhookCredentialEncryptionError>()(
   "WebhookCredentialEncryptionError",
-  { operation: Schema.Literals(["encrypt", "decrypt"]), reason: Schema.String }
+  {
+    operation: Schema.Literals(["encrypt", "decrypt"]),
+    reason: Schema.String,
+    cause: Schema.optionalKey(Schema.Defect()),
+  }
 ) {}
 
 /** Typed failure produced when signing-key generation or Standard Webhooks signing fails. */
 export class WebhookSigningError extends Schema.TaggedError<WebhookSigningError>()(
   "WebhookSigningError",
-  { operation: Schema.Literals(["generate", "sign"]) }
+  {
+    operation: Schema.Literals(["generate", "sign"]),
+    cause: Schema.optionalKey(Schema.Defect()),
+  }
 ) {}
 
 /**

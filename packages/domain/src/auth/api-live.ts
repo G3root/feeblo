@@ -90,7 +90,8 @@ function postVerificationOtp(
       secret
     ).pipe(
       Effect.mapError(
-        () => new InternalServerError({ message: "Failed to encrypt state" })
+        (cause) =>
+          new InternalServerError({ message: "Failed to encrypt state", cause })
       )
     );
 
@@ -138,9 +139,10 @@ function getVerificationOtp(
       secret
     ).pipe(
       Effect.mapError(
-        () =>
+        (cause) =>
           new BadRequestError({
             message: "Invalid verification request",
+            cause,
           })
       )
     );

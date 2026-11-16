@@ -60,9 +60,10 @@ const SlackSafeDisplayMetadata = Schema.Struct({
 const decodeSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(SlackSafeDisplayMetadata)(value ?? {}).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored Slack display metadata is invalid",
+          cause,
         })
     )
   );
@@ -106,9 +107,10 @@ export const makeSlackConnectionServiceLive = (
             { oauthState: nonce }
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Slack credentials could not be encrypted",
+                  cause,
                 })
             )
           );
@@ -156,9 +158,10 @@ export const makeSlackConnectionServiceLive = (
             organizationId,
           }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Slack OAuth state could not be encoded",
+                  cause,
                 })
             )
           );
@@ -192,9 +195,10 @@ export const makeSlackConnectionServiceLive = (
             Schema.fromJsonString(SlackOAuthState)
           )(state).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new BadRequestError({
                   message: "Slack OAuth state is invalid",
+                  cause,
                 })
             )
           );
@@ -236,9 +240,10 @@ export const makeSlackConnectionServiceLive = (
                 }),
               }).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Slack credentials could not be encrypted",
+                      cause,
                     })
                 )
               ),

@@ -90,9 +90,10 @@ const parseInteraction = (
       }
     }),
     Effect.mapError(
-      () =>
+      (cause) =>
         new DiscordInboundPayloadError({
           reason: "Discord interaction payload is invalid",
+          cause,
         })
     )
   );
@@ -180,10 +181,11 @@ export const makeDiscordProviderRegistration = ({
           DiscordChannelNotificationRouteConfiguration
         )(input.route.providerConfig).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "Discord route configuration is invalid",
                 provider: discordProviderKey,
+                cause,
               })
           )
         );
@@ -192,10 +194,11 @@ export const makeDiscordProviderRegistration = ({
           IntegrationPostEventData
         )(input.event.data).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "Discord event payload is invalid",
                 provider: discordProviderKey,
+                cause,
               })
           )
         );

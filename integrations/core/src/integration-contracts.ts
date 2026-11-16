@@ -360,6 +360,7 @@ export class IntegrationProviderInvalidConfigurationError extends Schema.TaggedE
     httpStatus: Schema.optionalKey(Schema.Int),
     message: Schema.String,
     provider: IntegrationProviderKey,
+    cause: Schema.optionalKey(Schema.Defect()),
   }
 ) {}
 

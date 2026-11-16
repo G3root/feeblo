@@ -343,6 +343,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
       Effect.timeout(SLACK_API_REQUEST_TIMEOUT_MS),
       Effect.mapError(
         () =>
+          // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
           new IntegrationProviderTemporaryFailure({
             message: `Slack request failed during ${input.context}`,
             provider: slackProviderKey,
@@ -363,6 +364,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
     const body = yield* response.json.pipe(
       Effect.mapError(
         () =>
+          // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
           new IntegrationProviderPermanentRejection({
             message: `Slack returned an unexpected response during ${input.context}`,
             provider: slackProviderKey,
@@ -407,6 +409,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
       httpRequest = yield* HttpClientRequest.bodyJson(httpRequest, body).pipe(
         Effect.mapError(
           () =>
+            // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
             new IntegrationProviderPermanentRejection({
               message: `Slack ${context} request could not be encoded`,
               provider: slackProviderKey,
@@ -439,6 +442,7 @@ export const makeSlackApiClient = (): SlackApiClient => {
           Schema.decodeUnknownEffect(schema)(body).pipe(
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderPermanentRejection({
                   message: `Slack ${context} response was invalid`,
                   provider: slackProviderKey,

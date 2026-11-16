@@ -67,9 +67,10 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
     const routes = yield* Effect.forEach(selections, (selection) =>
       Schema.decodeEffect(StoredRouteSelection)(selection).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new IntegrationEventRecordingError({
               message: "Stored integration route selection is invalid",
+              cause,
             })
         )
       )

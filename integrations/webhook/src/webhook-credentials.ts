@@ -56,10 +56,11 @@ export const encryptWebhookCredentialMaterial = (
       Schema.fromJsonString(WebhookEncryptedCredentialMaterial)
     )(credentials).pipe(
       Effect.mapError(
-        () =>
+        (cause) =>
           new WebhookCredentialEncryptionError({
             operation: "encrypt",
             reason: "Webhook credentials could not be encoded",
+            cause,
           })
       )
     );
@@ -108,10 +109,11 @@ export const decryptWebhookCredentialMaterial = (
               },
             })),
             Effect.mapError(
-              () =>
+              (cause) =>
                 new WebhookCredentialEncryptionError({
                   operation: "decrypt",
                   reason: "Encrypted webhook credentials are malformed",
+                  cause,
                 })
             )
           )

@@ -315,9 +315,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
               }))
             ),
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Failed to find similar posts",
+                  cause,
                 })
             ),
             withRemapDbErrors("Post", "select"),
@@ -367,9 +368,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
                     metadata
                   ).pipe(
                     Effect.mapError(
-                      () =>
+                      (cause) =>
                         new DataValidationError({
                           message: "Invalid feedback metadata",
+                          cause,
                         })
                     )
                   );

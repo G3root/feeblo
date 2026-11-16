@@ -58,9 +58,10 @@ const WebhookSafeDisplayMetadata = Schema.Struct({ hostname: Schema.String });
 const decodeWebhookSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(WebhookSafeDisplayMetadata)(value).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored webhook display metadata is invalid",
+          cause,
         })
     )
   );
@@ -68,9 +69,10 @@ const decodeWebhookSafeDisplayMetadata = (value: Schema.Json) =>
 const decodeWebhookRouteEventSelection = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(IntegrationRouteEventSelection)(value).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored webhook event selection is invalid",
+          cause,
         })
     )
   );
@@ -137,8 +139,11 @@ const decodeHistoryCursor = (
   return Schema.decodeEffect(Schema.DateFromString)(timePart).pipe(
     Effect.map((beforeTime) => Option.some({ beforeId: idPart, beforeTime })),
     Effect.mapError(
-      () =>
-        new BadRequestError({ message: "Webhook history cursor is invalid" })
+      (cause) =>
+        new BadRequestError({
+          message: "Webhook history cursor is invalid",
+          cause,
+        })
     )
   );
 };
@@ -254,9 +259,10 @@ export const WebhookManagementServiceLive = Layer.effect(
           endpointSecurityPolicy
         ).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new BadRequestError({
                 message: "Webhook endpoint URL is not allowed",
+                cause,
               })
           )
         );
@@ -271,9 +277,10 @@ export const WebhookManagementServiceLive = Layer.effect(
           }
         ).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new InternalServerError({
                 message: "Webhook credentials could not be encrypted",
+                cause,
               })
           )
         );
@@ -340,9 +347,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 endpointSecurityPolicy
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new BadRequestError({
                       message: "Webhook endpoint URL is not allowed",
+                      cause,
                     })
                 )
               );
@@ -382,9 +390,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 credentialsCiphertext
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be decrypted",
+                      cause,
                     })
                 )
               );
@@ -409,9 +418,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 }
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be encrypted",
+                      cause,
                     })
                 )
               );
@@ -755,9 +765,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 connection.credentialsCiphertext
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be decrypted",
+                      cause,
                     })
                 )
               );
@@ -784,9 +795,10 @@ export const WebhookManagementServiceLive = Layer.effect(
                 }
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be encrypted",
+                      cause,
                     })
                 )
               );
@@ -1060,8 +1072,11 @@ export const WebhookManagementServiceLive = Layer.effect(
           nextCursor,
         }).pipe(
           Effect.mapError(
-            () =>
-              new InternalServerError({ message: "Webhook history is invalid" })
+            (cause) =>
+              new InternalServerError({
+                message: "Webhook history is invalid",
+                cause,
+              })
           )
         );
       },

@@ -105,6 +105,7 @@ export class BadRequestError extends Schema.TaggedError<BadRequestError>()(
   "BadRequestError",
   {
     message: Schema.optional(Schema.String),
+    cause: Schema.optionalKey(Schema.Defect()),
   },
   { httpApiStatus: 400, identifier: "BadRequestError" }
 ) {}
@@ -130,6 +131,7 @@ export class InternalServerError extends Schema.TaggedError<InternalServerError>
   {
     message: Schema.String,
     detail: Schema.optional(Schema.String),
+    cause: Schema.optionalKey(Schema.Defect()),
   },
   { httpApiStatus: 500, identifier: "InternalServerError" }
 ) {}

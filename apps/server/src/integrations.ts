@@ -105,6 +105,7 @@ export const makeIntegrationLayers: Effect.Effect<
             // instead of treating it as a permanent configuration error.
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderTemporaryFailure({
                   message: "Webhook credentials could not be loaded",
                   provider: webhookProviderKey,
@@ -127,10 +128,11 @@ export const makeIntegrationLayers: Effect.Effect<
           connection.ciphertext
         ).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "Webhook credentials are invalid",
                 provider: webhookProviderKey,
+                cause,
               })
           )
         );
@@ -162,6 +164,7 @@ export const makeIntegrationLayers: Effect.Effect<
           .pipe(
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderTemporaryFailure({
                   message: "Slack credentials could not be loaded",
                   provider: slackProviderKey,
@@ -222,6 +225,7 @@ export const makeIntegrationLayers: Effect.Effect<
           .pipe(
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderTemporaryFailure({
                   message: "GitHub credentials could not be loaded",
                   provider: githubProviderKey,
@@ -290,9 +294,10 @@ export const makeIntegrationLayers: Effect.Effect<
         ).pipe(
           Effect.asVoid,
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationDeliveryWorkerPersistenceError({
                 operation: "record_external_resource_drafts",
+                cause,
               })
           )
         ),

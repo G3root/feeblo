@@ -19,9 +19,10 @@ export const parseGitHubAppInstallationCallbackUrl = (
     setupAction: parsed.searchParams.get("setup_action"),
   }).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new BadRequestError({
           message: "GitHub App installation callback parameters are invalid.",
+          cause,
         })
     )
   );

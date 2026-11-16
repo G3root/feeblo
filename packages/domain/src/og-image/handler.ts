@@ -69,9 +69,10 @@ const decodeRequest = (
     Object.fromEntries(params.entries())
   ).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new OgImageRequestValidationError({
           message: "Invalid OG image parameters",
+          cause,
         })
     )
   );

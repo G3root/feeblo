@@ -116,9 +116,10 @@ const parseGitHubAppWebhook = ({
           payload,
         })),
         Effect.mapError(
-          () =>
+          (cause) =>
             new GitHubInboundPayloadError({
               reason: "GitHub App webhook payload is invalid",
+              cause,
             })
         )
       );
@@ -132,9 +133,10 @@ const parseGitHubAppWebhook = ({
           payload,
         })),
         Effect.mapError(
-          () =>
+          (cause) =>
             new GitHubInboundPayloadError({
               reason: "GitHub App webhook payload is invalid",
+              cause,
             })
         )
       );
@@ -148,9 +150,10 @@ const parseGitHubAppWebhook = ({
           payload,
         })),
         Effect.mapError(
-          () =>
+          (cause) =>
             new GitHubInboundPayloadError({
               reason: "GitHub App webhook payload is invalid",
+              cause,
             })
         )
       );
@@ -240,10 +243,11 @@ export const makeGitHubProviderRegistration = ({
           GitHubIssueCreateRouteConfiguration
         )(input.route.providerConfig).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "GitHub issue route configuration is invalid",
                 provider: githubProviderKey,
+                cause,
               })
           )
         );
@@ -252,10 +256,11 @@ export const makeGitHubProviderRegistration = ({
           IntegrationPostEventData
         )(input.event.data).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "GitHub event payload is invalid",
                 provider: githubProviderKey,
+                cause,
               })
           )
         );

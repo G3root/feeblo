@@ -444,6 +444,7 @@ const decodeSdkResponse =
     Schema.decodeUnknownEffect(schema)(value).pipe(
       Effect.mapError(
         () =>
+          // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
           new IntegrationProviderTemporaryFailure({
             message: `GitHub ${context} response was invalid`,
             provider: githubProviderKey,
@@ -489,6 +490,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       ).pipe(
         Effect.mapError(
           () =>
+            // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
             new IntegrationProviderPermanentRejection({
               message: "GitHub setup user-token request could not be encoded",
               provider: githubProviderKey,
@@ -501,6 +503,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
         Effect.provide(FetchHttpClient.layer),
         Effect.mapError(
           () =>
+            // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
             new IntegrationProviderTemporaryFailure({
               message: "GitHub request failed during setup user-token exchange",
               provider: githubProviderKey,
@@ -529,6 +532,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       const body = yield* response.json.pipe(
         Effect.mapError(
           () =>
+            // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
             new IntegrationProviderPermanentRejection({
               message:
                 "GitHub returned an invalid response during setup user-token exchange",

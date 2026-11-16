@@ -36,9 +36,10 @@ const decodeProviderConfig = (value: Schema.Json) =>
     value ?? {}
   ).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored Slack route configuration is invalid",
+          cause,
         })
     )
   );

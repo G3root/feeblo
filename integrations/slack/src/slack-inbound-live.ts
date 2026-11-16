@@ -120,9 +120,10 @@ export const makeSlackInboundServiceLive = (
               connection.credentialsCiphertext
             ).pipe(
               Effect.mapError(
-                () =>
+                (cause) =>
                   new ChatInboundFailure({
                     message: "Slack credentials could not be decrypted",
+                    cause,
                   })
               ),
               Effect.map((credentials) =>
@@ -173,9 +174,10 @@ export const makeSlackInboundServiceLive = (
             ...(messageTs === undefined ? undefined : { messageTs }),
           }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new ChatInboundFailure({
                   message: "Could not encode feedback modal metadata",
+                  cause,
                 })
             )
           );
@@ -193,9 +195,10 @@ export const makeSlackInboundServiceLive = (
           // nothing — no stray message next to the modal.
           yield* apiClient.viewsOpen({ botToken, triggerId, view }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new ChatInboundFailure({
                   message: "Could not open the Feeblo feedback form",
+                  cause,
                 })
             )
           );
@@ -209,9 +212,10 @@ export const makeSlackInboundServiceLive = (
             payload.view.private_metadata
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new ChatInboundFailure({
                   message: "Feedback modal metadata is invalid",
+                  cause,
                 })
             )
           );

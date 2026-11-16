@@ -6,7 +6,11 @@ import * as Schema from "effect/Schema";
 /** Failure encrypting or decrypting provider credentials at rest. */
 export class IntegrationCredentialEncryptionError extends Schema.TaggedError<IntegrationCredentialEncryptionError>()(
   "IntegrationCredentialEncryptionError",
-  { operation: Schema.Literals(["encrypt", "decrypt"]), reason: Schema.String }
+  {
+    operation: Schema.Literals(["encrypt", "decrypt"]),
+    reason: Schema.String,
+    cause: Schema.optionalKey(Schema.Defect()),
+  }
 ) {}
 
 /** Encrypted at-rest value for provider credentials and OAuth state. */
@@ -91,10 +95,11 @@ export const encryptIntegrationCredentialMaterial = <Material, Encoded>(
       material
     ).pipe(
       Effect.mapError(
-        () =>
+        (cause) =>
           new IntegrationCredentialEncryptionError({
             operation: "encrypt",
             reason: "Provider credentials could not be encoded",
+            cause,
           })
       )
     );
@@ -128,10 +133,11 @@ export const decryptIntegrationCredentialMaterial = <
           ).pipe(
             Effect.map(redact),
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationCredentialEncryptionError({
                   operation: "decrypt",
                   reason: "Encrypted provider credentials are malformed",
+                  cause,
                 })
             )
           )
