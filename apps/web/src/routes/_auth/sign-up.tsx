@@ -1,9 +1,7 @@
 import { getSafeCallbackURL } from "@feeblo/post-ui/auth-flows";
-import {
-  AuthForm,
-  SignUpFields,
-  signUpFormOpts,
-} from "@feeblo/post-ui/auth-forms";
+import { AuthForm, signUpFormOpts } from "@feeblo/post-ui/auth-forms";
+import { useLastAuthMethod } from "@feeblo/post-ui/last-auth-method";
+import { LastUsedBadge } from "@feeblo/post-ui/last-used-badge";
 import { SocialAuthButtons } from "@feeblo/post-ui/social-auth-buttons";
 import { TurnstileField, useTurnstile } from "@feeblo/post-ui/turnstile";
 import {
@@ -15,6 +13,7 @@ import { refreshAuthSession } from "@feeblo/web-shared/auth-session";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 
+import { AuthDivider } from "~/features/auth/components/auth-divider";
 import { AuthShell } from "~/features/auth/components/auth-shell";
 
 export const Route = createFileRoute("/_auth/sign-up")({
@@ -30,6 +29,7 @@ export const Route = createFileRoute("/_auth/sign-up")({
 function RouteComponent() {
   const navigate = useNavigate({ from: "/sign-up" });
   const search = Route.useSearch();
+  const lastUsedMethod = useLastAuthMethod();
   const turnstile = useTurnstile();
 
   const signUp = useSignUpEmail({
@@ -118,27 +118,73 @@ function RouteComponent() {
 
   return (
     <AuthShell
-      description="Start your workspace with a new account."
+      description="Start collecting feedback in a few minutes."
       footer={
-        <div className="text-center text-sm">
+        <p>
           Already have an account?{" "}
           <Link
-            className="underline underline-offset-4"
+            className="text-foreground font-medium underline-offset-4 hover:underline"
             search={{ redirectTo: search.redirectTo }}
             to="/sign-in"
           >
             Sign in
           </Link>
-        </div>
+        </p>
       }
-      title="Create account"
+      title="Create your account"
     >
-      <AuthForm form={form}>
-        <SignUpFields
-          disabled={turnstile.isEnabled && !turnstile.token}
-          form={form}
-          submitLabel="Sign up"
-        >
+      <div className="flex flex-col gap-6">
+        <SocialAuthButtons
+          lastUsedMethod={lastUsedMethod}
+          redirectTo={search.redirectTo}
+        />
+
+        <AuthDivider>or sign up with email</AuthDivider>
+
+        <AuthForm form={form}>
+          <form.AppField name="name">
+            {(field) => (
+              <field.TextField
+                autoComplete="name"
+                label="Full name"
+                placeholder="Maya Robertson"
+                size="lg"
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="email">
+            {(field) => (
+              <field.TextField
+                autoComplete="email"
+                label="Email"
+                placeholder="you@company.com"
+                size="lg"
+                type="email"
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="password">
+            {(field) => (
+              <field.PasswordField
+                autoComplete="new-password"
+                label="Password"
+                size="lg"
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="confirmPassword">
+            {(field) => (
+              <field.PasswordField
+                autoComplete="new-password"
+                label="Confirm password"
+                size="lg"
+              />
+            )}
+          </form.AppField>
+
           <TurnstileField
             onError={turnstile.handleError}
             onExpire={turnstile.handleExpire}
@@ -146,10 +192,22 @@ function RouteComponent() {
             ref={turnstile.ref}
             siteKey={turnstile.siteKey}
           />
-        </SignUpFields>
-      </AuthForm>
 
-      <SocialAuthButtons redirectTo={search.redirectTo} />
+          <form.AppForm>
+            <form.SubscribeButton
+              className="relative w-full overflow-visible"
+              disabled={turnstile.isEnabled && !turnstile.token}
+              size="lg"
+              type="submit"
+            >
+              Create account
+              {lastUsedMethod === "email" ? (
+                <LastUsedBadge tone="onBrand" />
+              ) : null}
+            </form.SubscribeButton>
+          </form.AppForm>
+        </AuthForm>
+      </div>
     </AuthShell>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 
 import { m } from "../paraglide/messages.js";
 import { initializeEmailVerification } from "./auth-flows";
+import { rememberAuthMethod } from "./last-auth-method";
 import { clearVerificationOtp } from "./otp-resend";
 
 export type AuthErrorLike = {
@@ -43,6 +44,7 @@ export function useSignInEmail({
         });
 
         if (!response.error) {
+          rememberAuthMethod("email");
           await onSuccess?.();
 
           return { type: "success" };
@@ -134,6 +136,9 @@ export function useSignUpEmail({
           return { type: "verify-email", email: verificationEmail, ready };
         }
 
+        // Recorded before `onSuccess`: that callback navigates away (or hands
+        // off to another origin), so anything after it may never run.
+        rememberAuthMethod("email");
         await onSuccess?.();
 
         return { type: "success" };

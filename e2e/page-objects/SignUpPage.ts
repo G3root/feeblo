@@ -13,10 +13,10 @@ export class SignUpPage {
     this.nameInput = page.getByRole("textbox", { name: "Full Name" });
     this.emailInput = page.getByRole("textbox", { name: "Email" });
     this.passwordInput = page.getByLabel("Password", { exact: true });
-    this.confirmPasswordInput = page.getByLabel("Confirm Password", {
+    this.confirmPasswordInput = page.getByLabel("Confirm password", {
       exact: true,
     });
-    this.submitButton = page.getByRole("button", { name: "Sign up" });
+    this.submitButton = page.getByRole("button", { name: "Create account" });
   }
 
   async goto() {

@@ -73,7 +73,7 @@ function RouteComponent() {
   // cannot render holding a code the previous step never produced.
   const [snapshot, send] = useMachine(passwordResetMachine);
   const reset = toPasswordResetStep(snapshot);
-  const passwordHeadingRef = useRef<HTMLDivElement>(null);
+  const passwordHeadingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     if (reset.step === "password") {
@@ -209,29 +209,45 @@ function RouteComponent() {
       <AuthShell
         description={`Choose a new password for ${email}.`}
         footer={
-          <div className="text-center text-sm">
-            Remembered your password?{" "}
-            <Link className="underline underline-offset-4" to="/sign-in">
+          <p>
+            Remembered it?{" "}
+            <Link
+              className="text-foreground font-medium underline-offset-4 hover:underline"
+              to="/sign-in"
+            >
               Sign in
             </Link>
-          </div>
+          </p>
         }
-        title="Reset your password"
+        title="Choose a new password"
         titleRef={passwordHeadingRef}
       >
         <AuthForm form={passwordForm}>
           <passwordForm.AppField name="password">
-            {(field) => <field.PasswordField label="New Password" />}
+            {(field) => (
+              <field.PasswordField
+                autoComplete="new-password"
+                label="New password"
+                size="lg"
+              />
+            )}
           </passwordForm.AppField>
 
           <passwordForm.AppField name="confirmPassword">
-            {(field) => <field.PasswordField label="Confirm Password" />}
+            {(field) => (
+              <field.PasswordField
+                autoComplete="new-password"
+                label="Confirm password"
+                size="lg"
+              />
+            )}
           </passwordForm.AppField>
 
           <passwordForm.AppForm>
             <passwordForm.SubscribeButton
               className="w-full"
               label="Update password"
+              size="lg"
               type="submit"
             />
           </passwordForm.AppForm>
@@ -242,16 +258,19 @@ function RouteComponent() {
 
   return (
     <AuthShell
-      description={`We sent a 6-digit code to ${email}.`}
+      description={`We sent a six-digit code to ${email}.`}
       footer={
-        <div className="text-center text-sm">
-          Remembered your password?{" "}
-          <Link className="underline underline-offset-4" to="/sign-in">
+        <p>
+          Remembered it?{" "}
+          <Link
+            className="text-foreground font-medium underline-offset-4 hover:underline"
+            to="/sign-in"
+          >
             Sign in
           </Link>
-        </div>
+        </p>
       }
-      title="Enter verification code"
+      title="Check your email"
     >
       <AuthForm form={otpForm}>
         <OtpFormFields form={otpForm} submitLabel="Continue">

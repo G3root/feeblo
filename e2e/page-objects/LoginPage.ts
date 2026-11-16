@@ -11,7 +11,7 @@ export class LoginPage {
     this.emailInput = page.getByRole("textbox", { name: "Email" });
     this.passwordInput = page.getByLabel("Password", { exact: true });
     this.submitButton = page.getByRole("button", {
-      name: "Login",
+      name: "Sign in",
       exact: true,
     });
   }
