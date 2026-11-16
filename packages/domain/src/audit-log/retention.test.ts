@@ -29,11 +29,18 @@ describe("audit log retention", () => {
     return organizationId;
   });
 
-  const rowAt = (
-    organizationId: string,
-    occurredAt: Date,
-    id: string
-  ): TAuditLogInsert => ({
+  /** Named, because the id and the organization are both strings. */
+  interface TSeedRow {
+    readonly organizationId: string;
+    readonly occurredAt: Date;
+    readonly id: string;
+  }
+
+  const rowAt = ({
+    organizationId,
+    occurredAt,
+    id,
+  }: TSeedRow): TAuditLogInsert => ({
     action: "workspace.updated",
     actorLabel: null,
     actorRole: "admin",
@@ -57,11 +64,11 @@ describe("audit log retention", () => {
     userAgent: null,
   });
 
-  const appendAt = (organizationId: string, occurredAt: Date) =>
+  const appendAt = (args: Omit<TSeedRow, "id">) =>
     Effect.gen(function* () {
       const repository = yield* AuditLogRepository;
       const id = yield* AuditLogId.generate;
-      yield* repository.insert(rowAt(organizationId, occurredAt, id));
+      yield* repository.insert(rowAt({ ...args, id }));
     });
 
   /**
@@ -72,23 +79,19 @@ describe("audit log retention", () => {
    * rows exist, not how they got there.
    */
   const appendManyAt = (
-    organizationId: string,
-    occurredAt: Date,
-    count: number
+    args: Omit<TSeedRow, "id"> & { readonly count: number }
   ) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
       const ids = yield* Effect.forEach(
-        Array.from({ length: count }, (_, index) => index),
+        Array.from({ length: args.count }, (_, index) => index),
         () => AuditLogId.generate
       );
       for (let index = 0; index < ids.length; index += 500) {
         yield* db
           .insert(schema.auditLogTable)
           .values(
-            ids
-              .slice(index, index + 500)
-              .map((id) => rowAt(organizationId, occurredAt, id))
+            ids.slice(index, index + 500).map((id) => rowAt({ ...args, id }))
           );
       }
     });
@@ -108,9 +111,15 @@ describe("audit log retention", () => {
         const days = (value: number) =>
           DateTime.toDate(DateTime.subtract({ days: value })(now));
 
-        yield* appendAt(organizationId, days(AUDIT_LOG_RETENTION_DAYS + 40));
-        yield* appendAt(organizationId, days(AUDIT_LOG_RETENTION_DAYS - 1));
-        yield* appendAt(organizationId, days(1));
+        yield* appendAt({
+          organizationId,
+          occurredAt: days(AUDIT_LOG_RETENTION_DAYS + 40),
+        });
+        yield* appendAt({
+          organizationId,
+          occurredAt: days(AUDIT_LOG_RETENTION_DAYS - 1),
+        });
+        yield* appendAt({ organizationId, occurredAt: days(1) });
 
         const removed = yield* runAuditLogRetentionPass();
         expect(removed).toBe(1);
@@ -131,8 +140,12 @@ describe("audit log retention", () => {
         // statement would leave exactly one expired entry behind, and the
         // count below would catch it.
         const expired = 5_001;
-        yield* appendManyAt(organizationId, stale, expired);
-        yield* appendAt(organizationId, fresh);
+        yield* appendManyAt({
+          organizationId,
+          occurredAt: stale,
+          count: expired,
+        });
+        yield* appendAt({ organizationId, occurredAt: fresh });
 
         const removed = yield* runAuditLogRetentionPass();
         expect(removed).toBe(expired);
