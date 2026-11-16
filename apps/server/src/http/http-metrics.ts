@@ -40,6 +40,7 @@ export const httpServerRequestDuration = Metric.histogram(
 export const httpMetricsMiddleware = HttpMiddleware.make((httpApp) =>
   Effect.gen(function* () {
     const startedAt = yield* Clock.monotonicTimeNanos;
+
     return yield* HttpEffect.withPreResponseHandler(
       httpApp,
       // The router sets `RouteContext` on the request fiber before invoking the
@@ -48,10 +49,12 @@ export const httpMetricsMiddleware = HttpMiddleware.make((httpApp) =>
       Effect.fnUntraced(function* (request, response) {
         const finishedAt = yield* Clock.monotonicTimeNanos;
         const durationMs = Number(finishedAt - startedAt) / 1_000_000;
+
         const route = Option.match(
           yield* Effect.serviceOption(HttpRouter.RouteContext),
           { onNone: () => "unmatched", onSome: (matched) => matched.route.path }
         );
+
         yield* Metric.update(
           Metric.withAttributes(httpServerRequests, {
             method: request.method,
@@ -67,6 +70,7 @@ export const httpMetricsMiddleware = HttpMiddleware.make((httpApp) =>
           }),
           durationMs
         );
+
         return response;
       })
     );

@@ -124,8 +124,10 @@ const waitUntil = <E>(check: Effect.Effect<boolean, E>) =>
       if (yield* check) {
         return;
       }
+
       yield* TestClock.adjust(Duration.seconds(30));
     }
+
     return yield* Effect.die(
       "the revocation loop did not reach the expected state within the virtual clock budget"
     );
@@ -156,6 +158,7 @@ const fakePolarService = (
   revokeSubscription: ({ id }: { id: string }) =>
     Effect.suspend(() => {
       polarState.calls.push(id);
+
       return polarState.fail
         ? Effect.fail(
             new FailedToRevokeSubscriptionError({
@@ -170,6 +173,7 @@ const fakePolarService = (
 });
 
 const fakeConfiguredPolar = fakePolarService(fakePolarClient);
+
 const fakeUnconfiguredPolar = fakePolarService(undefined);
 
 const RevocationTestLayer = Layer.mergeAll(
@@ -212,6 +216,7 @@ describe("BillingRepository", () => {
           }),
           instant("2026-01-02T00:00:00.000Z")
         );
+
         const [inserted] = yield* db
           .select()
           .from(schema.subscriptionTable)
@@ -226,6 +231,7 @@ describe("BillingRepository", () => {
           }),
           instant("2026-01-03T00:00:00.000Z")
         );
+
         const rows = yield* db
           .select()
           .from(schema.subscriptionTable)
@@ -269,6 +275,7 @@ describe("BillingRepository", () => {
           .select()
           .from(schema.subscriptionTable)
           .where(eq(schema.subscriptionTable.externalId, "sub_paused"));
+
         expect(row?.status).toBe("incomplete");
       })
     );
@@ -292,10 +299,12 @@ describe("BillingRepository", () => {
         );
 
         expect(exit._tag).toBe("Success");
+
         const rows = yield* db
           .select()
           .from(schema.subscriptionTable)
           .where(eq(schema.subscriptionTable.externalId, "sub_no_org"));
+
         expect(rows).toHaveLength(0);
       })
     );
@@ -325,12 +334,14 @@ describe("BillingRepository", () => {
           );
 
           expect(exit._tag).toBe("Success");
+
           const subscriptionRows = yield* db
             .select()
             .from(schema.subscriptionTable)
             .where(
               eq(schema.subscriptionTable.externalId, "sub_revive_deleted")
             );
+
           expect(subscriptionRows).toHaveLength(0);
 
           const queued = yield* db
@@ -342,6 +353,7 @@ describe("BillingRepository", () => {
                 "sub_revive_deleted"
               )
             );
+
           expect(queued).toHaveLength(1);
           expect(queued[0]?.organizationId).toBe(deletedWorkspaceId);
           expect(queued[0]?.polarServer).toBe("sandbox");
@@ -375,6 +387,7 @@ describe("BillingRepository", () => {
           );
 
           expect(exit._tag).toBe("Success");
+
           const queued = yield* db
             .select()
             .from(schema.subscriptionRevocationTable)
@@ -384,6 +397,7 @@ describe("BillingRepository", () => {
                 "sub_lookalike_org"
               )
             );
+
           expect(queued).toHaveLength(0);
         })
     );
@@ -408,6 +422,7 @@ describe("BillingRepository", () => {
           );
 
           expect(exit._tag).toBe("Success");
+
           const queued = yield* db
             .select()
             .from(schema.subscriptionRevocationTable)
@@ -417,6 +432,7 @@ describe("BillingRepository", () => {
                 "sub_foreign_org"
               )
             );
+
           expect(queued).toHaveLength(0);
         })
     );
@@ -465,6 +481,7 @@ describe("BillingRepository", () => {
                 "sub_requeued"
               )
             );
+
           expect(queued).toHaveLength(1);
           expect(queued[0]?.revokedAt).not.toBeNull();
         })
@@ -499,6 +516,7 @@ describe("BillingRepository", () => {
           .select()
           .from(schema.subscriptionTable)
           .where(eq(schema.subscriptionTable.externalId, "sub_out_of_order"));
+
         expect(row?.status).toBe("canceled");
         expect(row?.lastEventAt?.toISOString()).toBe(
           "2026-01-05T00:00:00.000Z"
@@ -540,6 +558,7 @@ describe("BillingRepository", () => {
               organizationId,
               limit: 10,
             });
+
           expect(whileAlive).toHaveLength(0);
 
           yield* db
@@ -551,6 +570,7 @@ describe("BillingRepository", () => {
               organizationId,
               limit: 10,
             });
+
           expect(
             afterDelete.map((row) => row.externalSubscriptionId).sort()
           ).toEqual(["sub_queue_a", "sub_queue_b"]);
@@ -558,11 +578,13 @@ describe("BillingRepository", () => {
           yield* repository.markSubscriptionRevocationSucceeded({
             externalSubscriptionId: "sub_queue_a",
           });
+
           const afterSuccess =
             yield* repository.findPendingSubscriptionRevocations({
               organizationId,
               limit: 10,
             });
+
           expect(afterSuccess.map((row) => row.externalSubscriptionId)).toEqual(
             ["sub_queue_b"]
           );
@@ -571,6 +593,7 @@ describe("BillingRepository", () => {
             externalSubscriptionId: "sub_queue_b",
             message: "Polar unreachable",
           });
+
           const [failed] = yield* db
             .select()
             .from(schema.subscriptionRevocationTable)
@@ -580,6 +603,7 @@ describe("BillingRepository", () => {
                 "sub_queue_b"
               )
             );
+
           expect(failed?.attempts).toBe(1);
           expect(failed?.lastError).toBe("Polar unreachable");
           expect(failed?.revokedAt).toBeNull();
@@ -614,6 +638,7 @@ describe("BillingRepository", () => {
               organizationId
             )
           );
+
         expect(queued).toHaveLength(1);
       })
     );
@@ -643,6 +668,7 @@ describe("BillingRepository", () => {
           yield* repository.findSubscriptionsByOrganizationId({
             organizationId,
           });
+
         expect(subscriptions.map((row) => row.externalId).sort()).toEqual([
           "sub_all_a",
           "sub_all_b",
@@ -690,6 +716,7 @@ describe("BillingRepository", () => {
           yield* repository.findCurrentSubscriptionByOrganizationId({
             organizationId,
           });
+
         expect(Option.isNone(current)).toBe(true);
       })
     );
@@ -719,6 +746,7 @@ describe("BillingRepository", () => {
           const found = yield* repository.findSubscriptionByOrganizationId({
             organizationId,
           });
+
           expect(Option.getOrNull(found)?.externalId).toBe("sub_portal_active");
         })
     );
@@ -787,6 +815,7 @@ describe("BillingRepository", () => {
               "sub_revocation_ok"
             )
           );
+
         expect(row?.revokedAt).not.toBeNull();
         expect(row?.attempts).toBe(0);
         expect(polarState.calls).toEqual(["sub_revocation_ok"]);
@@ -826,6 +855,7 @@ describe("BillingRepository", () => {
               "sub_revocation_retry"
             )
           );
+
         expect(failed?.revokedAt).toBeNull();
         expect(failed?.attempts).toBe(1);
         expect(failed?.lastError).toBe("Polar unreachable");
@@ -837,6 +867,7 @@ describe("BillingRepository", () => {
           organizationId,
           limit: 10,
         });
+
         expect(pending).toHaveLength(0);
         expect(polarState.calls).toEqual([
           "sub_revocation_retry",
@@ -884,6 +915,7 @@ describe("BillingRepository", () => {
                 "sub_revocation_other_target"
               )
             );
+
           expect(queuedRow[0]?.polarServer).toBe("production");
 
           yield* revokePendingSubscriptionRevocations({ organizationId });
@@ -897,6 +929,7 @@ describe("BillingRepository", () => {
                 "sub_revocation_other_target"
               )
             );
+
           expect(row?.revokedAt).toBeNull();
           expect(row?.attempts).toBe(0);
           expect(polarState.calls).toEqual([]);
@@ -905,6 +938,7 @@ describe("BillingRepository", () => {
             organizationId,
             limit: 10,
           });
+
           expect(pending.map((item) => item.externalSubscriptionId)).toEqual([
             "sub_revocation_other_target",
           ]);
@@ -946,6 +980,7 @@ describe("BillingRepository", () => {
                 "sub_revocation_already"
               )
             );
+
           expect(row?.revokedAt).not.toBeNull();
           expect(row?.attempts).toBe(0);
           expect(row?.lastError).toBeNull();
@@ -954,6 +989,7 @@ describe("BillingRepository", () => {
             organizationId,
             limit: 10,
           });
+
           expect(pending).toHaveLength(0);
           expect(polarState.calls).toEqual(["sub_revocation_already"]);
         })
@@ -998,6 +1034,7 @@ describe("BillingRepository", () => {
                 "sub_guard_mismatch"
               )
             );
+
           expect(row?.revokedAt).toBeNull();
           expect(row?.attempts).toBe(0);
           expect(polarState.calls).toEqual([]);
@@ -1036,6 +1073,7 @@ describe("BillingRepository", () => {
           const fiber = yield* Effect.forkScoped(
             subscriptionRevocationMaintenance
           );
+
           yield* waitUntil(
             Effect.sync(() => polarState.calls.includes("sub_maintenance"))
           );
@@ -1091,6 +1129,7 @@ describe("BillingRepository", () => {
           organizationId,
           limit: 10,
         });
+
         expect(pending.map((row) => row.externalSubscriptionId)).toEqual([
           "sub_revocation_unconfigured",
         ]);
@@ -1133,6 +1172,7 @@ describe("BillingRepository", () => {
                 "sub_direct_unconfigured"
               )
             );
+
           expect(row?.revokedAt).toBeNull();
           expect(row?.attempts).toBe(0);
         })

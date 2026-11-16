@@ -54,6 +54,7 @@ const AuthHintPayloadSchema = Schema.Struct({
 
 function serializeAuthHint(user: AuthHintUser): string {
   const payload: AuthHintPayload = { user, v: 1 };
+
   // Percent-encoding keeps JSON structural characters cookie-safe.
   return encodeURIComponent(JSON.stringify(payload));
 }
@@ -61,6 +62,7 @@ function serializeAuthHint(user: AuthHintUser): string {
 function deserializeAuthHint(value: string): AuthHintUser | null {
   try {
     const parsed: unknown = JSON.parse(decodeURIComponent(value));
+
     return Schema.is(AuthHintPayloadSchema)(parsed) ? parsed.user : null;
   } catch {
     return null;
@@ -111,6 +113,7 @@ export function readAuthHintFromCookie(): AuthHintUser | null {
   }
 
   const prefix = `${AUTH_HINT_COOKIE_NAME}=`;
+
   const entry = document.cookie
     .split("; ")
     .find((cookie) => cookie.startsWith(prefix));

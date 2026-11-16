@@ -20,6 +20,7 @@ const [identity, setIdentity] = createSignal<WidgetIdentity | null>(null);
  */
 export function getWidgetToken(): string | null {
   const current = identity();
+
   return current?.token ?? null;
 }
 

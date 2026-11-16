@@ -62,9 +62,10 @@ const SlackSafeDisplayMetadata = Schema.Struct({
 const decodeSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(SlackSafeDisplayMetadata)(value ?? {}).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored Slack display metadata is invalid",
+          cause,
         })
     )
   );
@@ -97,22 +98,26 @@ export const makeSlackConnectionServiceLive = (
               message: "Slack integration is not configured",
             });
           }
+
           // Through the `SecureRandom` service, not the global: the OAuth state
           // must be substitutable in tests, and Workers forbid random value
           // generation in global scope.
           const nonce = yield* secureRandom.uuidV4();
           const connectionId = yield* IntegrationConnectionId.generate;
+
           const ciphertext = yield* encryptSlackCredentialMaterial(
             config.encryptionKey,
             { oauthState: nonce }
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Slack credentials could not be encrypted",
+                  cause,
                 })
             )
           );
+
           yield* db.transaction(() =>
             Effect.gen(function* () {
               // A new install attempt replaces any abandoned connecting row so
@@ -157,6 +162,7 @@ export const makeSlackConnectionServiceLive = (
               });
             })
           );
+
           const state = yield* Schema.encodeEffect(
             Schema.fromJsonString(SlackOAuthState)
           )({
@@ -165,12 +171,14 @@ export const makeSlackConnectionServiceLive = (
             organizationId,
           }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Slack OAuth state could not be encoded",
+                  cause,
                 })
             )
           );
+
           const authorizeUrl = new URL(SLACK_OAUTH_AUTHORIZE_URL);
           authorizeUrl.searchParams.set("client_id", config.clientId);
           authorizeUrl.searchParams.set(
@@ -182,6 +190,7 @@ export const makeSlackConnectionServiceLive = (
             config.oauthRedirectUrl
           );
           authorizeUrl.searchParams.set("state", state);
+
           return { authorizeUrl };
         },
         (effect) => effect.pipe(mapManagementError("connect start"))
@@ -199,12 +208,14 @@ export const makeSlackConnectionServiceLive = (
             Schema.fromJsonString(SlackOAuthState)
           )(state).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new BadRequestError({
                   message: "Slack OAuth state is invalid",
+                  cause,
                 })
             )
           );
+
           // OAuth exchange runs before any transaction: the code is single-use,
           // so Slack itself serializes replays. The guarded connection
           // transition below is the idempotency boundary for concurrent
@@ -217,7 +228,9 @@ export const makeSlackConnectionServiceLive = (
               redirectUri: config.oauthRedirectUrl,
             })
             .pipe(mapSlackApiError("OAuth handshake"));
+
           const botToken = Redacted.make(oauth.access_token);
+
           // The two Slack calls share only the token and the encryption is a
           // local operation over the token material, so all three run
           // together: one Slack round trip instead of two. `Effect.all` is
@@ -240,15 +253,17 @@ export const makeSlackConnectionServiceLive = (
                 }),
               }).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Slack credentials could not be encrypted",
+                      cause,
                     })
                 )
               ),
             ],
             { concurrency: "unbounded" }
           );
+
           return yield* db.transaction(() =>
             Effect.gen(function* () {
               const [connection] = yield* lockSlackConnection(
@@ -256,6 +271,7 @@ export const makeSlackConnectionServiceLive = (
                 decoded.connectionId,
                 decoded.organizationId
               );
+
               if (
                 connection === undefined ||
                 connection.lifecycle !== "connecting"
@@ -264,20 +280,24 @@ export const makeSlackConnectionServiceLive = (
                   message: "Slack connection was not found",
                 });
               }
+
               if (connection.credentialsCiphertext === null) {
                 return yield* new NotFoundError({
                   message: "Slack connection was not found",
                 });
               }
+
               const credentials = yield* decryptConnectionCredentials(
                 config,
                 connection.credentialsCiphertext
               );
+
               if (credentials.oauthState !== decoded.nonce) {
                 return yield* new BadRequestError({
                   message: "Slack OAuth state does not match",
                 });
               }
+
               const now = yield* DateTime.nowAsDate;
               // A Slack workspace has at most one active connection per
               // organization: archive any pre-existing active connection for
@@ -328,6 +348,7 @@ export const makeSlackConnectionServiceLive = (
                   updatedAt: now,
                 })
                 .where(eq(schema.integrationConnectionTable.id, connection.id));
+
               // One inbound route per capability; Slack routes requests by team
               // id so a single workspace connection owns both surfaces.
               // Duplicate replays are ignored via the connection/capability
@@ -352,6 +373,7 @@ export const makeSlackConnectionServiceLive = (
                   })
                   .onConflictDoNothing();
               }
+
               return { organizationId: decoded.organizationId };
             })
           );
@@ -387,6 +409,7 @@ export const makeSlackConnectionServiceLive = (
               )
             )
             .orderBy(desc(schema.integrationConnectionTable.createdAt));
+
           return yield* Effect.forEach(rows, (connection) =>
             decodeSafeDisplayMetadata(connection.safeDisplayMetadata).pipe(
               Effect.map((metadata) => ({
@@ -406,6 +429,7 @@ export const makeSlackConnectionServiceLive = (
         input: S.TSlackConnectionDisconnect
       ) {
         const { connectionId, organizationId } = input;
+
         return yield* db
           .transaction(() =>
             Effect.gen(function* () {
@@ -414,11 +438,13 @@ export const makeSlackConnectionServiceLive = (
                 connectionId,
                 organizationId
               );
+
               if (connection === undefined) {
                 return yield* new NotFoundError({
                   message: "Slack connection was not found",
                 });
               }
+
               if (connection.lifecycle === "archived") {
                 // The graph refuses to move an archived row, and a tombstone
                 // still holds whatever credentials it kept at archive time.
@@ -440,8 +466,10 @@ export const makeSlackConnectionServiceLive = (
                       )
                     )
                   );
+
                 return;
               }
+
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
@@ -508,6 +536,7 @@ export const makeSlackConnectionServiceLive = (
                   .where(
                     eq(schema.integrationConnectionTable.id, connectionId)
                   );
+
                 if (
                   connection?.credentialsCiphertext !== null &&
                   connection?.credentialsCiphertext !== undefined
@@ -518,6 +547,7 @@ export const makeSlackConnectionServiceLive = (
                       connection.credentialsCiphertext
                     )
                   );
+
                   if (
                     Exit.isSuccess(credentials) &&
                     credentials.value.botToken !== undefined
@@ -529,6 +559,7 @@ export const makeSlackConnectionServiceLive = (
                     );
                   }
                 }
+
                 const now = yield* DateTime.nowAsDate;
                 yield* db
                   .update(schema.integrationConnectionTable)

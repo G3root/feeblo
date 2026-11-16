@@ -71,6 +71,7 @@ describe("parseAccessTokenClaims", () => {
       client_id: "client_fallback",
       sub: "user_mcp_test",
     });
+
     expect(parsed._tag).toBe("Parsed");
     expect(parsed).toMatchObject({ clientId: "client_fallback" });
   });

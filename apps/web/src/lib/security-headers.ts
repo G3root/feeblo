@@ -69,17 +69,22 @@ export const parseImageOrigins = (
   values: readonly (string | undefined)[]
 ): readonly string[] => {
   const origins = new Set<string>();
+
   for (const value of values) {
     if (value === undefined) {
       continue;
     }
+
     for (const entry of value.split(",")) {
       const trimmed = entry.trim();
+
       if (trimmed.length === 0) {
         continue;
       }
+
       try {
         const url = new URL(trimmed);
+
         if (url.protocol === "http:" || url.protocol === "https:") {
           origins.add(url.origin);
         }
@@ -88,6 +93,7 @@ export const parseImageOrigins = (
       }
     }
   }
+
   return [...origins];
 };
 
@@ -114,6 +120,7 @@ const isHttpsUrl = (value: string | undefined): boolean => {
   if (value === undefined) {
     return false;
   }
+
   try {
     return new URL(value).protocol === "https:";
   } catch {
@@ -146,6 +153,7 @@ const contentSecurityPolicy = ({
     ...DEFAULT_IMAGE_ORIGINS,
     ...imageOrigins,
   ];
+
   return [
     // The widget is embedded by customer sites; every other document is not
     // framable at all.
@@ -195,22 +203,27 @@ export const applyPageSecurityHeaders = (
   input: PageSecurityInput
 ): Response => {
   const headers = pageSecurityHeaders(input);
+
   try {
     for (const [name, value] of Object.entries(headers)) {
       if (value !== undefined) {
         response.headers.set(name, value);
       }
     }
+
     return response;
   } catch {
     const merged = new Headers(response.headers);
+
     for (const [name, value] of Object.entries(headers)) {
       if (value !== undefined) {
         merged.set(name, value);
       }
     }
+
     const body =
       response.status === 204 || response.status === 304 ? null : response.body;
+
     return new Response(body, {
       headers: merged,
       status: response.status,

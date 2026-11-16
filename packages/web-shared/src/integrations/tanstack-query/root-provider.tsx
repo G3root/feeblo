@@ -35,6 +35,7 @@ export function getContext() {
   if (!clientQueryClient) {
     clientQueryClient = makeQueryClient();
   }
+
   return {
     queryClient: clientQueryClient,
   };

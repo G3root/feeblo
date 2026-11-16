@@ -24,6 +24,7 @@ export const AuditActorType = Schema.Literals([
   "oauth_client",
   "system",
 ]);
+
 export type TAuditActorType = Schema.Schema.Type<typeof AuditActorType>;
 
 /** The surface the request arrived through, which is not the same as who acted. */
@@ -32,10 +33,12 @@ export const AuditLogSource = Schema.Literals([
   "public_api",
   "system",
 ]);
+
 export type TAuditLogSource = Schema.Schema.Type<typeof AuditLogSource>;
 
 /** Whether the action happened or was refused. A denial is an entry, not a log line. */
 export const AuditOutcome = Schema.Literals(["allowed", "denied"]);
+
 export type TAuditOutcome = Schema.Schema.Type<typeof AuditOutcome>;
 
 /**
@@ -51,6 +54,7 @@ export const AuditChanges = Schema.Struct({
   before: Schema.Record(Schema.String, Schema.Unknown),
   after: Schema.Record(Schema.String, Schema.Unknown),
 });
+
 export type TAuditChanges = Schema.Schema.Type<typeof AuditChanges>;
 
 /**
@@ -59,6 +63,7 @@ export type TAuditChanges = Schema.Schema.Type<typeof AuditChanges>;
  * Each action documents the keys it writes; the reader treats them as opaque.
  */
 export const AuditMetadata = Schema.Record(Schema.String, Schema.Unknown);
+
 export type TAuditMetadata = Schema.Schema.Type<typeof AuditMetadata>;
 
 interface AuditResourceDefinition {
@@ -183,6 +188,7 @@ export function auditResourceTypeOf<A extends TAuditAction>(
 export function auditResourceTypeOf(action: string): string;
 export function auditResourceTypeOf(action: string): string {
   const separator = action.indexOf(".");
+
   return separator === -1 ? action : action.slice(0, separator);
 }
 
@@ -310,6 +316,7 @@ export const AuditResourceLabels = {
 const actionLabels: ReadonlyMap<string, string> = new Map(
   Object.entries(AuditActionLabels)
 );
+
 const resourceLabels: ReadonlyMap<string, string> = new Map(
   Object.entries(AuditResourceLabels)
 );

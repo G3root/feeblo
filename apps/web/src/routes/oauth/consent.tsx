@@ -50,6 +50,7 @@ const describeScope = (scope: PublicApiScope): string => {
   const [resource, action = ""] = scope.split(".");
   const subject = resource.replaceAll("_", " ");
   const sentence = `${action} ${subject}`;
+
   return sentence.charAt(0).toUpperCase() + sentence.slice(1);
 };
 
@@ -72,6 +73,7 @@ const describeIdentityScope = (scope: string): string => {
 function ConsentPage() {
   const search = Route.useSearch();
   const auth = useResolvedAuth();
+
   // A client that sends no `scope` is asking for the server's whole advertised
   // set — the provider's default is `opts.scopes`, which includes every write.
   // Rendering that set (rather than nothing) is what lets the member narrow it.
@@ -79,7 +81,9 @@ function ConsentPage() {
     search.scope === undefined || search.scope.length === 0
       ? [...OIDC_SCOPES, ...PUBLIC_API_SCOPES]
       : search.scope.split(" ").filter(Boolean);
+
   const requestedApiScopes = requested.filter(isPublicApiScope);
+
   const requestedIdentityScopes = requested.filter((scope) =>
     OIDC_SCOPES.has(scope)
   );
@@ -94,6 +98,7 @@ function ConsentPage() {
         ...requestedApiScopes.filter((scope) => DEFAULT_SCOPES.has(scope)),
       ])
   );
+
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
@@ -110,19 +115,24 @@ function ConsentPage() {
     if (activeOrganizationId === null) {
       return;
     }
+
     let cancelled = false;
     void (async () => {
       const result = await authClient.organization.list();
+
       if (cancelled || result.error) {
         return;
       }
+
       const active = result.data?.find(
         (organization) => organization.id === activeOrganizationId
       );
+
       if (active) {
         setWorkspaceName(active.name);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -131,11 +141,13 @@ function ConsentPage() {
   const toggle = (scope: string, checked: boolean) => {
     setSelected((current) => {
       const next = new Set(current);
+
       if (checked) {
         next.add(scope);
       } else {
         next.delete(scope);
       }
+
       return next;
     });
   };
@@ -150,11 +162,14 @@ function ConsentPage() {
     const accepted = accept
       ? requested.filter((scope) => selected.has(scope))
       : null;
+
     if (accepted !== null && accepted.length === 0) {
       setError("Choose at least one permission, or cancel the request.");
       setPending(false);
+
       return;
     }
+
     const result = await authClient.oauth2.consent(
       accepted === null ? { accept } : { accept, scope: accepted.join(" ") }
     );
@@ -162,8 +177,10 @@ function ConsentPage() {
     if (result.error) {
       setError(result.error.message ?? "The request could not be completed.");
       setPending(false);
+
       return;
     }
+
     if (result.data?.url) {
       window.location.assign(result.data.url);
     }

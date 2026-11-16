@@ -26,6 +26,7 @@ describe("audit log retention", () => {
       slug: organizationId,
       createdAt: now,
     });
+
     return organizationId;
   });
 
@@ -83,10 +84,12 @@ describe("audit log retention", () => {
   ) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const ids = yield* Effect.forEach(
         Array.from({ length: args.count }, (_, index) => index),
         () => AuditLogId.generate
       );
+
       for (let index = 0; index < ids.length; index += 500) {
         yield* db
           .insert(schema.auditLogTable)
@@ -100,6 +103,7 @@ describe("audit log retention", () => {
     Effect.gen(function* () {
       const db = yield* currentDb;
       const rows = yield* db.select().from(schema.auditLogTable);
+
       return rows.filter((row) => row.organizationId === organizationId).length;
     });
 
@@ -108,6 +112,7 @@ describe("audit log retention", () => {
       Effect.gen(function* () {
         const organizationId = yield* createOrganization();
         const now = yield* DateTime.now;
+
         const days = (value: number) =>
           DateTime.toDate(DateTime.subtract({ days: value })(now));
 
@@ -131,9 +136,11 @@ describe("audit log retention", () => {
       Effect.gen(function* () {
         const organizationId = yield* createOrganization();
         const now = yield* DateTime.now;
+
         const stale = DateTime.toDate(
           DateTime.subtract({ days: AUDIT_LOG_RETENTION_DAYS + 40 })(now)
         );
+
         const fresh = DateTime.toDate(DateTime.subtract({ days: 2 })(now));
 
         // One row past the batch limit: a pass that stops after its first

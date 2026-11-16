@@ -139,6 +139,7 @@ export const ListChangelogQuery = Schema.Struct({
 });
 
 const COVER_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+
 const COVER_IMAGE_URL_MAX_LENGTH = 2048;
 
 /**

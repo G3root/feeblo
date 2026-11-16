@@ -129,6 +129,7 @@ const makeMembershipRepository = Effect.gen(function* () {
     }: TCreateInvitation) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .insert(schema.invitationTable)
           .values({

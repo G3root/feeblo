@@ -94,6 +94,7 @@ function getValidatedSessionFromToken(
     if (!token) {
       return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
+
     const session = yield* Effect.tryPromise({
       try: () =>
         auth.api.getSession({
@@ -103,9 +104,11 @@ function getValidatedSessionFromToken(
         }),
       catch: () => new UnauthorizedError({ message: "Failed to get session" }),
     });
+
     if (!session) {
       return yield* new UnauthorizedError({ message: "Not authenticated" });
     }
+
     return session;
   });
 }
@@ -133,6 +136,7 @@ export const AuthMiddlewareLive = Layer.effect(
       const cookieHeader = isString(options.headers?.cookie)
         ? options.headers.cookie
         : options.headers?.Cookie;
+
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
       return getValidatedSessionFromToken(auth, token ?? "").pipe(
@@ -144,6 +148,7 @@ export const AuthMiddlewareLive = Layer.effect(
               })
             );
           }
+
           return effect.pipe(Effect.provideService(CurrentSession, session));
         })
       );
@@ -160,6 +165,7 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
       const cookieHeader = isString(options.headers?.cookie)
         ? options.headers.cookie
         : options.headers?.Cookie;
+
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
       return getValidatedSessionFromToken(auth, token ?? "").pipe(
@@ -186,6 +192,7 @@ export const PublicAuthMiddlewareLive = Layer.effect(
       const cookieHeader = isString(options.headers?.cookie)
         ? options.headers.cookie
         : options.headers?.Cookie;
+
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
       return getValidatedSessionFromToken(auth, token ?? "").pipe(
@@ -242,6 +249,7 @@ export const makeHttpApiAuthMiddlewareLive = (
                     message: "SSO sessions cannot access dashboard endpoints",
                   });
                 }
+
                 return yield* effect.pipe(
                   Effect.provideService(CurrentSession, session)
                 );

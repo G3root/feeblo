@@ -25,6 +25,7 @@ export async function executeRemediation(
       const boards = await fetchRpc((rpc) =>
         rpc.ListBoards({ organizationId })
       );
+
       const board = boards.find(
         (candidate) => candidate.id === action.resourceId
       );
@@ -57,6 +58,7 @@ export async function executeRemediation(
       const roadmaps = await fetchRpc((rpc) =>
         rpc.ListRoadmaps({ organizationId })
       );
+
       const roadmap = roadmaps.find(
         (candidate) => candidate.id === action.resourceId
       );

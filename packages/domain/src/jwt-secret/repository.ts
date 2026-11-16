@@ -26,6 +26,7 @@ interface TJwtSecretRotate {
 const generateSecret = () =>
   Effect.gen(function* () {
     const secureRandom = yield* SecureRandom.SecureRandom;
+
     return Buffer.from(yield* secureRandom.randomBytes(32)).toString("hex");
   });
 
@@ -81,6 +82,7 @@ const makeJwtSecretRepository = Effect.gen(function* () {
           Effect.gen(function* () {
             const nowUtc = yield* DateTime.now;
             const now = DateTime.toDate(nowUtc);
+
             const gracePeriod = DateTime.toDate(
               DateTime.addDuration(nowUtc, Duration.hours(24))
             );
@@ -139,6 +141,7 @@ const makeJwtSecretRepository = Effect.gen(function* () {
           Effect.gen(function* () {
             const nowUtc = yield* DateTime.now;
             const now = DateTime.toDate(nowUtc);
+
             const gracePeriod = DateTime.toDate(
               DateTime.addDuration(nowUtc, Duration.hours(24))
             );

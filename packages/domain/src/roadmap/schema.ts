@@ -4,6 +4,7 @@ import * as S from "effect/Schema";
 
 /** A roadmap filter with no conditions intentionally matches every workspace post. */
 export const RoadmapVisibility = S.Literals(["public", "private"]);
+
 export type TRoadmapVisibility = S.Schema.Type<typeof RoadmapVisibility>;
 
 const FilterValue = S.Array(S.String).check(S.isBetweenLength(1, 50));
@@ -31,6 +32,7 @@ export const SimpleRoadmapFilterCondition = S.Union([
   StatusRoadmapFilterCondition,
   TagRoadmapFilterCondition,
 ]);
+
 export type TSimpleRoadmapFilterCondition = S.Schema.Type<
   typeof SimpleRoadmapFilterCondition
 >;
@@ -40,6 +42,7 @@ export const SimpleRoadmapFilter = S.Struct({
   operator: S.Literal("and"),
   conditions: S.Array(SimpleRoadmapFilterCondition).check(S.isMaxLength(50)),
 });
+
 export type TSimpleRoadmapFilter = S.Schema.Type<typeof SimpleRoadmapFilter>;
 
 export const Roadmap = S.Struct({
@@ -55,6 +58,7 @@ export const Roadmap = S.Struct({
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,
 });
+
 export type TRoadmap = S.Schema.Type<typeof Roadmap>;
 
 const RoadmapCreateFields = {
@@ -72,6 +76,7 @@ export const RoadmapCreate = S.Struct({
   ...RoadmapCreateFields,
   mode: RoadmapMode,
 });
+
 export type TRoadmapCreate = S.Schema.Type<typeof RoadmapCreate>;
 
 const RoadmapUpdateFields = {
@@ -79,23 +84,28 @@ const RoadmapUpdateFields = {
   description: S.NullOr(S.String.check(S.isMaxLength(2000))),
   isPrimary: S.Boolean,
 };
+
 export const RoadmapUpdate = S.Struct({
   ...RoadmapUpdateFields,
   mode: RoadmapMode,
 });
+
 export type TRoadmapUpdate = S.Schema.Type<typeof RoadmapUpdate>;
 
 export const RoadmapList = S.Struct({ organizationId: WorkspaceId.schema });
+
 export type TRoadmapList = S.Schema.Type<typeof RoadmapList>;
 
 export const RoadmapBySlug = S.Struct({
   organizationId: WorkspaceId.schema,
   slug: S.String,
 });
+
 export type TRoadmapBySlug = S.Schema.Type<typeof RoadmapBySlug>;
 
 export const RoadmapDelete = S.Struct({
   id: RoadmapId.schema,
   organizationId: WorkspaceId.schema,
 });
+
 export type TRoadmapDelete = S.Schema.Type<typeof RoadmapDelete>;

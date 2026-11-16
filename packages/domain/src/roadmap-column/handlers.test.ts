@@ -118,13 +118,16 @@ describe("RoadmapColumnRpcHandlers", () => {
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = SitePolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -137,9 +140,11 @@ describe("RoadmapColumnRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapColumnRpcHandlersEffect;
         const fixture = yield* makeFixture("PUBLIC");
+
         const columns = yield* handlers.ListRoadmapColumnsPublic({
           organizationId: fixture.organizationId,
         });
+
         expect(columns).toMatchObject([{ id: fixture.columnId }]);
       })
     );
@@ -147,11 +152,13 @@ describe("RoadmapColumnRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapColumnRpcHandlersEffect;
         const fixture = yield* makeFixture("HIDDEN");
+
         const error = yield* Effect.flip(
           handlers.ListRoadmapColumnsPublic({
             organizationId: fixture.organizationId,
           })
         );
+
         expect(error).toMatchObject({ _tag: "PolicyDenied" });
       })
     );

@@ -57,6 +57,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
   const deleteDialogStore = useTagDeleteDialogContext();
 
   const tagsQuery = useOrgTags(organizationId);
+
   // The shared org-tags query is unordered; this table keeps its
   // most-recently-updated-first order locally.
   const tags = useMemo(
@@ -68,6 +69,7 @@ export function TagSettingsTable(props: TagSettingsTableProps) {
       ),
     [tagsQuery.data]
   );
+
   const handleCreate = () =>
     createDialogStore.send({ type: "toggle", data: {} });
 
@@ -173,6 +175,7 @@ function TagTableActions({
   organizationId: string;
 }) {
   const isSkeleton = useIsSkeleton();
+
   return (
     <div className="flex items-center justify-end">
       <SkeletonWrapper>

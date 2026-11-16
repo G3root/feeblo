@@ -82,9 +82,11 @@ const rowFailureMessage = (error: TaggedFailure): string => {
   if (Schema.is(CrmEntryLimitReachedError)(error)) {
     return "The workspace has no customer slots left; free one and retry this import.";
   }
+
   if (Schema.is(InvalidSubjectError)(error)) {
     return "The row's author could not be resolved.";
   }
+
   return "The post could not be created.";
 };
 
@@ -92,12 +94,15 @@ const resolveImportActor = (
   job: DataImportJobRecord
 ): Effect.Effect<PostWriteActor, EffectDrizzleQueryError, UserRepository> => {
   const userId = job.createdByUserId;
+
   if (userId === null) {
     return Effect.succeed<PostWriteActor>({ kind: "import" });
   }
+
   return Effect.gen(function* () {
     const users = yield* UserRepository;
     const user = yield* users.getById(userId);
+
     return Option.match(user, {
       onNone: (): PostWriteActor => ({ kind: "import" }),
       onSome: (found): PostWriteActor => ({
@@ -144,9 +149,11 @@ const resolveBatchTags = ({
       for (const tag of candidates) {
         const nameKey = normalizeTagKey(tag.name);
         const slugKey = normalizeTagKey(tag.slug);
+
         if (!byKey.has(nameKey)) {
           byKey.set(nameKey, tag.id);
         }
+
         if (!byKey.has(slugKey)) {
           byKey.set(slugKey, tag.id);
         }
@@ -156,9 +163,11 @@ const resolveBatchTags = ({
     remember(yield* tags.findMany({ organizationId }));
 
     const wanted = new Map<string, string>();
+
     for (const row of rows) {
       for (const name of row.payload?.tagNames ?? []) {
         const key = normalizeTagKey(name);
+
         if (!byKey.has(key) && !wanted.has(key)) {
           wanted.set(key, name);
         }
@@ -169,10 +178,12 @@ const resolveBatchTags = ({
       const created = yield* tags
         .create({ name, organizationId })
         .pipe(Effect.orElseSucceed(() => undefined));
+
       if (created !== undefined) {
         remember([created]);
         continue;
       }
+
       // The name won a race (or the insert failed for a reason a re-read can
       // repair); one re-read is the cheapest correct recovery.
       remember(
@@ -234,6 +245,7 @@ const resolveBatchBoards = ({
     ) => {
       for (const board of candidates) {
         existingIds.add(board.id);
+
         for (const key of [boardKey(board.name), board.slug.toLowerCase()]) {
           if (key.length > 0 && !byKey.has(key)) {
             byKey.set(key, board.id);
@@ -245,15 +257,19 @@ const resolveBatchBoards = ({
     remember(yield* boards.findMany({ organizationId: job.organizationId }));
 
     const wanted = new Map<string, string>();
+
     for (const row of rows) {
       const payload = row.payload;
+
       if (
         payload === null ||
         (payload.boardId !== null && existingIds.has(payload.boardId))
       ) {
         continue;
       }
+
       const key = boardKey(payload.boardName);
+
       if (key.length > 0 && !byKey.has(key) && !wanted.has(key)) {
         wanted.set(key, payload.boardName);
       }
@@ -270,10 +286,12 @@ const resolveBatchBoards = ({
           visibility: "PUBLIC",
         })
         .pipe(Effect.orElseSucceed((): [] => []));
+
       if (created.length > 0) {
         remember(created);
         continue;
       }
+
       // The slug won a race (or the insert failed for a reason a re-read can
       // repair); one re-read is the cheapest correct recovery.
       remember(
@@ -318,11 +336,13 @@ const applyPendingRow = ({
 }) =>
   Effect.gen(function* () {
     const payload = row.payload;
+
     if (payload === null) {
       yield* repository.markRowFailed({
         message: "The staged row is unreadable.",
         rowId: row.id,
       });
+
       return { kind: "failed" } satisfies RowOutcome;
     }
 
@@ -331,17 +351,20 @@ const applyPendingRow = ({
       boardResolution.existingIds.has(payload.boardId)
         ? payload.boardId
         : boardResolution.byKey.get(boardKey(payload.boardName));
+
     if (boardId === undefined) {
       yield* repository.markRowFailed({
         message: "The row's board could not be resolved.",
         rowId: row.id,
       });
+
       return { kind: "failed" } satisfies RowOutcome;
     }
 
     const applied = yield* transaction(
       Effect.gen(function* () {
         const postId = yield* PostId.generate;
+
         const createdAt = Option.getOrUndefined(
           Option.map(
             payload.createdAt === null
@@ -350,6 +373,7 @@ const applyPendingRow = ({
             DateTime.toDate
           )
         );
+
         yield* writes.create(
           {
             assetIds: [],
@@ -380,6 +404,7 @@ const applyPendingRow = ({
         const tagIds = payload.tagNames
           .map((name) => tagIdsByKey.get(normalizeTagKey(name)))
           .filter((id): id is string => id !== undefined);
+
         if (tagIds.length > 0) {
           yield* tags.setPostTags({
             organizationId: job.organizationId,
@@ -394,6 +419,7 @@ const applyPendingRow = ({
           postId,
           rowId: row.id,
         });
+
         return {
           content: sanitizeMarkdown(payload.content).sanitizedMarkdown,
           postId,
@@ -417,6 +443,7 @@ const applyPendingRow = ({
               message: rowFailureMessage(error),
               rowId: row.id,
             });
+
             return { kind: "failed" } satisfies RowOutcome;
           })
       )
@@ -436,10 +463,13 @@ const embedCreatedPosts = ({
     if (embeddings.length === 0) {
       return;
     }
+
     const service = yield* Effect.serviceOption(PostEmbeddingService);
+
     if (Option.isNone(service)) {
       return;
     }
+
     yield* Effect.forEach(
       embeddings,
       (embedding) =>
@@ -472,6 +502,7 @@ const embedCreatedPosts = ({
  */
 export const runDataImportPass = (claim: ClaimedDataImportJob) => {
   const { job, leaseOwner } = claim;
+
   return Effect.gen(function* () {
     const repository = yield* DataTransferRepository;
     const tags = yield* TagRepository;
@@ -488,12 +519,14 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
       ],
       { concurrency: "unbounded" }
     );
+
     // The workspace's stored default, not the `PENDING` type: a workspace may
     // repoint which status is the default, and several statuses may share a
     // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several),
     // so `pickDefaultPostStatus` is the rule every other surface that files a
     // post without a status already follows.
     const defaultStatus = pickDefaultPostStatus(statusRows);
+
     if (defaultStatus === undefined) {
       yield* repository.finishJob({
         failureMessage:
@@ -502,6 +535,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
         leaseOwner,
         status: "failed",
       });
+
       return { createdCount: 0, errorCount: 0, jobId: job.id };
     }
 
@@ -519,6 +553,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           leaseDurationMs: DATA_IMPORT_LEASE_MS,
           leaseOwner,
         });
+
         if (!renewed) {
           return yield* repository
             .syncCounts({ jobId: job.id, leaseOwner })
@@ -528,6 +563,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
         const stillRunning = yield* repository.isStillRunning({
           jobId: job.id,
         });
+
         if (!stillRunning) {
           return yield* repository
             .syncCounts({ jobId: job.id, leaseOwner })
@@ -538,6 +574,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           jobId: job.id,
           limit: DATA_IMPORT_BATCH_SIZE,
         });
+
         if (rows.length === 0) {
           break;
         }
@@ -551,7 +588,9 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
           organizationId: job.organizationId,
           rows,
         });
+
         const boardResolution = yield* resolveBatchBoards({ job, rows });
+
         for (const row of rows) {
           const outcome = yield* applyPendingRow({
             actor,
@@ -565,6 +604,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
             tags,
             writes,
           });
+
           if (outcome.kind === "created") {
             embeddings.push(outcome.embedding);
           }
@@ -582,11 +622,13 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
         jobId: job.id,
         leaseOwner,
       });
+
       yield* repository.finishJob({
         jobId: job.id,
         leaseOwner,
         status: "completed",
       });
+
       return { ...counts, jobId: job.id };
     });
 
@@ -617,6 +659,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
             embeddings,
             organizationId: job.organizationId,
           });
+
           return { createdCount: 0, errorCount: 0, jobId: job.id };
         })
       )
@@ -649,9 +692,11 @@ export const runDataImportWorker = ({
         leaseDurationMs,
         leaseOwner,
       });
+
       if (Option.isNone(claim)) {
         return;
       }
+
       yield* runDataImportPass(claim.value);
     }).pipe(
       Effect.catch((error) =>
@@ -675,6 +720,7 @@ export const runDataImportMaintenance: Effect.Effect<
   DataTransferRepository
 > = Effect.gen(function* () {
   const repository = yield* DataTransferRepository;
+
   return yield* repository.deleteExpiredJobs.pipe(
     Effect.tapError((error) =>
       Effect.logWarning("DataImport.retention_sweep_failed").pipe(

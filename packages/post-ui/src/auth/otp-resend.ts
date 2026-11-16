@@ -15,6 +15,7 @@ export const RateLimitErrorSchema = z.object({
 export function formatCountdown(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
+
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
@@ -28,9 +29,11 @@ export function getResendLabel({
   if (isResending) {
     return m.smart_shy_goldfish();
   }
+
   if (cooldown > 0) {
     return m.bold_cozy_owl({ time: formatCountdown(cooldown) });
   }
+
   return m.honest_ago_lemming();
 }
 
@@ -67,6 +70,7 @@ export function toResendResult(error: {
   code?: string;
 }): ResendResult {
   const rateLimitError = RateLimitErrorSchema.safeParse(error);
+
   return {
     success: false as const,
     retryAfterSeconds: rateLimitError.success
@@ -92,6 +96,7 @@ export function useOtpResend({
   const [expiresAt, setExpiresAt] = useState(
     () => Date.now() + RESEND_COOLDOWN_SECONDS * 1000
   );
+
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const [isResending, setIsResending] = useState(false);
 
@@ -100,10 +105,13 @@ export function useOtpResend({
   useEffect(() => {
     if (expiresAt - Date.now() <= 0) {
       setCooldown(0);
+
       return;
     }
+
     const timer = window.setInterval(() => {
       const remaining = Math.ceil((expiresAt - Date.now()) / 1000);
+
       if (remaining <= 0) {
         setCooldown(0);
         window.clearInterval(timer);
@@ -122,6 +130,7 @@ export function useOtpResend({
 
   const resend = useCallback(async () => {
     setIsResending(true);
+
     try {
       const result = await onResend();
 
@@ -131,12 +140,14 @@ export function useOtpResend({
           title: successMessage,
           type: "success",
         });
+
         return;
       }
 
       if (result.retryAfterSeconds !== undefined) {
         startCooldown(result.retryAfterSeconds);
       }
+
       toastManager.add({
         title: result.message ?? m.keen_top_panther(),
         type: "error",

@@ -85,6 +85,7 @@ const toRpcClientError = (
 /** The transport or protocol failure a batch's callers all see. */
 const errorOfCause = (cause: Cause.Cause<RpcClientError>): RpcClientError => {
   const failure = Cause.findErrorOption(cause);
+
   return Option.isSome(failure)
     ? failure.value
     : defect("The batched RPC request failed", Cause.squash(cause));
@@ -105,6 +106,7 @@ const encodeFrame = (
 ): Effect.Effect<string> =>
   Effect.suspend(() => {
     const encoded = parser.encode(frame);
+
     return isString(encoded)
       ? Effect.succeed(encoded)
       : Effect.die(
@@ -180,21 +182,26 @@ export const makeProtocolHttpBatch = (options: {
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient;
     const serialization = yield* RpcSerialization.RpcSerialization;
+
     const client = HttpClient.mapRequest(
       http,
       HttpClientRequest.prependUrl(options.url)
     ).pipe(HttpClient.filterStatusOk);
+
     const maxBatchFrames = Math.max(
       1,
       options.maxBatchFrames ?? defaultMaxBatchFrames
     );
+
     const maxBatchBytes = Math.max(
       1,
       options.maxBatchBytes ?? defaultMaxBatchBytes
     );
+
     const batchWindow = options.batchWindow ?? defaultBatchWindow;
     const sharesBatch = options.sharesBatch ?? (() => true);
     const encodeText = new TextEncoder();
+
     const decodeDefect = Schema.decodeUnknownEffect(
       serialization.codecFor(Schema.Defect())
     );
@@ -225,17 +232,20 @@ export const makeProtocolHttpBatch = (options: {
           const waiting = new Map(
             frames.map((frame) => [frame.requestId, frame] as const)
           );
+
           const failWaiting = (error: RpcClientError) =>
             Effect.gen(function* () {
               for (const frame of waiting.values()) {
                 yield* frame.complete(Exit.fail(error));
               }
+
               waiting.clear();
             });
 
           yield* Effect.gen(function* () {
             const parser = serialization.makeUnsafe();
             let body = "";
+
             for (const { encoded } of frames) {
               body += encoded;
             }
@@ -252,21 +262,26 @@ export const makeProtocolHttpBatch = (options: {
                   const serverFrames = chunk.flatMap(
                     parser.decode
                   ) as ReadonlyArray<FromServerEncoded>;
+
                   for (const serverFrame of serverFrames) {
                     switch (serverFrame._tag) {
                       case "Chunk":
                       case "Exit": {
                         const frame = waiting.get(serverFrame.requestId);
+
                         if (frame === undefined) break;
                         yield* writeResponse(frame.clientId, serverFrame);
+
                         // A chunk answers a stream, not the request; only
                         // the terminal frame releases its caller.
                         if (isTerminalResponse(serverFrame)) {
                           waiting.delete(serverFrame.requestId);
                           yield* frame.complete(Exit.succeed(undefined));
                         }
+
                         break;
                       }
+
                       case "Defect": {
                         // Connection-level: the server could not read the
                         // body, so no request in it has an answer coming.
@@ -275,10 +290,12 @@ export const makeProtocolHttpBatch = (options: {
                         );
                         break;
                       }
+
                       case "ClientProtocolError": {
                         yield* failWaiting(serverFrame.error);
                         break;
                       }
+
                       default: {
                         break;
                       }
@@ -328,6 +345,7 @@ export const makeProtocolHttpBatch = (options: {
               group = [];
               bytes = 0;
             }
+
             group.push(fromEntry(entry));
             bytes += entry.request.byteLength;
           }
@@ -371,6 +389,7 @@ export const makeProtocolHttpBatch = (options: {
                 }),
                 reads
               );
+
               return;
             }
 

@@ -22,6 +22,7 @@ export {
   DiscordUnknownInteractionPayload,
   ParsedDiscordInboundRequest,
 } from "@feeblo/domain-contracts/discord-inbound";
+
 export type {
   DiscordEmbed,
   DiscordEmbedField,
@@ -29,4 +30,5 @@ export type {
 } from "@feeblo/domain-contracts/discord-inbound";
 
 export const DiscordOAuthState = IntegrationOAuthState;
+
 export type DiscordOAuthState = Schema.Schema.Type<typeof DiscordOAuthState>;

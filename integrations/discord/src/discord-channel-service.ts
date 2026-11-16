@@ -34,9 +34,10 @@ const decodeProviderConfig = (value: Schema.Json) =>
     value ?? {}
   ).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored Discord route configuration is invalid",
+          cause,
         })
     )
   );
@@ -68,16 +69,19 @@ export const makeDiscordChannelServiceLive = (
             input.connectionId,
             input.organizationId
           );
+
           if (connection === undefined || connection.lifecycle !== "active") {
             return yield* new NotFoundError({
               message: "Discord connection was not found",
             });
           }
+
           if (connection.remoteAccountId === null) {
             return yield* new NotFoundError({
               message: "Discord connection was not found",
             });
           }
+
           const routeRows = yield* db
             .select({
               providerConfig: schema.integrationRouteTable.providerConfig,
@@ -96,6 +100,7 @@ export const makeDiscordChannelServiceLive = (
                 eq(schema.integrationRouteTable.enabled, true)
               )
             );
+
           const notificationChannels = yield* Effect.forEach(
             routeRows,
             (route) =>
@@ -103,7 +108,9 @@ export const makeDiscordChannelServiceLive = (
                 Effect.map((routeConfig) => routeConfig.channelId)
               )
           );
+
           const enabledChannels = new Set(notificationChannels);
+
           // `guilds/{guildId}/channels` returns every channel in one request;
           // only text and announcement channels can carry notifications.
           const discordChannels = yield* apiClient
@@ -112,6 +119,7 @@ export const makeDiscordChannelServiceLive = (
               guildId: connection.remoteAccountId,
             })
             .pipe(mapDiscordApiError("channel listing"));
+
           return discordChannels
             .filter((channel) =>
               DISCORD_NOTIFICATION_CHANNEL_TYPES.includes(
@@ -137,6 +145,7 @@ export const makeDiscordChannelServiceLive = (
             input.connectionId,
             input.organizationId
           );
+
           if (
             connection === undefined ||
             connection.lifecycle !== "active" ||
@@ -146,6 +155,7 @@ export const makeDiscordChannelServiceLive = (
               message: "Discord connection was not found",
             });
           }
+
           // Discord owns channel membership and names. Resolve the requested
           // channel against the connection's guild before persisting a route so
           // a caller cannot route deliveries into another installed guild.
@@ -155,6 +165,7 @@ export const makeDiscordChannelServiceLive = (
               guildId: connection.remoteAccountId,
             })
             .pipe(mapDiscordApiError("channel validation"));
+
           const selectedChannel = discordChannels.find(
             (channel) =>
               channel.id === input.channelId &&
@@ -163,11 +174,13 @@ export const makeDiscordChannelServiceLive = (
                 channel.type as (typeof DISCORD_NOTIFICATION_CHANNEL_TYPES)[number]
               )
           );
+
           if (selectedChannel === undefined) {
             return yield* new NotFoundError({
               message: "Discord channel was not found in the connected server",
             });
           }
+
           return yield* db
             .transaction(() =>
               Effect.gen(function* () {
@@ -176,6 +189,7 @@ export const makeDiscordChannelServiceLive = (
                   input.connectionId,
                   input.organizationId
                 );
+
                 if (
                   connection === undefined ||
                   connection.lifecycle !== "active"
@@ -184,6 +198,7 @@ export const makeDiscordChannelServiceLive = (
                     message: "Discord connection was not found",
                   });
                 }
+
                 // One route per channel: look the target channel's route up by
                 // its routeKey (the channel id) instead of decoding every
                 // channel.notifications route's providerConfig.
@@ -211,8 +226,10 @@ export const makeDiscordChannelServiceLive = (
                     )
                   )
                   .limit(1);
+
                 const channelName = selectedChannel.name;
                 const now = yield* DateTime.nowAsDate;
+
                 if (input.enabled) {
                   if (route === undefined) {
                     yield* db.insert(schema.integrationRouteTable).values({
@@ -262,6 +279,7 @@ export const makeDiscordChannelServiceLive = (
                       )
                     );
                 }
+
                 // Inside the same transaction as the route change: the entry
                 // and the channel's notification setting commit together. The
                 // setting name is in `metadata` because this is a route

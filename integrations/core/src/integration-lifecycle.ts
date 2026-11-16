@@ -204,6 +204,7 @@ const connectionHandles = (
     context: {},
     value: from,
   });
+
   return !isUnhandled(
     before,
     transition(integrationConnectionMachine, before, { type: to })
@@ -225,6 +226,7 @@ export const deliveryHandles = (
     context: {},
     value: from,
   });
+
   return !isUnhandled(
     before,
     transition(integrationDeliveryMachine, before, { type: to })

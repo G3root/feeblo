@@ -49,11 +49,13 @@ const voterFilterFromQuery = (query: {
   const id = providedQueryParam(query.voterId);
   const externalId = providedQueryParam(query.voterExternalId);
   const email = providedQueryParam(query.voterEmail);
+
   const voter: TPublicApiVoterFilter = {
     ...(id !== undefined && { id }),
     ...(externalId !== undefined && { externalId }),
     ...(email !== undefined && { email }),
   };
+
   return Object.keys(voter).length === 0 ? undefined : voter;
 };
 
@@ -121,6 +123,7 @@ export const voteHandlers = (
   listPostVotes: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       return yield* listPostVotesOperation.handler({
         ...params,
         cursor: query.cursor,
@@ -136,6 +139,7 @@ export const voteHandlers = (
   listVotes: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       return yield* listVotesOperation.handler({
         boardId: providedQueryParam(query.boardId),
         cursor: query.cursor,

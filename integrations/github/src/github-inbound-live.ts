@@ -50,6 +50,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
   const integrationEventRecorder = yield* IntegrationEventRecorder;
   const emailOutboxConfig = yield* EmailOutboxConfig;
   const postRepository = yield* PostRepository;
+
   const activeConnectionForInstallation = (installationId: string) =>
     db
       .select({
@@ -85,6 +86,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
             : Effect.succeed(rows[0])
         )
       );
+
   const applyIssue = (webhook: GitHubIssueWebhook) =>
     db
       .transaction(() =>
@@ -92,7 +94,9 @@ const makeGitHubInboundService = Effect.gen(function* () {
           const activeConnection = yield* activeConnectionForInstallation(
             webhook.installationId
           );
+
           const inboxId = yield* GitHubWebhookDeliveryId.generate;
+
           const inserted = yield* db
             .insert(schema.githubWebhookDeliveryTable)
             .values({
@@ -104,9 +108,11 @@ const makeGitHubInboundService = Effect.gen(function* () {
             .onConflictDoNothing()
             .returning({ id: schema.githubWebhookDeliveryTable.id })
             .pipe(Effect.mapError(inboundDatabaseError("inbox record")));
+
           if (inserted.length === 0) {
             return;
           }
+
           const links = yield* db
             .select({
               externalResourceId: schema.integrationExternalResourceTable.id,
@@ -138,6 +144,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
               )
             )
             .pipe(Effect.mapError(inboundDatabaseError("issue link lookup")));
+
           // The rule list is the same for every post linked to this issue and
           // nothing in this envelope changes it, so it is read once here and
           // not re-read per link. A webhook for an issue this workspace never
@@ -166,6 +173,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                       inboundDatabaseError("synchronization rule lookup")
                     )
                   );
+
           for (const link of links) {
             yield* db
               .update(schema.integrationExternalResourceTable)
@@ -179,6 +187,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .pipe(
                 Effect.mapError(inboundDatabaseError("issue state update"))
               );
+
             const allLinks = yield* db
               .select({
                 stateKey: schema.integrationExternalResourceTable.stateKey,
@@ -209,6 +218,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
                   inboundDatabaseError("linked issue aggregation")
                 )
               );
+
             const matches = findMatchingGitHubSyncRules(
               rules.map((rule) => ({
                 id: asLegid(GitHubSyncRuleId)(rule.id),
@@ -227,10 +237,13 @@ const makeGitHubInboundService = Effect.gen(function* () {
                   : []
               )
             );
+
             const match = matches[0];
+
             if (match === undefined) {
               continue;
             }
+
             const post = yield* db
               .select({
                 boardId: schema.postTable.boardId,
@@ -250,12 +263,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
               )
               .limit(1)
               .pipe(Effect.mapError(inboundDatabaseError("post lookup")));
+
             if (
               post[0] === undefined ||
               post[0].statusId === match.postStatusId
             ) {
               continue;
             }
+
             yield* db
               .update(schema.postTable)
               .set({ statusId: match.postStatusId })
@@ -285,6 +300,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
               Effect.provideService(Database.Database, db),
               Effect.mapError(inboundDatabaseError("status event recording"))
             );
+
             if (match.upvoterNotificationPolicy === "notify_upvoters") {
               yield* notifications
                 .notifyPostStatusChangedUpvoters({
@@ -343,11 +359,15 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 inboundDatabaseError("installation lifecycle lookup")
               )
             );
+
           const installation = installations[0];
+
           if (installation === undefined) {
             return;
           }
+
           const inboxId = yield* GitHubWebhookDeliveryId.generate;
+
           const inserted = yield* db
             .insert(schema.githubWebhookDeliveryTable)
             .values({
@@ -361,9 +381,11 @@ const makeGitHubInboundService = Effect.gen(function* () {
             .pipe(
               Effect.mapError(inboundDatabaseError("lifecycle inbox record"))
             );
+
           if (inserted.length === 0) {
             return;
           }
+
           if (webhook.action === "deleted") {
             yield* db
               .update(schema.integrationConnectionTable)
@@ -385,8 +407,10 @@ const makeGitHubInboundService = Effect.gen(function* () {
               .pipe(
                 Effect.mapError(inboundDatabaseError("installation archive"))
               );
+
             return;
           }
+
           if (webhook.action === "suspend") {
             yield* db
               .update(schema.githubInstallationTable)
@@ -415,11 +439,14 @@ const makeGitHubInboundService = Effect.gen(function* () {
                 )
               )
               .pipe(Effect.mapError(inboundDatabaseError("connection pause")));
+
             return;
           }
+
           if (webhook.action !== "unsuspend") {
             return;
           }
+
           yield* db
             .update(schema.githubInstallationTable)
             .set({ suspendedAt: null })
@@ -432,6 +459,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
             .pipe(
               Effect.mapError(inboundDatabaseError("installation restoration"))
             );
+
           if (
             installation.lifecycle === "paused" &&
             installation.suspendedAt !== null
@@ -469,6 +497,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
       switch (webhook.kind) {
         case "issue": {
           const payload = webhook.payload;
+
           if (
             payload.action !== "opened" &&
             payload.action !== "reopened" &&
@@ -476,6 +505,7 @@ const makeGitHubInboundService = Effect.gen(function* () {
           ) {
             return Effect.void;
           }
+
           return applyIssue({
             deliveryId: webhook.deliveryId,
             eventName: "issues",
@@ -486,8 +516,10 @@ const makeGitHubInboundService = Effect.gen(function* () {
             repositoryOwner: payload.repository.owner.login,
           });
         }
+
         case "installation": {
           const action = webhook.payload.action;
+
           if (
             action === "deleted" ||
             action === "suspend" ||
@@ -499,8 +531,10 @@ const makeGitHubInboundService = Effect.gen(function* () {
               installationId: String(webhook.payload.installation.id),
             });
           }
+
           return Effect.void;
         }
+
         case "installation_repositories":
           // Settings validate repository availability on update; this event is
           // acknowledged so GitHub does not retry a delivery with no mutation.

@@ -94,11 +94,13 @@ const PostCollectionsContext = createContext<PostCollectionsValue | null>(null);
 
 export function usePostCollections() {
   const ctx = useContext(PostCollectionsContext);
+
   if (!ctx) {
     throw new Error(
       "usePostCollections must be used within PostCollectionsProvider"
     );
   }
+
   return ctx;
 }
 

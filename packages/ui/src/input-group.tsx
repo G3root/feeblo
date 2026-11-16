@@ -57,17 +57,22 @@ export function InputGroupAddon({
       onMouseDown={(e: React.MouseEvent<HTMLDivElement>) => {
         // SAFETY: The event target is the expected DOM element type for this handler.
         const target = e.target as HTMLElement;
+
         const isInteractive = target.closest(
           "button, a, input, select, textarea, [role='button'], [role='combobox'], [role='listbox'], [data-slot='select-trigger']"
         );
+
         if (isInteractive) {
           return;
         }
+
         e.preventDefault();
         const parent = e.currentTarget.parentElement;
+
         const input = parent?.querySelector<
           HTMLInputElement | HTMLTextAreaElement
         >("input, textarea");
+
         if (input && !parent?.querySelector("input:focus, textarea:focus")) {
           input.focus();
         }

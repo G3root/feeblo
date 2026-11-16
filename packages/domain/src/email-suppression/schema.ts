@@ -129,6 +129,7 @@ export class EmailSuppressionInputError extends Schema.TaggedError<EmailSuppress
   {
     operation: Schema.String,
     reason: Schema.String,
+    cause: Schema.optionalKey(Schema.Defect()),
   }
 ) {}
 
@@ -148,10 +149,11 @@ export const parseSuppressionEmail = (
 ): Effect.Effect<EmailAddress, EmailSuppressionInputError> =>
   Schema.decodeEffect(EmailAddress)(normalizeEmailAddress(input)).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new EmailSuppressionInputError({
           operation,
           reason: "Email address is invalid",
+          cause,
         })
     )
   );

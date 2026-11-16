@@ -118,6 +118,7 @@ const seedCrmEntries = (args: {
     );
 
     const contacts = args.contacts ?? 0;
+
     if (contacts > 0) {
       yield* db.insert(schema.contactTable).values(
         Array.from({ length: contacts }, (_, index) => ({
@@ -179,6 +180,7 @@ describe("public API CRM entry allowance", () => {
           );
 
           expect(Schema.is(PlanRequiresUpgradeError)(error)).toBe(true);
+
           if (Schema.is(PlanRequiresUpgradeError)(error)) {
             expect(error.message).toBe(crmLimitMessage);
           }

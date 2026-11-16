@@ -15,14 +15,18 @@ export const renderGitHubIssueBody = ({
   readonly postUrl?: string;
 }): string => {
   const body = description?.trim();
+
   if (body === undefined || body.length === 0) {
     return "This issue was created from Feeblo feedback.";
   }
+
   if (body.length <= GITHUB_ISSUE_BODY_CHARACTER_LIMIT) {
     return body;
   }
+
   const marker = truncationMarker(postUrl);
   const truncatedLength = GITHUB_ISSUE_BODY_CHARACTER_LIMIT - marker.length;
+
   return `${body.slice(0, Math.max(0, truncatedLength))}${marker}`;
 };
 
@@ -33,6 +37,7 @@ export const renderGitHubIssueTitle = ({
   readonly title?: string | null;
 }): string => {
   const trimmed = title?.trim();
+
   return trimmed !== undefined && trimmed.length > 0
     ? trimmed
     : "Feeblo feedback";

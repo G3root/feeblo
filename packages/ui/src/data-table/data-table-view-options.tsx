@@ -33,6 +33,7 @@ export function DataTableViewOptions<TData extends RowData>({
           .filter(
             (column) => column.accessorFn !== undefined && column.getCanHide()
           );
+
         const items = columns.map((column) => ({
           label: column.columnDef.meta?.label ?? column.id,
           value: column.id,

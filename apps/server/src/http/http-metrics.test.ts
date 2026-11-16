@@ -42,6 +42,7 @@ it.live("records method, route, and status for a successful request", () =>
       const response = yield* Effect.promise(() =>
         handler(new Request("http://localhost/metrics-ok"))
       );
+
       expect(response.status).toBe(200);
 
       const value = yield* Metric.value(
@@ -51,6 +52,7 @@ it.live("records method, route, and status for a successful request", () =>
           status: "200",
         })
       );
+
       expect(value.count).toBe(1);
     })
   )
@@ -62,6 +64,7 @@ it.live("labels matched requests with the router's route template", () =>
       const response = yield* Effect.promise(() =>
         handler(new Request("http://localhost/metrics-posts/lg_abc123def456"))
       );
+
       expect(response.status).toBe(200);
 
       const value = yield* Metric.value(
@@ -71,6 +74,7 @@ it.live("labels matched requests with the router's route template", () =>
           status: "200",
         })
       );
+
       expect(value.count).toBe(1);
     })
   )
@@ -82,12 +86,15 @@ it.live("records failed and unmatched requests with their status", () =>
       const failed = yield* Effect.promise(() =>
         handler(new Request("http://localhost/metrics-boom"))
       );
+
       const notFound = yield* Effect.promise(() =>
         handler(new Request("http://localhost/metrics-not-found"))
       );
+
       const missing = yield* Effect.promise(() =>
         handler(new Request("http://localhost/metrics-missing"))
       );
+
       expect(failed.status).toBe(500);
       expect(notFound.status).toBe(404);
       expect(missing.status).toBe(404);
@@ -99,6 +106,7 @@ it.live("records failed and unmatched requests with their status", () =>
           status: "500",
         })
       );
+
       // A matched handler that answers 404 keeps its route template...
       const notFoundValue = yield* Metric.value(
         Metric.withAttributes(httpServerRequests, {
@@ -107,6 +115,7 @@ it.live("records failed and unmatched requests with their status", () =>
           status: "404",
         })
       );
+
       // ...and only genuinely unmatched paths collapse to one label, so
       // scanner traffic cannot mint a route label per path.
       const missingValue = yield* Metric.value(
@@ -116,6 +125,7 @@ it.live("records failed and unmatched requests with their status", () =>
           status: "404",
         })
       );
+
       expect(failedValue.count).toBe(1);
       expect(notFoundValue.count).toBe(1);
       expect(missingValue.count).toBe(1);
@@ -129,6 +139,7 @@ it.live("records the request duration histogram", () =>
       const response = yield* Effect.promise(() =>
         handler(new Request("http://localhost/metrics-slow"))
       );
+
       expect(response.status).toBe(200);
 
       const value = yield* Metric.value(
@@ -137,6 +148,7 @@ it.live("records the request duration histogram", () =>
           route: "/metrics-slow",
         })
       );
+
       expect(value.count).toBe(1);
     })
   )

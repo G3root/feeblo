@@ -78,12 +78,15 @@ export const ChatFeedbackServiceLive: Layer.Layer<
         const statuses = yield* postStatusRepository.findMany({
           organizationId,
         });
+
         const defaultStatus = pickDefaultPostStatus(statuses);
+
         if (defaultStatus === undefined) {
           return yield* new ChatInboundFailure({
             message: "Organization has no default post status",
           });
         }
+
         const [board] = yield* db
           .select({
             name: schema.boardTable.name,
@@ -97,11 +100,13 @@ export const ChatFeedbackServiceLive: Layer.Layer<
             )
           )
           .limit(1);
+
         if (board === undefined) {
           return yield* new ChatInboundFailure({
             message: "The feedback board was not found",
           });
         }
+
         // The write path sanitizes, owns the transaction, records the timeline
         // entry and integration event, notifies staff, opens the submission
         // email window, and schedules the embedding. The inbound author has no
@@ -109,6 +114,7 @@ export const ChatFeedbackServiceLive: Layer.Layer<
         // attributes the post to their feeblo user row; that synthetic inbox
         // is never subscribed.
         const id = yield* PostId.generate;
+
         const slug = yield* writes.create(
           {
             assetIds: [],
@@ -124,6 +130,7 @@ export const ChatFeedbackServiceLive: Layer.Layer<
           { kind: "api_key" },
           { creatorUserId: userId }
         );
+
         return {
           boardId,
           boardName: board.name,

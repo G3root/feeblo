@@ -43,6 +43,7 @@ import { PostWriteService } from "./write";
 
 describe("PostRpcHandlers on-behalf", () => {
   const recordedIntegrationEvents: unknown[] = [];
+
   type Role = Session["memberships"][number]["role"];
 
   type Fixture = {
@@ -165,11 +166,13 @@ describe("PostRpcHandlers on-behalf", () => {
   const getPost = (postId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [post] = yield* db
         .select()
         .from(schema.postTable)
         .where(eq(schema.postTable.id, postId))
         .limit(1);
+
       return post;
     });
 
@@ -252,11 +255,13 @@ describe("PostRpcHandlers on-behalf", () => {
             expect(post?.contactId).not.toBeNull();
 
             const db = yield* currentDb;
+
             const [storedContact] = yield* db
               .select()
               .from(schema.contactTable)
               .where(eq(schema.contactTable.id, post!.contactId!))
               .limit(1);
+
             expect(storedContact).toMatchObject({
               email: "jane@example.com",
               name: "Jane Doe",
@@ -272,6 +277,7 @@ describe("PostRpcHandlers on-behalf", () => {
                 )
               )
               .limit(1);
+
             expect(activity).toMatchObject({
               actorId: fixture.userId,
               actorMemberId: fixture.membershipId,
@@ -296,6 +302,7 @@ describe("PostRpcHandlers on-behalf", () => {
               .select({ kind: schema.emailOutboxTable.kind })
               .from(schema.emailOutboxTable)
               .where(eq(schema.emailOutboxTable.aggregateId, postId));
+
             expect(intents.map((intent) => intent.kind)).toEqual([
               "submission.created",
             ]);
@@ -338,6 +345,7 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(subscription)).toMatchObject({
               source: "post_creator",
               state: "active",
@@ -356,6 +364,7 @@ describe("PostRpcHandlers on-behalf", () => {
                 )
               )
               .limit(1);
+
             expect(emailContact).toMatchObject({
               verificationState: "verified",
               userId: "user_jane_verified",
@@ -367,6 +376,7 @@ describe("PostRpcHandlers on-behalf", () => {
               .select({ userId: schema.postSubscriptionTable.userId })
               .from(schema.postSubscriptionTable)
               .where(eq(schema.postSubscriptionTable.postId, postId));
+
             expect(subscriptions).toEqual([{ userId: "user_jane_verified" }]);
           })
       );
@@ -388,12 +398,15 @@ describe("PostRpcHandlers on-behalf", () => {
               needsUser: true,
               subject: { email: "sam@example.com", name: "Sam Shadow" },
             });
+
             const shadowUserId = resolved.userId!;
+
             const [shadow] = yield* db
               .select()
               .from(schema.userTable)
               .where(eq(schema.userTable.id, shadowUserId))
               .limit(1);
+
             expect(shadow?.emailVerified).toBe(false);
 
             const postId = yield* PostId.generate;
@@ -417,6 +430,7 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(subscription)).toMatchObject({
               source: "post_creator",
               state: "deferred_no_access",
@@ -434,6 +448,7 @@ describe("PostRpcHandlers on-behalf", () => {
                   "subscription.verification_requested"
                 )
               );
+
             expect(verificationIntents).toEqual([]);
 
             // In-app watch-list parity still applies to the shadow user.
@@ -441,6 +456,7 @@ describe("PostRpcHandlers on-behalf", () => {
               .select({ userId: schema.postSubscriptionTable.userId })
               .from(schema.postSubscriptionTable)
               .where(eq(schema.postSubscriptionTable.postId, postId));
+
             expect(subscriptions).toEqual([{ userId: shadowUserId }]);
           })
       );
@@ -475,6 +491,7 @@ describe("PostRpcHandlers on-behalf", () => {
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             source: "post_creator",
             state: "deferred_no_access",
@@ -485,6 +502,7 @@ describe("PostRpcHandlers on-behalf", () => {
             .select({ id: schema.postSubscriptionTable.id })
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, postId));
+
           expect(subscriptions).toEqual([]);
         })
       );
@@ -512,6 +530,7 @@ describe("PostRpcHandlers on-behalf", () => {
               );
 
             const createdPost = yield* getPost(postId);
+
             const readCreated = () =>
               db
                 .select({ metadata: schema.postActivityTable.metadata })
@@ -565,6 +584,7 @@ describe("PostRpcHandlers on-behalf", () => {
                   makeSession(fixture, "manager")
                 )
               );
+
             expect(posts.find((row) => row.id === postId)?.user).toEqual({
               name: "Dana Dee",
               image: null,
@@ -593,12 +613,14 @@ describe("PostRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("PolicyDenied");
 
           const posts = yield* db
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(posts).toEqual([]);
         })
       );
@@ -607,6 +629,7 @@ describe("PostRpcHandlers on-behalf", () => {
         Effect.gen(function* () {
           recordedIntegrationEvents.length = 0;
           const handlers = yield* PostRpcHandlersEffect;
+
           for (const role of ["owner", "admin"] as const) {
             const fixture = yield* makeFixture(role);
             const postId = yield* PostId.generate;
@@ -631,6 +654,7 @@ describe("PostRpcHandlers on-behalf", () => {
         Effect.gen(function* () {
           recordedIntegrationEvents.length = 0;
           const handlers = yield* PostRpcHandlersEffect;
+
           for (const role of [
             "contributor",
             "manager",
@@ -656,6 +680,7 @@ describe("PostRpcHandlers on-behalf", () => {
             });
 
             const db = yield* currentDb;
+
             const [activity] = yield* db
               .select({ metadata: schema.postActivityTable.metadata })
               .from(schema.postActivityTable)
@@ -666,6 +691,7 @@ describe("PostRpcHandlers on-behalf", () => {
                 )
               )
               .limit(1);
+
             expect(activity?.metadata).toBeNull();
           }
         })
@@ -691,6 +717,7 @@ describe("PostRpcHandlers on-behalf", () => {
             role: "contributor",
             createdAt: now,
           });
+
           return {
             userId: `user_teammate_${fixture.organizationId}`,
             memberId: `member_teammate_${fixture.organizationId}`,
@@ -700,10 +727,12 @@ describe("PostRpcHandlers on-behalf", () => {
       const countContacts = (organizationId: string) =>
         Effect.gen(function* () {
           const db = yield* currentDb;
+
           const rows = yield* db
             .select({ id: schema.contactTable.id })
             .from(schema.contactTable)
             .where(eq(schema.contactTable.organizationId, organizationId));
+
           return rows.length;
         });
 
@@ -748,6 +777,7 @@ describe("PostRpcHandlers on-behalf", () => {
                 )
               )
               .limit(1);
+
             expect(activity?.metadata).toEqual({
               onBehalfOf: {
                 userId: teammate.userId,
@@ -838,6 +868,7 @@ describe("PostRpcHandlers on-behalf", () => {
             .from(schema.contactTable)
             .where(eq(schema.contactTable.id, post!.contactId!))
             .limit(1);
+
           expect(storedContact).toMatchObject({
             email: "author-jane@example.com",
             name: "Jane Doe",
@@ -853,6 +884,7 @@ describe("PostRpcHandlers on-behalf", () => {
               )
             )
             .limit(1);
+
           expect(activity).toMatchObject({
             actorId: fixture.userId,
             actorMemberId: fixture.membershipId,
@@ -866,6 +898,7 @@ describe("PostRpcHandlers on-behalf", () => {
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             source: "post_creator",
             state: "deferred_no_access",
@@ -916,6 +949,7 @@ describe("PostRpcHandlers on-behalf", () => {
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             source: "post_creator",
             state: "active",
@@ -966,6 +1000,7 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(retired)).toMatchObject({
               state: "unsubscribed",
             });
@@ -987,6 +1022,7 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(incoming)).toMatchObject({
               source: "post_creator",
               state: "deferred_no_access",
@@ -1036,6 +1072,7 @@ describe("PostRpcHandlers on-behalf", () => {
             organizationId: fixture.organizationId,
             topic: { topicId: postId, topicType: "post" },
           });
+
           expect(Option.getOrUndefined(kept)).toMatchObject({
             source: "explicit",
             state: "deferred_no_access",
@@ -1082,14 +1119,17 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(retired)).toMatchObject({
               state: "unsubscribed",
             });
+
             const incoming = yield* emailSubscriptions.findSubscription({
               email: "author-sam@example.com",
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(incoming)).toMatchObject({
               source: "post_creator",
               state: "deferred_no_access",
@@ -1114,10 +1154,12 @@ describe("PostRpcHandlers on-behalf", () => {
             );
 
           const session = makeSession(fixture, "manager");
+
           const author = {
             email: "author-sam@example.com",
             name: "Sam Shadow",
           };
+
           for (let index = 0; index < 2; index++) {
             yield* handlers
               .UpdatePostAuthor({
@@ -1137,6 +1179,7 @@ describe("PostRpcHandlers on-behalf", () => {
                 eq(schema.postActivityTable.kind, "AUTHOR_CHANGED")
               )
             );
+
           expect(activities).toHaveLength(1);
         })
       );
@@ -1171,6 +1214,7 @@ describe("PostRpcHandlers on-behalf", () => {
                   )
                 )
             );
+
             expect(error._tag).toBe("PolicyDenied");
           }
 
@@ -1203,6 +1247,7 @@ describe("PostRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("FailedToUpdatePostError");
         })
       );
@@ -1235,6 +1280,7 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session));
+
           expect(posts.find((row) => row.id === postId)?.user).toEqual({
             name: "Display Doe",
             image: null,
@@ -1243,6 +1289,7 @@ describe("PostRpcHandlers on-behalf", () => {
           const detail = yield* handlers
             .GetPost({ organizationId: fixture.organizationId, slug })
             .pipe(Effect.provideService(CurrentSession, session));
+
           expect(detail.user).toEqual({
             name: "Display Doe",
             image: null,
@@ -1278,6 +1325,7 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session));
+
           expect(posts.find((row) => row.id === postId)?.user).toEqual({
             name: "Reassigned Roe",
             image: null,
@@ -1314,6 +1362,7 @@ describe("PostRpcHandlers on-behalf", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session));
+
           expect(posts.find((row) => row.id === postId)?.user).toEqual({
             name: "Jane Customer",
             image: null,
@@ -1348,6 +1397,7 @@ describe("PostRpcHandlers on-behalf", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(posts.find((row) => row.id === postId)?.user).toEqual({
             name: null,
             image: null,
@@ -1378,12 +1428,14 @@ describe("PostRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("BadRequestError");
 
           const posts = yield* db
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(posts).toEqual([]);
         })
       );

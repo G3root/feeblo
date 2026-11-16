@@ -66,6 +66,7 @@ const makeEmailOutboxLayer = (makeMailerLayer: MakeMailerLayer) => {
   // One mailer layer shared by every worker so repeated calls cannot build
   // duplicate transports.
   const mailerLayer = makeMailerLayer();
+
   return Layer.mergeAll(
     EmailOutboxWorkerLayer,
     EmailOutboxReconciliationLayer

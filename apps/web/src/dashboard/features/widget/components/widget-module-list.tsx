@@ -69,13 +69,16 @@ export function WidgetModuleList({
       if (event.canceled) {
         return;
       }
+
       const { source } = event.operation;
+
       // The sortable plugin reorders as the pointer moves and writes the
       // destination into the source's own `index`; at drop time `target` is
       // the source again, so the two indices are the whole answer.
       if (!source || !isSortable(source)) {
         return;
       }
+
       if (source.initialIndex !== source.index) {
         onMove(source.initialIndex, source.index);
       }
@@ -123,6 +126,7 @@ function WidgetModuleRow({
     id: entry.id,
     index,
   });
+
   const details = WIDGET_MODULE_DETAILS[entry.id];
 
   return (

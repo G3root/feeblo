@@ -198,6 +198,7 @@ describe("PostStatusRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListPostStatuses({ organizationId: fixture.organizationId })
@@ -214,6 +215,7 @@ describe("PostStatusRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const statusId = yield* insertStatus(fixture, {
           isDefault: true,
           orderIndex: 0,
@@ -242,10 +244,12 @@ describe("PostStatusRpcHandlers", () => {
           orderIndex: 0,
           type: "PENDING",
         });
+
         const doomedId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         const now = yield* DateTime.nowAsDate;
         const db = yield* currentDb;
 
@@ -387,6 +391,7 @@ describe("PostStatusRpcHandlers", () => {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         yield* insertStatus(fixture, { orderIndex: 4, type: "COMPLETED" });
 
         yield* handlers
@@ -423,11 +428,13 @@ describe("PostStatusRpcHandlers", () => {
           const db = yield* currentDb;
           const handlers = yield* PostStatusRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const previousDefaultId = yield* insertStatus(fixture, {
             isDefault: true,
             orderIndex: 0,
             type: "PENDING",
           });
+
           const nextDefaultId = yield* insertStatus(fixture, {
             orderIndex: 1,
             type: "REVIEW",
@@ -484,6 +491,7 @@ describe("PostStatusRpcHandlers", () => {
           orderIndex: 0,
           type: "PENDING",
         });
+
         const nextDefaultId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
@@ -511,6 +519,7 @@ describe("PostStatusRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const defaultId = yield* insertStatus(fixture, {
           isDefault: true,
           orderIndex: 0,
@@ -542,11 +551,13 @@ describe("PostStatusRpcHandlers", () => {
           const db = yield* currentDb;
           const handlers = yield* PostStatusRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const defaultId = yield* insertStatus(fixture, {
             isDefault: true,
             orderIndex: 0,
             type: "PENDING",
           });
+
           const doomedId = yield* insertStatus(fixture, {
             orderIndex: 1,
             type: "REVIEW",
@@ -601,15 +612,18 @@ describe("PostStatusRpcHandlers", () => {
         const db = yield* currentDb;
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const defaultId = yield* insertStatus(fixture, {
           isDefault: true,
           orderIndex: 0,
           type: "PENDING",
         });
+
         const doomedId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         const boundColumnId = yield* RoadmapColumnId.generate;
         const freeColumnId = yield* RoadmapColumnId.generate;
         const now = yield* DateTime.nowAsDate;
@@ -663,14 +677,17 @@ describe("PostStatusRpcHandlers", () => {
         const db = yield* currentDb;
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const firstReviewId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         const secondReviewId = yield* insertStatus(fixture, {
           orderIndex: 2,
           type: "REVIEW",
         });
+
         const completedId = yield* insertStatus(fixture, {
           orderIndex: 3,
           type: "COMPLETED",
@@ -717,10 +734,12 @@ describe("PostStatusRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostStatusRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const firstReviewId = yield* insertStatus(fixture, {
             orderIndex: 1,
             type: "REVIEW",
           });
+
           yield* insertStatus(fixture, { orderIndex: 2, type: "REVIEW" });
 
           const error = yield* Effect.flip(
@@ -753,6 +772,7 @@ describe("PostStatusRpcHandlers", () => {
           type: "PENDING",
         });
         const createdId = yield* PostStatusId.generate;
+
         const doomedId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",

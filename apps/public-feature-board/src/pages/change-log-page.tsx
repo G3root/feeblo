@@ -59,14 +59,18 @@ export function ChangelogPage() {
 
 function ChangelogContent() {
   const site = useSite();
+
   const { publicChangelogCategoryLinkCollection, publicChangelogCollection } =
     usePublicCollections();
+
   const store = useChangelogFilterStore();
   const search = useSelector(store, (state) => state.context.search);
+
   const selectedCategoryIds = useSelector(
     store,
     (state) => state.context.selectedCategoryIds
   );
+
   const normalizedSearch = search.trim();
   const hasActiveCategoryFilter = selectedCategoryIds.length > 0;
 
@@ -139,7 +143,9 @@ function ChangelogContent() {
         .from({ link: publicChangelogCategoryLinkCollection })
         .where(({ link }) => eq(link.organizationId, site.organizationId)),
   });
+
   const categoryIdsByChangelog = new Map<string, string[]>();
+
   for (const link of categoryLinks) {
     const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
     ids.push(link.categoryId);

@@ -48,6 +48,7 @@ describe("getSessionCookieName legacy env fallback", () => {
     expect(getSessionCookieName()).toBe("__Secure-better-auth.session_token");
     process.env.API_URL = "http://api.example.com";
     expect(getSessionCookieName()).toBe("better-auth.session_token");
+
     if (prev === undefined) delete process.env.API_URL;
     else process.env.API_URL = prev;
   });
@@ -60,8 +61,10 @@ describe("getSessionCookieName legacy env fallback", () => {
     expect(getSessionCookieName()).toBe("__Secure-better-auth.session_token");
     process.env.NODE_ENV = "development";
     expect(getSessionCookieName()).toBe("better-auth.session_token");
+
     if (prevApi === undefined) delete process.env.API_URL;
     else process.env.API_URL = prevApi;
+
     if (prevEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = prevEnv;
   });

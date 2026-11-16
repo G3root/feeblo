@@ -26,7 +26,9 @@ import { sendToParent } from "./messages";
  * testable without a router or a DOM.
  */
 export type WidgetBoard = TWidgetBoard;
+
 export type WidgetSuggestion = TWidgetSuggestion;
+
 export type WidgetUpdate = TWidgetUpdate;
 
 export type FeedbackResult = { ok: true } | { ok: false; message: string };
@@ -56,9 +58,11 @@ export async function requestBoards(): Promise<readonly WidgetBoard[]> {
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}/boards?organizationId=${encodeURIComponent(organizationId)}`;
   const res = await fetch(url);
+
   if (!res.ok) {
     throw new Error(`Failed to fetch boards: ${res.status}`);
   }
+
   return decodeWidgetBoards(await res.json());
 }
 
@@ -67,9 +71,11 @@ export async function requestUpdates(): Promise<readonly WidgetUpdate[]> {
   const organizationId = getOrganizationId();
   const url = `${getApiBaseUrl()}/updates?organizationId=${encodeURIComponent(organizationId)}`;
   const res = await fetch(url);
+
   if (!res.ok) {
     throw new Error(`Failed to fetch updates: ${res.status}`);
   }
+
   return decodeWidgetUpdates(await res.json());
 }
 
@@ -83,9 +89,11 @@ export async function fetchSuggestions(
     body: JSON.stringify({ ...input, organizationId: getOrganizationId() }),
     signal,
   });
+
   if (!response.ok) {
     throw new Error(`Failed to fetch suggestions: ${response.status}`);
   }
+
   return decodeWidgetSuggestions(await response.json());
 }
 
@@ -116,6 +124,7 @@ export async function submitFeedback(
 
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}/feedback`;
+
   const body: TWidgetFeedbackCreateWire = {
     boardId,
     content,
@@ -124,6 +133,7 @@ export async function submitFeedback(
     metadata,
     ...(token ? { token } : undefined),
   };
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -132,6 +142,7 @@ export async function submitFeedback(
 
   if (!response.ok) {
     const errorData = decodeWidgetError(await response.json());
+
     return {
       ok: false,
       message: errorData.message ?? "Failed to submit feedback",

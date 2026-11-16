@@ -9,6 +9,7 @@ import { cn } from "../../lib/utils";
  */
 export function Skeleton(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
+
   return (
     <div
       class={cn(

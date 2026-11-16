@@ -103,6 +103,7 @@ export const streamPostCsv = (input: {
     // A named board must exist, so a stale id reads as a 404 rather than an
     // empty file; an all-boards export skips the lookup entirely.
     let boardSlug: string | null = null;
+
     if (input.boardId !== null) {
       const found = yield* boardRepository
         .findByIdInOrganization({
@@ -110,11 +111,13 @@ export const streamPostCsv = (input: {
           organizationId: input.organizationId,
         })
         .pipe(withRemapDbErrors("Board", "select"));
+
       if (Option.isNone(found)) {
         return yield* new DataTransferBoardNotFoundError({
           message: "No board with this id exists in this workspace.",
         });
       }
+
       boardSlug = found.value.slug;
     }
 
@@ -125,6 +128,7 @@ export const streamPostCsv = (input: {
         organizationId: input.organizationId,
       })
     );
+
     if (total > DATA_EXPORT_MAX_ROWS) {
       return yield* new DataExportTooLargeError({
         maxRows: DATA_EXPORT_MAX_ROWS,
@@ -141,11 +145,14 @@ export const streamPostCsv = (input: {
     // caller actually receives. Counting the pages is also what makes an
     // empty export record nothing — no rows left, no access to log.
     const sentRows = yield* Ref.make(0);
+
     const recordExport = Effect.gen(function* () {
       const rowCount = yield* Ref.get(sentRows);
+
       if (rowCount === 0) {
         return;
       }
+
       // This is a read with no transaction behind it, and the bytes are
       // streamed to the client after this effect returns. Failing a completed
       // read because its log entry could not be written would deny a download
@@ -160,6 +167,7 @@ export const streamPostCsv = (input: {
         includeArchived: input.includeArchived,
         rowCount,
       };
+
       if (input.boardId === null) {
         yield* audit.recordBestEffort({
           organizationId: input.organizationId,
@@ -201,10 +209,12 @@ export const streamPostCsv = (input: {
       ).pipe(
         Effect.map((page) => {
           const last = page.at(-1);
+
           const next =
             page.length === EXPORT_PAGE_SIZE && last !== undefined
               ? Option.some({ createdAt: last.createdAt, id: last.id })
               : Option.none<ExportCursor>();
+
           return [page.map(mapRow), next] as const;
         })
       )
@@ -212,6 +222,7 @@ export const streamPostCsv = (input: {
 
     const now = yield* DateTime.nowAsDate;
     const name = boardSlug === null ? "posts" : `${boardSlug}-posts`;
+
     return {
       fileName: `${name}-${now.toISOString().slice(0, 10)}.csv`,
       stream: Stream.concat(

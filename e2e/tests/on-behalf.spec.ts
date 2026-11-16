@@ -155,6 +155,7 @@ async function pickPostAuthorNewCustomer(
     .getByRole("option")
     .filter({ hasText: email })
     .filter({ hasText: /as new customer/ });
+
   await expect(createOption).toBeVisible();
   await createOption.click();
 
@@ -308,6 +309,7 @@ async function openVotersDialog(page: Page) {
   await page.getByRole("button", { name: /^Show all \d+ voters$/ }).click();
   const dialog = page.getByRole("dialog", { name: /^Voters \(\d+\)$/ });
   await expect(dialog).toBeVisible();
+
   return dialog;
 }
 
@@ -357,11 +359,14 @@ async function inviteMember(
   const form = page.locator("form").filter({
     has: page.getByRole("textbox", { name: "Invite email" }),
   });
+
   await form.getByRole("textbox", { name: "Invite email" }).fill(email);
+
   if (role !== "manager") {
     await form.getByRole("combobox").click();
     await page.getByRole("option", { name: role }).click();
   }
+
   await form.getByRole("button", { name: "Invite" }).click();
   await expect(
     page.getByText("Invitation sent", { exact: true })
@@ -389,6 +394,7 @@ async function signInAsContributor(
   await inviteMember(ownerPage, invitee.email, "contributor");
   const email = await waitForTestEmail(ownerPage.request, invitee.email);
   const invitationId = invitationIdFromEmail(email);
+
   const accepted = await inviteeContext.request.post(
     `${apiUrl()}/api/auth/organization/accept-invitation`,
     {
@@ -396,6 +402,7 @@ async function signInAsContributor(
       headers: { Origin: webUrl() },
     }
   );
+
   expect(accepted.ok()).toBeTruthy();
 
   const contributorPage = await inviteeContext.newPage();
@@ -404,6 +411,7 @@ async function signInAsContributor(
   await expect(
     contributorPage.getByRole("button", { name: invitee.email })
   ).toBeVisible();
+
   return { contributorPage, inviteeContext };
 }
 
@@ -608,10 +616,12 @@ test.describe("voters on behalf", () => {
       const input = page.getByRole("combobox", { name: "Add voter" });
       await input.click();
       await input.fill(customerEmail);
+
       const votedRow = page
         .getByRole("option")
         .filter({ hasText: customerName })
         .first();
+
       await expect(votedRow).toBeVisible();
       await expect(
         page.getByRole("option").filter({ hasText: "Already voted" })
@@ -674,9 +684,11 @@ test.describe("voters on behalf", () => {
 
       // Removal is confirm-free, activity-logged, and re-addable.
       const listDialog = await openVotersDialog(page);
+
       const remove = listDialog.getByRole("button", {
         name: `Remove voter ${customerName}`,
       });
+
       await remove.hover();
       const removed = waitForRpc(page, "RemoveUpvoteOnBehalf");
       await remove.click();
@@ -804,9 +816,11 @@ test.describe("comments on behalf", () => {
     await openPost(page, title);
 
     await page.getByRole("button", { name: "Comment options" }).click();
+
     const authorInput = page.getByRole("combobox", {
       name: "Comment as customer",
     });
+
     await expect(authorInput).toBeVisible();
     await expect(authorInput).toBeEnabled();
 
@@ -816,6 +830,7 @@ test.describe("comments on behalf", () => {
     const statusSection = page.locator(
       'section[aria-label="Comment as status update"]'
     );
+
     await expect(statusSection).toBeVisible();
     const statusTrigger = statusSection.getByRole("combobox").first();
     await expect(statusTrigger).toBeVisible();
@@ -868,6 +883,7 @@ test.describe("permissions", () => {
       await dismissToast(page, "Post created successfully");
 
       const contributor = createTestUser();
+
       const { contributorPage, inviteeContext } = await signInAsContributor(
         browser,
         page,
@@ -879,9 +895,11 @@ test.describe("permissions", () => {
         // Post creation: the author picker is manager+ only, so the
         // contributor dialog has no `Post author` trigger at all.
         await contributorPage.getByRole("button", { name: "New post" }).click();
+
         const contributorDialog = contributorPage.getByRole("dialog", {
           name: "Create Post",
         });
+
         await expect(contributorDialog).toBeVisible();
         await expect(
           contributorDialog.getByRole("button", { name: /Post author/ })
@@ -916,9 +934,11 @@ test.describe("permissions", () => {
         // The owner on the same workspace sees every on-behalf surface.
         await page.goto(owner.organizationUrl);
         await page.getByRole("button", { name: "New post" }).click();
+
         const ownerDialog = page.getByRole("dialog", {
           name: "Create Post",
         });
+
         await expect(
           ownerDialog.getByRole("button", { name: /Post author/ })
         ).toBeVisible();
@@ -1036,6 +1056,7 @@ test.describe("post author reassignment", () => {
     await reassignAuthorThroughDialog(page, customerName, customerEmail);
     await dismissToast(page, "Author updated");
     await page.goto(owner.organizationUrl);
+
     // Dashboard rows fall back to the contact name when no user row is
     // linked, so the renamed author is visible on the dashboard card.
     // The card renders the name twice (mobile + desktop meta); target the
@@ -1043,6 +1064,7 @@ test.describe("post author reassignment", () => {
     const renamedCard = page
       .locator('[data-slot="post-card"]')
       .filter({ hasText: title });
+
     await expect(
       renamedCard.locator('[data-slot="post-card-author-name"]', {
         hasText: customerName,
@@ -1054,6 +1076,7 @@ test.describe("post author reassignment", () => {
     const visitorContext = await browser.newContext();
     const visitorPage = await visitorContext.newPage();
     trackPageErrors(visitorPage);
+
     try {
       await visitorPage.goto(publicBoardUrl(owner.workspaceName));
       await waitForHydration(visitorPage);
@@ -1170,6 +1193,7 @@ test.describe("public board", () => {
       const visitorContext = await browser.newContext();
       const visitorPage = await visitorContext.newPage();
       trackPageErrors(visitorPage);
+
       try {
         await visitorPage.goto(publicBoardUrl(owner.workspaceName));
         await waitForHydration(visitorPage);

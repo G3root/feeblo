@@ -98,6 +98,7 @@ function ApiKeyCreateForm({
           },
           reactivityKeys: apiKeyReactivityKeys(organizationId),
         });
+
         trackEvent("api_key_created", { success: true });
         form.reset();
         store.send({ type: "toggle" });

@@ -174,6 +174,7 @@ export const OtpFormFields = withForm({
         {(field) => {
           const isInvalid =
             field.state.meta.isTouched && !field.state.meta.isValid;
+
           return (
             <Field data-invalid={isInvalid}>
               <OTPField

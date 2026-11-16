@@ -60,9 +60,11 @@ const interactionDisplayName = (
   payload: DiscordApplicationCommandPayload | DiscordModalSubmitPayload
 ): string => {
   const user = payload.member?.user ?? payload.user;
+
   if (user === undefined) {
     return "";
   }
+
   return user.global_name ?? user.username;
 };
 
@@ -73,6 +75,7 @@ const slashCommandText = (
   const value = payload.data.options?.find(
     (option) => option.name === "text"
   )?.value;
+
   return isString(value) ? value : undefined;
 };
 
@@ -83,6 +86,7 @@ const messageContextMenuText = (
   if (payload.data.target_id === undefined) {
     return undefined;
   }
+
   return payload.data.resolved?.messages?.[payload.data.target_id]?.content;
 };
 
@@ -140,17 +144,20 @@ export const DiscordInboundServiceLive: Layer.Layer<
     }) =>
       Effect.gen(function* () {
         const boards = yield* boardRepository.findMany({ organizationId });
+
         if (boards.length === 0) {
           return ephemeralMessageResponse(
             "Feeblo has no boards configured yet. Ask an admin to create one."
           );
         }
+
         const customId = encodeModalMetadata({
           ...(messageId === undefined ? undefined : { messageId }),
           channelId,
           guildId,
           organizationId,
         });
+
         return {
           body: buildFeedbackModal({ boards, customId, initialTitle }),
           status: 200,
@@ -162,15 +169,18 @@ export const DiscordInboundServiceLive: Layer.Layer<
     ) =>
       Effect.gen(function* () {
         const connection = yield* findActiveConnection(payload.guild_id);
+
         if (connection._tag === "None") {
           return ephemeralMessageResponse(
             "Feeblo is not connected to this Discord server yet. Ask an admin to connect it in the Feeblo dashboard."
           );
         }
+
         const messageText =
           payload.data.type === 3
             ? messageContextMenuText(payload)
             : slashCommandText(payload);
+
         return yield* openFeedbackModal({
           channelId: payload.channel_id,
           guildId: payload.guild_id,
@@ -187,36 +197,45 @@ export const DiscordInboundServiceLive: Layer.Layer<
       Effect.gen(function* () {
         const metadata = yield* decodeModalMetadata(payload.data.custom_id);
         const connection = yield* findActiveConnection(metadata.guildId);
+
         if (connection._tag === "None") {
           return ephemeralMessageResponse(
             "Feeblo is not connected to this Discord server anymore."
           );
         }
+
         const values = payload.data.components;
         const title = readModalValue(values, "title")?.trim() ?? "";
+
         if (title.length === 0) {
           return ephemeralMessageResponse(
             "Please enter a title, then run /feeblo again."
           );
         }
+
         const details = readModalValue(values, "details")?.trim() ?? "";
         const boardId = readModalValue(values, "board")?.trim() ?? "";
+
         if (boardId.length === 0) {
           return ephemeralMessageResponse(
             "Please choose a board, then run /feeblo again."
           );
         }
+
         const invokingUserId = payload.member?.user.id ?? payload.user?.id;
+
         if (invokingUserId === undefined) {
           return yield* new ChatInboundFailure({
             message: "Discord interaction user is missing",
           });
         }
+
         const userId = yield* discordUserService.resolveUser({
           displayName: interactionDisplayName(payload),
           guildId: metadata.guildId,
           userId: invokingUserId,
         });
+
         const created = yield* chatFeedbackService.createPost({
           boardId,
           content: details,
@@ -225,13 +244,16 @@ export const DiscordInboundServiceLive: Layer.Layer<
           title,
           userId,
         });
+
         const postUrl =
           created.boardSlug.length > 0
             ? `${emailOutboxConfig.appUrl}/${encodeURIComponent(metadata.organizationId)}/post/${encodeURIComponent(created.boardSlug)}/${encodeURIComponent(created.slug)}`
             : undefined;
+
         if (postUrl === undefined) {
           return ephemeralMessageResponse(`✅ Feedback sent: ${created.title}`);
         }
+
         const confirmationEmbed = renderDiscordFeedbackConfirmationEmbed({
           actionUrl: postUrl,
           boardName: created.boardName,
@@ -241,6 +263,7 @@ export const DiscordInboundServiceLive: Layer.Layer<
           submitterName: interactionDisplayName(payload),
           title: created.title,
         });
+
         return ephemeralMessageResponse(
           "✅ Feedback sent to Feeblo. Select the title below to view it.",
           [confirmationEmbed]

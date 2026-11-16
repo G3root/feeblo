@@ -21,10 +21,13 @@ const isSafeUrl = (value: Properties[string]): boolean => {
   if (!isString(value)) {
     return true;
   }
+
   const trimmed = value.trim();
+
   if (trimmed === "") {
     return true;
   }
+
   try {
     return SAFE_URL_SCHEMES.has(
       new URL(trimmed, "https://feeblo.invalid").protocol
@@ -46,9 +49,11 @@ export function rehypeSafeUrlAttributes(): (tree: Root) => void {
   return (tree: Root) => {
     visit(tree, "element", (node: Element) => {
       const properties = node.properties;
+
       if (properties === undefined || properties === null) {
         return;
       }
+
       for (const attribute of URL_ATTRIBUTES) {
         if (attribute in properties && !isSafeUrl(properties[attribute])) {
           delete properties[attribute];

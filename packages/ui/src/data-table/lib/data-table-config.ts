@@ -115,6 +115,7 @@ export function createDataTableConfig<
   const filterVariants = getFilterVariants(columns);
   const filterableIds = getKeys(filterVariants);
   const reservedId = filterableIds.find(getIsDataTableKey);
+
   if (reservedId !== undefined) {
     throw new Error(
       `Data table column id "${reservedId}" is reserved for the ${reservedId} query key. Rename the column or turn off its filter.`
@@ -193,6 +194,7 @@ export function createDataTableConfig<
       query: Partial<ConfigQuery<TColumns>>
     ) {
       const next: DataTableSearchRecord = { ...search };
+
       const write = (key: string, value: DataTableRawValue) => {
         if (value === undefined) delete next[key];
         else next[key] = value;
@@ -218,6 +220,7 @@ export function createDataTableConfig<
       write(urlKeyOf("search"), globalFilter === "" ? undefined : globalFilter);
 
       const filtersByColumn = new Map<string, ColumnFilterItem[]>();
+
       for (const filter of filters) {
         filtersByColumn.set(filter.id, [
           ...(filtersByColumn.get(filter.id) ?? []),
@@ -258,13 +261,16 @@ export function applyColumnConfig<TData extends RowData>(
   }
 
   const columnId = getColumnId(column);
+
   const config =
     columnId !== undefined && Object.hasOwn(configs, columnId)
       ? configs[columnId]
       : undefined;
+
   if (!config) {
     return { ...column, enableColumnFilter: false, enableSorting: false };
   }
+
   const { enableSorting, ...meta } = config;
 
   return {
@@ -282,6 +288,7 @@ export function getColumnConfigs<TData extends RowData>(
 
   for (const column of getLeafColumns(columns)) {
     const columnId = getColumnId(column);
+
     if (!columnId) continue;
     configs[columnId] = getColumnConfig(column);
   }
@@ -299,6 +306,7 @@ export function getConfigInputKey<TData extends RowData>(
 export function createConfigFromInputKey(key: string) {
   const options: DataTableConfigOptions<DataTableColumnConfigs> =
     JSON.parse(key);
+
   return createDataTableConfig(options);
 }
 
@@ -309,6 +317,7 @@ export function getUnmatchedConfigIds<TData extends RowData>(
   const columnIds = new Set(
     getLeafColumns(columns).map((column) => getColumnId(column))
   );
+
   return Object.keys(configs).filter((columnId) => !columnIds.has(columnId));
 }
 
@@ -338,12 +347,15 @@ function parseInteger(
   max = Number.POSITIVE_INFINITY
 ) {
   const text = getSearchString(value);
+
   if (!isString(text)) return fallback;
 
   const parsed = Number(text);
+
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
     return fallback;
   }
+
   return parsed;
 }
 
@@ -352,6 +364,7 @@ function getJoinOperator(
   fallback: JoinOperator
 ): JoinOperator {
   const operator = getSearchString(value);
+
   return JOIN_OPERATORS.find((item) => item === operator) ?? fallback;
 }
 
@@ -390,6 +403,7 @@ function getColumnConfig<TData extends RowData>(
 ): DataTableColumnConfig {
   const hasAccessor = "accessorKey" in column || "accessorFn" in column;
   const enableSorting = hasAccessor && column.enableSorting !== false;
+
   if (!column.enableColumnFilter) return { enableSorting };
 
   return { enableSorting, variant: getFilterVariant(column.meta) };

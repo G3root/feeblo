@@ -77,6 +77,7 @@ const stateAfter = (
   const [next] = transition(emailIntentMachine, snapshotFor(state), {
     type: event,
   });
+
   // SAFETY: the machine is flat — every state and target is one of the
   // `EmailOutboxState` members — and `intent-machine.test.ts` walks the whole
   // graph rather than trusting this comment.
@@ -89,6 +90,7 @@ const handles = (
   event: TEmailIntentEvent
 ): boolean => {
   const before = snapshotFor(state);
+
   return !isUnhandled(
     before,
     transition(emailIntentMachine, before, { type: event })
@@ -111,6 +113,7 @@ export const targetStateFor = (event: TEmailIntentEvent): TEmailOutboxState => {
   const targets = EMAIL_INTENT_STATES.filter(
     (state) => stateAfter(state, event) !== state
   ).map((state) => stateAfter(state, event));
+
   const [target, ...rest] = [...new Set(targets)];
 
   if (target === undefined || rest.length > 0) {

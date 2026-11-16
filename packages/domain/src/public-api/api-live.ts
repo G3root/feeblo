@@ -30,6 +30,7 @@ const captureDependencies = <A>(
 ) =>
   Effect.gen(function* () {
     const context = yield* Effect.context<PublicApiDependencies>();
+
     return build(context);
   });
 

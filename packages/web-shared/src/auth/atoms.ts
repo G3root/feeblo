@@ -63,9 +63,11 @@ export const resetSessionGetterForTests = (): void => {
 export const meAtom = Atom.make(
   Effect.gen(function* () {
     const result = yield* Effect.promise(() => currentSessionGetter());
+
     if (result.error) {
       return yield* new AuthSessionRequestError({ cause: result.error });
     }
+
     if (result.data) {
       writeAuthHintToCookie({
         email: result.data.user.email,
@@ -75,6 +77,7 @@ export const meAtom = Atom.make(
     } else {
       clearAuthHintCookie();
     }
+
     return result.data;
   })
 ).pipe(
@@ -107,6 +110,7 @@ export const getCachedAuthSession = (): AuthClientSession | null => {
   }
 
   const result = authAtomRegistry.get(meAtom);
+
   return AsyncResult.isSuccess(result) ? result.value : null;
 };
 
@@ -121,5 +125,6 @@ export const getAuthSession = (): Promise<AuthClientSession | null> =>
 /** Re-run Better Auth's session endpoint and resolve the reconciled value. */
 export const refreshAuthSession = (): Promise<AuthClientSession | null> => {
   authAtomRegistry.refresh(meAtom);
+
   return getAuthSession();
 };

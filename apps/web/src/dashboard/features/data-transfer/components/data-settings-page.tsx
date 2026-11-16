@@ -122,10 +122,13 @@ const fallbackExportFileName = (
   boardId: string | null
 ): string => {
   const date = new Date().toISOString().slice(0, 10);
+
   if (boardId === null) {
     return `posts-${date}.csv`;
   }
+
   const slug = boards.find((board) => board.id === boardId)?.slug ?? "posts";
+
   return `${slug}-posts-${date}.csv`;
 };
 
@@ -135,6 +138,7 @@ const fallbackExportFileName = (
  */
 function useTransferBoards(organizationId: string) {
   const boardsResult = useAtomValue(dataTransferBoardsAtom(organizationId));
+
   const boards = Result.builder(boardsResult)
     .onInitial(
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
@@ -156,6 +160,7 @@ function useTransferBoards(organizationId: string) {
 /** The workspace's import jobs, newest first, from the live watch stream. */
 function useTransferJobs(organizationId: string) {
   const jobsResult = useAtomValue(dataImportJobsAtom(organizationId));
+
   const jobs = Result.builder(jobsResult)
     .onInitial(
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
@@ -186,6 +191,7 @@ function BoardPicker({
   readonly value: string;
 }) {
   const { boards, isLoading } = useTransferBoards(organizationId);
+
   const items = [
     { label: m.leafy_calm_jay(), value: ALL_BOARDS },
     ...boards.map((board) => ({ label: board.name, value: board.id })),
@@ -238,21 +244,28 @@ function ImportDropzone({
   const reject = (title: string) => {
     toastManager.add({ title, type: "error" });
   };
+
   const accept = (candidate: File | null) => {
     if (candidate === null) {
       onFileChange(null);
+
       return;
     }
+
     // The server holds the same limits; checking here turns a round trip into
     // an immediate sentence about the file the person just picked.
     if (!csvFileNamePattern.test(candidate.name)) {
       reject(m.quiet_fresh_moth());
+
       return;
     }
+
     if (candidate.size > DATA_IMPORT_MAX_BYTES) {
       reject(m.brave_calm_kite());
+
       return;
     }
+
     onFileChange(candidate);
   };
 
@@ -370,16 +383,20 @@ function ImportCard({
     if (file === null) {
       return;
     }
+
     setIsUploading(true);
+
     try {
       const body = new FormData();
       body.append("file", file);
       body.append("organizationId", organizationId);
+
       const response = await fetch(`${dataTransferApiBase()}/api/data/import`, {
         body,
         credentials: "include",
         method: "POST",
       });
+
       if (!response.ok) {
         // 409 is the workspace's slot being taken, which reads better as the
         // reserved conflict message; anything else shows the server's own
@@ -388,19 +405,25 @@ function ImportCard({
           response.status === 409
             ? m.grand_plain_moose()
             : ((await errorEnvelopeMessage(response)) ?? m.solid_calm_cub());
+
         toastManager.add({ title, type: "error" });
+
         return;
       }
+
       const payload: unknown = await response.json();
       // SAFETY: The endpoint contract returns a DataImportJobSummary; the
       // schema rejects drift instead of leaking it into the review panel. This
       // is a React event handler, not Effect code: the Option is the recovery.
       // eslint-disable-next-line effecttsgo/schema-sync -- non-Effect React boundary
       const decoded = Schema.decodeUnknownOption(DataImportJobSummary)(payload);
+
       if (Option.isNone(decoded)) {
         toastManager.add({ title: m.tidy_bold_yak(), type: "error" });
+
         return;
       }
+
       onStaged(decoded.value);
       setFile(null);
     } catch {
@@ -550,26 +573,33 @@ function ExportCard({ organizationId }: { readonly organizationId: string }) {
 
   const handleExport = async () => {
     setIsExporting(true);
+
     try {
       const url = new URL(`${dataTransferApiBase()}/api/data/export`);
       url.searchParams.set("organizationId", organizationId);
+
       if (selectedBoard !== ALL_BOARDS) {
         url.searchParams.set("boardId", selectedBoard);
       }
+
       if (includeArchived) {
         url.searchParams.set("includeArchived", "true");
       }
+
       // A navigation would show the JSON error envelope (a 404, the row cap)
       // as the page; reading the response here keeps a failure a toast and a
       // success an in-page download.
       const response = await fetch(url, { credentials: "include" });
+
       if (!response.ok) {
         toastManager.add({
           title: (await errorEnvelopeMessage(response)) ?? m.sunny_kind_gecko(),
           type: "error",
         });
+
         return;
       }
+
       await downloadResponse(
         response,
         fallbackExportFileName(
@@ -729,27 +759,35 @@ function RecentImportsCard({
 
 export function DataSettingsPage() {
   const organizationId = useOrganizationId();
+
   const { allowed: canImport, isPending: importPolicyPending } = usePolicy(
     hasPermission(organizationId, "boards.importPosts")
   );
+
   const { allowed: canExport, isPending: exportPolicyPending } = usePolicy(
     hasPermission(organizationId, "boards.exportData")
   );
+
   const cancelImport = useAtomSet(cancelDataImportAtom, { mode: "promise" });
   const jobs = useTransferJobs(organizationId);
   // The watch stream can lag one tick behind an upload; the local copy keeps
   // the card honest until the list catches up, and disappears once it does.
   const [localJob, setLocalJob] = useState<TDataImportJobSummary | null>(null);
+
   const [cancelTarget, setCancelTarget] =
     useState<TDataImportJobSummary | null>(null);
+
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
 
   const listedActive = jobs.find((job) => isActiveStatus(job.status)) ?? null;
+
   const unlistedLocal =
     localJob !== null && !jobs.some((job) => job.id === localJob.id)
       ? localJob
       : null;
+
   const activeJob = listedActive ?? unlistedLocal;
+
   const awaitingJob =
     activeJob !== null && canConfirmStatus(activeJob.status) ? activeJob : null;
 
@@ -760,7 +798,9 @@ export function DataSettingsPage() {
     if (cancelTarget === null) {
       return;
     }
+
     setBusyJobId(cancelTarget.id);
+
     try {
       await cancelImport({ payload: { id: cancelTarget.id, organizationId } });
       setLocalJob((current) =>

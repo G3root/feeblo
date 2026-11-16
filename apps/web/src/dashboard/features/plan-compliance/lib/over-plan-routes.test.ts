@@ -82,9 +82,11 @@ describe("isOverPlanPathAllowed", () => {
     const boards = compliance({
       violations: [violation("boards", [resource("board_1")])],
     });
+
     const privateBoards = compliance({
       violations: [violation("privateBoards", [resource("board_1", "board")])],
     });
+
     const categories = compliance({
       violations: [violation("changelogCategories", [])],
     });
@@ -119,6 +121,7 @@ describe("isOverPlanPathAllowed", () => {
     const crm = compliance({
       violations: [violation("crmEntries", [])],
     });
+
     const categories = compliance({
       violations: [violation("changelogCategories", [])],
     });

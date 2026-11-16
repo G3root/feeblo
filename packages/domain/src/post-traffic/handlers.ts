@@ -26,6 +26,7 @@ export const PostTrafficRpcHandlersEffect = Effect.gen(function* () {
     GetWorkspaceTraffic: (args: TWorkspaceTrafficPayload) =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
+
         // Same UTC day boundary as the insights read, so the two sections
         // describe the same window.
         const since = DateTime.toDate(
@@ -66,6 +67,7 @@ export const PostTrafficRpcHandlersEffect = Effect.gen(function* () {
     GetPostTraffic: (args: TPostTrafficPayload) =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
+
         const since = DateTime.toDate(
           DateTime.subtract({ days: TRAFFIC_WINDOW_DAYS })(now)
         );

@@ -12,9 +12,11 @@ const apiKeyPattern = /^fbk_/;
 function organizationIdOf(organizationUrl: string): string {
   const segment = new URL(organizationUrl).pathname.split("/").find(Boolean);
   expect(segment).toBeDefined();
+
   if (segment === undefined) {
     throw new Error("Workspace URL did not contain an organization id");
   }
+
   return segment;
 }
 
@@ -81,6 +83,7 @@ test.describe("public API keys", () => {
         const anonymous = await request.get(
           `${apiUrl()}/api/v1/posts/pst_missing`
         );
+
         expect(anonymous.status()).toBe(401);
         expect(await anonymous.json()).toMatchObject({
           _tag: "MISSING_API_KEY",
@@ -93,6 +96,7 @@ test.describe("public API keys", () => {
         const listed = await request.get(`${apiUrl()}/api/v1/posts`, {
           headers: { "x-api-key": apiKey },
         });
+
         expect(listed.status()).toBe(200);
         expect(Array.isArray((await listed.json()).data)).toBe(true);
 
@@ -104,6 +108,7 @@ test.describe("public API keys", () => {
             headers: { "x-api-key": apiKey },
           }
         );
+
         expect(retrieve.status()).toBe(400);
         expect(await retrieve.json()).toMatchObject({
           _tag: "INVALID_REQUEST",
@@ -138,6 +143,7 @@ test.describe("public API keys", () => {
         const listed = await request.get(`${apiUrl()}/api/v1/companies`, {
           headers: { "x-api-key": apiKey },
         });
+
         expect(listed.status()).toBe(200);
         expect(await listed.json()).toMatchObject({
           data: [{ name: "Acme", externalId: "e2e-crm-1", source: "API" }],
@@ -160,6 +166,7 @@ test.describe("public API keys", () => {
           `${apiUrl()}/api/v1/posts/pst_missing`,
           { headers: { "x-api-key": apiKey } }
         );
+
         expect(revoked.status()).toBe(401);
         expect(await revoked.json()).toMatchObject({
           _tag: "INVALID_API_KEY",

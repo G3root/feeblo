@@ -9,9 +9,11 @@ import { useCommentComposerState } from "./store";
 export function SubmitButton() {
   const { actions, meta, state } = useCommentComposer();
   const isPrivate = useCommentComposerState((context) => context.isPrivate);
+
   const isStoreSubmitting = useCommentComposerState(
     (context) => context.isSubmitting
   );
+
   const isDisabled = useCommentComposerIsDisabled();
 
   const hasOptionsMenu =

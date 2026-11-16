@@ -6,6 +6,7 @@ import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 export type SlackConnection = Atom.Success<
   ReturnType<typeof connectionsAtom>
 >[number];
+
 export type SlackChannel = Atom.Success<
   ReturnType<typeof channelsAtom>
 >[number];
@@ -49,9 +50,11 @@ export const slackStatusAtom = DashboardClient.query(
 
 export const startSlackConnectAtom =
   DashboardClient.mutation("StartSlackConnect");
+
 export const updateSlackChannelNotificationsAtom = DashboardClient.mutation(
   "UpdateSlackChannelNotifications"
 );
+
 export const disconnectSlackConnectionAtom = DashboardClient.mutation(
   "DisconnectSlackConnection"
 );

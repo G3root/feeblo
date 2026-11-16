@@ -38,6 +38,7 @@ const makeWorkspacePolicy = Effect.gen(function* () {
       const plans = yield* repository.findPlansByOrganizationIds(
         owned.map((workspace) => workspace.id)
       );
+
       const withPlans = owned.map((workspace) => ({
         ...workspace,
         plan: plans.get(workspace.id) ?? "free",

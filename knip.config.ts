@@ -44,6 +44,15 @@ const paraglideWorkspaceConfig = paraglideIsCompiled
   : { ignoreUnresolved: ["paraglide/(messages|runtime|server)\\.js$"] };
 
 export default defineConfig({
+  // The vendored Oxlint plugins under `tools/oxlint/**` are lint-time code, not
+  // shipped source: `oxlint.config.ts` is their only entry, and the copy has to
+  // stay mergeable with upstream, so a helper upstream exports for its own use
+  // must not be deleted here to satisfy an export report about this repo. The
+  // installed agent skills under `.agents/**` are the same kind of tooling
+  // asset: the anti-slop installer keeps its own copy of the plugin under
+  // `assets/` so it can re-run, and none of it is application code.
+  ignore: ["tools/oxlint/**", ".agents/**"],
+
   // An export the same file also uses is a file-local helper that happens to be
   // exported, not a dead public surface. This repo exports components and
   // schema constants for their own JSX and tests that way. Without this option

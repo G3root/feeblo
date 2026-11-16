@@ -218,15 +218,19 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const definition = yield* repository.findContactAttributeDefinitionById(
           contactAttributeDefinitionReference(args)
         );
+
         if (definition === undefined) {
           return yield* new BadRequestError({
             message: "Attribute definition not found",
           });
         }
+
         yield* validateAttributeValueEffect(definition, args.value);
+
         return yield* transaction(
           Effect.gen(function* () {
             const updated = yield* repository
@@ -243,6 +247,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
                   )
                 )
               );
+
             // The catalog's resource is the definition, so `resourceId` is the
             // attribute and the contact rides in `metadata`. The value itself
             // stays out: this table is append-only, so a customer value
@@ -260,6 +265,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
                 valueId: args.id,
               },
             });
+
             return updated;
           })
         );
@@ -294,15 +300,19 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const definition = yield* repository.findCompanyAttributeDefinitionById(
           companyAttributeDefinitionReference(args)
         );
+
         if (definition === undefined) {
           return yield* new BadRequestError({
             message: "Attribute definition not found",
           });
         }
+
         yield* validateAttributeValueEffect(definition, args.value);
+
         return yield* transaction(
           Effect.gen(function* () {
             const updated = yield* repository
@@ -319,6 +329,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
                   )
                 )
               );
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -331,6 +342,7 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
                 valueId: args.id,
               },
             });
+
             return updated;
           })
         );

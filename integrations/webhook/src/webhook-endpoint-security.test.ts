@@ -75,6 +75,7 @@ describe("webhook endpoint security", () => {
     ]) {
       expect(isWebhookPrivateOrReservedAddress(address)).toBe(true);
     }
+
     for (const address of [
       "8.8.8.8",
       "2606:4700:4700::1111",
@@ -92,6 +93,7 @@ describe("webhook endpoint security", () => {
       Effect.gen(function* () {
         const resolver = () =>
           Effect.succeed(["8.8.8.8", "169.254.169.254"] as const);
+
         const error = yield* Effect.flip(
           resolveAndParseWebhookEndpoint(
             "https://example.com/hook",

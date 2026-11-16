@@ -15,6 +15,7 @@ import { ForgotPasswordPage } from "../page-objects/ForgotPasswordPage";
 import { ResetPasswordPage } from "../page-objects/ResetPasswordPage";
 
 const RESET_PASSWORD_URL = /\/reset-password/;
+
 const SIGN_IN_URL = /\/sign-in/;
 
 test.describe("authentication", () => {
@@ -154,6 +155,7 @@ test.describe("dashboard auth redirects", () => {
     { tag: "@critical" },
     async ({ page }) => {
       const user = createTestUser();
+
       const { organizationUrl } = await createAuthenticatedWorkspace(
         page,
         user

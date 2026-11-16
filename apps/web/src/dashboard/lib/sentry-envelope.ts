@@ -30,26 +30,33 @@ export const envelopeTarget = (
   expectedDsn: string
 ): string | undefined => {
   const newline = body.indexOf("\n");
+
   if (newline < 0 || newline > 8192) return undefined;
   // `JSON.parse` returns any value, including `null`, a string, or an array;
   // reading `.dsn` off a non-object would throw and turn a malformed envelope
   // into a 500. Parse at the boundary and narrow before the read.
   let header: unknown;
+
   try {
     header = JSON.parse(body.slice(0, newline));
   } catch {
     return undefined;
   }
+
   if (!isPlainObject(header) || !("dsn" in header)) return undefined;
+
   if (!isString(header.dsn) || header.dsn !== expectedDsn) return undefined;
   let dsn: URL;
+
   try {
     dsn = new URL(expectedDsn);
   } catch {
     return undefined;
   }
+
   if (dsn.protocol !== "https:" || !projectIdPathPattern.test(dsn.pathname))
     return undefined;
+
   return `${dsn.origin}/api${dsn.pathname}/envelope/?sentry_version=7&sentry_key=${encodeURIComponent(dsn.username)}`;
 };
 
@@ -64,6 +71,7 @@ export const envelopeTarget = (
 export const isEnvelopeContentType = (value: string | null): boolean => {
   if (value === null) return true;
   const mediaType = value.split(";")[0]?.trim();
+
   return (
     mediaType === "application/x-sentry-envelope" || mediaType === "text/plain"
   );

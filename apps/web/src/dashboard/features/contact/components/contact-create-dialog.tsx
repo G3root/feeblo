@@ -74,6 +74,7 @@ function ContactCreateForm() {
   const { entitlements } = useEntitlements();
   const { data: definitions } = useContactAttributeDefinitions(organizationId);
   const { data: companiesData } = useOrgCompanies(organizationId);
+
   // The shared org-companies query is unordered; this picker orders by name.
   const companies = useMemo(
     () =>
@@ -82,10 +83,12 @@ function ContactCreateForm() {
       ),
     [companiesData]
   );
+
   const { data: contacts } = useOrgContacts(organizationId);
   const crmLimit = entitlements.limits.crmEntries;
   const totalCrmEntries = contacts.length + companies.length;
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
+
   const form = useAppForm({
     defaultValues: {
       attributes: {},
@@ -116,12 +119,14 @@ function ContactCreateForm() {
           title: "Complete all required custom fields",
           type: "error",
         });
+
         return;
       }
 
       try {
         const contactId = await ContactId.unsafeGenerate();
         const now = new Date();
+
         const contact = {
           id: contactId,
           organizationId,
@@ -136,6 +141,7 @@ function ContactCreateForm() {
           createdAt: now,
           updatedAt: now,
         };
+
         const { createAttribute } = await getContactCustomAttributeValueChanges(
           {
             contactId,
@@ -145,6 +151,7 @@ function ContactCreateForm() {
             values: data.value.attributes,
           }
         );
+
         await createContactAction({
           contact,
           createAttribute,
@@ -163,6 +170,7 @@ function ContactCreateForm() {
       }
     },
   });
+
   if (atLimit) {
     return (
       <div className="p-6">

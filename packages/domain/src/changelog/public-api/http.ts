@@ -52,6 +52,7 @@ const parseChangelogStatusFilter = (raw: string | undefined) =>
     }
 
     const decoded = Schema.decodeUnknownOption(PublicApiChangelogStatus)(raw);
+
     if (Option.isNone(decoded)) {
       return yield* invalidRequestError(
         "status must be draft, scheduled, or published."
@@ -128,6 +129,7 @@ export const changelogHandlers = (
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
       const status = yield* parseChangelogStatusFilter(query.status);
+
       return yield* listChangelogOperation.handler({
         cursor: query.cursor,
         limit,

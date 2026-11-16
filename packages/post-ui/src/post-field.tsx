@@ -66,10 +66,12 @@ export function StatusField({
     type: postStatus.type,
     value: postStatus.id,
   }));
+
   const currentStatus =
     currentStatusId === null
       ? undefined
       : statuses.find((postStatus) => postStatus.id === currentStatusId);
+
   const defaultValue = currentStatus
     ? {
         value: currentStatus.id,
@@ -182,6 +184,7 @@ export function PostBoardSelect({
   triggerClassName = "w-full",
 }: PostBoardSelectProps) {
   const currentBoard = boards.find((b) => b.id === currentBoardId);
+
   const items = boards.map((board) => ({
     value: board.id,
     label: board.name,

@@ -76,6 +76,7 @@ describe("CompanyRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
@@ -85,10 +86,12 @@ describe("CompanyRpcHandlers", () => {
     WorkspaceRepository.layer,
     AttributeDefinitionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer),
     Layer.provide(Database.PgliteDatabaseLive)
   );
+
   const TestLayer = Layer.mergeAll(
     CompanyPolicy.layer.pipe(
       Layer.provide(EntitlementPolicy.layer),
@@ -120,6 +123,7 @@ describe("CompanyRpcHandlers", () => {
         const companies = yield* handlers
           .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(companies).toHaveLength(1);
         expect(companies[0]).toMatchObject({ name: "Acme" });
       })
@@ -129,6 +133,7 @@ describe("CompanyRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* CompanyRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListCompanies({ organizationId: fixture.organizationId })
@@ -136,6 +141,7 @@ describe("CompanyRpcHandlers", () => {
               Effect.provideService(CurrentSession, makeSession(fixture, false))
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -152,6 +158,7 @@ describe("CompanyRpcHandlers", () => {
             name: "Acme",
           })
           .pipe(Effect.provideService(CurrentSession, session));
+
         const companyId = yield* CompanyId.parse(created.id);
 
         const updated = yield* handlers
@@ -161,6 +168,7 @@ describe("CompanyRpcHandlers", () => {
             name: "Acme Inc.",
           })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(updated).toMatchObject({
           id: created.id,
           name: "Acme Inc.",
@@ -177,6 +185,7 @@ describe("CompanyRpcHandlers", () => {
         const companies = yield* handlers
           .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(companies).toHaveLength(0);
       })
     );
@@ -208,6 +217,7 @@ describe("CompanyRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -238,11 +248,13 @@ describe("CompanyRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(error._tag).toBe("BadRequestError");
 
         const companies = yield* handlers
           .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(companies).toHaveLength(0);
       })
     );
@@ -276,11 +288,13 @@ describe("CompanyRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(error._tag).toBe("BadRequestError");
 
         const companies = yield* handlers
           .ListCompanies({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(companies).toHaveLength(0);
       })
     );
@@ -322,11 +336,13 @@ describe("CompanyRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(error._tag).toBe("PolicyDenied");
 
           const companies = yield* handlers
             .ListCompanies({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(companies).toHaveLength(0);
         })
     );

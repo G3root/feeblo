@@ -127,6 +127,7 @@ layer(TestLayer)("DataTransferRpcHandlers", (it) => {
         const handlers = yield* DataTransferRpcHandlersEffect;
         const service = yield* DataImportService;
         const fixture = yield* makeFixture();
+
         const session = Effect.provideService(
           CurrentSession,
           makeSession(fixture)
@@ -150,6 +151,7 @@ layer(TestLayer)("DataTransferRpcHandlers", (it) => {
           .pipe(session, Effect.provideService(AuditLogEnabled, true));
 
         const db = yield* currentDb;
+
         const rows = yield* db
           .select()
           .from(schema.auditLogTable)

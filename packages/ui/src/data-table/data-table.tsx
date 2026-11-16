@@ -54,7 +54,9 @@ export function DataTable<TData extends RowData>({
 
   function onTableKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const nativeEvent = event.nativeEvent;
+
     if (event.key !== "Escape" || nativeEvent.defaultPrevented) return;
+
     if (
       !(event.target instanceof Node) ||
       !event.currentTarget.contains(event.target)
@@ -63,15 +65,19 @@ export function DataTable<TData extends RowData>({
     }
 
     const selectedRowIds = getVisibleSelectedRows(table).map((row) => row.id);
+
     if (selectedRowIds.length === 0) return;
 
     onEscapeKeyDown?.(nativeEvent);
+
     if (nativeEvent.defaultPrevented) return;
 
     event.preventDefault();
     table.setRowSelection((prev) => {
       const next = { ...prev };
+
       for (const rowId of selectedRowIds) delete next[rowId];
+
       return next;
     });
   }

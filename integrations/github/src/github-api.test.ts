@@ -46,6 +46,7 @@ describe("GitHub App API response schemas", () => {
             total_count: 1,
           }),
         ]);
+
         expect(issue.number).toBe(7);
         expect(token.token).toBe("ghs_installation_token");
         expect(repositories.repositories[0]?.full_name).toBe("acme/feedback");
@@ -60,6 +61,7 @@ describe("GitHub App API response schemas", () => {
           total_count: 1,
         })
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -91,6 +93,7 @@ describe("GitHub App installation id validation", () => {
     () =>
       Effect.gen(function* () {
         const client = makeGitHubApiClient();
+
         const tag = yield* client
           .createInstallationAccessToken({
             appJwt: Redacted.make("app-jwt"),
@@ -102,6 +105,7 @@ describe("GitHub App installation id validation", () => {
               onSuccess: () => "success",
             })
           );
+
         expect(tag).toBe("IntegrationProviderInvalidConfigurationError");
       })
   );
@@ -109,6 +113,7 @@ describe("GitHub App installation id validation", () => {
   it.effect("rejects a non-numeric installation id before removal", () =>
     Effect.gen(function* () {
       const client = makeGitHubApiClient();
+
       const tag = yield* client
         .deleteInstallation({
           appJwt: Redacted.make("app-jwt"),
@@ -120,6 +125,7 @@ describe("GitHub App installation id validation", () => {
             onSuccess: () => "success",
           })
         );
+
       expect(tag).toBe("IntegrationProviderInvalidConfigurationError");
     })
   );

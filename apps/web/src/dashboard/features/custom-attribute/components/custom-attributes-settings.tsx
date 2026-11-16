@@ -263,6 +263,7 @@ function AttributeList({
 
 function AttributeActions({ onCreate }: { onCreate: () => void }) {
   const isSkeleton = useIsSkeleton();
+
   return (
     <div className="flex justify-end">
       <SkeletonWrapper>

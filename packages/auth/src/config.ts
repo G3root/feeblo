@@ -24,9 +24,11 @@ const assertProductionEncryptionKey = (
     if (nodeEnv !== "production") {
       return;
     }
+
     const byteLength = new TextEncoder().encode(
       Redacted.value(secret)
     ).byteLength;
+
     if (byteLength < MIN_AUTH_ENCRYPTION_KEY_BYTES) {
       return yield* Effect.fail(
         new Config.ConfigError(
@@ -55,15 +57,19 @@ export class AuthConfig extends Context.Service<AuthConfig>()("AuthConfig", {
     const trustedOrigins = yield* optionalString("AUTH_TRUSTED_ORIGINS");
     const turnstileKey = yield* optionalString("TURNSTILE_SECRET_KEY");
     const allowedEmails = yield* optionalString("ALLOWED_EMAILS");
+
     const nodeEnv = yield* Config.String("NODE_ENV").pipe(
       Config.withDefault("development")
     );
+
     const signUpEnabled = yield* Config.Boolean("AUTH_SIGN_UP_ENABLED").pipe(
       Config.withDefault(true)
     );
+
     const emailVerificationRequired = yield* Config.Boolean(
       "AUTH_EMAIL_VERIFICATION_REQUIRED"
     ).pipe(Config.withDefault(true));
+
     const autoSignInAfterSignUp = yield* Config.Boolean(
       "AUTH_AUTO_SIGN_IN_AFTER_SIGN_UP"
     ).pipe(Config.withDefault(false));

@@ -36,18 +36,23 @@ export const rpcMethodFromSpanName = (
  */
 const addRpcMethodToSharedSpan = (span: Tracer.Span, method: string): void => {
   const existing = span.attributes.get("rpc.method");
+
   if (isString(existing)) {
     if (existing !== method) {
       span.attribute("rpc.method", [existing, method]);
     }
+
     return;
   }
+
   if (isArray(existing)) {
     if (!existing.includes(method)) {
       span.attribute("rpc.method", [...existing, method]);
     }
+
     return;
   }
+
   span.attribute("rpc.method", method);
 };
 
@@ -68,11 +73,14 @@ export const rpcSpans = (
   ): Tracer.Span => {
     const method = rpcMethodFromSpanName(spanOptions.name, options.spanPrefix);
     const span = tracer.span(spanOptions);
+
     if (method === undefined) {
       return span;
     }
+
     span.attribute("rpc.system.name", "effect");
     span.attribute("rpc.method", method);
+
     // The parent is the HTTP server span for an in-process call. When the
     // client propagates its own trace context the RPC span hangs from that
     // external span and the HTTP span is only a link; label both so the
@@ -84,13 +92,16 @@ export const rpcSpans = (
     ) {
       addRpcMethodToSharedSpan(spanOptions.parent.value, method);
     }
+
     for (const link of spanOptions.links ?? []) {
       if (link.span._tag === "Span") {
         addRpcMethodToSharedSpan(link.span, method);
       }
     }
+
     return span;
   };
+
   return tracer.context === undefined
     ? { span }
     : { span, context: tracer.context };

@@ -12,6 +12,7 @@ import { resolveSite } from "~/lib/site";
 
 /** `/p/<slug>`, the board's feedback detail path. */
 const postDetailPathPattern = /^\/p\/([^/]+)$/;
+
 /** `/changelog/<slug>`, the board's changelog detail path. */
 const changelogDetailPathPattern = /^\/changelog\/([^/]+)$/;
 
@@ -100,6 +101,7 @@ async function resolvePageContent(
             Effect.catchTag("PostNotFoundError", () => Effect.succeed(null))
           )
       );
+
       if (post === null) {
         // A merged source 404s publicly; resolve its survivor so inbound
         // links (and merge emails) land on the canonical post.
@@ -110,10 +112,12 @@ async function resolvePageContent(
             slug: postMatch[1]!,
           })
         );
+
         return mergedTargetSlug === null
           ? { kind: "not-found" }
           : { kind: "redirect", to: `/p/${mergedTargetSlug}` };
       }
+
       return { kind: "found", post, changelog: null };
     }
 
@@ -124,6 +128,7 @@ async function resolvePageContent(
 
     // SAFETY: `postMatch` is null here, so `changelogMatch` matched.
     const changelogSlug = changelogMatch![1]!;
+
     // Resolve the single entry directly: pulling the whole published list
     // (up to `PUBLIC_CHANGELOG_LIMIT` full bodies) per detail hit wastes
     // that entire payload for one row.
@@ -137,6 +142,7 @@ async function resolvePageContent(
           Effect.catchTag("ChangelogNotFoundError", () => Effect.succeed(null))
         )
     );
+
     return changelog === null
       ? { kind: "not-found" }
       : { kind: "found", post: null, changelog };
@@ -156,6 +162,7 @@ async function resolvePageContent(
  */
 function dashboardOrigin(url: URL) {
   const configured = process.env.APP_URL;
+
   return configured !== undefined && URL.canParse(configured)
     ? new URL(configured).origin
     : url.origin;
@@ -173,6 +180,7 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
   .validator((data: { url: string }) => data)
   .handler(async ({ data }): Promise<PublicBoardPage> => {
     const url = new URL(data.url);
+
     const subdomain = extractSubdomain({
       url: data.url,
       rootDomain: process.env.APP_ROOT_DOMAIN ?? "",
@@ -197,6 +205,7 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
     }
 
     let site: TSite | null;
+
     try {
       site = await resolveSite(subdomain);
     } catch {

@@ -14,10 +14,12 @@ import { isTemporaryEditorMediaKey, S3UploadService } from "../services/s3";
 import { type AssetKind, type AssetOwner, AssetRepository } from "./repository";
 
 const EDITOR_ASSET_KINDS = ["editor_image", "editor_video"] as const;
+
 // TODO: Move to two-phase deletion if aged orphan reuse becomes supported.
 // Cleanup can still win the lock race against a concurrent reference insert
 // after this grace period, causing that save to fail its foreign-key check.
 const ORPHANED_EDITOR_ASSET_GRACE_PERIOD = Duration.hours(1);
+
 /**
  * How many editor-asset objects one request moves at once.
  *
@@ -93,6 +95,7 @@ export const registerUploadedAsset = ({
       kind,
       uploaded,
     });
+
     return { ...uploaded, assetId };
   }).pipe(
     Effect.tapCause(() =>
@@ -116,10 +119,12 @@ export const replaceSingletonAsset = <E, R>({
 }) =>
   Effect.gen(function* () {
     const repository = yield* AssetRepository;
+
     const previousAssets = yield* Effect.tapCause(
       transaction(
         Effect.gen(function* () {
           yield* updateOwner;
+
           const previousAssets = yield* repository.findByOwnerAndKind({
             kind,
             owner,
@@ -181,6 +186,7 @@ const findEditorAssetsByIds = ({
     }
 
     const db = yield* currentDb;
+
     const assets = yield* db
       .select({
         id: schema.assetTable.id,
@@ -222,6 +228,7 @@ const findCurrentEditorAssetsInContent = ({
     }
 
     const db = yield* currentDb;
+
     const assets = yield* db
       .select({
         id: schema.assetTable.id,
@@ -265,6 +272,7 @@ export const prepareEditorAssetContent = ({
       ...(userId && { userId }),
       assetIds,
     });
+
     const temporaryAssets = assets.filter(({ key }) =>
       isTemporaryEditorMediaKey(key)
     );
@@ -280,6 +288,7 @@ export const prepareEditorAssetContent = ({
 
     const s3 = yield* S3UploadService;
     const completedPromotions: PromotedEditorAsset[] = [];
+
     // Each copy is captured as an exit rather than propagated, so a sibling
     // that dies cannot interrupt a copy still in flight: an interrupted
     // `CopyObject` can still land in the bucket, and the rollback below has to
@@ -295,10 +304,12 @@ export const prepareEditorAssetContent = ({
               temporaryObject: { bucket: asset.bucket, key: asset.key },
               permanentObject,
             };
+
             // Recorded in the continuation, not in a later `tap`: the copy has
             // landed by the time this runs, and an interruption before the next
             // step must not hide that object from the rollback.
             completedPromotions.push(promotion);
+
             return promotion;
           }),
           Effect.exit
@@ -313,6 +324,7 @@ export const prepareEditorAssetContent = ({
     );
 
     const promotionFailure = promotionExits.find(Exit.isFailure);
+
     if (promotionFailure !== undefined) {
       yield* rollbackPreparedEditorAssets(completedPromotions);
       // `findFail` splits the typed error from the rest of the cause: the
@@ -320,6 +332,7 @@ export const prepareEditorAssetContent = ({
       // declared, and a defect is re-raised as a defect without widening the
       // error channel the callers type against.
       const failure = Cause.findFail(promotionFailure.cause);
+
       if (Result.isSuccess(failure)) {
         return yield* attachCause(
           new InternalServerError({
@@ -328,6 +341,7 @@ export const prepareEditorAssetContent = ({
           failure.success.error
         );
       }
+
       return yield* Effect.failCause(failure.failure);
     }
 
@@ -502,21 +516,25 @@ export const syncPostAssetReferences = ({
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
+
     const current = yield* db
       .select({ assetId: schema.postAssetTable.assetId })
       .from(schema.postAssetTable)
       .where(eq(schema.postAssetTable.postId, postId));
+
     const currentAssets = yield* findCurrentEditorAssetsInContent({
       organizationId,
       ...(userId && { userId }),
       content,
       currentAssetIds: current.map(({ assetId }) => assetId),
     });
+
     const submittedAssets = yield* findEditorAssetsByIds({
       organizationId,
       ...(userId && { userId }),
       assetIds,
     });
+
     const assets = [
       ...currentAssets,
       ...submittedAssets.filter(
@@ -525,6 +543,7 @@ export const syncPostAssetReferences = ({
           content.includes(url)
       ),
     ];
+
     yield* syncPostReferences({ postId, assets });
   });
 
@@ -551,21 +570,25 @@ export const syncChangelogAssetReferences = ({
 }) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
+
     const current = yield* db
       .select({ assetId: schema.changelogAssetTable.assetId })
       .from(schema.changelogAssetTable)
       .where(eq(schema.changelogAssetTable.changelogId, changelogId));
+
     const currentAssets = yield* findCurrentEditorAssetsInContent({
       organizationId,
       ...(userId && { userId }),
       content,
       currentAssetIds: current.map(({ assetId }) => assetId),
     });
+
     const submittedAssets = yield* findEditorAssetsByIds({
       organizationId,
       ...(userId && { userId }),
       assetIds,
     });
+
     // The client only knows the cover image URL (not its asset id), so after
     // a reload a re-save submits no cover asset id. Resolve the asset by URL
     // to keep its reference alive across saves; a null cover image yields no
@@ -593,20 +616,25 @@ export const syncChangelogAssetReferences = ({
                 eq(schema.assetTable.url, coverImageUrl)
               )
             )).slice(0, 1);
+
     const assetsById = new Map<string, EditorAsset>();
+
     for (const asset of currentAssets) {
       assetsById.set(asset.id, asset);
     }
+
     for (const asset of coverAssets) {
       if (!assetsById.has(asset.id)) {
         assetsById.set(asset.id, asset);
       }
     }
+
     for (const asset of submittedAssets) {
       if (!assetsById.has(asset.id) && content.includes(asset.url)) {
         assetsById.set(asset.id, asset);
       }
     }
+
     yield* syncChangelogReferences({
       changelogId,
       assets: [...assetsById.values()],
@@ -641,6 +669,7 @@ export const cleanupOrphanedEditorAssets = ({
         ORPHANED_EDITOR_ASSET_GRACE_PERIOD
       )
     );
+
     /**
      * Scoped to this workspace's own assets.
      *
@@ -654,6 +683,7 @@ export const cleanupOrphanedEditorAssets = ({
     const committedAssets = yield* transaction(
       Effect.gen(function* () {
         const db = yield* currentDb;
+
         const candidates = yield* db
           .select({ id: schema.assetTable.id })
           .from(schema.assetTable)
@@ -687,6 +717,7 @@ export const cleanupOrphanedEditorAssets = ({
               unreferencedByPostOrChangelog(db)
             )
           );
+
         const committed = unreferenced.filter(
           ({ key }) => !isTemporaryEditorMediaKey(key)
         );

@@ -14,6 +14,7 @@ import {
 } from "../helpers/widget-sso";
 
 const organizationIdPattern = /^org_/;
+
 const ssoTokenPattern = /ssoToken/;
 
 test("an SSO visitor never paints the sign-in button while the token exchanges", async ({
@@ -22,6 +23,7 @@ test("an SSO visitor never paints the sign-in button while the token exchanges",
 }) => {
   const owner = createTestUser();
   const workspace = await createAuthenticatedWorkspace(page, owner);
+
   const organizationId = new URL(workspace.organizationUrl).pathname
     .split("/")
     .find(Boolean);
@@ -53,13 +55,17 @@ test("an SSO visitor never paints the sign-in button while the token exchanges",
     // would otherwise paint the signed-out navbar, and the token exchange is
     // what proves the probe's answer is already stale.
     let releaseSession!: () => void;
+
     const sessionGate = new Promise<void>((resolve) => {
       releaseSession = resolve;
     });
+
     let releaseExchange!: () => void;
+
     const exchangeGate = new Promise<void>((resolve) => {
       releaseExchange = resolve;
     });
+
     await visitorPage.route("**/api/auth/get-session**", async (route) => {
       await sessionGate;
       await route.continue();
@@ -126,6 +132,7 @@ test(
   async ({ browser, page }) => {
     const owner = createTestUser();
     const workspace = await createAuthenticatedWorkspace(page, owner);
+
     const organizationId = new URL(workspace.organizationUrl).pathname
       .split("/")
       .find(Boolean);
@@ -133,6 +140,7 @@ test(
     if (!organizationId) {
       throw new Error("Workspace URL did not contain an organization id");
     }
+
     expect(organizationId).toMatch(organizationIdPattern);
 
     let secret = "";
@@ -151,10 +159,13 @@ test(
       name: "Widget SSO Visitor",
       email: `widget-${randomUUID().slice(0, 12)}@feeblo.dev`,
     };
+
     const token = signWidgetToken(secret, visitor, organizationId);
     const feedbackTitle = `Widget feedback ${randomUUID().slice(0, 8)}`;
+
     const feedbackContent =
       "Submitted from the embedded feedback widget by an identified user.";
+
     const boardUrl = publicBoardUrl(owner.workspaceName);
     const visitorContext = await browser.newContext();
     const visitorPage = await visitorContext.newPage();
@@ -180,6 +191,7 @@ test(
               close: () => WidgetHandle;
               open: () => WidgetHandle;
             };
+
             // SAFETY: the SDK bundle below registers Feeblo on the page
             // global before this evaluate step runs.
             const browserGlobal = globalThis as typeof globalThis & {
@@ -209,6 +221,7 @@ test(
                 const { title } = (
                   event as CustomEvent<{ data: { title: string } }>
                 ).detail.data;
+
                 browserGlobal.document.body.dataset.submittedFeedback = title;
               },
               { once: true }
@@ -234,16 +247,19 @@ test(
         const widget = visitorPage.frameLocator(
           "#feeblo-embed-container iframe"
         );
+
         await widget.getByRole("link", { name: "Features 💡" }).click();
         await widget
           .getByPlaceholder("Share your product feedback!")
           .fill(feedbackTitle);
         await widget.getByLabel("Details").fill(feedbackContent);
+
         const createFeedbackResponse = visitorPage.waitForResponse(
           (response) =>
             response.url().includes("/api/widget/v1/feedback") &&
             response.request().method() === "POST"
         );
+
         await widget.getByRole("button", { name: "Create a new post" }).click();
         const response = await createFeedbackResponse;
         expect(
@@ -266,6 +282,7 @@ test(
           const browserGlobal = globalThis as typeof globalThis & {
             e2eWidget?: { close: () => void };
           };
+
           browserGlobal.e2eWidget?.close();
         });
         await expect(
@@ -275,6 +292,7 @@ test(
         const publicBoardLink = visitorPage.getByRole("link", {
           name: "Open public board",
         });
+
         await expect(publicBoardLink).not.toHaveAttribute(
           "href",
           ssoTokenPattern
@@ -285,6 +303,7 @@ test(
             response.url() === `${apiUrl()}/api/auth/sign-in/jwt-auto-login` &&
             response.request().method() === "POST"
         );
+
         await publicBoardLink.click();
 
         const response = await autoLoginResponse;
@@ -321,6 +340,7 @@ test(
         const upvoteButton = visitorPage.getByRole("button", {
           name: "Upvote",
         });
+
         await expect(upvoteButton).toContainText("0");
         await upvoteButton.click();
         await expect(upvoteButton).toContainText("1");

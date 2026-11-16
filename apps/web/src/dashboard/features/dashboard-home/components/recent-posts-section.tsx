@@ -13,6 +13,7 @@ import {
 import * as dayjs from "@feeblo/utils/dayjs";
 import { MessageMultiple01Icon, Plus } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import type { ReactNode } from "react";
 
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
@@ -73,87 +74,97 @@ export function RecentPostsSection({
 }: RecentPostsSectionProps) {
   const boardMap = new Map(boards.map((b) => [b.id, b]));
 
-  return (
+  const section = (content: ReactNode) => (
     <section>
       <h2 className="text-muted-foreground mb-3 text-sm font-medium">
         Recent posts
       </h2>
 
-      {isLoading ? (
-        <RecentPostsSkeleton />
-      ) : isError ? (
-        <div className="border-border/70 bg-muted/20 text-muted-foreground flex min-h-32 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
-          There was a problem loading your recent posts.
-        </div>
-      ) : recentPosts.length > 0 ? (
-        // The section swaps between three branches, so the rows mount where the
-        // skeleton was and would otherwise land in one hard cut. Same entrance
-        // as `Empty`: fade, 4px rise, 2% settle, 200ms.
-        <div className="divide-border/40 border-border/60 ease-out-strong overflow-hidden rounded-xl border transition-[opacity,translate,scale] duration-200 motion-reduce:transition-opacity starting:translate-y-1 starting:scale-98 starting:opacity-0 motion-reduce:starting:translate-y-0 motion-reduce:starting:scale-100">
-          {recentPosts.map((post) => {
-            const board = boardMap.get(post.boardId);
-            const status = statuses.find((s) => s.id === post.statusId);
-            const description =
-              (post.excerpt && post.excerpt.trim().length > 0
-                ? post.excerpt.length > 100
-                  ? `${post.excerpt.slice(0, 99).trimEnd()}...`
-                  : post.excerpt
-                : "No details yet.") ||
-              `${board?.name ?? ""}${board?.name ? " · " : ""}${dayjs.default(post.createdAt).format("MMM D")}`;
-
-            return (
-              <PostCard.Root key={post.id}>
-                <PostCard.Link
-                  label={`View ${post.title}`}
-                  params={{
-                    organizationId,
-                    boardSlug: board?.slug ?? "",
-                    postSlug: post.slug,
-                  }}
-                  to="/$organizationId/post/$boardSlug/$postSlug"
-                />
-                <PostCard.Media>
-                  <StandaloneUpvoteButton
-                    organizationId={organizationId}
-                    postId={post.id}
-                    upvoteCollection={dashboardCollections.upvoteCollection}
-                    variant="compact"
-                  />
-                </PostCard.Media>
-                <PostCard.Body>
-                  <PostCard.Title>{post.title}</PostCard.Title>
-                  <PostCard.Description>{description}</PostCard.Description>
-                  <PostCard.MobileMeta
-                    boardName={board?.name ?? ""}
-                    image={post.user?.image}
-                    isMember={post.authorIsMember}
-                    name={post.user?.name}
-                  />
-                </PostCard.Body>
-                <PostCard.DesktopMeta>
-                  {status && (
-                    <PostCard.Status
-                      color={status.color ?? undefined}
-                      label={status.label || formatPostStatus(status.type)}
-                    />
-                  )}
-                  {board?.name && (
-                    <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>
-                  )}
-                  <PostCard.Author
-                    image={post.user?.image}
-                    isMember={post.authorIsMember}
-                    name={post.user?.name}
-                  />
-                </PostCard.DesktopMeta>
-              </PostCard.Root>
-            );
-          })}
-        </div>
-      ) : (
-        <EmptyState boards={boards} />
-      )}
+      {content}
     </section>
+  );
+
+  if (isLoading) {
+    return section(<RecentPostsSkeleton />);
+  }
+
+  if (isError) {
+    return section(
+      <div className="border-border/70 bg-muted/20 text-muted-foreground flex min-h-32 items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm">
+        There was a problem loading your recent posts.
+      </div>
+    );
+  }
+
+  if (recentPosts.length === 0) {
+    return section(<EmptyState boards={boards} />);
+  }
+
+  // The rows mount where the skeleton was and would otherwise land in one hard
+  // cut. Same entrance as `Empty`: fade, 4px rise, 2% settle, 200ms.
+  return section(
+    <div className="divide-border/40 border-border/60 ease-out-strong overflow-hidden rounded-xl border transition-[opacity,translate,scale] duration-200 motion-reduce:transition-opacity starting:translate-y-1 starting:scale-98 starting:opacity-0 motion-reduce:starting:translate-y-0 motion-reduce:starting:scale-100">
+      {recentPosts.map((post) => {
+        const board = boardMap.get(post.boardId);
+        const status = statuses.find((s) => s.id === post.statusId);
+
+        const description =
+          (post.excerpt && post.excerpt.trim().length > 0
+            ? post.excerpt.length > 100
+              ? `${post.excerpt.slice(0, 99).trimEnd()}...`
+              : post.excerpt
+            : "No details yet.") ||
+          `${board?.name ?? ""}${board?.name ? " · " : ""}${dayjs.default(post.createdAt).format("MMM D")}`;
+
+        return (
+          <PostCard.Root key={post.id}>
+            <PostCard.Link
+              label={`View ${post.title}`}
+              params={{
+                organizationId,
+                boardSlug: board?.slug ?? "",
+                postSlug: post.slug,
+              }}
+              to="/$organizationId/post/$boardSlug/$postSlug"
+            />
+            <PostCard.Media>
+              <StandaloneUpvoteButton
+                organizationId={organizationId}
+                postId={post.id}
+                upvoteCollection={dashboardCollections.upvoteCollection}
+                variant="compact"
+              />
+            </PostCard.Media>
+            <PostCard.Body>
+              <PostCard.Title>{post.title}</PostCard.Title>
+              <PostCard.Description>{description}</PostCard.Description>
+              <PostCard.MobileMeta
+                boardName={board?.name ?? ""}
+                image={post.user?.image}
+                isMember={post.authorIsMember}
+                name={post.user?.name}
+              />
+            </PostCard.Body>
+            <PostCard.DesktopMeta>
+              {status && (
+                <PostCard.Status
+                  color={status.color ?? undefined}
+                  label={status.label || formatPostStatus(status.type)}
+                />
+              )}
+              {board?.name && (
+                <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>
+              )}
+              <PostCard.Author
+                image={post.user?.image}
+                isMember={post.authorIsMember}
+                name={post.user?.name}
+              />
+            </PostCard.DesktopMeta>
+          </PostCard.Root>
+        );
+      })}
+    </div>
   );
 }
 
@@ -214,6 +225,7 @@ function EmptyState({ boards }: { boards: Board[] }) {
 
 function RecentPostsSkeleton() {
   const keys = ["a", "b", "c", "d", "e"];
+
   return (
     <div className="divide-border/40 border-border/60 overflow-hidden rounded-xl border">
       {keys.map((key) => (

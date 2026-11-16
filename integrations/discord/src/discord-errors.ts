@@ -21,7 +21,7 @@ import type {
 /** Failure parsing a verified Discord interaction request body into its typed payload. */
 export class DiscordInboundPayloadError extends Schema.TaggedError<DiscordInboundPayloadError>()(
   "DiscordInboundPayloadError",
-  { reason: Schema.String }
+  { reason: Schema.String, cause: Schema.optionalKey(Schema.Defect()) }
 ) {}
 
 /** Typed Discord API failure algebra re-exported at the provider boundary. */

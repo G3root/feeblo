@@ -28,6 +28,7 @@ export type DeliveryHistoryArgs = {
 export type DeliveryPage = Effect.Success<
   ReturnType<typeof loadWebhookDeliveryHistory>
 >;
+
 export type Delivery = DeliveryPage["items"][number];
 
 const loadWebhookDeliveryHistory = (input: {
@@ -37,6 +38,7 @@ const loadWebhookDeliveryHistory = (input: {
 }) =>
   Effect.gen(function* () {
     const client = yield* DashboardClient;
+
     return yield* client("GetWebhookDeliveryHistory", input);
   });
 
@@ -54,6 +56,7 @@ export const deliveriesAtom = Atom.family((args: DeliveryHistoryArgs) =>
   DashboardClient.runtime
     .pull((get) => {
       get(deliveryHistoryRefreshAtom(args));
+
       // SAFETY: The first delivery-history request has no cursor.
       return Stream.paginate(undefined as string | undefined, (cursor) =>
         loadWebhookDeliveryHistory({
@@ -83,24 +86,31 @@ export const preloadDeliveryHistoryAtom = Atom.fnSync(
 export const createWebhookEndpointAtom = DashboardClient.mutation(
   "CreateWebhookEndpoint"
 );
+
 export const updateWebhookEndpointAtom = DashboardClient.mutation(
   "UpdateWebhookEndpoint"
 );
+
 export const testWebhookDeliveryAtom = DashboardClient.mutation(
   "TestWebhookDelivery"
 );
+
 export const rotateWebhookSecretAtom = DashboardClient.mutation(
   "RotateWebhookSecret"
 );
+
 export const resumeWebhookEndpointAtom = DashboardClient.mutation(
   "ResumeWebhookEndpoint"
 );
+
 export const pauseWebhookEndpointAtom = DashboardClient.mutation(
   "PauseWebhookEndpoint"
 );
+
 export const removeWebhookEndpointAtom = DashboardClient.mutation(
   "RemoveWebhookEndpoint"
 );
+
 export const retryWebhookDeliveryAtom = DashboardClient.mutation(
   "RetryWebhookDelivery"
 );

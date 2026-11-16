@@ -1,6 +1,9 @@
 export type WidgetModule = "feedback" | "updates";
+
 export type WidgetMode = WidgetModule | "hub";
+
 export const SUPPORTED_LOCALES = ["en"] as const;
+
 export type WidgetLocale = (typeof SUPPORTED_LOCALES)[number];
 
 export function isSupportedLocale(value: string | null): value is WidgetLocale {
@@ -23,6 +26,7 @@ export function getWidgetConfig(): WidgetConfig {
         global?: { __ENV?: { widgetConfig?: WidgetConfig } };
       }
     ).global?.__ENV?.widgetConfig;
+
   return config ?? fallback;
 }
 

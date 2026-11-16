@@ -19,6 +19,7 @@ export const SlackEncryptedCredentialMaterial = Schema.Struct({
   /** Webhook URL Slack provisions for the installed app; unused by V1. */
   incomingWebhookUrl: Schema.optionalKey(Schema.String),
 });
+
 export type SlackEncryptedCredentialMaterial = Schema.Schema.Type<
   typeof SlackEncryptedCredentialMaterial
 >;

@@ -101,6 +101,7 @@ export const makeSlackIntegrationConfig = (config: ServerConfigValue) => {
   const clientId = config.slackClientId ?? "";
   const clientSecret = config.slackClientSecret;
   const signingSecret = config.slackSigningSecret;
+
   return SlackIntegrationConfig.of({
     appUrl: appUrlValue,
     authorizeScopes: SLACK_OAUTH_SCOPES,
@@ -127,6 +128,7 @@ export const makeDiscordIntegrationConfig = (config: ServerConfigValue) => {
   const clientSecret = config.discordClientSecret;
   const botToken = config.discordBotToken;
   const publicKey = config.discordPublicKey ?? "";
+
   return DiscordIntegrationConfig.of({
     appUrl: config.appUrl.replace(trailingSlashPattern, ""),
     authorizeScopes: DISCORD_OAUTH_SCOPES,
@@ -155,11 +157,14 @@ export const makeWebhookIntegrationConfig = (config: ServerConfigValue) => {
     if (config.nodeEnv === "production") {
       return "production" as const;
     }
+
     if (config.nodeEnv === "test") {
       return "test" as const;
     }
+
     return "development" as const;
   })();
+
   return WebhookIntegrationConfig.of({
     encryptionKey: config.integrationEncryptionKey,
     endpointSecurityPolicy: {
@@ -244,6 +249,7 @@ export const makeServiceLayers = ({
     ExternalResourceService,
     externalResourceService
   );
+
   // The entitlement decision is built from the workspace's billing state and is
   // read both by the Public API's key middleware and by its changelog writes
   // (publishing emails subscribers only on a plan that includes them). One
@@ -251,6 +257,7 @@ export const makeServiceLayers = ({
   const EntitlementPolicies = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer)
   );
+
   // The shared post write path's environment, provided once: the dashboard
   // RPCs, the Public API, the widget feedback endpoint, and the Slack and
   // Discord inbound feedback services all require this one service instead of
@@ -270,9 +277,11 @@ export const makeServiceLayers = ({
     S3UploadServiceLive,
     UserRepository.layer
   );
+
   const PostWrites = PostWriteService.layer.pipe(
     Layer.provide(PostWriteDependencies)
   );
+
   // The inbound feedback service is one provider-neutral service: Slack and
   // Discord both deliver a submission into the shared post write path, so the
   // two inbound services require the same instance rather than each building
@@ -281,6 +290,7 @@ export const makeServiceLayers = ({
     Layer.provide(PostStatusRepository.layer),
     Layer.provide(PostWrites)
   );
+
   const ServiceCore = Layer.mergeAll(
     workflowLayer,
     SiteRepository.layer,
@@ -396,5 +406,6 @@ export const makeServiceLayers = ({
       yield* runDataImportWorker().pipe(Effect.forkScoped);
     })
   ).pipe(Layer.provide(DataImportWorkerLive), Layer.provideMerge(ServiceCore));
+
   return Layer.mergeAll(ServiceCore, DataImportWorkerLayer);
 };

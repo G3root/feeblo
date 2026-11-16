@@ -28,9 +28,11 @@ function pageTypeForPath(pathname: string): OgImagePageType {
   if (pathname.startsWith("/roadmap")) {
     return "roadmap-main";
   }
+
   if (pathname.startsWith("/changelog")) {
     return "changelog-main";
   }
+
   return "feedback-main";
 }
 
@@ -59,9 +61,11 @@ export function buildOgImageUrl({
   if (postSlug !== null) {
     url.searchParams.set("type", "post-detail");
     url.searchParams.set("post", postSlug);
+
     return url.toString();
   }
 
   url.searchParams.set("type", pageTypeForPath(pathname));
+
   return url.toString();
 }

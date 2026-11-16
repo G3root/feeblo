@@ -39,6 +39,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 import { PostMergeMenu } from "./post-merge-menu";
 
 type DialogAction = "lock" | null;
+
 type PostAdminAction = "lock";
 
 export function PostSidebarActions() {
@@ -72,8 +73,10 @@ function PostAdminActionButtons() {
     organizationId,
     userBanActions,
   } = usePostCollectionData();
+
   const { commentCollection, postActivityCollection, postCollection } =
     useDashboardCollections();
+
   const postDialogStore = usePostDeleteDialogContext();
   const banDialogStore = useBanAuthorDialogContext();
   const [dialogAction, setDialogAction] = useState<DialogAction>(null);
@@ -135,7 +138,9 @@ function PostAdminActionButtons() {
     if (userBanActions === undefined) {
       return;
     }
+
     setIsUnbanning(true);
+
     try {
       await userBanActions.unban({
         target: { _tag: "post", postId: post.id },

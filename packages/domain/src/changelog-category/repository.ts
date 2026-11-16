@@ -218,6 +218,7 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
     update: ({ id, name, iconType, icon, organizationId }: TUpdate) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .update(schema.changelogCategoryTable)
           .set({

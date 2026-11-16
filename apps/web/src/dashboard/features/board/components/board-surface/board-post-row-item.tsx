@@ -21,6 +21,7 @@ export function BoardPostRowItem({
   organizationId: string;
 }) {
   const store = useBoardStore();
+
   const checked = useSelector(store, (state) =>
     state.context.selectedPosts.some((entry) => entry.postId === post.id)
   );

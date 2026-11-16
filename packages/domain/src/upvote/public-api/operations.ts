@@ -82,11 +82,13 @@ const toPublicVoteFailure = (
       "The vote's author could not be resolved in this workspace."
     );
   }
+
   if (Schema.is(SubjectNotFoundError)(cause)) {
     return invalidRequestError(
       "The vote's author could not be found in this workspace."
     );
   }
+
   if (
     Schema.is(NotFoundError)(cause) ||
     Schema.is(ConflictError)(cause) ||
@@ -94,6 +96,7 @@ const toPublicVoteFailure = (
   ) {
     return cause;
   }
+
   return undefined;
 };
 
@@ -134,6 +137,7 @@ const withVoteCreateFailures = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         if (Schema.is(CrmEntryLimitReachedError)(cause)) {
           return planRequiresUpgradeError(crmLimitMessage);
         }
+
         return (
           toPublicVoteFailure(cause) ??
           internalError("The request could not be completed.")

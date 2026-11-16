@@ -45,6 +45,7 @@ describe("EmailSuppressionRpcHandlers", () => {
         role,
         createdAt: now,
       });
+
       return { memberId, organizationId, role, userId } satisfies Fixture;
     });
 
@@ -104,6 +105,7 @@ describe("EmailSuppressionRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.total).toBe(1);
         expect(listed.items.map((item) => item.email)).toEqual([
           "blocked@example.com",
@@ -114,6 +116,7 @@ describe("EmailSuppressionRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(stats).toEqual({
           administrativeBlock: 1,
           complaint: 0,
@@ -145,6 +148,7 @@ describe("EmailSuppressionRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.total).toBe(1);
         expect(listed.items[0]?.note).toBe("Second report");
       })
@@ -207,6 +211,7 @@ describe("EmailSuppressionRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.items).toHaveLength(0);
       })
     );
@@ -243,6 +248,7 @@ describe("EmailSuppressionRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, session(fixture)))
           );
+
           expect(error._tag).toBe("NotFoundError");
 
           const [remaining] = yield* db
@@ -251,6 +257,7 @@ describe("EmailSuppressionRpcHandlers", () => {
             .where(
               eq(schema.emailSuppressionTable.email, "foreign@example.com")
             );
+
           expect(remaining?.email).toBe("foreign@example.com");
         })
     );
@@ -281,6 +288,7 @@ describe("EmailSuppressionRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.total).toBe(0);
       })
     );
@@ -290,10 +298,12 @@ describe("EmailSuppressionRpcHandlers", () => {
         const handlers = yield* EmailSuppressionRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const db = yield* currentDb;
+
         const provideSession = Effect.provideService(
           CurrentSession,
           session(fixture)
         );
+
         const auditOn = Effect.provideService(AuditLogEnabled, true);
 
         yield* handlers
@@ -320,6 +330,7 @@ describe("EmailSuppressionRpcHandlers", () => {
           "email_suppression.added",
           "email_suppression.removed",
         ]);
+
         for (const row of rows) {
           expect(row).toMatchObject({
             actorType: "user",
@@ -331,6 +342,7 @@ describe("EmailSuppressionRpcHandlers", () => {
           // The entry can never be amended, so the address must not be in it.
           expect(JSON.stringify(row)).not.toContain("blocked@example.com");
         }
+
         expect(
           rows.find((row) => row.action === "email_suppression.added")
         ).toMatchObject({ metadata: { reason: "administrative_block" } });

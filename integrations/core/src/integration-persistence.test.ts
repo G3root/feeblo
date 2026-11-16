@@ -46,6 +46,7 @@ const seedOrganization = Effect.fn("test.seedOrganization")(function* (
     name,
     slug: organizationId,
   });
+
   return organizationId;
 });
 
@@ -95,9 +96,11 @@ const seedRoute = ({
 } = {}) =>
   Effect.gen(function* () {
     const db = yield* currentDb;
+
     const organizationId =
       existingOrganizationId ??
       (yield* seedOrganization("Integration persistence test"));
+
     const connectionId = yield* IntegrationConnectionId.generate;
     const routeId = yield* IntegrationRouteId.generate;
     yield* db.insert(schema.integrationConnectionTable).values({
@@ -121,6 +124,7 @@ const seedRoute = ({
       providerConfig: {},
       safeDisplayMetadata: {},
     });
+
     return { connectionId, organizationId, routeId };
   });
 
@@ -130,6 +134,7 @@ const makePostCreatedEvent = Effect.gen(function* () {
   const boardId = yield* BoardId.generate;
   const postId = yield* PostId.generate;
   const statusId = yield* PostStatusId.generate;
+
   return {
     event: {
       causalHopCount: 0,
@@ -169,6 +174,7 @@ describe("integration persistence", () => {
           const recorder = yield* IntegrationEventRecorder;
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
+
           const event = {
             ...input.event,
             organizationId: route.organizationId,
@@ -204,6 +210,7 @@ describe("integration persistence", () => {
           const recorder = yield* IntegrationEventRecorder;
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
+
           const event = {
             ...input.event,
             organizationId: route.organizationId,
@@ -240,16 +247,20 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
+
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
             new Map([["webhook", ["events.post"]]]),
             {}
           );
+
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
+
           const event = {
             ...input.event,
             organizationId: route.organizationId,
           };
+
           yield* transaction(recorder.recordIntegrationEvent({ event }));
 
           const claimed = yield* repository.claimDueDeliveries({
@@ -257,6 +268,7 @@ describe("integration persistence", () => {
             leaseOwner: "worker-a",
             limit: 10,
           });
+
           expect(claimed).toHaveLength(1);
           const delivery = claimed[0];
           expect(delivery?.input.event.id).toBe(event.id);
@@ -280,8 +292,10 @@ describe("integration persistence", () => {
                 claimed: delivery,
               }))
           ).toBe(false);
+
           if (delivery !== undefined) {
             yield* repository.cancelClaimedDelivery({ claimed: delivery });
+
             const [canceled] = yield* db
               .select()
               .from(schema.integrationDeliveryTable)
@@ -291,6 +305,7 @@ describe("integration persistence", () => {
                   delivery.input.delivery.id
                 )
               );
+
             expect(canceled?.state).toBe("canceled");
             expect(canceled?.leaseOwner).toBeNull();
           }
@@ -314,22 +329,26 @@ describe("integration persistence", () => {
             new Map([["webhook", ["other.capability"]]]),
             {}
           );
+
           const unclaimed = yield* kernel.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "kernel-only",
             limit: 10,
           });
+
           expect(unclaimed).toHaveLength(0);
 
           const webhookKernel = yield* makeIntegrationDeliveryWorkerRepository(
             new Map([["webhook", ["events.post"]]]),
             {}
           );
+
           const claimed = yield* webhookKernel.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "webhook-kernel",
             limit: 10,
           });
+
           expect(claimed).toHaveLength(1);
         })
     );
@@ -341,9 +360,11 @@ describe("integration persistence", () => {
           const recorder = yield* IntegrationEventRecorder;
           const valid = yield* seedRoute();
           const crossProvider = yield* seedRoute({ capabilityKey: "commands" });
+
           const unknown = yield* seedRoute({
             capabilityKey: "unknown.capability",
           });
+
           const validEvent = yield* makePostCreatedEvent;
           const crossProviderEvent = yield* makePostCreatedEvent;
           const unknownEvent = yield* makePostCreatedEvent;
@@ -379,6 +400,7 @@ describe("integration persistence", () => {
             ]),
             {}
           );
+
           const claimed = yield* repository.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "provider-aware",
@@ -396,14 +418,17 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
+
           const organizationId = yield* seedOrganization(
             "Plan-gated workspace"
           );
+
           const slackRoute = yield* seedRoute({
             capabilityKey: "channel.notifications",
             organizationId,
             provider: "slack",
           });
+
           const webhookRoute = yield* seedRoute({ organizationId });
           const input = yield* makePostCreatedEvent;
           yield* transaction(
@@ -419,11 +444,13 @@ describe("integration persistence", () => {
             ]),
             { planGatedProviders: ["slack"] }
           );
+
           const claimed = yield* repository.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "plan-gate",
             limit: 10,
           });
+
           // Only the ungated webhook delivery stays claimable.
           expect(
             claimed.map((delivery) => delivery.input.connection.id)
@@ -435,9 +462,11 @@ describe("integration persistence", () => {
             .where(
               eq(schema.integrationDeliveryTable.organizationId, organizationId)
             );
+
           const slackDelivery = deliveries.find(
             (delivery) => delivery.connectionId === slackRoute.connectionId
           );
+
           expect(slackDelivery?.state).toBe("canceled");
           expect(slackDelivery?.lastError).toEqual({
             errorTag: "paused_by_plan",
@@ -451,11 +480,13 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const recorder = yield* IntegrationEventRecorder;
           const organizationId = yield* seedOrganization("Entitled workspace");
+
           const slackRoute = yield* seedRoute({
             capabilityKey: "channel.notifications",
             organizationId,
             provider: "slack",
           });
+
           yield* seedEntitledPlan(organizationId);
           const input = yield* makePostCreatedEvent;
           yield* transaction(
@@ -468,11 +499,13 @@ describe("integration persistence", () => {
             new Map([["slack", ["channel.notifications"]]]),
             { planGatedProviders: ["slack"] }
           );
+
           const claimed = yield* repository.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "plan-entitled",
             limit: 10,
           });
+
           expect(claimed).toHaveLength(1);
           expect(claimed[0]?.input.connection.id).toBe(slackRoute.connectionId);
         })
@@ -484,26 +517,34 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
+
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
             new Map([["webhook", ["events.post"]]]),
             {}
           );
+
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
+
           const event = {
             ...input.event,
             organizationId: route.organizationId,
           };
+
           yield* transaction(recorder.recordIntegrationEvent({ event }));
+
           const [claimed] = yield* repository.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "worker-recovery",
             limit: 1,
           });
+
           expect(claimed).toBeDefined();
+
           if (claimed === undefined) {
             return;
           }
+
           yield* db
             .update(schema.integrationDeliveryTable)
             .set({
@@ -514,12 +555,14 @@ describe("integration persistence", () => {
             );
 
           yield* repository.recoverExpiredLeases;
+
           const [recovered] = yield* db
             .select()
             .from(schema.integrationDeliveryTable)
             .where(
               eq(schema.integrationDeliveryTable.id, claimed.input.delivery.id)
             );
+
           expect(recovered?.state).toBe("pending");
           expect(recovered?.leaseOwner).toBeNull();
 
@@ -528,11 +571,14 @@ describe("integration persistence", () => {
             leaseOwner: "worker-b",
             limit: 1,
           });
+
           expect(reclaimed?.input.delivery.id).toBe(claimed.input.delivery.id);
           expect(reclaimed?.input.delivery.attemptCount).toBe(2);
+
           if (reclaimed === undefined) {
             return;
           }
+
           yield* db
             .update(schema.integrationConnectionTable)
             .set({ lifecycle: "paused" })
@@ -549,6 +595,7 @@ describe("integration persistence", () => {
               )
             );
           yield* repository.recoverExpiredLeases;
+
           const [canceledAfterRecovery] = yield* db
             .select()
             .from(schema.integrationDeliveryTable)
@@ -558,6 +605,7 @@ describe("integration persistence", () => {
                 reclaimed.input.delivery.id
               )
             );
+
           expect(canceledAfterRecovery?.state).toBe("canceled");
           expect(canceledAfterRecovery?.leaseOwner).toBeNull();
         })
@@ -569,10 +617,12 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
+
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
             new Map([["webhook", ["events.post"]]]),
             {}
           );
+
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           yield* transaction(
@@ -580,24 +630,29 @@ describe("integration persistence", () => {
               event: { ...input.event, organizationId: route.organizationId },
             })
           );
+
           const [claimed] = yield* repository.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "owner-a",
             limit: 1,
           });
+
           if (!claimed) {
             return;
           }
+
           yield* repository.persistDeliveryResult({
             claimed: { ...claimed, leaseOwner: "stale-owner" },
             outcome: { _tag: "Succeeded" },
           });
+
           let [row] = yield* db
             .select()
             .from(schema.integrationDeliveryTable)
             .where(
               eq(schema.integrationDeliveryTable.id, claimed.input.delivery.id)
             );
+
           expect(row?.state).toBe("leased");
           yield* repository.persistDeliveryResult({
             claimed,
@@ -620,10 +675,12 @@ describe("integration persistence", () => {
       () =>
         Effect.gen(function* () {
           const recorder = yield* IntegrationEventRecorder;
+
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
             new Map([["webhook", ["events.post"]]]),
             {}
           );
+
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
           yield* transaction(
@@ -631,6 +688,7 @@ describe("integration persistence", () => {
               event: { ...input.event, organizationId: route.organizationId },
             })
           );
+
           const [first, second] = yield* Effect.all(
             [
               repository.claimDueDeliveries({
@@ -646,6 +704,7 @@ describe("integration persistence", () => {
             ],
             { concurrency: "unbounded" }
           );
+
           expect(first.length + second.length).toBe(1);
         })
     );
@@ -656,11 +715,14 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
+
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
             new Map([["webhook", ["events.post"]]]),
             {}
           );
+
           const route = yield* seedRoute();
+
           for (let count = 0; count < 11; count++) {
             const input = yield* makePostCreatedEvent;
             yield* transaction(
@@ -669,30 +731,36 @@ describe("integration persistence", () => {
               })
             );
           }
+
           for (let count = 0; count < 10; count++) {
             const [claimed] = yield* repository.claimDueDeliveries({
               leaseDurationMs: 60_000,
               leaseOwner: `exhaust-${count}`,
               limit: 1,
             });
+
             if (claimed === undefined) {
               return yield* Effect.die("Expected pending delivery");
             }
+
             yield* repository.persistDeliveryResult({
               claimed,
               outcome: { _tag: "Terminal" },
             });
           }
+
           const [connection] = yield* db
             .select()
             .from(schema.integrationConnectionTable)
             .where(
               eq(schema.integrationConnectionTable.id, route.connectionId)
             );
+
           const [storedRoute] = yield* db
             .select()
             .from(schema.integrationRouteTable)
             .where(eq(schema.integrationRouteTable.id, route.routeId));
+
           const pending = yield* db
             .select()
             .from(schema.integrationDeliveryTable)
@@ -702,6 +770,7 @@ describe("integration persistence", () => {
                 route.connectionId
               )
             );
+
           expect(connection?.lifecycle).toBe("paused");
           expect(connection?.consecutiveExhaustedDeliveries).toBe(10);
           expect(storedRoute?.enabled).toBe(false);
@@ -717,30 +786,38 @@ describe("integration persistence", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const recorder = yield* IntegrationEventRecorder;
+
           const repository = yield* makeIntegrationDeliveryWorkerRepository(
             new Map([["webhook", ["events.post"]]]),
             {}
           );
+
           const route = yield* seedRoute();
           const input = yield* makePostCreatedEvent;
+
           const event = {
             ...input.event,
             organizationId: route.organizationId,
           };
+
           yield* transaction(recorder.recordIntegrationEvent({ event }));
+
           const [claimed] = yield* repository.claimDueDeliveries({
             leaseDurationMs: 60_000,
             leaseOwner: "cascade-test",
             limit: 1,
           });
+
           expect(claimed).toBeDefined();
           const deliveryId = claimed?.input.delivery.id ?? "missing";
+
           const [attempt] = yield* db
             .select({ id: schema.integrationDeliveryAttemptTable.id })
             .from(schema.integrationDeliveryAttemptTable)
             .where(
               eq(schema.integrationDeliveryAttemptTable.deliveryId, deliveryId)
             );
+
           expect(attempt?.id).toBeDefined();
 
           yield* db
@@ -792,10 +869,13 @@ describe("integration persistence", () => {
         const db = yield* currentDb;
         const recorder = yield* IntegrationEventRecorder;
         const first = yield* seedRoute();
+
         const second = yield* seedRoute({
           organizationId: first.organizationId,
         });
+
         const input = yield* makePostCreatedEvent;
+
         const event = {
           ...input.event,
           organizationId: first.organizationId,
@@ -806,10 +886,12 @@ describe("integration persistence", () => {
         );
 
         expect(result).toEqual({ deliveryCount: 2, eventRecorded: true });
+
         const deliveries = yield* db
           .select()
           .from(schema.integrationDeliveryTable)
           .where(eq(schema.integrationDeliveryTable.eventId, event.id));
+
         expect(
           deliveries.map((delivery) => delivery.actionKey).toSorted()
         ).toEqual(
@@ -825,13 +907,16 @@ describe("integration persistence", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const recorder = yield* IntegrationEventRecorder;
+
         const repository = yield* makeIntegrationDeliveryWorkerRepository(
           new Map([["webhook", ["batching.probe"]]]),
           {}
         );
+
         // A capability no other test uses keeps this claim scoped to this
         // test's three deliveries, however many earlier tests leave pending.
         const route = yield* seedRoute({ capabilityKey: "batching.probe" });
+
         for (let count = 0; count < 3; count++) {
           const input = yield* makePostCreatedEvent;
           yield* transaction(
@@ -851,6 +936,7 @@ describe("integration persistence", () => {
         expect(
           claimed.map((delivery) => delivery.input.delivery.attemptCount)
         ).toEqual([1, 1, 1]);
+
         const attempts = yield* db
           .select({
             attemptNumber: schema.integrationDeliveryAttemptTable.attemptNumber,
@@ -863,6 +949,7 @@ describe("integration persistence", () => {
               claimed.map((delivery) => delivery.input.delivery.id)
             )
           );
+
         expect(attempts).toHaveLength(3);
         expect(attempts.every((attempt) => attempt.attemptNumber === 1)).toBe(
           true

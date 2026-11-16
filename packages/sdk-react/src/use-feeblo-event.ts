@@ -45,13 +45,17 @@ export function useFeebloEvent(
     const forward: FeebloEventListener<FeebloEventName> = (nativeEvent) => {
       handlerRef.current(nativeEvent);
     };
+
     if (event === "*") {
       Feeblo.on("*", forward);
+
       return () => {
         Feeblo.off("*", forward);
       };
     }
+
     Feeblo.on(event, forward);
+
     return () => {
       Feeblo.off(event, forward);
     };

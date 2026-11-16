@@ -74,6 +74,7 @@ export const endUserHandlers = (
   listEndUsers: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       return yield* listEndUsersOperation.handler({
         companyId: providedQueryParam(query.companyId),
         cursor: query.cursor,

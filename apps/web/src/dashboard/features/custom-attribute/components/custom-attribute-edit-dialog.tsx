@@ -51,6 +51,7 @@ function getCollection(
 export function CustomAttributeEditDialog() {
   const store = useCustomAttributeEditDialogContext();
   const open = useSelector(store, (state) => state.context.open);
+
   const entityType = useSelector(
     store,
     (state) => state.context.data.entityType
@@ -75,10 +76,12 @@ function CustomAttributeEditForm() {
   const organizationId = useOrganizationId();
   const collections = useDashboardCollections();
   const store = useCustomAttributeEditDialogContext();
+
   const attributeId = useSelector(
     store,
     (state) => state.context.data.attributeId
   );
+
   const entityType = useSelector(
     store,
     (state) => state.context.data.entityType
@@ -121,10 +124,12 @@ function CustomAttributeEditFormFields({
 }) {
   const collections = useDashboardCollections();
   const store = useCustomAttributeEditDialogContext();
+
   const attributeId = useSelector(
     store,
     (state) => state.context.data.attributeId
   );
+
   const entityType = useSelector(
     store,
     (state) => state.context.data.entityType

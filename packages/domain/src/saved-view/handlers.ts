@@ -33,11 +33,13 @@ import type {
 const currentMemberId = (session: Session, organizationId: string) =>
   Effect.gen(function* () {
     const membership = Policy.getMembership(session, organizationId);
+
     if (membership === undefined) {
       return yield* new Policy.PolicyDeniedError({
         reason: "Not a member of this workspace",
       });
     }
+
     return membership.membershipId;
   });
 
@@ -62,6 +64,7 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const memberId = yield* currentMemberId(session, organizationId);
+
       return yield* repository.list({ boardId, memberId, organizationId });
     }).pipe(
       Policy.withPolicy(Policy.hasMembership(organizationId)),
@@ -108,6 +111,7 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const memberId = yield* currentMemberId(session, args.organizationId);
+
       // Ownership is checked by the predicate below rather than by the update
       // statement's row count: an update matching zero rows would otherwise
       // report success for a view that belongs to somebody else.
@@ -116,15 +120,18 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
         memberId,
         organizationId: args.organizationId,
       });
+
       if (existing === undefined) {
         return yield* new NotFoundError({ message: "Saved view not found" });
       }
+
       const update = {
         description: normalizeDescription(args.description),
         id: args.id,
         memberId,
         organizationId: args.organizationId,
       };
+
       // Every field except the description is omitted when the caller did not
       // send it. The repository leaves those columns out of the statement, so
       // a value written after the ownership read above is not replaced by this
@@ -133,6 +140,7 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
         args.isPrivate === undefined
           ? update
           : { ...update, isPrivate: args.isPrivate };
+
       const withName =
         args.name === undefined
           ? withVisibility
@@ -152,14 +160,17 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const memberId = yield* currentMemberId(session, args.organizationId);
+
       const existing = yield* repository.findOwned({
         id: args.id,
         memberId,
         organizationId: args.organizationId,
       });
+
       if (existing === undefined) {
         return yield* new NotFoundError({ message: "Saved view not found" });
       }
+
       yield* repository.remove({
         id: args.id,
         memberId,
@@ -183,11 +194,13 @@ export const SavedViewRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const memberId = yield* currentMemberId(session, args.organizationId);
+
       const existing = yield* repository.listOwned({
         boardId: args.boardId,
         memberId,
         organizationId: args.organizationId,
       });
+
       const existingIds = new Set(existing.map((view) => view.id));
       const orderedIds = new Set(args.orderedIds);
 

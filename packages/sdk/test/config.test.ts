@@ -55,11 +55,13 @@ describe("normalizeWidgetConfig", () => {
     "reports INVALID_CONFIG instead of a coercion error for Symbol-valued options %#",
     (options) => {
       let caught: unknown;
+
       try {
         normalizeWidgetConfig(options);
       } catch (error) {
         caught = error;
       }
+
       expect(caught).toBeInstanceOf(EmbedError);
       expect(caught).toMatchObject({ code: "INVALID_CONFIG" });
     }

@@ -36,9 +36,11 @@ export function BanAuthorDialog() {
   const open = useSelector(store, (state) => state.context.open);
   const data = useSelector(store, (state) => state.context.data);
   const { userBanActions } = usePostCollectionData();
+
   const {
     collections: { commentCollection, postCollection },
   } = usePostCollections();
+
   const [deleteContent, setDeleteContent] = useState(false);
   const [reason, setReason] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -51,12 +53,14 @@ export function BanAuthorDialog() {
 
   const ban = async () => {
     setIsPending(true);
+
     try {
       const result = await userBanActions.ban({
         deleteContent,
         target: data.target,
         ...(reason.trim() === "" ? undefined : { reason: reason.trim() }),
       });
+
       close();
       setDeleteContent(false);
       setReason("");
@@ -88,12 +92,14 @@ export function BanAuthorDialog() {
         if (isPending) {
           return;
         }
+
         // A dismissed dialog must not carry the delete choice, or a note
         // written for one comment, into the next one it is opened for.
         if (!nextOpen) {
           setDeleteContent(false);
           setReason("");
         }
+
         store.send({ type: "setOpen", open: nextOpen });
       }}
       open={open}
@@ -169,5 +175,6 @@ const describeDeletedContent = (result: {
           result.deletedComments === 1 ? "comment" : "comments"
         }`,
   ].filter((part): part is string => part !== null);
+
   return parts.join(" and ");
 };

@@ -133,6 +133,7 @@ describe("buildPlanComplianceView", () => {
     const [members] = view.sections;
     const ownerRow = members?.rows.find((row) => row.label === "Ada");
     const adminRow = members?.rows.find((row) => row.label === "Grace");
+
     const invitationRow = members?.rows.find(
       (row) => row.label === "linus@example.com"
     );

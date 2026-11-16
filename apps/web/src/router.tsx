@@ -25,6 +25,7 @@ import { routeTree } from "./routeTree.gen";
 // before hydration, so a failed first render is captured and the first route
 // change is traced. On the server these are no-ops.
 startWebErrorReporting();
+
 startWebTelemetry();
 
 /**
@@ -37,6 +38,7 @@ const getRootDomain = createIsomorphicFn()
     const runtimeWindow = window as Window & {
       global?: { __ENV?: { APP_ROOT_DOMAIN?: string } };
     };
+
     return runtimeWindow.global?.__ENV?.APP_ROOT_DOMAIN ?? "";
   })
   .server(() => process.env.APP_ROOT_DOMAIN ?? "");

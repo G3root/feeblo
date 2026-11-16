@@ -21,6 +21,7 @@ describe("MembershipRpcHandlers", () => {
     organizationId: string;
     userId: string;
   };
+
   const makeSession = (
     fixture: Fixture,
     role: Session["memberships"][number]["role"] | null = "owner"
@@ -43,6 +44,7 @@ describe("MembershipRpcHandlers", () => {
         ]
       : [],
   });
+
   const makeFixture = () =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -68,8 +70,10 @@ describe("MembershipRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
+
   const addAdmin = (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -87,20 +91,25 @@ describe("MembershipRpcHandlers", () => {
         role: "admin",
         createdAt: yield* DateTime.nowAsDate,
       });
+
       return memberId;
     });
+
   const Repositories = Layer.mergeAll(
     AuditLogRecorder.layer,
     MembershipRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = MembershipPolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -113,9 +122,11 @@ describe("MembershipRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* MembershipRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const memberships = yield* handlers
           .ListMemberships()
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(memberships).toMatchObject([
           { id: fixture.membershipId, organizationId: fixture.organizationId },
         ]);
@@ -125,6 +136,7 @@ describe("MembershipRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* MembershipRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListOrganizationMembers({ organizationId: fixture.organizationId })
@@ -132,6 +144,7 @@ describe("MembershipRpcHandlers", () => {
               Effect.provideService(CurrentSession, makeSession(fixture, null))
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -333,6 +346,7 @@ describe("MembershipRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(removeError._tag).toBe("PolicyDenied");
 
         const demoteError = yield* Effect.flip(
@@ -344,12 +358,14 @@ describe("MembershipRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(demoteError._tag).toBe("PolicyDenied");
 
         const [otherOwner] = yield* db
           .select({ role: schema.memberTable.role })
           .from(schema.memberTable)
           .where(eq(schema.memberTable.id, otherOwnerMemberId));
+
         expect(otherOwner?.role).toBe("owner");
       })
     );
@@ -472,6 +488,7 @@ describe("MembershipRpcHandlers", () => {
           .select({ id: schema.memberTable.id })
           .from(schema.memberTable)
           .where(eq(schema.memberTable.id, memberId));
+
         expect(remaining).toHaveLength(0);
       })
     );
@@ -512,6 +529,7 @@ describe("MembershipRpcHandlers", () => {
           .select({ id: schema.memberTable.id })
           .from(schema.memberTable)
           .where(eq(schema.memberTable.id, memberId));
+
         expect(remaining).toHaveLength(0);
       })
     );
@@ -673,6 +691,7 @@ describe("MembershipRpcHandlers", () => {
             .select()
             .from(schema.invitationTable)
             .where(eq(schema.invitationTable.id, invitationId));
+
           expect(invitation?.status).toBe("pending");
 
           const rows = yield* db
@@ -681,6 +700,7 @@ describe("MembershipRpcHandlers", () => {
             .where(
               eq(schema.auditLogTable.organizationId, mine.organizationId)
             );
+
           expect(rows).toHaveLength(0);
         }).pipe(Effect.provideService(AuditLogEnabled, true))
     );

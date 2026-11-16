@@ -152,6 +152,7 @@ describe("SavedViewRpcHandlers", () => {
             organizationId: f.organizationId,
           })
         );
+
         const bobViews = yield* as(
           f.bob,
           handlers.ListSavedViews({
@@ -198,6 +199,7 @@ describe("SavedViewRpcHandlers", () => {
               organizationId: f.organizationId,
             })
           );
+
           const bobViews = yield* as(
             f.bob,
             handlers.ListSavedViews({
@@ -241,6 +243,7 @@ describe("SavedViewRpcHandlers", () => {
             organizationId: f.organizationId,
           })
         );
+
         const feedbackViews = yield* as(
           f.alice,
           handlers.ListSavedViews({
@@ -364,6 +367,7 @@ describe("SavedViewRpcHandlers", () => {
         // write must not put any of those stale values back.
         const read = yield* Deferred.make<void>();
         const resume = yield* Deferred.make<void>();
+
         const gatedHandlers = yield* SavedViewRpcHandlersEffect.pipe(
           Effect.provideService(
             SavedViewRepository,
@@ -526,6 +530,7 @@ describe("SavedViewRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* SavedViewRpcHandlersEffect;
         const f = yield* fixture();
+
         const list = () =>
           as(
             f.alice,
@@ -620,6 +625,7 @@ describe("SavedViewRpcHandlers", () => {
             organizationId: f.organizationId,
           })
         ).pipe(Effect.flip);
+
         // An id from another member's surface is not the caller's to order.
         const foreign = yield* as(
           f.bob,
@@ -665,6 +671,7 @@ describe("SavedViewRpcHandlers", () => {
             query: emptyBoardQuery,
           })
         ).pipe(Effect.flip);
+
         const deleteError = yield* as(
           f.bob,
           handlers.DeleteSavedView({ id, organizationId: f.organizationId })
@@ -681,6 +688,7 @@ describe("SavedViewRpcHandlers", () => {
             organizationId: f.organizationId,
           })
         );
+
         expect(aliceViews.map((view) => view.name)).toEqual(["Mine"]);
       })
     );

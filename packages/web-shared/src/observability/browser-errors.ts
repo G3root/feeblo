@@ -37,6 +37,7 @@ const v8EvalOrigin = /^eval at [^(]*\((.*)\)(?:, [^()]*)?$/;
 
 const evalOrigin = (location: string): string => {
   const match = v8EvalOrigin.exec(location);
+
   return match === null ? location : evalOrigin(match[1] ?? "");
 };
 
@@ -62,15 +63,21 @@ const bareFrame = /^[a-z][\w+.-]*:\S*$/i;
  */
 const frameLocations = (stack: string): ReadonlyArray<string> => {
   const lines = stack.split("\n");
+
   const v8 = lines.flatMap((line) => {
     const match = v8Frame.exec(line);
+
     return match === null ? [] : [evalOrigin(match[1] ?? match[2] ?? "")];
   });
+
   if (v8.length > 0) return v8;
+
   return lines.flatMap((line) => {
     const frame = line.trim();
+
     if (bareFrame.test(frame)) return [frame];
     const match = namedFrame.exec(frame);
+
     return match === null ? [] : [match[2] ?? ""];
   });
 };
@@ -96,7 +103,9 @@ export const firstPartyFailure = <T>(value: T, scripts: string): boolean => {
   if (!(value instanceof Error)) return false;
   const locations = isString(value.stack) ? frameLocations(value.stack) : [];
   const thrower = locations.find((location) => !engineLocation(location));
+
   if (thrower === undefined) return true;
+
   return thrower.startsWith(scripts);
 };
 

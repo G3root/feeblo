@@ -27,6 +27,7 @@ describe("verifyRequestSignature", () => {
   it.effect("rejects a missing header", () =>
     Effect.gen(function* () {
       let verified = false;
+
       const failure = yield* Effect.flip(
         verifyRequestSignature({
           maxAgeMs: 60_000,
@@ -38,6 +39,7 @@ describe("verifyRequestSignature", () => {
             }),
         })
       );
+
       expect(failure.reason).toBe("Request signature headers are missing");
       expect(verified).toBe(false);
     })
@@ -47,6 +49,7 @@ describe("verifyRequestSignature", () => {
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
       const stale = String(Math.floor((now - 120_000) / 1000));
+
       const failure = yield* Effect.flip(
         verifyRequestSignature({
           maxAgeMs: 60_000,
@@ -56,6 +59,7 @@ describe("verifyRequestSignature", () => {
           verify: () => Effect.void,
         })
       );
+
       expect(failure.reason).toBe("Request timestamp is stale");
     })
   );
@@ -70,6 +74,7 @@ describe("verifyRequestSignature", () => {
           verify: () => Effect.void,
         })
       );
+
       expect(failure.reason).toBe("Request timestamp is invalid");
     })
   );
@@ -77,6 +82,7 @@ describe("verifyRequestSignature", () => {
   it.effect("surfaces the provider check failure", () =>
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
+
       const failure = yield* Effect.flip(
         verifyRequestSignature({
           maxAgeMs: 60_000,
@@ -91,6 +97,7 @@ describe("verifyRequestSignature", () => {
             ),
         })
       );
+
       expect(failure.reason).toBe("cryptographic check failed");
     })
   );

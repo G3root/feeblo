@@ -98,6 +98,7 @@ describe("email delivery state", () => {
             slug: organizationId,
             createdAt: yield* DateTime.nowAsDate,
           });
+
           const intent = yield* repository.recordIntent({
             aggregateId: "pst_delivery",
             aggregateType: "post",
@@ -108,8 +109,10 @@ describe("email delivery state", () => {
             payload: { kind: "submission.created", postId: "pst_delivery" },
             scheduledAt: yield* DateTime.nowAsDate,
           });
+
           if (intent._tag !== "Inserted") {
             expect(intent).toEqual({ _tag: "Inserted" });
+
             return;
           }
 
@@ -120,6 +123,7 @@ describe("email delivery state", () => {
             templatePayload: { postId: "pst_delivery" },
             templateVersion: 1,
           });
+
           const duplicate = yield* repository.createDelivery({
             outboxId: intent.intent.id,
             recipientEmail: "admin@example.com",
@@ -130,10 +134,13 @@ describe("email delivery state", () => {
 
           expect(created._tag).toBe("Inserted");
           expect(duplicate).toEqual({ _tag: "Duplicate" });
+
           if (created._tag !== "Inserted") {
             expect(created).toEqual({ _tag: "Inserted" });
+
             return;
           }
+
           expect(created.delivery.recipientEmail).toBe("admin@example.com");
           expect(created.delivery.messageId).toMatch(
             deterministicMessageIdPattern
@@ -171,6 +178,7 @@ describe("email delivery state", () => {
           slug: organizationId,
           createdAt: yield* DateTime.nowAsDate,
         });
+
         const intent = yield* repository.recordIntent({
           aggregateId: "pst_stale",
           aggregateType: "post",
@@ -181,10 +189,13 @@ describe("email delivery state", () => {
           payload: { kind: "submission.created", postId: "pst_stale" },
           scheduledAt: yield* DateTime.nowAsDate,
         });
+
         if (intent._tag !== "Inserted") {
           expect(intent).toEqual({ _tag: "Inserted" });
+
           return;
         }
+
         const created = yield* repository.createDelivery({
           outboxId: intent.intent.id,
           recipientEmail: "stale@example.com",
@@ -192,8 +203,10 @@ describe("email delivery state", () => {
           templatePayload: { postId: "pst_stale" },
           templateVersion: 1,
         });
+
         if (created._tag !== "Inserted") {
           expect(created).toEqual({ _tag: "Inserted" });
+
           return;
         }
 
@@ -204,12 +217,14 @@ describe("email delivery state", () => {
           nextAttemptAt: yield* DateTime.nowAsDate,
           lastError: { tag: "EmailDeliveryActivityError" },
         });
+
         expect(preClaimDeferred).toBe(true);
 
         const claimedVersion = yield* repository.claimDeliveryForSending({
           id: created.delivery.id,
           now: yield* DateTime.nowAsDate,
         });
+
         if (claimedVersion === undefined) {
           return yield* Effect.die("Expected the claim to win");
         }
@@ -222,10 +237,13 @@ describe("email delivery state", () => {
           nextAttemptAt: yield* DateTime.nowAsDate,
           lastError: { tag: "EmailDeliveryActivityError" },
         });
+
         expect(staleDeferred).toBe(false);
+
         const afterStale = yield* repository.findDeliveryById(
           created.delivery.id
         );
+
         expect(afterStale?.state).toBe("sending");
         expect(afterStale?.transitionVersion).toBe(claimedVersion);
 
@@ -236,10 +254,13 @@ describe("email delivery state", () => {
           nextAttemptAt: yield* DateTime.nowAsDate,
           lastError: { tag: "EmailDeliveryActivityError" },
         });
+
         expect(claimedDeferred).toBe(true);
+
         const afterClaimed = yield* repository.findDeliveryById(
           created.delivery.id
         );
+
         expect(afterClaimed?.state).toBe("deferred");
         expect(afterClaimed?.transitionVersion).toBe(claimedVersion + 1);
       })
@@ -257,6 +278,7 @@ describe("email delivery state", () => {
           slug: organizationId,
           createdAt: yield* DateTime.nowAsDate,
         });
+
         const intent = yield* repository.recordIntent({
           aggregateId: "pst_terminal",
           aggregateType: "post",
@@ -267,10 +289,13 @@ describe("email delivery state", () => {
           payload: { kind: "submission.created", postId: "pst_terminal" },
           scheduledAt: yield* DateTime.nowAsDate,
         });
+
         if (intent._tag !== "Inserted") {
           expect(intent).toEqual({ _tag: "Inserted" });
+
           return;
         }
+
         const delivery = yield* repository.createDelivery({
           outboxId: intent.intent.id,
           recipientEmail: "terminal@example.com",
@@ -278,8 +303,10 @@ describe("email delivery state", () => {
           templatePayload: { postId: "pst_terminal" },
           templateVersion: 1,
         });
+
         if (delivery._tag !== "Inserted") {
           expect(delivery).toEqual({ _tag: "Inserted" });
+
           return;
         }
 
@@ -287,14 +314,17 @@ describe("email delivery state", () => {
           id: delivery.delivery.id,
           now: yield* DateTime.nowAsDate,
         });
+
         const firstDelivery = yield* repository.markDeliveryDelivered({
           id: delivery.delivery.id,
           deliveredAt: yield* DateTime.nowAsDate,
         });
+
         const repeatedDelivery = yield* repository.markDeliveryDelivered({
           id: delivery.delivery.id,
           deliveredAt: yield* DateTime.nowAsDate,
         });
+
         const replayClaim = yield* repository.claimDeliveryForSending({
           id: delivery.delivery.id,
           now: yield* DateTime.nowAsDate,

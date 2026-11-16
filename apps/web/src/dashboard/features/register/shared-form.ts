@@ -8,6 +8,7 @@ export const registerFormSchema = z
   })
   .superRefine((value, ctx) => {
     const slug = toWorkspaceSlug(value.workspaceName);
+
     if (slug.length < 4) {
       ctx.addIssue({
         code: "custom",

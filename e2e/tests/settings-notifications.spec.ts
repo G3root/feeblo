@@ -24,7 +24,9 @@ test("notification preferences toggle and persist", async ({ page }) => {
   const pause = page.getByRole("switch", {
     name: "Pause all notification emails",
   });
+
   const newFeedback = page.getByRole("switch", { name: "New feedback" });
+
   const statusChanges = page.getByRole("switch", {
     name: "Post status changes",
   });
@@ -48,9 +50,11 @@ test("notification preferences toggle and persist", async ({ page }) => {
 
   // The changelog tab holds its own toggle.
   await page.getByRole("tab", { name: "Changelog" }).click();
+
   const changelog = page.getByRole("switch", {
     name: "Changelog published",
   });
+
   await expect(changelog).toBeChecked();
 
   // The workspace pause disables the categories but keeps their state.

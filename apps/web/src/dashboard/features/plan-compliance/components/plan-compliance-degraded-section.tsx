@@ -72,6 +72,7 @@ export function PlanComplianceDegradedSection({
 }) {
   const organizationId = useOrganizationId();
   const [open, setOpen] = useState(false);
+
   const items = DEGRADED_ITEMS.filter((item) =>
     degraded.includes(item.capability)
   );

@@ -56,6 +56,7 @@ export function BoardSurface({
     myFeedbackView !== undefined && memberId !== undefined
       ? { kind: myFeedbackView, memberId }
       : undefined;
+
   const isAwaitingMember =
     myFeedbackView !== undefined && myFeedbackScope === undefined;
 
@@ -127,12 +128,14 @@ function BoardViewSync({
   initialView: BoardView;
 }) {
   const store = useBoardStore();
+
   const signature = JSON.stringify([
     initialView.id,
     initialView.filters,
     initialGrouping ?? null,
     initialOrdering ?? null,
   ]);
+
   const appliedSignature = useRef(signature);
 
   useEffect(() => {

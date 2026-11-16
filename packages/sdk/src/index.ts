@@ -10,8 +10,11 @@ import { VERSION } from "./version";
 // ---------------------------------------------------------------------------
 
 export type { EmbedErrorDetails } from "./errors";
+
 export { EmbedError } from "./errors";
+
 export { init } from "./instance";
+
 export type {
   EmbedOptions,
   FeebloEventDetail,
@@ -31,7 +34,9 @@ export type {
   WidgetModule,
   WidgetPlacement,
 } from "./types";
+
 export { organizationId } from "./types";
+
 export { VERSION } from "./version";
 
 // ---------------------------------------------------------------------------
@@ -60,22 +65,27 @@ export const Feeblo = {
   organizationId,
   identify(user: UserIdentity): Feeblo {
     getCurrentEmbed()?.identify(user);
+
     return Feeblo;
   },
   open(): Feeblo {
     getCurrentEmbed()?.open();
+
     return Feeblo;
   },
   openModule(module: WidgetModule): Feeblo {
     getCurrentEmbed()?.openModule(module);
+
     return Feeblo;
   },
   close(): Feeblo {
     getCurrentEmbed()?.close();
+
     return Feeblo;
   },
   metadata(patch: Record<string, string | null>): Feeblo {
     getCurrentEmbed()?.metadata(patch);
+
     return Feeblo;
   },
   isOpen(): boolean {
@@ -83,6 +93,7 @@ export const Feeblo = {
   },
   setBoard(board: string): Feeblo {
     getCurrentEmbed()?.setBoard(board);
+
     return Feeblo;
   },
   destroy(): void {

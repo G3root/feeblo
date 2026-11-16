@@ -147,7 +147,9 @@ const failureMessage = <Failure>(error: Failure): string => {
   if (Schema.is(TaggedFailure)(error)) {
     return `${error._tag}: ${error.message}`;
   }
+
   if (Schema.is(MessageFailure)(error)) return error.message;
+
   return "The call failed.";
 };
 
@@ -168,6 +170,7 @@ Effect.Effect<unknown, unknown, PublicApiDependencies | PublicApiCaller>;
 
 const buildPublicApiCodeModeHandlers = () =>
   Effect.gen(function* () {
+    // oxlint-disable-next-line anti-slop-effect/prefer-yield-service -- the handler built here is stored and invoked later, outside the effect that built it, so it cannot inherit this environment; the captured context is what supplies the request-scoped services it declares
     const context = yield* Effect.context<PublicApiDependencies>();
     const approval = yield* Approval;
     const sandbox = yield* Sandbox;
@@ -175,6 +178,7 @@ const buildPublicApiCodeModeHandlers = () =>
     // Built once, when the toolkit's layer is, so a request pays only for the
     // page it reads.
     const catalog = makeOperationCatalog();
+
     const operations = new Map<string, (typeof PublicApiOperations)[number]>(
       PublicApiOperations.map((operation) => [operation.name, operation])
     );
@@ -192,6 +196,7 @@ const buildPublicApiCodeModeHandlers = () =>
       controls: SandboxCallControls
     ) {
       const operation = operations.get(call.name);
+
       if (operation === undefined) {
         return yield* toolFailure(
           `Unknown tool "${call.name}". Call search first and use one of the names it returns.`
@@ -275,6 +280,7 @@ const buildPublicApiCodeModeHandlers = () =>
       // context, so the request-scoped services the call needs — the key
       // middleware's caller and, for the approval gate, the MCP client — are
       // captured here and supplied to each call rather than inherited.
+      // oxlint-disable-next-line anti-slop-effect/prefer-yield-service -- the handler built here is stored and invoked later, outside the effect that built it, so it cannot inherit this environment; the captured context is what supplies the request-scoped services it declares
       const request = yield* Effect.context<
         PublicApiCaller | ApprovalEnvironment
       >();
@@ -335,6 +341,7 @@ export const makePublicApiCodeModeRoute = (
       const version = yield* Config.String("APP_RELEASE").pipe(
         Config.withDefault("dev")
       );
+
       const approvalMode =
         configuredApproval ??
         (yield* Config.Literals(APPROVAL_MODES, "MCP_APPROVAL").pipe(

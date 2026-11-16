@@ -93,9 +93,11 @@ const ETA_PATTERN = /^(\d{4})-Q([1-4])$/;
 
 function formatEta(value: string | null) {
   const match = value?.match(ETA_PATTERN);
+
   if (!match) {
     return null;
   }
+
   return `Q${match[2]} ${match[1]}`;
 }
 
@@ -164,6 +166,7 @@ function getActivityIcon(
 ): ActivityIcon {
   if (activity.kind === "STATUS_CHANGED" && activity.nextValue) {
     const statusType = statusTypes.get(activity.nextValue);
+
     if (statusType) {
       return {
         icon: BoardIconMap[statusType] ?? StatusIcon,
@@ -213,6 +216,7 @@ export function PostActivityList({
   // Staff subjects record no contact id, so their name comes from the member
   // row the attribution preserved.
   const { data: members } = useOrgMembers(organizationId);
+
   const { data: posts } = useLiveQuery({
     queryKey: [
       "post-activity-posts",
@@ -235,39 +239,49 @@ export function PostActivityList({
       ),
     [statuses]
   );
+
   const statusTypes = useMemo(
     () => new Map(statuses.map((status) => [status.id, status.type])),
     [statuses]
   );
+
   const boardNames = useMemo(
     () => new Map(boards.map((board) => [board.id, board.name])),
     [boards]
   );
+
   const tagNames = useMemo(
     () => new Map(tags.map((tag) => [tag.id, tag.name])),
     [tags]
   );
+
   const postNames = useMemo(
     () => new Map(posts.map((post) => [post.id, post.title])),
     [posts]
   );
+
   const contactsById = useMemo(
     () => new Map(contacts.map((contact) => [contact.id, contact])),
     [contacts]
   );
+
   const contactsByUserId = useMemo(() => {
     const map = new Map<string, TContact>();
+
     for (const contact of contacts) {
       if (contact.userId) {
         map.set(contact.userId, contact);
       }
     }
+
     return map;
   }, [contacts]);
+
   const membersByUserId = useMemo(
     () => new Map(members.map((member) => [member.userId, member])),
     [members]
   );
+
   // `ASSIGNEE_CHANGED` records the `member` row id, not the user id, so the
   // timeline needs its own lookup rather than the on-behalf one above.
   const memberNames = useMemo(
@@ -299,6 +313,7 @@ export function PostActivityList({
         const actorName = activity.actor.name ?? "Someone";
         const { icon, color } = getActivityIcon(activity, statusTypes);
         const onBehalfMetadata = getOnBehalfMetadata(activity);
+
         const onBehalfSubject = onBehalfMetadata
           ? resolveOnBehalfSubject(
               onBehalfMetadata,
@@ -307,6 +322,7 @@ export function PostActivityList({
               membersByUserId
             )
           : null;
+
         return (
           <ActivityTimelineItem
             icon={

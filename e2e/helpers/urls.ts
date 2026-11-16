@@ -19,11 +19,13 @@ export const apiUrl = (): string =>
 export function publicBoardUrl(workspaceName: string): string {
   const subdomain = workspaceName.toLowerCase().replaceAll(" ", "-");
   const url = new URL(webUrl());
+
   return `${url.protocol}//${subdomain}.${url.hostname}${url.port ? `:${url.port}` : ""}`;
 }
 
 /** A public-board host that no workspace owns; the site lookup fails there. */
 export function unknownPublicBoardUrl(): string {
   const url = new URL(webUrl());
+
   return `${url.protocol}//does-not-exist.${url.hostname}${url.port ? `:${url.port}` : ""}`;
 }

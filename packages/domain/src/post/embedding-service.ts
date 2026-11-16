@@ -23,6 +23,7 @@ export interface PostEmbedding {
 }
 
 export const DEFAULT_POST_EMBEDDING_MODEL = "text-embedding-3-small";
+
 export const DEFAULT_POST_EMBEDDING_DIMENSIONS = defaultPostEmbeddingDimensions;
 
 export class InvalidPostEmbeddingDimensionsError extends Data.TaggedError(
@@ -43,12 +44,15 @@ const make = Effect.gen(function* () {
   const apiKey = yield* Config.Redacted("EMBEDDING_API_KEY").pipe(
     Config.option
   );
+
   const model = yield* Config.String("EMBEDDING_MODEL").pipe(
     Config.withDefault(DEFAULT_POST_EMBEDDING_MODEL)
   );
+
   const dimensions = yield* Config.Number("EMBEDDING_DIMENSIONS").pipe(
     Config.withDefault(defaultPostEmbeddingDimensions)
   );
+
   if (
     !Number.isSafeInteger(dimensions) ||
     dimensions < 1 ||
@@ -59,17 +63,21 @@ const make = Effect.gen(function* () {
       message: "EMBEDDING_DIMENSIONS must be an integer between 1 and 2000",
     });
   }
+
   if (dimensions !== defaultPostEmbeddingDimensions) {
     return yield* new InvalidPostEmbeddingConfigurationError({
       dimensions,
       message: `EMBEDDING_DIMENSIONS (${dimensions}) must match the post embedding column dimension (${defaultPostEmbeddingDimensions})`,
     });
   }
+
   const apiUrl = yield* Config.String("EMBEDDING_API_URL").pipe(Config.option);
+
   const normalizedApiUrl = Option.filter(
     apiUrl,
     (value) => value.trim().length > 0
   );
+
   const timeout = yield* Config.Duration("EMBEDDING_TIMEOUT").pipe(
     Config.withDefault(Duration.seconds(10))
   );
@@ -90,6 +98,7 @@ const make = Effect.gen(function* () {
         apiUrl: normalizedApiUrl.value.trim(),
       }),
     }).pipe(Layer.provide(FetchHttpClient.layer));
+
     const modelLayer = OpenAiEmbeddingModel.layer({
       model,
       config: { dimensions },
@@ -102,9 +111,11 @@ const make = Effect.gen(function* () {
       // eslint-disable-next-line effecttsgo/strict-effect-provide -- one-shot layer inside the service build
       Effect.provide(modelLayer)
     );
+
     const response = yield* embeddingModel
       .embed(input)
       .pipe(Effect.timeout(timeout));
+
     if (response.vector.length !== dimensions) {
       return yield* new InvalidPostEmbeddingDimensionsError({
         actual: response.vector.length,

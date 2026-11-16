@@ -88,6 +88,7 @@ export const reduceSuggestionSearch = (
           ? state
           : { suggestions: [], status: "idle" };
       }
+
       return { suggestions: state.suggestions, status: "debouncing" };
     case "DEBOUNCED":
       return state.status === "debouncing"

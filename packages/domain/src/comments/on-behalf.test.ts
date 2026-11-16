@@ -100,6 +100,7 @@ describe("CommentRpcHandlers on-behalf", () => {
         organizationId,
       });
       const postId = yield* PostId.generate;
+
       const postSlug = yield* repository.create({
         id: postId,
         boardId,
@@ -160,17 +161,20 @@ describe("CommentRpcHandlers on-behalf", () => {
   const getComment = (commentId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [comment] = yield* db
         .select()
         .from(schema.commentTable)
         .where(eq(schema.commentTable.id, commentId))
         .limit(1);
+
       return comment;
     });
 
   const getActivity = (postId: string, commentId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [activity] = yield* db
         .select()
         .from(schema.postActivityTable)
@@ -182,6 +186,7 @@ describe("CommentRpcHandlers on-behalf", () => {
           )
         )
         .limit(1);
+
       return activity;
     });
 
@@ -263,11 +268,13 @@ describe("CommentRpcHandlers on-behalf", () => {
             // the email-only subject and linked to the resolved contact.
             const comment = yield* getComment(commentId);
             expect(comment?.memberId).toBeNull();
+
             const [shadow] = yield* db
               .select()
               .from(schema.userTable)
               .where(eq(schema.userTable.id, comment!.userId))
               .limit(1);
+
             expect(shadow?.email).toMatch(/^behalf-[0-9a-f]+@feeblo\.com$/);
             expect(shadow?.emailVerified).toBe(false);
 
@@ -284,6 +291,7 @@ describe("CommentRpcHandlers on-behalf", () => {
                 )
               )
               .limit(1);
+
             expect(contact).toMatchObject({
               name: "Jane Doe",
               userId: shadow?.id,
@@ -355,6 +363,7 @@ describe("CommentRpcHandlers on-behalf", () => {
               .where(
                 eq(schema.contactTable.organizationId, fixture.organizationId)
               );
+
             expect(contacts).toHaveLength(0);
 
             const activity = yield* getActivity(fixture.postId, commentId);
@@ -393,12 +402,14 @@ describe("CommentRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("PolicyDenied");
 
           const comments = yield* db
             .select({ id: schema.commentTable.id })
             .from(schema.commentTable)
             .where(eq(schema.commentTable.id, commentId));
+
           expect(comments).toEqual([]);
         })
       );
@@ -406,6 +417,7 @@ describe("CommentRpcHandlers on-behalf", () => {
       it.effect("allows owners and admins by inheritance", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
+
           for (const role of ["owner", "admin"] as const) {
             const fixture = yield* makeFixture(role);
             const commentId = yield* CommentId.generate;
@@ -430,6 +442,7 @@ describe("CommentRpcHandlers on-behalf", () => {
       it.effect("leaves no-author creation untouched for every role", () =>
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
+
           for (const role of [
             "contributor",
             "manager",
@@ -486,11 +499,14 @@ describe("CommentRpcHandlers on-behalf", () => {
             .select({ id: schema.emailOutboxTable.id })
             .from(schema.emailOutboxTable)
             .where(eq(schema.emailOutboxTable.aggregateId, fixture.postId));
+
           expect(intents).toEqual([]);
+
           const subscriptions = yield* db
             .select({ id: schema.postSubscriptionTable.id })
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, fixture.postId));
+
           expect(subscriptions).toEqual([]);
         })
       );
@@ -538,6 +554,7 @@ describe("CommentRpcHandlers on-behalf", () => {
                 makeSession(fixture, "manager")
               )
             );
+
           expect(memberComments.map((row) => row.id)).toEqual([commentId]);
 
           const publicComments = yield* handlers
@@ -546,6 +563,7 @@ describe("CommentRpcHandlers on-behalf", () => {
               slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(publicComments).toEqual([]);
 
           const activity = yield* getActivity(fixture.postId, commentId);
@@ -575,12 +593,14 @@ describe("CommentRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("SubjectNotFoundError");
 
           const comments = yield* db
             .select({ id: schema.commentTable.id })
             .from(schema.commentTable)
             .where(eq(schema.commentTable.id, commentId));
+
           expect(comments).toEqual([]);
         })
       );
@@ -607,12 +627,14 @@ describe("CommentRpcHandlers on-behalf", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("BadRequestError");
 
           const comments = yield* db
             .select({ id: schema.commentTable.id })
             .from(schema.commentTable)
             .where(eq(schema.commentTable.id, commentId));
+
           expect(comments).toEqual([]);
         })
       );

@@ -40,6 +40,7 @@ export function createSuggestionSearch(
   const [state, setState] = createSignal<SuggestionSearchState>(
     initialSuggestionSearchState
   );
+
   let controller: AbortController | undefined;
   let timer: number | undefined;
 
@@ -52,6 +53,7 @@ export function createSuggestionSearch(
       window.clearTimeout(timer);
       timer = undefined;
     }
+
     controller?.abort();
     controller = undefined;
   };
@@ -62,9 +64,11 @@ export function createSuggestionSearch(
     // request instead of one request per keystroke.
     stop();
     send({ type: "INPUT", query });
+
     if (query === null) {
       return;
     }
+
     timer = window.setTimeout(() => {
       timer = undefined;
       const request = new AbortController();
@@ -79,12 +83,14 @@ export function createSuggestionSearch(
           if (request.signal.aborted) {
             return;
           }
+
           send({ type: "LOADED", suggestions });
         })
         .catch(() => {
           if (request.signal.aborted) {
             return;
           }
+
           send({ type: "FAILED" });
         });
     }, SUGGESTIONS_DEBOUNCE_MS);

@@ -69,6 +69,7 @@ const makeCommentPolicy = Effect.gen(function* () {
       if (!args.parentCommentId) {
         return Effect.succeed(true);
       }
+
       return repository
         .findById({
           id: args.parentCommentId,

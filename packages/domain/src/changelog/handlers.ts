@@ -73,11 +73,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     GetChangelogPublic: (args: TChangelogGet) =>
       Effect.gen(function* () {
         const entry = yield* repository.findPublishedBySlug(args);
+
         if (entry === undefined) {
           return yield* new ChangelogNotFoundError({
             message: "Changelog entry not found",
           });
         }
+
         // Embedded so the public detail page renders its "shipped" list from
         // this single response instead of syncing every post and changelog
         // link in the organization.
@@ -85,6 +87,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           changelogId: entry.id,
           organizationId: args.organizationId,
         });
+
         return { ...entry, posts };
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
@@ -101,6 +104,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
+
       return Effect.gen(function* () {
         // A live entry needs its publication date. The Public API has always
         // refused a publish without one; the dashboard relied on its publish
@@ -111,8 +115,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             message: "A published changelog entry needs a publication date.",
           });
         }
+
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
           userId: session.session.userId,
@@ -120,6 +126,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           assetIds: args.assetIds,
           coverImageUrl: args.coverImage,
         });
+
         const isMember = Policy.getMembership(session, args.organizationId);
 
         const outboxId = yield* transaction(
@@ -148,6 +155,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 status: args.status,
               },
             });
+
             const createdOutboxId = isPublishedChangelogStatus(args.status)
               ? yield* publication.recordPublishedIntent({
                   actorUserId: session.session.userId,
@@ -155,6 +163,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                   organizationId: args.organizationId,
                 })
               : undefined;
+
             if (isPublishedChangelogStatus(args.status)) {
               yield* publication.notifyPublished({
                 ...(isMember && { actorUserId: session.session.userId }),
@@ -164,6 +173,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 title: args.title,
               });
             }
+
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -173,6 +183,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               assetIds: args.assetIds,
               coverImageUrl: prepared.coverImage,
             });
+
             return createdOutboxId;
           })
         ).pipe(
@@ -181,6 +192,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           ),
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
+
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(changelogPolicy.canCreate(args.organizationId)),
@@ -232,15 +244,18 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
+
       return Effect.gen(function* () {
         if (publishesWithoutTimestamp(args)) {
           return yield* new BadRequestError({
             message: "A published changelog entry needs a publication date.",
           });
         }
+
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
         const membership = Policy.getMembership(session, args.organizationId);
+
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
           userId: session.session.userId,
@@ -255,6 +270,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               id: args.id,
               organizationId: args.organizationId,
             });
+
             // The pre-transaction policy saw the row exist, so a `undefined`
             // here means it was deleted while this request was in flight.
             // Failing now (rather than letting the no-op update "succeed")
@@ -266,17 +282,20 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 message: "Changelog entry not found",
               });
             }
+
             const updated = yield* repository.update({
               ...args,
               content: prepared.content,
               coverImage: prepared.coverImage,
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
+
             if (updated === undefined) {
               return yield* new ChangelogNotFoundError({
                 message: "Changelog entry not found",
               });
             }
+
             // The update returns the row it wrote, not the one it replaced,
             // so the new values go in `metadata` rather than posing as a diff
             // with an empty `before`.
@@ -296,6 +315,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             // transition, not to the value: a save that leaves a live entry
             // live changes nothing and must not announce itself twice.
             const publishedNow = publishesNow(previousStatus, args.status);
+
             // A publish is its own audited event, recorded beside the update
             // that carried it; a save that leaves a live entry live is only an
             // update. `resourceId` is the same entry, so the reader can follow
@@ -310,6 +330,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 metadata: { title: args.title, slug: args.slug },
               });
             }
+
             const createdOutboxId = publishedNow
               ? yield* publication.recordPublishedIntent({
                   actorUserId: session.session.userId,
@@ -317,6 +338,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                   organizationId: args.organizationId,
                 })
               : undefined;
+
             if (publishedNow) {
               yield* publication.notifyPublished({
                 ...(membership && { actorUserId: session.session.userId }),
@@ -326,6 +348,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 title: args.title,
               });
             }
+
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -335,6 +358,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               assetIds: args.assetIds,
               coverImageUrl: prepared.coverImage,
             });
+
             return createdOutboxId;
           })
         ).pipe(
@@ -343,6 +367,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           ),
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
+
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(

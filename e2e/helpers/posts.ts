@@ -16,6 +16,7 @@ export async function fillEditor(
   const editor = (options.scope ?? page)
     .locator(".ProseMirror")
     .nth(options.index ?? 0);
+
   await expect(editor).toBeVisible();
 
   await expect(async () => {

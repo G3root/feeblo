@@ -46,6 +46,7 @@ await cp(databaseTemplateDirectory, databaseDirectory, {
   mode: constants.COPYFILE_FICLONE,
   recursive: true,
 });
+
 process.env.DATABASE_URL = `pglite:${databaseDirectory}`;
 
 afterAll(async () => {

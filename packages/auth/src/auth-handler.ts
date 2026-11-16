@@ -31,6 +31,7 @@ export const toAuthHandler = (
 
     verifyApiKey: async ({ body }) => {
       const result = await auth.api.verifyApiKey({ body: { key: body.key } });
+
       return result.valid && result.key
         ? { valid: true, key: result.key }
         : { valid: false, key: null };

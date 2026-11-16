@@ -9,6 +9,7 @@ import { cn } from "../../lib/utils";
  */
 export function Spinner(props: ComponentProps<"svg">) {
   const [local, others] = splitProps(props, ["class"]);
+
   return (
     <svg
       aria-label="Loading"

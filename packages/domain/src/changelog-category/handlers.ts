@@ -103,6 +103,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         yield* transaction(
           Effect.gen(function* () {
             const { updated } = yield* repository.update(args);
+
             // Another workspace's category, or one deleted since the page
             // loaded, matches nothing. The RPC answers 404 and the log stays
             // quiet, because nothing was updated.
@@ -111,6 +112,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
                 message: "Changelog category not found",
               });
             }
+
             // The update reports only that it matched, so the new values go in
             // `metadata` rather than posing as a diff with an empty `before`.
             yield* audit.record({
@@ -139,6 +141,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         yield* transaction(
           Effect.gen(function* () {
             const { deleted } = yield* repository.delete(args);
+
             // Same as the update: a delete that matched nothing is a 404, not
             // an entry about a category that still exists.
             if (!deleted) {
@@ -146,6 +149,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
                 message: "Changelog category not found",
               });
             }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -165,6 +169,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
         const categoryIds = [...new Set(args.categoryIds)];
+
         // Two independent checks against the same workspace, run together as
         // one round trip. The verdicts are collected rather than raced, so the
         // changelog is still the one reported when both inputs are foreign.
@@ -181,6 +186,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           ],
           { concurrency: "unbounded", mode: "result" }
         );
+
         yield* Effect.fromResult(changelogCheck);
         yield* Effect.fromResult(categoryCheck);
 
@@ -223,6 +229,7 @@ const validateChangelog = ({
 }) =>
   Effect.gen(function* () {
     const repository = yield* ChangelogCategoryRepository;
+
     const exists = yield* repository.hasChangelog({
       changelogId,
       organizationId,
@@ -244,6 +251,7 @@ const validateCategoryIds = ({
 }) =>
   Effect.gen(function* () {
     const repository = yield* ChangelogCategoryRepository;
+
     const count = yield* repository.countExistingCategories({
       organizationId,
       categoryIds,

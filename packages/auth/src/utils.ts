@@ -4,6 +4,7 @@ import { AuthConfig } from "./config";
 
 /** The characters that carry meaning in a `RegExp` source. */
 const regExpSyntaxPattern = /[.+?^${}()|[\]\\]/g;
+
 /** A `*` in an allow-list entry is a wildcard, as it is in `trustedOrigins`. */
 const wildcardPattern = /[*]/g;
 
@@ -34,6 +35,7 @@ const makeTrustedOrigins = Effect.fnUntraced(function* () {
     // controlled, so `*.<root>` is safe to trust (unlike the dev
     // `*.localhost:3001` convenience).
     const appProtocol = new URL(appUrl).protocol;
+
     return [appUrl, apiUrl, `${appProtocol}//*.${appRootDomain.split(":")[0]}`];
   }
 
@@ -100,6 +102,7 @@ const temporaryEmailDomains = [
 // Credit: https://github.com/lukevella/rallly/blob/main/apps/web/src/auth/helpers/temp-email-domains.ts
 export const isTemporaryEmail = (email: string): boolean => {
   const domain = email.split("@")[1]?.toLowerCase();
+
   if (!domain) {
     return false;
   }
@@ -129,8 +132,10 @@ export const isEmailBlocked = (
             .replaceAll(wildcardPattern, ".*")}$`,
           "i"
         );
+
         return regex.test(email);
       });
+
       if (!isAllowed) {
         return true;
       }

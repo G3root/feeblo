@@ -70,9 +70,11 @@ function SimilarPosts({
 
   useEffect(() => {
     const normalizedTitle = deferredTitle.trim();
+
     if (!suggestPosts || normalizedTitle.length < 3) {
       setPosts([]);
       setLoading(false);
+
       return;
     }
 
@@ -81,6 +83,7 @@ function SimilarPosts({
     const controller = new AbortController();
     let isCurrent = true;
     setLoading(true);
+
     const timer = window.setTimeout(() => {
       suggestPosts({
         ...(boardId && { boardId }),
@@ -104,6 +107,7 @@ function SimilarPosts({
           }
         });
     }, SUGGESTIONS_DEBOUNCE_MS);
+
     return () => {
       isCurrent = false;
       window.clearTimeout(timer);
@@ -131,6 +135,7 @@ function SimilarPosts({
       <div className="divide-y">
         {posts.map((post) => {
           const href = getPostHref?.(post);
+
           const body = (
             <>
               <span className="text-sm font-medium">{post.title}</span>
@@ -141,6 +146,7 @@ function SimilarPosts({
               ) : null}
             </>
           );
+
           return href ? (
             <a
               className="hover:bg-muted flex flex-col gap-0.5 px-3 py-2.5 transition-colors"
@@ -168,14 +174,17 @@ export interface PostCreateActionInput {
 
 export function PostCreateForm() {
   const store = usePostCreateDialogContext();
+
   const { collections, onAuthRequired, organizationId, persistPost } =
     usePostCollections();
+
   const {
     boardCollection,
     deleteEligibilityCollection,
     membersCollection,
     postCollection,
   } = collections;
+
   const { data: session } = useAuthState();
 
   // Mirrors the backend's PostPolicy gate for PostCreate.author; hidden
@@ -197,6 +206,7 @@ export function PostCreateForm() {
       if (!(membersCollection && organizationId && session?.user?.id)) {
         return undefined;
       }
+
       return q
         .from({ member: membersCollection })
         .where(({ member }) =>
@@ -215,21 +225,25 @@ export function PostCreateForm() {
       if (!organizationId) {
         return undefined;
       }
+
       return q
         .from({ board: boardCollection })
         .where(({ board }) => eq(board.organizationId, organizationId));
     },
   });
+
   const { data: postStatuses } = usePostStatuses();
 
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const explicitStatusId = store.get().context.data.statusId as
     | string
     | undefined;
+
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const explicitStatus = store.get().context.data.status as
     | BoardPostStatus
     | undefined;
+
   // The workspace's own default, not the first row and not a hardcoded type: a
   // quick-create from the board files into whichever status the workspace
   // marked as its default, which is where the widget and the Slack and Discord
@@ -274,6 +288,7 @@ export function PostCreateForm() {
         title: row.title,
         ...(author ? { author } : undefined),
       });
+
       // The RPC returns the collision-resolved slug actually persisted.
       // Reconcile the optimistic row before the mutation settles so links
       // and detail queries target the stored post.
@@ -282,15 +297,18 @@ export function PostCreateForm() {
           draft.slug = canonicalSlug;
         });
       }
+
       // Sync server writes before returning: the optimistic state is
       // dropped when the mutation settles, so refetch failures propagate
       // to the submit handler instead of being suppressed.
       await postCollection.utils.refetch();
+
       // A new own post is immediately deletable: refresh the hint set in the
       // background so submit doesn't wait on a second round trip for it.
       if (deleteEligibilityCollection) {
         refetchInBackground(deleteEligibilityCollection.utils.refetch());
       }
+
       return canonicalSlug;
     },
   });
@@ -309,6 +327,7 @@ export function PostCreateForm() {
     onSubmit: async ({ value }) => {
       if (!session) {
         onAuthRequired?.();
+
         return;
       }
 
@@ -322,12 +341,15 @@ export function PostCreateForm() {
         // finalization rides the editor chunk, already warm from the open
         // editor, so submit pays no extra load.
         const { finalizeEditorContent } = await import("@feeblo/ui/editor");
+
         const finalized = await finalizeEditorContent(
           value.content,
           assetOrganizationId,
           { scope: editorScope }
         );
+
         const { assetIds, content } = finalized;
+
         const selectedPostStatus = postStatuses.find(
           (postStatus) => postStatus.id === value.statusId
         );
@@ -335,17 +357,20 @@ export function PostCreateForm() {
         if (!selectedPostStatus) {
           throw new Error(m.knotty_actual_bumblebee());
         }
+
         // Attribution only rides along when a subject is actually picked;
         // otherwise the session user authors.
         const authorSelection = createOnBehalfPolicy.allowed
           ? value.author
           : undefined;
+
         // Mirrors the server's `authorIsMember`: an on-behalf subject carries
         // the picker's hint, a self-authored post follows the session's
         // membership.
         const authorIsMember = hasOnBehalfAuthorValue(authorSelection)
           ? (authorSelection.isMember ?? false)
           : member !== undefined;
+
         // An optimistic row cannot be banned: the participation policy refuses
         // a banned author's write, so the only way this row survives is for the
         // server to agree that nobody here is banned. A rejection rolls it back.
@@ -402,6 +427,7 @@ export function PostCreateForm() {
           form.resetField("content");
           form.resetField("author");
           setContentEditorKey((current) => current + 1);
+
           return;
         }
 
@@ -476,6 +502,7 @@ export function PostCreateForm() {
                   const selection = hasOnBehalfAuthorValue(field.state.value)
                     ? field.state.value
                     : null;
+
                   return (
                     <AuthorPicker
                       display={

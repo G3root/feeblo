@@ -219,6 +219,7 @@ const excludeUnchanged =
         () => "",
         (previous: string, value: A): readonly [string, ReadonlyArray<A>] => {
           const key = keyOf(value);
+
           return key === previous ? [previous, []] : [key, [value]];
         }
       )
@@ -268,6 +269,7 @@ const makeDataImportService = Effect.gen(function* () {
         "hasActiveJob",
         repository.hasActiveJob({ organizationId: input.organizationId })
       );
+
       if (hasActive) {
         return yield* new DataImportAlreadyActiveError({
           message: ACTIVE_IMPORT_MESSAGE,
@@ -294,11 +296,13 @@ const makeDataImportService = Effect.gen(function* () {
         ],
         { concurrency: "unbounded" }
       );
+
       const sortedBoards = [...existingBoards].sort(
         (left, right) =>
           left.createdAt.getTime() - right.createdAt.getTime() ||
           left.id.localeCompare(right.id)
       );
+
       const [defaultBoard = null] = sortedBoards;
 
       const [text, fileHash] = yield* Effect.all(
@@ -312,6 +316,7 @@ const makeDataImportService = Effect.gen(function* () {
       // The name the row report shows for a substituted status must be the one
       // the worker's rows actually land in.
       const defaultStatus = pickDefaultPostStatus(statusRows);
+
       if (defaultStatus === undefined) {
         return yield* new InternalServerError({
           message:
@@ -320,6 +325,7 @@ const makeDataImportService = Effect.gen(function* () {
       }
 
       const parsed = yield* parseBoardPostCsv(text);
+
       const prior = yield* fromStore(
         "findPriorJobByHash",
         repository.findPriorJobByHash({
@@ -327,6 +333,7 @@ const makeDataImportService = Effect.gen(function* () {
           organizationId: input.organizationId,
         })
       );
+
       const plan = planImportRows({
         boards: sortedBoards,
         defaultBoard,
@@ -361,6 +368,7 @@ const makeDataImportService = Effect.gen(function* () {
       );
 
       const jobId = yield* DataImportJobId.generate;
+
       return yield* repository
         .insertStagedJob({
           createdByMemberId: input.memberId,
@@ -392,9 +400,11 @@ const makeDataImportService = Effect.gen(function* () {
           organizationId: input.organizationId,
         })
       );
+
       if (Option.isSome(queued)) {
         return;
       }
+
       const job = yield* fromStore(
         "findJob",
         repository.findJob({
@@ -402,11 +412,13 @@ const makeDataImportService = Effect.gen(function* () {
           organizationId: input.organizationId,
         })
       );
+
       if (Option.isNone(job)) {
         return yield* new DataImportNotFoundError({
           message: "No import with this id exists in this workspace.",
         });
       }
+
       return yield* new DataImportNotConfirmableError({
         status: job.value.status,
         message: `This import is ${job.value.status.replaceAll("_", " ")} and cannot be confirmed.`,
@@ -422,9 +434,11 @@ const makeDataImportService = Effect.gen(function* () {
           organizationId: input.organizationId,
         })
       );
+
       if (canceled) {
         return;
       }
+
       const job = yield* fromStore(
         "findJob",
         repository.findJob({
@@ -432,6 +446,7 @@ const makeDataImportService = Effect.gen(function* () {
           organizationId: input.organizationId,
         })
       );
+
       if (Option.isNone(job)) {
         return yield* new DataImportNotFoundError({
           message: "No import with this id exists in this workspace.",
@@ -450,12 +465,15 @@ const makeDataImportService = Effect.gen(function* () {
           organizationId: input.organizationId,
         })
       );
+
       if (Option.isNone(job)) {
         return yield* new DataImportNotFoundError({
           message: "No import with this id exists in this workspace.",
         });
       }
+
       const window = clampReportWindow(input.limit, input.offset);
+
       // The row window, its summary, and the pending board names are three
       // reads of the same staged job and none needs another's answer, so they
       // resolve together; the report is polled while an import runs, which is
@@ -490,6 +508,7 @@ const makeDataImportService = Effect.gen(function* () {
         ],
         { concurrency: "unbounded" }
       );
+
       return {
         job: job.value,
         newBoards: [...newBoards],

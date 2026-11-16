@@ -27,6 +27,7 @@ type PostStatusRpcTag = RpcTagsOf<typeof PostStatusRpcs>;
 export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostStatusRepository;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
+
   // Statuses are the workspace's own vocabulary, the same kind of thing as
   // tags, changelog categories and roadmap columns, so they are managed at the
   // same level: manager and above.
@@ -140,6 +141,7 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         return yield* transaction(
           Effect.gen(function* () {
             const removed = yield* repository.delete(args);
@@ -150,6 +152,7 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
               action: "post_status.deleted",
               resourceId: args.id,
             });
+
             return removed;
           })
         );

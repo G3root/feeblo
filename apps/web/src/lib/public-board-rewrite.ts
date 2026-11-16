@@ -17,7 +17,9 @@ import { extractSubdomain } from "@feeblo/utils/url";
  */
 
 export const DASHBOARD_SUBDOMAIN = "app";
+
 export const PUBLIC_BOARD_PREFIX = "/s";
+
 export const FEEDBACK_WIDGET_PATH = "/feedback-widget";
 
 /**
@@ -39,6 +41,7 @@ function normalizePathname(pathname: string) {
   if (pathname.length > 1 && pathname.endsWith("/")) {
     return pathname.slice(0, -1);
   }
+
   return pathname;
 }
 
@@ -52,6 +55,7 @@ function resolveSubdomain(hostname: string, rootDomain: string) {
  */
 export function isDashboardHost(hostname: string, rootDomain: string) {
   const subdomain = resolveSubdomain(hostname, rootDomain);
+
   return !subdomain || subdomain.toLowerCase() === DASHBOARD_SUBDOMAIN;
 }
 
@@ -165,9 +169,11 @@ export function createPublicBoardRewrite(
         url.hostname,
         getRootDomain()
       );
+
       if (pathname !== url.pathname) {
         url.pathname = pathname;
       }
+
       return url;
     },
     output: ({ url }) => {
@@ -176,9 +182,11 @@ export function createPublicBoardRewrite(
         url.hostname,
         getRootDomain()
       );
+
       if (pathname !== url.pathname) {
         url.pathname = pathname;
       }
+
       return url;
     },
   };

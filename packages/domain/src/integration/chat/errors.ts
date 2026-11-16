@@ -19,7 +19,7 @@ import {
  */
 export class ChatInboundFailure extends Schema.TaggedError<ChatInboundFailure>()(
   "ChatInboundFailure",
-  { message: Schema.String }
+  { message: Schema.String, cause: Schema.optionalKey(Schema.Defect()) }
 ) {}
 
 /** RPC error union for every chat integration management operation. */
@@ -30,4 +30,5 @@ export const ChatIntegrationErrors = Schema.Union([
   PolicyDeniedError,
   UnauthorizedError,
 ]);
+
 export type ChatIntegrationError = typeof ChatIntegrationErrors.Type;

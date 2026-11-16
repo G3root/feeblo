@@ -54,12 +54,15 @@ export function CommentComposerEditor() {
       // be wiped entirely.
       const applyResetIfRequested = () => {
         const { resetKey } = store.get().context;
+
         if (resetKey === lastAppliedResetKey.current) {
           return;
         }
+
         lastAppliedResetKey.current = resetKey;
         editor.setContent(EMPTY_DOC, "start");
       };
+
       // Catch up on a reset that was requested while no editor was attached
       // (e.g. while a fresh instance was initializing), then keep applying
       // every later one.

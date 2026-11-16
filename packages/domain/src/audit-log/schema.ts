@@ -48,6 +48,7 @@ export const AuditLogStoredEntry = Schema.Struct({
   occurredAt: Schema.Date,
   recordedAt: Schema.Date,
 });
+
 export type TAuditLogStoredEntry = Schema.Schema.Type<
   typeof AuditLogStoredEntry
 >;
@@ -61,6 +62,7 @@ export const AuditLogEntry = Schema.Struct({
   occurredAt: Schema.DateFromString,
   recordedAt: Schema.DateFromString,
 });
+
 export type TAuditLogEntry = Schema.Schema.Type<typeof AuditLogEntry>;
 
 /**
@@ -73,10 +75,12 @@ export const AuditLogCursor = Schema.Struct({
   id: Schema.String,
   occurredAt: Schema.Date,
 });
+
 export type TAuditLogCursor = Schema.Schema.Type<typeof AuditLogCursor>;
 
 /** Which part of the log a listing covers. Absent lists both. */
 export const AuditLogKind = Schema.Literals(["changes", "access"]);
+
 export type TAuditLogKind = Schema.Schema.Type<typeof AuditLogKind>;
 
 export const AuditLogListRequest = Schema.Struct({
@@ -108,6 +112,7 @@ export const AuditLogListRequest = Schema.Struct({
   since: Schema.optionalKey(Schema.Date),
   until: Schema.optionalKey(Schema.Date),
 });
+
 export type TAuditLogListRequest = Schema.Schema.Type<
   typeof AuditLogListRequest
 >;
@@ -117,4 +122,5 @@ export const AuditLogPage = Schema.Struct({
   /** The cursor for the next page, or null on the last one. */
   next: Schema.NullOr(AuditLogCursor),
 });
+
 export type TAuditLogPage = Schema.Schema.Type<typeof AuditLogPage>;

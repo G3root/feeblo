@@ -105,11 +105,14 @@ function GitHubSettingsContent({
   const startConnect = useAtomSet(startGitHubConnectAtom, {
     mode: "promise",
   });
+
   const statusResult = useAtomValue(gitHubIntegrationStatusAtom);
   const connectionsResult = useAtomValue(gitHubConnectionsAtom(organizationId));
+
   const refreshConnections = useAtomRefresh(
     gitHubConnectionsAtom(organizationId)
   );
+
   const configured = Result.builder(statusResult)
     .onInitial(
       // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
@@ -118,6 +121,7 @@ function GitHubSettingsContent({
     .onFailure(() => false)
     .onSuccess((value) => value)
     .exhaustive();
+
   const connections = useAsyncList<GitHubConnection>(connectionsResult);
 
   const installGitHubApp = useProviderConnect({
@@ -135,14 +139,17 @@ function GitHubSettingsContent({
   if (configured === null) {
     return <LoadingCard message="Loading GitHub…" />;
   }
+
   if (!configured) {
     return (
       <LoadingCard message="GitHub is not configured for this deployment." />
     );
   }
+
   if (connections.isLoading) {
     return <LoadingCard message="Loading GitHub connection…" />;
   }
+
   if (connections.loadFailed) {
     return (
       <RetryCard
@@ -151,6 +158,7 @@ function GitHubSettingsContent({
       />
     );
   }
+
   if (connections.list.length === 0) {
     return (
       <Frame className="w-full">
@@ -182,6 +190,7 @@ function GitHubSettingsContent({
       </Frame>
     );
   }
+
   return (
     <div className="grid gap-4">
       {connections.list.map((connection) => (
@@ -244,12 +253,14 @@ function GitHubConnectionFrame({
   const args = { organizationId, connectionId: connection.id };
   const [dialogOpen, setDialogOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
   const disconnect = useAtomSet(disconnectGitHubConnectionAtom, {
     mode: "promise",
   });
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
+
     try {
       await disconnect({
         payload: args,
@@ -346,9 +357,11 @@ function GitHubPublishingSettings({
   const updateSettings = useAtomSet(updateGitHubPublishSettingsAtom, {
     mode: "promise",
   });
+
   const settingsResult = useAtomValue(gitHubPublishSettingsAtom(args));
   const repositoriesResult = useAtomValue(gitHubRepositoriesAtom(args));
   const boardsResult = useAtomValue(gitHubBoardsAtom(args.organizationId));
+
   const settings = Result.builder(settingsResult)
     .onInitial(() => null)
     .onFailure(
@@ -357,14 +370,17 @@ function GitHubPublishingSettings({
     )
     .onSuccess((value) => value)
     .exhaustive();
+
   const repositories = useAsyncList(repositoriesResult);
   const boards = useAsyncList(boardsResult);
+
   // The settings query refreshes from the mutation's reactivity keys, and that
   // refresh resolves after the write promise does. Holding the draft until the
   // server value catches up keeps the switch from snapping back to the stale
   // value in the gap, which `useOptimistic` alone cannot cover.
   const [pendingSettings, setPendingSettings] =
     useState<GitHubPublishSettings | null>(null);
+
   // Once the refreshed value carries the save, the overlay is done. Clear it
   // during render (React re-renders before committing) so the authoritative
   // value lands in the same commit instead of an effect pass that commits the
@@ -376,6 +392,7 @@ function GitHubPublishingSettings({
   ) {
     setPendingSettings(null);
   }
+
   const optimisticSettings = pendingSettings ?? settings;
 
   const save = (next: GitHubPublishSettings) => {
@@ -395,6 +412,7 @@ function GitHubPublishingSettings({
       }
     })();
   };
+
   if (!optimisticSettings) {
     return (
       <FramePanel>
@@ -404,10 +422,12 @@ function GitHubPublishingSettings({
       </FramePanel>
     );
   }
+
   const selectedRepository =
     optimisticSettings.repositoryOwner && optimisticSettings.repositoryName
       ? `${optimisticSettings.repositoryOwner}/${optimisticSettings.repositoryName}`
       : "";
+
   return (
     <FramePanel>
       <h2 className="text-sm font-medium">Automatic issue publishing</h2>
@@ -431,6 +451,7 @@ function GitHubPublishingSettings({
             onValueChange={(value) => {
               const [repositoryOwner, repositoryName] =
                 String(value).split("/");
+
               return save({
                 ...optimisticSettings,
                 repositoryOwner: repositoryOwner ?? null,
@@ -592,17 +613,22 @@ function GitHubSyncRules({
   };
 }) {
   const rulesResult = useAtomValue(gitHubSyncRulesAtom(args));
+
   const statusesResult = useAtomValue(
     gitHubPostStatusesAtom(args.organizationId)
   );
+
   const rules = useAsyncList<GitHubSyncRule>(rulesResult);
   const statuses = useAsyncList<GitHubPostStatus>(statusesResult);
+
   const openRule = rules.list.find(
     (rule) => rule.issueMatchMode === "any" && rule.issueState === "open"
   );
+
   const closedRule = rules.list.find(
     (rule) => rule.issueMatchMode === "all" && rule.issueState === "closed"
   );
+
   if (rules.isLoading) {
     return (
       <FramePanel>
@@ -610,6 +636,7 @@ function GitHubSyncRules({
       </FramePanel>
     );
   }
+
   if (rules.loadFailed) {
     return (
       <FramePanel>
@@ -617,6 +644,7 @@ function GitHubSyncRules({
       </FramePanel>
     );
   }
+
   return (
     <FramePanel>
       <div>
@@ -676,15 +704,19 @@ function GitHubSyncRuleSlot({
   // saves cannot issue duplicate createGitHubSyncRule calls.
   const createInFlightRef = useRef<Promise<GitHubSyncRule> | null>(null);
   const [saving, setSaving] = useState(false);
+
   const createRule = useAtomSet(createGitHubSyncRuleAtom, {
     mode: "promise",
   });
+
   const updateRule = useAtomSet(updateGitHubSyncRuleAtom, {
     mode: "promise",
   });
+
   const deleteRule = useAtomSet(deleteGitHubSyncRuleAtom, {
     mode: "promise",
   });
+
   // Draft derived from the server rule, overlaid by the pending draft above
   // while a save is settling.
   // The workspace's default status, not the first row: this is where a new
@@ -692,6 +724,7 @@ function GitHubSyncRuleSlot({
   // statuses must not change that.
   const defaultStatusId =
     statuses.find((status) => status.isDefault)?.id ?? statuses[0]?.id;
+
   const baseDraft = useMemo<GitHubSyncRuleDraft>(
     () => ({
       postStatusId: rule?.postStatusId ?? defaultStatusId ?? "",
@@ -706,24 +739,30 @@ function GitHubSyncRuleSlot({
       rule?.upvoterNotificationPolicy,
     ]
   );
+
   // The same refresh-gap as the publish settings above, one rule at a time:
   // hold the draft until the refreshed rule matches what was saved, then clear
   // it during render.
   const [pendingDraft, setPendingDraft] = useState<GitHubSyncRuleDraft | null>(
     null
   );
+
   if (pendingDraft !== null && syncRuleDraftEqual(baseDraft, pendingDraft)) {
     setPendingDraft(null);
   }
+
   const draft = pendingDraft ?? baseDraft;
   const ruleId = rule?.id ?? createdRuleId;
+
   const save = (next: GitHubSyncRuleDraft) => {
     setPendingDraft(next);
     void (async () => {
       setSaving(true);
+
       try {
         if (ruleId === null) {
           const reused = createInFlightRef.current !== null;
+
           const createPromise =
             createInFlightRef.current ??
             createRule({
@@ -738,17 +777,22 @@ function GitHubSyncRuleSlot({
               },
               reactivityKeys: gitHubReactivityKeys(args.organizationId),
             });
+
           createInFlightRef.current = createPromise;
           let created: GitHubSyncRule;
+
           try {
             created = await createPromise;
           } catch (error) {
             if (!reused) {
               createInFlightRef.current = null;
             }
+
             throw error;
           }
+
           setCreatedRuleId(created.id);
+
           if (reused) {
             await updateRule({
               payload: {
@@ -789,12 +833,16 @@ function GitHubSyncRuleSlot({
       }
     })();
   };
+
   const statusesReady = !statusesLoading && statuses.length > 0;
+
   const remove = async () => {
     if (ruleId === null) {
       return;
     }
+
     setSaving(true);
+
     try {
       await deleteRule({
         payload: {
@@ -820,6 +868,7 @@ function GitHubSyncRuleSlot({
       setSaving(false);
     }
   };
+
   return (
     <div className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
       <div className="grid gap-1 text-xs">

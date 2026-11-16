@@ -24,6 +24,7 @@ export function ChangelogCategoryFilter() {
   const site = useSite();
   const { publicChangelogCategoryCollection } = usePublicCollections();
   const store = useChangelogFilterStore();
+
   const selectedCategoryIds = useSelector(
     store,
     (state) => state.context.selectedCategoryIds

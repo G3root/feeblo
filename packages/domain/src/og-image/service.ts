@@ -21,11 +21,13 @@ const makeOgImageService = Effect.gen(function* () {
       | OgImageSiteNotFoundError
     > {
       const siteOption = yield* repository.findSite(input.siteId);
+
       if (Option.isNone(siteOption)) {
         return yield* new OgImageSiteNotFoundError({ siteId: input.siteId });
       }
 
       const site = siteOption.value;
+
       if (input.type !== "post-detail") {
         return { siteName: site.name, type: input.type };
       }
@@ -34,6 +36,7 @@ const makeOgImageService = Effect.gen(function* () {
         organizationId: site.organizationId,
         postSlug: input.post,
       });
+
       if (Option.isNone(postOption)) {
         return yield* new OgImagePostNotFoundError({
           postSlug: input.post,

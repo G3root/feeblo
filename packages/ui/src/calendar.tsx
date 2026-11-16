@@ -53,12 +53,14 @@ export function Calendar({
     weekday:
       "size-(--cell-size) p-0 text-xs font-medium text-muted-foreground/72",
   };
+
   const mergedClassNames: typeof defaultClassNames = Object.keys(
     defaultClassNames
   ).reduce(
     (acc, key) => {
       // SAFETY: The key is a member of the source object's key set in this usage.
       const userClass = classNames?.[key as keyof typeof classNames];
+
       const baseClass =
         // SAFETY: The key is a member of the source object's key set in this usage.
         defaultClassNames[key as keyof typeof defaultClassNames];

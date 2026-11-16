@@ -153,6 +153,7 @@ const presenceHandles = (
   event: TPostPresenceEvent
 ): boolean => {
   const before = presenceSnapshotFor(state);
+
   return !isUnhandled(
     before,
     transition(postPresenceMachine, before, { type: event })
@@ -165,6 +166,7 @@ const engagementHandles = (
   event: TPostEngagementEvent
 ): boolean => {
   const before = engagementSnapshotFor(state);
+
   return !isUnhandled(
     before,
     transition(postEngagementMachine, before, { type: event })
@@ -179,6 +181,7 @@ const presenceAfter = (
   const [next] = transition(postPresenceMachine, presenceSnapshotFor(state), {
     type: event,
   });
+
   // SAFETY: the machine is flat — every state and target is one of the three
   // presence states — and `machine.test.ts` walks the whole graph rather than
   // trusting this comment.
@@ -195,6 +198,7 @@ const engagementAfter = (
     engagementSnapshotFor(state),
     { type: event }
   );
+
   // SAFETY: as above, over the two engagement states.
   return next.value as TPostEngagement;
 };
@@ -232,14 +236,17 @@ const presenceTargetsOf = (
   event: TPostPresenceEvent
 ): readonly TPostPresence[] => {
   const targets = new Set<TPostPresence>();
+
   for (const from of POST_PRESENCE_STATES) {
     const next = presenceAfter(from, event);
+
     // Only a move counts: an event a state does not handle returns that state,
     // and counting it would make the target ambiguous.
     if (next !== from) {
       targets.add(next);
     }
   }
+
   return [...targets];
 };
 
@@ -248,12 +255,15 @@ const engagementTargetsOf = (
   event: TPostEngagementEvent
 ): readonly TPostEngagement[] => {
   const targets = new Set<TPostEngagement>();
+
   for (const from of POST_ENGAGEMENT_STATES) {
     const next = engagementAfter(from, event);
+
     if (next !== from) {
       targets.add(next);
     }
   }
+
   return [...targets];
 };
 

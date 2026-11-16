@@ -57,6 +57,7 @@ const useDebounce = ({
     },
     { wait }
   );
+
   const emitDebounced = useCallback(
     (next: string) => {
       emitDebouncedRaw(next, generationRef.current);
@@ -102,6 +103,7 @@ function DebouncedInputGroupInput({
     onChange,
     wait,
   });
+
   return (
     <InputGroupInput
       {...props}
@@ -115,4 +117,5 @@ function DebouncedInputGroupInput({
 }
 
 export { DebouncedInput, DebouncedInputGroupInput };
+
 export type { DebouncedInputProps };

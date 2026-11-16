@@ -40,10 +40,12 @@ export const FeedbackFormContext = createContext<FeedbackFormContextValue>();
 
 export function useFeedbackForm(): FeedbackFormContextValue {
   const value = useContext(FeedbackFormContext);
+
   if (!value) {
     throw new Error(
       "useFeedbackForm must be used within a FeedbackForm.Provider"
     );
   }
+
   return value;
 }

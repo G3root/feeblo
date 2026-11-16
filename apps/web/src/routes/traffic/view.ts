@@ -27,7 +27,9 @@ import { getPublicEnvServer } from "~/lib/server-runtime-public-env";
  * discarded it.
  */
 const maxBodyBytes = 2 * 1024;
+
 const upstreamTimeoutMillis = 3_000;
+
 const trailingSlashPattern = /\/+$/;
 
 const empty = (status: number): Response => new Response(null, { status });
@@ -36,25 +38,31 @@ const empty = (status: number): Response => new Response(null, { status });
 const visitorAddress = (request: Request): string | undefined => {
   const direct =
     request.headers.get("cf-connecting-ip") ?? request.headers.get("x-real-ip");
+
   if (direct !== null && direct.trim() !== "") return direct.trim();
   const chain = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+
   return chain === undefined || chain === "" ? undefined : chain;
 };
 
 const relay = async (request: Request): Promise<Response> => {
   const raw = await readBoundedText(request, maxBodyBytes);
+
   if (raw === undefined) return empty(413);
 
   let decoded: unknown;
+
   try {
     decoded = JSON.parse(raw);
   } catch {
     return empty(204);
   }
+
   if (!isPlainObject(decoded)) return empty(204);
 
   const userAgent = request.headers.get("user-agent");
   const country = request.headers.get("cf-ipcountry");
+
   // `undefined` is dropped by `JSON.stringify`, so an absent header and an
   // absent property are the same request to the API.
   const payload = {
@@ -66,6 +74,7 @@ const relay = async (request: Request): Promise<Response> => {
   const apiUrl = getPublicEnvServer().API_URL.replace(trailingSlashPattern, "");
   const headers = new Headers({ "content-type": "application/json" });
   const address = visitorAddress(request);
+
   if (address !== undefined) {
     headers.set("x-forwarded-for", address);
   }
@@ -77,6 +86,7 @@ const relay = async (request: Request): Promise<Response> => {
       method: "POST",
       signal: AbortSignal.timeout(upstreamTimeoutMillis),
     });
+
     // Release the body without copying the API's answer into the page.
     await upstream.arrayBuffer();
   } catch {

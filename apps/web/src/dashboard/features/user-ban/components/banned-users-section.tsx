@@ -103,21 +103,25 @@ export function BannedUsersSection({
   userBansAvailable: boolean;
 }) {
   const organizationId = useOrganizationId();
+
   const {
     commentCollection,
     postCollection,
     postSubscriptionCollection,
     upvoteCollection,
   } = useDashboardCollections();
+
   const [search, setSearch] = React.useState("");
   const [banOpen, setBanOpen] = React.useState(false);
   const [unbanningId, setUnbanningId] = React.useState<string | null>(null);
 
   const trimmedSearch = search.trim();
+
   const listArgs = React.useMemo(
     () => ({ organizationId, search: trimmedSearch }),
     [organizationId, trimmedSearch]
   );
+
   const bansResult = useAtomValue(userBansAtom(listArgs));
   const refreshBans = useAtomRefresh(userBansAtom(listArgs));
   const unban = useAtomSet(unbanUserAtom, { mode: "promise" });
@@ -174,6 +178,7 @@ export function BannedUsersSection({
 
   const handleUnban = async (id: string) => {
     setUnbanningId(id);
+
     try {
       await unban({
         payload: {
@@ -268,7 +273,7 @@ export function BannedUsersSection({
           </div>
         ) : null}
 
-        {isLoading ? (
+        {isLoading && (
           <SkeletonLoader isLoading>
             <div className="flex flex-col gap-2">
               {[0, 1, 2].map((key) => (
@@ -281,7 +286,9 @@ export function BannedUsersSection({
               ))}
             </div>
           </SkeletonLoader>
-        ) : loadFailed ? (
+        )}
+
+        {!isLoading && loadFailed && (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -296,7 +303,9 @@ export function BannedUsersSection({
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
-        ) : bans.length === 0 ? (
+        )}
+
+        {!isLoading && !loadFailed && bans.length === 0 && (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -314,7 +323,9 @@ export function BannedUsersSection({
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
-        ) : (
+        )}
+
+        {!isLoading && !loadFailed && bans.length > 0 && (
           <div className="flex flex-col gap-2" role="list">
             {bans.map((ban) => (
               <SettingsItem.Item key={ban.id} role="listitem">
@@ -415,6 +426,7 @@ function BanUserDialog({
       setReason("");
       setDeleteContent(false);
     }
+
     onOpenChange(nextOpen);
   };
 
@@ -424,8 +436,10 @@ function BanUserDialog({
     if (!canBan) {
       return;
     }
+
     const draft = draftRef.current;
     setPendingDraft(draft);
+
     try {
       await ban({
         payload: {
@@ -438,11 +452,13 @@ function BanUserDialog({
       });
       toastManager.add({ title: "User banned", type: "success" });
       refreshBanBadges(collections);
+
       // A dismissal and reopen while this ran means the fields on screen
       // belong to somebody else; the ban still lands, the form stays.
       if (draft !== draftRef.current) {
         return;
       }
+
       setEmail("");
       setReason("");
       setDeleteContent(false);

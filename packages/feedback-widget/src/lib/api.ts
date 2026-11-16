@@ -7,6 +7,7 @@ export type {
   WidgetSuggestion,
   WidgetUpdate,
 } from "./requests";
+
 export { fetchSuggestions } from "./requests";
 
 /**

@@ -223,6 +223,7 @@ export const authenticatePublicApiKey = (
     );
 
     const record = verified.valid ? verified.key : null;
+
     if (record === null) {
       return yield* invalidApiKeyError();
     }

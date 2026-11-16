@@ -166,6 +166,7 @@ const stateAfter = (
   const [next] = transition(emailSubscriptionMachine, snapshotFor(node), {
     type: event,
   });
+
   // SAFETY: the machine is flat — every state and target is one of the five
   // stored states or `none` — and `subscription-machine.test.ts` walks the
   // whole graph rather than trusting this comment.
@@ -188,6 +189,7 @@ export const nextStateForRequest = (
     snapshotFor(prior ?? "none", context),
     { type: "request" }
   );
+
   // SAFETY: as above, and `request` never targets `none`, so a request can only
   // answer with a stored state.
   return next.value as TEmailSubscriptionState;
@@ -199,6 +201,7 @@ const handles = (
   event: TEmailSubscriptionEvent
 ): boolean => {
   const before = snapshotFor(node);
+
   return !isUnhandled(
     before,
     transition(emailSubscriptionMachine, before, { type: event })
@@ -222,14 +225,17 @@ export const targetStateFor = (
   event: TEmailSubscriptionEvent
 ): TEmailSubscriptionState => {
   const targets = new Set<TEmailSubscriptionState>();
+
   for (const state of EMAIL_SUBSCRIPTION_STATES) {
     const next = stateAfter(state, event);
+
     // Only a move counts: an event a state does not handle returns that state,
     // and counting it would make the target ambiguous.
     if (next !== state && next !== "none") {
       targets.add(next);
     }
   }
+
   const [target, ...rest] = [...targets];
 
   if (target === undefined || rest.length > 0) {

@@ -34,16 +34,19 @@ export const runAuditLogRetentionPass = Effect.fn("AuditLogRetention.runPass")(
   function* () {
     const repository = yield* AuditLogRepository;
     const now = yield* DateTime.now;
+
     const cutoff = DateTime.toDate(
       DateTime.subtract({ days: AUDIT_LOG_RETENTION_DAYS })(now)
     );
 
     let removed = 0;
     let batch = yield* repository.deleteBefore(cutoff, RETENTION_BATCH_SIZE);
+
     while (batch === RETENTION_BATCH_SIZE) {
       removed += batch;
       batch = yield* repository.deleteBefore(cutoff, RETENTION_BATCH_SIZE);
     }
+
     removed += batch;
 
     return yield* Effect.logDebug("Ran the audit-log retention pass").pipe(

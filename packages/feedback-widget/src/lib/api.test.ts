@@ -21,6 +21,7 @@ import {
  */
 
 const organizationId = "org_test";
+
 const apiUrl = "https://api.feeblo.test";
 
 const board = {
@@ -58,14 +59,17 @@ const stubFetch = (body: Json, status = 200) => {
     status,
     headers: { "Content-Type": "application/json" },
   });
+
   vi.stubGlobal("fetch", () => Promise.resolve(response));
 };
 
 const feedbackForm = (fields: Record<string, string>) => {
   const formData = new FormData();
+
   for (const [name, value] of Object.entries(fields)) {
     formData.set(name, value);
   }
+
   return formData;
 };
 
@@ -104,10 +108,12 @@ describe("widget api boundary", () => {
     expect(updates[0]?.publishedAt).toEqual(new Date(update.publishedAt));
 
     stubFetch([suggestion]);
+
     const suggestions = await fetchSuggestions(
       { boardId: board.id, content: "Content", title: "Title" },
       new AbortController().signal
     );
+
     expect(suggestions).toEqual([suggestion]);
   });
 
@@ -142,13 +148,16 @@ describe("widget api boundary", () => {
   it("sends the request shape the endpoint decodes", async () => {
     stubBootEnv();
     let sentBody: Json | undefined;
+
     const fetchSpy = vi.fn((_url: string, init?: RequestInit) => {
       const body = init?.body;
       sentBody = isString(body) ? JSON.parse(body) : undefined;
+
       return Promise.resolve(
         new Response(JSON.stringify({ message: "ok" }), { status: 200 })
       );
     });
+
     vi.stubGlobal("fetch", fetchSpy);
 
     const result = await submitFeedback(

@@ -23,6 +23,7 @@ describe("audit catalog", () => {
     for (const action of AUDIT_ACTIONS) {
       expect(auditActionLabel(action)).not.toBeNull();
     }
+
     expect(auditActionLabel("post.vanished")).toBeNull();
   });
 
@@ -31,6 +32,7 @@ describe("audit catalog", () => {
       expect(AUDIT_ACTIONS).toContain(action);
       expect(isAuditAccessAction(action)).toBe(true);
     }
+
     expect(new Set(AUDIT_ACCESS_ACTIONS).size).toBe(
       AUDIT_ACCESS_ACTIONS.length
     );
@@ -41,6 +43,7 @@ describe("audit catalog", () => {
     Effect.gen(function* () {
       const decoded =
         yield* Schema.decodeEffect(AuditActionSchema)("post.updated");
+
       expect(decoded).toBe("post.updated");
 
       // The input is deliberately not a declared action; that is the case

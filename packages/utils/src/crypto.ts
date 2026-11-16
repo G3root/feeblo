@@ -35,6 +35,7 @@ export const symmetricEncrypt = async ({
   const keyAsBytes = deriveKey(key);
   const dataAsBytes = utf8ToBytes(data);
   const chacha = managedNonce(xchacha20poly1305)(keyAsBytes);
+
   return bytesToHex(chacha.encrypt(dataAsBytes));
 };
 
@@ -50,5 +51,6 @@ export const symmetricDecrypt = async ({
   const keyAsBytes = deriveKey(key);
   const dataAsBytes = hexToBytes(data);
   const chacha = managedNonce(xchacha20poly1305)(keyAsBytes);
+
   return new TextDecoder().decode(chacha.decrypt(dataAsBytes));
 };

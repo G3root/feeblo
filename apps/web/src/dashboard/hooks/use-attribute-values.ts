@@ -8,6 +8,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function useContactAttributeValues(contactId: string) {
   const { contactAttributeValueCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: [
       "contact-attribute-values",
@@ -23,6 +24,7 @@ export function useContactAttributeValues(contactId: string) {
 
 export function useCompanyAttributeValues(companyId: string) {
   const { companyAttributeValueCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: [
       "company-attribute-values",

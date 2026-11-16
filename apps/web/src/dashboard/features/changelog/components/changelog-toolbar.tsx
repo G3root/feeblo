@@ -37,6 +37,7 @@ const links = [
 export function ChangelogToolbar() {
   const organizationId = useOrganizationId();
   const { canCreate, createChangeLog } = useChangelogAction();
+
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -103,6 +104,7 @@ export function ChangelogToolbar() {
 function DebouncedSearch() {
   const store = useChangelogStore();
   const search = useSelector(store, (s) => s.context.filters.search);
+
   return (
     <DebouncedInputGroupInput
       aria-label="Search changelog titles"

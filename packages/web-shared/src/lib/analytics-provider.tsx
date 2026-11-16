@@ -187,5 +187,6 @@ export const AnalyticsProvider = (
   props: React.PropsWithChildren<{ client?: AnalyticsClient }>
 ) => {
   currentAnalyticsClient = props.client ?? null;
+
   return <>{props.children}</>;
 };

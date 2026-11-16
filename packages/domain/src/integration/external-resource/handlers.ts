@@ -7,6 +7,7 @@ import { ExternalResourceService } from "./service";
 /** Authorizes external-resource link reads at the integration-management boundary. */
 export const ExternalResourceRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* ExternalResourceService;
+
   return {
     ListPostExternalResourceLinks: (
       input: Parameters<typeof service.listPostLinks>[0]

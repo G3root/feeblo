@@ -96,11 +96,14 @@ describe("EmailProviderFeedbackService", () => {
             _tag: "Processed",
             deliveryUpdated: true,
           });
+
           const [stored] = yield* db
             .select({ state: schema.emailDeliveryTable.state })
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
           expect(stored?.state).toBe("delivered");
+
           const events = yield* db
             .select({
               id: schema.emailProviderEventTable.providerEventId,
@@ -110,6 +113,7 @@ describe("EmailProviderFeedbackService", () => {
             .where(
               eq(schema.emailProviderEventTable.deliveryId, delivery.deliveryId)
             );
+
           expect(events).toHaveLength(1);
           expect(events[0]?.metadata).toEqual({
             category: "delivery",
@@ -124,6 +128,7 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
+
           // `sending` is the state the worker holds between claiming a
           // delivery and recording the provider's acceptance. A delivered
           // event that lands inside that window moves the row without the
@@ -150,6 +155,7 @@ describe("EmailProviderFeedbackService", () => {
             })
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
           // The later state wins, and the acceptance it implies is kept.
           expect(stored?.state).toBe("delivered");
           expect(stored?.acceptedAt?.toISOString()).toBe(
@@ -164,6 +170,7 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
+
           // `acceptedAt` on the event is when the provider took the message
           // (SES `mail.timestamp`); `occurredAt` is when the feedback wired
           // up. The row must carry the first as its acceptance — a send
@@ -192,6 +199,7 @@ describe("EmailProviderFeedbackService", () => {
             })
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
           expect(stored?.state).toBe("delivered");
           expect(stored?.acceptedAt?.toISOString()).toBe(
             "2026-08-01T00:00:00.000Z"
@@ -208,6 +216,7 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
+
           // A worker that deferred after an uncertain submission leaves the row
           // in `deferred`, and `delivered` is not a legal target from there, so
           // the transition below matches nothing. The provider holding the
@@ -230,6 +239,7 @@ describe("EmailProviderFeedbackService", () => {
             _tag: "Processed",
             deliveryUpdated: false,
           });
+
           const [stored] = yield* db
             .select({
               acceptedAt: schema.emailDeliveryTable.acceptedAt,
@@ -237,6 +247,7 @@ describe("EmailProviderFeedbackService", () => {
             })
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
           expect(stored?.state).toBe("deferred");
           expect(stored?.acceptedAt?.toISOString()).toBe(
             "2026-08-09T12:00:00.000Z"
@@ -250,6 +261,7 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
+
           // A worker that could not confirm its submission marks the row
           // `failed` with no acceptance, and the provider's `failed` event
           // (`Reject` in `ses-mapping.ts`) names a message it rejected
@@ -273,6 +285,7 @@ describe("EmailProviderFeedbackService", () => {
             _tag: "Processed",
             deliveryUpdated: false,
           });
+
           const [stored] = yield* db
             .select({
               acceptedAt: schema.emailDeliveryTable.acceptedAt,
@@ -280,6 +293,7 @@ describe("EmailProviderFeedbackService", () => {
             })
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
           expect(stored?.state).toBe("failed");
           expect(stored?.acceptedAt).toBeNull();
         })
@@ -289,6 +303,7 @@ describe("EmailProviderFeedbackService", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const service = yield* EmailProviderFeedbackService;
+
         // The gate on `failed` events must not swallow their legal
         // lifecycle work: from `sending`, `failed` is a real transition and
         // still happens, while the acceptance stays unwritten — the row
@@ -310,6 +325,7 @@ describe("EmailProviderFeedbackService", () => {
           _tag: "Processed",
           deliveryUpdated: true,
         });
+
         const [stored] = yield* db
           .select({
             acceptedAt: schema.emailDeliveryTable.acceptedAt,
@@ -317,6 +333,7 @@ describe("EmailProviderFeedbackService", () => {
           })
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
         expect(stored?.state).toBe("failed");
         expect(stored?.acceptedAt).toBeNull();
       })
@@ -343,6 +360,7 @@ describe("EmailProviderFeedbackService", () => {
           })
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
         const deliveries = yield* db
           .select({ id: schema.emailDeliveryTable.id })
           .from(schema.emailDeliveryTable)
@@ -362,10 +380,12 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
+
           const delivery = yield* makeDelivery(
             "accepted",
             "bounce-feedback@example.com"
           );
+
           const event = {
             bounceType: "hard" as const,
             eventId: "provider-bounce-1",
@@ -380,6 +400,7 @@ describe("EmailProviderFeedbackService", () => {
 
           expect(first).toMatchObject({ _tag: "Processed", suppressed: true });
           expect(duplicate).toEqual({ _tag: "Duplicate" });
+
           const [suppression] = yield* db
             .select({
               firstReason: schema.emailSuppressionTable.firstReason,
@@ -393,6 +414,7 @@ describe("EmailProviderFeedbackService", () => {
                 "bounce-feedback@example.com"
               )
             );
+
           const events = yield* db
             .select({
               providerEventId: schema.emailProviderEventTable.providerEventId,
@@ -431,6 +453,7 @@ describe("EmailProviderFeedbackService", () => {
             _tag: "UnknownDelivery",
             suppressed: true,
           });
+
           const [suppression] = yield* db
             .select({
               firstReason: schema.emailSuppressionTable.firstReason,
@@ -444,6 +467,7 @@ describe("EmailProviderFeedbackService", () => {
                 "unknown-recipient@example.com"
               )
             );
+
           expect(suppression).toMatchObject({
             firstReason: "hard_bounce",
             organizationId: null,
@@ -456,6 +480,7 @@ describe("EmailProviderFeedbackService", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const service = yield* EmailProviderFeedbackService;
+
         const event = {
           bounceType: "hard" as const,
           eventId: "provider-uncorrelated-duplicate-1",
@@ -480,6 +505,7 @@ describe("EmailProviderFeedbackService", () => {
               "duplicate-bounce@example.com"
             )
           );
+
         expect(rows).toHaveLength(1);
       })
     );
@@ -508,6 +534,7 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
+
           const delivery = yield* makeDelivery(
             "accepted",
             "rewritten-header@example.com"
@@ -524,6 +551,7 @@ describe("EmailProviderFeedbackService", () => {
           });
 
           expect(result).toMatchObject({ _tag: "Processed", suppressed: true });
+
           const [suppression] = yield* db
             .select({
               organizationId: schema.emailSuppressionTable.organizationId,
@@ -535,6 +563,7 @@ describe("EmailProviderFeedbackService", () => {
                 "rewritten-header@example.com"
               )
             );
+
           expect(suppression?.organizationId).toBe(delivery.organizationId);
         })
     );
@@ -543,6 +572,7 @@ describe("EmailProviderFeedbackService", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const service = yield* EmailProviderFeedbackService;
+
         const delivery = yield* makeDelivery(
           "accepted",
           "mailbox-full@example.com"
@@ -563,6 +593,7 @@ describe("EmailProviderFeedbackService", () => {
           deliveryUpdated: true,
           suppressed: false,
         });
+
         const [stored] = yield* db
           .select({
             nextAttemptAt: schema.emailDeliveryTable.nextAttemptAt,
@@ -570,16 +601,19 @@ describe("EmailProviderFeedbackService", () => {
           })
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
         expect(stored?.state).toBe("deferred");
         expect(stored?.nextAttemptAt?.toISOString()).toBe(
           "2026-08-09T18:00:00.000Z"
         );
+
         const suppressions = yield* db
           .select({ email: schema.emailSuppressionTable.email })
           .from(schema.emailSuppressionTable)
           .where(
             eq(schema.emailSuppressionTable.email, "mailbox-full@example.com")
           );
+
         expect(suppressions).toHaveLength(0);
       })
     );
@@ -587,6 +621,7 @@ describe("EmailProviderFeedbackService", () => {
     it.effect("defers an undetermined bounce instead of suppressing it", () =>
       Effect.gen(function* () {
         const service = yield* EmailProviderFeedbackService;
+
         const delivery = yield* makeDelivery(
           "accepted",
           "undetermined@example.com"
@@ -613,6 +648,7 @@ describe("EmailProviderFeedbackService", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const service = yield* EmailProviderFeedbackService;
+
         const delivery = yield* makeDelivery(
           "accepted",
           "exhausted@example.com",
@@ -633,10 +669,12 @@ describe("EmailProviderFeedbackService", () => {
           deliveryUpdated: true,
           suppressed: false,
         });
+
         const [stored] = yield* db
           .select({ state: schema.emailDeliveryTable.state })
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
         expect(stored?.state).toBe("failed");
       })
     );
@@ -647,6 +685,7 @@ describe("EmailProviderFeedbackService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* EmailProviderFeedbackService;
+
           const delivery = yield* makeDelivery(
             "accepted",
             "precedence@example.com"
@@ -686,6 +725,7 @@ describe("EmailProviderFeedbackService", () => {
                 )
               )
             );
+
           expect(suppression).toMatchObject({
             firstReason: "hard_bounce",
             reason: "complaint",
@@ -697,6 +737,7 @@ describe("EmailProviderFeedbackService", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const service = yield* EmailProviderFeedbackService;
+
         const failedDelivery = yield* makeDelivery(
           "sending",
           "failed-feedback@example.com"
@@ -714,6 +755,7 @@ describe("EmailProviderFeedbackService", () => {
           .select({ state: schema.emailDeliveryTable.state })
           .from(schema.emailDeliveryTable)
           .where(eq(schema.emailDeliveryTable.id, failedDelivery.deliveryId));
+
         expect(failed?.state).toBe("failed");
       })
     );
@@ -722,6 +764,7 @@ describe("EmailProviderFeedbackService", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const service = yield* EmailProviderFeedbackService;
+
         const complaintDelivery = yield* makeDelivery(
           "delivered",
           "complaint-feedback@example.com"
@@ -741,6 +784,7 @@ describe("EmailProviderFeedbackService", () => {
           .where(
             eq(schema.emailDeliveryTable.id, complaintDelivery.deliveryId)
           );
+
         const [suppression] = yield* db
           .select({
             organizationId: schema.emailSuppressionTable.organizationId,
@@ -773,6 +817,7 @@ describe("EmailProviderFeedbackService", () => {
       () =>
         Effect.gen(function* () {
           const service = yield* EmailProviderFeedbackService;
+
           const error = yield* Effect.flip(
             service.ingest({
               eventId: "provider-unknown-1",
@@ -830,6 +875,7 @@ describe("EmailProviderFeedbackService", () => {
             .select({ updatedAt: schema.emailDeliveryTable.updatedAt })
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
           expect(stored?.updatedAt).toEqual(currentUpdatedAt);
         })
     );
@@ -862,6 +908,7 @@ describe("EmailProviderFeedbackService", () => {
               isNull(schema.emailSuppressionTable.organizationId)
             )
           );
+
         expect(row?.organizationId).toBeNull();
       })
     );

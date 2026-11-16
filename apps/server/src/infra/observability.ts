@@ -28,11 +28,14 @@ const failureSummaryLimit = 500;
 
 /** `Bearer <token>` and `Basic <credentials>`, kept for the scheme name. */
 const authSchemePattern = /\b(bearer|basic)\s+\S+/gi;
+
 /** `authorization=…`, `api-key: …`, and the other header names that hold a token. */
 const credentialAssignmentPattern =
   /(\b(?:authorization|token|secret|password|passwd|credential|api[-_]?key)[\w.-]*["']?\s*[=:]\s*["']?)(?:(?:basic|bearer)\s+)?\S+/gi;
+
 /** `https://user:password@host`, where only the password is secret. */
 const urlCredentialPattern = /(\bhttps?:\/\/[^/\s:@]+:)[^@\s/]+@/gi;
+
 /** Collapses newlines so one failure stays on one log line. */
 const whitespaceRunPattern = /\s+/g;
 
@@ -98,9 +101,12 @@ export const makeObservabilityLayer = (config: ServerConfigValue) =>
         if (Option.isNone(telemetry)) {
           return Layer.empty;
         }
+
         const { logLevel, logs, metrics, traces } = telemetry.value;
+
         const otlpEnabled =
           traces !== undefined || logs !== undefined || metrics !== undefined;
+
         if (!otlpEnabled) {
           return Layer.succeed(References.MinimumLogLevel, logLevel);
         }

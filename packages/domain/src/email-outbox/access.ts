@@ -113,16 +113,18 @@ export const evaluateOrganizationAccess = (
     return { eligible: false, recipientClass: "shadow" };
   }
 
-  const recipientClass: EmailRecipientAccessClass = hasMembership
-    ? "member"
-    : account.restrictedToOrganizationId === organizationId
-      ? "sso"
-      : account.restrictedToOrganizationId === null
-        ? "global"
-        : // Defensive: accounts restricted to a different organization carry
-          // synthetic inboxes, so resolution cannot reach them in practice; if
-          // one ever is reached it grants this workspace nothing.
-          "shadow";
+  let recipientClass: EmailRecipientAccessClass = "shadow";
+
+  if (hasMembership) {
+    recipientClass = "member";
+  } else if (account.restrictedToOrganizationId === organizationId) {
+    recipientClass = "sso";
+  } else if (account.restrictedToOrganizationId === null) {
+    recipientClass = "global";
+  }
+  // Otherwise it stays "shadow": accounts restricted to a different
+  // organization carry synthetic inboxes, so resolution cannot reach them in
+  // practice, and one that ever is reached grants this workspace nothing.
 
   const eligible =
     account.emailVerified &&

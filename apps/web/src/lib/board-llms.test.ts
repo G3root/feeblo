@@ -211,6 +211,7 @@ describe("renderBoardLlmsTxt", () => {
         excerpt: "x".repeat(400),
       })
     );
+
     const output = renderBoardLlmsTxt(
       site(),
       "https://acme.example.test",

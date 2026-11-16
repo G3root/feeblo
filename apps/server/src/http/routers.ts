@@ -40,6 +40,7 @@ export const BetterAuthRouterLive = HttpRouter.use((router) =>
     const forward = (request: HttpServerRequest.HttpServerRequest) =>
       Effect.gen(function* () {
         const clientIp = yield* ClientIp;
+
         const authApp = HttpEffect.fromWebHandler((webRequest) => {
           // Overwrite this internal header at the HTTP boundary. Better Auth
           // cannot access the peer socket, so this is the only client-IP value
@@ -49,6 +50,7 @@ export const BetterAuthRouterLive = HttpRouter.use((router) =>
             AUTH_CLIENT_IP_HEADER,
             clientIp._tag === "ClientIpAddress" ? clientIp.address : "unknown"
           );
+
           return handleBetterAuthRequest({
             handler: auth.handler,
             headers,
@@ -64,6 +66,7 @@ export const BetterAuthRouterLive = HttpRouter.use((router) =>
       }).pipe(Effect.orDie);
 
     yield* router.add("*", "/api/auth/*", forward);
+
     for (const path of OAUTH_DISCOVERY_PATHS) {
       yield* router.add("GET", path, forward);
     }
@@ -73,6 +76,7 @@ export const BetterAuthRouterLive = HttpRouter.use((router) =>
 export const OgImageRouterLive = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const ogImageService = yield* OgImageService;
+
     return yield* router.add("GET", "/og-image", (request) =>
       handleOgImage(request).pipe(
         Effect.provideService(OgImageService, ogImageService)
@@ -107,6 +111,7 @@ export const HealthRouter: Layer.Layer<never, never, HttpRouter.HttpRouter> =
         Config.withDefault("dev"),
         Effect.orDie
       );
+
       return yield* router.add(
         "GET",
         "/health",

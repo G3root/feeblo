@@ -91,6 +91,7 @@ describe("query collection mutation read-back", () => {
   it("rejects the transaction when the required read-back fails", async () => {
     const server: Array<Row> = [{ id: "1", text: "before" }];
     let failReadBack = false;
+
     const collection = createCollection(
       queryCollectionOptions({
         id: "read-back-failing",
@@ -102,6 +103,7 @@ describe("query collection mutation read-back", () => {
           if (failReadBack) {
             throw new Error("read-back failed");
           }
+
           return server.map((row) => ({ ...row }));
         },
         getKey: (row) => row.id,
@@ -117,6 +119,7 @@ describe("query collection mutation read-back", () => {
         },
       })
     );
+
     await collection.preload();
     failReadBack = true;
 
@@ -156,6 +159,7 @@ describe("settleOptimisticMutation", () => {
 
   it("reports failure when the handler rejects", async () => {
     const server: Array<Row> = [{ id: "1", text: "before" }];
+
     const collection = createCollection(
       queryCollectionOptions({
         id: "read-back-rejecting",
@@ -170,6 +174,7 @@ describe("settleOptimisticMutation", () => {
         },
       })
     );
+
     await collection.preload();
 
     const settled = new Promise<"success" | "error">((resolve) => {

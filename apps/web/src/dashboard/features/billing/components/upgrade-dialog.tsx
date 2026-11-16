@@ -142,6 +142,7 @@ function UpgradePlanDialogContent({
 }) {
   const currentPlanType = workspacePlans[0]?.plan ?? "free";
   const { plans: rawPlans } = buildPlanCards(catalog, currentPlanType);
+
   const plans: PlanView[] = rawPlans.map((plan) => ({
     ...plan,
     productId: {
@@ -152,12 +153,15 @@ function UpgradePlanDialogContent({
 
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
+
   const [selectedPlanType, setSelectedPlanType] =
     useState<PlanType>(currentPlanType);
+
   const hasPaidPlan = currentPlanType !== "free";
 
   const selectedPlan =
     plans.find((p) => p.planType === selectedPlanType) ?? plans[0];
+
   const isCurrentPlan = selectedPlanType === currentPlanType;
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
@@ -170,6 +174,7 @@ function UpgradePlanDialogContent({
   const visibleFeatures = showAllFeatures
     ? selectedPlan.features
     : selectedPlan.features.slice(0, 6);
+
   const hiddenCount = selectedPlan.features.length - visibleFeatures.length;
 
   return (
@@ -198,6 +203,7 @@ function UpgradePlanDialogContent({
               >
                 {plans?.map((plan) => {
                   const isCurrent = plan.planType === currentPlanType;
+
                   const selectedProduct =
                     selectedInterval === "year" ? plan.year : plan.month;
 
@@ -367,6 +373,18 @@ function UpgradePlanButton({
 }) {
   const [loading, setLoading] = useState(false);
 
+  let label = `Upgrade to ${selectedPlan.name}`;
+
+  if (loading) {
+    label = "Redirecting...";
+  } else if (hasPaidPlan) {
+    label = "Manage Billing";
+  } else if (isCurrentPlan) {
+    label = "Current Plan";
+  } else if (selectedPlan.planType === "free") {
+    label = "Unavailable";
+  }
+
   return (
     <Button
       className="w-full"
@@ -380,6 +398,7 @@ function UpgradePlanButton({
         try {
           if (hasPaidPlan) {
             setLoading(true);
+
             const didStart = await startBillingPortal({
               organizationId,
             });
@@ -387,15 +406,18 @@ function UpgradePlanButton({
             if (!didStart) {
               setLoading(false);
             }
+
             return;
           }
 
           const productId = selectedPlan.productId[selectedInterval];
+
           if (!productId || productId === "free") {
             throw new Error("Missing product id");
           }
 
           setLoading(true);
+
           const didStart = await startBillingCheckout({
             organizationId,
             productId,
@@ -411,15 +433,7 @@ function UpgradePlanButton({
       size="lg"
       type="button"
     >
-      {loading
-        ? "Redirecting..."
-        : hasPaidPlan
-          ? "Manage Billing"
-          : isCurrentPlan
-            ? "Current Plan"
-            : selectedPlan.planType === "free"
-              ? "Unavailable"
-              : `Upgrade to ${selectedPlan.name}`}
+      {label}
     </Button>
   );
 }

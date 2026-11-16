@@ -84,6 +84,7 @@ describe("ContactRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
@@ -101,10 +102,12 @@ describe("ContactRpcHandlers", () => {
       )
     )
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepository.layer),
     Layer.provide(Database.PgliteDatabaseLive)
   );
+
   const TestLayer = Layer.mergeAll(
     ContactPolicy.layer.pipe(
       Layer.provide(EntitlementPolicy.layer),
@@ -209,6 +212,7 @@ describe("ContactRpcHandlers", () => {
         const contacts = yield* handlers
           .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         const byId = new Map(contacts.map((contact) => [contact.id, contact]));
 
         // No account: attribution only, nothing to email.
@@ -310,6 +314,7 @@ describe("ContactRpcHandlers", () => {
             })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.authorName).toBe("After Rename");
           // A CRM rename is metadata about the post, not a change to it.
           expect(post?.updatedAt).toEqual(now);
@@ -387,6 +392,7 @@ describe("ContactRpcHandlers", () => {
             .select({ authorName: schema.postTable.authorName })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.authorName).toBe("renamed-address@example.com");
         })
     );
@@ -408,6 +414,7 @@ describe("ContactRpcHandlers", () => {
         const contacts = yield* handlers
           .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(contacts).toHaveLength(1);
         expect(contacts[0]).toMatchObject({
           name: "Ada",
@@ -429,6 +436,7 @@ describe("ContactRpcHandlers", () => {
             email: "ada@example.com",
           })
           .pipe(Effect.provideService(CurrentSession, session));
+
         const contactId = yield* ContactId.parse(created.id);
 
         const updated = yield* handlers
@@ -439,6 +447,7 @@ describe("ContactRpcHandlers", () => {
             phone: "+44 20 0000 0000",
           })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(updated).toMatchObject({
           id: created.id,
           name: "Ada Lovelace",
@@ -456,6 +465,7 @@ describe("ContactRpcHandlers", () => {
         const contacts = yield* handlers
           .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(contacts).toHaveLength(0);
       })
     );
@@ -530,6 +540,7 @@ describe("ContactRpcHandlers", () => {
         const users = yield* db
           .select({ id: schema.userTable.id, name: schema.userTable.name })
           .from(schema.userTable);
+
         expect(
           users.find((user) => user.id === "user_shadow_contact")?.name
         ).toBe("New Name");
@@ -580,6 +591,7 @@ describe("ContactRpcHandlers", () => {
             .select({ id: schema.userTable.id })
             .from(schema.userTable)
             .where(eq(schema.userTable.id, shadowId));
+
           expect(shadow).toBeUndefined();
         })
     );
@@ -637,6 +649,7 @@ describe("ContactRpcHandlers", () => {
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
           .where(eq(schema.userTable.id, shadowId));
+
         expect(shadow?.id).toBe(shadowId);
       })
     );
@@ -692,6 +705,7 @@ describe("ContactRpcHandlers", () => {
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
           .where(eq(schema.userTable.id, shadowId));
+
         expect(shadow?.id).toBe(shadowId);
       })
     );
@@ -751,6 +765,7 @@ describe("ContactRpcHandlers", () => {
                 `email_sub_${fixture.organizationId}`
               )
             );
+
           expect(subscription?.state).toBe("unsubscribed");
           expect(subscription?.unsubscribedAt).not.toBeNull();
 
@@ -759,6 +774,7 @@ describe("ContactRpcHandlers", () => {
             .select({ id: schema.contactTable.id })
             .from(schema.contactTable)
             .where(eq(schema.contactTable.id, contactId));
+
           expect(contact?.id).toBe(contactId);
         })
     );
@@ -802,6 +818,7 @@ describe("ContactRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(room.canCreate).toBe(true);
 
         // `free` is the only capped plan and allows 10 CRM entries; the
@@ -822,6 +839,7 @@ describe("ContactRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(full.canCreate).toBe(false);
       })
     );
@@ -877,11 +895,13 @@ describe("ContactRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(error._tag).toBe("BadRequestError");
 
         const contacts = yield* handlers
           .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(contacts).toHaveLength(0);
       })
     );
@@ -915,11 +935,13 @@ describe("ContactRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(error._tag).toBe("BadRequestError");
 
         const contacts = yield* handlers
           .ListContacts({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(contacts).toHaveLength(0);
       })
     );
@@ -962,11 +984,13 @@ describe("ContactRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(error._tag).toBe("PolicyDenied");
 
           const contacts = yield* handlers
             .ListContacts({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(contacts).toHaveLength(0);
         })
     );
@@ -999,6 +1023,7 @@ describe("ContactRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -1044,6 +1069,7 @@ describe("ContactRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(error._tag).toBe("PolicyDenied");
         })
     );

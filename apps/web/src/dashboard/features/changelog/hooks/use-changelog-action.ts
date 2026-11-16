@@ -17,6 +17,7 @@ export const useChangelogAction = () => {
   const organizationId = useOrganizationId();
   const { changelogCollection, membersCollection } = useDashboardCollections();
   const { data: session } = useAuthState();
+
   const { allowed: canCreate } = usePolicy(
     hasPermission(organizationId, "changelog.create")
   );
@@ -49,6 +50,7 @@ export const useChangelogAction = () => {
       const id = await ChangelogId.unsafeGenerate();
       const title = "Untitled changelog";
       const slug = `${slugify(title) || "changelog"}-${id.slice(-6)}`;
+
       const tx = changelogCollection.insert({
         id,
         title,

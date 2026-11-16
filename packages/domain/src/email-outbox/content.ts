@@ -15,6 +15,7 @@ import type {
 
 /** A custom domain is stored as a bare host, but a person may paste a URL. */
 const urlSchemePattern = /^https?:\/\//;
+
 /** The trailing slash the same paste may carry. */
 const trailingSlashPattern = /\/$/;
 
@@ -171,6 +172,7 @@ export const isChangelogPubliclyVisible = (
   transaction(
     Effect.gen(function* () {
       const db = yield* Database.Database;
+
       const [site] = yield* db
         .select({
           changelogVisibility: schema.siteTable.changelogVisibility,
@@ -178,15 +180,18 @@ export const isChangelogPubliclyVisible = (
         .from(schema.siteTable)
         .where(eq(schema.siteTable.organizationId, organizationId))
         .limit(1);
+
       if (!(site && site.changelogVisibility === "PUBLIC")) {
         return false;
       }
+
       // When the intent targets one entry, the entry itself must still be
       // published: an unpublish between intent recording and send must not
       // email subscribers a dead link.
       if (changelogId === undefined) {
         return true;
       }
+
       const [entry] = yield* db
         .select({ status: schema.changelogTable.status })
         .from(schema.changelogTable)
@@ -197,6 +202,7 @@ export const isChangelogPubliclyVisible = (
           )
         )
         .limit(1);
+
       return entry?.status === PUBLISHED_CHANGELOG_STATUS;
     })
   );
@@ -209,8 +215,10 @@ const buildPublicSiteUrl = (
     const host = site.customDomain
       .replace(urlSchemePattern, "")
       .replace(trailingSlashPattern, "");
+
     return `https://${host}`;
   }
+
   return `https://${site.subdomain}.${appRootDomain}`;
 };
 
@@ -228,9 +236,11 @@ export const resolveSubscriptionNotificationContent = (
         // The public URL must point at the public site (customDomain or
         // subdomain.${appRootDomain}), not the dashboard appUrl.
         const changelogId = intent.payload.changelogId;
+
         return yield* transaction(
           Effect.gen(function* () {
             const txDb = yield* Database.Database;
+
             const site = yield* txDb.query.siteTable.findFirst({
               where: { organizationId: intent.organizationId },
               columns: {
@@ -239,9 +249,11 @@ export const resolveSubscriptionNotificationContent = (
                 subdomain: true,
               },
             });
+
             if (!site || site.changelogVisibility !== "PUBLIC") {
               return undefined;
             }
+
             const changelog = yield* txDb.query.changelogTable.findFirst({
               where: {
                 id: changelogId,
@@ -260,9 +272,11 @@ export const resolveSubscriptionNotificationContent = (
                 title: true,
               },
             });
+
             if (!changelog) {
               return undefined;
             }
+
             const [organization, categories] = yield* Effect.all(
               [
                 txDb.query.organizationTable.findFirst({
@@ -288,7 +302,9 @@ export const resolveSubscriptionNotificationContent = (
               ],
               { concurrency: 2 }
             );
+
             const categoryNames = categories.map((row) => row.name);
+
             const publishedAtLabel = changelog.publishedAt
               ? new Intl.DateTimeFormat("en-US", {
                   month: "long",
@@ -299,8 +315,10 @@ export const resolveSubscriptionNotificationContent = (
                   timeZone: "UTC",
                 }).format(changelog.publishedAt)
               : null;
+
             const effectiveRootDomain = appRootDomain || new URL(appUrl).host;
             const publicSiteUrl = buildPublicSiteUrl(site, effectiveRootDomain);
+
             return {
               template: "changelog" as const,
               topic: { topicType: "changelog" as const, topicId: null },
@@ -324,6 +342,7 @@ export const resolveSubscriptionNotificationContent = (
           })
         );
       }
+
       case "post.status_changed":
       case "post.merged":
       case "post.unmerged":
@@ -335,6 +354,7 @@ export const resolveSubscriptionNotificationContent = (
         // Captured outside the transaction closure: TypeScript narrowing of a
         // property path does not survive into a nested closure.
         const actorUserId = intent.payload.actorUserId;
+
         // A merge notification is about the source post but must land on the
         // surviving target: the source is archived and its public URL
         // redirects. An unmerge reverses that: the source is live again, so it
@@ -343,18 +363,23 @@ export const resolveSubscriptionNotificationContent = (
           intent.payload.kind === "post.merged"
             ? intent.payload.targetPostId
             : postId;
+
         // The other post the event names: the merged-away source for a merge,
         // the survivor for an unmerge. Both titles make the email readable
         // without opening either post.
-        const counterpartPostId =
-          intent.payload.kind === "post.merged"
-            ? intent.payload.postId
-            : intent.payload.kind === "post.unmerged"
-              ? intent.payload.targetPostId
-              : undefined;
+        const { payload } = intent;
+        let counterpartPostId: string | undefined;
+
+        if (payload.kind === "post.merged") {
+          counterpartPostId = payload.postId;
+        } else if (payload.kind === "post.unmerged") {
+          counterpartPostId = payload.targetPostId;
+        }
+
         return yield* transaction(
           Effect.gen(function* () {
             const txDb = yield* Database.Database;
+
             const post = yield* txDb.query.postTable.findFirst({
               where: {
                 id: urlPostId,
@@ -366,9 +391,11 @@ export const resolveSubscriptionNotificationContent = (
                 postStatus: { columns: { type: true } },
               },
             });
+
             if (!post) {
               return undefined;
             }
+
             // A closure notification asserts a fact, so it is re-checked at send
             // time the way the changelog path re-checks `status = 'published'`:
             // a post reopened between the intent and the send must not announce
@@ -380,6 +407,7 @@ export const resolveSubscriptionNotificationContent = (
             ) {
               return undefined;
             }
+
             const counterpart = counterpartPostId
               ? yield* txDb.query.postTable.findFirst({
                   where: {
@@ -389,6 +417,7 @@ export const resolveSubscriptionNotificationContent = (
                   columns: { title: true },
                 })
               : undefined;
+
             // The actor is snapshotted into the intent; an integration or an
             // import has no user id, and the copy falls back to the passive
             // voice rather than guessing.
@@ -399,7 +428,9 @@ export const resolveSubscriptionNotificationContent = (
                     where: { id: actorUserId },
                     columns: { name: true },
                   });
+
             const actorName = actor?.name ?? null;
+
             // Members can open the dashboard; a public-board link is the
             // canonical reader view for everyone else (and for members too).
             // A private board has no public spelling, so it stays on appUrl.
@@ -410,11 +441,14 @@ export const resolveSubscriptionNotificationContent = (
                     columns: { customDomain: true, subdomain: true },
                   })
                 : undefined;
+
             const effectiveRootDomain = appRootDomain || new URL(appUrl).host;
+
             const url =
               site == null
                 ? `${appUrl}/${intent.organizationId}/post/${post.board?.slug ?? ""}/${post.slug}`
                 : `${buildPublicSiteUrl(site, effectiveRootDomain)}/p/${post.slug}`;
+
             // The subject of a merge email is the source post that was
             // folded in, even though the link points at the target. For an
             // unmerge the linked post (the restored source) is the subject.
@@ -422,10 +456,12 @@ export const resolveSubscriptionNotificationContent = (
               payloadKind === "post.merged"
                 ? (counterpart?.title ?? post.title)
                 : post.title;
+
             const counterpartTitle = counterpart?.title ?? "another post";
             const statusLabel = titleCase(post.postStatus?.type ?? "updated");
             let event = `moved to ${statusLabel}`;
             let body: string;
+
             switch (payloadKind) {
               case "post.merged":
                 event = "merged";
@@ -455,6 +491,7 @@ export const resolveSubscriptionNotificationContent = (
                     : `${actorName} moved this post to ${statusLabel}.`;
                 break;
             }
+
             return {
               template: "subscription-notification" as const,
               topic: {
@@ -473,6 +510,7 @@ export const resolveSubscriptionNotificationContent = (
           })
         );
       }
+
       default:
         return undefined;
     }

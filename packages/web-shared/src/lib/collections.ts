@@ -216,6 +216,7 @@ export function settleOptimisticMutation(
     transaction = mutate();
   } catch {
     onError();
+
     return;
   }
 

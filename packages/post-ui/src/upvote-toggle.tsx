@@ -56,6 +56,7 @@ function useUpvote({
         )
         .select(({ upvote }) => ({ id: upvote.id })),
   });
+
   const upvotes = upvotesQuery.data;
 
   const userUpvoteQuery = useLiveQuery({
@@ -68,6 +69,7 @@ function useUpvote({
     ],
     query: (q) => {
       if (!session) return undefined;
+
       return q
         .from({ upvote: upvoteCollection })
         .where(({ upvote }) =>
@@ -87,19 +89,23 @@ function useUpvote({
   // signed-in visitor's own vote resolves.
   const isLoading =
     isLiveQueryPending(upvotesQuery) || isLiveQueryPending(userUpvoteQuery);
+
   const upvoteCount = upvotes?.length ?? 0;
   const isUpvoted = !!userUpvoteQuery.data;
 
   const onToggle = async () => {
     if (disabled) return;
+
     if (!session) {
       onAuthRequired?.();
+
       return;
     }
 
     const userId = session.user.id;
     const key = getUpvoteCollectionKey({ userId, postId });
     const intendedUpvoted = !upvoteCollection.has(key);
+
     const membership = session.memberships.find(
       (m) => m.organizationId === organizationId && m.userId === session.user.id
     );
@@ -109,12 +115,14 @@ function useUpvote({
     // treat a row that already matches the intended state as success so a
     // retry cannot toggle it back.
     await upvoteCollection.utils.refetch({ throwOnError: true });
+
     if (upvoteCollection.has(key) === intendedUpvoted) {
       return;
     }
 
     if (intendedUpvoted) {
       const upvoteId = await UpvoteId.unsafeGenerate();
+
       const tx = upvoteCollection.insert({
         id: upvoteId,
         createdAt: new Date(),
@@ -130,6 +138,7 @@ function useUpvote({
           image: session.user.image ?? null,
         },
       });
+
       await tx.when("settled");
     } else {
       const tx = upvoteCollection.delete(key);
@@ -237,6 +246,7 @@ export interface UpvoteButtonProps {
 
 export function UpvoteButton({ variant }: UpvoteButtonProps) {
   const { isLocked, isMerged, post, organizationId } = usePostCollectionData();
+
   const {
     collections: { upvoteCollection },
     onAuthRequired,
@@ -343,9 +353,11 @@ const UpvoteToggleContext = createContext<UpvoteToggleContextValue | null>(
 
 function useUpvoteToggleContext() {
   const value = use(UpvoteToggleContext);
+
   if (!value) {
     throw new Error("UpvoteToggle components must be used within Provider.");
   }
+
   return value;
 }
 

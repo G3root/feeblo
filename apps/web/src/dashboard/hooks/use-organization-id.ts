@@ -7,6 +7,7 @@ export const useOrganizationId = (): string => {
       return params?.organizationId;
     },
   });
+
   if (!organizationId) {
     throw new Error("Organization ID is required");
   }

@@ -144,20 +144,25 @@ export function ViewTabStrip({
   // strip. The chain swallows rejections so one failed write cannot skip every
   // later one; each caller reports its own failure below.
   const reorderQueue = useRef<Promise<void>>(Promise.resolve());
+
   const ownedRows = useMemo(
     () => rows.filter((view) => view.memberId === currentMemberId),
     [currentMemberId, rows]
   );
+
   const sharedRows = useMemo(
     () => rows.filter((view) => view.memberId !== currentMemberId),
     [currentMemberId, rows]
   );
+
   const orderedOwned = useMemo(() => {
     if (pendingOrder === null) {
       return ownedRows;
     }
+
     const byId = new Map(ownedRows.map((view) => [view.id, view]));
     const pendingIds = new Set(pendingOrder);
+
     const pendingRows = pendingOrder.flatMap((id) => {
       const row = byId.get(id);
 
@@ -172,6 +177,7 @@ export function ViewTabStrip({
       ...ownedRows.filter((view) => !pendingIds.has(view.id)),
     ];
   }, [ownedRows, pendingOrder]);
+
   const ordered = useMemo(
     () => [...orderedOwned, ...sharedRows],
     [orderedOwned, sharedRows]
@@ -203,10 +209,12 @@ export function ViewTabStrip({
   const [visibleCount, setVisibleCount] = useState(tabs.length);
   const areaRef = useRef<HTMLDivElement | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
+
   const hiddenTabs = useMemo(
     () => tabs.slice(visibleCount),
     [tabs, visibleCount]
   );
+
   // Whether the popover is rendered changes the space the strip may use, so a
   // measurement has to follow the flip. Reserving a button can only hide more
   // tabs, never all of them, so the two states cannot oscillate.
@@ -219,6 +227,7 @@ export function ViewTabStrip({
     if (!area || !strip) {
       return;
     }
+
     // Returning the previous count on an unchanged measurement keeps React from
     // re-rendering on every observed notification.
     const next = measureTabs(area, strip, hasOverflow);
@@ -243,6 +252,7 @@ export function ViewTabStrip({
     if (!area) {
       return undefined;
     }
+
     // The area, not the strip: the strip's own box is what the measurement
     // changes, and observing it would re-enter this effect's own output.
     const observer = new ResizeObserver(measure);
@@ -279,6 +289,7 @@ export function ViewTabStrip({
     if (event.canceled) {
       return;
     }
+
     const { source } = event.operation;
 
     // The sortable plugin reorders as the pointer moves and writes the
@@ -298,6 +309,7 @@ export function ViewTabStrip({
     if (moved === undefined) {
       return;
     }
+
     // Shared pills are disabled drop sources, but the pointer can still end on
     // one; that means "the end of my own list" rather than an index past it.
     const targetIndex = Math.min(source.index, ids.length);
@@ -318,6 +330,7 @@ export function ViewTabStrip({
       ? tab.id === activeViewId
       : BUILT_IN_VIEWS[tab.fixed].id === activeViewId
   );
+
   const activeTabIsHidden =
     activeTab !== undefined && activeTab.id !== undefined
       ? hiddenTabs.some((tab) => tab.id === activeTab.id)
@@ -438,16 +451,19 @@ const measureTabs = (
   }
 
   const gap = Number.parseFloat(getComputedStyle(area).columnGap) || 0;
+
   const createWidth =
     area
       .querySelector<HTMLElement>("[data-view-tabs-create]")
       ?.getBoundingClientRect().width ?? 0;
+
   // The retry control only exists while the saved-view read is failed, and its
   // label is fixed, so measuring it here cannot feed back into `visibleCount`.
   const retryWidth =
     area
       .querySelector<HTMLElement>("[data-view-tabs-retry]")
       ?.getBoundingClientRect().width ?? 0;
+
   // The "more" button is reserved at its *maximum* width rather than at its
   // measured width: its label is the active tab's name when that tab is the one
   // clipped, so measuring the label would make the count depend on its own
@@ -457,6 +473,7 @@ const measureTabs = (
     (createWidth > 0 ? createWidth + gap : 0) +
     (retryWidth > 0 ? retryWidth + gap : 0) +
     (hasOverflow ? OVERFLOW_TAB_BUTTON_MAX_PX + gap : 0);
+
   return countFittingTabs({
     available: areaWidth - reserved,
     gap,

@@ -16,11 +16,13 @@ export const statusDisplayName = (
   type: TPostStatusType
 ): string => {
   const trimmed = label.trim();
+
   if (trimmed.length > 0) {
     return trimmed;
   }
 
   const [first = "", ...rest] = type.toLowerCase().split("_");
   const capitalized = first.charAt(0).toUpperCase() + first.slice(1);
+
   return [capitalized, ...rest].join(" ");
 };

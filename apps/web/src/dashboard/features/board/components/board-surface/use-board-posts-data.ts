@@ -89,6 +89,7 @@ export function useBoardPostsData({
     postTagCollection,
     upvoteCollection,
   } = useDashboardCollections();
+
   const { filters, ordering } = query;
   const statusFilter = filters.status;
   const tagFilter = filters.tag;
@@ -166,6 +167,7 @@ export function useBoardPostsData({
       // selected this join is an inert no-op rather than a branch.
       const requireAllTags =
         tagOperator === "includeAllOf" || tagOperator === "excludeIfAllOf";
+
       const matchingTags = q
         .from({ postTag: postTagCollection })
         .where(({ postTag }) =>
@@ -263,6 +265,7 @@ export function useBoardPostsData({
               isNull(matchingTags.postId),
               isUndefined(matchingTags.postId)
             );
+
             if (
               tagFilter.operator === "excludeIfAnyOf" ||
               tagFilter.operator === "excludeIfAllOf"
@@ -286,23 +289,33 @@ export function useBoardPostsData({
           return condition;
         });
 
-      const orderedQuery =
-        ordering.field === "title"
-          ? filteredQuery.orderBy(({ post }) => post.title, ordering.direction)
-          : ordering.field === "updatedAt"
-            ? filteredQuery.orderBy(
-                ({ post }) => post.updatedAt,
-                ordering.direction
-              )
-            : ordering.field === "upvoteCount"
-              ? filteredQuery.orderBy(
-                  ({ upvoteCounts }) => coalesce(upvoteCounts.upvoteCount, 0),
-                  ordering.direction
-                )
-              : filteredQuery.orderBy(
-                  ({ post }) => post.createdAt,
-                  ordering.direction
-                );
+      let orderedQuery = filteredQuery.orderBy(
+        ({ post }) => post.createdAt,
+        ordering.direction
+      );
+
+      switch (ordering.field) {
+        case "title":
+          orderedQuery = filteredQuery.orderBy(
+            ({ post }) => post.title,
+            ordering.direction
+          );
+          break;
+        case "updatedAt":
+          orderedQuery = filteredQuery.orderBy(
+            ({ post }) => post.updatedAt,
+            ordering.direction
+          );
+          break;
+        case "upvoteCount":
+          orderedQuery = filteredQuery.orderBy(
+            ({ upvoteCounts }) => coalesce(upvoteCounts.upvoteCount, 0),
+            ordering.direction
+          );
+          break;
+        default:
+          break;
+      }
 
       return orderedQuery.select(
         ({ board, post, postStatus, upvoteCounts }) => ({

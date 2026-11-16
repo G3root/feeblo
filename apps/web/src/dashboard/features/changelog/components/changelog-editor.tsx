@@ -148,11 +148,14 @@ function useChangelogEditorForm({
           organizationId,
           { assetIds: changelog.assetIds, scope: editorScope }
         );
+
         const { assetIds: contentAssetIds, content } = finalized;
+
         const assetIds = [
           ...contentAssetIds,
           ...(coverImageAssetRef.current ? [coverImageAssetRef.current] : []),
         ];
+
         const payload = updatedChangelogSchema.parse({
           id: changelog.id,
           title: value.title.trim(),
@@ -242,10 +245,12 @@ export function ChangelogEditorProvider({
   const [editorScope] = useState(() => crypto.randomUUID());
   const coverImageAssetRef = useRef<string | null>(null);
   const formResetKey = `${changelog.id}:${changelog.updatedAt.getTime()}`;
+
   // Backend mirror: ChangelogPolicy.canUpdate requires changelog.*.
   const { allowed: isOwner } = usePolicy(
     hasPermission(organizationId, "changelog.*")
   );
+
   const form = useChangelogEditorForm({
     changelog,
     editorScope,
@@ -269,6 +274,7 @@ export function ChangelogEditorProvider({
       const tx = changelogCollection.delete(changelog.id, {
         optimistic: false,
       });
+
       await tx.when("settled");
       trackEvent("changelog_deleted", { success: true });
 
@@ -293,6 +299,7 @@ export function ChangelogEditorProvider({
   const submitDefault = useCallback(() => {
     void form.handleSubmit({ successTitle: "Changes saved" });
   }, [form]);
+
   const value = useMemo<ChangelogEditorContextValue>(
     () => ({
       changelog,
@@ -409,16 +416,19 @@ export function ChangelogEditorTitleField() {
 export function ChangelogEditorCoverImageField() {
   const { coverImageAssetRef, form, isOwner, organizationId } =
     useChangelogEditor();
+
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const uploadCoverImage = async (file: File) => {
     setIsUploading(true);
+
     try {
       const { assetId, url } = await uploadChangelogCoverImage(
         file,
         organizationId
       );
+
       coverImageAssetRef.current = assetId;
       form.setFieldValue("coverImage", url);
       toastManager.add({
@@ -510,9 +520,11 @@ export function ChangelogEditorCoverImageField() {
             disabled={!isOwner}
             onChange={(event) => {
               const file = event.target.files?.[0];
+
               if (file) {
                 uploadCoverImage(file).catch(() => undefined);
               }
+
               event.target.value = "";
             }}
             ref={inputRef}
@@ -604,6 +616,7 @@ export function ChangelogEditorContentField() {
     useChangelogEditor();
 
   const isDisabled = !isOwner;
+
   return (
     <form.Field name="content">
       {(field) => (
@@ -623,6 +636,7 @@ export function ChangelogEditorContentField() {
 
 export function ChangelogEditorDetails() {
   const { changelog } = useChangelogEditor();
+
   const details: Array<{
     icon: typeof Link03Icon;
     label: string;
@@ -721,9 +735,11 @@ export function ChangelogEditorCategoryField() {
           )
         ),
   });
+
   const links = linksQuery.data ?? [];
 
   const selectedCategoryIds = new Set(links.map((link) => link.categoryId));
+
   const selectedCategories = categories.filter((category) =>
     selectedCategoryIds.has(category.id)
   );
@@ -732,6 +748,7 @@ export function ChangelogEditorCategoryField() {
     if (!isOwner) {
       return;
     }
+
     try {
       await fetchRpc((rpc) =>
         rpc.SetChangelogCategories({
@@ -756,11 +773,13 @@ export function ChangelogEditorCategoryField() {
   const handleValueChange = async (nextSelected: typeof selectedCategories) => {
     const nextIds = new Set(nextSelected.map((category) => category.id));
     const nextCategoryIds: string[] = [];
+
     for (const category of categories) {
       if (nextIds.has(category.id)) {
         nextCategoryIds.push(category.id);
       }
     }
+
     await updateCategories(nextCategoryIds);
   };
 
@@ -781,11 +800,13 @@ export function ChangelogEditorCategoryField() {
     );
 
     const nextCategoryIds: string[] = [];
+
     for (const link of currentLinks) {
       if (link.categoryId !== categoryId) {
         nextCategoryIds.push(link.categoryId);
       }
     }
+
     await updateCategories(nextCategoryIds);
   };
 

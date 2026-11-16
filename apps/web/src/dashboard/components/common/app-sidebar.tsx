@@ -70,6 +70,7 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const organizationId = useOrganizationId();
+
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -215,6 +216,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 function CreateBoardButton() {
   const organizationId = useOrganizationId();
   const store = useCreateBoardDialogContext();
+
   // Backend mirror: BoardPolicy.canCreate requires admin/owner boards.create.
   const { allowed: canCreateBoard } = usePolicy(
     hasPermission(organizationId, "boards.create")
@@ -240,6 +242,7 @@ function CreateBoardButton() {
 function BoardList() {
   const organizationId = useOrganizationId();
   const boardQuery = useOrgBoards(organizationId);
+
   // The shared org-boards query is unordered; the sidebar keeps its
   // newest-first order locally.
   const boards = useMemo(
@@ -289,9 +292,11 @@ interface BoardItemProp {
 
 function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
   const organizationId = useOrganizationId();
+
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+
   return (
     <SkeletonWrapper>
       <SidebarMenuItem>
@@ -329,6 +334,7 @@ function BoardMenu({ boardPublicId }: BoardMenuProps) {
       hasPermission(organizationId, "boards.delete")
     )
   );
+
   return (
     <Menu>
       <MenuTrigger
@@ -400,6 +406,7 @@ const RenameBoardButton = ({
   disabled?: boolean;
 }) => {
   const store = useRenameBoardDialogContext();
+
   return (
     <MenuItem
       disabled={disabled}

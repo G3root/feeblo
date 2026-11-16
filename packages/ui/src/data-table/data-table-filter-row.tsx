@@ -50,10 +50,12 @@ export function FilterRow<TData extends RowData>({
   onFilterRemove,
 }: FilterRowProps<TData>) {
   const label = column.columnDef.meta?.label ?? column.id;
+
   const operatorOptions = getFilterOperators(filter.variant).map((option) => ({
     label: option.label,
     value: option.value,
   }));
+
   const fieldItems = columns.map((item) => ({
     label: item.columnDef.meta?.label ?? item.id,
     value: item.id,
@@ -65,6 +67,7 @@ export function FilterRow<TData extends RowData>({
         items={fieldItems}
         onValueChange={(columnId) => {
           const nextColumn = columns.find((item) => item.id === columnId);
+
           if (!nextColumn) return;
           onFilterUpdate(filter.filterId, {
             ...getDefaultFilter(nextColumn),

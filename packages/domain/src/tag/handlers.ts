@@ -37,6 +37,7 @@ const validateTagIds = ({
 }) =>
   Effect.gen(function* () {
     const repository = yield* TagRepository;
+
     const count = yield* repository.countExistingTags({
       organizationId,
       tagIds,
@@ -115,6 +116,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
     CreateTag: (args: TTagCreate) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+
         const membership = session.memberships.find(
           (entry) => entry.organizationId === args.organizationId
         );
@@ -204,6 +206,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         const membership = Policy.getMembership(session, args.organizationId);
         const tagIds = normalizeTagIds(args.tagIds);
+
         // The post and the tags are validated by the same repository and
         // neither check needs the other's answer, so they run together: one
         // round trip instead of two. The verdicts are collected rather than
@@ -222,6 +225,7 @@ export const TagRpcHandlersEffect = Effect.gen(function* () {
           ],
           { concurrency: "unbounded", mode: "result" }
         );
+
         yield* Effect.fromResult(postCheck);
         yield* Effect.fromResult(tagCheck);
 

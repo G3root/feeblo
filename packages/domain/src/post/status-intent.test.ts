@@ -24,6 +24,7 @@ const dateAt = (instant: string | number | Date): Date =>
   DateTime.toDateUtc(DateTime.makeUnsafe(instant));
 
 const NOW = dateAt("2026-08-09T00:00:00.000Z");
+
 const WINDOW_MS = Duration.toMillis(postStatusCoalescingWindow);
 
 /**
@@ -108,6 +109,7 @@ describe("recordPostStatusChangeIntent", () => {
         const repository = yield* EmailOutboxRepository;
 
         yield* createOrganization(organizationId);
+
         const outboxId = yield* record(
           organizationId,
           CLOSING_POST_STATUS_TYPE,
@@ -115,6 +117,7 @@ describe("recordPostStatusChangeIntent", () => {
         );
 
         expect(outboxId).toBeDefined();
+
         const pending = yield* repository.findPending({
           before: NOW,
           organizationId,
@@ -133,6 +136,7 @@ describe("recordPostStatusChangeIntent", () => {
         const repository = yield* EmailOutboxRepository;
 
         yield* createOrganization(organizationId);
+
         const outboxId = yield* record(
           organizationId,
           "IN_PROGRESS",

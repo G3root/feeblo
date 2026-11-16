@@ -89,10 +89,13 @@ export function NewUserDialog({
   const handleSubmit = async () => {
     const nextName = name.trim();
     const nextEmail = email.trim();
+
     if (!nextName) {
       setError(m.keen_trite_gecko());
+
       return;
     }
+
     // The deliverability check mirrors the server's `AuthorEmail` filter
     // (`PostCreateAuthor.email`): without it, dotted junk passes the dialog
     // and fails on submit with a raw RPC error.
@@ -101,10 +104,13 @@ export function NewUserDialog({
       !isDeliverableAuthorEmail(nextEmail)
     ) {
       setError(m.tense_super_wallaby());
+
       return;
     }
+
     setError(null);
     setIsSubmitting(true);
+
     try {
       await onSubmit({ email: nextEmail, name: nextName });
       onOpenChange(false);
@@ -119,6 +125,7 @@ export function NewUserDialog({
     <Dialog
       onOpenChange={(nextOpen) => {
         onOpenChange(nextOpen);
+
         if (!nextOpen) {
           reset();
         }

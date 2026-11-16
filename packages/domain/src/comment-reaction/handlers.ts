@@ -77,6 +77,7 @@ export const CommentReactionRpcHandlersEffect = Effect.gen(function* () {
   const toggleReaction = toggleWrite.handlers((surface, args) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+
       const request = {
         commentId: args.commentId,
         emoji: args.emoji,

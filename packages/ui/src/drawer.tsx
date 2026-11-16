@@ -359,6 +359,7 @@ export function DrawerBar({
   const { position: contextPosition } = useContext(DrawerContext);
   const position = positionProp ?? contextPosition;
   const horizontal = position === "left" || position === "right";
+
   const defaultProps = {
     "aria-hidden": true as const,
     className: cn(

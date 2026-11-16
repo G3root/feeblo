@@ -169,6 +169,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
             .where(
               eq(schema.commentReactionTable.id, existingReaction.value.id)
             );
+
           return { reacted: false, emoji: null };
         }
 
@@ -248,6 +249,7 @@ const makeCommentReactionRepository = Effect.gen(function* () {
             .where(
               eq(schema.commentReactionTable.id, existingReaction.value.id)
             );
+
           return { reacted: false, emoji: null };
         }
 

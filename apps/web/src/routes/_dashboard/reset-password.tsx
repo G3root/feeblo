@@ -129,6 +129,7 @@ function RouteComponent() {
       let response: Awaited<
         ReturnType<typeof authClient.emailOtp.resetPassword>
       >;
+
       try {
         response = await authClient.emailOtp.resetPassword({
           email,
@@ -148,6 +149,7 @@ function RouteComponent() {
             },
           },
         });
+
         return;
       }
 
@@ -162,6 +164,7 @@ function RouteComponent() {
             type: "error",
           });
           send({ type: "CODE_REJECTED" });
+
           return;
         }
 
@@ -174,6 +177,7 @@ function RouteComponent() {
             },
           },
         });
+
         return;
       }
 

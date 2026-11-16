@@ -40,6 +40,7 @@ test.describe("changelog editor", () => {
           document.documentElement.dataset.changelogEditorEmptyState = "seen";
         }
       };
+
       check();
       new MutationObserver(check).observe(document.body, {
         childList: true,

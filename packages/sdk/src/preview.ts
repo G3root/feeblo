@@ -42,9 +42,11 @@ function isWidgetPlacement(value: string | null): value is WidgetPlacement {
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is the helper's contract: the caller names the element type once instead of every call site repeating `as HTMLInputElement`.
 function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
+
   if (!element) {
     throw new Error(`Preview element not found: ${selector}`);
   }
+
   return element;
 }
 
@@ -52,19 +54,25 @@ function readConfig(): PreviewConfig {
   const params = new URLSearchParams(window.location.search);
   const requestedMode = params.get("mode");
   const mode = isWidgetMode(requestedMode) ? requestedMode : DEFAULTS.mode;
+
   const requestedModules = (params.get("modules") ?? "")
     .split(",")
     .filter(isWidgetModule);
+
   const modules = [
     ...new Set(
       requestedModules.length > 0 ? requestedModules : DEFAULTS.modules
     ),
   ];
+
   const requestedPlacement = params.get("placement");
+
   const placement = isWidgetPlacement(requestedPlacement)
     ? requestedPlacement
     : undefined;
+
   const userId = params.get("userId")?.trim();
+
   const user: UserIdentity | undefined = userId
     ? {
         id: userId,
@@ -85,25 +93,39 @@ function readConfig(): PreviewConfig {
 }
 
 const statusOutput = requiredElement<HTMLOutputElement>("#preview-status");
+
 const urlOutput = requiredElement<HTMLOutputElement>("#url-output");
+
 const embedRoot = requiredElement<HTMLElement>("#embed-root");
+
 const organizationInput = requiredElement<HTMLInputElement>("#organization-id");
+
 const baseUrlInput = requiredElement<HTMLInputElement>("#base-url");
+
 const userIdInput = requiredElement<HTMLInputElement>("#user-id");
+
 const userNameInput = requiredElement<HTMLInputElement>("#user-name");
+
 const userEmailInput = requiredElement<HTMLInputElement>("#user-email");
+
 const hubOptions = requiredElement<HTMLElement>("#hub-options");
+
 const openFeedbackButton = requiredElement<HTMLButtonElement>("#open-feedback");
+
 const openUpdatesButton = requiredElement<HTMLButtonElement>("#open-updates");
+
 const productFeedbackButton =
   requiredElement<HTMLButtonElement>("#product-feedback");
+
 const copyUrlButton = requiredElement<HTMLButtonElement>("#copy-url");
 
 let widget: FeebloWidget;
+
 const inputTimers = new WeakMap<HTMLInputElement, number>();
 
 function updateUrl(patch: Record<string, string | undefined>): void {
   const url = new URL(window.location.href);
+
   for (const [key, value] of Object.entries(patch)) {
     if (value) {
       url.searchParams.set(key, value);
@@ -111,6 +133,7 @@ function updateUrl(patch: Record<string, string | undefined>): void {
       url.searchParams.delete(key);
     }
   }
+
   window.history.replaceState({}, "", url);
   initializePreview();
 }
@@ -119,19 +142,23 @@ function setChoiceState(config: PreviewConfig): void {
   interface PreviewFieldValues {
     readonly [key: string]: string;
   }
+
   const values: PreviewFieldValues = {
     mode: config.mode,
     modules: config.modules.join(","),
     placement: config.placement ?? "",
     theme: config.theme,
   };
+
   for (const control of document.querySelectorAll<HTMLElement>(
     "[data-control]"
   )) {
     const name = control.dataset.control;
+
     if (!name) {
       continue;
     }
+
     for (const button of control.querySelectorAll<HTMLButtonElement>(
       "[data-value]"
     )) {
@@ -151,14 +178,18 @@ function syncControls(config: PreviewConfig): void {
     [userNameInput, config.user?.name ?? ""],
     [userEmailInput, config.user?.email ?? ""],
   ]);
+
   for (const [input, value] of values) {
     if (document.activeElement !== input) {
       input.value = value;
     }
   }
+
   hubOptions.hidden = config.mode !== "hub";
+
   const enabledModules: WidgetModule[] =
     config.mode === "hub" ? config.modules : [config.mode];
+
   openFeedbackButton.disabled = !enabledModules.includes("feedback");
   openUpdatesButton.disabled = !enabledModules.includes("updates");
   setChoiceState(config);
@@ -197,9 +228,11 @@ function bindChoiceControls(): void {
     "[data-control]"
   )) {
     const name = control.dataset.control;
+
     if (!name) {
       continue;
     }
+
     for (const button of control.querySelectorAll<HTMLButtonElement>(
       "[data-value]"
     )) {
@@ -231,6 +264,7 @@ Feeblo.on("*", (event) => {
 });
 
 bindChoiceControls();
+
 for (const input of [
   organizationInput,
   baseUrlInput,
@@ -247,21 +281,26 @@ requiredElement<HTMLButtonElement>("#open-widget").addEventListener(
     widget.open();
   }
 );
+
 requiredElement<HTMLButtonElement>("#close-widget").addEventListener(
   "click",
   () => {
     widget.close();
   }
 );
+
 openFeedbackButton.addEventListener("click", () => {
   widget.openModule("feedback");
 });
+
 openUpdatesButton.addEventListener("click", () => {
   widget.openModule("updates");
 });
+
 productFeedbackButton.addEventListener("click", () => {
   widget.open(productFeedbackButton);
 });
+
 copyUrlButton.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(window.location.href);
@@ -269,10 +308,12 @@ copyUrlButton.addEventListener("click", async () => {
   } catch {
     copyUrlButton.textContent = "Copy failed";
   }
+
   window.setTimeout(() => {
     copyUrlButton.textContent = "Copy";
   }, 1200);
 });
 
 window.addEventListener("popstate", initializePreview);
+
 initializePreview();
