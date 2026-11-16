@@ -19,6 +19,121 @@ export type AttributeValue =
   | null
   | undefined;
 
+type ConfigValidationResult =
+  | { readonly valid: true }
+  | { readonly valid: false; readonly error: string };
+
+type AttributeConfigValue = S.Schema.Type<typeof AttributeConfig>;
+
+/** One attribute type's value check and its own config checks. */
+type AttributeTypeRules = {
+  /** Whether a non-null value has this type's runtime shape. */
+  readonly accepts: (value: AttributeValue) => boolean;
+  /** The type's configured-rule check; absent when the type has none. */
+  readonly checkConfig?: AttributeConfigCheck;
+};
+
+type AttributeConfigCheck = (input: {
+  readonly config: AttributeConfigValue;
+  readonly definition: AttributeDefinition;
+  readonly value: AttributeValue;
+}) => ConfigValidationResult;
+
+/** TEXT: an optional pattern, compiled only after the safety check. */
+const checkTextConfig: AttributeConfigCheck = ({
+  config,
+  definition,
+  value,
+}) => {
+  if (!isString(value)) {
+    return {
+      valid: false,
+      error: `Expected text value for "${definition.name}"`,
+    };
+  }
+
+  if (config.pattern === undefined) {
+    return { valid: true };
+  }
+
+  if (isPotentiallyUnsafeRegex(config.pattern)) {
+    // Never execute a pattern that can backtrack catastrophically;
+    // fail loudly so the misconfiguration surfaces instead.
+    return {
+      valid: false,
+      error: `Configured validation pattern for "${definition.name}" is unsafe and was not applied`,
+    };
+  }
+
+  try {
+    return new RegExp(config.pattern).test(value)
+      ? { valid: true }
+      : {
+          valid: false,
+          error: `Value for "${definition.name}" does not match configured rules`,
+        };
+  } catch {
+    return {
+      valid: false,
+      error: `Configured validation pattern for "${definition.name}" is invalid`,
+    };
+  }
+};
+
+/** INTEGER and DECIMAL share one optional range. */
+const checkNumericConfig: AttributeConfigCheck = ({
+  config,
+  definition,
+  value,
+}) => {
+  if (!isNumber(value)) {
+    return {
+      valid: false,
+      error: `Expected numeric value for "${definition.name}"`,
+    };
+  }
+
+  if (config.min !== undefined && value < config.min) {
+    return {
+      valid: false,
+      error: `Value for "${definition.name}" is below the configured minimum`,
+    };
+  }
+
+  if (config.max !== undefined && value > config.max) {
+    return {
+      valid: false,
+      error: `Value for "${definition.name}" exceeds the configured maximum`,
+    };
+  }
+
+  return { valid: true };
+};
+
+/**
+ * One entry per attribute type: how a value is type-checked and which
+ * configured rules apply. A new type is one entry here rather than a new case
+ * in the two switches that used to answer these questions separately.
+ */
+const attributeTypeRules: Record<
+  AttributeDefinition["type"],
+  AttributeTypeRules
+> = {
+  BOOLEAN: { accepts: isBoolean },
+  DATE: {
+    accepts: (value) => value instanceof Date && !Number.isNaN(value.getTime()),
+  },
+  DECIMAL: {
+    accepts: (value) => isNumber(value) && !Number.isNaN(value),
+    checkConfig: checkNumericConfig,
+  },
+  INTEGER: {
+    accepts: (value) => isNumber(value) && Number.isInteger(value),
+    checkConfig: checkNumericConfig,
+  },
+  TEXT: { accepts: isString, checkConfig: checkTextConfig },
+};
+
 const validateType = (
   definition: AttributeDefinition,
   value: AttributeValue
@@ -27,25 +142,8 @@ const validateType = (
     return !definition.isRequired;
   }
 
-  switch (definition.type) {
-    case "TEXT":
-      return isString(value);
-    case "INTEGER":
-      return isNumber(value) && Number.isInteger(value);
-    case "DECIMAL":
-      return isNumber(value) && !Number.isNaN(value);
-    case "BOOLEAN":
-      return isBoolean(value);
-    case "DATE":
-      return value instanceof Date && !Number.isNaN(value.getTime());
-    default:
-      return false;
-  }
+  return attributeTypeRules[definition.type].accepts(value);
 };
-
-type ConfigValidationResult =
-  | { readonly valid: true }
-  | { readonly valid: false; readonly error: string };
 
 const validateConfig = (
   definition: AttributeDefinition,
@@ -73,74 +171,13 @@ const validateConfig = (
     };
   }
 
-  const config = decodedConfig.value;
+  const { checkConfig } = attributeTypeRules[definition.type];
 
-  switch (definition.type) {
-    case "TEXT": {
-      if (!isString(value)) {
-        return {
-          valid: false,
-          error: `Expected text value for "${definition.name}"`,
-        };
-      }
-
-      if (config.pattern === undefined) {
-        return { valid: true };
-      }
-
-      if (isPotentiallyUnsafeRegex(config.pattern)) {
-        // Never execute a pattern that can backtrack catastrophically;
-        // fail loudly so the misconfiguration surfaces instead.
-        return {
-          valid: false,
-          error: `Configured validation pattern for "${definition.name}" is unsafe and was not applied`,
-        };
-      }
-
-      try {
-        return new RegExp(config.pattern).test(value)
-          ? { valid: true }
-          : {
-              valid: false,
-              error: `Value for "${definition.name}" does not match configured rules`,
-            };
-      } catch {
-        return {
-          valid: false,
-          error: `Configured validation pattern for "${definition.name}" is invalid`,
-        };
-      }
+  return (
+    checkConfig?.({ config: decodedConfig.value, definition, value }) ?? {
+      valid: true,
     }
-
-    case "INTEGER":
-    case "DECIMAL": {
-      if (!isNumber(value)) {
-        return {
-          valid: false,
-          error: `Expected numeric value for "${definition.name}"`,
-        };
-      }
-
-      if (config.min !== undefined && value < config.min) {
-        return {
-          valid: false,
-          error: `Value for "${definition.name}" is below the configured minimum`,
-        };
-      }
-
-      if (config.max !== undefined && value > config.max) {
-        return {
-          valid: false,
-          error: `Value for "${definition.name}" exceeds the configured maximum`,
-        };
-      }
-
-      return { valid: true };
-    }
-
-    default:
-      return { valid: true };
-  }
+  );
 };
 
 export type AttributeValidationResult = {

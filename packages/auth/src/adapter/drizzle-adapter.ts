@@ -1,4 +1,4 @@
-/* eslint-disable anti-slop/no-known-value-widening, anti-slop/no-runtime-typeof, anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion -- Vendored Better Auth Drizzle adapter (upstream code, kept close to source). */
+/* eslint-disable anti-slop/no-known-value-widening, anti-slop/no-runtime-typeof, anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion, anti-slop-martinfowler/loops, anti-slop-martinfowler/repeated-switches -- Vendored Better Auth Drizzle adapter (upstream code, kept close to source; its loops and repeated switches are upstream's shape, not this repo's). */
 import type { BetterAuthOptions } from "@better-auth/core";
 import type {
   AdapterFactoryCustomizeAdapterCreator,

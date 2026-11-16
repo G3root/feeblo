@@ -758,6 +758,27 @@ export const initAuthHandler = (
       return "email-verification";
     };
 
+    /** What one OTP type charges and what the email calls it. */
+    type VerificationOtpMeta = {
+      readonly flow: VerificationOtpFlow;
+      readonly label: string;
+    };
+
+    /**
+     * One table, so a new type cannot be added to the flow and not to the
+     * label.
+     */
+    const verificationOtpMeta = (type: string): VerificationOtpMeta => {
+      switch (type) {
+        case "forget-password":
+          return { flow: "password-reset", label: "password reset" };
+        case "sign-in":
+          return { flow: "sign-in", label: "sign-in" };
+        default:
+          return { flow: "email-verification", label: "email verification" };
+      }
+    };
+
     const consumeVerificationOtpRateLimitForFlow = async (
       flow: VerificationOtpFlow,
       email: string
@@ -1291,24 +1312,10 @@ export const initAuthHandler = (
             // dispatching the email-OTP endpoint, so hooks.before does not run.
             // Keep those sends rate limited, while avoiding a second consume
             // for paths already handled by the request hook.
+            const { flow, label: flowLabel } = verificationOtpMeta(type);
+
             if (!(ctx && verificationOtpRateLimitedPaths.has(ctx.path))) {
-              let flow: VerificationOtpFlow = "email-verification";
-
-              if (type === "forget-password") {
-                flow = "password-reset";
-              } else if (type === "sign-in") {
-                flow = "sign-in";
-              }
-
               await consumeVerificationOtpRateLimitForFlow(flow, email);
-            }
-
-            let flowLabel = "email verification";
-
-            if (type === "forget-password") {
-              flowLabel = "password reset";
-            } else if (type === "sign-in") {
-              flowLabel = "sign-in";
             }
 
             const { createVerificationOtpEmail } =

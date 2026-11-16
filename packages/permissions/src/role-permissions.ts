@@ -65,23 +65,13 @@ export const ROLE_PERMISSIONS = {
 } satisfies Record<Role, readonly Permission[]>;
 
 /** Every permission granted to `role`, including inherited ones. */
-export const permissionsForRole = (role: Role): ReadonlySet<Permission> => {
-  const permissions = new Set<Permission>();
-
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-  for (const [candidate, rank] of Object.entries(ROLE_RANK) as [
-    Role,
-    number,
-  ][]) {
-    if (rank <= ROLE_RANK[role]) {
-      for (const permission of ROLE_PERMISSIONS[candidate]) {
-        permissions.add(permission);
-      }
-    }
-  }
-
-  return permissions;
-};
+export const permissionsForRole = (role: Role): ReadonlySet<Permission> =>
+  new Set(
+    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+    (Object.entries(ROLE_RANK) as [Role, number][])
+      .filter(([, rank]) => rank <= ROLE_RANK[role])
+      .flatMap(([candidate]) => ROLE_PERMISSIONS[candidate])
+  );
 
 /** True when `role` grants `permission` directly or through a resource wildcard. */
 export const roleGrants = (role: Role, permission: Permission): boolean => {
