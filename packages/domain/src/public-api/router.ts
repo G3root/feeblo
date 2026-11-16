@@ -1,6 +1,7 @@
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import { ChangelogRepository } from "../changelog/repository";
 import { CommentRepository } from "../comments/repository";
@@ -63,6 +64,10 @@ import { PublicApiProjections } from "./projections";
  * surface's private wiring.
  */
 export const PublicApiInternals = Layer.mergeAll(
+  // The scope gate records a refused credential, so the audit writer is built
+  // with the rest of the surface's private dependencies rather than being a
+  // requirement every operation carries.
+  AuditLogRecorder.layer,
   BoardRepository.layer,
   ChangelogRepository.layer,
   CompanyRepository.layer,

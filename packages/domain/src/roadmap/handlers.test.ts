@@ -1,10 +1,13 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { type LegidOf, RoadmapId, SiteId, WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
@@ -158,6 +161,7 @@ describe("RoadmapRpcHandlers", () => {
     Entitlements,
     Policies,
     RoadmapPolicies,
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
@@ -716,6 +720,40 @@ describe("RoadmapRpcHandlers", () => {
             isPrimary: true,
           });
         })
+    );
+
+    it.effect("records a created roadmap against the session user", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* RoadmapRpcHandlersEffect;
+        const fixture = yield* makeFixture("PUBLIC");
+        const roadmapId = yield* RoadmapId.generate;
+
+        yield* handlers
+          .CreateRoadmap(
+            roadmapCreateInput(fixture, roadmapId, "Second roadmap")
+          )
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          action: "roadmap.created",
+          actorRole: "owner",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceId: roadmapId,
+          resourceType: "roadmap",
+          source: "dashboard",
+        });
+      }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
   });
 });

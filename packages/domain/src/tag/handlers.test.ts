@@ -15,6 +15,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -167,7 +169,8 @@ describe("TagRpcHandlers", () => {
     TagRepository.layer,
     SiteRepository.layer,
     WorkspaceRepository.layer,
-    PostActivityRepository.layer
+    PostActivityRepository.layer,
+    AuditLogRecorder.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
@@ -682,6 +685,88 @@ describe("TagRpcHandlers", () => {
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toHaveLength(1);
           })
+      );
+
+      it.effect("records each tag mutation against the session user", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* TagRpcHandlersEffect;
+          const f = yield* fixture();
+          const tagId = yield* TagId.generate;
+
+          yield* handlers
+            .CreateTag({
+              id: tagId,
+              name: "Old name",
+              organizationId: f.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .UpdateTag({
+              id: tagId,
+              name: "New name",
+              organizationId: f.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .SetPostTags({
+              organizationId: f.organizationId,
+              postId: f.postId,
+              tagIds: [tagId],
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .DeleteTag({
+              id: tagId,
+              organizationId: f.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(eq(schema.auditLogTable.organizationId, f.organizationId));
+
+          expect(rows).toHaveLength(4);
+          const byAction = new Map(rows.map((row) => [row.action, row]));
+
+          expect(byAction.get("tag.created")).toMatchObject({
+            actorRole: "owner",
+            actorType: "user",
+            actorUserId: f.userId,
+            metadata: { name: "Old name" },
+            outcome: "allowed",
+            resourceId: tagId,
+            resourceType: "tag",
+            source: "dashboard",
+          });
+          expect(byAction.get("tag.updated")).toMatchObject({
+            actorType: "user",
+            actorUserId: f.userId,
+            metadata: { name: "New name" },
+            resourceId: tagId,
+            resourceType: "tag",
+          });
+          expect(byAction.get("tag.deleted")).toMatchObject({
+            actorType: "user",
+            actorUserId: f.userId,
+            resourceId: tagId,
+            resourceType: "tag",
+          });
+          // The tag write carries the post it changed: the diff names the tag
+          // list, not the tag row.
+          expect(byAction.get("post.updated")).toMatchObject({
+            actorType: "user",
+            actorUserId: f.userId,
+            changes: {
+              fields: ["tagIds"],
+              before: { tagIds: [] },
+              after: { tagIds: [tagId] },
+            },
+            resourceId: f.postId,
+            resourceType: "post",
+          });
+        }).pipe(Effect.provideService(AuditLogEnabled, true))
       );
     }
   );

@@ -57,6 +57,7 @@ export const ROLE_PERMISSIONS = {
     "integrations.manage",
     "apiKeys.manage",
     "emailSuppressions.manage",
+    "auditLog.read",
   ],
   // Owner is retained for legacy workspaces. It intentionally adds no grants:
   // owner and admin have the same effective permissions.

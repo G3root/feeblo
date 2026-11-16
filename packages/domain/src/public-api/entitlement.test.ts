@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { createCompanyOperation } from "../company/public-api/operations";
 import { CompanyRepository } from "../company/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -34,6 +35,9 @@ const dateAt = (instant: string | number | Date): Date =>
  */
 
 const TestLayer = Layer.mergeAll(
+  // Every operation goes through the scope gate, which the test bypasses with
+  // a caller that already holds the scope — the layer is needed all the same.
+  AuditLogRecorder.layer,
   CompanyRepository.layer,
   EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer)),
   WorkspaceRepository.layer

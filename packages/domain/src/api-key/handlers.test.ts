@@ -8,6 +8,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { InternalServerError } from "../rpc-errors";
 import { Auth, CurrentSession, type Session } from "../session-middleware";
@@ -208,6 +210,7 @@ describe("ApiKeyRpcHandlers", () => {
 
   const TestLayer = Layer.mergeAll(
     DatabaseLive,
+    AuditLogRecorder.layer.pipe(Layer.provide(DatabaseLive)),
     ApiKeyRepository.layer.pipe(Layer.provide(DatabaseLive)),
     ApiKeyPolicy.layer.pipe(
       Layer.provide(EntitlementPolicyLive),
@@ -538,6 +541,49 @@ describe("ApiKeyRpcHandlers", () => {
 
           expect(error._tag).toBe("PolicyDenied");
         })
+    );
+
+    it.effect("records the revoked key when the audit log is on", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ApiKeyRpcHandlersEffect;
+        const fixture = yield* makeFixture("starter");
+        yield* seedKey(fixture, {
+          id: "apikey_revoked",
+          name: "Production",
+          plaintext: "fbk_revoked",
+        });
+
+        yield* handlers
+          .RevokeApiKey({
+            organizationId: fixture.organizationId,
+            keyId: "apikey_revoked",
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
+          );
+
+        // The revoke is not inside a transaction, so the entry is written best
+        // effort; with the flag on it still lands, naming the key by id.
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          action: "api_key.revoked",
+          actorRole: "owner",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceId: "apikey_revoked",
+          resourceType: "api_key",
+          source: "dashboard",
+        });
+      }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
   });
 });

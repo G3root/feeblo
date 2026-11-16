@@ -10,9 +10,12 @@ import {
   NodeServices,
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
+import { AuditLogRepository } from "@feeblo/domain/audit-log/repository";
+import { auditLogRetention } from "@feeblo/domain/audit-log/retention";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
@@ -222,6 +225,21 @@ export const program = Effect.gen(function* () {
     Effect.provide(trafficRuntime),
     Effect.forkScoped
   );
+
+  // The audit log owns the one writer allowed to delete from an append-only
+  // table; the sweep says so on its own transaction. It is not scheduled while
+  // the feature is off, though: the recorder writes nothing then, so the table
+  // is empty and a daily pass would only wake the worker to delete nothing.
+  // The flag is the same constant the recorder's `AuditLogEnabled` defaults to,
+  // and the sweep resumes with it — entries written before it was turned off
+  // are swept once it is back on.
+  if (isFeatureEnabled("AUDIT_LOG")) {
+    const auditLogRuntime = yield* Layer.build(AuditLogRepository.layer);
+    yield* auditLogRetention.pipe(
+      Effect.provide(auditLogRuntime),
+      Effect.forkScoped
+    );
+  }
 
   return yield* Layer.launch(server);
 });

@@ -186,6 +186,33 @@ const makeBoardRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map(EffectArray.get(0))),
 
+    /**
+     * The same read, with the board row locked until the caller's transaction
+     * ends.
+     *
+     * An audit diff is only true if the "before" it records is the value the
+     * update actually replaced. Two concurrent saves would otherwise read the
+     * same row under READ COMMITTED and the second entry would name a value the
+     * board no longer had. `no key update` serializes the writers without
+     * blocking inserts that merely reference the board.
+     */
+    findByIdInOrganizationForUpdate: ({
+      id,
+      organizationId,
+    }: TBoardFindByIdInOrganization) =>
+      db
+        .select(BOARD_FIELDS)
+        .from(schema.boardTable)
+        .where(
+          and(
+            eq(schema.boardTable.id, id),
+            eq(schema.boardTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .for("no key update")
+        .pipe(Effect.map(EffectArray.get(0))),
+
     countByOrganizationId: ({ organizationId }: { organizationId: string }) =>
       db
         .select({ id: schema.boardTable.id })

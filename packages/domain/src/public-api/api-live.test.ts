@@ -13,6 +13,7 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { TestClock } from "effect/testing";
 
+import { AuditLogEnabled } from "../audit-log/flag";
 import { CompanyRepository } from "../company/repository";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { PublicApiVoteRepository } from "../upvote/public-api/repository";
@@ -725,6 +726,43 @@ layer(makeTestApp())("public api v1", (it) => {
       expect(decodeError(responseBody(retrieve)).message).toContain(
         "posts.read"
       );
+    })
+  );
+
+  it.effect("records a scope refusal as a denied audit entry", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      registerKey("fbk_audit_denied", workspace.organizationId, {
+        boards: ["read"],
+      });
+
+      const response = yield* executeRequest(
+        "/api/v1/posts",
+        "fbk_audit_denied"
+      ).pipe(Effect.provideService(AuditLogEnabled, true));
+      expect(response.status).toBe(403);
+
+      const db = yield* currentDb;
+      const rows = yield* db
+        .select()
+        .from(schema.auditLogTable)
+        .where(
+          and(
+            eq(schema.auditLogTable.organizationId, workspace.organizationId),
+            eq(schema.auditLogTable.action, "api.request")
+          )
+        );
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        actorType: "api_key",
+        denialReason: "Missing posts.read scope",
+        outcome: "denied",
+        resourceType: "api",
+        source: "public_api",
+      });
+      expect(rows[0]?.actorTokenId).not.toBeNull();
+      expect(rows[0]?.metadata).toEqual({ scope: "posts.read" });
     })
   );
 
