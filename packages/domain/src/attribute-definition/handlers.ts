@@ -111,12 +111,15 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         const definition = yield* repository.findContactAttributeDefinitionById(
           contactAttributeDefinitionReference(args)
         );
+
         if (definition === undefined) {
           return yield* new BadRequestError({
             message: "Attribute definition not found",
           });
         }
+
         yield* validateAttributeValueEffect(definition, args.value);
+
         return yield* repository.updateContactAttributeValue(args).pipe(
           // A strict update that matched nothing means the id names no value
           // row of this contact under this attribute — a stale or mismatched
@@ -159,12 +162,15 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         const definition = yield* repository.findCompanyAttributeDefinitionById(
           companyAttributeDefinitionReference(args)
         );
+
         if (definition === undefined) {
           return yield* new BadRequestError({
             message: "Attribute definition not found",
           });
         }
+
         yield* validateAttributeValueEffect(definition, args.value);
+
         return yield* repository.updateCompanyAttributeValue(args).pipe(
           // A strict update that matched nothing means the id names no value
           // row of this company under this attribute — a stale or mismatched

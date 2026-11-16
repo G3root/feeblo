@@ -13,6 +13,7 @@ vi.mock("@feeblo/web-shared/auth-client", () => ({
     parse: <T,>(value: T) => value,
   },
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/runtime", () => ({
   fetchRpc: vi.fn(),
@@ -54,6 +55,7 @@ class MockXMLHttpRequest {
 
   private dispatch(type: string) {
     const listener = this.listeners.get(type);
+
     if (isFunction(listener)) {
       // SAFETY: the non-object union branch is a callable EventListener.
       (listener as (event: Event) => void)(new Event(type));
@@ -75,6 +77,7 @@ afterEach(() => {
 describe("PostEditor", () => {
   it("uploads an image and submits the editor content", async () => {
     const onSubmit = vi.fn();
+
     const screen = await render(
       <PostEditor
         onSubmit={onSubmit}
@@ -167,6 +170,7 @@ describe("PostEditor", () => {
       .fn()
       .mockRejectedValueOnce(new Error("Save failed"))
       .mockResolvedValueOnce(undefined);
+
     const screen = await render(
       <PostEditor
         onSubmit={onSubmit}

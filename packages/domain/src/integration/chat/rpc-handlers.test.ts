@@ -71,6 +71,7 @@ const seedWorkspace = Effect.fn("test.seedWorkspace")(function* (
     slug: organizationId,
     createdAt: now,
   });
+
   if (options.paid) {
     yield* db.insert(schema.productTable).values({
       id: `product_${organizationId}`,
@@ -101,6 +102,7 @@ const seedWorkspace = Effect.fn("test.seedWorkspace")(function* (
       productId: `product_${organizationId}`,
     });
   }
+
   return organizationId;
 });
 
@@ -129,9 +131,11 @@ describe("makeChatManagementRpcHandlers", () => {
       () =>
         Effect.gen(function* () {
           const calls: string[] = [];
+
           const handlers = yield* makeChatManagementRpcHandlers(
             makeService(calls)
           );
+
           const organizationId = yield* seedWorkspace();
 
           const error = yield* Effect.flip(
@@ -146,9 +150,11 @@ describe("makeChatManagementRpcHandlers", () => {
           );
 
           expect(error._tag).toBe("PolicyDenied");
+
           if (error._tag !== "PolicyDenied") {
             return yield* Effect.die("Expected PolicyDenied");
           }
+
           expect(error.reason).toContain("Starter plan");
           expect(calls).toEqual([]);
         })
@@ -159,9 +165,11 @@ describe("makeChatManagementRpcHandlers", () => {
       () =>
         Effect.gen(function* () {
           const calls: string[] = [];
+
           const handlers = yield* makeChatManagementRpcHandlers(
             makeService(calls)
           );
+
           const organizationId = yield* seedWorkspace({ paid: true });
 
           const started = yield* handlers

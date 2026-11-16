@@ -6,6 +6,7 @@ import { getCurrentEmbed, init } from "../src/instance";
 import type { FeebloWidget } from "../src/types";
 
 const MOCK_ORIGIN = "http://localhost:3001";
+
 const fakePostMessage = vi.fn();
 
 function createMockIframe(): HTMLIFrameElement {
@@ -16,6 +17,7 @@ function createMockIframe(): HTMLIFrameElement {
     writable: true,
     configurable: true,
   });
+
   return iframe;
 }
 
@@ -128,6 +130,7 @@ describe("init", () => {
     const identifyCall = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "IDENTIFY"
     );
+
     expect(identifyCall).toBeDefined();
   });
 });
@@ -150,9 +153,11 @@ describe("FeebloWidget methods", () => {
     widget.open();
 
     expect(fakePostMessage).toHaveBeenCalled();
+
     const showMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SHOW"
     );
+
     expect(showMsg).toBeDefined();
   });
 
@@ -165,6 +170,7 @@ describe("FeebloWidget methods", () => {
     const hideMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "HIDE"
     );
+
     expect(hideMsg).toBeDefined();
   });
 
@@ -178,6 +184,7 @@ describe("FeebloWidget methods", () => {
     const boardMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     expect(boardMsg).toBeDefined();
     expect(boardMsg?.[0].data.board).toBe("roadmap");
   });
@@ -206,6 +213,7 @@ describe("FeebloWidget methods", () => {
     const identifyMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "IDENTIFY"
     );
+
     expect(identifyMsg).toBeDefined();
   });
 
@@ -298,6 +306,7 @@ describe("FeebloWidget methods", () => {
     const showMessages = fakePostMessage.mock.calls.filter(
       ([msg]: [any]) => msg?.event === "SHOW"
     );
+
     expect(showMessages.length).toBe(0);
   });
 
@@ -311,6 +320,7 @@ describe("FeebloWidget methods", () => {
     const hideMessages = fakePostMessage.mock.calls.filter(
       ([msg]: [any]) => msg?.event === "HIDE"
     );
+
     expect(hideMessages.length).toBe(0);
   });
 });
@@ -402,6 +412,7 @@ describe("defaultBoard handling", () => {
     const boardBeforeReady = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     expect(boardBeforeReady).toBeUndefined();
 
     postWidgetMessage({ event: "READY" });
@@ -409,6 +420,7 @@ describe("defaultBoard handling", () => {
     const boardMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     expect(boardMsg).toBeDefined();
     expect(boardMsg?.[0].data.board).toBe("roadmap");
   });
@@ -424,6 +436,7 @@ describe("defaultBoard handling", () => {
     const boardMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     expect(boardMsg).toBeDefined();
     expect(boardMsg?.[0].data.board).toBe("roadmap");
   });
@@ -434,6 +447,7 @@ describe("defaultBoard handling", () => {
       modules: ["feedback", "updates"],
       defaultBoard: "roadmap",
     });
+
     widget.openModule("feedback");
     fakePostMessage.mockClear();
 
@@ -442,6 +456,7 @@ describe("defaultBoard handling", () => {
     const navigationEvents = fakePostMessage.mock.calls
       .map(([message]: [any]) => message?.event)
       .filter((event) => event === "SET_MODULE" || event === "SET_BOARD");
+
     expect(navigationEvents).toEqual(["SET_MODULE", "SET_BOARD"]);
   });
 
@@ -455,6 +470,7 @@ describe("defaultBoard handling", () => {
     const boardMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     expect(boardMsg).toBeUndefined();
   });
 
@@ -469,6 +485,7 @@ describe("defaultBoard handling", () => {
     const boardMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     expect(boardMsg).toBeUndefined();
   });
 });
@@ -493,6 +510,7 @@ describe("navigation sync ordering", () => {
     const call = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     return call?.[0].data;
   }
 
@@ -502,6 +520,7 @@ describe("navigation sync ordering", () => {
       modules: ["feedback", "updates"],
       defaultBoard: "roadmap",
     });
+
     postWidgetMessage({ event: "READY" });
     widget.open();
     widget.close();
@@ -523,6 +542,7 @@ describe("navigation sync ordering", () => {
       modules: ["feedback", "updates"],
       defaultBoard: "roadmap",
     });
+
     postWidgetMessage({ event: "READY" });
     widget.open();
     fakePostMessage.mockClear();
@@ -538,6 +558,7 @@ describe("navigation sync ordering", () => {
       modules: ["feedback", "updates"],
       defaultBoard: "roadmap",
     });
+
     postWidgetMessage({ event: "READY" });
     widget.open();
     widget.close();
@@ -560,6 +581,7 @@ describe("navigation sync ordering", () => {
       mode: "hub",
       modules: ["feedback", "updates"],
     });
+
     postWidgetMessage({ event: "READY" });
     widget.close();
     fakePostMessage.mockClear();
@@ -580,6 +602,7 @@ describe("navigation sync ordering", () => {
       modules: ["feedback", "updates"],
       defaultBoard: "roadmap",
     });
+
     postWidgetMessage({ event: "READY" });
     widget.close();
     fakePostMessage.mockClear();
@@ -595,6 +618,7 @@ describe("navigation sync ordering", () => {
       modules: ["feedback", "updates"],
       defaultBoard: "roadmap",
     });
+
     postWidgetMessage({ event: "READY" });
     fakePostMessage.mockClear();
 
@@ -819,6 +843,7 @@ describe("Feeblo namespace", () => {
     const hideMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "HIDE"
     );
+
     expect(hideMsg).toBeDefined();
   });
 
@@ -832,6 +857,7 @@ describe("Feeblo namespace", () => {
     const identifyMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "IDENTIFY"
     );
+
     expect(identifyMsg).toBeDefined();
   });
 
@@ -868,6 +894,7 @@ describe("Feeblo namespace", () => {
     const boardMsg = fakePostMessage.mock.calls.find(
       ([msg]: [any]) => msg?.event === "SET_BOARD"
     );
+
     expect(boardMsg).toBeDefined();
   });
 

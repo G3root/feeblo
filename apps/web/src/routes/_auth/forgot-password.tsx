@@ -42,8 +42,10 @@ function RouteComponent() {
 
       try {
         const isResetReady = await initializePasswordReset(value.email);
+
         if (!isResetReady) {
           await clearVerificationOtp(value.email, "reset-password");
+
           return;
         }
 
@@ -67,8 +69,10 @@ function RouteComponent() {
                   },
                 },
               });
+
               return;
             }
+
             case "TEMPORARY_EMAIL_NOT_ALLOWED": {
               form.setErrorMap({
                 onSubmit: {
@@ -79,19 +83,23 @@ function RouteComponent() {
                   },
                 },
               });
+
               return;
             }
+
             default: {
               break;
             }
           }
 
           const rateLimitError = RateLimitErrorSchema.safeParse(response.error);
+
           if (rateLimitError.success) {
             const minutes = Math.max(
               1,
               Math.ceil(rateLimitError.data.retryAfterSeconds / 60)
             );
+
             form.setErrorMap({
               onSubmit: {
                 fields: {
@@ -103,6 +111,7 @@ function RouteComponent() {
                 },
               },
             });
+
             return;
           }
 
@@ -115,6 +124,7 @@ function RouteComponent() {
               },
             },
           });
+
           return;
         }
 

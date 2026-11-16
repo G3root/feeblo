@@ -67,6 +67,7 @@ export function useOccupyMobileBottomSlot(occupied: boolean): void {
     }
 
     setOccupied(true);
+
     return () => setOccupied(false);
   }, [occupied, setOccupied]);
 }

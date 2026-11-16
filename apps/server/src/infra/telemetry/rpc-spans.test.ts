@@ -10,13 +10,16 @@ import { allowedSpans } from "./span-attributes";
 
 const recordingTracer = () => {
   const spans: Array<Tracer.NativeSpan> = [];
+
   const tracer = Tracer.make({
     span: (options) => {
       const span = new Tracer.NativeSpan(options);
       spans.push(span);
+
       return span;
     },
   });
+
   return { spans, tracer };
 };
 
@@ -126,6 +129,7 @@ describe("rpcSpans", () => {
   it.effect("labels the HTTP link when the client owns the trace context", () =>
     Effect.gen(function* () {
       const { spans, tracer } = recordingTracer();
+
       const httpSpan = new Tracer.NativeSpan({
         annotations: Context.empty(),
         kind: "internal",
@@ -135,6 +139,7 @@ describe("rpcSpans", () => {
         sampled: true,
         startTime: 0n,
       });
+
       yield* Effect.void.pipe(
         Effect.withSpan(`${rpcSpanPrefix}.Ping`, {
           parent: Tracer.externalSpan({
@@ -155,6 +160,7 @@ describe("rpcSpans", () => {
   it.effect("keeps every method on an HTTP link shared by RPC calls", () =>
     Effect.gen(function* () {
       const { tracer } = recordingTracer();
+
       const httpSpan = new Tracer.NativeSpan({
         annotations: Context.empty(),
         kind: "internal",
@@ -164,6 +170,7 @@ describe("rpcSpans", () => {
         sampled: true,
         startTime: 0n,
       });
+
       for (const method of ["CreatePost", "GetPost"]) {
         yield* Effect.void.pipe(
           Effect.withSpan(`${rpcSpanPrefix}.${method}`, {

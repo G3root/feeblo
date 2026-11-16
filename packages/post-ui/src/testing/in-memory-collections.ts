@@ -36,9 +36,11 @@ export function createMockCollection<T extends object>({
       commit = c;
 
       b();
+
       for (const item of initialData) {
         w({ type: "insert", value: item });
       }
+
       void c();
       markReady();
     },
@@ -47,30 +49,36 @@ export function createMockCollection<T extends object>({
   const utils = {
     begin: () => {
       const handle = begin;
+
       if (!handle) {
         throw new Error(
           "In-memory collection sync has not been initialized; cannot begin a transaction."
         );
       }
+
       handle();
     },
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     write: ((value) => {
       const handle = write;
+
       if (!handle) {
         throw new Error(
           "In-memory collection sync has not been initialized; cannot write."
         );
       }
+
       return handle(value);
     }) as WriteOp<T>,
     commit: () => {
       const handle = commit;
+
       if (!handle) {
         throw new Error(
           "In-memory collection sync has not been initialized; cannot commit a transaction."
         );
       }
+
       handle();
     },
     // Query-backed collections expose a refetch; the in-memory sync has no

@@ -66,11 +66,14 @@ function DataTableSliderFilterContent<TData extends RowData>({
   const [facetedRange, setFacetedRange] = React.useState(() =>
     getFacetedRange(column)
   );
+
   const min = declaredMin ?? facetedRange?.[0] ?? 0;
   const max = declaredMax ?? facetedRange?.[1] ?? 100;
+
   const hasNoValues =
     (declaredMin === undefined || declaredMax === undefined) &&
     getFacetedRange(column) === null;
+
   const step = getRangeStep(min, max);
 
   function onOpenChange(open: boolean) {
@@ -79,7 +82,9 @@ function DataTableSliderFilterContent<TData extends RowData>({
 
   React.useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
+
     if (!column.table.options.manualFiltering) return;
+
     if (declaredMin !== undefined && declaredMax !== undefined) return;
     console.warn(
       `DataTableSliderFilter: column "${column.id}" is missing \`meta.min\` or \`meta.max\`, so in server mode its bounds only cover the rows on the current page. Set both to the full range of the data.`
@@ -87,14 +92,18 @@ function DataTableSliderFilterContent<TData extends RowData>({
   }, [column, declaredMin, declaredMax]);
 
   const bounds = parseRangeBounds(columnFilterValueProp);
+
   const columnFilterValue: RangeValue | undefined = bounds
     ? [bounds[0] ?? min, bounds[1] ?? max]
     : undefined;
+
   const range: RangeValue = columnFilterValue ?? [min, max];
+
   const [drafts, setDrafts] = React.useState<[string | null, string | null]>([
     null,
     null,
   ]);
+
   const [showInvalid, setShowInvalid] = React.useState(false);
   const invalidTimeoutRef = React.useRef<number | undefined>(undefined);
 
@@ -105,10 +114,13 @@ function DataTableSliderFilterContent<TData extends RowData>({
 
   function onInvalidChange(isInvalid: boolean) {
     window.clearTimeout(invalidTimeoutRef.current);
+
     if (!isInvalid) {
       setShowInvalid(false);
+
       return;
     }
+
     if (showInvalid) return;
     invalidTimeoutRef.current = window.setTimeout(
       () => setShowInvalid(true),
@@ -141,12 +153,14 @@ function DataTableSliderFilterContent<TData extends RowData>({
   function onDraftChange(index: 0 | 1, value: string) {
     const nextDrafts: [string | null, string | null] =
       index === 0 ? [value, drafts[1]] : [drafts[0], value];
+
     setDrafts(nextDrafts);
 
     const nextBounds = getValidRangeFilterBounds(getInputValues(nextDrafts), [
       min,
       max,
     ]);
+
     if (nextBounds) setRangeFilter(nextBounds);
     onInvalidChange(!nextBounds);
   }
@@ -303,18 +317,23 @@ function getFacetedRange<TData extends RowData>(
   column: Column<DataTableFeatures, TData>
 ): RangeValue | null {
   const values = column.getFacetedMinMaxValues();
+
   if (Array.isArray(values) && values.length === 2) {
     const [min, max] = values;
+
     if (isNumber(min) && isNumber(max)) {
       return min === max ? [min, min + 1] : [min, max];
     }
   }
+
   return null;
 }
 
 function getRangeStep(min: number, max: number) {
   const rangeSize = max - min;
+
   if (rangeSize <= 100) return 1;
+
   return 10 ** Math.floor(Math.log10(rangeSize / 100));
 }
 
@@ -324,7 +343,9 @@ function parseRangeBounds(
   if (!Array.isArray(value) || value.length !== 2) return undefined;
 
   const [start, end] = value.map(parseRangeBound);
+
   if (start === null || end === null) return undefined;
+
   if (start === undefined && end === undefined) return undefined;
 
   return [start, end];
@@ -332,8 +353,10 @@ function parseRangeBounds(
 
 function parseRangeBound(value: DataTableRawValue) {
   if (value === undefined || value === "") return undefined;
+
   if (!isNumber(value) && !isString(value)) return null;
 
   const number = Number(value);
+
   return Number.isNaN(number) ? null : number;
 }

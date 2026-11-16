@@ -63,6 +63,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
   const RepositoryLayer = AttributeDefinitionRepository.layer.pipe(
     Layer.provide(Database.PgliteDatabaseLive)
   );
+
   const TestLayer = Layer.merge(
     Layer.merge(
       RepositoryLayer,
@@ -129,6 +130,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
           const contactDefinitions = yield* handlers
             .ListContactAttributeDefinitions({ organizationId })
             .pipe(provideSession);
+
           const companyDefinitions = yield* handlers
             .ListCompanyAttributeDefinitions({ organizationId })
             .pipe(provideSession);
@@ -167,6 +169,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* AttributeDefinitionRpcHandlersEffect;
         const { organizationId, session } = yield* makeFixture();
+
         const memberSession: Session = {
           ...session,
           memberships: session.memberships.map((membership) => ({
@@ -174,10 +177,12 @@ describe("AttributeDefinitionRpcHandlers", () => {
             role: "manager",
           })),
         };
+
         const provideMemberSession = Effect.provideService(
           CurrentSession,
           memberSession
         );
+
         const contactId = yield* ContactAttributeDefinitionId.generate;
 
         const createError = yield* Effect.flip(
@@ -193,6 +198,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             })
             .pipe(provideMemberSession)
         );
+
         expect(createError._tag).toBe("PolicyDenied");
 
         const deleteError = yield* Effect.flip(
@@ -203,6 +209,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             })
             .pipe(provideMemberSession)
         );
+
         expect(deleteError._tag).toBe("PolicyDenied");
       })
     );
@@ -229,6 +236,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
 
           const textId = yield* ContactAttributeDefinitionId.generate;
           const numberId = yield* ContactAttributeDefinitionId.generate;
+
           for (const [definitionId, name, key] of [
             [textId, "Job title", "jobTitle"],
             [numberId, "Report count", "reportCount"],
@@ -272,12 +280,14 @@ describe("AttributeDefinitionRpcHandlers", () => {
               })
               .pipe(provideSession)
           );
+
           expect(error._tag).toBe("BadRequestError");
 
           const rows = yield* db
             .select()
             .from(schema.contactAttributeValueTable)
             .where(eq(schema.contactAttributeValueTable.id, valueRowId));
+
           expect(rows).toHaveLength(1);
           expect(rows[0]?.attributeId).toBe(textId);
           expect(rows[0]?.valueText).toBe("Engineer");
@@ -316,6 +326,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
 
           const textId = yield* ContactAttributeDefinitionId.generate;
           const numberId = yield* ContactAttributeDefinitionId.generate;
+
           for (const [definitionId, name, key] of [
             [textId, "Job title", "jobTitle"],
             [numberId, "Report count", "reportCount"],
@@ -358,6 +369,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
               value: 3,
             })
           );
+
           expect(error._tag).toBe("FailedToUpsertAttributeValueError");
           expect(
             yield* db
@@ -376,6 +388,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
 
           // An unused client id still inserts.
           const unusedId = yield* ContactAttributeValueId.generate;
+
           const inserted = yield* repository.upsertContactAttributeValue({
             id: unusedId,
             organizationId,
@@ -383,6 +396,7 @@ describe("AttributeDefinitionRpcHandlers", () => {
             attributeId: numberId,
             value: 3,
           });
+
           expect(inserted?.id).toBe(unusedId);
         })
     );

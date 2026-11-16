@@ -1,6 +1,9 @@
 export const CONTAINER_ID = "feeblo-embed-container";
+
 export const LAUNCHER_ID = "feeblo-widget-launcher";
+
 export const FEEDBACK_ATTRIBUTE = "data-feeblo-feedback";
+
 export const FADE_DURATION_MS = 150;
 
 export const NAMESPACE = "feeblo";

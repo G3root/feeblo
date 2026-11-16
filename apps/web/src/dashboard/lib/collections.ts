@@ -15,6 +15,7 @@ import type { Upvote } from "@feeblo/domain/upvote/schema";
 type PostWithTransientAuthor = {
   author?: TPostCreateAuthor;
 };
+
 import {
   eqFilterValue,
   postSlugFromPath,
@@ -59,8 +60,11 @@ import {
 import { fetchRpc } from "./runtime";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
+
 type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
+
 type PostSubscriptionRow = Schema.Schema.Type<typeof PostSubscription>;
+
 type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 
 /**
@@ -206,6 +210,7 @@ export function postCollection(scope: DashboardCollectionScope) {
             )
           )
         );
+
         // Deleting a survivor also reverts its merged children server-side, so
         // the synced rows must be refreshed or the restored duplicates stay
         // hidden behind their stale `mergedIntoPostId`. This collection is the
@@ -220,6 +225,7 @@ export function postCollection(scope: DashboardCollectionScope) {
         );
 
         const failure = results.find((result) => result.status === "rejected");
+
         if (failure) {
           throw failure.reason;
         }
@@ -249,16 +255,20 @@ export function postDetailCollection(scope: DashboardCollectionScope) {
       // entry per post regardless of where they subscribe from.
       queryKey: (opts) => {
         const filters = parseLoadSubsetOptions(opts).filters;
+
         const slug =
           eqFilterValue(filters, "slug") ?? scopePostSlug(scope, filters);
+
         return organizationScopedQueryKey(scope, "post-detail", slug);
       },
       syncMode: "on-demand",
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         const filters = parseLoadSubsetOptions(
           ctx.meta?.loadSubsetOptions
         ).filters;
+
         const slug =
           eqFilterValue(filters, "slug") ?? scopePostSlug(scope, filters);
 
@@ -280,6 +290,7 @@ export function postDetailCollection(scope: DashboardCollectionScope) {
               ),
           { signal: ctx.signal }
         );
+
         return post === null ? [] : [post];
       },
       getKey: (item) => item.id,
@@ -583,6 +594,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
       queryKey: () => organizationScopedQueryKey(scope, "changelog-post"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         if (!organizationId) {
           return [];
         }
@@ -591,6 +603,7 @@ export function changelogPostCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListChangelogPosts({ organizationId }),
           { signal: ctx.signal }
         );
+
         return [...data];
       },
       getKey: getChangelogPostKey,
@@ -642,6 +655,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -862,6 +876,7 @@ export function membersCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListOrganizationMembers({ organizationId }),
           { signal: ctx.signal }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -914,6 +929,7 @@ export function invitationsCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListOrganizationInvitations({ organizationId }),
           { signal: ctx.signal }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -949,6 +965,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         const slug = scopePostSlug(
           scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
@@ -965,6 +982,7 @@ export function commentCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListComments({ organizationId, slug }),
           { signal: ctx.signal }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -1071,6 +1089,7 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
       syncMode: "on-demand",
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         const postId = eqFilterValue(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters,
           "postId"
@@ -1084,6 +1103,7 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
           client
             .requireDependency<QueryClient>("queryClient")
             .getQueryData<readonly TPostActivity[]>(ctx.queryKey) ?? [];
+
         const since = existingData.reduce<Date | undefined>(
           (latest, activity) =>
             latest === undefined || activity.createdAt > latest
@@ -1091,6 +1111,7 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
               : latest,
           undefined
         );
+
         const changes = await fetchRpc(
           (rpc) =>
             rpc.ListPostActivities({
@@ -1100,12 +1121,15 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
             }),
           { signal: ctx.signal }
         );
+
         const merged = new Map(
           existingData.map((activity) => [activity.id, activity])
         );
+
         for (const activity of changes) {
           merged.set(activity.id, activity);
         }
+
         // Preserve the full merged history: the timeline renders every activity
         // and `since` only moves forward, so dropping entries would make that
         // history permanently unreachable (the backend offers no backfill for
@@ -1113,6 +1137,7 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
         const ordered = [...merged.values()].sort(
           (left, right) => +left.createdAt - +right.createdAt
         );
+
         return ordered;
       },
       getKey: (item) => item.id,
@@ -1137,6 +1162,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         const slug = scopePostSlug(
           scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
@@ -1152,6 +1178,7 @@ export function commentReactionCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [...data];
       },
       // SAFETY: The endpoint/API contract guarantees this response shape.
@@ -1213,6 +1240,7 @@ export function upvoteCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [...data];
       },
       // SAFETY: The endpoint/API contract guarantees this response shape.
@@ -1288,6 +1316,7 @@ export function deleteEligibilityCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListPostDeleteEligibility({ organizationId }),
           { signal: ctx.signal }
         );
+
         return result.eligibleIds.map((postId) => ({
           organizationId,
           postId,
@@ -1315,6 +1344,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
 
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         const slug = scopePostSlug(
           scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
@@ -1330,6 +1360,7 @@ export function postReactionCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [...data];
         // SAFETY: The endpoint/API contract guarantees this response shape.
       },
@@ -1387,6 +1418,7 @@ export function siteCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -1432,6 +1464,7 @@ export function workspacePlanCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [data];
       },
       getKey: (item) => item.organizationId,
@@ -1471,6 +1504,7 @@ export function planComplianceCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [data];
       },
       getKey: (item) => item.organizationId,
@@ -1509,6 +1543,7 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
       syncMode: "on-demand",
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         const slug = scopePostSlug(
           scope,
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
@@ -1524,6 +1559,7 @@ export function postSubscriptionCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         // SAFETY: The endpoint/API contract guarantees this response shape.
         return [...data];
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -1580,6 +1616,7 @@ export function jwtSecretCollection(scope: DashboardCollectionScope) {
           (rpc) => rpc.ListJwtSecrets({ organizationId }),
           { signal: ctx.signal }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -1967,6 +2004,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
       queryKey: () => organizationScopedQueryKey(scope, "roadmap"),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
+
         if (!organizationId) {
           return [];
         }
@@ -1977,6 +2015,7 @@ export function roadmapCollection(scope: DashboardCollectionScope) {
             signal: ctx.signal,
           }
         );
+
         return [...data];
       },
       getKey: (item) => item.id,
@@ -2206,6 +2245,7 @@ export function savedViewCollection(
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
         const { modified: view, original } = mutation;
+
         // Unchanged fields are omitted so the handler keeps the stored value.
         // The sheet leaves `name`, `query`, and `isPrivate` untouched unless
         // the member changed them, but the row itself may be stale; letting
@@ -2213,17 +2253,22 @@ export function savedViewCollection(
         // newer field.
         const queryChanged =
           JSON.stringify(original.query) !== JSON.stringify(view.query);
+
         const nameChanged = original.name !== view.name;
         const isPrivateChanged = original.isPrivate !== view.isPrivate;
+
         const update = {
           description: view.description,
           id: view.id,
           organizationId: view.organizationId,
         };
+
         const withName = nameChanged ? { ...update, name: view.name } : update;
+
         const withVisibility = isPrivateChanged
           ? { ...withName, isPrivate: view.isPrivate }
           : withName;
+
         const payload = queryChanged
           ? { ...withVisibility, query: view.query }
           : withVisibility;

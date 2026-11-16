@@ -26,9 +26,11 @@ const fieldsWithout = <Fields extends Schema.Struct.Fields>(
   keys: Iterable<PropertyKey>
 ): Fields => {
   const remaining = { ...fields };
+
   for (const key of keys) {
     Reflect.deleteProperty(remaining, key);
   }
+
   return remaining;
 };
 
@@ -56,6 +58,7 @@ export const payloadOf = <
 ): Schema.Struct<Omit<Fields, PathKeys[number]>> =>
   input.mapFields((fields) => {
     const body = fieldsWithout(fields, pathKeys);
+
     // SAFETY: `body` starts as the input's complete field map and only the
     // keys in `pathKeys` are deleted, so its remaining fields are exactly the
     // ones `Omit<Fields, PathKeys[number]>` names.
@@ -84,6 +87,7 @@ export const paramsOf = <
 
   return input.mapFields((fields) => {
     const params = fieldsWithout(fields, bodyKeys);
+
     // SAFETY: `params` starts as the input's complete field map and only the
     // keys that are not in `pathKeys` are deleted, so the fields that remain
     // are exactly the ones `Pick<Fields, PathKeys[number]>` names.

@@ -62,17 +62,20 @@ export const makeWebhookProviderRegistration = ({
         Effect.gen(function* () {
           const credentials =
             yield* credentialResolver.loadWebhookCredentials(input);
+
           const eventData = yield* Schema.decodeUnknownEffect(
             IntegrationPostEventData
           )(input.event.data).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook event payload is invalid",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
+
           // A member actor is a display name only (mem_* is never published);
           // an end-user actor carries no identifiers on the event, so only the
           // classification is sent. The post's author block is where a
@@ -84,6 +87,7 @@ export const makeWebhookProviderRegistration = ({
                   displayName: eventData.actor.displayName ?? null,
                 }
               : { type: "end_user" };
+
           const payload = yield* Schema.decodeEffect(WebhookExternalPayload)({
             actor,
             board: {
@@ -118,36 +122,42 @@ export const makeWebhookProviderRegistration = ({
             version: input.event.version,
           }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook wire payload is invalid",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
+
           const endpoint = yield* resolveAndParseWebhookEndpoint(
             Redacted.value(credentials.endpointUrl),
             endpointSecurityPolicy
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook endpoint is invalid",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
+
           const rawBody = yield* Schema.encodeEffect(
             Schema.fromJsonString(WebhookExternalPayload)
           )(payload).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new IntegrationProviderInvalidConfigurationError({
                   message: "Webhook wire payload could not be serialized",
                   provider: webhookProviderKey,
+                  cause,
                 })
             )
           );
+
           // Signing is a local, transient crypto operation: a failure here is
           // retryable, not a configuration problem for the endpoint.
           const signingHeaders = yield* signWebhookDelivery({
@@ -157,12 +167,14 @@ export const makeWebhookProviderRegistration = ({
           }).pipe(
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderTemporaryFailure({
                   message: "Webhook request could not be signed",
                   provider: webhookProviderKey,
                 })
             )
           );
+
           // The transport enforces the delivery deadline itself, so no second
           // timeout is applied here; its timeout error maps like any other
           // transport failure below.
@@ -184,17 +196,21 @@ export const makeWebhookProviderRegistration = ({
                   })
             )
           );
+
           const retryAfterMs =
             response.retryAfter === undefined
               ? undefined
               : Duration.toMillis(response.retryAfter);
+
           const outcome = classifyIntegrationHttpDeliveryStatus(
             response.status,
             retryAfterMs
           );
+
           if (outcome._tag === "Succeeded") {
             return { httpStatus: response.status };
           }
+
           if (outcome._tag === "Retry" && response.status === 429) {
             return yield* new IntegrationProviderRateLimitedError({
               httpStatus: response.status,
@@ -203,6 +219,7 @@ export const makeWebhookProviderRegistration = ({
               ...(retryAfterMs === undefined ? undefined : { retryAfterMs }),
             });
           }
+
           if (outcome._tag === "Retry") {
             return yield* new IntegrationProviderTemporaryFailure({
               httpStatus: response.status,
@@ -210,6 +227,7 @@ export const makeWebhookProviderRegistration = ({
               provider: webhookProviderKey,
             });
           }
+
           return yield* new IntegrationProviderPermanentRejection({
             httpStatus: response.status,
             message: "Webhook receiver rejected delivery",

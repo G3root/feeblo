@@ -14,17 +14,23 @@ import "./styles/widget.css";
  * `widget.js` (plus `widget.css` and the font assets) with no HTML file.
  */
 const svg = sprite.slice(sprite.indexOf("<svg"));
+
 const holder = document.createElement("div");
+
 holder.setAttribute("aria-hidden", "true");
+
 holder.style.cssText = "position:absolute;width:0;height:0;overflow:hidden";
+
 holder.innerHTML = svg;
 
 const spriteElement = holder.firstElementChild;
+
 if (spriteElement) {
   document.body.appendChild(spriteElement);
 }
 
 const root = document.getElementById("root");
+
 if (root) {
   render(() => <WidgetApp />, root);
 }

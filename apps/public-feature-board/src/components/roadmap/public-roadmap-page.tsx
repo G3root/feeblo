@@ -50,7 +50,9 @@ const PublicRoadmapContext = createContext<{
 
 function usePublicRoadmap() {
   const ctx = use(PublicRoadmapContext);
+
   if (!ctx) throw new Error("Must be used within PublicRoadmapProvider");
+
   return ctx;
 }
 
@@ -63,6 +65,7 @@ function PublicRoadmapProvider({
 }) {
   const site = useSite();
   const navigate = useNavigate();
+
   const {
     publicBoardCollection,
     publicPostCollection,
@@ -83,10 +86,12 @@ function PublicRoadmapProvider({
     });
 
   const displayedRoadmap = roadmaps[0] ?? null;
+
   const lanes = useMemo(
     () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
     [displayedRoadmap, lanesFor]
   );
+
   const primarySlug = allRoadmaps[0]?.slug;
 
   const openPost = useCallback(
@@ -212,6 +217,7 @@ function PublicRoadmapBoardContent() {
 export function PublicRoadmapPage({ slug }: { slug?: string }) {
   // Back-compat: delegates to explicit variants
   if (slug === undefined) return <PublicRoadmapIndexPage />;
+
   return <PublicRoadmapDetailPage slug={slug} />;
 }
 
@@ -236,7 +242,9 @@ function PublicRoadmapIndexView() {
       />
     );
   }
+
   if (isLoading) return <Roadmap.Skeleton />;
+
   if (!displayedRoadmap) {
     return (
       <PublicRoadmapError
@@ -245,6 +253,7 @@ function PublicRoadmapIndexView() {
       />
     );
   }
+
   return <PublicRoadmapBoardContent />;
 }
 
@@ -269,7 +278,9 @@ function PublicRoadmapDetailView() {
       />
     );
   }
+
   if (isLoading) return <Roadmap.Skeleton />;
+
   if (!displayedRoadmap) {
     return (
       <PublicRoadmapError
@@ -278,5 +289,6 @@ function PublicRoadmapDetailView() {
       />
     );
   }
+
   return <PublicRoadmapBoardContent />;
 }

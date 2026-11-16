@@ -35,9 +35,11 @@ describe("registerUploadedAsset", () => {
     promoteEditorMedia: () => Effect.die("not used in this test"),
     deleteObject: () => Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
   });
+
   const RepositoryTest = AssetRepository.layer.pipe(
     Layer.provide(Database.PgliteDatabaseLive)
   );
+
   const TestLayer = Layer.mergeAll(
     Database.PgliteDatabaseLive,
     RepositoryTest,
@@ -168,10 +170,12 @@ describe("registerUploadedAsset", () => {
           content: "![shared](https://assets.example/shared.png)",
           assetIds: [],
         });
+
         const urlOnlyRefs = yield* db
           .select({ assetId: schema.postAssetTable.assetId })
           .from(schema.postAssetTable)
           .where(eq(schema.postAssetTable.postId, postId));
+
         expect(urlOnlyRefs).toEqual([]);
 
         yield* syncPostAssetReferences({
@@ -196,6 +200,7 @@ describe("registerUploadedAsset", () => {
           .select({ assetId: schema.changelogAssetTable.assetId })
           .from(schema.changelogAssetTable)
           .where(eq(schema.changelogAssetTable.changelogId, changelogId));
+
         const remainingPostRefs = yield* db
           .select({ assetId: schema.postAssetTable.assetId })
           .from(schema.postAssetTable)
@@ -214,6 +219,7 @@ describe("registerUploadedAsset", () => {
           .select({ assetId: schema.changelogAssetTable.assetId })
           .from(schema.changelogAssetTable)
           .where(eq(schema.changelogAssetTable.changelogId, changelogId));
+
         expect(remainingRefs).toEqual([]);
       })
     );
@@ -490,6 +496,7 @@ describe("registerUploadedAsset", () => {
           .select({ id: schema.assetTable.id })
           .from(schema.assetTable)
           .where(eq(schema.assetTable.organizationId, organizationId));
+
         expect(assets).toEqual([{ id: "asset_recent_editor" }]);
         expect(yield* Ref.get(deletedKeys)).toEqual([
           "editor-media/user/image/orphaned.png",
@@ -542,6 +549,7 @@ describe("registerUploadedAsset", () => {
             .select({ id: schema.assetTable.id })
             .from(schema.assetTable)
             .where(eq(schema.assetTable.id, "asset_user_orphaned"));
+
           expect(assets).toEqual([{ id: "asset_user_orphaned" }]);
           expect(yield* Ref.get(deletedKeys)).toEqual([]);
         })

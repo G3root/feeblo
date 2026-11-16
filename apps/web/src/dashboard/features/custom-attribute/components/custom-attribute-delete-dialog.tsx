@@ -24,6 +24,7 @@ export function CustomAttributeDeleteDialog() {
   const store = useCustomAttributeDeleteDialogContext();
   const collections = useDashboardCollections();
   const open = useSelector(store, (state) => state.context.open);
+
   const entityType = useSelector(
     store,
     (state) => state.context.data.entityType

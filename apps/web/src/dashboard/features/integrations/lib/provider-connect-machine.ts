@@ -32,9 +32,11 @@ export const PROVIDER_REDIRECT_TIMEOUT_MS = 5000;
 const RequestEventSchema = Schema.toStandardSchemaV1(
   Schema.Struct({ type: Schema.Literal("REQUEST") })
 );
+
 const AuthorizedEventSchema = Schema.toStandardSchemaV1(
   Schema.Struct({ type: Schema.Literal("AUTHORIZED") })
 );
+
 const FailedEventSchema = Schema.toStandardSchemaV1(
   Schema.Struct({ type: Schema.Literal("FAILED") })
 );
@@ -92,8 +94,10 @@ export const toProviderConnectStatus = (
   if (snapshot.matches("requesting")) {
     return "requesting";
   }
+
   if (snapshot.matches("redirecting")) {
     return "redirecting";
   }
+
   return "idle";
 };

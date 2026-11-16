@@ -29,9 +29,13 @@ export const S3Layer = Layer.unwrap(
 ).pipe(Layer.provide(S3Config.layer));
 
 const TRAILING_SLASH_REGEX = /\/$/;
+
 const PROFILE_IMAGE_PREFIX = "profile-images";
+
 const ORGANIZATION_LOGO_PREFIX = "organization-logos";
+
 const EDITOR_MEDIA_PREFIX = "editor-media";
+
 export const TEMPORARY_EDITOR_MEDIA_PREFIX = `tmp/${EDITOR_MEDIA_PREFIX}`;
 
 export const isTemporaryEditorMediaKey = (key: string) =>
@@ -69,11 +73,13 @@ const makeS3UploadService = Effect.gen(function* () {
   const config = yield* S3Config;
   const bucket = config.publicBucketName;
   const s3 = yield* S3;
+
   const resolvePublicUrl = (fileKey: string) => {
     const encodedKey = fileKey
       .split("/")
       .map((segment) => encodeURIComponent(segment))
       .join("/");
+
     const baseUrl =
       config.publicBaseUrl._tag === "Some"
         ? config.publicBaseUrl.value.replace(TRAILING_SLASH_REGEX, "")
@@ -85,6 +91,7 @@ const makeS3UploadService = Effect.gen(function* () {
       url: `${baseUrl}/${encodedKey}`,
     };
   };
+
   // Written through `S3.putObject` rather than the `@effect-aws/s3` file
   // system: `writeFile` sends only `Bucket`, `Key`, and `Body`, and object
   // storage does not infer a content type from the key's extension, so every
@@ -123,6 +130,7 @@ const makeS3UploadService = Effect.gen(function* () {
         const now = yield* DateTime.now;
         const fileKey = `${PROFILE_IMAGE_PREFIX}/${userId}/${now.epochMilliseconds}-${yield* secureRandom.uuidV4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
+
         return resolvePublicUrl(fileKey);
       }),
     uploadOrganizationLogo: ({
@@ -141,6 +149,7 @@ const makeS3UploadService = Effect.gen(function* () {
         const now = yield* DateTime.now;
         const fileKey = `${ORGANIZATION_LOGO_PREFIX}/${organizationId}/${now.epochMilliseconds}-${yield* secureRandom.uuidV4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
+
         return resolvePublicUrl(fileKey);
       }),
     uploadEditorMedia: ({
@@ -161,6 +170,7 @@ const makeS3UploadService = Effect.gen(function* () {
         const now = yield* DateTime.now;
         const fileKey = `${TEMPORARY_EDITOR_MEDIA_PREFIX}/${userId}/${kind}/${now.epochMilliseconds}-${yield* secureRandom.uuidV4()}.${extension}`;
         yield* putObject({ bytes, contentType, fileKey });
+
         return resolvePublicUrl(fileKey);
       }),
     promoteEditorMedia: ({
@@ -174,6 +184,7 @@ const makeS3UploadService = Effect.gen(function* () {
         const finalKey = sourceKey.slice(
           `${TEMPORARY_EDITOR_MEDIA_PREFIX}/`.length
         );
+
         // `copyObject` keeps the source's metadata (S3's default
         // `MetadataDirective: COPY`), so the promoted object inherits both the
         // content type and the temporary cache TTL the upload wrote. Giving it
@@ -185,6 +196,7 @@ const makeS3UploadService = Effect.gen(function* () {
           CopySource: `${encodeURIComponent(sourceBucket)}/${encodeURIComponent(sourceKey)}`,
           Key: finalKey,
         });
+
         return resolvePublicUrl(finalKey);
       }),
     deleteObject: (bucket: string, key: string) =>

@@ -50,15 +50,20 @@ const protobufAcknowledgement = (bytes: Uint8Array) => {
   const reader = new BinaryReader(bytes);
   let rejected = "0";
   let message = "";
+
   while (reader.pos < reader.len) {
     const [field, wire] = reader.tag();
+
     if (field !== 1 || wire !== WireType.LengthDelimited) {
       reader.skip(wire, field);
       continue;
     }
+
     const partial = new BinaryReader(reader.bytes());
+
     while (partial.pos < partial.len) {
       const [innerField, innerWire] = partial.tag();
+
       if (innerField === 1 && innerWire === WireType.Varint) {
         rejected = String(partial.int64());
       } else if (innerField === 2 && innerWire === WireType.LengthDelimited) {
@@ -68,6 +73,7 @@ const protobufAcknowledgement = (bytes: Uint8Array) => {
       }
     }
   }
+
   return {
     partialSuccess: { rejectedDataPoints: rejected, errorMessage: message },
   };
@@ -95,15 +101,18 @@ const exportFailureReason = (
   if (!HttpClientError.isHttpClientError(cause)) {
     return "transport";
   }
+
   if (cause.reason._tag === "DecodeError") {
     return "acknowledgement";
   }
+
   if (
     cause.reason._tag === "TransportError" &&
     cause.reason.description === acknowledgementTimeout
   ) {
     return "timeout";
   }
+
   return "transport";
 };
 
@@ -112,15 +121,19 @@ const decodeAcknowledgement = (
 ) =>
   Effect.gen(function* () {
     const bytes = new Uint8Array(yield* response.arrayBuffer);
+
     if (bytes.byteLength === 0) {
       return undefined;
     }
+
     const failed = () => decodeError(response.request, response);
+
     if (response.headers["content-type"]?.includes("application/x-protobuf")) {
       return yield* Schema.decodeEffect(Acknowledgement)(
         protobufAcknowledgement(bytes)
       ).pipe(Effect.mapError(failed));
     }
+
     return yield* Schema.decodeEffect(Schema.fromJsonString(Acknowledgement))(
       new TextDecoder().decode(bytes)
     ).pipe(Effect.mapError(failed));
@@ -130,13 +143,16 @@ const acknowledge = (response: HttpClientResponse.HttpClientResponse) =>
   Effect.gen(function* () {
     const acknowledgement = yield* decodeAcknowledgement(response);
     const partial = acknowledgement?.partialSuccess;
+
     if (partial === undefined) {
       return;
     }
+
     const rejected =
       (partial.rejectedSpans ?? 0) +
       (partial.rejectedLogRecords ?? 0) +
       (partial.rejectedDataPoints ?? 0);
+
     // OTLP prohibits retrying partial success. Account for it without resending
     // accepted records, and never log a collector's potentially sensitive body.
     if (rejected > 0 || partial.errorMessage) {

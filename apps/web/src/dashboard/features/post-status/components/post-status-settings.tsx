@@ -251,6 +251,7 @@ function PostStatusRow({
   const deleteDialog = usePostStatusDeleteDialogContext();
   const { postStatusCollection } = useDashboardCollections();
   const [isMakingDefault, setIsMakingDefault] = useState(false);
+
   const { ref, handleRef, isDragging } = useSortable({
     id: status.id,
     accept: "status",

@@ -37,15 +37,18 @@ const mobileNavItems = [
 
 export function MobileNav() {
   const organizationId = useOrganizationId();
+
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
+
   const { toggleSidebar } = useSidebar();
   const occupied = useMobileBottomSlotOccupied();
 
   const activeIndex = mobileNavItems.findIndex((item) =>
     pathname.startsWith(`/${organizationId}/${item.segment}`)
   );
+
   const hasActiveItem = activeIndex >= 0;
 
   return (

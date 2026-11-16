@@ -33,19 +33,25 @@ export function OverPlanGate() {
   const organizationId = useOrganizationId();
   const navigate = useNavigate();
   const { compliance, isLoading } = usePlanCompliance();
+
   const { allowed: canManageBilling, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "billing.*")
   );
+
   const { data: session } = useAuthState();
+
   const actorRole =
     session?.memberships.find(
       (membership) => membership.organizationId === organizationId
     )?.role ?? null;
+
   const { pendingAction, run } = useRemediation();
   const { planComplianceCollection } = useDashboardCollections();
+
   const [dialogAction, setDialogAction] = useState<RemediationAction | null>(
     null
   );
+
   const hasTrackedView = useRef(false);
   const wasOverPlan = useRef(false);
 
@@ -58,6 +64,7 @@ export function OverPlanGate() {
     const refetch = () => {
       void planComplianceCollection.utils.refetch();
     };
+
     window.addEventListener("focus", refetch);
 
     return () => window.removeEventListener("focus", refetch);
@@ -92,6 +99,7 @@ export function OverPlanGate() {
     if (wasOverPlan.current) {
       trackEvent("over_plan_remediation_completed", { plan: compliance.plan });
     }
+
     void navigate({
       to: "/$organizationId",
       params: { organizationId },

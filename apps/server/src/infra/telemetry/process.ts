@@ -68,27 +68,33 @@ export const startProcessMetrics = (service: string) =>
       Effect.sync(() => {
         const monitor = monitorEventLoopDelay({ resolution: 20 });
         monitor.enable();
+
         return monitor;
       }),
       (monitor) => Effect.sync(() => monitor.disable())
     );
+
     let previousTime = performance.now();
     let previousCpu = cpuUsage();
     let previousLoop = performance.eventLoopUtilization();
+
     const sample = Effect.gen(function* () {
       const now = performance.now();
       const cpu = cpuUsage();
       const loop = performance.eventLoopUtilization();
       const memory = memoryUsage();
       const seconds = (now - previousTime) / 1_000;
+
       const cores =
         (cpu.user - previousCpu.user + cpu.system - previousCpu.system) /
         1_000_000 /
         seconds;
+
       const utilization = performance.eventLoopUtilization(
         loop,
         previousLoop
       ).utilization;
+
       const eventLoopDelay =
         delay.count === 0
           ? undefined
@@ -97,6 +103,7 @@ export const startProcessMetrics = (service: string) =>
               p99: delay.percentile(99) / 1_000_000_000,
               max: delay.max / 1_000_000_000,
             };
+
       previousTime = now;
       previousCpu = cpu;
       previousLoop = loop;
@@ -108,11 +115,13 @@ export const startProcessMetrics = (service: string) =>
       yield* Metric.update(metrics.heapTotal, memory.heapTotal);
       yield* Metric.update(metrics.external, memory.external);
       yield* Metric.update(metrics.utilization, utilization);
+
       if (eventLoopDelay !== undefined) {
         yield* Metric.update(metrics.delayMean, eventLoopDelay.mean);
         yield* Metric.update(metrics.delayP99, eventLoopDelay.p99);
         yield* Metric.update(metrics.delayMax, eventLoopDelay.max);
       }
+
       const eventLoopAnnotations =
         eventLoopDelay === undefined
           ? {}
@@ -121,6 +130,7 @@ export const startProcessMetrics = (service: string) =>
               "eventloop.delay.p99.ms": eventLoopDelay.p99 * 1_000,
               "eventloop.delay.max.ms": eventLoopDelay.max * 1_000,
             };
+
       yield* Effect.logInfo("process.runtime").pipe(
         Effect.annotateLogs({
           "event.name": "process.runtime",
@@ -140,6 +150,7 @@ export const startProcessMetrics = (service: string) =>
         Effect.annotateLogs(eventLoopAnnotations)
       );
     });
+
     yield* Effect.sleep("1 second").pipe(
       Effect.andThen(sample),
       Effect.andThen(

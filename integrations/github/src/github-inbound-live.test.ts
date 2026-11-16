@@ -83,10 +83,12 @@ const seedRuleScenario = ({
     const completedStatusId = yield* PostStatusId.generate;
     const closedStatusId = yield* PostStatusId.generate;
     const postId = yield* PostId.generate;
+
     const extraPostIds = yield* Effect.forEach(
       Array.from({ length: linkedPosts - 1 }, (_, index) => index),
       () => PostId.generate
     );
+
     const postIds = [postId, ...extraPostIds];
     const connectionId = yield* IntegrationConnectionId.generate;
     const installationId = `gh-installation-${organizationId}`;
@@ -230,8 +232,10 @@ describe("GitHub inbound synchronization", () => {
         const closedStatusId = yield* PostStatusId.generate;
         const postId = yield* PostId.generate;
         const connectionId = yield* IntegrationConnectionId.generate;
+
         const externalResourceId =
           yield* IntegrationExternalResourceId.generate;
+
         const linkId = yield* PostExternalResourceLinkId.generate;
         const ruleId = yield* GitHubSyncRuleId.generate;
         const now = yield* DateTime.nowAsDate;
@@ -337,6 +341,7 @@ describe("GitHub inbound synchronization", () => {
           .select({ statusId: schema.postTable.statusId })
           .from(schema.postTable)
           .where(eq(schema.postTable.id, postId));
+
         expect(post?.statusId).toBe(closedStatusId);
       })
     );
@@ -347,6 +352,7 @@ describe("GitHub inbound synchronization", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const inbound = yield* GitHubInboundService;
+
           const seeded = yield* seedRuleScenario({
             linkedIssueStates: ["open", "open"],
             rules: [
@@ -367,10 +373,12 @@ describe("GitHub inbound synchronization", () => {
             repositoryName: "test",
             repositoryOwner: "feeblo",
           });
+
           const [afterFirst] = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, seeded.postId));
+
           expect(afterFirst?.statusId).toBe(seeded.openStatusId);
 
           yield* inbound.applyIssueWebhook({
@@ -382,10 +390,12 @@ describe("GitHub inbound synchronization", () => {
             repositoryName: "test",
             repositoryOwner: "feeblo",
           });
+
           const [afterSecond] = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, seeded.postId));
+
           expect(afterSecond?.statusId).toBe(seeded.closedStatusId);
         })
     );
@@ -396,6 +406,7 @@ describe("GitHub inbound synchronization", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const inbound = yield* GitHubInboundService;
+
           const seeded = yield* seedRuleScenario({
             linkedIssueStates: ["closed", "closed"],
             rules: [
@@ -421,10 +432,12 @@ describe("GitHub inbound synchronization", () => {
             repositoryName: "test",
             repositoryOwner: "feeblo",
           });
+
           const [post] = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, seeded.postId));
+
           expect(post?.statusId).toBe(seeded.closedStatusId);
         })
     );
@@ -435,6 +448,7 @@ describe("GitHub inbound synchronization", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const inbound = yield* GitHubInboundService;
+
           const seeded = yield* seedRuleScenario({
             linkedIssueStates: ["closed"],
             rules: [
@@ -461,10 +475,12 @@ describe("GitHub inbound synchronization", () => {
             repositoryName: "test",
             repositoryOwner: "feeblo",
           });
+
           const [post] = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, seeded.postId));
+
           expect(post?.statusId).toBe(seeded.closedStatusId);
         })
     );
@@ -473,6 +489,7 @@ describe("GitHub inbound synchronization", () => {
       Effect.gen(function* () {
         const db = yield* currentDb;
         const inbound = yield* GitHubInboundService;
+
         const seeded = yield* seedRuleScenario({
           linkedIssueStates: ["open"],
           rules: [
@@ -498,10 +515,12 @@ describe("GitHub inbound synchronization", () => {
           repositoryName: "test",
           repositoryOwner: "feeblo",
         });
+
         const [post] = yield* db
           .select({ statusId: schema.postTable.statusId })
           .from(schema.postTable)
           .where(eq(schema.postTable.id, seeded.postId));
+
         expect(post?.statusId).toBe(seeded.completedStatusId);
       })
     );
@@ -512,6 +531,7 @@ describe("GitHub inbound synchronization", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const inbound = yield* GitHubInboundService;
+
           const seeded = yield* seedRuleScenario({
             linkedIssueStates: ["open"],
             linkedPosts: 2,
@@ -538,10 +558,12 @@ describe("GitHub inbound synchronization", () => {
           // Nothing in one envelope changes the rule list, so it is read once
           // for the delivery rather than once per linked post.
           expect(ruleReadCount()).toBe(1);
+
           const posts = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.organizationId, seeded.organizationId));
+
           expect(posts).toHaveLength(2);
           expect(
             posts.every((post) => post.statusId === seeded.closedStatusId)
@@ -555,6 +577,7 @@ describe("GitHub inbound synchronization", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const inbound = yield* GitHubInboundService;
+
           const seeded = yield* seedRuleScenario({
             linkedIssueStates: ["open"],
             rules: [
@@ -578,10 +601,12 @@ describe("GitHub inbound synchronization", () => {
           });
 
           expect(ruleReadCount()).toBe(0);
+
           const [post] = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, seeded.postId));
+
           expect(post?.statusId).toBe(seeded.openStatusId);
         })
     );

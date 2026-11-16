@@ -39,6 +39,7 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
 }: BoardGridLaneColumnProps) {
   const store = usePostCreateDialogContext();
   const effectiveLabel = label || (status ? formatPostStatus(status) : "Posts");
+
   const { ref, isDropTarget } = useSortable({
     id,
     accept: "item",

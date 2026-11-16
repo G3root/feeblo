@@ -18,6 +18,7 @@ export const InsightsRpcHandlersEffect = Effect.gen(function* () {
     GetWorkspaceInsights: (args: TInsightsPayload) =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
+
         // Start of the first day, not "now minus N days": the chart's last
         // bucket is today and partial, so a 7-day range is today plus the six
         // days before it. A rolling 168-hour window would produce eight daily
@@ -28,6 +29,7 @@ export const InsightsRpcHandlersEffect = Effect.gen(function* () {
           })(now),
           "day"
         );
+
         const sinceDate = DateTime.toDate(since);
         const untilDate = DateTime.toDate(now);
 

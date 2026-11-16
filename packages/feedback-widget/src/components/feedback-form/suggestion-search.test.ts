@@ -73,6 +73,7 @@ describe("suggestion search reducer", () => {
       query: { ...QUERY, title: "Export is missing " },
       type: "INPUT",
     });
+
     expect(ids(debouncing)).toStrictEqual(["a", "b"]);
     expect(debouncing.status).toBe("debouncing");
 
@@ -105,6 +106,7 @@ describe("suggestion search reducer", () => {
       query: { ...QUERY, content: "different" },
       type: "INPUT",
     });
+
     const stale = reduceSuggestionSearch(afterChange, loaded("stale"));
 
     expect(stale).toBe(afterChange);
@@ -117,6 +119,7 @@ describe("suggestion search reducer", () => {
       { query: QUERY, type: "INPUT" },
       { type: "DEBOUNCED" },
     ]);
+
     const afterChange = reduceSuggestionSearch(inFlight, {
       query: { ...QUERY, content: "different" },
       type: "INPUT",

@@ -23,6 +23,7 @@ export function WidgetShell(props: {
   const view = createMemo(() => resolveView(location.pathname));
   const tabs = createMemo(() => widgetTabs(config));
   const activeModule = createMemo(() => moduleForPath(location.pathname));
+
   const activeTabIndex = createMemo(() =>
     Math.max(
       0,

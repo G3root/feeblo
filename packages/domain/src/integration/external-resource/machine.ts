@@ -95,6 +95,7 @@ const stateAfter = (
     snapshotFor(state),
     { type: event }
   );
+
   // SAFETY: the machine is flat — every state and target is one of the three
   // stored states — so a `StateValue` read from it is always a state.
   // `machine.test.ts` walks the whole graph rather than trusting this.
@@ -113,6 +114,7 @@ const handles = (
   event: TExternalResourceCreateRequestEvent
 ): boolean => {
   const before = snapshotFor(state);
+
   return !isUnhandled(
     before,
     transition(externalResourceCreateRequestMachine, before, { type: event })
@@ -142,14 +144,17 @@ const targetsOf = (
   event: TExternalResourceCreateRequestEvent
 ): readonly TExternalResourceCreateRequestState[] => {
   const targets = new Set<TExternalResourceCreateRequestState>();
+
   for (const from of EXTERNAL_RESOURCE_CREATE_REQUEST_STATES) {
     const next = stateAfter(from, event);
+
     // Only a move counts: an event a state does not handle returns that state,
     // and counting it would make the target ambiguous.
     if (next !== from) {
       targets.add(next);
     }
   }
+
   return [...targets];
 };
 

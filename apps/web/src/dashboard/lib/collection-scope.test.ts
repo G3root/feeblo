@@ -12,6 +12,7 @@ import {
 } from "./collection-scope";
 
 const orgA = { organizationId: "org-a", postSlug: "post-1" };
+
 const orgB = { organizationId: "org-b", postSlug: "post-1" };
 
 describe("organizationScopedCollectionId", () => {
@@ -54,6 +55,7 @@ describe("slugScopedCollectionId", () => {
       organizationId: "org-a",
       postSlug: "post-1",
     });
+
     const post2 = slugScopedCollectionId("commentCollection", {
       organizationId: "org-a",
       postSlug: "post-2",
@@ -139,22 +141,27 @@ describe("collections module invariants", () => {
     const blocks: Array<{ name: string; body: string }> = [];
     const re = /export function (\w+Collection)\(/g;
     let match: RegExpExecArray | null;
+
     while ((match = re.exec(source))) {
       const braceOpen = source.indexOf("{", match.index);
       let depth = 0;
       let end = braceOpen;
+
       for (let i = braceOpen; i < source.length; i++) {
         if (source[i] === "{") depth++;
         else if (source[i] === "}") {
           depth--;
+
           if (depth === 0) {
             end = i;
             break;
           }
         }
       }
+
       blocks.push({ name: match[1], body: source.slice(braceOpen, end) });
     }
+
     return blocks;
   }
 
@@ -172,6 +179,7 @@ describe("collections module invariants", () => {
     );
 
     expect(slugScoped.length).toBeGreaterThan(0);
+
     for (const block of slugScoped) {
       expect(
         block.body,
@@ -183,6 +191,7 @@ describe("collections module invariants", () => {
   it("keys every org-scoped collection by organization", () => {
     for (const block of blocks) {
       if (block.body.includes("slugScopedCollectionId(")) continue;
+
       if (!block.body.includes("organizationScopedQueryKey(")) continue;
       expect(
         block.body,

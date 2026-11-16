@@ -18,6 +18,7 @@ import { usePostCollections } from "./providers/post-collections-provider";
  */
 export function usePostDetail() {
   const { post } = usePostCollectionData();
+
   const {
     collections: { postDetailCollection },
     organizationId,

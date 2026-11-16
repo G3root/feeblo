@@ -14,8 +14,10 @@ import { dashboardCollections } from "~/lib/collections";
 
 export function WorkspaceDetailsSection() {
   const organizationId = useOrganizationId();
+
   const { allowed: canManageOrganization, isPending: isPolicyPending } =
     usePolicy(hasOwnerOrAdminRole(organizationId));
+
   const organizationQuery = useLiveQuery({
     queryKey: [
       "workspace-details",
@@ -79,6 +81,7 @@ export function WorkspaceDetailsSection() {
     </SettingsItem.Item>
   );
 }
+
 function WorkspaceNameField({
   canEdit,
   initialName,
@@ -103,6 +106,7 @@ function WorkspaceNameField({
         title: "Workspace name cannot be empty",
         type: "error",
       });
+
       return;
     }
 
@@ -117,6 +121,7 @@ function WorkspaceNameField({
           draft.name = name;
         }
       );
+
       await tx.when("settled");
       trackEvent("org_renamed", { success: true });
       toastManager.add({
@@ -150,6 +155,7 @@ function WorkspaceNameField({
     </SettingsItem.Field>
   );
 }
+
 function WorkspaceLogoButton({
   canEdit,
   imageUrl,
@@ -208,6 +214,7 @@ function WorkspaceLogoButton({
               draft.logo = null;
             }
           );
+
           await tx.when("settled");
           trackEvent("org_logo_updated", { action: "removed", success: true });
         } catch (error) {

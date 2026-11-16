@@ -68,16 +68,20 @@ export const dataImportDetailAtom = Atom.family(
       organizationId: args.organizationId,
       sort: args.sort,
     };
+
     // Optional keys are added one at a time: the RPC payload type refuses an
     // explicit `undefined`, and a key that is present must carry a real value.
     const withFilter =
       args.filter === null ? window : { ...window, filter: args.filter };
+
     const withBoard =
       args.board === null ? withFilter : { ...withFilter, board: args.board };
+
     const payload =
       args.message === null
         ? withBoard
         : { ...withBoard, message: args.message };
+
     return DashboardClient.runtime.atom(
       Stream.unwrap(
         DashboardClient.use((client) =>
@@ -90,5 +94,6 @@ export const dataImportDetailAtom = Atom.family(
 
 export const confirmDataImportAtom =
   DashboardClient.mutation("ConfirmDataImport");
+
 export const cancelDataImportAtom =
   DashboardClient.mutation("CancelDataImport");

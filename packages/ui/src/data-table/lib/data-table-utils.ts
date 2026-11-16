@@ -19,6 +19,7 @@ import type {
   FilterOperatorOption,
   FilterVariant,
 } from "./data-table-types";
+
 export const FILTER_VARIANTS = [
   "text",
   "number",
@@ -117,6 +118,7 @@ export function getColumnId<TData extends RowData>(
   column: ColumnDef<DataTableFeatures, TData>
 ) {
   const accessorKey = "accessorKey" in column ? column.accessorKey : undefined;
+
   return (
     column.id ??
     (accessorKey === undefined
@@ -130,6 +132,7 @@ export function getFilterVariant(
   meta: DataTableColumnMeta | undefined
 ): FilterVariant {
   const variant = meta?.variant;
+
   return FILTER_VARIANTS.find((item) => item === variant) ?? "text";
 }
 
@@ -143,9 +146,11 @@ export function getIsNumberRangeColumn<TData extends RowData>(
   column: Column<DataTableFeatures, TData>
 ) {
   const options = getColumnNumberOptions(column.columnDef.meta);
+
   if (isNumber(options?.min) && isNumber(options.max)) {
     return true;
   }
+
   return !column.table.options.manualFiltering;
 }
 
@@ -183,9 +188,11 @@ export function getPlainFilterOperator(
   isList: boolean
 ): FilterOperator {
   if (variant === "select") return "inArray";
+
   if (isList && (variant === "number" || variant === "date")) {
     return "isBetween";
   }
+
   return variant === "text" ? "iLike" : "eq";
 }
 
@@ -201,6 +208,7 @@ export function coerceFilterValue(
 
   if (operator === "inArray" || operator === "notInArray") {
     if (Array.isArray(value)) return value;
+
     return value ? [value] : [];
   }
 
@@ -223,10 +231,13 @@ export function getSelectFilterValue(filter: ColumnFilterItem) {
 
 export function stringifyFilterValue(value: DataTableRawValue): string {
   if (value === null || value === undefined) return "";
+
   if (value instanceof Date) return value.toISOString();
+
   if (isPlainObject(value) || Array.isArray(value)) {
     return JSON.stringify(value);
   }
+
   return String(value);
 }
 
@@ -250,6 +261,7 @@ export function createPlainFilter<TColumnId extends string>(
 
   if (variant === "boolean" && Array.isArray(value)) {
     if (value.length !== 1) return null;
+
     return createPlainFilter(id, variant, value[0]);
   }
 
@@ -263,7 +275,9 @@ export function createPlainFilter<TColumnId extends string>(
       operator,
       (Array.isArray(value) ? value : [value]).map(stringify)
     );
+
     if (values.every((item) => item === "")) return null;
+
     return { id, variant, operator, value: values, filterId };
   }
 
@@ -301,6 +315,7 @@ export function normalizeColumnFilter(
   }
 
   const item = createPlainFilter(filter.id, variant, rawValue);
+
   if (item) return { ...item, filterId };
 
   return {
@@ -395,17 +410,23 @@ export function getIsValidFilterValue(filter: ColumnFilterItem) {
 
 export function parseFilterDate(value: DataTableRawValue): Date | undefined {
   if (value instanceof Date) return getValidDate(value);
+
   if (isNumber(value)) return getValidDate(new Date(value));
+
   if (!isString(value) || value.trim() === "") return undefined;
 
   const text = value.trim();
   const match = CALENDAR_DATE_PATTERN.exec(text);
+
   if (match) {
     const [, year, month, day] = match.map(Number);
+
     if (year === undefined || month === undefined || day === undefined) {
       return undefined;
     }
+
     const date = new Date(year, month - 1, day);
+
     return date.getFullYear() === year &&
       date.getMonth() === month - 1 &&
       date.getDate() === day
@@ -414,18 +435,21 @@ export function parseFilterDate(value: DataTableRawValue): Date | undefined {
   }
 
   const numeric = Number(text);
+
   return getValidDate(new Date(Number.isNaN(numeric) ? text : numeric));
 }
 
 export function formatFilterDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
+
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
 export function getFilterDates(value: ColumnFilterItem["value"]) {
   return (Array.isArray(value) ? value : [value]).flatMap((item) => {
     const date = parseFilterDate(item);
+
     return date ? [date] : [];
   });
 }
@@ -440,6 +464,7 @@ export function getRangeFilterBounds(
 ): [number | undefined, number | undefined] {
   const [start, end] = values.map((value) => {
     const number = Number(value);
+
     return value.trim() === "" || Number.isNaN(number)
       ? undefined
       : Math.min(Math.max(number, min), max);
@@ -460,8 +485,10 @@ export function getValidRangeFilterBounds(
 
   for (const bound of [start, end]) {
     if (bound === undefined) continue;
+
     if (Number.isNaN(bound) || bound < min || bound > max) return null;
   }
+
   if (start !== undefined && end !== undefined && start > end) return null;
 
   return [start, end];
@@ -472,7 +499,9 @@ export function getAriaSort(
   columnId: string
 ): React.AriaAttributes["aria-sort"] {
   const sort = sorting[0];
+
   if (sort?.id !== columnId) return undefined;
+
   return sort.desc ? "descending" : "ascending";
 }
 
@@ -516,10 +545,12 @@ export function getColumnSizingStyle<TData extends RowData>(
 
   for (const { column } of table.getLeafHeaders()) {
     const isPinned = column.getIsPinned();
+
     if (!isPinned) continue;
 
     const offset =
       isPinned === "start" ? column.getStart("start") : column.getAfter("end");
+
     style.set(getColumnVar(column.id, "offset"), `${offset}px`);
   }
 
@@ -534,10 +565,12 @@ export function getIsTableShortcutTarget(
   target: EventTarget | null
 ) {
   const root = element?.closest(DATA_TABLE_SELECTOR);
+
   if (!root) return true;
 
   const targetRoot =
     target instanceof Element ? target.closest(DATA_TABLE_SELECTOR) : null;
+
   if (targetRoot) return targetRoot === root;
 
   return document.querySelector(DATA_TABLE_SELECTOR) === root;
@@ -548,6 +581,7 @@ function getColumnVar(columnId: string, property: "size" | "offset") {
     /[^a-zA-Z0-9-]/g,
     (char) => `_${char.codePointAt(0)?.toString(16)}_`
   );
+
   return `--column-${name}-${property}`;
 }
 
@@ -566,6 +600,7 @@ function normalizeFilterValues(
     const [start = "", end = ""] = values;
     const startTime = parseFilterDate(start)?.getTime();
     const endTime = parseFilterDate(end)?.getTime();
+
     return startTime !== undefined &&
       endTime !== undefined &&
       startTime > endTime
@@ -577,6 +612,7 @@ function normalizeFilterValues(
 
   const [start = "", end = ""] = values.map((value) => {
     const trimmed = value.trim();
+
     return trimmed === "" || Number.isNaN(Number(trimmed)) ? "" : trimmed;
   });
 
@@ -591,5 +627,6 @@ function getFilterValueStringifier(variant: FilterVariant) {
 
 function stringifyFilterDate(value: DataTableRawValue) {
   const date = parseFilterDate(value);
+
   return date ? formatFilterDate(date) : "";
 }

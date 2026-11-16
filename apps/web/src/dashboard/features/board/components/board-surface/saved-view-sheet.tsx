@@ -120,12 +120,14 @@ export function SavedViewSheet({
   target: SavedViewTarget | undefined;
 }) {
   const navigate = useNavigate();
+
   // The editor's values, not the board's: a member can open an existing view,
   // change its filters or grouping, and cancel without the board moving
   // underneath them.
   const [draftFilters, setDraftFilters] = useState<TBoardFilters>(
     () => query.filters
   );
+
   const [draftGrouping, setDraftGrouping] = useState<TBoardGrouping>(
     () => query.grouping
   );
@@ -143,6 +145,7 @@ export function SavedViewSheet({
           title: "Only workspace members can save a view",
           type: "error",
         });
+
         return;
       }
 
@@ -156,6 +159,7 @@ export function SavedViewSheet({
         grouping: draftGrouping,
         ordering: query.ordering,
       });
+
       const writableQuery = {
         filters: {
           assigneeMemberIds:
@@ -182,6 +186,7 @@ export function SavedViewSheet({
         ordering: { ...normalized.ordering },
         version: normalized.version,
       };
+
       // The sheet's starting query is the stored one, so a comparison against
       // it separates a real query edit from a rename or description change.
       // Both sides are normalized because a stored row and a live board query
@@ -190,10 +195,12 @@ export function SavedViewSheet({
         target !== undefined &&
         JSON.stringify(normalizeBoardQuery(query)) !==
           JSON.stringify(normalized);
+
       // The form starts at the target's mount-time values. Only fields the
       // member actually changed should be written; an untouched field must not
       // send that starting value over a newer row.
       const nameChanged = target !== undefined && target.name !== value.name;
+
       const isPrivateChanged =
         target !== undefined && target.isPrivate !== value.isPrivate;
 
@@ -201,12 +208,15 @@ export function SavedViewSheet({
         if (target) {
           const transaction = collection.update(target.id, (draft) => {
             draft.description = value.description;
+
             if (nameChanged) {
               draft.name = value.name;
             }
+
             if (isPrivateChanged) {
               draft.isPrivate = value.isPrivate;
             }
+
             // Only a real query edit writes the query. A rename or description
             // change leaves the row's current query alone, so a row refetched
             // while the sheet was open is not overwritten by the sheet's
@@ -215,6 +225,7 @@ export function SavedViewSheet({
               draft.query = writableQuery;
             }
           });
+
           await transaction.when("settled");
 
           form.reset();
@@ -231,10 +242,12 @@ export function SavedViewSheet({
             title: `Updated "${value.name}"`,
             type: "success",
           });
+
           return;
         }
 
         const viewId = await SavedViewId.unsafeGenerate();
+
         const transaction = collection.insert({
           boardId,
           createdAt: new Date(),
@@ -248,6 +261,7 @@ export function SavedViewSheet({
           query: writableQuery,
           updatedAt: new Date(),
         });
+
         await transaction.when("settled");
 
         form.reset();

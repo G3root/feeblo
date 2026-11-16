@@ -8,6 +8,7 @@ export {
   DEFAULT_POST_STATUS_TYPE,
   pickDefaultPostStatus,
 } from "@feeblo/domain-contracts/post-status-default";
+
 export {
   POST_STATUS_TYPES,
   PostStatusType,

@@ -37,7 +37,9 @@ export const verifyRequestSignature = ({
       })
     );
   }
+
   const timestamp = Number(timestampHeader);
+
   if (!Number.isFinite(timestamp)) {
     return Effect.fail(
       new IntegrationRequestSignatureError({
@@ -45,6 +47,7 @@ export const verifyRequestSignature = ({
       })
     );
   }
+
   if (Math.abs(now - timestamp * 1000) > maxAgeMs) {
     return Effect.fail(
       new IntegrationRequestSignatureError({
@@ -52,5 +55,6 @@ export const verifyRequestSignature = ({
       })
     );
   }
+
   return verify({ signatureHeader, timestampHeader });
 };

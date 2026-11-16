@@ -47,12 +47,14 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
     CreateChangelogPost: (args: TChangelogPostCreate) =>
       Effect.gen(function* () {
         const eligible = yield* repository.findEligible(args);
+
         if (eligible.length === 0) {
           return yield* new Policy.PolicyDeniedError({
             reason:
               "Post is not an unannounced completed post in this organization",
           });
         }
+
         // changelogPolicy.canUpdate additionally requires the changelog to
         // belong to this organization, so a manager cannot link this
         // organization's post to another organization's changelog.

@@ -28,31 +28,49 @@ import * as HttpServerResponse from "effect/http/HttpServerResponse";
 const absoluteUrlPattern = /^[a-z][a-z0-9+.-]*:\/\//iu;
 
 export const API_VERSION_PATH = "/api/v1";
+
 export const API_OPENAPI_PATH = `${API_VERSION_PATH}/openapi.json`;
+
 export const API_REFERENCE_PATH = `${API_VERSION_PATH}/docs`;
+
 export const AGENT_AUTH_PATH = "/auth.md";
+
 export const AGENT_LLMS_PATH = "/llms.txt";
+
 export const AGENT_ROBOTS_PATH = "/robots.txt";
+
 export const AGENT_SITEMAP_PATH = "/sitemap.xml";
+
 export const API_CATALOG_PATH = "/.well-known/api-catalog";
+
 export const AGENT_CATALOG_PATH = "/.well-known/ai-catalog.json";
+
 /**
  * The multi-origin server list the docs site already publishes as
  * `/.well-known/mcp.json`. Kept because the documentation and the landing page
  * link to it; SEP-1649 clients read `MCP_SERVER_CARD_PATH` instead.
  */
 export const MCP_SERVERS_PATH = "/.well-known/mcp.json";
+
 export const MCP_SERVER_CARD_PATH = "/.well-known/mcp/server-card.json";
 
 const MARKDOWN_CONTENT_TYPE = "text/markdown; charset=utf-8";
+
 const TEXT_CONTENT_TYPE = "text/plain; charset=utf-8";
+
 const XML_CONTENT_TYPE = "application/xml; charset=utf-8";
+
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
+
 const MARKDOWN_LINK_TYPE = "text/markdown";
+
 const TEXT_LINK_TYPE = "text/plain";
+
 const JSON_LINK_TYPE = "application/json";
+
 const API_CATALOG_CONTENT_TYPE =
   'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"';
+
 const API_CATALOG_LINK_TYPE = "application/linkset+json";
 
 /**
@@ -90,6 +108,7 @@ export const discoveryOrigin = (
     ?.split(",")[0]
     ?.trim()
     .toLowerCase();
+
   const protocol =
     forwardedProto === "http" || forwardedProto === "https"
       ? forwardedProto

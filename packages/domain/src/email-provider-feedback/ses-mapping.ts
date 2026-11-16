@@ -11,11 +11,14 @@ const parseOccurredAt = (
   fallback: string | undefined
 ): Date => {
   const parsed = timestamp === undefined ? undefined : new Date(timestamp);
+
   if (parsed !== undefined && !Number.isNaN(parsed.getTime())) {
     return parsed;
   }
+
   const fallbackParsed =
     fallback === undefined ? undefined : new Date(fallback);
+
   return fallbackParsed !== undefined && !Number.isNaN(fallbackParsed.getTime())
     ? fallbackParsed
     : // Both timestamps invalid (should not happen for AWS payloads); keep the
@@ -25,14 +28,18 @@ const parseOccurredAt = (
 
 const findMessageId = (notification: SesEventNotification): string => {
   const mail = notification.mail;
+
   const messageIdHeader = mail.headers
     ?.find((header) => header.name.toLowerCase() === "message-id")
     ?.value.trim();
+
   const commonHeaderMessageId = mail.commonHeaders?.messageId?.trim();
+
   // A whitespace-only id must count as absent, not as an empty id, so the
   // lookup falls back to the mail-level messageId for both sources.
   const present = (value: string | undefined): string | undefined =>
     value === undefined || value === "" ? undefined : value;
+
   return (
     present(messageIdHeader) ?? present(commonHeaderMessageId) ?? mail.messageId
   );
@@ -54,7 +61,9 @@ const parseMailAcceptanceTimestamp = (
   if (timestamp === undefined) {
     return undefined;
   }
+
   const parsed = new Date(timestamp);
+
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
 
@@ -65,6 +74,48 @@ const findHeader = (
   notification.mail.headers
     ?.find((header) => header.name.toLowerCase() === name)
     ?.value.trim();
+
+/**
+ * The addresses a provider event names as its subject, when it names any.
+ *
+ * Each event type keeps the recipients in a different field, and other types
+ * carry none, which is why the caller falls back to the envelope destination.
+ */
+const reportedRecipients = (
+  notification: SesEventNotification
+): readonly string[] => {
+  switch (notification.eventType) {
+    case "Bounce":
+      return (notification.bounce?.bouncedRecipients ?? []).flatMap(
+        (recipient) =>
+          recipient.emailAddress === undefined ? [] : [recipient.emailAddress]
+      );
+    case "Complaint":
+      return (notification.complaint?.complainedRecipients ?? []).flatMap(
+        (recipient) =>
+          recipient.emailAddress === undefined ? [] : [recipient.emailAddress]
+      );
+    case "Delivery":
+      return notification.delivery?.recipients ?? [];
+    default:
+      return [];
+  }
+};
+
+/**
+ * `Permanent` is a hard bounce and `Transient` a soft one; every other
+ * classification, including a missing bounce block, stays undetermined so the
+ * address is retried rather than suppressed.
+ */
+const hardOrSoftBounceType = (
+  bounceType: string | undefined
+): "hard" | "soft" | "undetermined" => {
+  if (bounceType === "Permanent") return "hard";
+
+  if (bounceType === "Transient") return "soft";
+
+  return "undetermined";
+};
 
 /**
  * The addresses a provider event is about.
@@ -78,22 +129,10 @@ const findHeader = (
 const findRecipients = (
   notification: SesEventNotification
 ): readonly string[] => {
-  const reported =
-    notification.eventType === "Bounce"
-      ? (notification.bounce?.bouncedRecipients ?? []).flatMap((recipient) =>
-          recipient.emailAddress === undefined ? [] : [recipient.emailAddress]
-        )
-      : notification.eventType === "Complaint"
-        ? (notification.complaint?.complainedRecipients ?? []).flatMap(
-            (recipient) =>
-              recipient.emailAddress === undefined
-                ? []
-                : [recipient.emailAddress]
-          )
-        : notification.eventType === "Delivery"
-          ? (notification.delivery?.recipients ?? [])
-          : [];
+  const reported = reportedRecipients(notification);
+
   const fallback = notification.mail.destination ?? [];
+
   return [
     ...new Set(
       (reported.length > 0 ? reported : fallback).map((email) =>
@@ -113,6 +152,7 @@ const findRecipients = (
  */
 const normalizeProviderMessageId = (value: string): string => {
   const trimmed = value.trim();
+
   return trimmed.startsWith("<") ? trimmed : `<${trimmed}>`;
 };
 
@@ -130,10 +170,12 @@ export const toProviderLifecycleEvent = (
   const acceptance = parseMailAcceptanceTimestamp(mailTimestamp);
   const recipients = findRecipients(notification);
   const headerDeliveryId = findHeader(notification, "x-feeblo-delivery-id");
+
   const deliveryId =
     headerDeliveryId === undefined || headerDeliveryId === ""
       ? undefined
       : headerDeliveryId;
+
   // Every mapped outcome except a rejection proves the provider took the
   // message, so each of them carries the mail's acceptance timestamp; a
   // `Reject` — a message the provider refused instead of accepting — must
@@ -144,6 +186,7 @@ export const toProviderLifecycleEvent = (
   switch (notification.eventType) {
     case "Delivery": {
       const smtpResponse = notification.delivery?.smtpResponse?.trim();
+
       const base = {
         eventId,
         messageId,
@@ -156,6 +199,7 @@ export const toProviderLifecycleEvent = (
         ...(deliveryId !== undefined && { deliveryId }),
         ...acceptanceFields,
       };
+
       return smtpResponse !== undefined && smtpResponse !== ""
         ? {
             ...base,
@@ -166,22 +210,22 @@ export const toProviderLifecycleEvent = (
           }
         : base;
     }
+
     case "Bounce": {
       const bounce = notification.bounce;
+
       // Only `Permanent` is an address fact. `Transient` is retried. Anything
       // else — `Undetermined`, or an event with no bounce block at all — is
       // also retried: treating an unknown classification as hard would
       // suppress an address that may still be deliverable.
-      const bounceType =
-        bounce?.bounceType === "Permanent"
-          ? "hard"
-          : bounce?.bounceType === "Transient"
-            ? "soft"
-            : "undetermined";
+      const bounceType = hardOrSoftBounceType(bounce?.bounceType);
+
       const diagnosticCode =
         bounce?.bouncedRecipients?.[0]?.diagnosticCode?.trim();
+
       const category =
         bounce?.bounceSubType?.trim() ?? bounce?.bounceType ?? "bounce";
+
       const base: Extract<ProviderLifecycleEvent, { type: "bounced" }> = {
         eventId,
         messageId,
@@ -193,6 +237,7 @@ export const toProviderLifecycleEvent = (
         ...(deliveryId !== undefined && { deliveryId }),
         ...acceptanceFields,
       };
+
       return diagnosticCode !== undefined && diagnosticCode !== ""
         ? {
             ...base,
@@ -203,9 +248,11 @@ export const toProviderLifecycleEvent = (
           }
         : base;
     }
+
     case "Complaint": {
       const complaint = notification.complaint;
       const category = complaint?.complaintFeedbackType?.trim() ?? "complaint";
+
       return {
         eventId,
         messageId,
@@ -217,9 +264,11 @@ export const toProviderLifecycleEvent = (
         ...acceptanceFields,
       };
     }
+
     case "DeliveryDelay": {
       const deliveryDelay = notification.deliveryDelay;
       const delayType = deliveryDelay?.delayType?.trim();
+
       const base = {
         eventId,
         messageId,
@@ -229,6 +278,7 @@ export const toProviderLifecycleEvent = (
         ...(deliveryId !== undefined && { deliveryId }),
         ...acceptanceFields,
       };
+
       return delayType !== undefined && delayType !== ""
         ? {
             ...base,
@@ -236,8 +286,10 @@ export const toProviderLifecycleEvent = (
           }
         : base;
     }
+
     case "Reject": {
       const reason = notification.reject?.reason?.trim();
+
       const base = {
         eventId,
         messageId,
@@ -246,6 +298,7 @@ export const toProviderLifecycleEvent = (
         type: "failed" as const,
         ...(deliveryId !== undefined && { deliveryId }),
       };
+
       return reason !== undefined && reason !== ""
         ? {
             ...base,
@@ -253,6 +306,7 @@ export const toProviderLifecycleEvent = (
           }
         : base;
     }
+
     default:
       return undefined;
   }

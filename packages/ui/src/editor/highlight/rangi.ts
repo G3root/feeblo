@@ -30,6 +30,7 @@ export const createRangiParser =
     const tokens = tokenize(content, {
       lang: normalizeCodeBlockLanguage(language),
     });
+
     const decorations: Decoration[] = [];
 
     // Inline decoration positions are relative to the document, and the code
@@ -37,8 +38,10 @@ export const createRangiParser =
     // values are raw and cover the input in source order (including newlines),
     // so advancing by each token's length keeps positions exact.
     let from = pos + 1;
+
     for (const token of tokens) {
       const to = from + token.text.length;
+
       if (token.type) {
         decorations.push(
           Decoration.inline(from, to, {
@@ -46,6 +49,7 @@ export const createRangiParser =
           })
         );
       }
+
       from = to;
     }
 

@@ -49,6 +49,7 @@ function ApiKeysSettingsContent({
   const [oneTimeKey, setOneTimeKey] = useState<CreatedApiKey | null>(null);
 
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
+
   const publicApiAvailable =
     isEntitlementsLoading || entitlements.capabilities.publicApi;
 

@@ -33,6 +33,7 @@ test.describe("widget settings", () => {
     const panel = page
       .locator('iframe[title="Widget preview"]')
       .locator("xpath=..");
+
     await page
       .getByRole("button", { name: "Close the widget preview" })
       .click();

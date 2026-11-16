@@ -31,6 +31,7 @@ describe("ChangelogRpcHandlers", () => {
     organizationId: string;
     userId: string;
   };
+
   const makeSession = (fixture: Fixture, isMember = true): Session => ({
     user: {
       id: fixture.userId,
@@ -50,6 +51,7 @@ describe("ChangelogRpcHandlers", () => {
         ]
       : [],
   });
+
   const makeFixture = () =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -104,8 +106,10 @@ describe("ChangelogRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
+
   const Repositories = Layer.mergeAll(
     ChangelogRepository.layer,
     ChangelogPostRepository.layer,
@@ -113,13 +117,16 @@ describe("ChangelogRpcHandlers", () => {
     SiteRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = Layer.mergeAll(ChangelogPolicy.layer, SitePolicy.layer).pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -148,9 +155,11 @@ describe("ChangelogRpcHandlers", () => {
             publishedAt: null,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         const entries = yield* handlers
           .ListChangelogs({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(entries[0]).toMatchObject({
           id,
           slug: "release",
@@ -175,6 +184,7 @@ describe("ChangelogRpcHandlers", () => {
           createdAt: yield* DateTime.nowAsDate,
           updatedAt: yield* DateTime.nowAsDate,
         });
+
         const create = (
           entryId: typeof id,
           title: string,
@@ -194,6 +204,7 @@ describe("ChangelogRpcHandlers", () => {
               publishedAt: status === "published" ? new Date() : null,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         yield* create(id, "Shipped", "published");
         const draftId = yield* ChangelogId.generate;
         yield* create(draftId, "Unshipped", "draft");
@@ -221,6 +232,7 @@ describe("ChangelogRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(draftError._tag).toBe("ChangelogNotFoundError");
 
         const missingError = yield* Effect.flip(
@@ -231,6 +243,7 @@ describe("ChangelogRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(missingError._tag).toBe("ChangelogNotFoundError");
       })
     );
@@ -243,12 +256,16 @@ describe("ChangelogRpcHandlers", () => {
           const db = yield* currentDb;
           const id = yield* ChangelogId.generate;
           const assetId = `asset_${id}`;
+
           const temporaryUrl =
             "https://assets.example/tmp/editor-media/image.png";
+
           const permanentUrl = "https://assets.example/editor-media/image.png";
+
           const promotions = yield* Ref.make<{ bucket: string; key: string }[]>(
             []
           );
+
           yield* db.insert(schema.assetTable).values({
             id: assetId,
             bucket: "test-bucket",
@@ -298,10 +315,12 @@ describe("ChangelogRpcHandlers", () => {
             .select({ content: schema.changelogTable.content })
             .from(schema.changelogTable)
             .where(eq(schema.changelogTable.id, id));
+
           const references = yield* db
             .select()
             .from(schema.changelogAssetTable)
             .where(eq(schema.changelogAssetTable.changelogId, id));
+
           expect(entry?.content).toContain(permanentUrl);
           expect(references).toEqual([{ changelogId: id, assetId }]);
           expect(yield* Ref.get(promotions)).toEqual([
@@ -318,8 +337,10 @@ describe("ChangelogRpcHandlers", () => {
           const db = yield* currentDb;
           const id = yield* ChangelogId.generate;
           const assetId = `asset_${id}`;
+
           const temporaryUrl =
             "https://assets.example/tmp/editor-media/cover.png";
+
           const permanentUrl = "https://assets.example/editor-media/cover.png";
           yield* db.insert(schema.assetTable).values({
             id: assetId,
@@ -374,10 +395,12 @@ describe("ChangelogRpcHandlers", () => {
             .select({ coverImage: schema.changelogTable.coverImage })
             .from(schema.changelogTable)
             .where(eq(schema.changelogTable.id, id));
+
           const references = yield* db
             .select()
             .from(schema.changelogAssetTable)
             .where(eq(schema.changelogAssetTable.changelogId, id));
+
           const listed = yield* handlers
             .ListChangelogsPublic({
               organizationId: fixture.organizationId,
@@ -410,6 +433,7 @@ describe("ChangelogRpcHandlers", () => {
             .select()
             .from(schema.changelogAssetTable)
             .where(eq(schema.changelogAssetTable.changelogId, id));
+
           expect(referencesAfterResave).toEqual([{ changelogId: id, assetId }]);
 
           // Removing the cover image prunes the reference again.
@@ -432,6 +456,7 @@ describe("ChangelogRpcHandlers", () => {
             .select()
             .from(schema.changelogAssetTable)
             .where(eq(schema.changelogAssetTable.changelogId, id));
+
           expect(referencesAfterRemove).toEqual([]);
 
           // A cover URL that matches no caller-owned asset is retained
@@ -439,6 +464,7 @@ describe("ChangelogRpcHandlers", () => {
           // keep alive).
           const unmatchedCoverUrl =
             "https://assets.example/unmatched/cover.png";
+
           yield* handlers
             .UpdateChangelog({
               assetIds: [],
@@ -458,10 +484,12 @@ describe("ChangelogRpcHandlers", () => {
             .select({ coverImage: schema.changelogTable.coverImage })
             .from(schema.changelogTable)
             .where(eq(schema.changelogTable.id, id));
+
           const referencesAfterUnmatched = yield* db
             .select()
             .from(schema.changelogAssetTable)
             .where(eq(schema.changelogAssetTable.changelogId, id));
+
           expect(entryAfterUnmatched?.coverImage).toBe(unmatchedCoverUrl);
           expect(referencesAfterUnmatched).toEqual([]);
         })
@@ -538,6 +566,7 @@ describe("ChangelogRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* ChangelogRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListChangelogs({ organizationId: fixture.organizationId })
@@ -545,6 +574,7 @@ describe("ChangelogRpcHandlers", () => {
               Effect.provideService(CurrentSession, makeSession(fixture, false))
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -580,10 +610,12 @@ describe("ChangelogRpcHandlers", () => {
         );
 
         expect(error._tag).toBe("BadRequestError");
+
         // The rejection is before the transaction, so nothing was written.
         const entries = yield* handlers
           .ListChangelogs({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(entries).toHaveLength(0);
       })
     );
@@ -628,9 +660,11 @@ describe("ChangelogRpcHandlers", () => {
         );
 
         expect(error._tag).toBe("BadRequestError");
+
         const entries = yield* handlers
           .ListChangelogs({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(entries[0]?.status).toBe("draft");
       })
     );
@@ -664,6 +698,7 @@ describe("ChangelogRpcHandlers", () => {
             before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
             organizationId: fixture.organizationId,
           });
+
           expect(intents.map(({ kind }) => kind)).toEqual([
             "changelog.published",
           ]);
@@ -728,6 +763,7 @@ describe("ChangelogRpcHandlers", () => {
             before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
             organizationId: fixture.organizationId,
           });
+
           expect(intents.map(({ kind }) => kind)).toEqual([
             "changelog.published",
           ]);

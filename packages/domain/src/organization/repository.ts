@@ -73,6 +73,7 @@ const makeOrganizationRepository = Effect.gen(function* () {
         .pipe(
           Effect.map((rows) => {
             const [row] = rows;
+
             return row?.jwtMaxTokenLifetimeMinutes ?? null;
           })
         ),

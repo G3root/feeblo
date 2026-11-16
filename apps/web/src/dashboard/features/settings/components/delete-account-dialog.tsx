@@ -35,10 +35,12 @@ export function DeleteAccountDialog() {
   const { data: session } = useAuthState();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
+
   const [error, setError] = useState<{
     readonly code: string | undefined;
     readonly message: string;
   } | null>(null);
+
   const [isDeleting, setIsDeleting] = useState(false);
 
   const close = () => {
@@ -50,10 +52,12 @@ export function DeleteAccountDialog() {
   const deleteAccount = async () => {
     setIsDeleting(true);
     setError(null);
+
     try {
       const result = await authClient.deleteUser({
         password: password.length > 0 ? password : undefined,
       });
+
       if (result.error) {
         trackEvent("account_deleted", { success: false });
         setError({
@@ -64,8 +68,10 @@ export function DeleteAccountDialog() {
               ? "For your security this needs a recent sign-in. Sign out, sign back in, then try again."
               : (result.error.message ?? "Could not delete your account."),
         });
+
         return;
       }
+
       trackEvent("account_deleted", { success: true });
       // The session cookie is cleared server-side; a full navigation drops the
       // SPA's cached session so the guard resolves the signed-out state.
@@ -89,10 +95,13 @@ export function DeleteAccountDialog() {
         if (isDeleting) {
           return;
         }
+
         if (next) {
           setOpen(true);
+
           return;
         }
+
         close();
       }}
       open={open}

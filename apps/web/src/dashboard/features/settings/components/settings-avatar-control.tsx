@@ -41,11 +41,14 @@ const SettingsAvatarControlContext =
   createContext<SettingsAvatarControlContextValue | null>(null);
 
 const MAX_CROPPED_IMAGE_DIMENSION = 1024;
+
 const MAX_CROPPED_IMAGE_SIZE = 5 * 1024 * 1024;
+
 // Cap decoded source dimensions (~25MP) so getImage() can never allocate a
 // natural-resolution canvas from an unbounded source (e.g. a huge PNG/WebP
 // with a small byte size).
 const MAX_SOURCE_IMAGE_PIXELS = 25_000_000;
+
 const EDITOR_SIZE = 288;
 
 function useSettingsAvatarControl() {
@@ -65,6 +68,7 @@ async function hasExcessiveSourcePixels(file: File): Promise<boolean> {
     const bitmap = await createImageBitmap(file);
     const excessive = bitmap.width * bitmap.height > MAX_SOURCE_IMAGE_PIXELS;
     bitmap.close();
+
     return excessive;
   } catch {
     // Let AvatarEditor surface decode failures via onLoadFailure.
@@ -80,6 +84,7 @@ async function createCroppedImage(
     1,
     MAX_CROPPED_IMAGE_DIMENSION / Math.max(source.width, source.height)
   );
+
   const outputWidth = Math.max(1, Math.round(source.width * scale));
   const outputHeight = Math.max(1, Math.round(source.height * scale));
 
@@ -88,6 +93,7 @@ async function createCroppedImage(
   canvas.height = outputHeight;
 
   const ctx = canvas.getContext("2d");
+
   if (!ctx) {
     throw new Error("Could not get canvas context");
   }
@@ -99,17 +105,20 @@ async function createCroppedImage(
       (blob) => {
         if (!blob) {
           reject(new Error("Canvas is empty"));
+
           return;
         }
 
         if (blob.size > MAX_CROPPED_IMAGE_SIZE) {
           reject(new Error("Cropped image exceeds the 5MB limit"));
+
           return;
         }
 
         const croppedFile = new File([blob], `cropped-${fileName}`, {
           type: "image/webp",
         });
+
         resolve(croppedFile);
       },
       "image/webp",
@@ -154,6 +163,7 @@ function Root({
 
   const handleCropDialogOpenChange = useCallback((open: boolean) => {
     setCropDialogOpen(open);
+
     if (!open) {
       selectionVersionRef.current += 1;
       setZoom(1);
@@ -169,6 +179,7 @@ function Root({
     }
 
     const editor = editorRef.current;
+
     if (!(selectedFile && editor)) {
       return;
     }
@@ -212,24 +223,29 @@ function Root({
         type: "error",
       });
       event.target.value = "";
+
       return;
     }
 
     if (await hasExcessiveSourcePixels(file)) {
       if (selectionVersionRef.current !== version) {
         event.target.value = "";
+
         return;
       }
+
       toastManager.add({
         title: "Image dimensions exceed the 25MP limit",
         type: "error",
       });
       event.target.value = "";
+
       return;
     }
 
     if (selectionVersionRef.current !== version) {
       event.target.value = "";
+
       return;
     }
 
@@ -243,6 +259,7 @@ function Root({
   const openFileDialog = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
   const contextValue = useMemo(
     () => ({
       ariaLabel,

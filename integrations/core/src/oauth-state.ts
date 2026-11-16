@@ -11,6 +11,7 @@ export const IntegrationOAuthState = Schema.Struct({
   organizationId: WorkspaceId.schema,
   nonce: Schema.String,
 });
+
 export type IntegrationOAuthState = Schema.Schema.Type<
   typeof IntegrationOAuthState
 >;

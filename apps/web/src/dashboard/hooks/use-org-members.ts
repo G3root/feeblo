@@ -5,6 +5,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 /** The organization's members. */
 export function useOrgMembers(organizationId: string) {
   const { membersCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: ["org-members", membersCollection.id, organizationId],
     query: (q) =>

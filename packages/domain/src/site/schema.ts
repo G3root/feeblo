@@ -2,6 +2,7 @@ import { SiteId, WorkspaceId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
 export const changelogVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
+
 export const roadmapVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
 
 export const Site = S.Struct({

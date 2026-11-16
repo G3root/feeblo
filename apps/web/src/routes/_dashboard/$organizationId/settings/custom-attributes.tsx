@@ -22,6 +22,7 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async ({ params }) => {
     const session = await getAuthSession();
+
     if (
       session !== null &&
       hasPermission(params.organizationId, "contacts.*")(session)
@@ -31,12 +32,14 @@ export const Route = createFileRoute(
         dashboardCollections.companyAttributeDefinitionCollection.preload(),
       ]);
     }
+
     return null;
   },
 });
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
+
   const { allowed: canManageAttributes, isPending } = usePolicy(
     hasPermission(organizationId, "contacts.*")
   );
@@ -44,6 +47,7 @@ function RouteComponent() {
   if (isPending) {
     return null;
   }
+
   if (!canManageAttributes) {
     return <SettingsAccessDenied />;
   }

@@ -56,24 +56,32 @@ export function DeleteWorkspaceDialog({
     if (!confirmed) {
       return;
     }
+
     setIsDeleting(true);
     setError(null);
+
     try {
       const result = await authClient.organization.delete({ organizationId });
+
       if (result.error) {
         trackEvent("org_deleted", { success: false });
         setError(result.error.message ?? "Could not delete the workspace.");
+
         return;
       }
+
       trackEvent("org_deleted", { success: true });
+
       if (onDeleted === undefined) {
         // Every organization-scoped cache in the SPA belongs to a workspace
         // that no longer exists; a full navigation rebuilds them against the
         // next workspace (or the registration page when this was the last
         // one).
         window.location.assign("/");
+
         return;
       }
+
       // The caller keeps the page (register's limit card) and refreshes its
       // own state instead of navigating away.
       close();
@@ -94,10 +102,13 @@ export function DeleteWorkspaceDialog({
         if (isDeleting) {
           return;
         }
+
         if (next) {
           setOpen(true);
+
           return;
         }
+
         close();
       }}
       open={open}

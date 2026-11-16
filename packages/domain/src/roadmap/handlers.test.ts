@@ -74,6 +74,7 @@ describe("RoadmapRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       if (includeRoadmap) {
         yield* db.insert(schema.roadmapTable).values({
           id: roadmapId,
@@ -145,17 +146,21 @@ describe("RoadmapRpcHandlers", () => {
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = SitePolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const RoadmapPolicies = RoadmapPolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -170,9 +175,11 @@ describe("RoadmapRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapRpcHandlersEffect;
         const fixture = yield* makeFixture("PUBLIC");
+
         const roadmaps = yield* handlers.ListRoadmapsPublic({
           organizationId: fixture.organizationId,
         });
+
         expect(roadmaps).toMatchObject([{ id: fixture.roadmapId }]);
       })
     );
@@ -180,11 +187,13 @@ describe("RoadmapRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapRpcHandlersEffect;
         const fixture = yield* makeFixture("HIDDEN");
+
         const error = yield* Effect.flip(
           handlers.ListRoadmapsPublic({
             organizationId: fixture.organizationId,
           })
         );
+
         expect(error).toMatchObject({ _tag: "PolicyDenied" });
       })
     );
@@ -205,6 +214,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === roadmapId)
         ).toMatchObject({
@@ -302,6 +312,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === roadmapId)
         ).toMatchObject({
@@ -388,6 +399,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === roadmapId)
         ).toMatchObject({
@@ -416,6 +428,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === firstId)
         ).toMatchObject({
@@ -498,6 +511,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === fixture.roadmapId)
         ).toMatchObject({
@@ -536,6 +550,7 @@ describe("RoadmapRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(
             roadmaps.find((roadmap) => roadmap.id === secondId)
           ).toMatchObject({
@@ -560,6 +575,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(roadmaps).toHaveLength(0);
       })
     );
@@ -589,6 +605,7 @@ describe("RoadmapRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(
             roadmaps.find((roadmap) => roadmap.id === fixture.roadmapId)
           ).toMatchObject({

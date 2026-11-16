@@ -17,6 +17,7 @@ export function trackPageErrors(page: Page): void {
   if (errorsByPage.has(page)) {
     return;
   }
+
   const errors: Array<string> = [];
   errorsByPage.set(page, errors);
   page.on("pageerror", (error) => {
@@ -36,6 +37,7 @@ export async function assertNoPageErrors(
   const errors = (errorsByPage.get(page) ?? []).filter(
     (entry) => !allowed.some((pattern) => pattern.test(entry))
   );
+
   expect(
     errors,
     `Unexpected client errors:\n${errors.join("\n")}`

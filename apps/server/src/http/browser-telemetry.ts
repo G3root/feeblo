@@ -38,7 +38,9 @@ import {
 
 /** Browser batches are one buffered second of spans or logs. */
 const maxBodyBytes = 256 * 1024;
+
 const maxBodySize = ByteSize.bytes(maxBodyBytes);
+
 /** One buffered second cannot legitimately carry more than this. */
 const maxRecords = 1_000;
 
@@ -60,7 +62,9 @@ export interface BrowserTelemetryIdentity {
 }
 
 const SpanRecord = Schema.Record(Schema.String, Schema.Json);
+
 const LogRecord = Schema.Record(Schema.String, Schema.Json);
+
 const TracePayload = Schema.fromJsonString(
   Schema.Struct({
     resourceSpans: Schema.Array(
@@ -76,6 +80,7 @@ const TracePayload = Schema.fromJsonString(
     ),
   })
 );
+
 const LogPayload = Schema.fromJsonString(
   Schema.Struct({
     resourceLogs: Schema.Array(
@@ -117,10 +122,13 @@ export const browserBatch = (
 ): string | undefined => {
   if (signal === "traces") {
     const payload = Schema.decodeOption(TracePayload)(body);
+
     if (Option.isNone(payload)) return undefined;
+
     const spans = payload.value.resourceSpans.flatMap((entry) =>
       entry.scopeSpans.flatMap((scope) => scope.spans)
     );
+
     return JSON.stringify({
       resourceSpans: [
         {
@@ -130,11 +138,15 @@ export const browserBatch = (
       ],
     });
   }
+
   const payload = Schema.decodeOption(LogPayload)(body);
+
   if (Option.isNone(payload)) return undefined;
+
   const logRecords = payload.value.resourceLogs.flatMap((entry) =>
     entry.scopeLogs.flatMap((scope) => scope.logRecords)
   );
+
   return JSON.stringify({
     resourceLogs: [
       {
@@ -159,6 +171,7 @@ const forward = (
         const request = HttpClientRequest.post(target.url, {
           body: HttpBody.text(body, "application/json"),
         });
+
         const withHeaders =
           target.headers === undefined
             ? request
@@ -166,13 +179,16 @@ const forward = (
                 request,
                 Redacted.value(target.headers)
               );
+
         const response = yield* client.execute(withHeaders);
+
         // The caller is an exporter that retries on failure; it must not be
         // told a dropped batch was accepted.
         if (response.status >= 300 && response.status < 400) return empty(502);
         // Release the socket without copying a collector response body into
         // the browser-facing response.
         yield* response.arrayBuffer;
+
         return empty(response.status >= 400 ? 502 : 202);
       }).pipe(
         Effect.timeoutOrElse({
@@ -198,15 +214,18 @@ const relay =
     // becomes a console error on every page load.
     if (target === undefined) return Effect.succeed(empty(202));
     const contentType = request.headers["content-type"];
+
     if (
       contentType === undefined ||
       !contentType.startsWith("application/json")
     )
       return Effect.succeed(empty(415));
+
     return Effect.gen(function* () {
       const body = yield* request.text.pipe(
         Effect.provideService(HttpIncomingMessage.MaxBodySize, maxBodySize)
       );
+
       // `MaxBodySize` bounds decompression, not a plain text read, so the
       // relay enforces its own cap after buffering. The global body-limit
       // middleware already caps the request at 1 MB.
@@ -216,7 +235,9 @@ const relay =
       // server's identity before it reaches the collector with the server's
       // credentials; a malformed or mismatched batch is a client error.
       const batch = browserBatch(signal, body, identity);
+
       if (batch === undefined) return empty(400);
+
       return yield* forward(client, target, batch);
     }).pipe(
       // `MaxBodySize` fails the read with a `Cause`-wide error; the only
@@ -248,12 +269,14 @@ export const makeBrowserTelemetryRouter = (
   HttpRouter.use((router) =>
     Effect.gen(function* () {
       const client = yield* HttpClient.HttpClient;
+
       const config = yield* telemetryConfig({
         // The browser speaks as its own service; joining it to the server's
         // service name would erase which half of the trace it is.
         service: `${options.service}-web`,
         environment: options.environment,
       }).pipe(Effect.option);
+
       // The service name is fixed here rather than read from `config`: an
       // operator-set `OTEL_SERVICE_NAME` must not let browser records claim
       // the server's identity.
@@ -264,19 +287,23 @@ export const makeBrowserTelemetryRouter = (
           ? options.environment
           : config.value.environment,
       };
+
       const traces = relay(
         client,
         "traces",
         Option.isNone(config) ? undefined : config.value.traces,
         identity
       );
+
       const logs = relay(
         client,
         "logs",
         Option.isNone(config) ? undefined : config.value.logs,
         identity
       );
+
       const unknown = () => Effect.succeed(empty(404));
+
       return yield* router
         .add("POST", "/api/telemetry/traces", traces)
         .pipe(

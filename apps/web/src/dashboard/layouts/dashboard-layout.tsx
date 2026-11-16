@@ -52,6 +52,7 @@ import {
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const organizationId = useOrganizationId();
+
   // Each collection is keyed by the scope it was materialized for. The layout
   // does not re-render for a child route on its own, and during a client-side
   // navigation `window.location` can still name the post being left while the
@@ -62,6 +63,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     strict: false,
     select: (params) => params?.postSlug,
   });
+
   const collections = useMemo(() => {
     const scoped = dashboardCollectionsFor({ organizationId, postSlug });
 
@@ -79,17 +81,20 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       commentReactionCollection: scoped.commentReactionCollection,
     };
   }, [organizationId, postSlug]);
+
   const getPostHref = useCallback<
     NonNullable<PostCollectionsValue["getPostHref"]>
   >(
     (post) => {
       const board = dashboardCollections.boardCollection.get(post.boardId);
+
       return board
         ? `/${organizationId}/post/${board.slug}/${post.slug}`
         : `/${organizationId}`;
     },
     [organizationId]
   );
+
   const suggestPosts = useCallback<
     NonNullable<PostCollectionsValue["suggestPosts"]>
   >(
@@ -105,10 +110,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       ),
     [organizationId]
   );
+
   const persistPost = useCallback<PostCollectionsValue["persistPost"]>(
     async (input) => fetchRpc((rpc) => rpc.CreatePost(input)),
     []
   );
+
   return (
     <UpgradePlanDialogProvider>
       <PostCollectionsProvider

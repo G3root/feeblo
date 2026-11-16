@@ -120,6 +120,7 @@ function OrderingControls() {
   const store = useBoardStore();
   const ordering = useBoardOrdering();
   const isAscending = ordering.direction === "asc";
+
   // The trigger has no label element, so its accessible name would otherwise be
   // its content — just the selected value ("Created"). Prefixing the purpose
   // and keeping the value gives a screen reader both, because the trigger
@@ -151,6 +152,7 @@ function OrderingControls() {
           if (!value) {
             return;
           }
+
           store.send({
             type: "setOrderField",
             // SAFETY: The select is populated only with BoardOrderField values.
@@ -186,6 +188,7 @@ function OrderingControls() {
 function ViewSelect() {
   const store = useBoardStore();
   const mode = useSelector(store, (state) => state.context.displayMode);
+
   return (
     <ToggleGroup
       onValueChange={(value) => {

@@ -25,18 +25,23 @@ import { requestLabel } from "./request-label";
 export const serverTimingMiddleware = HttpMiddleware.make((httpApp) =>
   Effect.withFiber((fiber) => {
     const startedAt = fiber.getRef(Clock).monotonicTimeNanosUnsafe();
+
     return Effect.gen(function* () {
       const span = yield* Effect.currentSpan.pipe(Effect.option);
+
       return yield* HttpEffect.withPreResponseHandler(
         httpApp,
         (request, response) => {
           const duration =
             Number(fiber.getRef(Clock).monotonicTimeNanosUnsafe() - startedAt) /
             1_000_000;
+
           const durationMs = duration.toFixed(2);
+
           const timings = [
             `total;dur=${durationMs};desc="${requestLabel(request)}"`,
           ];
+
           if (Option.isSome(span)) {
             timings.push(`feeblo-trace;desc="${span.value.traceId}"`);
             timings.push(`feeblo-span;desc="${span.value.spanId}"`);
@@ -44,6 +49,7 @@ export const serverTimingMiddleware = HttpMiddleware.make((httpApp) =>
               `feeblo-sampled;desc="${span.value.sampled ? "1" : "0"}"`
             );
           }
+
           return Effect.succeed(
             HttpServerResponse.setHeaders(response, {
               "server-timing": timings.join(", "),

@@ -6,6 +6,7 @@ import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
 export type DiscordConnection = Atom.Success<
   ReturnType<typeof connectionsAtom>
 >[number];
+
 export type DiscordChannel = Atom.Success<
   ReturnType<typeof channelsAtom>
 >[number];
@@ -50,9 +51,11 @@ export const discordStatusAtom = DashboardClient.query(
 export const startDiscordConnectAtom = DashboardClient.mutation(
   "StartDiscordConnect"
 );
+
 export const updateDiscordChannelNotificationsAtom = DashboardClient.mutation(
   "UpdateDiscordChannelNotifications"
 );
+
 export const disconnectDiscordConnectionAtom = DashboardClient.mutation(
   "DisconnectDiscordConnection"
 );

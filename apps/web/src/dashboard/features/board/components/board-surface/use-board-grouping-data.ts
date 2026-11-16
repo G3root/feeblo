@@ -40,6 +40,7 @@ export function useBoardGroupingData(
           tagId: postTag.tagId,
         })),
   });
+
   const postTags = postTagsQuery.data;
 
   const members = useMemo<BoardGroupingMember[]>(

@@ -103,21 +103,28 @@ export type GitHubPostStatus = Atom.Success<
 
 export const startGitHubConnectAtom =
   DashboardClient.mutation("StartGitHubConnect");
+
 export const disconnectGitHubConnectionAtom = DashboardClient.mutation(
   "DisconnectGitHubConnection"
 );
+
 export const updateGitHubPublishSettingsAtom = DashboardClient.mutation(
   "UpdateGitHubSettings"
 );
+
 export const createGitHubSyncRuleAtom =
   DashboardClient.mutation("CreateGitHubRule");
+
 export const updateGitHubSyncRuleAtom =
   DashboardClient.mutation("UpdateGitHubRule");
+
 export const deleteGitHubSyncRuleAtom =
   DashboardClient.mutation("DeleteGitHubRule");
+
 export const createGitHubPostIssueAtom = DashboardClient.mutation(
   "CreateGitHubPostIssue"
 );
+
 export const linkGitHubPostIssueAtom = DashboardClient.mutation(
   "LinkGitHubPostIssue"
 );

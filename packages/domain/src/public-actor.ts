@@ -25,6 +25,7 @@ export const redactActorIdentity = <T extends ActorRow>(
   if (sessionUserId && row.userId === sessionUserId) {
     return row;
   }
+
   return { ...row, userId: null, memberId: null };
 };
 
@@ -33,12 +34,15 @@ export const redactActorIdentities = <T extends ActorRow>(
   sessionUserId: string | undefined
 ): T[] => {
   const redacted: T[] = Array.from<T>({ length: rows.length });
+
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
+
     if (row) {
       redacted[index] = redactActorIdentity(row, sessionUserId);
     }
   }
+
   return redacted;
 };
 
@@ -71,6 +75,7 @@ export const redactCreatorIdentity = <T extends CreatorRow>(
   if (sessionUserId && row.creatorId === sessionUserId) {
     return withoutAssignee;
   }
+
   return { ...withoutAssignee, creatorId: null, creatorMemberId: null };
 };
 

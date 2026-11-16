@@ -28,6 +28,7 @@ import type { AnyRouter } from "@tanstack/react-router";
 
 const environment = (): string => {
   const env = getRuntimePublicEnv();
+
   return (
     env.sentryEnvironment ??
     env.appEnv ??
@@ -64,6 +65,7 @@ export const startWebTelemetry = (): void => {
 export const startWebErrorReporting = (): void => {
   if (!hasWindow()) return;
   const env = getRuntimePublicEnv();
+
   if (env.sentryDsn === undefined || env.sentryDsn.length === 0) return;
   startErrorReporting({
     dsn: env.sentryDsn,
@@ -91,15 +93,18 @@ export const reportRouteError = <T>(error: T): void => {
  */
 export const startNavigationTelemetry = (router: AnyRouter): (() => void) => {
   if (!hasWindow()) return () => {};
+
   const start = router.subscribe("onBeforeNavigate", (event) => {
     recordBrowserNavigation({
       type: "start",
       path: event.toLocation.pathname,
     });
   });
+
   const end = router.subscribe("onResolved", () => {
     recordBrowserNavigation({ type: "end" });
   });
+
   return () => {
     start();
     end();

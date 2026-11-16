@@ -78,10 +78,12 @@ export interface ResolvedPrincipal {
 }
 
 type Contact = typeof schema.contactTable.$inferSelect;
+
 type ContactInsert = typeof schema.contactTable.$inferInsert;
 
 const normalizeEmail = (email: string | undefined): string | undefined => {
   const trimmed = email?.toLowerCase().trim();
+
   return trimmed ? trimmed : undefined;
 };
 
@@ -102,12 +104,15 @@ const makeResolvePrincipalService = Effect.gen(function* () {
           )
         )
         .limit(1);
+
       const contact = rows[0];
+
       if (!contact) {
         return yield* new SubjectNotFoundError({
           message: "No customer with this id exists in this workspace",
         });
       }
+
       return contact;
     });
 
@@ -180,10 +185,12 @@ const makeResolvePrincipalService = Effect.gen(function* () {
     Effect.gen(function* () {
       for (const detect of detectors) {
         const found = yield* detect;
+
         if (Option.isSome(found)) {
           return found;
         }
       }
+
       return Option.none();
     });
 
@@ -201,6 +208,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
       }
 
       const now = yield* DateTime.nowAsDate;
+
       const [updated = null] = yield* db
         .update(schema.contactTable)
         .set({
@@ -245,11 +253,13 @@ const makeResolvePrincipalService = Effect.gen(function* () {
       if (!args.needsUser) {
         return contact.userId;
       }
+
       if (contact.userId) {
         return contact.userId;
       }
 
       const shadowEmail = contact.email ?? args.email;
+
       if (!shadowEmail || isSyntheticEmail(shadowEmail)) {
         return yield* new InvalidSubjectError({
           message: "Cannot attribute to a customer without an email address",
@@ -263,6 +273,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
       });
 
       const now = yield* DateTime.nowAsDate;
+
       // The null-userId predicate prevents replacing a concurrent real-account
       // link; on a lost race the winner's id is returned instead.
       const [updated = null] = yield* db
@@ -279,11 +290,13 @@ const makeResolvePrincipalService = Effect.gen(function* () {
       if (updated?.userId) {
         return updated.userId;
       }
+
       const [current] = yield* db
         .select({ userId: schema.contactTable.userId })
         .from(schema.contactTable)
         .where(eq(schema.contactTable.id, contact.id))
         .limit(1);
+
       return current?.userId ?? shadow.id;
     });
 
@@ -311,6 +324,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
       insert: Effect.gen(function* () {
         const id = yield* ContactId.generate;
         const now = yield* DateTime.nowAsDate;
+
         const [created = null] = yield* db
           .insert(schema.contactTable)
           // The resolver creates as a side effect of attributing something,
@@ -324,6 +338,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
           })
           .onConflictDoNothing()
           .returning();
+
         return Option.fromNullishOr(created);
       }),
       onLostRace: Effect.die(
@@ -394,11 +409,13 @@ const makeResolvePrincipalService = Effect.gen(function* () {
         // -- Priority 1: explicit feeblo user id ---------------------------
         if (subject.userId) {
           const user = yield* userRepository.getById(subject.userId);
+
           if (Option.isNone(user)) {
             return yield* new SubjectNotFoundError({
               message: "No user with this id exists",
             });
           }
+
           // Mirrors `findAdoptableByIdentityHash`: an account bound to a
           // different workspace can never be attributed here.
           if (
@@ -413,6 +430,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
           let contact = Option.getOrUndefined(
             yield* findContactByUser(organizationId, user.value.id)
           );
+
           if (!contact) {
             // A member is staff, not a customer: attribute to the account and
             // keep the member row so the member tick survives. No contact is
@@ -423,6 +441,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               organizationId,
               user.value.id
             );
+
             if (memberId !== null) {
               return staffPrincipal(user.value, memberId);
             }
@@ -436,6 +455,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
                 : !isSyntheticEmail(user.value.email)
                   ? user.value.email
                   : undefined;
+
             const existingByEmail = candidateEmail
               ? Option.getOrUndefined(
                   yield* findContactByEmail(organizationId, candidateEmail)
@@ -444,11 +464,13 @@ const makeResolvePrincipalService = Effect.gen(function* () {
 
             if (existingByEmail) {
               const now = yield* DateTime.nowAsDate;
+
               const [linked = null] = yield* db
                 .update(schema.contactTable)
                 .set({ userId: user.value.id, updatedAt: now })
                 .where(eq(schema.contactTable.id, existingByEmail.id))
                 .returning();
+
               contact = linked ?? existingByEmail;
             } else {
               contact = yield* ensureContactInRoom(
@@ -471,6 +493,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
           }
 
           const enriched = yield* enrichContact(contact, subject);
+
           return customerPrincipal(
             enriched,
             enriched.userId ?? user.value.id,
@@ -484,29 +507,36 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             subject.contactId,
             organizationId
           );
+
           const contact = yield* enrichContact(found, subject);
+
           const userId = yield* ensureLinkedUser(contact, {
             organizationId,
             needsUser,
             email,
           });
+
           return customerPrincipal(contact, userId, email);
         }
 
         // -- Priority 3: external id from the customer's system ------------
         const externalId = subject.externalId;
+
         if (externalId) {
           const byExternalId = yield* findContactByExternalId(
             organizationId,
             externalId
           );
+
           if (Option.isSome(byExternalId)) {
             const contact = yield* enrichContact(byExternalId.value, subject);
+
             const userId = yield* ensureLinkedUser(contact, {
               organizationId,
               needsUser,
               email,
             });
+
             return customerPrincipal(contact, userId, email);
           }
 
@@ -517,8 +547,10 @@ const makeResolvePrincipalService = Effect.gen(function* () {
                 yield* findContactByEmail(organizationId, email)
               )
             : undefined;
+
           if (byEmail) {
             const now = yield* DateTime.nowAsDate;
+
             // Claim the external id only when the matched contact has none;
             // an existing external id (even a different one) is never
             // overwritten by resolution input.
@@ -532,17 +564,20 @@ const makeResolvePrincipalService = Effect.gen(function* () {
                 )
               )
               .returning();
+
             const contact = yield* enrichContact(
               // SAFETY: `byEmail` is narrowed non-null within this branch and
               // the returning() fallback preserves the row type.
               claimed ?? byEmail,
               subject
             );
+
             const userId = yield* ensureLinkedUser(contact, {
               organizationId,
               needsUser,
               email,
             });
+
             return customerPrincipal(contact, userId, email);
           }
 
@@ -560,24 +595,29 @@ const makeResolvePrincipalService = Effect.gen(function* () {
                 ...(email ? [findContactByEmail(organizationId, email)] : []),
               ])
           );
+
           const userId = yield* ensureLinkedUser(created, {
             organizationId,
             needsUser,
             email,
           });
+
           return customerPrincipal(created, userId, email);
         }
 
         // -- Priority 4: email as the find-or-create key -------------------
         if (email) {
           const existing = yield* findContactByEmail(organizationId, email);
+
           if (Option.isSome(existing)) {
             const contact = yield* enrichContact(existing.value, subject);
+
             const userId = yield* ensureLinkedUser(contact, {
               organizationId,
               needsUser,
               email,
             });
+
             return customerPrincipal(contact, userId, email);
           }
 
@@ -587,28 +627,35 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             email,
             organizationId,
           });
+
           if (Option.isSome(adoptable)) {
             const user = adoptable.value;
+
             const linked = Option.getOrUndefined(
               yield* findContactByUser(organizationId, user.id)
             );
+
             // A workspace member stays staff even when they are resolved by
             // the email they typed: no contact is minted for them. An
             // existing contact for the account still wins.
             if (!linked) {
               const memberId = yield* findMembership(organizationId, user.id);
+
               if (memberId !== null) {
                 return staffPrincipal(user, memberId);
               }
             }
+
             if (linked) {
               const contact = yield* enrichContact(linked, subject);
+
               return customerPrincipal(
                 contact,
                 contact.userId ?? user.id,
                 email
               );
             }
+
             const created = yield* ensureContactInRoom(
               {
                 organizationId,
@@ -619,6 +666,7 @@ const makeResolvePrincipalService = Effect.gen(function* () {
               },
               () => findContactByUser(organizationId, user.id)
             );
+
             return customerPrincipal(created, user.id, email);
           }
 
@@ -633,11 +681,13 @@ const makeResolvePrincipalService = Effect.gen(function* () {
             },
             () => findContactByEmail(organizationId, email)
           );
+
           const userId = yield* ensureLinkedUser(created, {
             organizationId,
             needsUser,
             email,
           });
+
           return customerPrincipal(created, userId, email);
         }
 

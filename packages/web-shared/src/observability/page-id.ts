@@ -13,8 +13,10 @@ const pageIds = new WeakMap<Document, string>();
 export const browserPageId = (): string | undefined => {
   if (!hasWindow()) return undefined;
   const existing = pageIds.get(document);
+
   if (existing !== undefined) return existing;
   const created = crypto.randomUUID();
   pageIds.set(document, created);
+
   return created;
 };

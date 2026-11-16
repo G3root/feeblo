@@ -31,10 +31,13 @@ export const startTestServer = (handler: http.RequestListener) =>
         server.once("error", reject);
         server.listen(0, "127.0.0.1", () => {
           const address = server.address();
+
           if (address === null || isString(address)) {
             reject(new TypeError("Expected TCP test server"));
+
             return;
           }
+
           resolve(new URL(`http://127.0.0.1:${address.port}/hook`));
         });
       })

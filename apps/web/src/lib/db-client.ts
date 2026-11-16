@@ -23,6 +23,7 @@ const getBoardPathname = createIsomorphicFn()
   .client(() => () => window.location.pathname)
   .server(() => {
     const { pathname } = new URL(getRequest().url);
+
     return () => pathname;
   });
 
@@ -76,6 +77,7 @@ export const getDbClient = createIsomorphicFn()
         pathname: getBoardPathname(),
       }),
     });
+
     requestDbClients.set(request, client);
 
     return client;

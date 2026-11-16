@@ -34,6 +34,7 @@ const uploadEditorMediaFile = ({
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append("file", file);
+
     if (options.organizationId) {
       formData.append("organizationId", options.organizationId);
     }
@@ -95,6 +96,7 @@ export const createEditorUploader = (
           organizationId: options.organizationId,
         }),
       });
+
       return Promise.resolve(previewUrl);
     };
   }
@@ -119,6 +121,7 @@ export const finalizeEditorContent = async (
 ): Promise<FinalizedEditorContent> => {
   let finalizedContent = content;
   const assetIds = [...(options.assetIds ?? [])];
+
   const finalizedUploads: Array<{
     pending: PendingEditorUpload;
     previewUrl: string;
@@ -130,6 +133,7 @@ export const finalizeEditorContent = async (
     pending: PendingEditorUpload;
     previewUrl: string;
   }> = [];
+
   for (const [previewUrl, pending] of pendingEditorUploads) {
     // Asset ownership is decided at finalize time, not at insert time. The
     // editor may be mounted before the member/organization check resolves
@@ -141,6 +145,7 @@ export const finalizeEditorContent = async (
     const organizationMismatch =
       pending.organizationId !== undefined &&
       pending.organizationId !== organizationId;
+
     if (
       organizationMismatch ||
       (options.scope !== undefined && pending.scope !== options.scope)
@@ -183,18 +188,22 @@ export const finalizeEditorContent = async (
   );
 
   let firstError: unknown;
+
   for (const settled of settledEntries) {
     if (settled.status === "rejected") {
       firstError ??= settled.reason;
       continue;
     }
+
     const { pending, previewUrl, uploaded } = settled.value;
     const uploadedPending = { ...pending, uploaded };
     pendingEditorUploads.set(previewUrl, uploadedPending);
     finalizedContent = finalizedContent.split(previewUrl).join(uploaded.url);
+
     if (!assetIds.includes(uploaded.assetId)) {
       assetIds.push(uploaded.assetId);
     }
+
     finalizedUploads.push({ pending: uploadedPending, previewUrl });
   }
 
@@ -209,6 +218,7 @@ export const finalizeEditorContent = async (
         if (pendingEditorUploads.get(previewUrl) !== pending) {
           continue;
         }
+
         URL.revokeObjectURL(previewUrl);
         pendingEditorUploads.delete(previewUrl);
       }

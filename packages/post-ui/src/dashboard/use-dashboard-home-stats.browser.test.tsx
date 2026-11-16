@@ -144,6 +144,7 @@ function createCollections(
 describe("useDashboardHomeStats", () => {
   it("returns only the organization's boards and statuses", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useDashboardHomeStats({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -160,6 +161,7 @@ describe("useDashboardHomeStats", () => {
 
   it("returns at most 5 recent posts ordered by createdAt descending", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useDashboardHomeStats({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -179,6 +181,7 @@ describe("useDashboardHomeStats", () => {
 
   it("counts upvotes only for the recent posts within the organization", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useDashboardHomeStats({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -194,6 +197,7 @@ describe("useDashboardHomeStats", () => {
 
   it("updates reactively when a post is inserted", async () => {
     const collections = createCollections();
+
     const { result, act } = await renderHook(() =>
       useDashboardHomeStats({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -222,6 +226,7 @@ describe("useDashboardHomeStats", () => {
 
   it("is disabled without an organization id", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useDashboardHomeStats({ ...collections, organizationId: undefined })
     );

@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 
 /** Provider key owned by the custom-webhook adapter, outside the provider-neutral kernel. */
 export const webhookProviderKey = IntegrationProviderKey.make("webhook");
+
 export const webhookEventsPostCapabilityKey =
   IntegrationCapabilityKey.make("events.post");
 
@@ -43,6 +44,7 @@ export const webhookProviderManifest = IntegrationProviderManifest.make({
 export type WebhookConnectionConfiguration = Schema.Schema.Type<
   typeof WebhookConnectionConfiguration
 >;
+
 export type WebhookRouteConfiguration = Schema.Schema.Type<
   typeof WebhookRouteConfiguration
 >;

@@ -250,11 +250,13 @@ layer(TestLayer)("widget updates", (it) => {
           const request = HttpServerRequest.fromWeb(
             new Request("http://localhost/api/widget/v1/suggestions")
           );
+
           const rateLimitedSuggestion = Effect.succeed("suggestions").pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Failed to find similar posts",
+                  cause,
                 })
             ),
             withPublicHttpRateLimit({

@@ -9,6 +9,7 @@ export type TestUser = {
 
 export function createTestUser(): TestUser {
   const id = randomUUID().slice(0, 12);
+
   return {
     name: `Test User ${id}`,
     email: `test-${id}@feeblo.dev`.toLowerCase(),

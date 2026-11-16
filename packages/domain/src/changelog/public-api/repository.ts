@@ -174,6 +174,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
         categories: new Map<string, PublicApiChangelogCategoryEntry[]>(),
         linkedPosts: new Map<string, PublicApiChangelogLinkedPostEntry[]>(),
       };
+
       if (changelogIds.length === 0) {
         return empty;
       }
@@ -245,6 +246,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
       );
 
       const categories = new Map<string, PublicApiChangelogCategoryEntry[]>();
+
       for (const row of categoryRows) {
         const entries = categories.get(row.changelogId) ?? [];
         entries.push({
@@ -260,6 +262,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
         string,
         PublicApiChangelogLinkedPostEntry[]
       >();
+
       for (const row of postRows) {
         const entries = linkedPosts.get(row.changelogId) ?? [];
         entries.push({ id: row.id, slug: row.slug, title: row.title });
@@ -341,9 +344,11 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
         const conditions: SQL[] = [
           eq(schema.changelogTable.organizationId, organizationId),
         ];
+
         if (status !== null) {
           conditions.push(eq(schema.changelogTable.status, status));
         }
+
         if (cursor !== null) {
           conditions.push(
             sql`(${schema.changelogTable.createdAt}, ${schema.changelogTable.id}) < (${cursor.createdAt}, ${cursor.id})`
@@ -404,6 +409,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
           .limit(1);
 
         const row = rows.at(0);
+
         if (row === undefined) {
           return Option.none();
         }
@@ -595,6 +601,7 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
             // Only the transition into `published` is a publication; a save
             // that leaves a live entry live announces nothing.
             const publishedNow = publishesNow(previousStatus, status);
+
             if (publishedNow && !allowPublish) {
               return yield* forbiddenScopeError("changelog.publish");
             }

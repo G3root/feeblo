@@ -45,6 +45,7 @@ describe("readCheckoutSubscription", () => {
   it.effect("refuses a checkout stamped for another workspace", () =>
     Effect.gen(function* () {
       let subscriptionReads = 0;
+
       const error = yield* Effect.flip(
         readCheckoutSubscription(
           {
@@ -54,6 +55,7 @@ describe("readCheckoutSubscription", () => {
             }),
             getSubscription: async () => {
               subscriptionReads += 1;
+
               return subscription("org_workspace");
             },
           },
@@ -90,6 +92,7 @@ describe("readCheckoutSubscription", () => {
   it.effect("returns no subscription while the checkout has none", () =>
     Effect.gen(function* () {
       let subscriptionReads = 0;
+
       const confirmation = yield* readCheckoutSubscription(
         {
           getCheckout: async () => ({
@@ -98,6 +101,7 @@ describe("readCheckoutSubscription", () => {
           }),
           getSubscription: async () => {
             subscriptionReads += 1;
+
             return subscription("org_workspace");
           },
         },
@@ -140,6 +144,7 @@ describe("classifyPolarRevokeFailure", () => {
         error: "AlreadyCanceledSubscription",
       })
     );
+
     expect(canceled.alreadyRevoked).toBe(true);
     expect(canceled.statusCode).toBe(403);
     expect(canceled.errorTag).toBe("AlreadyCanceledSubscription");
@@ -150,6 +155,7 @@ describe("classifyPolarRevokeFailure", () => {
         error: "ResourceNotFound",
       })
     );
+
     expect(missing.alreadyRevoked).toBe(true);
     expect(missing.statusCode).toBe(404);
     expect(missing.errorTag).toBe("ResourceNotFound");

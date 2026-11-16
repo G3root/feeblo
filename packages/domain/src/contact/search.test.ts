@@ -42,15 +42,18 @@ describe("ContactRepository.search", () => {
   }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const values: typeof schema.userTable.$inferInsert = {
         id: args.id,
         name: args.name ?? args.id,
         email: args.email,
         emailVerified: args.emailVerified ?? true,
       };
+
       if (args.restrictedToOrganizationId !== undefined) {
         values.restrictedToOrganizationId = args.restrictedToOrganizationId;
       }
+
       yield* db.insert(schema.userTable).values(values);
     });
 
@@ -80,22 +83,28 @@ describe("ContactRepository.search", () => {
   }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const values: typeof schema.contactTable.$inferInsert = {
         id: args.id,
         organizationId: args.organizationId,
       };
+
       if (args.name !== undefined) {
         values.name = args.name;
       }
+
       if (args.email !== undefined) {
         values.email = args.email;
       }
+
       if (args.userId !== undefined) {
         values.userId = args.userId;
       }
+
       if (args.companyId !== undefined) {
         values.companyId = args.companyId;
       }
+
       yield* db.insert(schema.contactTable).values(values);
     });
 
@@ -116,6 +125,7 @@ describe("ContactRepository.search", () => {
     });
 
   let postStatusOrder = 0;
+
   const insertPostWithBoard = (args: {
     postId: string;
     boardVisibility: "PUBLIC" | "PRIVATE";
@@ -133,6 +143,7 @@ describe("ContactRepository.search", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       // post_status is unique per (organization, type): reuse the org's
       // PENDING status instead of inserting a duplicate.
       const existingStatus = yield* db
@@ -145,7 +156,9 @@ describe("ContactRepository.search", () => {
           )
         )
         .limit(1);
+
       let statusId = existingStatus[0]?.id;
+
       if (!statusId) {
         statusId = `status_${args.postId}`;
         yield* db.insert(schema.postStatusTable).values({
@@ -155,6 +168,7 @@ describe("ContactRepository.search", () => {
           organizationId: args.organizationId,
         });
       }
+
       yield* db.insert(schema.postTable).values({
         id: args.postId,
         title: "Post",
@@ -189,12 +203,15 @@ describe("ContactRepository.search", () => {
    * every test in this file shares one database.
    */
   let fixture: { organizationId: string } | null = null;
+
   const getFixture = () => {
     if (fixture !== null) {
       return Effect.succeed(fixture);
     }
+
     return Effect.gen(function* () {
       fixture = yield* buildFixture();
+
       return fixture;
     });
   };
@@ -387,6 +404,7 @@ describe("ContactRepository.search", () => {
           organizationId: "org_main",
           query: "acme.com",
         });
+
         const byId = new Map(results.map((row) => [row.contactId, row]));
         // Staff's contact row is hidden in favor of the member row.
         const staff = results.find((row) => row.userId === "user_staff");
@@ -419,6 +437,7 @@ describe("ContactRepository.search", () => {
             query: "acme.com",
             postId: "post_private",
           });
+
           const byId = new Map(results.map((row) => [row.contactId, row]));
 
           expect(
@@ -452,6 +471,7 @@ describe("ContactRepository.search", () => {
             query: "acme.com",
             postId: "post_public",
           });
+
           const byId = new Map(results.map((row) => [row.contactId, row]));
 
           expect(byId.get("contact_global")?.hasAccess).toBe(true);
@@ -486,6 +506,7 @@ describe("ContactRepository.search", () => {
         const match = results.find(
           (row) => row.userId === "user_lonely_member"
         );
+
         expect(match).toBeDefined();
         expect(match?.contactId).toBeNull();
         expect(match?.isMember).toBe(true);
@@ -503,6 +524,7 @@ describe("ContactRepository.search", () => {
           query: "acme.com",
           limit: 2,
         });
+
         expect(limited.length).toBe(2);
 
         const clamped = yield* repository.search({
@@ -510,12 +532,14 @@ describe("ContactRepository.search", () => {
           query: "acme.com",
           limit: 10_000,
         });
+
         expect(clamped.length).toBeLessThanOrEqual(25);
 
         const shortQuery = yield* repository.search({
           organizationId: "org_main",
           query: "a",
         });
+
         expect(shortQuery).toEqual([]);
       })
     );

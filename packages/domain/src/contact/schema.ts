@@ -125,9 +125,13 @@ export const ContactSearchResult = S.Struct({
 });
 
 export type TContactCreate = S.Schema.Type<typeof ContactCreate>;
+
 export type TContactUpdate = S.Schema.Type<typeof ContactUpdate>;
+
 export type TContactDelete = S.Schema.Type<typeof ContactDelete>;
+
 export type TContactSearch = S.Schema.Type<typeof ContactSearch>;
+
 export type TContactSearchResult = S.Schema.Type<typeof ContactSearchResult>;
 
 /**
@@ -156,6 +160,7 @@ export const ContactAccountKind = S.Literals([
 export const ContactNotifyAccess = S.Literals(["YES", "PUBLIC_ONLY", "NO"]);
 
 export type TContactAccountKind = S.Schema.Type<typeof ContactAccountKind>;
+
 export type TContactNotifyAccess = S.Schema.Type<typeof ContactNotifyAccess>;
 
 export const Contact = S.Struct({

@@ -39,16 +39,20 @@ type RoadmapBoardProps = {
 
 export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
   const { postCollection } = useDashboardCollections();
+
   // Dragging an issue between lanes changes its status, which the backend
   // reserves for `posts.status` holders — disable the interaction entirely
   // for everyone else instead of letting an optimistic move fail with 403.
   const { allowed: canChangeStatus } = usePolicy(
     hasPermission(organizationId, "posts.status")
   );
+
   const [dragPreview, setDragPreview] = useState<
     RoadmapLane<RoadmapBoardPost>[] | null
   >(null);
+
   const items = dragPreview ?? lanes;
+
   const activeDrag = useRef<{
     sourceId: string;
     sourceStatusId: string;
@@ -61,6 +65,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
 
       if (source?.type !== "item") {
         activeDrag.current = null;
+
         return;
       }
 
@@ -85,6 +90,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
 
       // SAFETY: The upstream contract guarantees a string here.
       const targetStatusId = target?.data?.statusId as string | undefined;
+
       if (!targetStatusId) {
         return;
       }
@@ -115,6 +121,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
 
       if (event.canceled || source?.type !== "item") {
         setDragPreview(null);
+
         return;
       }
 
@@ -122,6 +129,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
       const sourceStatusId =
         dragState?.sourceStatusId ??
         (source.data?.statusId as string | undefined);
+
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const targetStatusId =
         dragState?.targetStatusId ??
@@ -132,6 +140,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
         sourceStatusId === targetStatusId
       ) {
         setDragPreview(null);
+
         return;
         // SAFETY: The upstream contract guarantees a string here.
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -144,6 +153,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
           draft.statusId = targetStatusId;
         }
       );
+
       setDragPreview(null);
 
       void tx.when("settled").then(
@@ -188,6 +198,7 @@ function movePostToStatus(
   const sourceLane = lanes.find((lane) =>
     lane.posts.some((post) => post.id === postId)
   );
+
   const targetLane = lanes.find((lane) => lane.statusId === targetStatusId);
 
   if (!(sourceLane && targetLane) || sourceLane === targetLane) {
@@ -195,11 +206,13 @@ function movePostToStatus(
   }
 
   const postIndex = sourceLane.posts.findIndex((post) => post.id === postId);
+
   if (postIndex === -1) {
     return lanes;
   }
 
   const post = sourceLane.posts[postIndex];
+
   if (!post) {
     return lanes;
   }
@@ -240,6 +253,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
   organizationId: string;
 }) {
   const createPostStore = usePostCreateDialogContext();
+
   const { ref, isDropTarget } = useSortable({
     id: lane.statusId,
     accept: "item",
@@ -309,6 +323,7 @@ const RoadmapBoardCard = memo(function RoadmapBoardCard({
   post: RoadmapBoardPost;
 }) {
   const navigate = useNavigate();
+
   const { isDragging, ref } = useSortable({
     id: post.id,
     group: post.status,

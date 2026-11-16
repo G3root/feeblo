@@ -78,6 +78,7 @@ const failIfTagNameIsTaken = (args: {
 }) =>
   Effect.gen(function* () {
     const tags = yield* TagRepository;
+
     const existing = yield* tags.findNameConflict(args).pipe(
       withRemapDbErrors("PublicApiTag", "select"),
       Effect.catchTag("InternalServerError", () => onInternalError)

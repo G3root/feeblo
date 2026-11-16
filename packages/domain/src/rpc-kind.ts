@@ -83,6 +83,7 @@ export type RpcKind = "read" | "write";
 export type RpcTag = RpcTagsOf<typeof AllRpcs>;
 
 type ReadVerb = (typeof readRpcVerbs)[number];
+
 type WriteVerb = (typeof writeRpcVerbs)[number];
 
 /**
@@ -107,6 +108,7 @@ export type RpcKindOf<Tag extends string> =
       : never;
 
 type AssertNever<Value extends never> = Value;
+
 type AssertTrue<Value extends true> = Value;
 
 /** The tags whose names start with neither a read verb nor a write verb. */
@@ -129,8 +131,10 @@ export type EveryRpcTagIsClassified = AssertNever<UnclassifiedRpcTags>;
  */
 const isPrefixedBy = (tag: string, verb: string): boolean => {
   if (tag.length === verb.length) return tag === verb;
+
   if (!tag.startsWith(verb)) return false;
   const next = tag.charCodeAt(verb.length);
+
   return next >= 0x41 && next <= 0x5a;
 };
 

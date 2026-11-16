@@ -190,6 +190,7 @@ describe("UpvoteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* UpvoteRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .ListUpvotes({
@@ -377,6 +378,7 @@ describe("UpvoteRpcHandlers", () => {
               postId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(first.upvoted).toBe(true);
 
           // Second toggle: remove upvote
@@ -386,6 +388,7 @@ describe("UpvoteRpcHandlers", () => {
               postId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(second.upvoted).toBe(false);
 
           // Verify the upvote is removed
@@ -394,6 +397,7 @@ describe("UpvoteRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(upvotes).toHaveLength(0);
         })
       );
@@ -443,6 +447,7 @@ describe("UpvoteRpcHandlers", () => {
               postId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(postUpvotes[0]?.user.name).toBe("Test User");
         })
       );
@@ -478,6 +483,7 @@ describe("UpvoteRpcHandlers", () => {
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
               );
+
             expect(upvotes).toHaveLength(1);
             expect(upvotes[0]?.user).toEqual({ name: null, image: null });
           })
@@ -536,6 +542,7 @@ describe("UpvoteRpcHandlers", () => {
               email: `${otherUserId}@example.com`,
               name: "Other User",
             });
+
             const otherSession: Session = {
               user: {
                 id: otherUserId,
@@ -626,6 +633,7 @@ describe("UpvoteRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(upvotes).toHaveLength(0);
 
           const memberUpvotes = yield* handlers
@@ -633,6 +641,7 @@ describe("UpvoteRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(memberUpvotes).toHaveLength(1);
         })
       );
@@ -686,6 +695,7 @@ describe("UpvoteRpcHandlers", () => {
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
               );
+
             expect(publicUpvotes).toHaveLength(0);
           }
 
@@ -695,6 +705,7 @@ describe("UpvoteRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(memberUpvotes).toHaveLength(2);
         })
       );
@@ -815,6 +826,7 @@ describe("UpvoteRpcHandlers", () => {
               postId,
             })
             .pipe(Effect.provideService(CurrentSession, session));
+
           expect(first.upvoted).toBe(true);
 
           // Second toggle: remove upvote
@@ -824,6 +836,7 @@ describe("UpvoteRpcHandlers", () => {
               postId,
             })
             .pipe(Effect.provideService(CurrentSession, session));
+
           expect(second.upvoted).toBe(false);
 
           // Verify upvote is removed
@@ -832,6 +845,7 @@ describe("UpvoteRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(upvotes).toHaveLength(0);
         })
       );
@@ -845,12 +859,14 @@ describe("UpvoteRpcHandlers", () => {
         const postId = yield* PostId.generate;
 
         yield* createPost(fixture, postId, "No implicit subscription");
+
         const result = yield* handlers
           .ToggleUpvote({
             organizationId: fixture.organizationId,
             postId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(result.upvoted).toBe(true);
 
         const isSubscribed = yield* subscriptions.isSubscribed({
@@ -858,6 +874,7 @@ describe("UpvoteRpcHandlers", () => {
           postId,
           userId: fixture.userId,
         });
+
         expect(isSubscribed).toBe(false);
       })
     );

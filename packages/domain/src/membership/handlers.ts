@@ -87,14 +87,17 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
                     memberId,
                     organizationId,
                   });
+
                   yield* repository.updateMemberRole({
                     organizationId,
                     memberId,
                     role,
                   });
+
                   if (Option.isNone(previous)) {
                     return;
                   }
+
                   yield* audit.record({
                     organizationId,
                     actor: actorFromSession(session, organizationId),
@@ -147,6 +150,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
             if (Option.isNone(target)) {
               return;
             }
+
             yield* audit.record({
               organizationId,
               actor: actorFromSession(session, organizationId),

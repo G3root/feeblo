@@ -28,15 +28,18 @@ const Add = Rpc.make("Add", {
   payload: Schema.Struct({ a: Schema.Finite, b: Schema.Finite }),
   success: Schema.Finite,
 });
+
 const Echo = Rpc.make("Echo", {
   payload: Schema.Struct({ text: Schema.String }),
   success: Schema.String,
 });
+
 const Watch = Rpc.make("Watch", {
   payload: Schema.Struct({}),
   stream: true,
   success: Schema.String,
 });
+
 const TestRpcs = RpcGroup.make(Add, Echo, Watch);
 
 /**
@@ -59,9 +62,11 @@ const framesIn = (body: string): ReadonlyArray<RequestEncoded> =>
 /** The body of a request the protocol posted. */
 const bodyOf = (request: HttpClientRequest.HttpClientRequest): string => {
   const body = request.body;
+
   if (body._tag !== "Uint8Array") {
     throw new Error("The batched protocol must post a byte body");
   }
+
   return new TextDecoder().decode(body.body);
 };
 
@@ -85,12 +90,14 @@ const answerOf = (
         Effect.map(({ a, b }) => exitOf(frame.id, a + b))
       );
     }
+
     case "Echo": {
       return Schema.decodeUnknownEffect(Echo.payloadSchema)(frame.payload).pipe(
         Effect.orDie,
         Effect.map(({ text }) => exitOf(frame.id, text))
       );
     }
+
     default: {
       return Effect.succeed({
         _tag: "Exit",
@@ -120,10 +127,12 @@ const answeringClient = (
     HttpClient.HttpClient,
     Effect.gen(function* () {
       const serialization = yield* RpcSerialization.RpcSerialization;
+
       return HttpClient.make((request) =>
         Effect.gen(function* () {
           const body = bodyOf(request);
           yield* Ref.update(posts, (all) => [...all, body]);
+
           const answers = yield* Effect.forEach(
             framesIn(body).toReversed(),
             (frame) =>
@@ -131,6 +140,7 @@ const answeringClient = (
                 Effect.map((answer) => JSON.stringify(answer) + "\n")
               )
           );
+
           return HttpClientResponse.fromWeb(
             request,
             new Response(answers.join(""), {
@@ -274,6 +284,7 @@ describe("batched RPC protocol", () => {
 
       const results = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* Effect.all(
           [
             client.Add({ a: 1, b: 2 }),
@@ -303,6 +314,7 @@ describe("batched RPC protocol", () => {
 
       const total = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* client.Add({ a: 40, b: 2 });
       }).pipe(Effect.provideContext(context));
 
@@ -317,6 +329,7 @@ describe("batched RPC protocol", () => {
   it.live("sends a frame the classifier rules out alone and at once", () =>
     Effect.gen(function* () {
       const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+
       const context = yield* Layer.build(
         testLayer(answeringClient(posts), {
           sharesBatch: (tag) => tag === "Echo",
@@ -325,6 +338,7 @@ describe("batched RPC protocol", () => {
 
       const results = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* Effect.all(
           [client.Add({ a: 1, b: 2 }), client.Echo({ text: "hello" })],
           { concurrency: "unbounded" }
@@ -346,12 +360,14 @@ describe("batched RPC protocol", () => {
   it.live("posts each write of a burst as its own request", () =>
     Effect.gen(function* () {
       const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+
       const context = yield* Layer.build(
         testLayer(answeringClient(posts), { sharesBatch: () => false })
       );
 
       const results = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* Effect.all(
           [client.Add({ a: 1, b: 2 }), client.Add({ a: 20, b: 22 })],
           { concurrency: "unbounded" }
@@ -370,6 +386,7 @@ describe("batched RPC protocol", () => {
     () =>
       Effect.gen(function* () {
         const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+
         const context = yield* Layer.build(
           testLayer(answeringClient(posts), {
             batchWindow: Duration.seconds(30),
@@ -381,6 +398,7 @@ describe("batched RPC protocol", () => {
         // window; a direct send answers inside the timeout.
         const total = yield* Effect.gen(function* () {
           const client = yield* RpcClient.make(TestRpcs);
+
           return yield* client.Add({ a: 40, b: 2 });
         }).pipe(
           Effect.timeout(Duration.seconds(1)),
@@ -397,6 +415,7 @@ describe("batched RPC protocol", () => {
   it.live("cancels a response whose caller is interrupted", () =>
     Effect.gen(function* () {
       const cancels = { count: 0 };
+
       const context = yield* Layer.build(
         testLayer(openEndedClient(cancels), { sharesBatch: () => false })
       );
@@ -420,12 +439,14 @@ describe("batched RPC protocol", () => {
   it.live("splits a batch at its byte budget", () =>
     Effect.gen(function* () {
       const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+
       const context = yield* Layer.build(
         testLayer(answeringClient(posts), { maxBatchBytes: 1 })
       );
 
       const results = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* Effect.all(
           [client.Echo({ text: "one" }), client.Echo({ text: "two" })],
           { concurrency: "unbounded" }
@@ -447,6 +468,7 @@ describe("batched RPC protocol", () => {
 
       const outcomes = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* Effect.all(
           [
             client.Add({ a: 1, b: 2 }).pipe(Effect.exit),
@@ -467,6 +489,7 @@ describe("batched RPC protocol", () => {
 
       const outcome = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* client.Add({ a: 1, b: 2 }).pipe(Effect.exit);
       }).pipe(Effect.provideContext(context));
 
@@ -482,6 +505,7 @@ describe("batched RPC protocol", () => {
         Exit.Exit<number | string, RpcClientError>
       > = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
+
         return yield* Effect.all(
           [
             client.Add({ a: 1, b: 2 }).pipe(Effect.exit),
@@ -501,6 +525,7 @@ describe("batched RPC protocol", () => {
         expect(Option.isSome(failure)).toBe(true);
         const error = Option.getOrThrow(failure);
         expect(error.reason._tag).toBe("RpcClientDefect");
+
         if (error.reason._tag === "RpcClientDefect") {
           expect(String(error.reason.cause)).toContain("server exploded");
         }
@@ -518,6 +543,7 @@ describe("batched RPC protocol", () => {
           Exit.Exit<number | string, RpcClientError>
         > = yield* Effect.gen(function* () {
           const client = yield* RpcClient.make(TestRpcs);
+
           return yield* Effect.all(
             [
               client.Add({ a: 1, b: 2 }).pipe(Effect.exit),
@@ -540,6 +566,7 @@ describe("batched RPC protocol", () => {
           expect(Option.isSome(failure)).toBe(true);
           const error = Option.getOrThrow(failure);
           expect(error.reason._tag).toBe("HttpError");
+
           if (error.reason._tag === "HttpError") {
             expect(error.reason.kind).toBe("StatusCodeError");
           }

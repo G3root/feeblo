@@ -228,11 +228,13 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       if (post === undefined) {
         return yield* notFoundError("Post not found.");
       }
+
       if (post.mergedIntoPostId !== null) {
         return yield* conflictError(
           "This post has been merged into another post and cannot be voted on."
         );
       }
+
       if (post.lockedAt !== null) {
         return yield* conflictError(
           "This post is locked and no longer accepts votes."
@@ -278,14 +280,17 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
         eq(schema.contactTable.organizationId, args.organizationId),
         isNotNull(schema.contactTable.userId),
       ];
+
       if (voter?.id !== undefined) {
         contactConditions.push(eq(schema.contactTable.id, voter.id));
       }
+
       if (voter?.externalId !== undefined) {
         contactConditions.push(
           eq(schema.contactTable.externalId, voter.externalId)
         );
       }
+
       if (hasEmail) {
         contactConditions.push(
           sql`lower(${schema.contactTable.email}) = ${email}`
@@ -312,6 +317,7 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       // so it can never widen a filter that also names an id or an external id.
       const emailOnly =
         hasEmail && voter?.id === undefined && voter?.externalId === undefined;
+
       // Both legs are lookups the caller's filter names; neither needs the
       // other's rows, so they resolve together instead of back to back.
       const [contacts, emailUsers] = yield* Effect.all(
@@ -331,14 +337,17 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       );
 
       const ids = new Set<string>();
+
       for (const contact of contacts) {
         if (contact.userId !== null) {
           ids.add(contact.userId);
         }
       }
+
       for (const user of emailUsers) {
         ids.add(user.id);
       }
+
       return Option.some(Array.from(ids));
     });
 
@@ -449,9 +458,11 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
           eq(schema.upvoteTable.organizationId, organizationId),
           eq(schema.upvoteTable.postId, postId),
         ];
+
         if (cursor !== null) {
           conditions.push(voteCursorCondition(cursor));
         }
+
         if (Option.isSome(voterUserIds)) {
           conditions.push(
             inArray(schema.upvoteTable.userId, [...voterUserIds.value])
@@ -534,9 +545,11 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
         const conditions: SQL[] = [
           eq(schema.upvoteTable.organizationId, organizationId),
         ];
+
         if (postId !== null) {
           conditions.push(eq(schema.upvoteTable.postId, postId));
         }
+
         if (boardId !== null) {
           conditions.push(
             inArray(
@@ -553,9 +566,11 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
             )
           );
         }
+
         if (cursor !== null) {
           conditions.push(voteCursorCondition(cursor));
         }
+
         if (Option.isSome(voterUserIds)) {
           conditions.push(
             inArray(schema.upvoteTable.userId, [...voterUserIds.value])
@@ -619,6 +634,7 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
       db.transaction(() =>
         Effect.gen(function* () {
           yield* requireVotablePost(args);
+
           return yield* provideVoteWriteEnvironment(
             addVoteOnBehalf({
               actor: { memberId: null, userId: null },
@@ -653,6 +669,7 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
             postId: args.postId,
             voteId: args.voteId,
           });
+
           if (Option.isNone(removed)) {
             return { removed: false } as const;
           }

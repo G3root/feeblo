@@ -34,6 +34,7 @@ const makeChangelogSubscriptionRepository = Effect.gen(function* () {
     subscribe: ({ organizationId, userId, memberId }: TSubscribe) =>
       Effect.gen(function* () {
         const id = yield* ChangelogSubscriptionId.generate;
+
         return yield* db
           .insert(schema.changelogSubscriptionTable)
           .values({

@@ -27,9 +27,11 @@ const RETENTION_PASS_INTERVAL = "24 hours";
 export const postTrafficRetention = Effect.gen(function* () {
   const repository = yield* PostTrafficRepository;
   const now = yield* DateTime.now;
+
   const before = DateTime.toDate(
     DateTime.subtract({ days: POST_VIEW_RETENTION_DAYS })(now)
   );
+
   yield* repository.deleteEventsBefore(before);
 }).pipe(
   Effect.tap(() => Effect.logDebug("Ran the post-traffic retention pass")),

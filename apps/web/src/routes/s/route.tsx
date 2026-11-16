@@ -83,6 +83,7 @@ const getDocumentCacheControl = createIsomorphicFn()
   .client(() => undefined)
   .server(() => {
     const cookieHeader = getRequest().headers.get("cookie") ?? "";
+
     const hasLocaleCookie = cookieHeader
       .split(";")
       .some((entry) => entry.trim().startsWith(`${LOCALE_COOKIE_NAME}=`));
@@ -216,9 +217,11 @@ export const Route = createFileRoute("/s")({
 
     const { site, post, changelog, canonicalUrl, siteUrl, ogImageUrl } =
       boardPage;
+
     const jsonLd: JsonLdNode[] = [
       websiteJsonLd({ name: site.name, url: siteUrl }),
     ];
+
     let pageTitle = `${site.name} — Feedback and roadmap`;
     let pageDescription = `Share feedback, follow the roadmap, and read product updates from ${site.name}.`;
 
@@ -393,6 +396,7 @@ function useBoardSsoToken(organizationId: string | undefined): boolean {
   const [token] = useState(() =>
     hasWindow() ? getSsoTokenFromHash(window.location.hash) : null
   );
+
   const [reconciliationSettled, setReconciliationSettled] = useState(false);
   const reconciliationStartedFor = useRef<string | undefined>(undefined);
 
@@ -410,6 +414,7 @@ function useBoardSsoToken(organizationId: string | undefined): boolean {
     ) {
       return;
     }
+
     reconciliationStartedFor.current = organizationId;
 
     if (token !== null) {
@@ -421,6 +426,7 @@ function useBoardSsoToken(organizationId: string | undefined): boolean {
     void (async () => {
       try {
         const session = await getAuthSession();
+
         const restrictedToOrganizationId =
           session?.user.restrictedToOrganizationId;
 

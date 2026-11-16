@@ -308,6 +308,7 @@ export function useRoadmapData<
     isLiveQueryFailed(allRoadmapsQuery) ||
     isLiveQueryFailed(columnsQuery) ||
     isLiveQueryFailed(postsQuery);
+
   // A query with a result — including an empty roadmap — is content, not a
   // loading state: hydration lands results before the first client render and
   // a skeleton gated on `isLoading` would replace them (see

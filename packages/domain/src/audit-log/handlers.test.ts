@@ -10,6 +10,7 @@ import { AuditLogRpcHandlersEffect } from "./handlers";
 import { AuditLogRepository, type TAuditLogInsert } from "./repository";
 
 const T0 = new Date("2026-01-01T00:00:00.000Z");
+
 const at = (minutes: number) => new Date(T0.getTime() + minutes * 60_000);
 
 describe("AuditLogRpcHandlers", () => {
@@ -45,6 +46,7 @@ describe("AuditLogRpcHandlers", () => {
         role,
         userId,
       });
+
       return { memberId, organizationId, role, userId } satisfies Fixture;
     });
 
@@ -101,6 +103,7 @@ describe("AuditLogRpcHandlers", () => {
       const repository = yield* AuditLogRepository;
       const id = yield* AuditLogId.generate;
       yield* repository.insert({ ...row(organizationId, overrides), id });
+
       return id;
     });
 
@@ -115,9 +118,11 @@ describe("AuditLogRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* AuditLogRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const older = yield* append(fixture.organizationId, {
             occurredAt: at(0),
           });
+
           const newer = yield* append(fixture.organizationId, {
             action: "board.exported",
             occurredAt: at(1),
@@ -144,6 +149,7 @@ describe("AuditLogRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* AuditLogRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const ids = yield* Effect.forEach([0, 1, 2], (minute) =>
           append(fixture.organizationId, { occurredAt: at(minute) })
         );
@@ -154,8 +160,10 @@ describe("AuditLogRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(first.items).toHaveLength(2);
         expect(first.next).not.toBeNull();
+
         if (first.next === null) return;
 
         const second = yield* handlers
@@ -186,6 +194,7 @@ describe("AuditLogRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)))
         );
+
         expect(failure._tag).toBe("PolicyDenied");
       })
     );

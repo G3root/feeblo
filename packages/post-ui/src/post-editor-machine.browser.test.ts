@@ -21,7 +21,9 @@ import {
  */
 
 const V1 = new Date("2024-01-01T00:00:00.000Z");
+
 const V2 = new Date("2024-01-02T00:00:00.000Z");
+
 const V3 = new Date("2024-01-03T00:00:00.000Z");
 
 type EditorValue = "conflict" | "editing" | "loading";
@@ -45,6 +47,7 @@ const step = (
 describe("post editor machine", () => {
   it("starts loading with no version to save against", () => {
     const actor = createActor(postEditorMachine).start();
+
     try {
       expect(stateOf(actor.getSnapshot())).toStrictEqual({
         editorKey: 0,
@@ -146,6 +149,7 @@ describe("post editor machine", () => {
       type: "RELOAD_LATEST",
       version: V2,
     });
+
     const conflicted = step(reloaded, { type: "CONFLICT" });
     const again = step(conflicted, { type: "RELOAD_LATEST", version: V3 });
 

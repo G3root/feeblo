@@ -43,25 +43,30 @@ export function InvitationAcceptanceCard({
   readonly invitationId: string;
 }) {
   const navigate = useNavigate();
+
   const [responding, setResponding] = useState<"accept" | "reject" | null>(
     null
   );
+
   const invitationQuery = useQuery({
     queryKey: ["invitation", invitationId],
     queryFn: async (): Promise<InvitationLookup> => {
       const result = await authClient.organization.getInvitation({
         query: { id: invitationId },
       });
+
       if (result.error) {
         // Better Auth answers "wrong account" with FORBIDDEN and every other
         // rejection — expired, revoked, already answered — with BAD_REQUEST.
         const wrongRecipient =
           result.error.status === 403 ||
           result.error.code === "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION";
+
         return wrongRecipient
           ? { kind: "wrong-recipient" }
           : { kind: "unavailable" };
       }
+
       return {
         kind: "ready",
         invitation: {
@@ -76,6 +81,7 @@ export function InvitationAcceptanceCard({
   });
 
   const lookup = invitationQuery.data;
+
   const organizationId =
     lookup?.kind === "ready" ? lookup.invitation.organizationId : undefined;
 
@@ -92,12 +98,15 @@ export function InvitationAcceptanceCard({
     if (organizationId === undefined) {
       return;
     }
+
     setResponding(action);
+
     try {
       const result =
         action === "accept"
           ? await authClient.organization.acceptInvitation({ invitationId })
           : await authClient.organization.rejectInvitation({ invitationId });
+
       if (result.error) {
         trackEvent(
           action === "accept"
@@ -112,21 +121,26 @@ export function InvitationAcceptanceCard({
               : "Could not decline the invitation",
           type: "error",
         });
+
         return;
       }
+
       trackEvent(
         action === "accept"
           ? "org_invitation_accepted"
           : "org_invitation_declined",
         { success: true }
       );
+
       if (action === "reject") {
         toastManager.add({ title: "Invitation declined", type: "success" });
         // The guard resolves "/" to the user's own workspace, or to
         // registration when they have none yet.
         await navigate({ to: "/" });
+
         return;
       }
+
       // Accepting adds a membership; the cached session must see it before the
       // guard canonicalizes the destination. If the refresh fails the cache
       // still says the user is not a member — and for a first invitation it
@@ -137,10 +151,13 @@ export function InvitationAcceptanceCard({
         () => true,
         () => false
       );
+
       if (!refreshed) {
         window.location.assign(`/${organizationId}`);
+
         return;
       }
+
       toastManager.add({ title: "Invitation accepted", type: "success" });
       await navigate({
         to: "/$organizationId",

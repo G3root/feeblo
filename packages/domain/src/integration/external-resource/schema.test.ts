@@ -15,6 +15,7 @@ import * as Schema from "effect/Schema";
 import { ExternalResourceRecord, PostExternalResourceLink } from "./schema";
 
 const decodePostLink = Schema.decodeUnknownOption(PostExternalResourceLink);
+
 const decodeRecord = Schema.decodeUnknownOption(ExternalResourceRecord);
 
 /**

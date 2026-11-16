@@ -41,11 +41,13 @@ export const applyCommentStatusUpdate = (
   actor: CommentActor
 ) => {
   const statusUpdateId = args.statusUpdateId ?? null;
+
   return Effect.gen(function* () {
     if (statusUpdateId === null || args.parentCommentId !== null) {
       // Replies and plain comments never move the post's status.
       return { outboxId: undefined, statusUpdateId: null };
     }
+
     const db = yield* currentDb;
     const activityRepository = yield* PostActivityRepository;
 
@@ -65,6 +67,7 @@ export const applyCommentStatusUpdate = (
       )
       .limit(1)
       .pipe(Effect.map(EffectArray.get(0)));
+
     if (Option.isNone(statusRow)) {
       // Unknown status for this organization: keep the comment but do not
       // pretend it changed anything.
@@ -112,6 +115,7 @@ export const applyCommentStatusUpdate = (
       )
       .returning({ id: schema.postTable.id })
       .pipe(Effect.map(EffectArray.get(0)));
+
     if (Option.isNone(transitionedPost)) {
       // A concurrent transition won the race: keep the comment but do not
       // label it a status update or record stale history.

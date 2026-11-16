@@ -29,8 +29,10 @@ import { m } from "../paraglide/messages.js";
 
 /** Debounce applied before each ContactSearch round-trip. */
 const SEARCH_DEBOUNCE_MS = 200;
+
 /** Minimum query length before the picker hits ContactSearch. */
 const MIN_QUERY_LENGTH = 2;
+
 /** The separators an address or display name splits an initial out of. */
 const initialsSeparatorPattern = /[\s@._-]+/;
 
@@ -140,6 +142,7 @@ export function describeContactSelection(
   if (!selection) {
     return null;
   }
+
   return selection.name ?? selection.email ?? null;
 }
 
@@ -156,6 +159,7 @@ function initialsOf(name: string | null, email: string | null) {
   if (parts.length === 0) {
     return "?";
   }
+
   return `${parts[0]?.[0] ?? ""}${parts.length > 1 ? (parts[1]?.[0] ?? "") : ""}`.toUpperCase();
 }
 
@@ -242,6 +246,7 @@ export function ContactCombobox({
       setResults([]);
       setSearchFailed(false);
       setIsSearching(false);
+
       return;
     }
 
@@ -250,6 +255,7 @@ export function ContactCombobox({
     const controller = new AbortController();
     let isCurrent = true;
     setIsSearching(true);
+
     const timer = window.setTimeout(() => {
       searchRef
         .current({
@@ -284,6 +290,7 @@ export function ContactCombobox({
   }, [organizationId, postId, query, retryToken]);
 
   const trimmedQuery = query.trim();
+
   // The create-new path feeds the raw query to find-or-create as an EMAIL;
   // non-email queries (names) only ever surface real search results. The
   // deliverability check mirrors the server's `AuthorEmail` filter so the
@@ -292,6 +299,7 @@ export function ContactCombobox({
     trimmedQuery.length >= MIN_QUERY_LENGTH &&
     EmailSchema.safeParse(trimmedQuery).success &&
     isDeliverableAuthorEmail(trimmedQuery);
+
   // The create-new entry is always offered for email-like
   // queries, not just on empty results — otherwise a substring hit hides the
   // only path to attribute to someone new. Suppressed only for an exact
@@ -303,7 +311,9 @@ export function ContactCombobox({
       contact.email !== null &&
       contact.email.toLowerCase() === trimmedQuery.toLowerCase()
   );
+
   const offersCreate = queryLooksLikeEmail && !searchFailed && !exactEmailHit;
+
   const createOption: ContactOption[] = offersCreate
     ? [{ kind: "create", email: trimmedQuery }]
     : [];
@@ -320,10 +330,12 @@ export function ContactCombobox({
     canCreate: boolean;
     organizationId: string;
   } | null>(null);
+
   const canCreateContact =
     createEligibilityResult?.organizationId === organizationId
       ? createEligibilityResult.canCreate
       : null;
+
   const createEligibilityRef = useRef(createEligibility);
   useEffect(() => {
     createEligibilityRef.current = createEligibility;
@@ -332,6 +344,7 @@ export function ContactCombobox({
     if (!offersCreate || canCreateContact !== null) {
       return;
     }
+
     let isCurrent = true;
     const probedOrganizationId = organizationId;
     createEligibilityRef.current({ organizationId: probedOrganizationId }).then(
@@ -348,6 +361,7 @@ export function ContactCombobox({
         // write path answers the cap with copy of its own.
       }
     );
+
     return () => {
       isCurrent = false;
     };
@@ -372,18 +386,23 @@ export function ContactCombobox({
       if (contact.avatarUrl) {
         selection.avatarUrl = contact.avatarUrl;
       }
+
       if (contact.contactId) {
         selection.contactId = contact.contactId;
       }
+
       if (contact.email) {
         selection.email = contact.email;
       }
+
       if (contact.name) {
         selection.name = contact.name;
       }
+
       if (contact.userId) {
         selection.userId = contact.userId;
       }
+
       selection.hasAccess = contact.hasAccess;
       selection.isMember = contact.isMember;
       onSelect(selection);
@@ -397,6 +416,7 @@ export function ContactCombobox({
   // below probes again when the create entry appears.
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
+
     if (nextOpen) {
       setCreateEligibilityResult(null);
     }
@@ -463,6 +483,7 @@ export function ContactCombobox({
         if (eventDetails.reason !== "input-change") {
           return;
         }
+
         setQuery(nextQuery);
       }}
       onOpenChange={handleOpenChange}

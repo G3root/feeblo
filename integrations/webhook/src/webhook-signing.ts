@@ -36,11 +36,14 @@ export const generateWebhookSigningSecret: Effect.Effect<
 > = Effect.gen(function* () {
   const secureRandom = yield* SecureRandom.SecureRandom;
   const bytes = yield* secureRandom.randomBytes(32);
+
   return Redacted.make(
     `${signingSecretPrefix}${Buffer.from(bytes).toString("base64")}`
   );
 }).pipe(
-  Effect.mapError(() => new WebhookSigningError({ operation: "generate" }))
+  Effect.mapError(
+    (cause) => new WebhookSigningError({ operation: "generate", cause })
+  )
 );
 
 /** Replaces the active signing key and retains it for the required 24-hour rotation grace period; the clock (and thus TestClock) drives expiry. */
@@ -54,6 +57,7 @@ export const rotateWebhookSigningKeyring = (
   Effect.gen(function* () {
     const rotationTime = yield* DateTime.now;
     const current = yield* generateWebhookSigningSecret;
+
     return {
       current,
       previous: {
@@ -75,12 +79,15 @@ export const signWebhookDelivery = ({
 }): Effect.Effect<WebhookSigningHeaders, WebhookSigningError> =>
   Effect.gen(function* () {
     const signingTime = yield* DateTime.now;
+
     return yield* Effect.try({
       try: () => {
         const signingDate = DateTime.toDate(signingTime);
+
         const currentSignature = new Webhook(
           Redacted.value(keyring.current)
         ).sign(deliveryId, signingDate, rawBody);
+
         const priorSignature =
           keyring.previous !== undefined &&
           keyring.previous.expiresAt.epochMilliseconds >

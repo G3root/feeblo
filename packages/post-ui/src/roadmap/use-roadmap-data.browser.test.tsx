@@ -266,6 +266,7 @@ function createCollections(
 describe("useRoadmapData", () => {
   it("returns status-mode roadmaps ordered by createdAt ascending", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useRoadmapData({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -287,6 +288,7 @@ describe("useRoadmapData", () => {
 
   it("groups posts into lanes respecting column order and dropping unconfigured statuses", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useRoadmapData({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -308,6 +310,7 @@ describe("useRoadmapData", () => {
 
   it("returns a single empty lane for a roadmap with one configured column", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useRoadmapData({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -322,6 +325,7 @@ describe("useRoadmapData", () => {
 
   it("filters roadmaps by slug when provided", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useRoadmapData({
         ...collections,
@@ -342,6 +346,7 @@ describe("useRoadmapData", () => {
 
   it("does not select a filtered-mode roadmap by slug", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useRoadmapData({
         ...collections,
@@ -363,6 +368,7 @@ describe("useRoadmapData", () => {
 
   it("returns no roadmap when the slug filter does not match", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useRoadmapData({
         ...collections,
@@ -414,6 +420,7 @@ describe("useRoadmapData", () => {
         }),
       ],
     });
+
     const { result } = await renderHook(() =>
       useRoadmapData({
         ...collections,
@@ -467,6 +474,7 @@ describe("useRoadmapData", () => {
         },
       ],
     });
+
     const { result } = await renderHook(() =>
       useRoadmapData({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -480,6 +488,7 @@ describe("useRoadmapData", () => {
 
   it("updates lanes reactively when a post is inserted", async () => {
     const collections = createCollections();
+
     const { result, act } = await renderHook(() =>
       useRoadmapData({ ...collections, organizationId: ORGANIZATION_ID })
     );
@@ -510,6 +519,7 @@ describe("useRoadmapData", () => {
     const plannedLane = result.current
       .lanesFor("rm-1")
       .find((lane) => lane.statusId === "st-planned");
+
     expect(plannedLane?.posts.map((post) => post.id)).toEqual([
       "post-1",
       "post-4",
@@ -518,6 +528,7 @@ describe("useRoadmapData", () => {
 
   it("is disabled without an organization id", async () => {
     const collections = createCollections();
+
     const { result } = await renderHook(() =>
       useRoadmapData({ ...collections, organizationId: undefined })
     );

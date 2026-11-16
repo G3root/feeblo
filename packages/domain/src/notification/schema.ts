@@ -70,7 +70,9 @@ export const NotificationMarkAllRead = S.Struct({
 export type TNotificationEventType = S.Schema.Type<
   typeof NotificationEventType
 >;
+
 export type TNotificationList = S.Schema.Type<typeof NotificationList>;
+
 export type TNotificationMarkRead = S.Schema.Type<typeof NotificationMarkRead>;
 
 /** The sort key one page cursor carries: the last row's instant and id. */
@@ -108,9 +110,11 @@ export const decodeNotificationCursor = (
   if (cursor === undefined) {
     return { _tag: "Absent" };
   }
+
   const decoded = S.decodeOption(S.fromJsonString(NotificationCursorPayload))(
     Buffer.from(cursor, "base64url").toString("utf8")
   );
+
   return Option.isSome(decoded)
     ? {
         _tag: "Decoded",

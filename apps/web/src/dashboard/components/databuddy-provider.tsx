@@ -136,6 +136,7 @@ export function setAnalyticsOrganization(organizationId: string) {
 export const pageContext = (pathname: string) => {
   const segments = pathname.split("/").filter(Boolean);
   const section = segments[1] ?? "home";
+
   const pages = new Set([
     "board",
     "changelog",
@@ -149,13 +150,17 @@ export const pageContext = (pathname: string) => {
     "invitation",
     "register",
   ]);
+
   const page = pages.has(section) ? section : "home";
   const tab = page === "settings" ? segments[2] : undefined;
+
   const context = {
     page,
     page_kind: segments.length > 3 ? ("detail" as const) : ("index" as const),
   };
+
   if (tab !== undefined) Object.assign(context, { tab });
+
   return context;
 };
 
@@ -181,6 +186,7 @@ if (hasWindow() && clientId) {
   window.addEventListener("feeblo:operation-failed", (event) => {
     if (!(event instanceof CustomEvent)) return;
     const detail = operationFailed.safeParse(event.detail);
+
     if (!detail.success) return;
     track("browser_operation_failed", {
       ...detail.data,

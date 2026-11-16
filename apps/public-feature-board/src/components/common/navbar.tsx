@@ -77,6 +77,7 @@ function NavTab({ href, label }: { href: string; label: string }) {
   // home tab (`/s`) prefixes every board route and stays selected everywhere.
   const currentPath = toBoardPublicPath(useLocation().pathname);
   const publicHref = toBoardPublicPath(href);
+
   const isActive =
     publicHref === "/"
       ? currentPath === "/"

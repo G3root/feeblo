@@ -4,6 +4,7 @@ import * as S from "effect/Schema";
 export const IntegrationProviderKey = S.NonEmptyString.pipe(
   S.brand("IntegrationProviderKey")
 );
+
 export type TIntegrationProviderKey = S.Schema.Type<
   typeof IntegrationProviderKey
 >;
@@ -12,6 +13,7 @@ export type TIntegrationProviderKey = S.Schema.Type<
 export const IntegrationExternalResourceType = S.NonEmptyString.pipe(
   S.brand("IntegrationExternalResourceType")
 );
+
 export type TIntegrationExternalResourceType = S.Schema.Type<
   typeof IntegrationExternalResourceType
 >;
@@ -26,6 +28,7 @@ export const EXTERNAL_RESOURCE_CREATE_REQUEST_STATES = [
 export const ExternalResourceCreateRequestState = S.Literals(
   EXTERNAL_RESOURCE_CREATE_REQUEST_STATES
 );
+
 export type TExternalResourceCreateRequestState = S.Schema.Type<
   typeof ExternalResourceCreateRequestState
 >;
@@ -36,6 +39,7 @@ export const IntegrationCapabilityDirection = S.Literals([
   "inbound",
   "bidirectional",
 ]);
+
 export type TIntegrationCapabilityDirection = S.Schema.Type<
   typeof IntegrationCapabilityDirection
 >;
@@ -47,6 +51,7 @@ export const IntegrationConnectionMode = S.Literals([
   "api_key",
   "github_app",
 ]);
+
 export type TIntegrationConnectionMode = S.Schema.Type<
   typeof IntegrationConnectionMode
 >;
@@ -55,6 +60,7 @@ export type TIntegrationConnectionMode = S.Schema.Type<
 export const IntegrationCapabilityKey = S.NonEmptyString.pipe(
   S.brand("IntegrationCapabilityKey")
 );
+
 export type TIntegrationCapabilityKey = S.Schema.Type<
   typeof IntegrationCapabilityKey
 >;
@@ -64,15 +70,19 @@ export const SUBSCRIBABLE_INTEGRATION_EVENT_TYPES = [
   "post.created",
   "post.status_changed",
 ] as const;
+
 export const SubscribableIntegrationEventType = S.Literals(
   SUBSCRIBABLE_INTEGRATION_EVENT_TYPES
 );
+
 export type TSubscribableIntegrationEventType = S.Schema.Type<
   typeof SubscribableIntegrationEventType
 >;
+
 export const IntegrationRouteEventSelection = S.Array(
   SubscribableIntegrationEventType
 );
+
 export type TIntegrationRouteEventSelection = S.Schema.Type<
   typeof IntegrationRouteEventSelection
 >;
@@ -83,6 +93,7 @@ export const IntegrationEventType = S.Literals([
   "post.status_changed",
   "webhook.test",
 ]);
+
 export type TIntegrationEventType = S.Schema.Type<typeof IntegrationEventType>;
 
 /**
@@ -103,6 +114,7 @@ export const IntegrationConnectionLifecycleStatus = S.Literals([
   "revocation_unconfirmed",
   "archived",
 ]);
+
 export type TIntegrationConnectionLifecycleStatus = S.Schema.Type<
   typeof IntegrationConnectionLifecycleStatus
 >;
@@ -115,6 +127,7 @@ export const IntegrationDeliveryState = S.Literals([
   "exhausted",
   "canceled",
 ]);
+
 export type TIntegrationDeliveryState = S.Schema.Type<
   typeof IntegrationDeliveryState
 >;
@@ -127,36 +140,42 @@ export const IntegrationDeliveryRetryDecision = S.Literals([
   "exhausted",
   "canceled",
 ]);
+
 export type TIntegrationDeliveryRetryDecision = S.Schema.Type<
   typeof IntegrationDeliveryRetryDecision
 >;
 
 /** JSON objects explicitly safe to expose without provider credentials. */
 export const IntegrationSafeDisplayMetadata = S.Record(S.String, S.Json);
+
 export type TIntegrationSafeDisplayMetadata = S.Schema.Type<
   typeof IntegrationSafeDisplayMetadata
 >;
 
 /** Versioned provider-owned route configuration persisted as JSON. */
 export const IntegrationProviderConfiguration = S.Json;
+
 export type TIntegrationProviderConfiguration = S.Schema.Type<
   typeof IntegrationProviderConfiguration
 >;
 
 /** Immutable provider-neutral event snapshot persisted as JSON. */
 export const StoredIntegrationEventPayload = S.Json;
+
 export type TStoredIntegrationEventPayload = S.Schema.Type<
   typeof StoredIntegrationEventPayload
 >;
 
 /** Safe delivery failure summary; raw provider responses are never persisted. */
 export const IntegrationDeliveryLastError = S.Struct({ errorTag: S.String });
+
 export type TIntegrationDeliveryLastError = S.Schema.Type<
   typeof IntegrationDeliveryLastError
 >;
 
 /** Optional safe attempt diagnostics, excluding payloads, URLs, and credentials. */
 export const IntegrationDeliveryAttemptDiagnostics = S.Record(S.String, S.Json);
+
 export type TIntegrationDeliveryAttemptDiagnostics = S.Schema.Type<
   typeof IntegrationDeliveryAttemptDiagnostics
 >;
@@ -168,6 +187,7 @@ export const StoredIntegrationEventOrigin = S.Struct({
   connectionId: S.optionalKey(S.NonEmptyString),
   routeId: S.optionalKey(S.NonEmptyString),
 });
+
 export type TStoredIntegrationEventOrigin = S.Schema.Type<
   typeof StoredIntegrationEventOrigin
 >;

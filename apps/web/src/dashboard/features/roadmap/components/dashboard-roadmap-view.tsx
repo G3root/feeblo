@@ -58,7 +58,9 @@ const RoadmapDashboardContext =
 
 function useRoadmapDashboard() {
   const ctx = use(RoadmapDashboardContext);
+
   if (!ctx) throw new Error("Must be used within RoadmapDashboardProvider");
+
   return ctx;
 }
 
@@ -72,6 +74,7 @@ function DashboardRoadmapIndexProvider({
   organizationId: string;
 }) {
   const navigate = useNavigate();
+
   const { allRoadmaps, isError, isLoading, lanesFor, roadmaps } =
     useRoadmapData({
       boardCollection: dashboardCollections.boardCollection,
@@ -83,6 +86,7 @@ function DashboardRoadmapIndexProvider({
     });
 
   const displayedRoadmap = roadmaps[0] ?? null;
+
   const lanes = useMemo(
     () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
     [displayedRoadmap, lanesFor]
@@ -91,6 +95,7 @@ function DashboardRoadmapIndexProvider({
   const switchRoadmap = useCallback(
     (nextSlug: string) => {
       const primarySlug = allRoadmaps[0]?.slug;
+
       if (nextSlug === primarySlug) {
         void navigate({
           to: "/$organizationId/roadmap",
@@ -148,6 +153,7 @@ function DashboardRoadmapDetailProvider({
   slug: string;
 }) {
   const navigate = useNavigate();
+
   const { allRoadmaps, isError, isLoading, lanesFor, roadmaps } =
     useRoadmapData({
       boardCollection: dashboardCollections.boardCollection,
@@ -160,6 +166,7 @@ function DashboardRoadmapDetailProvider({
     });
 
   const displayedRoadmap = roadmaps[0] ?? null;
+
   const lanes = useMemo(
     () => (displayedRoadmap ? lanesFor(displayedRoadmap.id) : []),
     [displayedRoadmap, lanesFor]
@@ -168,6 +175,7 @@ function DashboardRoadmapDetailProvider({
   const switchRoadmap = useCallback(
     (nextSlug: string) => {
       const primarySlug = allRoadmaps[0]?.slug;
+
       if (nextSlug === primarySlug) {
         void navigate({
           to: "/$organizationId/roadmap",
@@ -297,8 +305,11 @@ function RoadmapDashboardViewContent() {
   } = useRoadmapDashboard();
 
   if (isError) return <RoadmapDashboardError />;
+
   if (isLoading) return <Roadmap.Skeleton />;
+
   if (!displayedRoadmap) return <RoadmapEmptyState />;
+
   return <RoadmapDashboardContent />;
 }
 
@@ -308,8 +319,11 @@ function RoadmapDashboardViewContentWithNotFound() {
   } = useRoadmapDashboard();
 
   if (isError) return <RoadmapDashboardError />;
+
   if (isLoading) return <Roadmap.Skeleton />;
+
   if (!displayedRoadmap) return <RoadmapDashboardNotFound />;
+
   return <RoadmapDashboardContent />;
 }
 

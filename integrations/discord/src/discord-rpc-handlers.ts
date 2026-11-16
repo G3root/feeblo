@@ -14,6 +14,7 @@ import * as Effect from "effect/Effect";
 export const DiscordManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* DiscordManagementService;
   const handlers = yield* makeChatManagementRpcHandlers(service);
+
   return {
     ListDiscordChannels: handlers.channelList,
     UpdateDiscordChannelNotifications: handlers.channelNotificationsUpdate,

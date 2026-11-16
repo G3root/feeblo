@@ -23,6 +23,7 @@ import { usePlanCompliance } from "../hooks/use-plan-compliance";
 export function OverPlanBanner() {
   const organizationId = useOrganizationId();
   const { compliance, isOverPlan } = usePlanCompliance();
+
   const { allowed: canManageBilling } = usePolicy(
     hasPermission(organizationId, "billing.*")
   );

@@ -6,6 +6,7 @@ import { apiUrl } from "../helpers/urls";
 test("rejects an oversized chunked Better Auth request", async () => {
   const status = await new Promise<number>((resolve, reject) => {
     const target = new URL("/api/auth/sign-in/jwt-auto-login", apiUrl());
+
     const request = httpRequest(
       target,
       {
@@ -20,6 +21,7 @@ test("rejects an oversized chunked Better Auth request", async () => {
         response.on("end", () => resolve(response.statusCode ?? 0));
       }
     );
+
     request.on("error", reject);
     request.write("x".repeat(600_000));
     request.end("x".repeat(600_000));

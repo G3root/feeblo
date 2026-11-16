@@ -22,10 +22,13 @@ export function FullNameField() {
 
   async function handleBlur() {
     const currentName = data?.user?.name;
+
     if (!currentName) {
       return;
     }
+
     const name = inputRef.current?.value.trim();
+
     if (!name || name === "") {
       toastManager.add({
         title: "Full name cannot be empty",
@@ -34,6 +37,7 @@ export function FullNameField() {
 
       return;
     }
+
     if (name === currentName) {
       return;
     }
@@ -70,6 +74,7 @@ export function FullNameField() {
     </SettingsItem.Field>
   );
 }
+
 export function DangerZone() {
   return (
     <SettingsItem.Item>
@@ -92,6 +97,7 @@ export function DangerZone() {
     </SettingsItem.Item>
   );
 }
+
 export function ProfileButton() {
   const { data, refetch } = useAuthState();
 

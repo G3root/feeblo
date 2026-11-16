@@ -12,7 +12,9 @@ export const REACTION_EMOJI_BY_NAME = {
 } as const;
 
 export type ReactionEmojiName = keyof typeof REACTION_EMOJI_BY_NAME;
+
 export type ReactionEmoji = ReactionEmojiName;
+
 export type ReactionEmojiValue =
   (typeof REACTION_EMOJI_BY_NAME)[ReactionEmojiName];
 

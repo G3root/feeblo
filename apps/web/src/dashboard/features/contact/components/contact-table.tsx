@@ -144,6 +144,7 @@ export function ContactTable({
     () => new Map(companies.map((company) => [company.id, company])),
     [companies]
   );
+
   const companyOptions = React.useMemo(
     () =>
       companies
@@ -165,6 +166,7 @@ export function ContactTable({
   );
 
   const attributeValues = useOrgContactAttributeValues(organizationId);
+
   const attributeValueState = React.useMemo<ContactAttributeValuesState>(() => {
     const byContact = new Map<string, Map<string, CustomAttributeValue>>();
 
@@ -172,6 +174,7 @@ export function ContactTable({
       const values =
         byContact.get(value.contactId) ??
         new Map<string, CustomAttributeValue>();
+
       values.set(value.attributeId, value);
       byContact.set(value.contactId, values);
     }
@@ -497,16 +500,18 @@ function AccountStatus({
   notifyAccess?: TContactNotifyAccess;
 }) {
   const label = accountKind ? accountKindLabel[accountKind] : NO_ACCOUNT_LABEL;
-  const hint =
-    accountKind === "SHADOW"
-      ? "Cannot sign in"
-      : notifyAccess === "NO"
-        ? // No account, or an account whose email is unverified: attribution
-          // without delivery is exactly what the reader needs to know.
-          "Won't be notified"
-        : notifyAccess === "PUBLIC_ONLY"
-          ? "Notified on public boards only"
-          : null;
+
+  let hint: string | null = null;
+
+  if (accountKind === "SHADOW") {
+    hint = "Cannot sign in";
+  } else if (notifyAccess === "NO") {
+    // No account, or an account whose email is unverified: attribution
+    // without delivery is exactly what the reader needs to know.
+    hint = "Won't be notified";
+  } else if (notifyAccess === "PUBLIC_ONLY") {
+    hint = "Notified on public boards only";
+  }
 
   return (
     <div className="flex flex-col gap-0.5">

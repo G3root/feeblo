@@ -87,10 +87,12 @@ export function MembersSection() {
 
   const membersQuery = useOrgMembers(organizationId);
   const membersData = membersQuery.data;
+
   const members = React.useMemo(() => {
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const membersSource = (membersData ?? []) as OrganizationMemberRow[];
     const term = search.trim().toLowerCase();
+
     if (!term) {
       return membersSource;
     }
@@ -98,6 +100,7 @@ export function MembersSection() {
     return membersSource.filter((member) => {
       const name = member.user?.name?.toLowerCase() ?? "";
       const email = member.user?.email?.toLowerCase() ?? "";
+
       return name.includes(term) || email.includes(term);
     });
   }, [membersData, search]);
@@ -229,21 +232,27 @@ export function MembersSection() {
 
 export function InvitationsSection() {
   const organizationId = useOrganizationId();
+
   const { allowed: canListInvitations, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "members.invite")
   );
+
   const [search, setSearch] = React.useState("");
 
   const invitationsQuery = useOrgInvitations({
     organizationId,
     enabled: !isPolicyPending && canListInvitations,
   });
+
   const invitationsData = invitationsQuery.data;
+
   const invitations = React.useMemo(() => {
     // SAFETY: The upstream contract guarantees this value here.
     const invitationsSource = (invitationsData ??
       []) as OrganizationInvitationRow[];
+
     const term = search.trim().toLowerCase();
+
     if (!term) {
       return invitationsSource;
     }
@@ -425,9 +434,11 @@ function MemberListItem({
 }) {
   const { membersCollection } = useDashboardCollections();
   const { data: session } = useAuthState();
+
   const actorRole = session?.memberships.find(
     (membership) => membership.organizationId === organizationId
   )?.role;
+
   const canManageTarget =
     actorRole !== undefined && compareRoles(role, actorRole) === -1;
 
@@ -450,6 +461,7 @@ function MemberListItem({
                   throw new Error("value not found");
                   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                 }
+
                 // SAFETY: The upstream contract guarantees this value here.
                 settleOptimisticMutation(
                   () =>
@@ -663,6 +675,7 @@ function InvitationListItemLoading() {
 }
 
 const memberLoadingIds = ["member-loading-1", "member-loading-2"];
+
 const invitationLoadingIds = ["invitation-loading-1", "invitation-loading-2"];
 
 const InviteMemberFormSchema = z.object({
@@ -699,6 +712,7 @@ function InviteMemberForm() {
           title: "Failed to invite member",
           type: "error",
         });
+
         return;
       }
 

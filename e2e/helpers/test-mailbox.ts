@@ -11,7 +11,9 @@ export interface TestEmail {
 }
 
 const mailboxUrl = (): string => `${apiUrl()}/__e2e/emails`;
+
 const invitationPathPattern = /\/invitation\/([^"<\s]+)/;
+
 const verificationCodePattern = /\b(\d{6})\b/;
 
 export async function getTestEmails(
@@ -21,6 +23,7 @@ export async function getTestEmails(
   expect(response.ok()).toBeTruthy();
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const body = (await response.json()) as { readonly emails: TestEmail[] };
+
   return body.emails;
 }
 
@@ -100,11 +103,13 @@ export async function waitForPasswordResetEmail(
 export function verificationCodeFromEmail(email: TestEmail): string {
   const match = email.text.match(verificationCodePattern);
   expect(match?.[1]).toBeTruthy();
+
   return match?.[1] ?? "";
 }
 
 export function invitationIdFromEmail(email: TestEmail): string {
   const match = email.html.match(invitationPathPattern);
   expect(match?.[1]).toBeTruthy();
+
   return decodeURIComponent(match?.[1] ?? "");
 }

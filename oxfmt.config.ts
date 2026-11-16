@@ -43,6 +43,11 @@ export default defineConfig({
     "**/*.tsbuildinfo",
 
     "**/.agents",
+    // The vendored Oxlint plugins (`tools/oxlint/**`) are copied from their
+    // upstream repositories and keep upstream's formatting, which is tabs. They
+    // are excluded from linting for the same reason; reformatting them would
+    // make every future update a merge conflict in files this repo does not own.
+    "tools/oxlint/**",
   ],
   jsxSingleQuote: false,
   printWidth: 80,

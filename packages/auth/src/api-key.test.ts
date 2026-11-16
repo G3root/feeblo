@@ -53,6 +53,7 @@ const databaseDirectory = mkdtempSync(join(tmpdir(), "feeblo-auth-apikey-"));
 // takes seconds on its own and can exceed vitest's default hook timeout when
 // the whole workspace runs its tests in parallel.
 process.env.DATABASE_URL = `pglite:${databaseDirectory}`;
+
 await migratePglite(process.env.DATABASE_URL);
 
 // This suite deliberately builds runtimes by hand, which
@@ -66,6 +67,7 @@ const runtime: ManagedRuntime.ManagedRuntime<
   Database.Database,
   SqlError.SqlError | Config.ConfigError
 > = ManagedRuntime.make(Database.PgliteDatabaseLive);
+
 const db = await runtime.runPromise(Database.Database);
 
 /**
@@ -98,6 +100,7 @@ const assertPublicApiEntitled = async (organizationId: string) => {
 const sessionCookieFrom = (headers: Headers): string => {
   const cookies = parseSetCookieHeader(headers.get("set-cookie") ?? "");
   const entry = [...cookies].find(([name]) => name.endsWith("session_token"));
+
   return entry === undefined ? "" : `${entry[0]}=${entry[1].value}`;
 };
 
@@ -262,9 +265,11 @@ describe("auth plugin wiring", () => {
       "content-type": "application/json",
       origin: "http://localhost:3000",
     });
+
     if (cookie) {
       headers.set("cookie", cookie);
     }
+
     return headers;
   };
 
@@ -375,6 +380,7 @@ describe("auth plugin wiring", () => {
       const { organizationId, userId } = await seedMember("admin");
 
       const thirtyDays = 30 * 24 * 60 * 60;
+
       const rotating = await auth.api.createApiKey({
         body: {
           organizationId,
@@ -387,9 +393,11 @@ describe("auth plugin wiring", () => {
 
       const expiresAt = rotating.expiresAt;
       expect(expiresAt).not.toBeNull();
+
       const daysAway =
         ((expiresAt?.getTime() ?? Date.now()) - Date.now()) /
         (24 * 60 * 60 * 1000);
+
       expect(daysAway).toBeGreaterThan(29.9);
       expect(daysAway).toBeLessThan(30.1);
 
@@ -404,6 +412,7 @@ describe("auth plugin wiring", () => {
           permissions: { boards: ["read"], posts: ["read"] },
         },
       });
+
       expect(yearly.expiresAt).not.toBeNull();
 
       // Past the ceiling is refused; the dashboard offers nothing longer.
@@ -428,6 +437,7 @@ describe("auth plugin wiring", () => {
           permissions: { boards: ["read"], posts: ["read"] },
         },
       });
+
       expect(forever.expiresAt).toBeNull();
     },
     perTestTimeout
@@ -451,16 +461,19 @@ describe("auth plugin wiring", () => {
       const verified = await auth.api.verifyApiKey({
         body: { key: created.key },
       });
+
       expect(verified.valid).toBe(true);
 
       const wrongScope = await auth.api.verifyApiKey({
         body: { key: created.key, permissions: { posts: ["write"] } },
       });
+
       expect(wrongScope.valid).toBe(false);
 
       const garbage = await auth.api.verifyApiKey({
         body: { key: "fbk_nope" },
       });
+
       expect(garbage.valid).toBe(false);
 
       // Revocation is a row delete — what `ApiKeyRepository.revoke` performs —
@@ -474,6 +487,7 @@ describe("auth plugin wiring", () => {
       const revoked = await auth.api.verifyApiKey({
         body: { key: created.key },
       });
+
       expect(revoked.valid).toBe(false);
     },
     perTestTimeout
@@ -486,6 +500,7 @@ describe("auth plugin wiring", () => {
       const { organizationId, userId } = await seedMember("manager");
 
       let denied = false;
+
       try {
         await auth.api.createApiKey({
           body: { organizationId, userId, name: "Production" },
@@ -700,6 +715,7 @@ describe("auth plugin wiring", () => {
         cookie: options.cookie,
         origin: "http://localhost:3000",
       });
+
       const body =
         path === "/update-member-role"
           ? {
@@ -734,6 +750,7 @@ describe("auth plugin wiring", () => {
         },
         returnHeaders: true,
       });
+
       await runtime.runPromise(
         db.insert(schema.memberTable).values({
           id: `caller_${organizationId}`,
@@ -743,6 +760,7 @@ describe("auth plugin wiring", () => {
           createdAt: new Date(),
         })
       );
+
       return sessionCookieFrom(signUp.headers);
     };
 
@@ -767,6 +785,7 @@ describe("auth plugin wiring", () => {
           createdAt: now,
         })
       );
+
       return membershipId;
     };
 
@@ -788,12 +807,14 @@ describe("auth plugin wiring", () => {
         expect(await response.json()).toMatchObject({
           code: MEMBER_MUTATION_ROUTE_DISABLED,
         });
+
         const peer = await runtime.runPromise(
           db
             .select({ role: schema.memberTable.role })
             .from(schema.memberTable)
             .where(eq(schema.memberTable.id, peerMembershipId))
         );
+
         expect(peer.at(0)?.role).toBe("admin");
       },
       perTestTimeout
@@ -817,12 +838,14 @@ describe("auth plugin wiring", () => {
         expect(await response.json()).toMatchObject({
           code: MEMBER_MUTATION_ROUTE_DISABLED,
         });
+
         const peer = await runtime.runPromise(
           db
             .select({ id: schema.memberTable.id })
             .from(schema.memberTable)
             .where(eq(schema.memberTable.id, peerMembershipId))
         );
+
         expect(peer).toHaveLength(1);
       },
       perTestTimeout

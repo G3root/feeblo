@@ -38,9 +38,11 @@ export function RootComponent(props: RouteSectionProps) {
   const warmModuleData = () => {
     if (warmed) return;
     warmed = true;
+
     if (config.modules.includes("feedback")) {
       void fetchBoards().catch(() => undefined);
     }
+
     if (config.modules.includes("updates")) {
       void fetchUpdates().catch(() => undefined);
     }
@@ -66,11 +68,13 @@ export function RootComponent(props: RouteSectionProps) {
         if (config.modules.includes(message.data.module)) {
           navigate(message.data.module === "updates" ? "/updates" : "/");
         }
+
         break;
       case "SET_BOARD":
         if (config.modules.includes("feedback") && message.data?.board) {
           navigate(`/board/${message.data.board}`);
         }
+
         break;
       case "SET_LOCALE":
         document.documentElement.lang = message.data.locale;
@@ -81,6 +85,7 @@ export function RootComponent(props: RouteSectionProps) {
           const { token: _token, ...publicIdentity } = message.data;
           sendToParent({ event: "IDENTITY_CHANGED", data: publicIdentity });
         }
+
         break;
     }
   };

@@ -64,30 +64,35 @@ export const makeSlackCredentialResolver = ({
   loadSlackCredentials: (input) =>
     Effect.gen(function* () {
       const ciphertext = yield* loadCiphertext(input);
+
       if (ciphertext === null) {
         return yield* new IntegrationProviderInvalidConfigurationError({
           message: "Slack credentials are unavailable",
           provider: slackProviderKey,
         });
       }
+
       const credentials = yield* decryptSlackCredentialMaterial(
         encryptionKey,
         ciphertext
       ).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new IntegrationProviderInvalidConfigurationError({
               message: "Slack credentials are invalid",
               provider: slackProviderKey,
+              cause,
             })
         )
       );
+
       if (credentials.botToken === undefined) {
         return yield* new IntegrationProviderInvalidConfigurationError({
           message: "Slack credentials are unavailable",
           provider: slackProviderKey,
         });
       }
+
       return { botToken: credentials.botToken };
     }),
 });
@@ -95,9 +100,11 @@ export const makeSlackCredentialResolver = ({
 const parseFormBody = (rawBody: string) => {
   const params = new URLSearchParams(rawBody);
   const result: Record<string, string> = {};
+
   for (const [key, value] of params.entries()) {
     result[key] = value;
   }
+
   return result;
 };
 
@@ -130,19 +137,23 @@ const makeSlackInboundHandler = ({
           signatureHeader: input.headers["x-slack-signature"] ?? "",
         })
       );
+
       if (Result.isFailure(verified)) {
         return {
           body: "invalid request signature",
           status: 401,
         } satisfies IntegrationInboundResponse;
       }
+
       const parsed = yield* Effect.result(parse(input.rawBody));
+
       if (Result.isFailure(parsed)) {
         return {
           body: "invalid request payload",
           status: 400,
         } satisfies IntegrationInboundResponse;
       }
+
       return {
         body: parsed.success,
         status: 200,
@@ -161,9 +172,10 @@ const parseSlashCommand = (
       payload,
     })),
     Effect.mapError(
-      () =>
+      (cause) =>
         new SlackInboundPayloadError({
           reason: "Slash command payload is invalid",
+          cause,
         })
     )
   );
@@ -178,6 +190,7 @@ const parseInteractive = (
   const payloadJson = rawBody.startsWith("{")
     ? rawBody
     : new URLSearchParams(rawBody).get("payload");
+
   if (payloadJson === null) {
     return Effect.fail(
       new SlackInboundPayloadError({
@@ -185,6 +198,7 @@ const parseInteractive = (
       })
     );
   }
+
   return Schema.decodeEffect(Schema.fromJsonString(SlackInteractivePayload))(
     payloadJson
   ).pipe(
@@ -193,9 +207,10 @@ const parseInteractive = (
       payload,
     })),
     Effect.mapError(
-      () =>
+      (cause) =>
         new SlackInboundPayloadError({
           reason: "Interactive payload is invalid",
+          cause,
         })
     )
   );
@@ -221,30 +236,36 @@ export const makeSlackProviderRegistration = ({
             provider: slackProviderKey,
           });
         }
+
         const credentials =
           yield* credentialResolver.loadSlackCredentials(input);
+
         const routeConfig = yield* Schema.decodeUnknownEffect(
           SlackChannelNotificationRouteConfiguration
         )(input.route.providerConfig).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "Slack route configuration is invalid",
                 provider: slackProviderKey,
+                cause,
               })
           )
         );
+
         const eventData = yield* Schema.decodeUnknownEffect(
           IntegrationPostEventData
         )(input.event.data).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new IntegrationProviderInvalidConfigurationError({
                 message: "Slack event payload is invalid",
                 provider: slackProviderKey,
+                cause,
               })
           )
         );
+
         const blocks = renderChannelUpdateMessageBlocks({
           actionUrl: eventData.post.url.toString(),
           ...(eventData.actor.kind === "member" &&
@@ -261,6 +282,7 @@ export const makeSlackProviderRegistration = ({
           ],
           title: eventData.post.title,
         });
+
         // Join the channel before posting so notifications work without a
         // member having to add the bot manually (public channels only;
         // joining a channel the bot is already in is a no-op success).
@@ -273,6 +295,7 @@ export const makeSlackProviderRegistration = ({
             channelId: routeConfig.channelId,
           })
           .pipe(Effect.ignore);
+
         return yield* apiClient
           .chatPostMessage({
             blocks,

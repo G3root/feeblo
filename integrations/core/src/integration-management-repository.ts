@@ -32,6 +32,7 @@ export const makeIntegrationManagementRepository: Effect.Effect<
   Database.Database
 > = Effect.gen(function* () {
   const db = yield* currentDb;
+
   const cleanupRetention = Effect.fn(
     "IntegrationManagementRepository.cleanupRetention"
   )(function* ({ before }: { readonly before: Date }) {
@@ -59,6 +60,7 @@ export const makeIntegrationManagementRepository: Effect.Effect<
         yield* db
           .delete(schema.integrationEventTable)
           .where(lte(schema.integrationEventTable.retentionExpiresAt, before));
+
         const archived = yield* db
           .select({ id: schema.integrationConnectionTable.id })
           .from(schema.integrationConnectionTable)
@@ -68,10 +70,13 @@ export const makeIntegrationManagementRepository: Effect.Effect<
               lte(schema.integrationConnectionTable.retentionExpiresAt, before)
             )
           );
+
         const connectionIds = archived.map(({ id }) => id);
+
         if (connectionIds.length === 0) {
           return;
         }
+
         yield* db
           .delete(schema.integrationRouteTable)
           .where(
@@ -83,6 +88,7 @@ export const makeIntegrationManagementRepository: Effect.Effect<
       })
     );
   });
+
   return {
     cleanupRetention,
   };

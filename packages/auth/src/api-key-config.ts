@@ -91,6 +91,7 @@ const assertApiKeyCreator = async (
 
   const session = await getSessionFromCtx(ctx, { disableCookieCache: true });
   const userId = session?.user.id;
+
   if (!userId) {
     throw APIError.from(
       "UNAUTHORIZED",
@@ -105,6 +106,7 @@ const assertApiKeyCreator = async (
       { field: "organizationId", value: organizationId },
     ],
   });
+
   if (!member) {
     throw APIError.from(
       "FORBIDDEN",
@@ -129,6 +131,7 @@ const assertApiKeyCreator = async (
     },
     ctx
   );
+
   if (!permitted) {
     throw APIError.from(
       "FORBIDDEN",
@@ -164,6 +167,7 @@ export const enforcePublicApiKeyPlan = async (
   }
 
   const rawOrganizationId = ctx.body?.["organizationId"];
+
   // A missing organization id is the endpoint's own validation error; do not
   // turn it into a plan lookup.
   if (rawOrganizationId === undefined) {
@@ -175,6 +179,7 @@ export const enforcePublicApiKeyPlan = async (
   // value the endpoint will accept would let `[organizationId]` through as
   // `organizationId`; `String` matches zod's coercion for JSON values.
   const organizationId = String(rawOrganizationId);
+
   if (organizationId.length === 0) {
     return;
   }

@@ -140,6 +140,7 @@ function ReactionPickerGrid() {
       <div className="grid grid-cols-4 gap-1">
         {REACTION_EMOJIS.map((emoji) => {
           const isSelected = state.selectedReactions.has(emoji);
+
           return (
             <Button
               disabled={state.disabled}
@@ -186,9 +187,11 @@ function useLastKnownUserReactions(
 ): Array<{ emoji: string }> | undefined {
   const cacheRef = useRef(new Map<string, Array<{ emoji: string }>>());
   const cache = cacheRef.current;
+
   if (userReactions !== undefined) {
     cache.set(key, userReactions);
   }
+
   return userReactions ?? cache.get(key);
 }
 
@@ -199,6 +202,7 @@ function ReactionPickerDisplayRow() {
     <div className="flex flex-row gap-1">
       {Array.from(state.reactionList.entries()).map(([emoji, { count }]) => {
         const isSelected = state.selectedReactions.has(emoji);
+
         return (
           <Button
             className="flex flex-row items-center gap-1"
@@ -253,10 +257,12 @@ export function PostReactionPicker() {
   const disabled = isLocked || isMerged;
   const postId = post.id;
   const postSlug = post.slug;
+
   const {
     collections: { postReactionCollection },
     onAuthRequired,
   } = usePostCollections();
+
   const { data: session } = useAuthState();
 
   const reactionCountsQuery = useLiveQuery({
@@ -270,6 +276,7 @@ export function PostReactionPicker() {
       if (!postSlug) {
         return undefined;
       }
+
       return q
         .from({ postReaction: postReactionCollection })
         .where(({ postReaction }) =>
@@ -286,6 +293,7 @@ export function PostReactionPicker() {
         .orderBy(({ postReaction }) => postReaction.emoji, "asc");
     },
   });
+
   const reactionCounts = reactionCountsQuery.data;
   // Hydration lands the counts before the first client render; a skeleton
   // gated on `isLoading` would replace them (see `isLiveQueryPending`).
@@ -303,6 +311,7 @@ export function PostReactionPicker() {
       if (!(postSlug && session?.user?.id)) {
         return undefined;
       }
+
       return q
         .from({ postReaction: postReactionCollection })
         .where(({ postReaction }) =>
@@ -337,6 +346,7 @@ export function PostReactionPicker() {
       } else {
         toastManager.add({ title: m.zany_white_rat(), type: "error" });
       }
+
       return;
     }
 
@@ -368,9 +378,12 @@ export function PostReactionPicker() {
           userId: currentUserId,
         })
       );
+
       await tx.when("settled");
+
       return;
     }
+
     const tx = postReactionCollection.insert({
       id: await PostReactionId.unsafeGenerate(),
       createdAt: new Date(),
@@ -382,6 +395,7 @@ export function PostReactionPicker() {
       memberId: membership?.membershipId ?? null,
       emoji,
     });
+
     await tx.when("settled");
   };
 
@@ -428,6 +442,7 @@ export function CommentReactionPicker({
     onAuthRequired,
     organizationId,
   } = usePostCollections();
+
   const { data: session } = useAuthState();
 
   const reactionCountsQuery = useLiveQuery({
@@ -441,6 +456,7 @@ export function CommentReactionPicker({
       if (!postSlug) {
         return undefined;
       }
+
       return q
         .from({ commentReaction: commentReactionCollection })
         .where(({ commentReaction }) =>
@@ -457,6 +473,7 @@ export function CommentReactionPicker({
         .orderBy(({ commentReaction }) => commentReaction.emoji, "asc");
     },
   });
+
   const reactionCounts = reactionCountsQuery.data;
   const isReactionCountsLoading = isLiveQueryPending(reactionCountsQuery);
 
@@ -472,6 +489,7 @@ export function CommentReactionPicker({
       if (!(postSlug && session?.user?.id)) {
         return undefined;
       }
+
       return q
         .from({ commentReaction: commentReactionCollection })
         .where(({ commentReaction }) =>
@@ -506,6 +524,7 @@ export function CommentReactionPicker({
       } else {
         toastManager.add({ title: m.zany_white_rat(), type: "error" });
       }
+
       return;
     }
 
@@ -537,9 +556,12 @@ export function CommentReactionPicker({
           commentId,
         })
       );
+
       await tx.when("settled");
+
       return;
     }
+
     const tx = commentReactionCollection.insert({
       id: await CommentReactionId.unsafeGenerate(),
       createdAt: new Date(),
@@ -552,6 +574,7 @@ export function CommentReactionPicker({
       emoji,
       commentId,
     });
+
     await tx.when("settled");
   };
 

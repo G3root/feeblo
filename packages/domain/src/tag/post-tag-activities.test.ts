@@ -63,6 +63,7 @@ describe("postTagChangeActivities", () => {
       nextTagIds: ["a", "b"],
       actor,
     });
+
     const applied = postTagChangeActivities({
       previousTagIds: ["a", "b"],
       nextTagIds: ["a", "b"],

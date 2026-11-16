@@ -75,6 +75,7 @@ function postVerificationOtp(
     const { appUrl, secret } = config;
 
     const email = payload.email.toLowerCase();
+
     if (!isValidVerificationOTPEmail(email)) {
       return yield* new BadRequestError({
         message: "Invalid verification state",
@@ -89,7 +90,8 @@ function postVerificationOtp(
       secret
     ).pipe(
       Effect.mapError(
-        () => new InternalServerError({ message: "Failed to encrypt state" })
+        (cause) =>
+          new InternalServerError({ message: "Failed to encrypt state", cause })
       )
     );
 
@@ -137,9 +139,10 @@ function getVerificationOtp(
       secret
     ).pipe(
       Effect.mapError(
-        () =>
+        (cause) =>
           new BadRequestError({
             message: "Invalid verification request",
+            cause,
           })
       )
     );
@@ -160,6 +163,7 @@ function deleteVerificationOtp(
 > {
   return Effect.gen(function* () {
     const { appUrl } = config;
+
     // Mirror the cookie set by postVerificationOtp: same name, path, and
     // Secure flag so the client actually clears it. (Secure is not part of
     // cookie identity, but emitting an identically-Secure Max-Age=0 is the

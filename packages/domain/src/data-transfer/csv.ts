@@ -34,8 +34,10 @@ export {
 
 /** Leading apostrophes a spreadsheet uses to mark a value as literal text. */
 const leadingApostrophePattern = /^'+/;
+
 /** Trailing zeros in a fixed-precision rendering of a small decimal. */
 const trailingZeroPattern = /0+$/u;
+
 /** The decimal point left behind once the trailing zeros are gone. */
 const trailingDecimalPointPattern = /\.$/u;
 
@@ -85,6 +87,7 @@ export type ParsedBoardPostCsv = {
 };
 
 const QUOTE = '"';
+
 const TAG_SEPARATOR = ";";
 
 // ── Formula-injection escaping (ported from hucre's csv/formula.ts) ──
@@ -171,12 +174,15 @@ const detectBom = (
   ) {
     return { encoding: "utf-8", length: 3 };
   }
+
   if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
     return { encoding: "utf-16le", length: 2 };
   }
+
   if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
     return { encoding: "utf-16be", length: 2 };
   }
+
   return null;
 };
 
@@ -194,10 +200,12 @@ export const decodeBoardPostCsv = (
   Effect.tryPromise({
     try: async () => {
       const bom = detectBom(bytes);
+
       const decoder = new TextDecoder(bom?.encoding ?? "utf-8", {
         fatal: true,
         ignoreBOM: false,
       });
+
       return decoder.decode(bom === null ? bytes : bytes.subarray(bom.length));
     },
     catch: () =>
@@ -232,22 +240,28 @@ const formatNumber = (value: number): string => {
   if (!Number.isFinite(value)) {
     return String(value);
   }
+
   const magnitude = Math.abs(value);
+
   if (Number.isInteger(value) && magnitude >= 1e15) {
     const plain = value.toFixed(0);
+
     if (Number(plain) === value) {
       return plain;
     }
   }
+
   if (magnitude > 0 && magnitude < 1e-6) {
     const plain = value
       .toFixed(20)
       .replace(trailingZeroPattern, "")
       .replace(trailingDecimalPointPattern, ".0");
+
     if (Number(plain) === value) {
       return plain;
     }
   }
+
   return String(value);
 };
 
@@ -267,13 +281,17 @@ const formatCsvCell = (value: BoardPostCsvCell): string => {
   if (value === null) {
     return "";
   }
+
   if (isNumber(value)) {
     return formatNumber(value);
   }
+
   if (value instanceof Date) {
     return formatDate(value);
   }
+
   const escaped = escapeFormula(value);
+
   return escaped === value ? quoteField(value) : quoteCsvCell(escaped);
 };
 
@@ -356,6 +374,7 @@ const parseRecords = (
     field = "";
     fieldWasQuoted = false;
   };
+
   const pushRecord = () => {
     records.push({ cells, firstFieldQuoted, lineNumber: recordLine });
     cells = [];
@@ -372,13 +391,16 @@ const parseRecords = (
           index += 2;
           continue;
         }
+
         inQuotes = false;
         index += 1;
         continue;
       }
+
       if (character === "\n") {
         line += 1;
       }
+
       field += character;
       index += 1;
       continue;
@@ -395,6 +417,7 @@ const parseRecords = (
       if (cells.length === 0) {
         firstFieldQuoted = fieldWasQuoted;
       }
+
       pushCell();
       index += 1;
       continue;
@@ -404,6 +427,7 @@ const parseRecords = (
       if (cells.length === 0) {
         firstFieldQuoted = fieldWasQuoted;
       }
+
       pushCell();
       pushRecord();
       line += 1;
@@ -419,13 +443,16 @@ const parseRecords = (
   if (inQuotes) {
     return { unterminated: true };
   }
+
   if (field !== "" || cells.length > 0 || fieldWasQuoted) {
     if (cells.length === 0) {
       firstFieldQuoted = fieldWasQuoted;
     }
+
     pushCell();
     pushRecord();
   }
+
   return { records };
 };
 
@@ -462,13 +489,16 @@ const BOARD_POST_CSV_COLUMN_BY_NAME: ReadonlyMap<string, BoardPostCsvColumn> =
 const dedupeTags = (names: readonly string[]): readonly string[] => {
   const seen = new Set<string>();
   const tags: string[] = [];
+
   for (const name of names) {
     const key = name.toLowerCase();
+
     if (!seen.has(key)) {
       seen.add(key);
       tags.push(name);
     }
   }
+
   return tags;
 };
 
@@ -498,12 +528,14 @@ export const parseBoardPostCsv = (
 > =>
   Effect.gen(function* () {
     const parsed = parseRecords(source);
+
     if ("unterminated" in parsed) {
       return yield* new InvalidBoardPostCsvError({
         message:
           "The file has an unterminated quoted value. Check for a missing closing quote.",
       });
     }
+
     const records = parsed.records.filter(
       (record) =>
         !(
@@ -512,7 +544,9 @@ export const parseBoardPostCsv = (
           !record.firstFieldQuoted
         )
     );
+
     const [header, ...dataRecords] = records;
+
     if (header === undefined) {
       return yield* new InvalidBoardPostCsvError({
         message: "The file is empty. Expected a header row and data rows.",
@@ -524,14 +558,17 @@ export const parseBoardPostCsv = (
     header.cells.forEach((cell, index) => {
       const name = normalizeColumnName(cell);
       const column = BOARD_POST_CSV_COLUMN_BY_NAME.get(name);
+
       if (column !== undefined) {
         // First occurrence wins; a duplicated header would otherwise make
         // which value applies depend on column order.
         if (!columnIndex.has(column)) {
           columnIndex.set(column, index);
         }
+
         return;
       }
+
       if (name.length > 0) {
         unknownColumns.push(cell.trim());
       }
@@ -543,6 +580,7 @@ export const parseBoardPostCsv = (
           "The file has no title column. Expected a header row naming at least title.",
       });
     }
+
     if (dataRecords.length > DATA_IMPORT_MAX_ROWS) {
       return yield* new DataImportRowLimitError({
         maxRows: DATA_IMPORT_MAX_ROWS,
@@ -559,8 +597,10 @@ export const parseBoardPostCsv = (
         // removed. Every other column is a scalar, where surrounding
         // whitespace is noise.
         const raw = column === "content" ? cell : cell.trim();
+
         return FREE_TEXT_COLUMNS.has(column) ? unescapeFormula(raw) : raw;
       };
+
       return {
         rowNumber: record.lineNumber,
         title: value("title"),
@@ -579,6 +619,7 @@ export const parseBoardPostCsv = (
     });
 
     const notices: string[] = [];
+
     if (unknownColumns.length > 0) {
       notices.push(
         `Ignoring unknown column${unknownColumns.length === 1 ? "" : "s"}: ${unknownColumns.join(", ")}.`

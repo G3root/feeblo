@@ -19,6 +19,7 @@ export const Route = createFileRoute(
 
 function WidgetSettingsRoute() {
   const organizationId = useOrganizationId();
+
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "site.update")
   );
@@ -26,6 +27,7 @@ function WidgetSettingsRoute() {
   if (isPending) {
     return null;
   }
+
   if (!allowed) {
     return <SettingsAccessDenied />;
   }

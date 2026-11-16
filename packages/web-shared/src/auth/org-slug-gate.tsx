@@ -25,9 +25,11 @@ export function OrganizationIdGate({
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   const params = useParams({ strict: false }) as { organizationId?: string };
   const navigate = useNavigate();
+
   const isNotFound = useRouterState({
     select: (state) => state.matches.some((match) => match._notFound),
   });
+
   const needsCanonicalization =
     params.organizationId !== activeOrganizationId && !isNotFound;
 

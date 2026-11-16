@@ -24,6 +24,7 @@ const collect = (sent: Array<Sent>): Layer.Layer<HttpClient.HttpClient> =>
           // The relay sends an `HttpBody.text`, which keeps its source text.
           body: body._tag === "Uint8Array" ? (body.text ?? "") : "",
         });
+
         return HttpClientResponse.fromWeb(
           request,
           new Response(null, { status: 200 })
@@ -68,14 +69,17 @@ const post = (
 describe("browser telemetry relay", () => {
   it.live("forwards a trace batch to the configured destination", () => {
     const sent: Array<Sent> = [];
+
     return Effect.gen(function* () {
       const { handler, dispose } = HttpRouter.toWebHandler(
         app(tracingEnv, sent),
         { disableLogger: true }
       );
+
       const response = yield* Effect.promise(() =>
         post(handler, "/api/telemetry/traces", '{"resourceSpans":[]}')
       );
+
       yield* Effect.promise(() => dispose());
       expect(response.status).toBe(202);
       expect(sent.map(({ url }) => url)).toEqual([
@@ -88,6 +92,7 @@ describe("browser telemetry relay", () => {
 
   it.live("replaces the caller's identity before forwarding", () => {
     const sent: Array<Sent> = [];
+
     const forged = JSON.stringify({
       resourceSpans: [
         {
@@ -100,14 +105,17 @@ describe("browser telemetry relay", () => {
         },
       ],
     });
+
     return Effect.gen(function* () {
       const { handler, dispose } = HttpRouter.toWebHandler(
         app(tracingEnv, sent),
         { disableLogger: true }
       );
+
       const response = yield* Effect.promise(() =>
         post(handler, "/api/telemetry/traces", forged)
       );
+
       yield* Effect.promise(() => dispose());
       expect(response.status).toBe(202);
       expect(sent[0]?.body).toContain('"stringValue":"feeblo-server-web"');
@@ -118,14 +126,17 @@ describe("browser telemetry relay", () => {
 
   it.live("rejects a non-JSON body before forwarding", () => {
     const sent: Array<Sent> = [];
+
     return Effect.gen(function* () {
       const { handler, dispose } = HttpRouter.toWebHandler(
         app(tracingEnv, sent),
         { disableLogger: true }
       );
+
       const response = yield* Effect.promise(() =>
         post(handler, "/api/telemetry/traces", "not json", "text/plain")
       );
+
       yield* Effect.promise(() => dispose());
       expect(response.status).toBe(415);
       expect(sent).toEqual([]);
@@ -134,11 +145,13 @@ describe("browser telemetry relay", () => {
 
   it.live("refuses a body that is not an OTLP batch for the signal", () => {
     const sent: Array<Sent> = [];
+
     return Effect.gen(function* () {
       const { handler, dispose } = HttpRouter.toWebHandler(
         app(tracingEnv, sent),
         { disableLogger: true }
       );
+
       const response = yield* Effect.promise(() =>
         post(
           handler,
@@ -146,6 +159,7 @@ describe("browser telemetry relay", () => {
           JSON.stringify({ resourceLogs: [] })
         )
       );
+
       yield* Effect.promise(() => dispose());
       expect(response.status).toBe(400);
       expect(sent).toEqual([]);
@@ -154,13 +168,16 @@ describe("browser telemetry relay", () => {
 
   it.live("accepts and discards a batch when OTLP is unconfigured", () => {
     const sent: Array<Sent> = [];
+
     return Effect.gen(function* () {
       const { handler, dispose } = HttpRouter.toWebHandler(app({}, sent), {
         disableLogger: true,
       });
+
       const response = yield* Effect.promise(() =>
         post(handler, "/api/telemetry/traces", '{"resourceSpans":[]}')
       );
+
       yield* Effect.promise(() => dispose());
       expect(response.status).toBe(202);
       expect(sent).toEqual([]);
@@ -169,14 +186,17 @@ describe("browser telemetry relay", () => {
 
   it.live("answers 404 for an unknown relay path", () => {
     const sent: Array<Sent> = [];
+
     return Effect.gen(function* () {
       const { handler, dispose } = HttpRouter.toWebHandler(
         app(tracingEnv, sent),
         { disableLogger: true }
       );
+
       const response = yield* Effect.promise(() =>
         post(handler, "/api/telemetry/metrics", "{}")
       );
+
       yield* Effect.promise(() => dispose());
       expect(response.status).toBe(404);
       expect(sent).toEqual([]);
@@ -185,14 +205,17 @@ describe("browser telemetry relay", () => {
 
   it.live("caps an oversized batch", () => {
     const sent: Array<Sent> = [];
+
     return Effect.gen(function* () {
       const { handler, dispose } = HttpRouter.toWebHandler(
         app(tracingEnv, sent),
         { disableLogger: true }
       );
+
       const response = yield* Effect.promise(() =>
         post(handler, "/api/telemetry/traces", `"${"x".repeat(300 * 1024)}"`)
       );
+
       yield* Effect.promise(() => dispose());
       expect(response.status).toBe(413);
       expect(sent).toEqual([]);
@@ -228,6 +251,7 @@ describe("browserBatch", () => {
         },
       ],
     });
+
     const rewritten = browserBatch("traces", body, identity);
     expect(rewritten).toBeDefined();
     expect(rewritten).toContain('"stringValue":"feeblo-server-web"');
@@ -254,6 +278,7 @@ describe("browserBatch", () => {
         },
       ],
     });
+
     const rewritten = browserBatch("logs", body, identity);
     expect(rewritten).toBeDefined();
     expect(rewritten).toContain('"stringValue":"feeblo-server-web"');

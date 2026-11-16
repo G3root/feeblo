@@ -33,6 +33,7 @@ export function createStoreContext<TStore, TDefaultValue = undefined>(
         errorMessage ??
           `\`${hookName}\` must be used within \`${providerName}\``
       );
+
       error.name = "ContextError";
       Error.captureStackTrace?.(error, useContext);
       throw error;
@@ -48,6 +49,7 @@ export function createStoreContext<TStore, TDefaultValue = undefined>(
 
   const Provider: React.FC<ProviderProps> = (props) => {
     const { children, defaultValue: providerDefaultValue } = props;
+
     const store = useState(() =>
       createStoreForContext(providerDefaultValue)
     )[0];

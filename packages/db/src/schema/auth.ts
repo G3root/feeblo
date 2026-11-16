@@ -417,6 +417,7 @@ export const jwtSecretTable = pgTable(
 );
 
 export type Organization = typeof organizationTable.$inferSelect;
+
 export type NewOrganization = typeof organizationTable.$inferInsert;
 
 /**
@@ -484,4 +485,5 @@ export const apiKeyTable = pgTable(
 );
 
 export type ApiKey = typeof apiKeyTable.$inferSelect;
+
 export type NewApiKey = typeof apiKeyTable.$inferInsert;

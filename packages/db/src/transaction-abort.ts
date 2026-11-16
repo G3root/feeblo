@@ -96,9 +96,11 @@ const abortCodeOf = (
   if (depth > maxWrapperDepth) {
     return Option.none();
   }
+
   const driverError = Option.getOrUndefined(
     Schema.decodeUnknownOption(DriverError)(error)
   );
+
   if (driverError !== undefined) {
     // A driver error's code is authoritative: a non-abort one ends the walk
     // instead of searching its own fields for an abort code it did not report.
@@ -106,18 +108,23 @@ const abortCodeOf = (
       ? Option.some(driverError.code)
       : Option.none();
   }
+
   const wrapper = Option.getOrUndefined(
     Schema.decodeUnknownOption(FailureWrapper)(error)
   );
+
   if (wrapper === undefined) {
     return Option.none();
   }
+
   for (const inner of wrappedFailures(wrapper)) {
     const found = abortCodeOf(inner, depth + 1);
+
     if (Option.isSome(found)) {
       return found;
     }
   }
+
   return Option.none();
 };
 

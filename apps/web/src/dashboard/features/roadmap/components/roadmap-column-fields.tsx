@@ -105,6 +105,7 @@ export function RoadmapColumnItem({
                                 const status = statusOptions.find(
                                   (option) => option.id === value
                                 );
+
                                 return status
                                   ? status.label ||
                                       formatPostStatus(status.type)
@@ -139,6 +140,7 @@ export function RoadmapColumnItem({
     </Frame>
   );
 }
+
 interface RoadmapAddColumnButtonProps {
   onAddColumn: (nextStatus: TPostStatus | undefined) => Promise<void>;
   statusOptions: TPostStatus[];
@@ -160,6 +162,7 @@ export function RoadmapAddColumnButton({
         const usedStatusIds = new Set(
           usedStatusKey ? usedStatusKey.split(",") : []
         );
+
         const nextStatus = statusOptions.find(
           (status) => !usedStatusIds.has(status.id)
         );

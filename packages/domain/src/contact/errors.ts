@@ -11,6 +11,7 @@ export class DataValidationError extends Schema.TaggedError<DataValidationError>
   "DataValidationError",
   {
     message: Schema.optional(Schema.String),
+    cause: Schema.optionalKey(Schema.Defect()),
   },
   { httpApiStatus: 400, identifier: "DataValidationError" }
 ) {}

@@ -15,20 +15,26 @@ import { isDashboardHost } from "@/lib/public-board-rewrite";
  */
 
 const PUBLIC_API_PATH = "/api/v1";
+
 const OPENAPI_PATH = `${PUBLIC_API_PATH}/openapi.json`;
+
 const REFERENCE_PATH = `${PUBLIC_API_PATH}/docs`;
 
 /** Mirrors `PUBLIC_API_MCP_PATH` and `PUBLIC_API_KEY_HEADER` in `@feeblo/domain`. */
 const PUBLIC_API_MCP_PATH = "/mcp";
+
 const PUBLIC_API_KEY_HEADER = "x-api-key";
 
 /** Leading slashes, which the splat a route captures never carries. */
 const leadingSlashPattern = /^\/+/u;
 
 export const DASHBOARD_AUTH_PATH = "/auth.md";
+
 export const DASHBOARD_API_CATALOG_PATH = "/.well-known/api-catalog";
+
 export const DASHBOARD_MCP_SERVER_CARD_PATH =
   "/.well-known/mcp/server-card.json";
+
 export const DASHBOARD_AGENT_CATALOG_PATH = "/.well-known/ai-catalog.json";
 
 const API_ORIGIN_FALLBACK = "https://api.feeblo.com";
@@ -322,6 +328,7 @@ export const acceptsMarkdown = (accept: string | null) => {
     }
 
     const weight = Number.parseFloat(quality.slice(2));
+
     return Number.isFinite(weight) && weight > 0;
   }
 

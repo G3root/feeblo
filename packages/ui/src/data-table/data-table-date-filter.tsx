@@ -57,6 +57,7 @@ function DataTableDateFilterContent<TData extends RowData>({
     }
 
     const timestamps = parseColumnFilterValue(columnFilterValue);
+
     if (multiple) {
       return {
         from: parseAsDate(timestamps[0]),
@@ -65,6 +66,7 @@ function DataTableDateFilterContent<TData extends RowData>({
     }
 
     const date = parseAsDate(timestamps[0]);
+
     return date ? [date] : [];
   }, [columnFilterValue, multiple]);
 
@@ -72,12 +74,14 @@ function DataTableDateFilterContent<TData extends RowData>({
     (date: Date | DateRange | undefined) => {
       if (!date) {
         column.setFilterValue(undefined);
+
         return;
       }
 
       if (multiple && !("getTime" in date)) {
         const from = date.from ?? date.to;
         const to = date.to ?? date.from;
+
         if (!from || !to) {
           column.setFilterValue(undefined);
         } else if (from.toDateString() === to.toDateString()) {
@@ -103,6 +107,7 @@ function DataTableDateFilterContent<TData extends RowData>({
   const hasValue = getIsDateRange(selectedDates)
     ? Boolean(selectedDates.from || selectedDates.to)
     : selectedDates.length > 0;
+
   const dateText = getIsDateRange(selectedDates)
     ? formatDateRange(selectedDates)
     : formatDate(selectedDates[0]);
@@ -198,7 +203,9 @@ function parseColumnFilterValue(value: DataTableRawValue) {
       isNumber(item) || isString(item) ? item : undefined
     );
   }
+
   if (isString(value) || isNumber(value)) return [value];
+
   return [];
 }
 
@@ -206,6 +213,7 @@ function parseAsDate(timestamp: number | string | undefined): Date | undefined {
   if (timestamp === undefined || !timestamp) return undefined;
   const numericTimestamp = isString(timestamp) ? Number(timestamp) : timestamp;
   const date = new Date(numericTimestamp);
+
   return !Number.isNaN(date.getTime()) ? date : undefined;
 }
 
@@ -218,7 +226,9 @@ function formatDateRange(range: DateRange) {
     if (range.from.toDateString() === range.to.toDateString()) {
       return formatDate(range.from);
     }
+
     return `${formatDate(range.from)} - ${formatDate(range.to)}`;
   }
+
   return formatDate(range.from ?? range.to);
 }

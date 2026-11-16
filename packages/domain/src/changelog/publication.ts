@@ -64,6 +64,7 @@ export const makeChangelogPublication = Effect.gen(function* () {
     organizationId,
   }: TRecordPublishedIntent) {
     const now = yield* DateTime.nowAsDate;
+
     const result = yield* emailOutbox
       .recordIntent({
         aggregateId: changelogId,
@@ -96,6 +97,7 @@ export const makeChangelogPublication = Effect.gen(function* () {
             })
         )
       );
+
     return result._tag === "Inserted" ? result.intent.id : undefined;
   });
 

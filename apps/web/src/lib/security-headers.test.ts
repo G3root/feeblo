@@ -19,6 +19,7 @@ const imgSrcOf = (policy: string): string => {
     .split(";")
     .map((part) => part.trim())
     .find((part) => part.startsWith("img-src "));
+
   return directive?.slice("img-src ".length) ?? "";
 };
 
@@ -89,6 +90,7 @@ describe("pageSecurityHeaders", () => {
       includeHsts: true,
       pathname: "/feedback-widget/org_1",
     });
+
     expect(headers["content-security-policy"]).toContain("frame-ancestors *");
     expect(headers["x-frame-options"]).toBeUndefined();
   });
@@ -105,6 +107,7 @@ describe("pageSecurityHeaders", () => {
     expect(sources).toContain("data:");
     expect(sources).toContain("blob:");
     expect(sources).toContain("https://media.example.com");
+
     for (const origin of DEFAULT_IMAGE_ORIGINS) {
       expect(sources).toContain(origin);
     }

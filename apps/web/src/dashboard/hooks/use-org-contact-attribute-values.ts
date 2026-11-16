@@ -12,6 +12,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function useOrgContactAttributeValues(organizationId: string) {
   const { contactAttributeValueCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: [
       "org-contact-attribute-values",

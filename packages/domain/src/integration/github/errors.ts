@@ -16,6 +16,7 @@ export const GitHubIntegrationErrors = Schema.Union([
   PolicyDeniedError,
   UnauthorizedError,
 ]);
+
 export type GitHubIntegrationError = Schema.Schema.Type<
   typeof GitHubIntegrationErrors
 >;

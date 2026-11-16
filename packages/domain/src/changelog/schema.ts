@@ -82,6 +82,7 @@ export const ChangelogGet = S.Struct({
 export type TChangelogGet = S.Schema.Type<typeof ChangelogGet>;
 
 const COVER_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+
 const COVER_IMAGE_URL_MAX_LENGTH = 2048;
 
 const coverImageWithDefault = S.NullOr(

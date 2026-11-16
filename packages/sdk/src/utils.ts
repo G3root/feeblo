@@ -13,10 +13,12 @@ export type CompactValue =
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 export function compact<T extends object>(obj: T) {
   const out: Record<string, CompactValue> = {};
+
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) {
       out[key] = value;
     }
   }
+
   return out;
 }

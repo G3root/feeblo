@@ -115,6 +115,7 @@ const approve = (options: {
 }) =>
   Effect.gen(function* () {
     const approval = yield* Approval;
+
     return yield* approval.approve({
       input: options.input ?? approvalRequest.input,
       operation: approvalRequest.operation,
@@ -134,6 +135,7 @@ const shownRequest = (
   if (Option.isNone(request)) {
     throw new Error("the gate did not ask the client");
   }
+
   return request.value;
 };
 
@@ -152,6 +154,7 @@ it.effect("asks the client and runs the call when the person approves", () =>
     const shown = shownRequest(yield* Ref.get(seen));
     expect(shown.mode).toBe("form");
     expect(shown.message).toContain("deletePost");
+
     if (shown.mode !== "form") return;
     // The form asks for exactly one boolean, so a client renders a yes/no.
     expect(JSON.stringify(shown.requestedSchema)).toContain("approved");
@@ -163,6 +166,7 @@ it.effect("names the record the call would change", () =>
     const first = yield* Ref.make<Option.Option<McpSchema.ElicitRequestParams>>(
       Option.none()
     );
+
     const second = yield* Ref.make<
       Option.Option<McpSchema.ElicitRequestParams>
     >(Option.none());
@@ -227,10 +231,12 @@ it.effect("refuses the call when the person rejects the form", () =>
     }).pipe(Effect.flip);
 
     expect(Schema.is(ApprovalDenied)(failure)).toBe(true);
+
     if (Schema.is(ApprovalDenied)(failure)) {
       expect(failure.operation).toBe("deletePost");
       expect(failure.message).toContain("was not approved");
     }
+
     expect(Option.isSome(yield* Ref.get(seen))).toBe(true);
   })
 );
@@ -248,6 +254,7 @@ it.effect("refuses the call when the person declines it", () =>
     }).pipe(Effect.flip);
 
     expect(Schema.is(ApprovalDenied)(failure)).toBe(true);
+
     if (Schema.is(ApprovalDenied)(failure)) {
       expect(failure.message).toContain("was declined");
     }
@@ -267,9 +274,11 @@ it.effect("refuses without asking a client that cannot be asked", () =>
     }).pipe(Effect.flip);
 
     expect(Schema.is(ApprovalDenied)(failure)).toBe(true);
+
     if (Schema.is(ApprovalDenied)(failure)) {
       expect(failure.message).toContain("cannot be asked");
     }
+
     // The client has a reverse client that would have answered yes; the gate
     // refused anyway, which is what proves it checks the capability.
     expect(Option.isNone(yield* Ref.get(seen))).toBe(true);

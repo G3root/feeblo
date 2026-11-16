@@ -51,6 +51,7 @@ export function DataTableOptionList({
 }: DataTableOptionListProps) {
   const [search, setSearch] = React.useState("");
   const normalizedSearch = search.trim().toLowerCase();
+
   const visibleItems =
     normalizedSearch === ""
       ? items
@@ -83,10 +84,12 @@ export function DataTableOptionList({
           visibleItems.map((item) => {
             const isSelected = selectedValues.includes(item.value);
             const Icon = item.icon;
+
             const rowClassName = cn(
               "hover:bg-accent flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
               isSelected && "bg-accent/60"
             );
+
             const rowContent = (
               <>
                 {Icon ? (
@@ -102,6 +105,7 @@ export function DataTableOptionList({
                 ) : null}
               </>
             );
+
             return (
               <li key={item.value}>
                 {multiple ? (

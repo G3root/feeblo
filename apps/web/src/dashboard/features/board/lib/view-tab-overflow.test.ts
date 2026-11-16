@@ -66,6 +66,7 @@ describe("countFittingTabs", () => {
 
     for (let available = 0; available <= 1200; available += 8) {
       const unreserved = countFittingTabs({ available, gap: GAP, widths });
+
       const reserved = countFittingTabs({
         available: available - (OVERFLOW_TAB_BUTTON_MAX_PX + GAP),
         gap: GAP,
@@ -85,6 +86,7 @@ describe("countFittingTabs", () => {
     const total = widths.reduce((sum, width) => sum + width, 0) + gap * 5;
 
     const unreserved = countFittingTabs({ available: total, gap, widths });
+
     const reserved = countFittingTabs({
       available: total - (OVERFLOW_TAB_BUTTON_MAX_PX + gap),
       gap,

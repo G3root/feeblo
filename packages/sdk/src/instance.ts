@@ -18,11 +18,13 @@ import { isBrowser } from "./utils";
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const boxedKind = <T>(value: T): string | null => {
   if (value === null || value === undefined) return null;
+
   // SAFETY: Object.getPrototypeOf always returns an object or null; every
   // prototype carries a constructor whose name identifies the built-in.
   const prototype = Object.getPrototypeOf(Object(value)) as {
     constructor?: { name?: string };
   } | null;
+
   return prototype?.constructor?.name ?? null;
 };
 
@@ -32,6 +34,7 @@ const isStringValue = <T>(value: T): value is T & string =>
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const isObjectValue = <T>(value: T): boolean => {
   const kind = boxedKind(value);
+
   return (
     kind !== null &&
     kind !== "String" &&
@@ -51,9 +54,11 @@ const isObjectValue = <T>(value: T): boolean => {
  */
 function resolveAutoLoginOrigins(options: EmbedOptions): string[] {
   const origins = new Set<string>();
+
   const addOrigin = (value: string) => {
     try {
       const origin = new URL(value, window.location.href).origin;
+
       if (origin !== "null") {
         origins.add(origin);
       }
@@ -61,17 +66,23 @@ function resolveAutoLoginOrigins(options: EmbedOptions): string[] {
       // Ignore malformed configuration values.
     }
   };
+
   addOrigin(window.location.origin);
   addOrigin(resolveBaseUrl(options));
+
   for (const origin of options.autoLoginOrigins ?? []) {
     addOrigin(origin);
   }
+
   return [...origins];
 }
 
 let currentEmbed: Embed | null = null;
+
 let currentOrgId: string | null = null;
+
 let globalCleanup: (() => void) | null = null;
+
 let linkCleanup: (() => void) | null = null;
 
 function setupGlobalListeners(): void {
@@ -83,6 +94,7 @@ function setupGlobalListeners(): void {
     // SAFETY: the message contract is established by the guards below (object
     // value, FeebloWidget target, non-empty data) before any field is read.
     const msg = e.data as ExternalMessageData;
+
     if (
       !msg ||
       !isObjectValue(msg) ||
@@ -91,11 +103,14 @@ function setupGlobalListeners(): void {
     ) {
       return;
     }
+
     if (msg.data.action === "openFeedbackWidget" && currentEmbed) {
       if (msg.data.setBoard) {
         currentEmbed.setBoard(msg.data.setBoard);
       }
+
       currentEmbed.openModule("feedback");
+
       if (!currentEmbed.isOpenState()) {
         currentEmbed.open();
       }
@@ -118,7 +133,9 @@ export function destroyInstance(embed: Embed | null): void {
   if (!embed) {
     return;
   }
+
   embed.destroy();
+
   if (currentEmbed === embed) {
     stopTriggerScanning();
     linkCleanup?.();
@@ -133,33 +150,40 @@ function createWidgetProxy(embed: Embed): FeebloWidget {
   const widget: FeebloWidget = {
     identify: (identity) => {
       embed.identify(identity);
+
       return widget;
     },
     setBoard: (board) => {
       embed.setBoard(board);
+
       return widget;
     },
     metadata: (patch) => {
       embed.metadata(patch);
+
       return widget;
     },
     isOpen: () => embed.isOpenState(),
     open: (trigger, metadata) => {
       embed.open(trigger, metadata);
+
       return widget;
     },
     openModule: (module) => {
       embed.openModule(module);
+
       return widget;
     },
     close: () => {
       embed.close();
+
       return widget;
     },
     destroy: () => {
       destroyInstance(embed);
     },
   };
+
   return widget;
 }
 
@@ -174,6 +198,7 @@ function noopWidget(): FeebloWidget {
     destroy: () => undefined,
     isOpen: () => false,
   };
+
   return self;
 }
 
@@ -221,6 +246,7 @@ export function init(
 
   const normalizedConfig = normalizeWidgetConfig(resolvedOptions);
   const nextConfigKey = widgetConfigKey(normalizedConfig);
+
   if (
     currentEmbed &&
     currentOrgId === organizationId &&
@@ -229,6 +255,7 @@ export function init(
     if (resolvedOptions.user) {
       currentEmbed.identify(resolvedOptions.user);
     }
+
     return createWidgetProxy(currentEmbed);
   }
 

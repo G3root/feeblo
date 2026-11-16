@@ -79,6 +79,7 @@ it.live("rejects a POST from an untrusted origin", () =>
       const response = yield* post(app.handler, {
         origin: "https://evil.example",
       });
+
       expect(response.status).toBe(403);
     })
   )
@@ -99,9 +100,11 @@ it.live("allows the app origin and root-domain subdomains", () =>
       const appOrigin = yield* post(app.handler, {
         origin: "https://app.feeblo.com",
       });
+
       const boardOrigin = yield* post(app.handler, {
         origin: "https://customer.feeblo.com",
       });
+
       expect(appOrigin.status).toBe(200);
       expect(boardOrigin.status).toBe(200);
     })
@@ -114,6 +117,7 @@ it.live("rejects cross-site fetch metadata when origin is absent", () =>
       const response = yield* post(app.handler, {
         "sec-fetch-site": "cross-site",
       });
+
       expect(response.status).toBe(403);
     })
   )
@@ -125,6 +129,7 @@ it.live("allows same-site and non-browser requests", () =>
       const sameSite = yield* post(app.handler, {
         "sec-fetch-site": "same-site",
       });
+
       const noHeaders = yield* post(app.handler, {});
       expect(sameSite.status).toBe(200);
       expect(noHeaders.status).toBe(200);
@@ -138,11 +143,13 @@ it.live(
     withApp(productionConfig, (app) =>
       Effect.gen(function* () {
         const rpc = yield* post(app.handler, SESSION_COOKIE);
+
         const media = yield* post(
           app.handler,
           SESSION_COOKIE,
           "/api/media/upload"
         );
+
         expect(rpc.status).toBe(403);
         expect(media.status).toBe(403);
       })
@@ -159,6 +166,7 @@ it.live(
           SESSION_COOKIE,
           "/api/auth/sign-in/email"
         );
+
         const noCookie = yield* post(app.handler, {});
         expect(betterAuth.status).toBe(200);
         expect(noCookie.status).toBe(200);
@@ -173,6 +181,7 @@ it.live("allows a cookie-bearing browser request with fetch metadata", () =>
         ...SESSION_COOKIE,
         "sec-fetch-site": "same-site",
       });
+
       expect(response.status).toBe(200);
     })
   )
@@ -193,15 +202,19 @@ it.live("allows operator-trusted origins from AUTH_TRUSTED_ORIGINS", () =>
         const exact = yield* post(app.handler, {
           origin: "https://partner.example",
         });
+
         const wildcard = yield* post(app.handler, {
           origin: "https://team.boards.example",
         });
+
         const localhost = yield* post(app.handler, {
           origin: "http://board.localhost:3001",
         });
+
         const unrelated = yield* post(app.handler, {
           origin: "https://unrelated.example",
         });
+
         expect(exact.status).toBe(200);
         expect(wildcard.status).toBe(200);
         expect(localhost.status).toBe(200);
@@ -220,6 +233,7 @@ it.live("does not gate safe methods", () =>
           })
         )
       );
+
       expect(response.status).toBe(200);
     })
   )

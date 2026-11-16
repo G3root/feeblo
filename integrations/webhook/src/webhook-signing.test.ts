@@ -17,10 +17,13 @@ describe("signWebhookDelivery", () => {
   it.effect("signs the exact raw body with a stable delivery ID", () =>
     Effect.gen(function* () {
       yield* TestClock.setTime(fixedNow.getTime());
+
       const secret = Redacted.make(
         "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
       );
+
       const rawBody = '{"type":"post.created","title":"A  B"}';
+
       const headers = yield* signWebhookDelivery({
         deliveryId: "delivery_123",
         keyring: { current: secret },
@@ -45,19 +48,25 @@ describe("signWebhookDelivery", () => {
       () =>
         Effect.gen(function* () {
           yield* TestClock.setTime(fixedNow.getTime());
+
           const oldSecret = Redacted.make(
             "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
           );
+
           const rotated = yield* rotateWebhookSigningKeyring({
             current: oldSecret,
           });
+
           const rawBody = '{"type":"webhook.test"}';
+
           const duringGrace = yield* signWebhookDelivery({
             deliveryId: "delivery_123",
             keyring: rotated,
             rawBody,
           });
+
           yield* TestClock.adjust("24 hours");
+
           const afterGrace = yield* signWebhookDelivery({
             deliveryId: "delivery_123",
             keyring: rotated,

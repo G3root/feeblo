@@ -15,6 +15,7 @@ export const SlackSlashCommandPayload = Schema.Struct({
   response_url: Schema.String,
   api_app_id: Schema.optionalKey(Schema.String),
 });
+
 export type SlackSlashCommandPayload = Schema.Schema.Type<
   typeof SlackSlashCommandPayload
 >;
@@ -37,6 +38,7 @@ export const SlackMessageActionPayload = Schema.Struct({
   token: Schema.optionalKey(Schema.String),
   message_ts: Schema.optionalKey(Schema.String),
 });
+
 export type SlackMessageActionPayload = Schema.Schema.Type<
   typeof SlackMessageActionPayload
 >;
@@ -68,6 +70,7 @@ export const SlackViewInputValue = Schema.Struct({
     )
   ),
 });
+
 export type SlackViewInputValue = Schema.Schema.Type<
   typeof SlackViewInputValue
 >;
@@ -84,6 +87,7 @@ export const SlackView = Schema.Struct({
     ),
   }),
 });
+
 export type SlackView = Schema.Schema.Type<typeof SlackView>;
 
 /** Slack `view_submission` payload. */
@@ -94,6 +98,7 @@ export const SlackViewSubmissionPayload = Schema.Struct({
   view: SlackView,
   response_urls: Schema.optionalKey(Schema.Array(Schema.Unknown)),
 });
+
 export type SlackViewSubmissionPayload = Schema.Schema.Type<
   typeof SlackViewSubmissionPayload
 >;
@@ -116,6 +121,7 @@ export const SlackBlockActionsPayload = Schema.Struct({
   response_url: Schema.optionalKey(Schema.String),
   trigger_id: Schema.optionalKey(Schema.String),
 });
+
 export type SlackBlockActionsPayload = Schema.Schema.Type<
   typeof SlackBlockActionsPayload
 >;
@@ -126,6 +132,7 @@ export const SlackInteractivePayload = Schema.Union([
   SlackViewSubmissionPayload,
   SlackBlockActionsPayload,
 ]);
+
 export type SlackInteractivePayload = Schema.Schema.Type<
   typeof SlackInteractivePayload
 >;
@@ -141,6 +148,7 @@ export const ParsedSlackInboundRequest = Schema.Union([
     payload: SlackInteractivePayload,
   }),
 ]);
+
 export type ParsedSlackInboundRequest = Schema.Schema.Type<
   typeof ParsedSlackInboundRequest
 >;

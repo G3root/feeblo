@@ -91,6 +91,7 @@ function DataTableCommandFilterMenuContent<TData extends RowData>({
   const columns = table
     .getAllLeafColumns()
     .filter((column) => column.getCanFilter());
+
   const fieldItems = columns.map((column) => ({
     label: column.columnDef.meta?.label ?? column.id,
     value: column.id,
@@ -99,6 +100,7 @@ function DataTableCommandFilterMenuContent<TData extends RowData>({
   const onFilterAdd = React.useCallback(
     (columnId: string) => {
       const column = columns.find((item) => item.id === columnId);
+
       if (!column) return;
       table.addColumnFilter({
         ...getDefaultFilter(column),
@@ -196,6 +198,7 @@ function DataTableCommandFilterMenuContent<TData extends RowData>({
         >
           {(filter, _index, { handleRef, isDragging }) => {
             const column = columns.find((item) => item.id === filter.id);
+
             if (!column) return null;
 
             return (

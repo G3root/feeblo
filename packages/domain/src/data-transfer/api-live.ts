@@ -59,7 +59,9 @@ const HandlerDependencies = Layer.mergeAll(
 
 /** Control characters and separators that must not reach the header. */
 const UNSAFE_FILENAME_CHARACTERS = /["\\/\r\n]/gu;
+
 const NON_ASCII_CHARACTERS = /[^\x20-\x7e]/gu;
+
 const RFC_5987_EXTRA_ESCAPES = /['()*!]/gu;
 
 /**
@@ -74,10 +76,12 @@ const contentDisposition = (fileName: string): string => {
   const fallback = fileName
     .replace(UNSAFE_FILENAME_CHARACTERS, "_")
     .replace(NON_ASCII_CHARACTERS, "_");
+
   const encoded = encodeURIComponent(fileName).replace(
     RFC_5987_EXTRA_ESCAPES,
     (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
   );
+
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 };
 
@@ -87,9 +91,11 @@ const parseIncludeArchived = (
   if (value === undefined || value === "false") {
     return Effect.succeed(false);
   }
+
   if (value === "true") {
     return Effect.succeed(true);
   }
+
   return Effect.fail(
     new BadRequestError({
       message: "includeArchived must be true or false.",
@@ -113,6 +119,7 @@ export const DataTransferApiLive = HttpApiBuilder.group(
           const membership = session.memberships.find(
             (candidate) => candidate.organizationId === organizationId
           );
+
           if (membership === undefined) {
             return yield* new UnauthorizedError({
               message: "You are not a member of this organization",
@@ -133,13 +140,16 @@ export const DataTransferApiLive = HttpApiBuilder.group(
           }
 
           const fs = yield* FileSystem.FileSystem;
+
           const readFailure = () =>
             new InternalServerError({
               message: "Could not read the uploaded file.",
             });
+
           const info = yield* fs
             .stat(file.path)
             .pipe(Effect.mapError(readFailure));
+
           if (info.size > ByteSize.bytes(DATA_IMPORT_MAX_BYTES)) {
             return yield* new DataImportFileTooLargeError({
               maxBytes: DATA_IMPORT_MAX_BYTES,
@@ -148,11 +158,13 @@ export const DataTransferApiLive = HttpApiBuilder.group(
               )} MB.`,
             });
           }
+
           const bytes = yield* fs
             .readFile(file.path)
             .pipe(Effect.mapError(readFailure));
 
           const service = yield* DataImportService;
+
           const job = yield* service.stageBoardImport({
             bytes,
             fileName: file.name,
@@ -160,6 +172,7 @@ export const DataTransferApiLive = HttpApiBuilder.group(
             organizationId,
             userId: session.user.id,
           });
+
           return toDataImportJobSummary(job);
           // eslint-disable-next-line effecttsgo/strict-effect-provide -- HttpApiBuilder handlers resolve their own services (the same shape as the media upload)
         }).pipe(Effect.provide(HandlerDependencies))
@@ -171,14 +184,17 @@ export const DataTransferApiLive = HttpApiBuilder.group(
             key: `data-export:${session.user.id}`,
             name: "data-export",
           });
+
           const includeArchived = yield* parseIncludeArchived(
             query.includeArchived
           );
+
           const exportFile = yield* streamPostCsv({
             boardId: query.boardId ?? null,
             includeArchived,
             organizationId: query.organizationId,
           });
+
           return HttpServerResponse.stream(exportFile.stream, {
             contentType: "text/csv; charset=utf-8",
             headers: {
@@ -196,10 +212,12 @@ export const DataTransferApiLive = HttpApiBuilder.group(
             key: `data-export:${session.user.id}`,
             name: "data-export",
           });
+
           const report = yield* streamImportProblemsCsv({
             id: params.id,
             organizationId: query.organizationId,
           });
+
           return HttpServerResponse.stream(report.stream, {
             contentType: "text/csv; charset=utf-8",
             headers: {

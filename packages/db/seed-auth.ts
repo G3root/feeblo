@@ -62,12 +62,14 @@ export const parseSeedAuthOptions = (
   env: Record<string, string | undefined>
 ): SeedAuthConfig | SeedConfigError => {
   const databaseUrl = env.DATABASE_URL;
+
   if (!databaseUrl) {
     return new SeedConfigError({
       message:
         "SeedConfigError: DATABASE_URL is required to seed the database.",
     });
   }
+
   if (
     databaseUrl.startsWith("pglite:") ||
     databaseUrl.startsWith("memory://")
@@ -77,6 +79,7 @@ export const parseSeedAuthOptions = (
         "SeedConfigError: db:seed requires a real Postgres DATABASE_URL (PGlite is not supported).",
     });
   }
+
   return {
     databaseUrl,
     baseUrl: env.API_URL ?? env.APP_URL ?? "http://localhost:3000",
