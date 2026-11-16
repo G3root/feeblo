@@ -1,7 +1,5 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import * as Permissions from "@feeblo/permissions";
-import { isString } from "@feeblo/utils/runtime-kind";
-import { and, eq, inArray } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -136,25 +134,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
    * entries are written for the rows the delete could have removed rather than
    * for whatever the client sent.
    */
-  const requestedPostIds = (args: TPostDelete) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      const ids = isString(args.id) ? [args.id] : args.id;
-
-      const rows = yield* db
-        .select({ id: schema.postTable.id })
-        .from(schema.postTable)
-        .where(
-          and(
-            inArray(schema.postTable.id, ids),
-            eq(schema.postTable.organizationId, args.organizationId),
-            eq(schema.postTable.boardId, args.boardId)
-          )
-        );
-
-      return rows.map((row) => row.id);
-    });
-
   /**
    * Re-attributes a post to a resolved on-behalf subject.
    *
@@ -304,22 +283,25 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       };
 
       if (surface === "public") {
-        return yield* writes.remove(
-          write,
-          memberActor(session, args.organizationId)
-        );
+        yield* writes.remove(write, memberActor(session, args.organizationId));
+
+        return;
       }
 
       return yield* transaction(
         Effect.gen(function* () {
-          const ids = yield* requestedPostIds(args);
-          yield* writes.remove(
+          const removed = yield* writes.remove(
             write,
             memberActor(session, args.organizationId)
           );
+
           const actor = actorFromSession(session, args.organizationId);
+          // The ids the delete removed, not the ids the request asked for:
+          // the pre-read and the delete are two statements, and a post that
+          // vanished between them must not leave an entry claiming it was
+          // deleted.
           yield* Effect.forEach(
-            ids,
+            removed.deletedIds,
             (id) =>
               audit.record({
                 organizationId: args.organizationId,

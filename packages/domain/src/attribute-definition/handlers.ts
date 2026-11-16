@@ -7,6 +7,7 @@ import { AuditLogRecorder } from "../audit-log/recorder";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
+import { AttributeDefinitionNotFoundError } from "./errors";
 import { AttributeDefinitionPolicy } from "./policies";
 import { AttributeDefinitionRepository } from "./repository";
 import { AttributeDefinitionRpcs } from "./rpcs";
@@ -77,7 +78,15 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.updateContactAttributeDefinition(args);
+            const { updated } =
+              yield* repository.updateContactAttributeDefinition(args);
+
+            if (!updated) {
+              return yield* new AttributeDefinitionNotFoundError({
+                message: "Attribute definition not found",
+              });
+            }
+
             // The update returns nothing, so the new values go in `metadata`
             // rather than posing as a diff with an empty `before`.
             yield* audit.record({
@@ -106,7 +115,15 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.deleteContactAttributeDefinition(args);
+            const { deleted } =
+              yield* repository.deleteContactAttributeDefinition(args);
+
+            if (!deleted) {
+              return yield* new AttributeDefinitionNotFoundError({
+                message: "Attribute definition not found",
+              });
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -165,7 +182,15 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.updateCompanyAttributeDefinition(args);
+            const { updated } =
+              yield* repository.updateCompanyAttributeDefinition(args);
+
+            if (!updated) {
+              return yield* new AttributeDefinitionNotFoundError({
+                message: "Attribute definition not found",
+              });
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -192,7 +217,15 @@ export const AttributeDefinitionRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.deleteCompanyAttributeDefinition(args);
+            const { deleted } =
+              yield* repository.deleteCompanyAttributeDefinition(args);
+
+            if (!deleted) {
+              return yield* new AttributeDefinitionNotFoundError({
+                message: "Attribute definition not found",
+              });
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),

@@ -1229,7 +1229,9 @@ const makePostWriteService = Effect.gen(function* () {
         });
       }
 
-      return undefined;
+      // The outcome travels: `removePost` audits the ids this delete removed,
+      // not the ids the request asked for.
+      return result;
     }).pipe(
       Effect.tap(() =>
         cleanupOrphanedEditorAssets({

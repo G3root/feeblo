@@ -131,7 +131,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
         const outboxId = yield* transaction(
           Effect.gen(function* () {
-            yield* repository.create({
+            const created = yield* repository.create({
               ...args,
               content: prepared.content,
               coverImage: prepared.coverImage,
@@ -139,6 +139,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               ...(isMember && { creatorMemberId: isMember.membershipId }),
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
+
             // In the same transaction as the entry it describes, so a create
             // that fails anywhere below leaves no audit row claiming it
             // happened. `metadata` rather than `changes`: there is no previous
@@ -149,9 +150,12 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               source: "dashboard",
               action: "changelog.created",
               resourceId: args.id,
+              // The stored slug, not the submitted one: the repository derives
+              // it from the title when the caller left it empty, and the entry
+              // should name the entry as it exists.
               metadata: {
                 title: args.title,
-                slug: args.slug,
+                slug: created?.slug ?? args.slug,
                 status: args.status,
               },
             });
@@ -206,7 +210,17 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.delete(args);
+            const deleted = yield* repository.delete(args);
+
+            // `canDelete` proved the caller may delete, not that there was
+            // anything to delete. A row that is already gone (or never was in
+            // this workspace) is a 404, and nothing is recorded for it.
+            if (!deleted) {
+              return yield* new ChangelogNotFoundError({
+                message: "Changelog entry not found",
+              });
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -307,7 +321,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               resourceId: args.id,
               metadata: {
                 title: args.title,
-                slug: args.slug,
+                slug: updated.slug,
                 status: args.status,
               },
             });
@@ -327,7 +341,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 source: "dashboard",
                 action: "changelog.published",
                 resourceId: args.id,
-                metadata: { title: args.title, slug: args.slug },
+                metadata: { title: args.title, slug: updated.slug },
               });
             }
 

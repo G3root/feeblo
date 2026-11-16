@@ -262,6 +262,28 @@ const makeChangelogCategoryRepository = Effect.gen(function* () {
         .limit(1)
         .pipe(Effect.map((rows) => rows.length === 1)),
 
+    /**
+     * The same read, with the entry locked until the caller's transaction ends.
+     *
+     * The category links are replaced in that transaction, and the entry it
+     * audits belongs to it: without the lock a concurrent delete could remove
+     * the entry between the check and the write, and the entry would name a
+     * changelog that no longer exists.
+     */
+    lockChangelog: ({ changelogId, organizationId }: THasChangelog) =>
+      db
+        .select({ id: schema.changelogTable.id })
+        .from(schema.changelogTable)
+        .where(
+          and(
+            eq(schema.changelogTable.id, changelogId),
+            eq(schema.changelogTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .for("no key update")
+        .pipe(Effect.map((rows) => rows.length === 1)),
+
     countExistingCategories: ({
       categoryIds,
       organizationId,

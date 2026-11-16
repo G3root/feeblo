@@ -83,6 +83,15 @@ interface TRestoreMergedEngagement {
 interface TPostDeleteResult {
   deleted: boolean;
   /**
+   * The ids the delete actually removed, in the order the rows came back.
+   *
+   * A caller that audits a deletion has to name these and not the ids it
+   * asked for: the two differ when a post vanished between the caller's read
+   * and this statement, and an entry for a row this delete did not remove is
+   * an entry about something that did not happen.
+   */
+  deletedIds: readonly string[];
+  /**
    * Merged children reverted by the delete (with the survivor they pointed
    * at), so callers can record the reversal on each child's timeline.
    */
@@ -1112,7 +1121,7 @@ const makePostRepository = Effect.gen(function* () {
         // Nothing matched (missing id or wrong org/board) — report "not
         // deleted" instead of vacuously comparing two empty lists.
         if (scannedSurvivors.length === 0) {
-          return { deleted: false, restoredChildren: [] };
+          return { deleted: false, deletedIds: [], restoredChildren: [] };
         }
 
         const survivorIds = scannedSurvivors.map((post) => post.id);
@@ -1156,7 +1165,7 @@ const makePostRepository = Effect.gen(function* () {
         );
 
         if (posts.length !== survivorIds.length) {
-          return { deleted: false, restoredChildren: [] };
+          return { deleted: false, deletedIds: [], restoredChildren: [] };
         }
 
         if (onlyIfNew) {
@@ -1165,7 +1174,7 @@ const makePostRepository = Effect.gen(function* () {
           // only be a caller that asked for the creator scope without one,
           // and it can match nothing.
           if (creatorId === null) {
-            return { deleted: false, restoredChildren: [] };
+            return { deleted: false, deletedIds: [], restoredChildren: [] };
           }
 
           const newPosts = yield* db
@@ -1196,7 +1205,7 @@ const makePostRepository = Effect.gen(function* () {
             );
 
           if (newPosts.length !== posts.length) {
-            return { deleted: false, restoredChildren: [] };
+            return { deleted: false, deletedIds: [], restoredChildren: [] };
           }
         }
 
@@ -1260,6 +1269,7 @@ const makePostRepository = Effect.gen(function* () {
 
         return {
           deleted: deleted.length === posts.length,
+          deletedIds: deleted.map((row) => row.id),
           restoredChildren,
         } satisfies TPostDeleteResult;
       });

@@ -239,7 +239,11 @@ const makeMembershipRepository = Effect.gen(function* () {
         .where(
           and(
             eq(schema.invitationTable.id, invitationId),
-            eq(schema.invitationTable.organizationId, organizationId)
+            eq(schema.invitationTable.organizationId, organizationId),
+            // Only a pending invitation can be withdrawn. Without this a
+            // second cancel matches the row it already cancelled and reports
+            // a withdrawal that did not happen.
+            eq(schema.invitationTable.status, "pending")
           )
         )
         .returning({ id: schema.invitationTable.id })

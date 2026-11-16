@@ -655,6 +655,27 @@ describe("MembershipRpcHandlers", () => {
             resourceType: "member",
             source: "dashboard",
           });
+
+          // Cancelling the same invitation again matches no pending row, so it
+          // reports success and adds nothing to the log.
+          yield* handlers
+            .CancelOrganizationInvitation({
+              organizationId: fixture.organizationId,
+              invitationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const afterRetry = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.action, "member.invite_cancelled")
+              )
+            );
+
+          expect(afterRetry).toHaveLength(1);
         }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
 

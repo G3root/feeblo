@@ -112,7 +112,11 @@ const makeGitHubManagementService = Effect.gen(function* () {
 
   const lockConnection = (organizationId: string, connectionId: string) =>
     db
-      .select({ lifecycle: schema.integrationConnectionTable.lifecycle })
+      .select({
+        credentialsCiphertext:
+          schema.integrationConnectionTable.credentialsCiphertext,
+        lifecycle: schema.integrationConnectionTable.lifecycle,
+      })
       .from(schema.integrationConnectionTable)
       .where(
         and(
@@ -250,7 +254,10 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 // A GitHub deletion webhook archives the row without touching
                 // its credentials, and this early return used to leave them
                 // there for good. Scrubbing is the one part of a disconnect an
-                // archived connection still owes.
+                // archived connection still owes — and it is a change, so it is
+                // recorded. A second disconnect finds nothing left to scrub and
+                // records nothing, which is what keeps a retry out of the log.
+                const scrubbed = connection.credentialsCiphertext !== null;
                 yield* db
                   .update(schema.integrationConnectionTable)
                   .set({
@@ -276,6 +283,15 @@ const makeGitHubManagementService = Effect.gen(function* () {
                   .pipe(
                     Effect.mapError(databaseError("archived credential scrub"))
                   );
+
+                if (scrubbed) {
+                  yield* recordChange({
+                    organizationId: input.organizationId,
+                    action: "integration.disconnected",
+                    connectionId: input.connectionId,
+                    metadata: { archived: true, provider: "github" },
+                  });
+                }
 
                 return undefined;
               }
@@ -611,7 +627,12 @@ const makeGitHubManagementService = Effect.gen(function* () {
                 connectionId: input.connectionId,
                 metadata: {
                   boardId: input.boardId,
-                  boardScope: input.boardScope,
+                  // Derived from the board being stored, the way `getSettings`
+                  // reads it back: a request may send `any_board` with a board
+                  // id, and the row keeps the board. The entry names the scope
+                  // the workspace will actually have.
+                  boardScope:
+                    input.boardId === null ? "any_board" : "specific_board",
                   enabled: input.enabled,
                   provider: "github",
                   repositoryName: input.repositoryName,

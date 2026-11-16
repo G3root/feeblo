@@ -179,7 +179,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     ) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+
+        return yield* db
           .update(schema.contactAttributeDefinitionTable)
           .set({
             name: args.name,
@@ -197,7 +198,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               )
             )
           )
-          .pipe(Effect.asVoid);
+          .returning({ id: schema.contactAttributeDefinitionTable.id })
+          .pipe(Effect.map((rows) => ({ updated: rows.length > 0 })));
       }),
 
     deleteContactAttributeDefinition: (
@@ -214,7 +216,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
             )
           )
         )
-        .pipe(Effect.asVoid),
+        .returning({ id: schema.contactAttributeDefinitionTable.id })
+        .pipe(Effect.map((rows) => ({ deleted: rows.length > 0 }))),
 
     contactAttributeDefinitionExists: (
       args: TContactAttributeDefinitionDelete
@@ -281,7 +284,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
     ) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+
+        return yield* db
           .update(schema.companyAttributeDefinitionTable)
           .set({
             name: args.name,
@@ -299,7 +303,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
               )
             )
           )
-          .pipe(Effect.asVoid);
+          .returning({ id: schema.companyAttributeDefinitionTable.id })
+          .pipe(Effect.map((rows) => ({ updated: rows.length > 0 })));
       }),
 
     deleteCompanyAttributeDefinition: (
@@ -316,7 +321,8 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
             )
           )
         )
-        .pipe(Effect.asVoid),
+        .returning({ id: schema.companyAttributeDefinitionTable.id })
+        .pipe(Effect.map((rows) => ({ deleted: rows.length > 0 }))),
 
     companyAttributeDefinitionExists: (
       args: TCompanyAttributeDefinitionDelete

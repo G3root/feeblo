@@ -192,6 +192,21 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
 
         yield* transaction(
           Effect.gen(function* () {
+            // Locked and re-checked inside the transaction that replaces the
+            // links: the check above ran before it, so a delete racing this
+            // write could otherwise leave an entry naming an entry that is
+            // gone. The lock is held through the audit write.
+            const stillThere = yield* repository.lockChangelog({
+              changelogId: args.changelogId,
+              organizationId: args.organizationId,
+            });
+
+            if (!stillThere) {
+              return yield* new Policy.PolicyDeniedError({
+                reason: "Changelog does not belong to this organization",
+              });
+            }
+
             yield* repository.setChangelogCategories({ ...args, categoryIds });
             // Filing an entry under categories changes the entry, not the
             // category rows, so this is `changelog.updated` with the changelog

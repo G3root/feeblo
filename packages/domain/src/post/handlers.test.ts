@@ -862,7 +862,11 @@ describe("PostRpcHandlers", () => {
             organizationId: fixture.organizationId,
           });
 
-          expect(result).toEqual({ deleted: false, restoredChildren: [] });
+          expect(result).toEqual({
+            deleted: false,
+            deletedIds: [],
+            restoredChildren: [],
+          });
 
           const [post] = yield* db
             .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })

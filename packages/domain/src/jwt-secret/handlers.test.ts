@@ -214,6 +214,27 @@ describe("JwtSecretRpcHandlers", () => {
         // must not swallow the identifier: `secretId` as a key would have
         // matched its credential-shaped-name rule and stored `[redacted]`.
         expect(rows[0]?.metadata).toEqual({ id: active.id });
+
+        // A second revoke inside the 24h grace window finds the secret already
+        // revoked and changes nothing, so it must not add an entry.
+        yield* handlers
+          .RevokeJwtSecret({
+            organizationId: fixture.organizationId,
+            secretId: yield* JwtSecretId.parse(active.id),
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, session),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const afterRetry = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(afterRetry).toHaveLength(1);
         // The generated value must not appear anywhere in the stored row.
         expect(JSON.stringify(rows[0])).not.toContain(active.secret);
       })

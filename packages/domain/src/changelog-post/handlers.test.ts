@@ -301,5 +301,37 @@ describe("ChangelogPostRpcHandlers", () => {
         });
       })
     );
+
+    it.effect("records nothing when the link was already absent", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogPostRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        const args = {
+          changelogId: fixture.changelogId,
+          postId: fixture.postId,
+          organizationId: fixture.organizationId,
+        };
+
+        // Unlinking a post that was never linked changes nothing, so there is
+        // no `linked: false` entry to write.
+        yield* handlers
+          .DeleteChangelogPost(args)
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture)),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(0);
+      })
+    );
   });
 });

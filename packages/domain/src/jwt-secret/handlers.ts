@@ -28,7 +28,15 @@ export const JwtSecretRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.revoke(args);
+            const { revoked } = yield* repository.revoke(args);
+
+            // A retry inside the grace window finds the secret already
+            // revoked and changes nothing; a second entry would claim a
+            // second revocation.
+            if (!revoked) {
+              return;
+            }
+
             // `jwt_secret` is a singleton resource, so no `resourceId`. Only
             // the id of the secret is recorded: the value is never read here,
             // and this module generates it, so nothing credential-shaped can

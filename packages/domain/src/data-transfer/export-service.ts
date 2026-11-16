@@ -228,8 +228,13 @@ export const streamPostCsv = (input: {
       stream: Stream.concat(
         Stream.make(encodeText(BOARD_POST_CSV_HEADER)),
         pages.pipe(
-          Stream.tap(() => Ref.update(sentRows, (count) => count + 1)),
           Stream.grouped(EXPORT_PAGE_SIZE),
+          // Counted per batch, on the rows that are about to be serialized, so
+          // the number in the entry is the number of records the caller gets
+          // rather than the number of pages the source produced.
+          Stream.tap((rows) =>
+            Ref.update(sentRows, (count) => count + rows.length)
+          ),
           Stream.map((rows) => encodeText(serializeBoardPostCsvRows(rows)))
         )
       ).pipe(
