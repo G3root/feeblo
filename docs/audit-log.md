@@ -148,7 +148,7 @@ Adding one is three lines: declare the verb if it is new, call `record` inside t
 
 - **365 days**, flat. A plan-shaped window would make a downgrade delete evidence, so tiering is a later decision, not a default.
 - **Batched**, 5,000 rows per statement through `ctid` (`DELETE … LIMIT` is not Postgres), each batch its own transaction so a sweep never holds a lock a writer would wait on. A pass repeats until a batch comes back short, so a backlog drains in one run instead of one batch a day.
-- **Every 24 hours**, forked from `apps/server/src/app/program.ts` next to the other maintenance loops. A failed pass logs and the next one retries; interruption propagates.
+- **Every 24 hours**, forked from `apps/server/src/app/program.ts` next to the other maintenance loops — and not forked at all while `AUDIT_LOG` is off, since there is nothing to sweep. A failed pass logs and the next one retries; interruption propagates.
 - Each batch opens its transaction with `SET LOCAL feeblo.audit_retention = 'on'`, which is the append-only trigger's one escape hatch. `SET LOCAL` is transaction-scoped: outside an explicit transaction it has no lasting effect, which is why the sweep opens its own transaction instead of sharing one.
 
 `auditLogRetention` is the loop (pass + `Schedule.spaced("24 hours")`); `runAuditLogRetentionPass` is one sweep, exported so a test can run exactly one.
