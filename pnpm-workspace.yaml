@@ -45,6 +45,11 @@ catalog:
   "@bufbuild/protobuf": 2.17.0
   "@cloudflare/workers-types": ^5.20261104.1
   "@databuddy/sdk": ^3.5.1
+  # Already used by `apps/web` for the board's drag and drop; the design
+  # system's sortable list adds only this entry, not the legacy
+  # `@dnd-kit/core`/`sortable`/`modifiers`/`utilities` set the shadcn registry
+  # pulls in.
+  "@dnd-kit/react": ^0.5.3
   "@dotenvx/dotenvx": ^2.38.2
   "@effect-aws/client-s3": 2.0.0
   "@effect/ai-openai": 4.1.2
@@ -80,6 +85,7 @@ catalog:
   "@tanstack/react-form": ^1.33.3
   "@tanstack/react-query": ^5.106.1
   "@tanstack/react-router": ^1.170.46
+  "@tanstack/react-table": ^9.3.1
   "@tanstack/react-start": ^1.169.4
   "@tanstack/react-virtual": ^3.14.26
   "@types/node": ^26.6.6

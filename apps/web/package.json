@@ -22,7 +22,7 @@
     "@databuddy/sdk": "catalog:",
     "@dnd-kit/abstract": "^0.5.3",
     "@dnd-kit/dom": "^0.5.3",
-    "@dnd-kit/react": "^0.5.3",
+    "@dnd-kit/react": "catalog:",
     "@effect/atom-react": "catalog:",
     "@egoist/tailwindcss-icons": "^1.9.2",
     "@feeblo/auth": "workspace:*",

@@ -155,10 +155,17 @@ it.live("serves an MCP server card that states the key requirement", () =>
         }>;
       };
 
-      expect(parsed.servers).toHaveLength(1);
+      // Two endpoints over one credential: the per-operation list and code
+      // mode, which is the same operations as `search` and `execute`.
+      expect(parsed.servers).toHaveLength(2);
       expect(parsed.servers[0]).toMatchObject({
         transport: "streamable-http",
         url: "https://api.feeblo.com/mcp",
+        authentication: { required: true, scheme: "x-api-key" },
+      });
+      expect(parsed.servers[1]).toMatchObject({
+        transport: "streamable-http",
+        url: "https://api.feeblo.com/mcp/code",
         authentication: { required: true, scheme: "x-api-key" },
       });
     })

@@ -7,6 +7,7 @@ import {
   NodeHttpServer,
   NodePath,
   NodeRuntime,
+  NodeServices,
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
 import { AuditLogRepository } from "@feeblo/domain/audit-log/repository";
@@ -21,6 +22,7 @@ import { ExternalResourceService } from "@feeblo/domain/integration/external-res
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import { PostTrafficRepository } from "@feeblo/domain/post-traffic/repository";
 import { postTrafficRetention } from "@feeblo/domain/post-traffic/retention";
+import { NodeSandboxLive } from "@feeblo/domain/public-api/sandbox-node";
 import { Mailer } from "@feeblo/transactional/mailer";
 import {
   makeMailerTestLayer,
@@ -172,6 +174,11 @@ export const makeServerApp = Effect.gen(function* () {
         Layer.provide(ServiceLayers),
         Layer.provide(NodeFileSystem.layer),
         Layer.provide(NodePath.layer),
+        // The code-mode route declares a `Sandbox` requirement; this is the
+        // one implementation, and `NodeServices` is what gives it the child
+        // process spawner it needs.
+        Layer.provide(NodeSandboxLive),
+        Layer.provide(NodeServices.layer),
         Layer.provide(platform)
       ),
   };
