@@ -1,7 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema, transaction } from "@feeblo/db";
 import { AuditLogId, WorkspaceId } from "@feeblo/id";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -207,6 +207,28 @@ describe("AuditLogRepository", () => {
           organizationId: mine,
         });
         expect(page.items.map((entry) => entry.id)).not.toContain(foreign);
+      })
+    );
+
+    it.effect("keeps entries when the workspace is deleted", () =>
+      Effect.gen(function* () {
+        const repository = yield* AuditLogRepository;
+        const db = yield* currentDb;
+        const organizationId = yield* createOrganization();
+        const id = yield* append(organizationId);
+
+        // No foreign key on `organization_id`, deliberately: a cascade would
+        // delete the entries, and the append-only trigger refuses exactly that
+        // delete. Workspace deletion happens in the auth layer, inside
+        // better-auth's transaction, so the audit module cannot join it to set
+        // the retention GUC. An entry outlives its workspace instead, and the
+        // retention sweep is what eventually removes it.
+        yield* db
+          .delete(schema.organizationTable)
+          .where(eq(schema.organizationTable.id, organizationId));
+
+        const page = yield* repository.findPage({ limit: 10, organizationId });
+        expect(page.items.map((entry) => entry.id)).toEqual([id]);
       })
     );
 

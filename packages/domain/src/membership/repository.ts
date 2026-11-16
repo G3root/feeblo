@@ -191,6 +191,34 @@ const makeMembershipRepository = Effect.gen(function* () {
         )
         .pipe(Effect.map(EffectArray.get(0))),
 
+    /**
+     * The same read, with the member row locked until the caller's transaction
+     * ends.
+     *
+     * The previous role is half of the audit diff, and two concurrent role
+     * changes would otherwise both read the same value: the second entry would
+     * claim a transition the workspace never made.
+     */
+    findMemberByIdForUpdate: ({ memberId, organizationId }: TFindMemberById) =>
+      db
+        .select({
+          id: schema.memberTable.id,
+          organizationId: schema.memberTable.organizationId,
+          userId: schema.memberTable.userId,
+          role: schema.memberTable.role,
+          createdAt: schema.memberTable.createdAt,
+        })
+        .from(schema.memberTable)
+        .where(
+          and(
+            eq(schema.memberTable.id, memberId),
+            eq(schema.memberTable.organizationId, organizationId)
+          )
+        )
+        .limit(1)
+        .for("no key update")
+        .pipe(Effect.map(EffectArray.get(0))),
+
     deleteMember: ({ memberId, organizationId }: TDeleteMember) =>
       db
         .delete(schema.memberTable)

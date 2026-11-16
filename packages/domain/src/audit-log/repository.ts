@@ -1,9 +1,5 @@
 import { currentDb, schema, transaction } from "@feeblo/db";
 import type {
-  TAuditActorType,
-  TAuditChanges,
-  TAuditLogSource,
-  TAuditMetadata,
   TAuditOutcome,
   TAuditResourceType,
 } from "@feeblo/domain-contracts/audit";
@@ -35,30 +31,20 @@ import {
   type TAuditLogKind,
 } from "./schema";
 
-/** One row as the recorder writes it: every optional column already lowered. */
-export interface TAuditLogInsert {
-  readonly id: string;
-  readonly organizationId: string;
-  readonly occurredAt: Date;
-  readonly actorType: TAuditActorType;
-  readonly actorUserId: string | null;
-  readonly actorTokenId: string | null;
-  readonly actorLabel: string | null;
-  readonly actorRole: string | null;
-  readonly affectedUserId: string | null;
-  readonly source: TAuditLogSource;
-  readonly action: TAuditAction;
-  readonly outcome: TAuditOutcome;
-  readonly denialReason: string | null;
-  readonly resourceType: TAuditResourceType;
-  readonly resourceId: string | null;
-  readonly changes: TAuditChanges | null;
-  readonly metadata: TAuditMetadata | null;
-  readonly requestId: string | null;
-  readonly originIp: string | null;
-  readonly originCountry: string | null;
-  readonly userAgent: string | null;
-}
+/**
+ * One row as the recorder writes it.
+ *
+ * Derived from the table rather than restated, so a column added to
+ * `audit_log` is a compile error at the recorder instead of a column silently
+ * taking its default. `Required` keeps the explicit-null contract — the
+ * recorder lowers every absent value to `null` rather than omitting the key —
+ * and `recorded_at` is the one column the database stamps, so it is the one
+ * key left out.
+ */
+export type TAuditLogInsert = Omit<
+  Required<typeof schema.auditLogTable.$inferInsert>,
+  "recordedAt"
+>;
 
 export interface TAuditLogPageQuery {
   readonly organizationId: string;

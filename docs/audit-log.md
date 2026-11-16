@@ -36,7 +36,8 @@ request_id, origin_ip, origin_country, user_agent
 - **`occurred_at` vs `recorded_at`.** When the action happened, and when the row was written. In a transaction they are the same instant; they diverge only if a writer ever batches, and the reader wants `occurred_at` either way.
 - **`changes` vs `metadata`.** `changes` is the strict before/after diff (`{ fields, before, after }`). `metadata` is the action-specific context — the endpoint and status of an audited read, the member-management subject's name, a route. Anything that is not a field-by-field diff belongs in `metadata`.
 - **`actor_label` is frozen; a person's name is not.** An API key's name at the time of the action is the audit fact, and the key is usually revoked next. A member's name is resolved from the directory when the log is read, so a rename corrects it and a departed member shows their id. Do not name an API-key row from the user table: every key row also carries `actor_user_id` (whoever minted it), and that would put a person's name on an action the key took.
-- **No foreign keys on the actor.** A deleted user or a revoked key must leave the entry intact. `organization_id` cascades, so deleting a workspace deletes its log — the log is a workspace-internal accountability record, not a legal archive.
+- **No foreign keys on the actor.** A deleted user or a revoked key must leave the entry intact.
+- **No foreign key on `organization_id` either.** A cascade would delete the entries, and the append-only trigger refuses exactly that delete — so a workspace deletion would fail instead of succeeding. Workspace deletion happens in the auth layer, inside better-auth's own transaction, where the audit module cannot join it to set the retention GUC. An entry therefore outlives the workspace it describes, the retention sweep is the only thing that removes it, and every read is scoped by the caller's organization, so an orphan is unreachable by any tenant.
 
 ## Invariants the database keeps
 
@@ -127,16 +128,40 @@ The audited-read list is the sizing decision, not a detail: it is the difference
 
 ### Shipped call sites
 
-`SetPostTags` (`packages/domain/src/tag/handlers.ts`) is the first in-transaction writer. Further call sites are additive: add the action to the catalog, call `record` inside the handler's transaction, and provide `AuditLogRecorder.layer` where the handler layer is built.
+| Module | Actions |
+| --- | --- |
+| `board` | created, updated, deleted |
+| `tag` | created, updated, deleted, and `post.updated` from `SetPostTags` |
+| `post-status` | created, updated (update, set-default, reorder), deleted |
+| `roadmap` | created, updated, deleted |
+| `membership` | role_changed, removed |
+| `api-key` | created, revoked |
+| `public-api` | `api.request`, a refusal at the scope gate |
+
+Every one writes `record` inside the handler's `transaction()`, except the two that cannot: the API key lifecycle (the credential call is the plugin's own) and the scope refusal (the request is already being refused). Both use `recordBestEffort` and say why inline.
+
+Adding one is three lines: declare the verb if it is new, call `record` inside the transaction, and provide `AuditLogRecorder.layer` where the handler layer is built (`PublicApiInternals` already does, for the surface's own gate).
+
+## Retention
+
+`packages/domain/src/audit-log/retention.ts` is the policy and the loop; `AuditLogRepository.deleteBefore` is the one statement that removes rows.
+
+- **365 days**, flat. A plan-shaped window would make a downgrade delete evidence, so tiering is a later decision, not a default.
+- **Batched**, 5,000 rows per statement through `ctid` (`DELETE … LIMIT` is not Postgres), each batch its own transaction so a sweep never holds a lock a writer would wait on. A pass repeats until a batch comes back short, so a backlog drains in one run instead of one batch a day.
+- **Every 24 hours**, forked from `apps/server/src/app/program.ts` next to the other maintenance loops. A failed pass logs and the next one retries; interruption propagates.
+- Each batch opens its transaction with `SET LOCAL feeblo.audit_retention = 'on'`, which is the append-only trigger's one escape hatch. A `SET` outside a transaction is a no-op, which is why the sweep owns its transaction rather than sharing one.
+
+`auditLogRetention` is the loop (pass + `Schedule.spaced("24 hours")`); `runAuditLogRetentionPass` is one sweep, exported so a test can run exactly one.
 
 ## Not built yet
 
 - The dashboard page and its filters; the RPC has no client.
 - The Public API surface (`audit_log.read` scope, hand-written DTO per ADR 0004).
-- The retention sweep (`packages/db` script) and any plan-based retention.
-- Denial recording: `api.request` is declared but nothing writes it.
+- The remaining call sites: post, comments, contact, company, user-ban, data-transfer, changelog, attribute definitions, webhooks and the chat integrations. The catalog declares them; the next PR wires them and drops the verbs that turn out not to be needed.
+- The audited reads (`board.exported`, `data_transfer.exported`, `contact.read`) are declared and nothing records them yet.
+- **Plan-based retention.** Flat at a year today; a shorter window for a lower tier is a product decision with a data-loss consequence, and the sweep takes the window as a constant so it is one edit.
 - Partitioning. Revisit at roughly 20M live rows or when a retention sweep takes minutes; the primary key would have to include `occurred_at`, so the decision is a rewrite, made with numbers rather than a hunch.
 
 ## Tests
 
-`packages/domain/src/audit-log/` — catalog integrity, repository paging and filters, the check constraints and the append-only trigger, the recorder's flag, derivation and redaction, and the handler's role gate.
+`packages/domain/src/audit-log/` covers the catalog's shape, the repository's paging and filters, the check constraints, the append-only trigger and the workspace-deletion contract (an entry outlives its workspace), the recorder's flag, derivation and redaction, the read RPC's role gate, and the retention pass — including a run that drains two batches and leaves the fresh row behind.

@@ -17,8 +17,6 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-import { organizationTable } from "./auth";
-
 /**
  * The workspace audit log: append-only entries describing what a member, an
  * API key or the product itself did to a workspace.
@@ -43,9 +41,19 @@ export const auditLogTable = pgTable(
   "audit_log",
   {
     id: text("id").primaryKey(),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    /**
+     * The workspace the entry belongs to. Deliberately not a foreign key.
+     *
+     * A cascade would collide with the append-only trigger below: deleting the
+     * organization deletes its entries, and that `DELETE` is exactly what the
+     * trigger refuses. Workspace deletion happens in the auth layer, inside
+     * better-auth's own transaction, so the audit module cannot join it to set
+     * the retention GUC. An entry therefore outlives the workspace it
+     * describes — which is what evidence should do — and the retention sweep is
+     * the only thing that removes it. Every read is scoped by the caller's
+     * organization, so an orphan is unreachable by any tenant.
+     */
+    organizationId: text("organization_id").notNull(),
     occurredAt: timestamp("occurred_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

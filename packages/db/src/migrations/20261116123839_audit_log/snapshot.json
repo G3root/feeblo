@@ -2,7 +2,7 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "913302e6-7959-473c-b22c-634f979bc0bd",
+  "id": "a3d9fbeb-985c-4b84-a575-fe8ccc2c0874",
   "prevIds": [
     "51fb0ed5-ba28-43d6-a143-c73ac9f24eea"
   ],
@@ -172,29 +172,6 @@
         "n|tbl|public.audit_log",
         "n|sch|public",
         "n|col|public.audit_log.occurred_at"
-      ]
-    },
-    {
-      "statementType": "create_fk",
-      "statementTarget": [
-        "table",
-        "public",
-        "audit_log"
-      ],
-      "writes": [
-        "s|fk|public.audit_log.audit_log_organization_id_organization_id_fkey",
-        "n|fk|public.audit_log.audit_log_organization_id_organization_id_fkey",
-        "e|fk|public.audit_log.audit_log_organization_id_organization_id_fkey",
-        "n|con|public.audit_log.audit_log_organization_id_organization_id_fkey"
-      ],
-      "reads": [
-        "n|tbl|public.audit_log",
-        "n|sch|public",
-        "n|tbl|public.organization",
-        "n|sch|public",
-        "n|col|public.audit_log.organization_id",
-        "n|col|public.organization.id",
-        "e|uniqueness|public.organization.id"
       ]
     }
   ],
@@ -789,26 +766,6 @@
         "method": "btree",
         "concurrently": false,
         "entityType": "indexes"
-      }
-    },
-    {
-      "op": "create",
-      "row": {
-        "schema": "public",
-        "table": "audit_log",
-        "name": "audit_log_organization_id_organization_id_fkey",
-        "nameExplicit": false,
-        "columns": [
-          "organization_id"
-        ],
-        "schemaTo": "public",
-        "tableTo": "organization",
-        "columnsTo": [
-          "id"
-        ],
-        "onUpdate": "NO ACTION",
-        "onDelete": "CASCADE",
-        "entityType": "fks"
       }
     },
     {

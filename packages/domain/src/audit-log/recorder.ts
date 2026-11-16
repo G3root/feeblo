@@ -1,6 +1,5 @@
 import {
   type TAuditAction,
-  type TAuditActorType,
   type TAuditChanges,
   type TAuditLogSource,
   type TAuditMetadata,
@@ -18,7 +17,13 @@ import { AuditLogEnabled } from "./flag";
 import { AuditLogRepository } from "./repository";
 
 /**
- * The credential behind an audited action.
+ * The credential behind an audited action, discriminated by kind.
+ *
+ * The shape is a union rather than a bag of optional fields because three
+ * combinations are meaningless and the database should never see them: an API
+ * key with a role (a key holds no role — its creator's role is the person's,
+ * and naming it would put a member's authority on a key's action), a system
+ * action with an identity, and a user with a credential id.
  *
  * `label` is the credential's name frozen at write time — the name a key had
  * when it acted is the audit fact, and the key is often revoked next. A
@@ -26,16 +31,42 @@ import { AuditLogRepository } from "./repository";
  * directory when the log is read, so a rename corrects it and a departed
  * member shows their id, which is honest.
  */
-export interface TAuditActorRef {
-  readonly type: TAuditActorType;
-  /** The person behind the action: a session user, or an OAuth grant's subject. */
-  readonly userId?: string | undefined;
-  /** The machine credential: an API key id, or an OAuth client id. */
-  readonly tokenId?: string | undefined;
-  readonly label?: string | undefined;
-  /** The role held at the time, frozen so a later demotion cannot rewrite it. */
-  readonly role?: Role | undefined;
-}
+export type TAuditActorRef =
+  | {
+      readonly type: "user";
+      /** The session user the action ran as. */
+      readonly userId: string;
+      /** The role held at the time, frozen so a later demotion cannot rewrite it. */
+      readonly role?: Role;
+      readonly tokenId?: never;
+      readonly label?: never;
+    }
+  | {
+      readonly type: "oauth_client";
+      /** The member who consented; the grant acts with their authority. */
+      readonly userId: string;
+      /** The OAuth client id. */
+      readonly tokenId: string;
+      readonly label?: string;
+      readonly role?: Role;
+    }
+  | {
+      readonly type: "api_key";
+      /** The API key id. */
+      readonly tokenId: string;
+      /** Whoever minted the key, when the auth layer knows them. */
+      readonly userId?: string;
+      readonly label?: string;
+      /** A key holds no role; naming one would be the minter's, not the key's. */
+      readonly role?: never;
+    }
+  | {
+      readonly type: "system";
+      readonly userId?: never;
+      readonly tokenId?: never;
+      readonly label?: string;
+      readonly role?: never;
+    };
 
 export type TAuditRecordInput<A extends TAuditAction = TAuditAction> = {
   readonly organizationId: string;

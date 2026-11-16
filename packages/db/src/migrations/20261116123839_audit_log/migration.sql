@@ -34,7 +34,6 @@ CREATE INDEX "audit_log_org_actor_idx" ON "audit_log" ("organization_id","actor_
 CREATE INDEX "audit_log_changedFields_idx" ON "audit_log" USING gin (("changes" -> 'fields'));--> statement-breakpoint
 CREATE INDEX "audit_log_denied_idx" ON "audit_log" ("organization_id","occurred_at" DESC NULLS LAST) WHERE "outcome" = 'denied';--> statement-breakpoint
 CREATE INDEX "audit_log_occurredAt_idx" ON "audit_log" ("occurred_at");--> statement-breakpoint
-ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 CREATE FUNCTION "audit_log_append_only"() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN

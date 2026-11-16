@@ -122,30 +122,35 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
-        // The full row, not `getById`: the audit diff needs the previous
-        // name, and both reads are scoped to the caller's workspace.
-        const currentBoard = yield* repository.findByIdInOrganization({
-          id: args.id,
-          organizationId: args.organizationId,
-        });
-
-        if (Option.isNone(currentBoard)) {
-          return yield* new BadRequestError({
-            message: "Board not found",
-          });
-        }
-
-        const previous = currentBoard.value;
-        // A save that changed nothing is not an event; `fields` is what the
-        // reader filters on, so an empty diff is left unrecorded rather than
-        // written as an update with no change.
-        const fields = [
-          ...(previous.name === args.name ? [] : ["name"]),
-          ...(previous.visibility === args.visibility ? [] : ["visibility"]),
-        ];
-
         yield* transaction(
           Effect.gen(function* () {
+            // Locked, and inside the transaction: the diff has to name the
+            // value this update replaced, not the one a concurrent save was
+            // about to replace. The full row, not `getById`, because the diff
+            // needs the previous name; both reads are workspace-scoped.
+            const currentBoard =
+              yield* repository.findByIdInOrganizationForUpdate({
+                id: args.id,
+                organizationId: args.organizationId,
+              });
+
+            if (Option.isNone(currentBoard)) {
+              return yield* new BadRequestError({
+                message: "Board not found",
+              });
+            }
+
+            const previous = currentBoard.value;
+            // A save that changed nothing is not an event; `fields` is what
+            // the reader filters on, so an empty diff is left unrecorded
+            // rather than written as an update with no change.
+            const fields = [
+              ...(previous.name === args.name ? [] : ["name"]),
+              ...(previous.visibility === args.visibility
+                ? []
+                : ["visibility"]),
+            ];
+
             yield* repository.update(args);
             if (fields.length === 0) {
               return;

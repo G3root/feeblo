@@ -29,34 +29,68 @@ describe("audit log retention", () => {
     return organizationId;
   });
 
+  const rowAt = (
+    organizationId: string,
+    occurredAt: Date,
+    id: string
+  ): TAuditLogInsert => ({
+    action: "workspace.updated",
+    actorLabel: null,
+    actorRole: "admin",
+    actorTokenId: null,
+    actorType: "user",
+    actorUserId: "user_1",
+    affectedUserId: null,
+    changes: null,
+    denialReason: null,
+    id,
+    metadata: null,
+    occurredAt,
+    organizationId,
+    originCountry: null,
+    originIp: null,
+    outcome: "allowed",
+    requestId: null,
+    resourceId: null,
+    resourceType: "workspace",
+    source: "dashboard",
+    userAgent: null,
+  });
+
   const appendAt = (organizationId: string, occurredAt: Date) =>
     Effect.gen(function* () {
       const repository = yield* AuditLogRepository;
       const id = yield* AuditLogId.generate;
-      const row: TAuditLogInsert = {
-        action: "workspace.updated",
-        actorLabel: null,
-        actorRole: "admin",
-        actorTokenId: null,
-        actorType: "user",
-        actorUserId: "user_1",
-        affectedUserId: null,
-        changes: null,
-        denialReason: null,
-        id,
-        metadata: null,
-        occurredAt,
-        organizationId,
-        originCountry: null,
-        originIp: null,
-        outcome: "allowed",
-        requestId: null,
-        resourceId: null,
-        resourceType: "workspace",
-        source: "dashboard",
-        userAgent: null,
-      };
-      yield* repository.insert(row);
+      yield* repository.insert(rowAt(organizationId, occurredAt, id));
+    });
+
+  /**
+   * Seeds `count` entries at one instant.
+   *
+   * Chunked: one statement per 500 rows keeps the bind-parameter count well
+   * inside Postgres' limit, and the retention test only cares about how many
+   * rows exist, not how they got there.
+   */
+  const appendManyAt = (
+    organizationId: string,
+    occurredAt: Date,
+    count: number
+  ) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const ids = yield* Effect.forEach(
+        Array.from({ length: count }, (_, index) => index),
+        () => AuditLogId.generate
+      );
+      for (let index = 0; index < ids.length; index += 500) {
+        yield* db
+          .insert(schema.auditLogTable)
+          .values(
+            ids
+              .slice(index, index + 500)
+              .map((id) => rowAt(organizationId, occurredAt, id))
+          );
+      }
     });
 
   const countFor = (organizationId: string) =>
@@ -84,7 +118,7 @@ describe("audit log retention", () => {
       })
     );
 
-    it.effect("sweeps in batches and keeps the newest of every batch", () =>
+    it.effect("drains more than one batch in a single pass", () =>
       Effect.gen(function* () {
         const organizationId = yield* createOrganization();
         const now = yield* DateTime.now;
@@ -93,12 +127,15 @@ describe("audit log retention", () => {
         );
         const fresh = DateTime.toDate(DateTime.subtract({ days: 2 })(now));
 
-        // Three stale and one fresh is enough to prove the loop drains more
-        // than a single statement would.
-        yield* Effect.forEach([0, 1, 2], () => appendAt(organizationId, stale));
+        // One row past the batch limit: a pass that stops after its first
+        // statement would leave exactly one expired entry behind, and the
+        // count below would catch it.
+        const expired = 5_001;
+        yield* appendManyAt(organizationId, stale, expired);
         yield* appendAt(organizationId, fresh);
 
-        yield* runAuditLogRetentionPass();
+        const removed = yield* runAuditLogRetentionPass();
+        expect(removed).toBe(expired);
         expect(yield* countFor(organizationId)).toBe(1);
       })
     );

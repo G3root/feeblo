@@ -154,28 +154,30 @@ describe("AuditLogRecorder", () => {
       () =>
         Effect.gen(function* () {
           const recorder = yield* AuditLogRecorder;
-          // No such organization: the foreign key refuses the row.
-          const unknown = yield* WorkspaceId.generate;
+          const organizationId = yield* createOrganization();
+
+          // An allowed action carrying a denial reason violates the table's
+          // own check constraint. That is the honest way to make the insert
+          // fail: the recorder derives the resource type, so a writer cannot
+          // produce a mismatched pair on its own, and `organization_id` has no
+          // foreign key to violate.
+          const invalid = {
+            organizationId,
+            actor: actorFromSystem(),
+            source: "system" as const,
+            action: "workspace.updated" as const,
+            denialReason: "refused",
+          };
 
           const failure = yield* Effect.flip(
             recorder
-              .record({
-                organizationId: unknown,
-                actor: actorFromSystem(),
-                source: "system",
-                action: "workspace.updated",
-              })
+              .record(invalid)
               .pipe(Effect.provideService(AuditLogEnabled, true))
           );
           expect(failure._tag).toBe("EffectDrizzleQueryError");
 
           yield* recorder
-            .recordBestEffort({
-              organizationId: unknown,
-              actor: actorFromSystem(),
-              source: "system",
-              action: "workspace.updated",
-            })
+            .recordBestEffort(invalid)
             .pipe(Effect.provideService(AuditLogEnabled, true));
         })
     );

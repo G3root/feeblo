@@ -80,7 +80,10 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
               // same transaction as the write.
               yield* transaction(
                 Effect.gen(function* () {
-                  const previous = yield* repository.findMemberById({
+                  // Locked, so a concurrent role change cannot be read as
+                  // the previous one and make the entry claim a transition
+                  // that never happened.
+                  const previous = yield* repository.findMemberByIdForUpdate({
                     memberId,
                     organizationId,
                   });
