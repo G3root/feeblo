@@ -18,12 +18,14 @@ const schemaRejection = (kind: HttpApiError.HttpApiSchemaError["kind"]) =>
 /** A reporter that only remembers, so the test reads what reached the boundary. */
 const collectingReporter = () => {
   const causes: Array<Cause.Cause<unknown>> = [];
+
   const reporter: ErrorReporter.ErrorReporter = {
     [ErrorReporter.TypeId]: ErrorReporter.TypeId,
     report: ({ cause }) => {
       causes.push(cause);
     },
   };
+
   return { causes, reporter };
 };
 

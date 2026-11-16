@@ -281,6 +281,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     "EntitlementPolicy.mayCreatePublicEmailSubscriptions"
   )(function* (organizationId: string) {
     const { entitlements } = yield* findEntitlements(organizationId);
+
     return entitlements.capabilities.subscriberEmails;
   });
 
@@ -297,6 +298,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
   const mayRemoveBranding = Effect.fn("EntitlementPolicy.mayRemoveBranding")(
     function* (organizationId: string) {
       const { entitlements } = yield* findEntitlements(organizationId);
+
       return entitlements.capabilities.removeBranding;
     }
   );
@@ -305,6 +307,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
   const mayUseIntegrations = Effect.fn("EntitlementPolicy.mayUseIntegrations")(
     function* (organizationId: string) {
       const { entitlements } = yield* findEntitlements(organizationId);
+
       return entitlements.capabilities.integrations;
     }
   );

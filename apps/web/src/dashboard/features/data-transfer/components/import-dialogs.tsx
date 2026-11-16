@@ -121,6 +121,7 @@ export function CancelImportDialog({
   readonly open: boolean;
 }) {
   const staged = canConfirmStatus(job.status);
+
   return (
     <AlertDialog onOpenChange={onOpenChange} open={open}>
       <AlertDialogPopup>

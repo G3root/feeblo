@@ -59,22 +59,28 @@ describe("checkout confirmation machine", () => {
       confirmCheckout: async (input, signal) => {
         confirmCalls.push(input);
         confirmSignals.push(signal);
+
         if (holdConfirm) {
           await new Promise<void>((resolve) => pendingConfirms.push(resolve));
         }
+
         if (confirmError) {
           throw confirmError;
         }
+
         confirmCompleted += 1;
       },
       readPlan: () => plan,
       refetchPlan: async () => {
         refetchCount += 1;
+
         if (stalledRefetch) {
           // Never settles: the invoke's `timeout` is the only way out.
           await new Promise<void>(() => undefined);
+
           return;
         }
+
         if (refetchError) {
           const error = refetchError;
           refetchError = null;
@@ -127,6 +133,7 @@ describe("checkout confirmation machine", () => {
         plan: undefined,
       },
     });
+
     expect(statusOf(pending)).toBe("pending");
 
     const paid = createActor(machine, {
@@ -136,6 +143,7 @@ describe("checkout confirmation machine", () => {
         plan: "starter",
       },
     });
+
     expect(statusOf(paid)).toBe("confirmed");
   });
 

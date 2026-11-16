@@ -24,6 +24,7 @@ import {
 } from "../session-middleware";
 
 const MAX_ORGANIZATION_LOGO_BYTES = 5 * 1024 * 1024;
+
 const ALLOWED_CONTENT_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -39,6 +40,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
       ({ payload: { file, organizationId } }) => {
         return Effect.gen(function* () {
           const session = yield* CurrentSession;
+
           // Explicit permission gate (same `can()` as Policy.canPermission):
           // workspace management is the `workspace.update` grant, which is
           // exactly the roles `isPrivilegedRole` used to hardcode.
@@ -61,6 +63,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
           }
 
           const extension = getFileExtension(file.contentType);
+
           if (!extension) {
             return yield* new BadRequestError({
               message: "Unsupported file type. Use JPEG, PNG, or WEBP",
@@ -71,29 +74,33 @@ export const OrganizationApiLive = HttpApiBuilder.group(
 
           // Check the on-disk size before reading the file into memory so an
           // oversized upload cannot exhaust server memory.
-          const fileInfo = yield* fs
-            .stat(file.path)
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({ message: "Failed to read file" })
-              )
-            );
+          const fileInfo = yield* fs.stat(file.path).pipe(
+            Effect.mapError(
+              (cause) =>
+                new InternalServerError({
+                  message: "Failed to read file",
+                  cause,
+                })
+            )
+          );
+
           const maxSize = ByteSize.bytes(MAX_ORGANIZATION_LOGO_BYTES);
+
           if (fileInfo.size === ByteSize.zero || fileInfo.size > maxSize) {
             return yield* new BadRequestError({
               message: "Workspace logo must be between 1B and 5MB",
             });
           }
 
-          const bytes = yield* fs
-            .readFile(file.path)
-            .pipe(
-              Effect.mapError(
-                () =>
-                  new InternalServerError({ message: "Failed to read file" })
-              )
-            );
+          const bytes = yield* fs.readFile(file.path).pipe(
+            Effect.mapError(
+              (cause) =>
+                new InternalServerError({
+                  message: "Failed to read file",
+                  cause,
+                })
+            )
+          );
 
           if (
             bytes.length === 0 ||
@@ -108,6 +115,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
           // against the file's magic bytes so arbitrary payloads are never
           // stored as "logos" in the public-read bucket.
           const sniffedContentType = sniffMediaType(bytes);
+
           if (
             sniffedContentType === null ||
             sniffedContentType !== file.contentType
@@ -123,6 +131,7 @@ export const OrganizationApiLive = HttpApiBuilder.group(
           // the one instance every upload path uses, and a test that supplies
           // a substitute is not overridden here.
           const s3Service = yield* S3UploadService;
+
           const uploaded = yield* s3Service
             .uploadOrganizationLogo({
               bytes,
@@ -134,8 +143,11 @@ export const OrganizationApiLive = HttpApiBuilder.group(
             })
             .pipe(
               Effect.mapError(
-                () =>
-                  new InternalServerError({ message: "Failed to upload image" })
+                (cause) =>
+                  new InternalServerError({
+                    message: "Failed to upload image",
+                    cause,
+                  })
               )
             );
 

@@ -16,8 +16,10 @@ export async function resolveSite(subdomain: string): Promise<TSite | null> {
   // Lazy-load the Effect RPC runtime so it stays out of the worker's
   // startup module graph (same pattern as the feed endpoints).
   const { fetchRpcServer } = await import("./runtime-server");
+
   const sites = await fetchRpcServer((rpc) =>
     rpc.ListSiteSubdomains({ subdomain })
   );
+
   return sites[0] ?? null;
 }

@@ -20,7 +20,7 @@ import type {
 
 export class GitHubInboundPayloadError extends Schema.TaggedError<GitHubInboundPayloadError>()(
   "GitHubInboundPayloadError",
-  { reason: Schema.String }
+  { reason: Schema.String, cause: Schema.optionalKey(Schema.Defect()) }
 ) {}
 
 export type GitHubApiFailure =

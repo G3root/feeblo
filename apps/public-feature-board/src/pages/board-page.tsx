@@ -61,6 +61,7 @@ function ListHeader({ count, title }: { count?: number; title: string }) {
 export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
   const site = useSite();
   const organizationId = site.organizationId;
+
   const {
     publicBoardCollection,
     publicPostCollection,

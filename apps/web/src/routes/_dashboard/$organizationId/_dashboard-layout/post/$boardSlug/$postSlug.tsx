@@ -103,12 +103,14 @@ function RouteComponent() {
   const { organizationId, boardSlug, postSlug } = Route.useParams();
   const { boardCollection, postCollection } = useDashboardCollections();
   const queryClient = useQueryClient();
+
   // The linked-resources panel and its GitHub actions are read/written through
   // RPCs that require integrations.manage, so gate them the same way the
   // settings route does instead of rendering actions that will 403.
   const githubResourcesPolicy = usePolicy(
     hasPermission(organizationId, "integrations.manage")
   );
+
   // Banning a comment or post author is a manager action behind the paid plan
   // gate. Lifting a ban is the same permission with no plan gate, so a workspace
   // that downgrades can still clear the bans it kept. The server enforces the
@@ -116,19 +118,23 @@ function RouteComponent() {
   // entitlements read: while it is loading the capability is unknown, and
   // showing a ban button the plan may not cover is worse than a frame of nothing.
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
+
   const { allowed: canManageUserBans } = usePolicy(
     hasPermission(organizationId, "userBans.manage")
   );
+
   const canBanAuthors =
     canManageUserBans &&
     !isEntitlementsLoading &&
     entitlements.capabilities.userBans;
+
   // Ban and unban go through the ban atoms rather than a bare RPC: the atoms
   // bump the reactivity key the security settings list is cached under, so
   // writing from here cannot leave that list — or the badges it agrees with —
   // showing the previous answer.
   const banUser = useAtomSet(banUserAtom, { mode: "promise" });
   const unbanUser = useAtomSet(unbanUserAtom, { mode: "promise" });
+
   const userBanActions = useMemo<UserBanActions>(
     () => ({
       ban: (input) =>
@@ -156,6 +162,7 @@ function RouteComponent() {
     }),
     [banUser, organizationId, unbanUser]
   );
+
   // The dialog lives here rather than inside the linked-resource menu: a menu
   // item click closes (and unmounts) the popup, so a dialog mounted in the
   // actions node would disappear with it.
@@ -188,11 +195,13 @@ function RouteComponent() {
 
   const board = postRow?.board;
   const post = postRow?.post;
+
   // Drop a dialog opened on another post (or while the next one loads) so it
   // cannot outlive the post it belongs to.
   if (githubIssueDialog !== null && githubIssueDialog.postId !== post?.id) {
     setGithubIssueDialog(null);
   }
+
   const activityQuery = useMemo(
     () =>
       createPostActivityQuery({

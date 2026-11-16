@@ -183,10 +183,13 @@ export const makeSavedViewRepository = Effect.gen(function* () {
       query,
     }: TSavedViewUpdateInput) => {
       const set = { description };
+
       const withVisibility =
         isPrivate === undefined ? set : { ...set, isPrivate };
+
       const withName =
         name === undefined ? withVisibility : { ...withVisibility, name };
+
       const withQuery = query === undefined ? withName : { ...withName, query };
 
       return (

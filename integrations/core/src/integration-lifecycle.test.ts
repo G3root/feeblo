@@ -19,6 +19,7 @@ import {
  */
 
 const connections = INTEGRATION_CONNECTION_STATES;
+
 const connectionPairs = connections.flatMap((from) =>
   connections.map((to) => [from, to] as const)
 );
@@ -147,6 +148,7 @@ describe("integration connection lifecycle", () => {
 
 describe("integration delivery state", () => {
   const deliveries = INTEGRATION_DELIVERY_STATES;
+
   const deliveryPairs = deliveries.flatMap((from) =>
     deliveries.map((to) => [from, to] as const)
   );

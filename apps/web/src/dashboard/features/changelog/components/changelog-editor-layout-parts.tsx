@@ -3,7 +3,9 @@ import { cn } from "@feeblo/ui/utils";
 import type { ComponentProps } from "react";
 
 type ChangelogEditorSectionProps = ComponentProps<"section">;
+
 type ChangelogEditorAsideProps = ComponentProps<"aside">;
+
 type ChangelogEditorDivProps = ComponentProps<"div">;
 
 export function Main({
@@ -23,6 +25,7 @@ export function Main({
     </section>
   );
 }
+
 export function Header({
   children,
   className,
@@ -37,6 +40,7 @@ export function Header({
     </div>
   );
 }
+
 export function HeaderContent({
   children,
   className,
@@ -48,6 +52,7 @@ export function HeaderContent({
     </div>
   );
 }
+
 export function Sidebar({
   children,
   className,
@@ -59,6 +64,7 @@ export function Sidebar({
     </aside>
   );
 }
+
 export function SidebarSeparator(props: ComponentProps<typeof Separator>) {
   return <Separator {...props} />;
 }

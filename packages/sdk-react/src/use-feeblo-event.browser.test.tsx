@@ -74,6 +74,7 @@ describe("useFeebloEvent", () => {
       useFeebloEvent("feedbackSubmitted", (event) => {
         received.push(event.detail.data?.title ?? "");
       });
+
       return null;
     }
 
@@ -154,6 +155,7 @@ function SwitchingProbe(props: {
     if (event.detail.type === "widgetReady") {
       setReadyCount((previous) => previous + 1);
     }
+
     if (event.detail.type === "widgetClosed") {
       setClosedCount((previous) => previous + 1);
     }

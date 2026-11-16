@@ -193,6 +193,7 @@ export function useDashboardHomeStats<
     isLiveQueryFailed(statusesQuery) ||
     isLiveQueryFailed(recentPostsQuery) ||
     isLiveQueryFailed(upvoteCountsQuery);
+
   const isLoading =
     boardsQuery.isLoading ||
     statusesQuery.isLoading ||

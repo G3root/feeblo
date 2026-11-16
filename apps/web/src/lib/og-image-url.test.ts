@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildOgImageUrl } from "./og-image-url";
 
 const API_URL = "https://api.feeblo.com";
+
 const SITE_ID = "sit_01jq8z3k4m5n6p7q8r9s0t1v2w";
 
 /** The query string as an object, which is the shape `OgImageRequest` decodes. */

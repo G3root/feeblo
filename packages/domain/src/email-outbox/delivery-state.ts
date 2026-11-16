@@ -127,6 +127,7 @@ const handles = (
   to: TEmailDeliveryState
 ): boolean => {
   const before = snapshotFor(state);
+
   return !isUnhandled(
     before,
     transition(emailDeliveryMachine, before, { type: to })

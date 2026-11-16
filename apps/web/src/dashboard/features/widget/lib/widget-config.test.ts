@@ -145,6 +145,7 @@ describe("install snippets", () => {
         ],
       })
     );
+
     const snippet = buildScriptSnippet(target, config);
     const react = buildReactSnippet(target, config);
 

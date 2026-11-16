@@ -128,6 +128,7 @@ describe("ContactRepository", () => {
             externalId: "sso-1",
             email: "ada@example.com",
           });
+
           if (Option.isNone(existingContact)) {
             return yield* Effect.die(
               new Error("the external id must match the SSO contact")
@@ -142,6 +143,7 @@ describe("ContactRepository", () => {
               existing: existingContact.value,
             })
           );
+
           expect(error._tag).toBe("FailedToUpdateContactError");
 
           // Neither row was rewritten.
@@ -149,11 +151,14 @@ describe("ContactRepository", () => {
             .select()
             .from(schema.contactTable)
             .where(eq(schema.contactTable.id, emailHolderId));
+
           expect(holder[0]?.email).toBe("ada@example.com");
+
           const matched = yield* db
             .select()
             .from(schema.contactTable)
             .where(eq(schema.contactTable.id, ssoContactId));
+
           expect(matched[0]?.email).toBeNull();
         })
     );
@@ -194,6 +199,7 @@ describe("ContactRepository", () => {
             organizationId,
             externalId: "sso-rename",
           });
+
           if (Option.isNone(existingContact)) {
             return yield* Effect.die(
               new Error("the external id must match the SSO contact")
@@ -214,6 +220,7 @@ describe("ContactRepository", () => {
             })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.authorName).toBe("After Rename");
           // The fallback is metadata about the post, not a post edit.
           expect(post?.updatedAt).toEqual(dateAt("2020-01-01T00:00:00.000Z"));
@@ -256,6 +263,7 @@ describe("ContactRepository", () => {
             organizationId,
             externalId: "sso-phone",
           });
+
           if (Option.isNone(existingContact)) {
             return yield* Effect.die(
               new Error("the external id must match the SSO contact")
@@ -278,6 +286,7 @@ describe("ContactRepository", () => {
             })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.authorName).toBe("Deliberately stale");
           expect(post?.updatedAt).toEqual(dateAt("2020-01-01T00:00:00.000Z"));
         })
@@ -298,6 +307,7 @@ describe("ContactRepository", () => {
           const newEmail = "after-sso@example.com";
           const shadowUserId = `shadow_${contactId}`;
           const ssoUserId = `sso_${contactId}`;
+
           const ssoEmail = `sso-${createHash("sha256")
             .update(ssoUserId)
             .digest("hex")
@@ -351,6 +361,7 @@ describe("ContactRepository", () => {
             organizationId,
             externalId: "sso-move",
           });
+
           if (Option.isNone(existingContact)) {
             return yield* Effect.die(
               new Error("the external id must match the SSO contact")
@@ -371,6 +382,7 @@ describe("ContactRepository", () => {
             .select()
             .from(schema.contactTable)
             .where(eq(schema.contactTable.id, contactId));
+
           expect(contact?.email).toBe(newEmail);
           expect(contact?.userId).toBe(ssoUserId);
 
@@ -378,12 +390,14 @@ describe("ContactRepository", () => {
             .select({ id: schema.userTable.id })
             .from(schema.userTable)
             .where(eq(schema.userTable.id, shadowUserId));
+
           expect(oldShadow).toBeUndefined();
 
           const [post] = yield* db
             .select({ creatorId: schema.postTable.creatorId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.creatorId).toBe(ssoUserId);
         })
     );
@@ -442,12 +456,14 @@ describe("ContactRepository", () => {
             organizationId,
             email: newEmail,
           });
+
           expect(Option.isSome(updated)).toBe(true);
 
           const [user] = yield* db
             .select()
             .from(schema.userTable)
             .where(eq(schema.userTable.id, shadowUserId));
+
           expect(user?.emailHash).toBe(hashEmail(newEmail));
           // The synthetic inbox is what keeps a shadow unauthenticatable.
           expect(user?.email).toMatch(/^behalf-.*@feeblo\.com$/);
@@ -460,6 +476,7 @@ describe("ContactRepository", () => {
             })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.authorName).toBe(newEmail);
           expect(post?.updatedAt).toEqual(dateAt("2020-01-01T00:00:00.000Z"));
         })
@@ -530,6 +547,7 @@ describe("ContactRepository", () => {
             organizationId,
             email: targetEmail,
           });
+
           expect(Option.isSome(updated)).toBe(true);
 
           // The correction commits by adopting the existing identity, not by
@@ -538,6 +556,7 @@ describe("ContactRepository", () => {
             .select()
             .from(schema.contactTable)
             .where(eq(schema.contactTable.id, contactId));
+
           expect(contact?.email).toBe(targetEmail);
           expect(contact?.userId).toBe(existingShadowUserId);
 
@@ -547,12 +566,14 @@ describe("ContactRepository", () => {
             .where(
               eq(schema.userTable.restrictedToOrganizationId, organizationId)
             );
+
           expect(users.map((user) => user.id)).toEqual([existingShadowUserId]);
 
           const [post] = yield* db
             .select({ creatorId: schema.postTable.creatorId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.creatorId).toBe(existingShadowUserId);
         })
     );
@@ -599,6 +620,7 @@ describe("ContactRepository", () => {
             .select()
             .from(schema.userTable)
             .where(eq(schema.userTable.id, userId));
+
           expect(user?.emailHash).toBe(hashEmail(oldEmail));
           expect(user?.updatedAt).toEqual(oldUpdatedAt);
         })

@@ -44,9 +44,11 @@ const buildAuthClientOptions = (
   fetchOptions: {
     onRequest(context: any) {
       const timeZone = options?.getTimeZone?.();
+
       if (timeZone) {
         context.headers.set(clientTimeZoneHeader, timeZone);
       }
+
       return context;
     },
   },
@@ -71,13 +73,16 @@ export const createVanillaAuthClient = (
 ) => createVanillaAuthClientBase(buildAuthClientOptions(baseURL, options));
 
 export type TAuthClient = ReturnType<typeof createAuthClient>;
+
 export type AuthClientSession = NonNullable<
   TAuthClient["$Infer"]["Session"]
 > & {
   memberships: AuthClientMembership[];
   organizations: AuthClientOrganization[];
 };
+
 export type AuthClientSessionData = AuthClientSession["session"];
+
 export type AuthClientUser = AuthClientSession["user"];
 
 export const authStateSchema = z.object({

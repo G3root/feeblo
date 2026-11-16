@@ -23,12 +23,15 @@ export const verifyGitHubWebhookSignature = ({
       })
     );
   }
+
   const expected = createHmac("sha256", Redacted.value(webhookSecret))
     .update(rawBody)
     .digest("hex");
+
   const received = signatureHeader.slice("sha256=".length);
   const expectedBuffer = Buffer.from(expected, "hex");
   const receivedBuffer = Buffer.from(received, "hex");
+
   return expectedBuffer.length === receivedBuffer.length &&
     timingSafeEqual(expectedBuffer, receivedBuffer)
     ? Effect.void

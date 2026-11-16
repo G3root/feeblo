@@ -50,7 +50,9 @@ export type ImportPlan = {
  * the resolver's when the author is written.
  */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+
 const ETA_PATTERN = /^(\d{4})-Q([1-4])$/iu;
+
 /** Anything that is not a lowercase letter or digit, dropped by `normalizeKey`. */
 const nonAlphanumericPattern = /[^a-z0-9]/gu;
 
@@ -82,33 +84,43 @@ const matchBoard = (
 const boardLookups = (boards: readonly ImportPlanBoard[]) => {
   const bySlug = new Map<string, ImportPlanBoard>();
   const byName = new Map<string, ImportPlanBoard>();
+
   for (const board of boards) {
     const slug = board.slug.toLowerCase();
+
     if (!bySlug.has(slug)) {
       bySlug.set(slug, board);
     }
+
     const name = normalizeKey(board.name);
+
     if (!byName.has(name)) {
       byName.set(name, board);
     }
   }
+
   return { byName, bySlug };
 };
 
 const statusLookups = (statuses: readonly ImportPlanStatus[]) => {
   const byName = new Map<string, ImportPlanStatus>();
   const byType = new Map<string, ImportPlanStatus>();
+
   for (const status of statuses) {
     const display = statusDisplayName(status.label, status.type);
     const displayKey = normalizeKey(display);
+
     if (!byName.has(displayKey)) {
       byName.set(displayKey, status);
     }
+
     const typeKey = normalizeKey(statusDisplayName("", status.type));
+
     if (!byType.has(typeKey)) {
       byType.set(typeKey, status);
     }
   }
+
   return { byName, byType };
 };
 
@@ -116,13 +128,16 @@ const parseEta = (value: string) => {
   if (value.length === 0) {
     return { etaQuarter: null, warning: null };
   }
+
   const match = ETA_PATTERN.exec(value);
+
   if (match === null) {
     return {
       etaQuarter: null,
       warning: `The eta value "${value}" is not a quarter (YYYY-Qn); left empty.`,
     };
   }
+
   return {
     etaQuarter: `${match[1] ?? ""}-Q${match[2] ?? ""}`.toUpperCase(),
     warning: null,
@@ -133,6 +148,7 @@ const parseInstant = (value: string) => {
   if (value.length === 0) {
     return { createdAt: null, invalid: false };
   }
+
   return Option.match(DateTime.make(value), {
     onNone: () => ({ createdAt: null, invalid: true }),
     onSome: (instant) => ({
@@ -174,10 +190,12 @@ export const planImportRows = ({
   readonly defaultStatus: ImportPlanStatus;
 }): ImportPlan => {
   const lookups = statusLookups(statuses);
+
   const defaultName = statusDisplayName(
     defaultStatus.label,
     defaultStatus.type
   );
+
   const boardLookupsByName = boardLookups(boards);
 
   const planned = rows.map((row): PlannedImportRow => {
@@ -188,6 +206,7 @@ export const planImportRows = ({
         message: "The title is required.",
       };
     }
+
     if (row.title.length > POST_TITLE_MAX_LENGTH) {
       return {
         kind: "failed",
@@ -195,6 +214,7 @@ export const planImportRows = ({
         message: `The title is longer than ${POST_TITLE_MAX_LENGTH} characters.`,
       };
     }
+
     if (row.content.length > POST_CONTENT_MAX_LENGTH) {
       return {
         kind: "failed",
@@ -213,8 +233,10 @@ export const planImportRows = ({
             boardLookupsByName.bySlug,
             boardLookupsByName.byName
           );
+
     let boardId: string | null;
     let boardName: string;
+
     if (row.board.trim().length === 0) {
       if (defaultBoard === null) {
         return {
@@ -224,6 +246,7 @@ export const planImportRows = ({
             "The board is empty and this workspace has no boards. Name a board in the row.",
         };
       }
+
       boardId = defaultBoard.id;
       boardName = defaultBoard.name;
       warnings.push(`The board is empty; imported into "${boardName}".`);
@@ -233,6 +256,7 @@ export const planImportRows = ({
     } else {
       boardId = null;
       boardName = row.board.trim();
+
       if (boardKey(boardName).length === 0) {
         return {
           kind: "failed",
@@ -247,6 +271,7 @@ export const planImportRows = ({
         ? undefined
         : (lookups.byName.get(normalizeKey(row.status)) ??
           lookups.byType.get(normalizeKey(row.status)));
+
     if (row.status.length === 0) {
       warnings.push(`The status is empty; imported as "${defaultName}".`);
     } else if (matchedStatus === undefined) {
@@ -256,11 +281,13 @@ export const planImportRows = ({
     }
 
     const eta = parseEta(row.eta);
+
     if (eta.warning !== null) {
       warnings.push(eta.warning);
     }
 
     const instant = parseInstant(row.createdAt);
+
     if (instant.invalid) {
       return {
         kind: "failed",
@@ -271,6 +298,7 @@ export const planImportRows = ({
 
     const authorName = row.authorName.length > 0 ? row.authorName : null;
     let authorEmail = row.authorEmail.length > 0 ? row.authorEmail : null;
+
     if (authorEmail !== null && !EMAIL_PATTERN.test(authorEmail)) {
       warnings.push(
         "The author email is not a valid address; the post imports without an author."
@@ -306,16 +334,20 @@ export const planImportRows = ({
   });
 
   const newBoards = new Map<string, string>();
+
   for (const row of planned) {
     if (row.kind === "pending" && row.payload.boardId === null) {
       const key = boardKey(row.payload.boardName);
+
       if (!newBoards.has(key)) {
         newBoards.set(key, row.payload.boardName);
       }
     }
   }
+
   const newBoardNames = [...newBoards.values()];
   const shownBoards = newBoardNames.slice(0, 8);
+
   const boardNotices =
     newBoardNames.length === 0
       ? []

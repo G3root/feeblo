@@ -6,6 +6,7 @@
 
 /** A `behalf-*` synthetic inbox: a shadow user, never a real address. */
 const shadowUserEmailPattern = /^behalf-[0-9a-f]+@feeblo\.com$/;
+
 /** An `sso-*` synthetic inbox: a widget portal user, never a real address. */
 const portalUserEmailPattern = /^sso-[0-9a-f]+@feeblo\.com$/;
 

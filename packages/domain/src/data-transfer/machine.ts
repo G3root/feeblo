@@ -140,6 +140,7 @@ const statusAfter = (
   const [next] = transition(dataImportJobMachine, snapshotFor(status), {
     type: event,
   });
+
   // SAFETY: the machine is flat — every state is a top-level string and every
   // target is one of the six `DataImportStatus` members — so a `StateValue`
   // read from it is always a status. The machine's own `satisfies` above is
@@ -160,6 +161,7 @@ const handles = (
   event: TDataImportJobEvent
 ): boolean => {
   const before = snapshotFor(status);
+
   return !isUnhandled(
     before,
     transition(dataImportJobMachine, before, { type: event })

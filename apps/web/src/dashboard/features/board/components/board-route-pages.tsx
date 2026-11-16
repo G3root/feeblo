@@ -299,6 +299,7 @@ function SavedViewSurface({
   viewId: string;
 }) {
   const memberId = useCurrentMemberId(organizationId);
+
   const collection = useMemo(
     () => savedViewCollectionFor(organizationId, boardId, memberId),
     [organizationId, boardId, memberId]
@@ -455,5 +456,7 @@ const emptyFilters = (): TBoardFilters =>
   normalizeBoardFilters(emptyBoardQuery.filters);
 
 const allFeedbackView = builtInView("all");
+
 const activeFeedbackView = builtInView("active");
+
 const backlogFeedbackView = builtInView("backlog");

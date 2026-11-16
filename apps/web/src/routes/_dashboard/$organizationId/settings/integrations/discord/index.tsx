@@ -14,6 +14,7 @@ export const Route = createFileRoute(
 
 function DiscordIntegrationSettingsRoute() {
   const organizationId = useOrganizationId();
+
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "integrations.manage")
   );
@@ -21,6 +22,7 @@ function DiscordIntegrationSettingsRoute() {
   if (isPending) {
     return null;
   }
+
   if (!allowed) {
     return <SettingsAccessDenied />;
   }

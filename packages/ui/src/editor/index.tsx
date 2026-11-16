@@ -48,6 +48,7 @@ export function Editor(props: EditorProps) {
 
   const defaultContent = useMemo(() => {
     const markdown = store.get().context.postContent;
+
     return markdown
       ? unwrapImageParagraphs(markdownToHtml(markdown))
       : undefined;
@@ -63,6 +64,7 @@ export function Editor(props: EditorProps) {
       editorScope: props.editorScope,
       organizationId: props.organizationId,
     });
+
     return createEditor({
       extension,
       ...(defaultContent && { defaultContent }),
@@ -83,9 +85,11 @@ export function Editor(props: EditorProps) {
         placeholder: props.placeholder ?? DEFAULT_PLACEHOLDER,
       })
     );
+
     const disposeReadonly = props.readOnly
       ? editor.use(defineReadonly())
       : null;
+
     return () => {
       disposePlaceholder();
       disposeReadonly?.();
@@ -96,6 +100,7 @@ export function Editor(props: EditorProps) {
 
   useEffect(() => {
     props.editorRef?.(editor);
+
     return () => props.editorRef?.(null);
   }, [editor, props.editorRef]);
 
@@ -125,4 +130,5 @@ export function Editor(props: EditorProps) {
 }
 
 export { EditorProvider, useEditorContext } from "./editor-store";
+
 export { finalizeEditorContent } from "./uploader";

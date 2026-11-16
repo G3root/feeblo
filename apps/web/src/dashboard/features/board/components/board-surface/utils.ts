@@ -112,10 +112,12 @@ function groupByStatus(
   }
 
   const lanes: BoardPostLane[] = [];
+
   for (const lane of map.values()) {
     if (lane.posts.length === 0) {
       continue;
     }
+
     lanes.push({
       id: lane.statusId,
       label: lane.label,
@@ -151,6 +153,7 @@ function groupByAssignee(
   }
 
   const lanes: BoardPostLane[] = [];
+
   for (const member of members) {
     const memberPosts = byMember.get(member.id);
 

@@ -67,16 +67,20 @@ export const classifyPolarRevokeFailure = (
   cause: unknown
 ): ClassifiedRevokeFailure => {
   const decoded = Schema.decodeUnknownOption(PolarRevokeFailure)(cause);
+
   if (Option.isNone(decoded)) {
     return { alreadyRevoked: false };
   }
+
   const { statusCode } = decoded.value;
+
   const error = Option.getOrUndefined(
     Option.map(
       Schema.decodeUnknownOption(PolarErrorBody)(decoded.value.error),
       (body) => body.error
     )
   );
+
   return {
     alreadyRevoked:
       error === "AlreadyCanceledSubscription" || error === "ResourceNotFound",
@@ -96,9 +100,11 @@ export const describeRevokeFailure = (
   if (failure.errorTag !== undefined) {
     return `Polar answered ${failure.statusCode ?? "an unknown status"} ${failure.errorTag}`;
   }
+
   if (failure.statusCode !== undefined) {
     return `Polar answered HTTP ${failure.statusCode}`;
   }
+
   return "no Polar answer (transport error)";
 };
 
@@ -201,6 +207,7 @@ export const readCheckoutSubscription = (
     });
 
     const subscriptionId = checkout.subscription_id;
+
     if (subscriptionId === null) {
       return Option.none<SubscriptionConfirmation>();
     }
@@ -326,6 +333,7 @@ const makePolarService = Effect.gen(function* () {
         if (!client) {
           return Option.none<PolarOrganizationSubscriptionSettings>();
         }
+
         return yield* readOrganizationSubscriptionSettings(() =>
           client.organizations.list({ limit: 1 })
         );
@@ -454,6 +462,7 @@ const makePolarService = Effect.gen(function* () {
           try: () => client.subscriptions.revoke(id),
           catch: (cause) => {
             const classified = classifyPolarRevokeFailure(cause);
+
             return new FailedToRevokeSubscriptionError({
               // The stable prefix leads a search back to this error; the
               // classified detail tells a failed queue row's `lastError`

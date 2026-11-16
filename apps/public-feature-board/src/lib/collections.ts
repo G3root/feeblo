@@ -43,11 +43,15 @@ import {
 } from "./board-scope";
 
 type CommentReactionRow = Schema.Schema.Type<typeof CommentReaction>;
+
 type ChangelogSubscriptionRow = Schema.Schema.Type<
   typeof ChangelogSubscription
 >;
+
 type PostReactionRow = Schema.Schema.Type<typeof PostReaction>;
+
 type PostSubscriptionRow = Schema.Schema.Type<typeof PostSubscription>;
+
 type UpvoteRow = Schema.Schema.Type<typeof Upvote>;
 
 /**
@@ -72,9 +76,11 @@ const getCurrentUserId = createIsomorphicFn()
  */
 function boardCollectionDeps(client: DbClient) {
   const scope = client.requireDependency<BoardScope>(BOARD_SCOPE_DEPENDENCY);
+
   const queryClient = client.requireDependency<QueryClient>(
     BOARD_QUERY_CLIENT_DEPENDENCY
   );
+
   const rpcHelpers = createRpcCollectionHelpers({
     getOrganizationId: () => scope.getOrganizationId(),
     getPostSlug: () => scope.getPostSlug(),
@@ -356,9 +362,11 @@ export const publicChangelogDetailDescriptor = collectionOptions(
       staleTime: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const filters = parseLoadSubsetOptions(
           ctx.meta?.loadSubsetOptions
         ).filters;
+
         const slug = eqFilterValue(filters, "slug") ?? deps.getChangelogSlug();
 
         if (!(slug && organizationId)) {
@@ -370,6 +378,7 @@ export const publicChangelogDetailDescriptor = collectionOptions(
             (rpc) => rpc.GetChangelogPublic({ organizationId, slug }),
             { signal: ctx.signal }
           );
+
           return [entry];
         } catch (error) {
           // A missing or hidden entry resolves to an empty collection so the
@@ -378,6 +387,7 @@ export const publicChangelogDetailDescriptor = collectionOptions(
           if (isRpcErrorTag(error, "ChangelogNotFoundError")) {
             return [];
           }
+
           throw error;
         }
       },
@@ -466,6 +476,7 @@ export const publicPostTagDescriptor = collectionOptions(
       staleTime: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
@@ -504,6 +515,7 @@ export const publicCommentDescriptor = collectionOptions(
       staleTime: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
@@ -605,6 +617,7 @@ export const publicCommentReactionDescriptor = collectionOptions(
       staleTime: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
@@ -741,6 +754,7 @@ export const publicPostUpvoteDescriptor = collectionOptions(
       staleTime: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
@@ -812,6 +826,7 @@ export const publicPostReactionDescriptor = collectionOptions(
       staleTime: Duration.toMillis(Duration.minutes(5)),
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
@@ -880,6 +895,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
       syncMode: "on-demand",
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const slug = deps.resolvePostSlug(
           parseLoadSubsetOptions(ctx.meta?.loadSubsetOptions).filters
         );
@@ -895,6 +911,7 @@ export const publicPostSubscriptionDescriptor = collectionOptions(
           }
           // SAFETY: The endpoint/API contract guarantees this response shape.
         );
+
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         return [...data];
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
@@ -947,6 +964,7 @@ export const publicChangelogSubscriptionDescriptor = collectionOptions(
       syncMode: "on-demand",
       queryFn: async () => {
         const organizationId = deps.getOrganizationId();
+
         if (!organizationId) {
           return [];
         }
@@ -954,6 +972,7 @@ export const publicChangelogSubscriptionDescriptor = collectionOptions(
         const data = await fetchRpc((rpc) =>
           rpc.ListChangelogSubscriptionsPublic({ organizationId })
         );
+
         // SAFETY: The endpoint/API contract guarantees this response shape.
         return [...data];
       },
@@ -994,16 +1013,20 @@ export const publicPostDetailDescriptor = collectionOptions(
       // entry per post regardless of where they subscribe from.
       queryKey: (opts) => {
         const filters = parseLoadSubsetOptions(opts).filters;
+
         const slug =
           eqFilterValue(filters, "slug") ?? deps.resolvePostSlug(filters);
+
         return deps.organizationScopedQueryKey("public-post-detail", slug);
       },
       syncMode: "on-demand",
       queryFn: async (ctx) => {
         const organizationId = deps.getOrganizationId();
+
         const filters = parseLoadSubsetOptions(
           ctx.meta?.loadSubsetOptions
         ).filters;
+
         const slug =
           eqFilterValue(filters, "slug") ?? deps.resolvePostSlug(filters);
 
@@ -1016,6 +1039,7 @@ export const publicPostDetailDescriptor = collectionOptions(
             (rpc) => rpc.GetPostPublic({ organizationId, slug }),
             { signal: ctx.signal }
           );
+
           return [post];
         } catch (error) {
           // A missing or merged-away slug resolves to an empty collection so
@@ -1024,6 +1048,7 @@ export const publicPostDetailDescriptor = collectionOptions(
           if (isRpcErrorTag(error, "PostNotFoundError")) {
             return [];
           }
+
           throw error;
         }
       },
@@ -1052,6 +1077,7 @@ export const publicDeleteEligibilityDescriptor = collectionOptions(
           (rpc) => rpc.ListPostDeleteEligibilityPublic({ organizationId }),
           { signal: ctx.signal }
         );
+
         return result.eligibleIds.map((postId) => ({
           organizationId,
           postId,

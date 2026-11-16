@@ -28,6 +28,7 @@ const toMutableColumnConfig = (config: TRoadmapColumnConfig) =>
 
 const makeRoadmapColumnRepository = Effect.gen(function* () {
   const db = yield* currentDb;
+
   return {
     findMany: ({
       organizationId,
@@ -101,6 +102,7 @@ const makeRoadmapColumnRepository = Effect.gen(function* () {
     update: ({ organizationId, ...input }: TRoadmapColumnUpdate) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         const [updated] = yield* db
           .update(schema.roadmapColumnTable)
           .set({
@@ -171,6 +173,7 @@ const makeRoadmapColumnRepository = Effect.gen(function* () {
       }),
   };
 });
+
 export class RoadmapColumnRepository extends Context.Service<RoadmapColumnRepository>()(
   "RoadmapColumnRepository",
   { make: makeRoadmapColumnRepository }

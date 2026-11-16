@@ -41,6 +41,7 @@ export const makeSlackManagementServiceLive = (
       const config = yield* SlackIntegrationConfig;
       const connectionService = yield* SlackConnectionService;
       const channelService = yield* SlackChannelService;
+
       return SlackManagementService.of(
         chatManagementServiceRecord<SlackManagementSchemas>({
           channelService,

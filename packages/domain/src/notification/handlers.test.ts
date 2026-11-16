@@ -55,6 +55,7 @@ describe("NotificationRpcHandlers", () => {
         role: "manager",
         createdAt: now,
       });
+
       return { memberId, organizationId, userId } satisfies Fixture;
     });
 
@@ -103,6 +104,7 @@ describe("NotificationRpcHandlers", () => {
         deduplicationKey: `test:${id}`,
         ...(options.createdAt && { createdAt: options.createdAt }),
       });
+
       return id;
     });
 
@@ -123,6 +125,7 @@ describe("NotificationRpcHandlers", () => {
         role: "manager",
         createdAt: yield* DateTime.nowAsDate,
       });
+
       return { ...fixture, memberId, userId } satisfies Fixture;
     });
 
@@ -139,6 +142,7 @@ describe("NotificationRpcHandlers", () => {
           const handlers = yield* NotificationRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const id = yield* insertNotification(fixture);
+
           const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
             effect.pipe(
               Effect.provideService(CurrentSession, session(fixture))
@@ -179,6 +183,7 @@ describe("NotificationRpcHandlers", () => {
           const handlers = yield* NotificationRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const actor = yield* addMember(fixture);
+
           const id = yield* insertNotification(fixture, {
             actorUserId: actor.userId,
           });
@@ -212,6 +217,7 @@ describe("NotificationRpcHandlers", () => {
             email: `${visitorId}@example.com`,
             name: "Public visitor",
           });
+
           const id = yield* insertNotification(fixture, {
             actorUserId: visitorId,
           });
@@ -237,6 +243,7 @@ describe("NotificationRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* NotificationRpcHandlersEffect;
             const fixture = yield* makeFixture();
+
             const error = yield* Effect.flip(
               handlers
                 .ListNotifications({ organizationId: fixture.organizationId })
@@ -244,6 +251,7 @@ describe("NotificationRpcHandlers", () => {
                   Effect.provideService(CurrentSession, session(fixture, false))
                 )
             );
+
             expect(error._tag).toBe("PolicyDenied");
           })
       );
@@ -260,10 +268,12 @@ describe("NotificationRpcHandlers", () => {
             yield* insertNotification(fixture, {
               recipientUserId: otherMember.userId,
             });
+
             const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
                 Effect.provideService(CurrentSession, session(fixture))
               );
+
             const otherScoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
                 Effect.provideService(CurrentSession, session(otherMember))
@@ -298,16 +308,20 @@ describe("NotificationRpcHandlers", () => {
             const handlers = yield* NotificationRpcHandlersEffect;
             const fixture = yield* makeFixture();
             const otherMember = yield* addMember(fixture);
+
             const oldest = yield* insertNotification(fixture, {
               createdAt: dateAt("2026-01-01T00:00:00.000Z"),
             });
+
             const newest = yield* insertNotification(fixture, {
               createdAt: dateAt("2026-01-01T00:02:00.000Z"),
             });
+
             yield* insertNotification(fixture, {
               recipientUserId: otherMember.userId,
               createdAt: dateAt("2026-01-01T00:03:00.000Z"),
             });
+
             const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
                 Effect.provideService(CurrentSession, session(fixture))
@@ -319,7 +333,9 @@ describe("NotificationRpcHandlers", () => {
                 limit: 1,
               })
             );
+
             expect(firstPage).toMatchObject([{ id: newest }]);
+
             const secondPage = yield* scoped(
               handlers.ListNotifications({
                 organizationId: fixture.organizationId,
@@ -330,6 +346,7 @@ describe("NotificationRpcHandlers", () => {
                 limit: 1,
               })
             );
+
             expect(secondPage).toMatchObject([{ id: oldest }]);
           })
       );
@@ -341,6 +358,7 @@ describe("NotificationRpcHandlers", () => {
             const handlers = yield* NotificationRpcHandlersEffect;
             const fixture = yield* makeFixture();
             const sharedInstant = dateAt("2026-01-01T00:01:00.000Z");
+
             // A fan-out writes every recipient row in one statement, so every
             // row of the batch carries one `createdAt`. Legid ids are random,
             // so the expected order comes from the composite sort key (id
@@ -350,9 +368,11 @@ describe("NotificationRpcHandlers", () => {
               yield* insertNotification(fixture, { createdAt: sharedInstant }),
               yield* insertNotification(fixture, { createdAt: sharedInstant }),
             ];
+
             const expectedOrder = [...batch].sort((left, right) =>
               left > right ? -1 : left < right ? 1 : 0
             );
+
             const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
                 Effect.provideService(CurrentSession, session(fixture))
@@ -364,9 +384,11 @@ describe("NotificationRpcHandlers", () => {
                 limit: 2,
               })
             );
+
             expect(firstPage.map((row) => row.id)).toEqual(
               expectedOrder.slice(0, 2)
             );
+
             const secondPage = yield* scoped(
               handlers.ListNotifications({
                 organizationId: fixture.organizationId,
@@ -377,6 +399,7 @@ describe("NotificationRpcHandlers", () => {
                 limit: 2,
               })
             );
+
             expect(secondPage.map((row) => row.id)).toEqual(
               expectedOrder.slice(2)
             );
@@ -390,6 +413,7 @@ describe("NotificationRpcHandlers", () => {
             const handlers = yield* NotificationRpcHandlersEffect;
             const fixture = yield* makeFixture();
             yield* insertNotification(fixture);
+
             const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
                 Effect.provideService(CurrentSession, session(fixture))
@@ -403,6 +427,7 @@ describe("NotificationRpcHandlers", () => {
                 })
               )
             );
+
             expect(malformed._tag).toBe("BadRequestError");
 
             // An empty string is a supplied value that does not decode, not
@@ -415,6 +440,7 @@ describe("NotificationRpcHandlers", () => {
                 })
               )
             );
+
             expect(empty._tag).toBe("BadRequestError");
             expect(
               yield* scoped(
@@ -431,13 +457,16 @@ describe("NotificationRpcHandlers", () => {
           const handlers = yield* NotificationRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const otherMember = yield* addMember(fixture);
+
           const otherId = yield* insertNotification(fixture, {
             recipientUserId: otherMember.userId,
           });
+
           const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
             effect.pipe(
               Effect.provideService(CurrentSession, session(fixture))
             );
+
           const otherScoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
             effect.pipe(
               Effect.provideService(CurrentSession, session(otherMember))
@@ -484,6 +513,7 @@ describe("NotificationRpcHandlers", () => {
             ? { restrictedToOrganizationId: organizationId }
             : undefined),
         });
+
         if (options.withMembership) {
           yield* db.insert(schema.memberTable).values({
             id: `member_${suffix}`,
@@ -493,6 +523,7 @@ describe("NotificationRpcHandlers", () => {
             createdAt: now,
           });
         }
+
         yield* db.insert(schema.changelogSubscriptionTable).values({
           id: `chgsub_${suffix}`,
           organizationId,
@@ -501,6 +532,7 @@ describe("NotificationRpcHandlers", () => {
           createdAt: now,
           updatedAt: now,
         });
+
         return { userId };
       });
 
@@ -518,17 +550,20 @@ describe("NotificationRpcHandlers", () => {
               slug: organizationId,
               createdAt: yield* DateTime.nowAsDate,
             });
+
             const subscribedMember = yield* insertChangelogSubscriber(
               organizationId,
               "subscribed_member",
               { withMembership: true }
             );
+
             // A signed-in visitor who never joined the workspace still gets
             // the in-app notification.
             const subscribedVisitor = yield* insertChangelogSubscriber(
               organizationId,
               "subscribed_visitor"
             );
+
             // A workspace member who never subscribed is not notified.
             yield* db.insert(schema.userTable).values({
               id: `user_unsubscribed`,
@@ -556,6 +591,7 @@ describe("NotificationRpcHandlers", () => {
               .where(
                 eq(schema.notificationTable.organizationId, organizationId)
               );
+
             expect(rows).toHaveLength(2);
             expect(rows.map((row) => row.recipientUserId).sort()).toEqual(
               [subscribedMember.userId, subscribedVisitor.userId].sort()
@@ -585,11 +621,13 @@ describe("NotificationRpcHandlers", () => {
               slug: organizationId,
               createdAt: yield* DateTime.nowAsDate,
             });
+
             const unrestrictedMember = yield* insertChangelogSubscriber(
               organizationId,
               "unrestricted_member",
               { withMembership: true }
             );
+
             // A member restricted to the workspace via SSO cannot open the
             // dashboard, so their notification links to the public changelog.
             const restrictedMember = yield* insertChangelogSubscriber(
@@ -611,6 +649,7 @@ describe("NotificationRpcHandlers", () => {
               .where(
                 eq(schema.notificationTable.organizationId, organizationId)
               );
+
             expect(rows).toHaveLength(2);
             expect(
               rows.find(
@@ -640,11 +679,13 @@ describe("NotificationRpcHandlers", () => {
               slug: organizationId,
               createdAt: yield* DateTime.nowAsDate,
             });
+
             const publisher = yield* insertChangelogSubscriber(
               organizationId,
               "publisher",
               { withMembership: true }
             );
+
             const reader = yield* insertChangelogSubscriber(
               organizationId,
               "reader"
@@ -664,6 +705,7 @@ describe("NotificationRpcHandlers", () => {
               .where(
                 eq(schema.notificationTable.organizationId, organizationId)
               );
+
             expect(rows).toHaveLength(1);
             expect(rows[0]).toMatchObject({
               recipientUserId: reader.userId,
@@ -702,6 +744,7 @@ describe("NotificationRpcHandlers", () => {
                 slug: organizationId,
                 createdAt: now,
               });
+
               for (const userId of [
                 memberSubscriberId,
                 visitorCreatorId,
@@ -714,6 +757,7 @@ describe("NotificationRpcHandlers", () => {
                   name: userId,
                 });
               }
+
               yield* db.insert(schema.memberTable).values({
                 id: memberSubscriberMemberId,
                 organizationId,
@@ -781,6 +825,7 @@ describe("NotificationRpcHandlers", () => {
                 commentId: internalCommentId,
                 visibility: "INTERNAL",
               });
+
               const internalRows = yield* db
                 .select()
                 .from(schema.notificationTable)
@@ -790,6 +835,7 @@ describe("NotificationRpcHandlers", () => {
                     eq(schema.notificationTable.resourceId, internalCommentId)
                   )
                 );
+
               // The non-member post creator and the non-member subscriber
               // cannot see INTERNAL comments, so only the member subscriber
               // is notified.
@@ -804,6 +850,7 @@ describe("NotificationRpcHandlers", () => {
                 commentId: publicCommentId,
                 visibility: "PUBLIC",
               });
+
               const publicRows = yield* db
                 .select()
                 .from(schema.notificationTable)
@@ -813,6 +860,7 @@ describe("NotificationRpcHandlers", () => {
                     eq(schema.notificationTable.resourceId, publicCommentId)
                   )
                 );
+
               // PUBLIC comments keep the existing fan-out to everyone.
               expect(
                 publicRows.map((row) => row.recipientUserId).sort()

@@ -34,6 +34,7 @@ describe("normalizeUserIdentity", () => {
       avatar: "https://example.com/avatar.png",
       token: "tok_123",
     };
+
     const result = normalizeUserIdentity(user);
 
     expect(result.email).toBe("test@example.com");

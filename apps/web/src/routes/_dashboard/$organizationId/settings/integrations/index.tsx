@@ -95,9 +95,11 @@ export const Route = createFileRoute(
 
 function IntegrationsSettingsRoute() {
   const organizationId = useOrganizationId();
+
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "integrations.manage")
   );
+
   const search = Route.useSearch();
   const router = useRouter();
 
@@ -138,6 +140,7 @@ function IntegrationsSettingsRoute() {
     } else {
       return;
     }
+
     void router.navigate({
       to: "/$organizationId/settings/integrations",
       params: { organizationId },
@@ -156,6 +159,7 @@ function IntegrationsSettingsRoute() {
   if (isPending) {
     return null;
   }
+
   if (!allowed) {
     return <SettingsAccessDenied />;
   }

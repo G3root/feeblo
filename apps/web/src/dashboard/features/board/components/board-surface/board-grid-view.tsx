@@ -32,6 +32,7 @@ function movePostToColumn(
   const fromLane = lanes.find((lane) =>
     lane.posts.some((post) => post.id === sourceId)
   );
+
   const toLane = lanes.find((lane) => lane.statusId === targetStatusId);
   const fromStatusId = fromLane?.statusId;
   const targetStatus = toLane?.status;
@@ -97,13 +98,16 @@ export function BoardGridView({
   groupedPosts: BoardPostLane[];
 }) {
   const { postCollection } = useDashboardCollections();
+
   // Dragging a post between lanes changes its status, which the backend
   // reserves for `posts.status` holders — disable the interaction entirely
   // for everyone else instead of letting an optimistic move fail with 403.
   const { allowed: canChangeStatus } = usePolicy(
     hasPermission(organizationId, "posts.status")
   );
+
   const [items, setItems] = useState(groupedPosts);
+
   const [previousGroupedPosts, setPreviousGroupedPosts] =
     useState(groupedPosts);
 
@@ -118,6 +122,7 @@ export function BoardGridView({
   const [visibleCounts, setVisibleCounts] = useState<
     Readonly<Record<string, number>>
   >({});
+
   // `none` is a single lane whose id is the fixed `"all"` from
   // `groupBoardPosts`, so it pages through the same map as the grouped lanes.
   const flatLaneId = items[0]?.id ?? "all";
@@ -127,6 +132,7 @@ export function BoardGridView({
   const flatRemainingCount = flatRows.length - flatVisibleRows.length;
   const [initialSnapshot] = useState(() => items);
   const snapshot = useRef(initialSnapshot);
+
   const activeDrag = useRef<{
     sourceId: string;
     sourceStatusId: string;
@@ -142,6 +148,7 @@ export function BoardGridView({
 
       if (source?.type !== "item") {
         activeDrag.current = null;
+
         return;
       }
 
@@ -191,11 +198,13 @@ export function BoardGridView({
 
       if (event.canceled) {
         setItems(snapshot.current);
+
         return;
       }
 
       if (source?.type !== "item") {
         setItems(snapshot.current);
+
         return;
       }
 
@@ -203,6 +212,7 @@ export function BoardGridView({
       const sourceStatusId =
         dragState?.sourceStatusId ??
         (source.data?.statusId as string | undefined);
+
       const targetStatusId =
         // SAFETY: The upstream contract guarantees a string here.
         dragState?.targetStatusId ??
@@ -213,6 +223,7 @@ export function BoardGridView({
         sourceStatusId === targetStatusId
       ) {
         setItems(snapshot.current);
+
         return;
         // SAFETY: The upstream contract guarantees a string here.
       }
@@ -289,6 +300,7 @@ export function BoardGridView({
               const visibleCount = visibleCounts[lane.id] ?? GRID_PAGE_SIZE;
               const visibleRows = rows.slice(0, visibleCount);
               const remainingCount = rows.length - visibleRows.length;
+
               return (
                 <BoardGridLaneColumn
                   boardId={boardId}

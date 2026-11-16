@@ -110,6 +110,7 @@ const makePostTrafficRepository = Effect.gen(function* () {
     recordView: (input: TRecordPostViewInput) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .transaction(() =>
             Effect.gen(function* () {
@@ -243,14 +244,17 @@ const makePostTrafficRepository = Effect.gen(function* () {
           postId,
           since,
         });
+
         const devices = yield* breakdown(schema.postViewEventTable.device, {
           postId,
           since,
         });
+
         const browsers = yield* breakdown(schema.postViewEventTable.browser, {
           postId,
           since,
         });
+
         const os = yield* breakdown(schema.postViewEventTable.os, {
           postId,
           since,
@@ -288,6 +292,7 @@ const makePostTrafficRepository = Effect.gen(function* () {
     }: Pick<TPostTrafficRead, "organizationId" | "since">) =>
       Effect.gen(function* () {
         const window = yield* viewsInWindow({ organizationId, since });
+
         const allTime = yield* db.execute<{ views: number }>(sql`
           select coalesce(sum(${schema.postViewTotalTable.views}), 0)::int as "views"
           from ${schema.postViewTotalTable}
@@ -300,14 +305,17 @@ const makePostTrafficRepository = Effect.gen(function* () {
           organizationId,
           since,
         });
+
         const devices = yield* breakdown(schema.postViewEventTable.device, {
           organizationId,
           since,
         });
+
         const browsers = yield* breakdown(schema.postViewEventTable.browser, {
           organizationId,
           since,
         });
+
         const os = yield* breakdown(schema.postViewEventTable.os, {
           organizationId,
           since,

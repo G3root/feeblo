@@ -18,6 +18,7 @@ function ImportReviewRoute() {
   const { jobId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "boards.importPosts")
   );
@@ -25,6 +26,7 @@ function ImportReviewRoute() {
   if (isPending) {
     return null;
   }
+
   if (!allowed) {
     return <SettingsAccessDenied />;
   }

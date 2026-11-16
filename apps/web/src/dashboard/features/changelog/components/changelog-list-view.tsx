@@ -50,6 +50,7 @@ export function ChangelogListView({
 }) {
   const { changelogCategoryCollection, changelogCategoryLinkCollection } =
     useDashboardCollections();
+
   const categoriesQuery = useLiveQuery({
     // The changelog list re-renders on every search/filter change; the
     // explicit keys keep the two list lookups off the identity path.
@@ -63,7 +64,9 @@ export function ChangelogListView({
         .from({ category: changelogCategoryCollection })
         .where(({ category }) => eq(category.organizationId, organizationId)),
   });
+
   const categories = categoriesQuery.data ?? [];
+
   const categoryById = new Map(
     categories.map((category) => [category.id, category])
   );
@@ -79,8 +82,10 @@ export function ChangelogListView({
         .from({ link: changelogCategoryLinkCollection })
         .where(({ link }) => eq(link.organizationId, organizationId)),
   });
+
   const links = linksQuery.data ?? [];
   const categoryIdsByChangelog = new Map<string, string[]>();
+
   for (const link of links) {
     const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
     ids.push(link.categoryId);
@@ -174,6 +179,7 @@ export function ChangelogListView({
 const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
 });
+
 const publishDateFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",

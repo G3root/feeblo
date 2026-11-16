@@ -63,11 +63,13 @@ export async function settlePreloads(
 ): Promise<PreloadOutcome> {
   if (!isServerRender()) {
     await Promise.all(preloads);
+
     return { degraded: false };
   }
 
   const settled = Promise.allSettled(preloads);
   let timedOut = false;
+
   const budget = new Promise<void>((resolve) => {
     setTimeout(() => {
       timedOut = true;

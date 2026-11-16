@@ -214,6 +214,7 @@ const makeCommentService = Effect.gen(function* () {
         .for("no key update");
 
       const post = rows.at(0);
+
       if (post === undefined) {
         return;
       }
@@ -380,6 +381,7 @@ const makeCommentService = Effect.gen(function* () {
             args.statusUpdate === undefined
               ? { outboxId: undefined, statusUpdateId: null }
               : yield* args.statusUpdate;
+
           const statusUpdateId = statusUpdate.statusUpdateId;
 
           yield* repository.create({
@@ -453,6 +455,7 @@ const makeCommentService = Effect.gen(function* () {
               visibility: args.edit.visibility,
             }),
           });
+
           if (Option.isSome(updated)) {
             yield* activityRepository.create({
               organizationId: args.edit.organizationId,
@@ -464,6 +467,7 @@ const makeCommentService = Effect.gen(function* () {
               visibility: args.edit.visibility ?? null,
             });
           }
+
           return updated;
         })
       );
@@ -487,6 +491,7 @@ const makeCommentService = Effect.gen(function* () {
             organizationId: args.target.organizationId,
             postId: args.target.postId,
           });
+
           if (Option.isSome(deleted)) {
             yield* activityRepository.create({
               organizationId: args.target.organizationId,
@@ -497,6 +502,7 @@ const makeCommentService = Effect.gen(function* () {
               commentId: args.target.id,
             });
           }
+
           return deleted;
         })
       );
@@ -520,6 +526,7 @@ const makeCommentService = Effect.gen(function* () {
             organizationId: args.target.organizationId,
             postId: args.target.postId,
           });
+
           if (Option.isSome(result)) {
             yield* activityRepository.create({
               organizationId: args.target.organizationId,
@@ -530,6 +537,7 @@ const makeCommentService = Effect.gen(function* () {
               commentId: args.target.id,
             });
           }
+
           return result;
         })
       );
@@ -553,6 +561,7 @@ const makeCommentService = Effect.gen(function* () {
             organizationId: args.target.organizationId,
             postId: args.target.postId,
           });
+
           if (Option.isSome(result)) {
             yield* activityRepository.create({
               organizationId: args.target.organizationId,
@@ -563,6 +572,7 @@ const makeCommentService = Effect.gen(function* () {
               commentId: args.target.id,
             });
           }
+
           return result;
         })
       );

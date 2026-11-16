@@ -16,12 +16,14 @@ vi.mock("@feeblo/web-shared/auth-client", () => ({
     parse: <T,>(value: T) => value,
   },
 }));
+
 // The widget form reads these workspace modules directly; the stub provides
 // a faithful in-memory implementation for the RPC transport boundary.
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/runtime", () => ({
   fetchRpc: vi.fn().mockResolvedValue(undefined),
 }));
+
 // The widget form reads these workspace modules directly; the stub provides
 // a faithful in-memory implementation for the auth state hook boundary.
 // eslint-disable-next-line anti-slop/no-module-mocking
@@ -50,11 +52,14 @@ let memberData: MockMember | undefined = {
   organizationId: "organization-id",
   userId: "user-1",
 };
+
 let bumpRender: (() => void) | null = null;
+
 function setMemberData(value: MockMember | undefined) {
   memberData = value;
   bumpRender?.();
 }
+
 // The form's TanStack DB queries are exercised through an in-memory seam that
 // resolves the member / board / status reads the component performs.
 type MockLiveResult = {
@@ -77,6 +82,7 @@ vi.mock("@tanstack/react-db", () => ({
           options.onMutate(variables);
           await options.mutationFn(variables);
         })();
+
         return { when: () => promise };
       }
   ),
@@ -84,29 +90,37 @@ vi.mock("@tanstack/react-db", () => ({
   queryOnce: vi.fn(),
   useLiveQuery: vi.fn((config: { query: (q: never) => MockLiveResult }) => {
     let alias = "";
+
     const fakeQ = {
       from: (
         arg: Record<string, string | number | boolean | null | undefined>
       ) => {
         alias = Object.keys(arg)[0] ?? "";
         const chain = { where: () => chain, findOne: () => undefined };
+
         return chain;
       },
     };
+
     // SAFETY: Test fixture: `never` marks an intentionally unsupported input to assert rejection.
     config.query(fakeQ as never);
+
     if (alias === "member") {
       return { data: memberData };
     }
+
     if (alias === "board") {
       return { data: [board] };
     }
+
     if (alias === "postStatus") {
       return { data: [postStatus] };
     }
+
     return { data: undefined };
   }),
 }));
+
 // The widget form reads these workspace modules directly; the stub provides
 // a faithful in-memory implementation for the id generation boundary.
 // The post form needs a deterministic generated post id for its upload flow.
@@ -155,6 +169,7 @@ class MockXMLHttpRequest {
 
   private dispatch(type: string) {
     const listener = this.listeners.get(type);
+
     if (isFunction(listener)) {
       // SAFETY: the non-object union branch is a callable EventListener.
       (listener as (event: Event) => void)(new Event(type));
@@ -174,6 +189,7 @@ const board = {
   updatedAt: new Date(),
   visibility: "PUBLIC",
 };
+
 const postStatus = {
   archivedAt: null,
   boardIds: null,
@@ -200,6 +216,7 @@ function FormHarness() {
   const [, forceRender] = useState(0);
   useEffect(() => {
     bumpRender = () => forceRender((count) => count + 1);
+
     return () => {
       bumpRender = null;
     };
@@ -258,9 +275,11 @@ async function pasteImage(screen: RenderScreen, text: string) {
     { timeout: 10_000 }
   );
   const editor = screen.getByRole("textbox", { name: "" }).all()[1];
+
   if (!editor) {
     throw new Error("expected the post content editor to be mounted");
   }
+
   await editor.click();
   await editor.fill(text);
 
@@ -285,6 +304,7 @@ async function submit(screen: RenderScreen): Promise<string> {
   // the slim list row.
   // SAFETY: The harness's persistPost receives the form's persistence input.
   const persisted = persistSpy.mock.calls[0]?.[0] as { content: string };
+
   return persisted.content;
 }
 

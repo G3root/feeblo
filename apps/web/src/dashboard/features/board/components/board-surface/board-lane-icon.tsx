@@ -12,6 +12,18 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { StatusIcon } from "./status-icon";
 
 /**
+ * The neutral lane mark per grouping. `status` is the fallback for a lane that
+ * groups by status without a status to show, which renders as a generic list.
+ */
+const LANE_ICON_BY_GROUPING: Record<TBoardGroupBy, typeof GroupItemsIcon> = {
+  assignee: UserCircleIcon,
+  board: DashboardSquare01Icon,
+  label: Tag01Icon,
+  none: Rows3Icon,
+  status: GroupItemsIcon,
+};
+
+/**
  * The mark on a lane header, chosen by what the lane represents.
  *
  * Status lanes keep the status icon and colour, because those are the same
@@ -30,16 +42,7 @@ export function BoardLaneIcon({
     return <StatusIcon status={status} />;
   }
 
-  const icon =
-    groupBy === "assignee"
-      ? UserCircleIcon
-      : groupBy === "board"
-        ? DashboardSquare01Icon
-        : groupBy === "label"
-          ? Tag01Icon
-          : groupBy === "none"
-            ? Rows3Icon
-            : GroupItemsIcon;
+  const icon = LANE_ICON_BY_GROUPING[groupBy];
 
   return (
     <HugeiconsIcon

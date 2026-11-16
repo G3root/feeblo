@@ -104,6 +104,7 @@ export const verifyJwt = (
 
     const maxTokenLifetime =
       options.maxTokenLifetime ?? DEFAULT_MAX_TOKEN_LIFETIME;
+
     const nowSeconds =
       options.nowSeconds ??
       (yield* Effect.map(Clock.currentTimeMillis, (ms) =>
@@ -136,9 +137,11 @@ export const verifyJwt = (
       if (result !== null && result.aud === expectedOrganizationId) {
         yield* enforceTimeClaims(result, nowSeconds);
         yield* enforceMaxLifetime(result, maxTokenLifetime);
+
         return result;
       }
     }
+
     return yield* new UnauthorizedError({ message: "Invalid JWT" });
   });
 

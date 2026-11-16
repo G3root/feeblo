@@ -5,10 +5,12 @@ import { symmetricDecrypt, symmetricEncrypt } from "./crypto";
 describe("symmetric crypto via HKDF", () => {
   it("round-trips encrypt/decrypt with HKDF-derived key", async () => {
     const key = "test-auth-encryption-key-with-enough-entropy-1234";
+
     const data = JSON.stringify({
       email: "test@example.com",
       type: "email-verification",
     });
+
     const encrypted = await symmetricEncrypt({ key, data });
     const decrypted = await symmetricDecrypt({ key, data: encrypted });
     expect(decrypted).toBe(data);
@@ -40,6 +42,7 @@ describe("symmetric crypto via HKDF", () => {
 
   it("handles empty string and unicode", async () => {
     const key = "unicode-test-key-32-chars-xxxxxx!!";
+
     for (const data of ["", "🦄 emoji test", "a".repeat(10_000)]) {
       const enc = await symmetricEncrypt({ key, data });
       expect(await symmetricDecrypt({ key, data: enc })).toBe(data);

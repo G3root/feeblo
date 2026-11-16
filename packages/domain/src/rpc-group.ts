@@ -139,5 +139,6 @@ export type RpcTagsOf<Group> = Group extends {
  */
 export const AllRpcs = (() => {
   const [first, ...rest] = RpcGroups;
+
   return first[1].merge(...rest.map(([, group]) => group));
 })();

@@ -29,6 +29,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
         const workspaceName = args.workspaceName.trim();
 
         const subdomain = slugify(workspaceName);
+
         if (subdomain.length < 4) {
           return yield* new BadRequestError({
             message:
@@ -72,6 +73,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
     GetWorkspaceCreationState: () =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+
         return yield* workspacePolicy.getCreationState({
           userId: session.session.userId,
         });
@@ -99,6 +101,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
           onSuccess: () =>
             Effect.gen(function* () {
               const taken = yield* repository.isSubdomainTaken(args.slug);
+
               if (!taken) {
                 return {
                   available: true,
@@ -106,9 +109,11 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
                   reason: null,
                 };
               }
+
               const suggestion = yield* repository.getSubdomainSuggestion(
                 args.slug
               );
+
               return {
                 available: false,
                 suggestion: Option.getOrNull(suggestion),

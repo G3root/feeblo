@@ -11,60 +11,79 @@ export const JwtSecretId = makeId("jwt_secret", "jwt", {
 export const WorkspaceId = makeId("workspace", "org", {
   approximateLength: 12,
 });
+
 export const UserId = makeId("user", "usr", {
   approximateLength,
 });
+
 export const SessionId = makeId("session", "ses", {
   approximateLength,
 });
+
 export const ProjectId = makeId("project", "prj", {
   approximateLength,
 });
+
 export const MemberId = makeId("member", "mem", {
   approximateLength,
 });
+
 export const BoardId = makeId("board", "brd", {
   approximateLength,
 });
+
 export const PostStatusId = makeId("post_status", "pss", {
   approximateLength,
 });
+
 export const PostId = makeId("post", "pst", {
   approximateLength,
 });
+
 export const UpvoteId = makeId("upvote", "upv", {
   approximateLength,
 });
+
 export const CommentReactionId = makeId("comment_reaction", "crt", {
   approximateLength,
 });
+
 export const CommentId = makeId("comment", "cmt", {
   approximateLength,
 });
+
 export const ReplyId = makeId("reply", "rpl", {
   approximateLength,
 });
+
 export const PostReactionId = makeId("post_reaction", "rct", {
   approximateLength,
 });
+
 export const PostSubscriptionId = makeId("post_subscription", "psb", {
   approximateLength,
 });
+
 export const ChangelogSubscriptionId = makeId("changelog_subscription", "cgs", {
   approximateLength,
 });
+
 export const EmailOutboxId = makeId("email_outbox", "eob", {
   approximateLength,
 });
+
 export const EmailDeliveryId = makeId("email_delivery", "edl", {
   approximateLength,
 });
+
 export const EmailContactId = makeId("email_contact", "ect", {
   approximateLength,
 });
+
 export const EmailSubscriptionId = makeId("email_subscription", "esb", {
   approximateLength,
 });
+
 export const AuditLogId = makeId("audit_log", "alog", {
   approximateLength,
 });
@@ -72,9 +91,11 @@ export const AuditLogId = makeId("audit_log", "alog", {
 export const PostActivityId = makeId("post_activity", "pac", {
   approximateLength,
 });
+
 export const NotificationId = makeId("notification", "ntf", {
   approximateLength,
 });
+
 export const NotificationPreferenceId = makeId(
   "notification_preference",
   "npr",
@@ -82,12 +103,15 @@ export const NotificationPreferenceId = makeId(
     approximateLength,
   }
 );
+
 export const SiteId = makeId("site", "sit", {
   approximateLength,
 });
+
 export const SubscriptionId = makeId("subscription", "sub", {
   approximateLength,
 });
+
 export const ChangelogId = makeId("changelog", "chg", {
   approximateLength,
 });

@@ -79,6 +79,7 @@ layer(TestLayer)("CRM entry intake", (it) => {
   it.effect("creates an entry while the plan has room", () =>
     Effect.gen(function* () {
       const organizationId = yield* makeOrganization;
+
       const created = yield* createCrmEntry({
         organizationId,
         insert: Effect.succeed("created"),
@@ -163,12 +164,14 @@ layer(TestLayer)("CRM entry intake", (it) => {
       Effect.gen(function* () {
         const organizationId = yield* makeOrganization;
         let lookups = 0;
+
         const found = yield* ensureCrmEntry({
           organizationId,
           // Absent before the insert, present after it: the concurrent
           // writer's row is what the re-read must return.
           find: Effect.sync(() => {
             lookups += 1;
+
             return lookups === 1
               ? Option.none<string>()
               : Option.some("winner");

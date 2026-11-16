@@ -22,15 +22,18 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await dashboardCollections.siteCollection.preload();
+
     return null;
   },
 });
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
+
   const { allowed: canManageRoadmap, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "site.update")
   );
+
   const site = useSite();
   const [isPending, startTransition] = useTransition();
 
@@ -62,6 +65,7 @@ function RouteComponent() {
       }
     });
   };
+
   return (
     <SettingsLayout.Root>
       <SettingsLayout.Header>

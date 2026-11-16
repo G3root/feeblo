@@ -31,8 +31,10 @@ import { GitHubProvider, type GitHubProviderContract } from "./github-provider";
 /** Recording fake provider; the test sets `createIssue` behavior per scenario. */
 const makeFakeGitHubProvider = () => {
   const calls: string[] = [];
+
   let createIssueImpl: GitHubProviderContract["createIssue"] = () =>
     Effect.die("createIssue not configured");
+
   return {
     calls,
     reset: () => {
@@ -45,6 +47,7 @@ const makeFakeGitHubProvider = () => {
       completeInstallation: () => Effect.die("unused"),
       createIssue: (input) => {
         calls.push("createIssue");
+
         return createIssueImpl(input);
       },
       listRepositories: () => Effect.die("unused"),
@@ -65,6 +68,7 @@ const testConfig = Layer.succeed(
 
 const makeTestLayer = () => {
   const provider = makeFakeGitHubProvider();
+
   return {
     provider,
     layer: Layer.mergeAll(
@@ -239,6 +243,7 @@ describe("GitHub management service", () => {
           const link = yield* service.createPostIssue(createInput(seeded));
 
           expect(link.displayKey).toBe("acme/feedback#7");
+
           const [request] = yield* db
             .select({ state: schema.externalResourceCreateRequestTable.state })
             .from(schema.externalResourceCreateRequestTable)
@@ -254,6 +259,7 @@ describe("GitHub management service", () => {
                 )
               )
             );
+
           expect(request?.state).toBe("succeeded");
 
           const [resource] = yield* db
@@ -272,6 +278,7 @@ describe("GitHub management service", () => {
                 eq(schema.integrationExternalResourceTable.remoteId, "I_7")
               )
             );
+
           expect(resource?.remoteId).toBe("I_7");
           expect(resource?.remoteUrl).toBe(
             "https://github.com/acme/feedback/issues/7"
@@ -293,6 +300,7 @@ describe("GitHub management service", () => {
                 eq(schema.postExternalResourceLinkTable.postId, seeded.postId)
               )
             );
+
           expect(postLink?.postId).toBe(seeded.postId);
           expect(postLink?.externalResourceId).toBe(resource?.id);
         })
@@ -317,6 +325,7 @@ describe("GitHub management service", () => {
           const first = yield* Effect.exit(
             service.createPostIssue(createInput(seeded))
           );
+
           expect(Exit.isFailure(first)).toBe(true);
 
           const [request] = yield* db
@@ -334,11 +343,13 @@ describe("GitHub management service", () => {
                 )
               )
             );
+
           expect(request?.state).toBe("pending");
 
           const second = yield* Effect.exit(
             service.createPostIssue(createInput(seeded))
           );
+
           expect(Exit.isFailure(second)).toBe(true);
           expect(
             test.provider.calls.filter((call) => call === "createIssue")
@@ -365,6 +376,7 @@ describe("GitHub management service", () => {
           const first = yield* Effect.exit(
             service.createPostIssue(createInput(seeded))
           );
+
           expect(Exit.isFailure(first)).toBe(true);
 
           const [request] = yield* db
@@ -382,11 +394,13 @@ describe("GitHub management service", () => {
                 )
               )
             );
+
           expect(request?.state).toBe("failed");
 
           const second = yield* Effect.exit(
             service.createPostIssue(createInput(seeded))
           );
+
           expect(Exit.isFailure(second)).toBe(true);
           expect(
             test.provider.calls.filter((call) => call === "createIssue")
@@ -402,6 +416,7 @@ describe("GitHub management service", () => {
         const seeded = yield* seedRuleFixtures;
 
         const created = yield* service.createRule(ruleCreateInput(seeded));
+
         const rules = yield* service.listRules({
           organizationId: seeded.organizationId,
           connectionId: seeded.connectionId,
@@ -445,6 +460,7 @@ describe("GitHub management service", () => {
             upvoterNotificationPolicy: "do_not_notify_upvoters",
             enabled: false,
           });
+
           const [persisted] = yield* service.listRules({
             organizationId: seeded.organizationId,
             connectionId: seeded.connectionId,
@@ -512,6 +528,7 @@ describe("GitHub management service", () => {
           issueMatchMode: "any",
           issueState: "open",
         });
+
         const rules = yield* service.listRules({
           organizationId: seeded.organizationId,
           connectionId: seeded.connectionId,
@@ -532,6 +549,7 @@ describe("GitHub management service", () => {
           connectionId: seeded.connectionId,
           id: created.id,
         });
+
         const rules = yield* service.listRules({
           organizationId: seeded.organizationId,
           connectionId: seeded.connectionId,
@@ -597,6 +615,7 @@ describe("GitHub management service", () => {
         const seeded = yield* seedRuleFixtures;
         const firstId = yield* GitHubSyncRuleId.generate;
         const secondId = yield* GitHubSyncRuleId.generate;
+
         const ruleRow = {
           organizationId: seeded.organizationId,
           connectionId: seeded.connectionId,
@@ -611,6 +630,7 @@ describe("GitHub management service", () => {
           id: firstId,
           ...ruleRow,
         });
+
         const result = yield* db
           .insert(schema.githubSyncRuleTable)
           .values({ id: secondId, ...ruleRow })

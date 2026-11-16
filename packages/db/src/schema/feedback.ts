@@ -1730,13 +1730,19 @@ export const savedViewTable = pgTable(
 );
 
 export type InsertComment = typeof commentTable.$inferInsert;
+
 export type PostSubscription = typeof postSubscriptionTable.$inferSelect;
+
 export type NewPostSubscription = typeof postSubscriptionTable.$inferInsert;
+
 export type ChangelogSubscription =
   typeof changelogSubscriptionTable.$inferSelect;
+
 export type NewChangelogSubscription =
   typeof changelogSubscriptionTable.$inferInsert;
+
 export type NotificationPreference =
   typeof notificationPreferenceTable.$inferSelect;
+
 export type NewNotificationPreference =
   typeof notificationPreferenceTable.$inferInsert;

@@ -78,6 +78,7 @@ export const makeServerApp = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
   const mailbox = config.e2eTestMailer ? yield* TestMailer.make : undefined;
+
   const makeMailerLayer = (): Layer.Layer<
     Mailer,
     Layer.Error<typeof Mailer.layer>
@@ -85,6 +86,7 @@ export const makeServerApp = Effect.gen(function* () {
 
   const WorkFlowLayer = makeWorkflowLayer(mailbox, makeMailerLayer);
   const RateLimitLayer = makeRateLimitLayer(config);
+
   const AuthLayer = makeAuthLayer(
     config.apiUrl,
     makeMailerLayer,
@@ -97,6 +99,7 @@ export const makeServerApp = Effect.gen(function* () {
   const externalResourceContext = yield* Layer.build(
     ExternalResourceServiceLive
   );
+
   const externalResources = Context.get(
     externalResourceContext,
     ExternalResourceService
@@ -120,10 +123,12 @@ export const makeServerApp = Effect.gen(function* () {
   );
 
   const GitHubConfigLayer = makeGitHubConfigLayer(config);
+
   const SlackConfigLayer = Layer.succeed(
     SlackIntegrationConfig,
     makeSlackIntegrationConfig(config)
   );
+
   const DiscordConfigLayer = Layer.succeed(
     DiscordIntegrationConfig,
     makeDiscordIntegrationConfig(config)
@@ -145,6 +150,7 @@ export const makeServerApp = Effect.gen(function* () {
     mailbox,
     nodeEnv: config.nodeEnv,
   });
+
   const MergedRoutes = makeMergedRoutes({
     appUrl: config.appUrl,
     browserTelemetry: makeBrowserTelemetryRouter({
@@ -154,6 +160,7 @@ export const makeServerApp = Effect.gen(function* () {
     integrationRuntime,
     publicRouters: PublicRouters,
   });
+
   const AllRoutes = withGlobalMiddleware(MergedRoutes, config);
 
   return {
@@ -212,6 +219,7 @@ export const program = Effect.gen(function* () {
       PolarService.layer
     )
   );
+
   yield* subscriptionRevocationMaintenance.pipe(
     Effect.provide(billingRuntime),
     Effect.forkScoped
@@ -249,6 +257,7 @@ export const program = Effect.gen(function* () {
 const ObservabilityLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
+
     return makeObservabilityLayer(config);
   })
 ).pipe(Layer.provideMerge(ServerConfig.layer));

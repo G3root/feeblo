@@ -21,10 +21,13 @@ const words = (value: string): ReadonlySet<string> =>
 export const lexicalSimilarity = (left: string, right: string): number => {
   const leftWords = words(left);
   const rightWords = words(right);
+
   const intersection = [...leftWords].filter((word) =>
     rightWords.has(word)
   ).length;
+
   const union = new Set([...leftWords, ...rightWords]).size;
+
   return union === 0 ? 0 : intersection / union;
 };
 
@@ -108,6 +111,7 @@ export const makePostSuggestions = <Row extends PostSuggestionCandidate, E, R>(
     const { boardId, content, limit, organizationId, publicOnly, title } = args;
     const input = postEmbeddingInput({ content, title });
     const resultLimit = limit ?? SUGGESTION_DEFAULT_LIMIT;
+
     const lexicalPool = Math.max(
       SUGGESTION_LEXICAL_POOL_MINIMUM,
       resultLimit * 5
@@ -145,6 +149,7 @@ export const makePostSuggestions = <Row extends PostSuggestionCandidate, E, R>(
             candidate.distance <= SUGGESTION_MAX_DISTANCE
         )
         .map(({ distance: _distance, ...post }) => post);
+
       if (matches.length > 0) {
         return matches;
       }
@@ -162,6 +167,7 @@ export const makePostSuggestions = <Row extends PostSuggestionCandidate, E, R>(
     return lexicalCandidates
       .map((row) => {
         const { distance: _distance, ...post } = row;
+
         return { post, score: postLexicalSimilarity(input, row) };
       })
       .filter(({ score }) => score > 0)

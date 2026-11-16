@@ -54,13 +54,16 @@ function DiscordSettingsContent({
   const startConnect = useAtomSet(startDiscordConnectAtom, { mode: "promise" });
   const connectionsResult = useAtomValue(connectionsAtom(organizationId));
   const refreshConnections = useAtomRefresh(connectionsAtom(organizationId));
+
   const {
     list: connections,
     isLoading,
     loadFailed,
   } = useAsyncList<DiscordConnection>(connectionsResult);
+
   const statusResult = useAtomValue(discordStatusAtom);
   const refreshStatus = useAtomRefresh(discordStatusAtom);
+
   const discordConfigured = Result.builder(statusResult)
     .onInitial(
       // SAFETY: Loading/empty-state placeholder: null is valid until the async source resolves.
@@ -98,6 +101,7 @@ function DiscordSettingsContent({
       </Card>
     );
   }
+
   if (discordConfigured === "error") {
     return (
       <Card>
@@ -112,6 +116,7 @@ function DiscordSettingsContent({
       </Card>
     );
   }
+
   if (!discordConfigured) {
     return (
       <Card>
@@ -207,12 +212,14 @@ function DiscordConnectionFrame({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
   const disconnect = useAtomSet(disconnectDiscordConnectionAtom, {
     mode: "promise",
   });
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
+
     try {
       await disconnect({
         payload: {
@@ -315,6 +322,7 @@ function ConnectionBadge({
       </span>
     );
   }
+
   if (lifecycle === "connecting") {
     return (
       <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
@@ -322,6 +330,7 @@ function ConnectionBadge({
       </span>
     );
   }
+
   return (
     <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
       {lifecycle}
@@ -337,21 +346,26 @@ function FeedbackChannelSelect({
   readonly organizationId: string;
 }) {
   const args = { connectionId, organizationId };
+
   const updateNotifications = useAtomSet(
     updateDiscordChannelNotificationsAtom,
     { mode: "promise" }
   );
+
   const channelsResult = useAtomValue(channelsAtom(args));
   const refreshChannels = useAtomRefresh(channelsAtom(args));
+
   const {
     list: channels,
     isLoading,
     loadFailed,
   } = useAsyncList<DiscordChannel>(channelsResult);
+
   const [pendingChannelId, setPendingChannelId] = useState<string | null>(null);
 
   const handleToggle = async (channel: DiscordChannel, enabled: boolean) => {
     setPendingChannelId(channel.id);
+
     try {
       await updateNotifications({
         payload: {
@@ -381,6 +395,7 @@ function FeedbackChannelSelect({
   if (isLoading) {
     return <p className="text-muted-foreground text-sm">Loading channels…</p>;
   }
+
   if (loadFailed) {
     return (
       <div className="flex items-center gap-2 text-sm">
@@ -391,6 +406,7 @@ function FeedbackChannelSelect({
       </div>
     );
   }
+
   if (channels.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
@@ -404,6 +420,7 @@ function FeedbackChannelSelect({
     <div className="flex flex-col gap-2">
       {channels.map((channel) => {
         const pending = pendingChannelId === channel.id;
+
         return (
           <div
             className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"

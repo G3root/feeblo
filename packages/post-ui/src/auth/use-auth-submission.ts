@@ -44,14 +44,17 @@ export function useSignInEmail({
 
         if (!response.error) {
           await onSuccess?.();
+
           return { type: "success" };
         }
 
         if (response.error.code === "EMAIL_NOT_VERIFIED") {
           const ready = await initializeEmailVerification(email);
+
           if (ready) {
             await onEmailNotVerified?.(email);
           }
+
           return { type: "email-not-verified", ready };
         }
 
@@ -104,6 +107,7 @@ export function useSignUpEmail({
     }: SignUpEmailInput): Promise<SignUpEmailResult> => {
       try {
         const captchaToken = getCaptchaToken?.();
+
         const response = await authClient.signUp.email({
           email,
           name,
@@ -119,15 +123,19 @@ export function useSignUpEmail({
         }
 
         const verificationEmail = response.data?.user?.email ?? email;
+
         if (!response.data?.user?.emailVerified) {
           const ready = await initializeEmailVerification(verificationEmail);
+
           if (ready) {
             await onVerifyEmail?.(verificationEmail);
           }
+
           return { type: "verify-email", email: verificationEmail, ready };
         }
 
         await onSuccess?.();
+
         return { type: "success" };
       } catch (error) {
         return {
@@ -163,6 +171,7 @@ export function useVerifyEmailOtp({
                 : (response.error.message ?? m.every_salty_antelope()),
             type: "error",
           });
+
           return false;
         }
 
@@ -173,6 +182,7 @@ export function useVerifyEmailOtp({
 
         await clearVerificationOtp(email, "email-verification");
         await onSuccess?.();
+
         return true;
       } catch (error) {
         toastManager.add({
@@ -180,6 +190,7 @@ export function useVerifyEmailOtp({
             error instanceof Error ? error.message : m.every_salty_antelope(),
           type: "error",
         });
+
         return false;
       }
     },
@@ -212,18 +223,21 @@ export function useCheckResetPasswordOtp({
                 title: m.fresh_cozy_midge(),
                 type: "error",
               });
+
               return false;
             case "OTP_EXPIRED":
               toastManager.add({
                 title: m.frail_active_rat(),
                 type: "error",
               });
+
               return false;
             case "TOO_MANY_ATTEMPTS":
               toastManager.add({
                 title: m.fair_direct_goldfish(),
                 type: "error",
               });
+
               return false;
             case "USER_NOT_FOUND":
               toastManager.add({
@@ -231,17 +245,20 @@ export function useCheckResetPasswordOtp({
                 type: "error",
               });
               await onUserNotFound?.();
+
               return false;
             default:
               toastManager.add({
                 title: response.error.message ?? m.every_salty_antelope(),
                 type: "error",
               });
+
               return false;
           }
         }
 
         await onVerified(otp);
+
         return true;
       } catch (error) {
         toastManager.add({
@@ -249,6 +266,7 @@ export function useCheckResetPasswordOtp({
             error instanceof Error ? error.message : m.every_salty_antelope(),
           type: "error",
         });
+
         return false;
       }
     },

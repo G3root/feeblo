@@ -40,9 +40,11 @@ function renderSlugFooter(
       </FieldDescription>
     );
   }
+
   if (slugStatus === "checking") {
     return <FieldDescription>Checking availability…</FieldDescription>;
   }
+
   if (slugStatus === "available") {
     return (
       <FieldDescription className="text-emerald-600">
@@ -50,6 +52,7 @@ function renderSlugFooter(
       </FieldDescription>
     );
   }
+
   if (slugStatus === "taken") {
     return (
       <div className="flex flex-col gap-2">
@@ -72,9 +75,11 @@ function renderSlugFooter(
       </div>
     );
   }
+
   if (slugStatus === "error") {
     return <FieldError>Could not check availability. Try again.</FieldError>;
   }
+
   return null;
 }
 
@@ -88,8 +93,10 @@ export const RegisterWorkspaceStep = withForm({
     );
 
     const slug = toWorkspaceSlug(workspaceName);
+
     const { availability, reportWorkspaceName } =
       useWorkspaceSlugAvailability(workspaceName);
+
     const { status: slugStatus, suggestion, reason } = availability;
 
     /**
@@ -107,6 +114,7 @@ export const RegisterWorkspaceStep = withForm({
           {(field) => {
             const isInvalid =
               field.state.meta.isTouched && !field.state.meta.isValid;
+
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>Workspace Name</FieldLabel>

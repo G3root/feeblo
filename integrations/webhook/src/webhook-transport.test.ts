@@ -32,6 +32,7 @@ describe("makeWebhookPinnedLookup", () => {
       "2a01:4f8:121:114d::2",
       "178.63.67.153",
     ]);
+
     let captured: readonly LookupAddress[] | string | undefined;
     lookup("webhook.site", { all: true }, (error, result) => {
       expect(error).toBeNull();
@@ -45,9 +46,11 @@ describe("makeWebhookPinnedLookup", () => {
 
   it("keeps the classic single-address form when `all` is not requested", () => {
     const lookup = makeWebhookPinnedLookup(["178.63.67.153"]);
+
     let captured:
       | { address: string | LookupAddress[]; family: number | undefined }
       | undefined;
+
     lookup("webhook.site", {}, (error, address, family) => {
       expect(error).toBeNull();
       captured = { address, family };
@@ -60,6 +63,7 @@ describe("makeWebhookPinnedLookup", () => {
       "2a01:4f8:121:114d::2",
       "178.63.67.153",
     ]);
+
     let captured: readonly LookupAddress[] | string | undefined;
     lookup("webhook.site", { all: true, family: 4 }, (error, result) => {
       expect(error).toBeNull();
@@ -73,6 +77,7 @@ describe("makeWebhookPinnedLookup", () => {
       "178.63.67.153",
       "2a01:4f8:121:114d::2",
     ]);
+
     let captured: readonly LookupAddress[] | string | undefined;
     lookup("webhook.site", { all: true, family: 6 }, (error, result) => {
       expect(error).toBeNull();
@@ -86,9 +91,11 @@ describe("makeWebhookPinnedLookup", () => {
       "2a01:4f8:121:114d::2",
       "178.63.67.153",
     ]);
+
     let captured:
       | { address: string | LookupAddress[]; family: number | undefined }
       | undefined;
+
     lookup("webhook.site", { family: 4 }, (error, address, family) => {
       expect(error).toBeNull();
       captured = { address, family };
@@ -160,7 +167,9 @@ describe("sendWebhookDelivery", () => {
         const secret = Redacted.make(
           "whsec_MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTI="
         );
+
         const rawBody = '{"type":"webhook.test","value":"exact  spacing"}';
+
         // The receiver captures the request facts and always completes with
         // 204; assertions run only after the delivery has settled so a failing
         // expectation cannot hang the request handler.
@@ -168,12 +177,14 @@ describe("sendWebhookDelivery", () => {
           readonly body: string;
           readonly headers: Record<string, string | string[] | undefined>;
         }) => void = () => undefined;
+
         const received = new Promise<{
           readonly body: string;
           readonly headers: Record<string, string | string[] | undefined>;
         }>((resolve) => {
           receiveRequest = resolve;
         });
+
         const endpointUrl = yield* startTestServer((request, response) => {
           const chunks: Buffer[] = [];
           request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -185,6 +196,7 @@ describe("sendWebhookDelivery", () => {
             response.writeHead(204).end();
           });
         });
+
         const endpoint = yield* resolveAndParseWebhookEndpoint(
           endpointUrl.toString(),
           {
@@ -192,17 +204,20 @@ describe("sendWebhookDelivery", () => {
             allowPrivateNetworkInDevelopment: true,
           }
         );
+
         const signingHeaders = yield* signWebhookDelivery({
           deliveryId: "delivery_123",
           keyring: { current: secret },
           rawBody,
         });
+
         const result = yield* sendWebhookDelivery({
           endpoint,
           eventType: "webhook.test",
           rawBody,
           signingHeaders,
         });
+
         expect(result).toEqual({ status: 204 });
 
         const request = yield* Effect.promise(() => received);
@@ -229,6 +244,7 @@ describe("sendWebhookDelivery", () => {
       const endpointUrl = yield* startTestServer((_request, response) =>
         response.writeHead(302, { location: "http://127.0.0.1/other" }).end()
       );
+
       const endpoint = yield* resolveAndParseWebhookEndpoint(
         endpointUrl.toString(),
         {
@@ -236,6 +252,7 @@ describe("sendWebhookDelivery", () => {
           allowPrivateNetworkInDevelopment: true,
         }
       );
+
       const signingHeaders = yield* signWebhookDelivery({
         deliveryId: "delivery_123",
         keyring: {
@@ -245,12 +262,14 @@ describe("sendWebhookDelivery", () => {
         },
         rawBody: "{}",
       });
+
       const result = yield* sendWebhookDelivery({
         endpoint,
         eventType: "webhook.test",
         rawBody: "{}",
         signingHeaders,
       });
+
       expect(result).toEqual({ status: 302 });
     })
   );
@@ -264,6 +283,7 @@ describe("sendWebhookDelivery", () => {
           response.write("partial");
           response.destroy();
         });
+
         const endpoint = yield* resolveAndParseWebhookEndpoint(
           endpointUrl.toString(),
           {
@@ -271,6 +291,7 @@ describe("sendWebhookDelivery", () => {
             allowPrivateNetworkInDevelopment: true,
           }
         );
+
         const signingHeaders = yield* signWebhookDelivery({
           deliveryId: "delivery_123",
           keyring: {
@@ -280,6 +301,7 @@ describe("sendWebhookDelivery", () => {
           },
           rawBody: "{}",
         });
+
         const failure = yield* Effect.flip(
           sendWebhookDelivery({
             endpoint,
@@ -288,6 +310,7 @@ describe("sendWebhookDelivery", () => {
             signingHeaders,
           })
         );
+
         expect(failure).toMatchObject({ kind: "network" });
         expect(failure.message).toBe(
           "WebhookTransportError: network failure while sending the webhook delivery"
@@ -300,13 +323,16 @@ describe("sendWebhookDelivery", () => {
       // Completes when the receiver has the request in hand, proving the
       // delivery's timeout race is armed before the clock advances.
       let markRequestArrived: () => void = () => undefined;
+
       const requestArrived = new Promise<void>((resolve) => {
         markRequestArrived = resolve;
       });
+
       const endpointUrl = yield* startTestServer(() => {
         // Never respond; the delivery must settle via WEBHOOK_REQUEST_TIMEOUT_MS.
         markRequestArrived();
       });
+
       const endpoint = yield* resolveAndParseWebhookEndpoint(
         endpointUrl.toString(),
         {
@@ -314,6 +340,7 @@ describe("sendWebhookDelivery", () => {
           allowPrivateNetworkInDevelopment: true,
         }
       );
+
       const signingHeaders = yield* signWebhookDelivery({
         deliveryId: "delivery_123",
         keyring: {
@@ -323,6 +350,7 @@ describe("sendWebhookDelivery", () => {
         },
         rawBody: "{}",
       });
+
       // `it.effect` drives the clock with TestClock, so the delivery's timeout
       // race is armed on virtual time while the HTTP request itself runs for
       // real; advancing the clock interrupts the real socket.
@@ -333,10 +361,13 @@ describe("sendWebhookDelivery", () => {
           rawBody: "{}",
           signingHeaders,
         }).pipe(Effect.flip, Effect.forkChild);
+
         yield* Effect.promise(() => requestArrived);
         yield* TestClock.adjust(WEBHOOK_REQUEST_TIMEOUT_MS);
+
         return yield* Fiber.join(delivery);
       });
+
       expect(failure).toMatchObject({ kind: "timeout" });
       expect(failure.message).toBe(
         "WebhookTransportError: webhook delivery request timed out"
@@ -351,6 +382,7 @@ describe("sendWebhookDelivery", () => {
         hostname: "127.0.0.1",
         pinnedAddresses: ["127.0.0.1"],
       };
+
       const failure = yield* Effect.flip(
         sendWebhookDelivery({
           endpoint,
@@ -363,6 +395,7 @@ describe("sendWebhookDelivery", () => {
           },
         })
       );
+
       expect(failure).toMatchObject({ kind: "payload_too_large" });
       expect(failure.message).toBe(
         "WebhookTransportError: webhook payload exceeds the 256 KiB limit"
@@ -390,6 +423,7 @@ describe("sendWebhookDelivery", () => {
           },
         })
       );
+
       expect(failure).toMatchObject({ kind: "network" });
     })
   );

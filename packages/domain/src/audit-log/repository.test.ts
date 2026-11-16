@@ -10,6 +10,7 @@ import { AuditLogRepository, type TAuditLogInsert } from "./repository";
 import type { TAuditLogCursor, TAuditLogStoredEntry } from "./schema";
 
 const T0 = new Date("2026-01-01T00:00:00.000Z");
+
 const at = (minutes: number) => new Date(T0.getTime() + minutes * 60_000);
 
 describe("AuditLogRepository", () => {
@@ -27,6 +28,7 @@ describe("AuditLogRepository", () => {
       slug: organizationId,
       createdAt: now,
     });
+
     return organizationId;
   });
 
@@ -68,6 +70,7 @@ describe("AuditLogRepository", () => {
         ...overrides,
         id,
       });
+
       return id;
     });
 
@@ -89,6 +92,7 @@ describe("AuditLogRepository", () => {
             ? { limit: 2, organizationId }
             : { limit: 2, organizationId, after: first.next }
         );
+
         expect(second.items.map((entry) => entry.id)).toEqual([oldest]);
         expect(second.next).toBeNull();
       })
@@ -98,12 +102,14 @@ describe("AuditLogRepository", () => {
       Effect.gen(function* () {
         const repository = yield* AuditLogRepository;
         const organizationId = yield* createOrganization();
+
         const ids = yield* Effect.forEach([0, 1, 2], () =>
           append(organizationId, { occurredAt: at(5) })
         );
 
         const seen: string[] = [];
         let after: TAuditLogCursor | null = null;
+
         for (let page = 0; page < 4; page += 1) {
           const result: {
             readonly items: ReadonlyArray<TAuditLogStoredEntry>;
@@ -113,8 +119,10 @@ describe("AuditLogRepository", () => {
               ? { limit: 2, organizationId }
               : { limit: 2, organizationId, after }
           );
+
           seen.push(...result.items.map((entry) => entry.id));
           after = result.next;
+
           if (after === null) break;
         }
 
@@ -128,12 +136,14 @@ describe("AuditLogRepository", () => {
         const repository = yield* AuditLogRepository;
         const organizationId = yield* createOrganization();
         const change = yield* append(organizationId);
+
         const exportAllowed = yield* append(organizationId, {
           action: "board.exported",
           resourceType: "board",
           resourceId: "board_1",
           occurredAt: at(1),
         });
+
         const exportDenied = yield* append(organizationId, {
           action: "board.exported",
           resourceType: "board",
@@ -148,6 +158,7 @@ describe("AuditLogRepository", () => {
           limit: 10,
           organizationId,
         });
+
         expect(changes.items.map((entry) => entry.id).sort()).toEqual(
           [change, exportDenied].sort()
         );
@@ -157,6 +168,7 @@ describe("AuditLogRepository", () => {
           limit: 10,
           organizationId,
         });
+
         expect(access.items.map((entry) => entry.id).sort()).toEqual(
           [exportAllowed, exportDenied].sort()
         );
@@ -167,6 +179,7 @@ describe("AuditLogRepository", () => {
       Effect.gen(function* () {
         const repository = yield* AuditLogRepository;
         const organizationId = yield* createOrganization();
+
         const status = yield* append(organizationId, {
           action: "post.status_changed",
           changes: {
@@ -175,6 +188,7 @@ describe("AuditLogRepository", () => {
             after: { statusId: "status_2" },
           },
         });
+
         yield* append(organizationId, {
           action: "post.updated",
           changes: {
@@ -190,6 +204,7 @@ describe("AuditLogRepository", () => {
           limit: 10,
           organizationId,
         });
+
         expect(found.items.map((entry) => entry.id)).toEqual([status]);
       })
     );
@@ -206,6 +221,7 @@ describe("AuditLogRepository", () => {
           limit: 10,
           organizationId: mine,
         });
+
         expect(page.items.map((entry) => entry.id)).not.toContain(foreign);
       })
     );
@@ -247,6 +263,7 @@ describe("AuditLogRepository", () => {
             id,
           })
         );
+
         expect(failure._tag).toBe("EffectDrizzleQueryError");
       })
     );
@@ -263,11 +280,13 @@ describe("AuditLogRepository", () => {
             sql`update audit_log set actor_label = 'rewritten' where id = ${id}`
           )
         );
+
         expect(updated._tag).toBe("EffectDrizzleQueryError");
 
         const deleted = yield* Effect.flip(
           db.execute(sql`delete from audit_log where id = ${id}`)
         );
+
         expect(deleted._tag).toBe("EffectDrizzleQueryError");
 
         // The retention sweep is the one writer allowed to remove rows, and it

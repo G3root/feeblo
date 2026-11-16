@@ -26,6 +26,7 @@ describe("sendUnlessSuppressed", () => {
       slug: organizationId,
       createdAt: now,
     });
+
     return organizationId;
   });
 
@@ -85,6 +86,7 @@ describe("sendUnlessSuppressed", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const organizationId = yield* createOrganization();
+
           const error = yield* Effect.flip(
             sendUnlessSuppressed({
               email: "Rejected@Example.com",
@@ -102,6 +104,7 @@ describe("sendUnlessSuppressed", () => {
           );
 
           expect(error).toBeInstanceOf(MailPermanentDeliveryError);
+
           const [row] = yield* db
             .select({
               organizationId: schema.emailSuppressionTable.organizationId,
@@ -111,6 +114,7 @@ describe("sendUnlessSuppressed", () => {
             .where(
               eq(schema.emailSuppressionTable.email, "rejected@example.com")
             );
+
           expect(row).toMatchObject({
             organizationId,
             reason: "hard_bounce",
@@ -141,6 +145,7 @@ describe("sendUnlessSuppressed", () => {
           .select({ email: schema.emailSuppressionTable.email })
           .from(schema.emailSuppressionTable)
           .where(eq(schema.emailSuppressionTable.email, "policy@example.com"));
+
         expect(rows).toHaveLength(0);
       })
     );

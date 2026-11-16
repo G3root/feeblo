@@ -75,6 +75,7 @@ const makePostPolicy = Effect.gen(function* () {
   const isCreator = (args: TIsCreator) =>
     Policy.policy((user) => {
       const { postId } = args;
+
       // An empty array stays in the batch branch and is denied by the length
       // check below.
       return isIdBatch(postId)
@@ -113,6 +114,7 @@ const makePostPolicy = Effect.gen(function* () {
   const isNewPostOwner = (args: TIsCreator) =>
     Policy.policy((user) => {
       const { postId } = args;
+
       return isIdBatch(postId)
         ? repository
             .findNewByCreatorIds({
@@ -203,6 +205,7 @@ const makePostPolicy = Effect.gen(function* () {
     if (args.source === "public") {
       return Policy.hasRestrictedOrganizationScope(args.organizationId);
     }
+
     if (args.onBehalf === true) {
       // Attributing a post to a customer is a curation capability reserved
       // for managers and above (`posts.createOnBehalf`).
@@ -211,6 +214,7 @@ const makePostPolicy = Effect.gen(function* () {
         Policy.canPermission(args.organizationId, "posts.createOnBehalf")
       );
     }
+
     return Policy.hasMembership(args.organizationId);
   };
 
@@ -229,6 +233,7 @@ const makePostPolicy = Effect.gen(function* () {
         })
       );
     }
+
     return Policy.all(
       Policy.hasMembership(args.organizationId),
       isNotMerged({
@@ -258,6 +263,7 @@ const makePostPolicy = Effect.gen(function* () {
         })
       );
     }
+
     return Policy.all(
       Policy.hasMembership(args.organizationId),
       isNotMerged({

@@ -91,6 +91,7 @@ function PostEditorInitialContentProvider({
   const [initialContent, setInitialContent] = useState(() => ({
     value: content,
   }));
+
   const [prevResetKey, setPrevResetKey] = useState(resetKey);
 
   // Refresh the editor's initial content when the editor is reset. This is
@@ -157,6 +158,7 @@ function PostEditorProvider({
     }),
     []
   );
+
   const state = useMemo<PostEditorState>(
     () => ({
       disabled,
@@ -167,7 +169,9 @@ function PostEditorProvider({
     }),
     [disabled, editorScope, organizationId, placeholder, resetKey]
   );
+
   const meta = useMemo<PostEditorMeta>(() => ({ submitLabel }), [submitLabel]);
+
   const contextValue = useMemo<PostEditorContextValue>(
     () => ({ actions, meta, state }),
     [actions, meta, state]
@@ -207,6 +211,7 @@ const PostEditorEditor = memo(function PostEditorEditor() {
 });
 
 const ANCHORED_SAVE_TOAST_ID = "post-save";
+
 const PostEditorSubmit = memo(function PostEditorSubmit() {
   const { actions, meta, state } = usePostEditor();
   const saveButtonRef = useRef<HTMLButtonElement>(null);
@@ -223,11 +228,13 @@ const PostEditorSubmit = memo(function PostEditorSubmit() {
           // or replace the button, which would null `saveButtonRef.current`
           // (or detach the element) before the toast is added.
           const anchor = saveButtonRef.current;
+
           if (!anchor || isSubmitting) {
             return;
           }
 
           setIsSubmitting(true);
+
           try {
             await actions.onSubmit();
 
@@ -315,9 +322,11 @@ function PostEditorComponent({
 
   const handleContentChange = (doc: string) => {
     contentRef.current = doc;
+
     if (!isContentControlled) {
       setInternalContent(doc);
     }
+
     externalOnContentChange?.(doc);
   };
 
@@ -327,15 +336,18 @@ function PostEditorComponent({
       organizationId,
       { assetIds: existingAssetIds, scope: editorScope }
     );
+
     await onSubmit({
       assetIds: finalized.assetIds,
       content: finalized.content,
     });
     finalized.commit();
     setResetKey((k) => k + 1);
+
     if (!isContentControlled) {
       setInternalContent("");
     }
+
     contentRef.current = "";
   };
 
@@ -370,8 +382,10 @@ export function PostContentUpdateInput() {
     collections: { postCollection, postDetailCollection },
     organizationId,
   } = usePostCollections();
+
   const { canManagePost, isLocked, isMerged, post, pageType } =
     usePostCollectionData();
+
   // Initial body + attachments resolve through the detail collection (the
   // context row is a slim list item without `content`).
   const detail = usePostDetail();
@@ -440,6 +454,7 @@ export function PostContentUpdateInput() {
         await postDetailCollection.utils.refetch().catch(() => undefined);
         throw error;
       }
+
       // The detail row is the mutation target, so its read-back is awaited
       // before the optimistic state settles. The list row's derived excerpt
       // refreshes detached instead of adding a second round trip to the save.
@@ -477,6 +492,7 @@ export function PostContentUpdateInput() {
             content,
             expectedUpdatedAt,
           });
+
           await tx.when("settled");
           const refreshedVersion = postDetailCollection.get(post.id)?.updatedAt;
           send({ type: "SAVED", version: refreshedVersion });
@@ -492,6 +508,7 @@ export function PostContentUpdateInput() {
               type: "error",
             });
           }
+
           throw error;
         }
       }}
@@ -508,6 +525,7 @@ export function PostContentUpdateInput() {
                 if (detail.updatedAt === undefined) {
                   return;
                 }
+
                 // Remounts the editor, so the draft is replaced by the server's
                 // body; only this choice increments the key.
                 send({ type: "RELOAD_LATEST", version: detail.updatedAt });
@@ -524,6 +542,7 @@ export function PostContentUpdateInput() {
                 if (detail.updatedAt === undefined) {
                   return;
                 }
+
                 // Keeps the mounted draft and adopts the server's version, so
                 // the next save overwrites the newer row.
                 send({ type: "KEEP_DRAFT", version: detail.updatedAt });

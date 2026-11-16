@@ -37,14 +37,17 @@ export function WidgetIdentifyUsers({
 }: WidgetIdentifyUsersProps) {
   const store = useWidgetStore();
   const draft = useSelector(store, (snapshot) => snapshot.context.draft);
+
   const installTab = useSelector(
     store,
     (snapshot) => snapshot.context.installTab
   );
+
   const config = widgetEmbedConfig(draft);
   const target = { baseUrl: window.location.origin, organizationId };
 
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
+
   const widgetSsoAvailable =
     isEntitlementsLoading || entitlements.capabilities.widgetSso;
 

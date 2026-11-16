@@ -7,11 +7,13 @@
  * case where this process sends a signal.
  */
 const parentPid = Number(process.argv[2]);
+
 const deadlineMs = Number(process.argv[3]);
 
 const parentAlive = () => {
   try {
     process.kill(parentPid, 0);
+
     return true;
   } catch {
     return false;
@@ -22,6 +24,7 @@ const deadline = setTimeout(() => {
   console.error(
     `[vitest-watchdog] test run exceeded ${deadlineMs}ms; killing pid ${parentPid}`
   );
+
   try {
     process.kill(parentPid, "SIGKILL");
   } catch {

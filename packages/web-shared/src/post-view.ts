@@ -19,6 +19,7 @@
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 
 const RELAY_PATH = "/traffic/view";
+
 const STORAGE_PREFIX = "feeblo:post-view:";
 
 type DeviceHint = "desktop" | "mobile" | "tablet";
@@ -29,25 +30,34 @@ const newId = (): string => crypto.randomUUID();
 
 const detectDeviceHint = (): DeviceHint | undefined => {
   const userAgent = navigator.userAgent;
+
   if (/iPad/.test(userAgent)) return "tablet";
+
   if (/Mobi|iPhone|iPod|Android.*Mobile/.test(userAgent)) return "mobile";
+
   if (/Android/.test(userAgent)) return "tablet";
+
   // iPadOS 13+ reports a Macintosh agent. A Mac has no touch points; an iPad
   // has several, and that is enough to tell them apart without a fingerprint.
   if (/Macintosh/.test(userAgent)) {
     return navigator.maxTouchPoints > 1 ? "tablet" : "desktop";
   }
+
   if (/Windows|Linux|CrOS/.test(userAgent)) return "desktop";
+
   return undefined;
 };
 
 const alreadyCounted = (postId: string): boolean => {
   const key = `${STORAGE_PREFIX}${postId}`;
+
   try {
     if (sessionStorage.getItem(key) !== null) {
       return true;
     }
+
     sessionStorage.setItem(key, "1");
+
     return false;
   } catch {
     // Storage can be disabled in private modes. Counting is better than
@@ -64,11 +74,13 @@ export const trackPostView = (postId: string): void => {
   if (!hasWindow()) {
     return;
   }
+
   // Automated browsers are not readers; this is the same client-side signal the
   // public telemetry uses to skip its own e2e runs.
   if (navigator.webdriver) {
     return;
   }
+
   if (alreadyCounted(postId)) {
     return;
   }
@@ -80,6 +92,7 @@ export const trackPostView = (postId: string): void => {
     id: newId(),
     postId,
   });
+
   // A string body with a text/plain type is a CORS-simple request, so the
   // beacon cannot be stopped by a preflight. The relay accepts plain text.
   const sent = navigator.sendBeacon?.(

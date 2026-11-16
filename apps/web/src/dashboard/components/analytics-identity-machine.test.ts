@@ -180,6 +180,7 @@ describe("analytics identity machine", () => {
     const reachable = new Set<AnalyticsIdentityState>(
       ANALYTICS_IDENTITY_STATES
     );
+
     const checked = new Set<string>();
 
     for (const from of reachable) {

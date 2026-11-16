@@ -110,10 +110,12 @@ export const recordPostStatusChangeIntent = (
         },
         scheduledAt: input.now,
       });
+
       return result._tag === "Inserted" ? result.intent.id : undefined;
     }
 
     const scheduledAt = DateTime.addDuration(now, postStatusCoalescingWindow);
+
     const result = yield* emailOutbox.upsertPendingStatusChange({
       aggregateId: input.postId,
       aggregateType: "post",
@@ -130,6 +132,7 @@ export const recordPostStatusChangeIntent = (
       },
       scheduledAt: DateTime.toDate(scheduledAt),
     });
+
     return result._tag === "Written" ? result.intent.id : undefined;
   }).pipe(
     Effect.mapError((error) =>

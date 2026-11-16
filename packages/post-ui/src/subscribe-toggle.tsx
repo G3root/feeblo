@@ -29,6 +29,7 @@ const ANCHORED_SUBSCRIBE_TOAST_ID = "post-subscribe";
 export function SubscribeButton() {
   const { isLocked, isMerged, organizationId, post } = usePostCollectionData();
   const { data: session } = useAuthState();
+
   const {
     collections: { postSubscriptionCollection },
     onAuthRequired,
@@ -58,6 +59,7 @@ export function SubscribeButton() {
       if (!(postId && session)) {
         return undefined;
       }
+
       return q
         .from({ subscription: postSubscriptionCollection })
         .where(({ subscription }) =>
@@ -92,6 +94,7 @@ export function SubscribeButton() {
 
     if (!session) {
       onAuthRequired?.();
+
       return;
     }
 
@@ -103,6 +106,7 @@ export function SubscribeButton() {
     // A rejected persistence is caught below so the error does not escape
     // unhandled; the optimistic flip is rolled back by the collection.
     isPersistingRef.current = true;
+
     try {
       const userId = session.user.id;
       const key = getPostSubscriptionCollectionKey({ userId, postId });
@@ -118,6 +122,7 @@ export function SubscribeButton() {
         );
 
         const id = await PostSubscriptionId.unsafeGenerate();
+
         const transaction = postSubscriptionCollection.insert({
           id,
           createdAt: new Date(),
@@ -127,6 +132,7 @@ export function SubscribeButton() {
           userId,
           memberId: membership?.membershipId ?? null,
         });
+
         await transaction.when("settled");
       }
 

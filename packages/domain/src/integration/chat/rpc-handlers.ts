@@ -23,6 +23,7 @@ export const makeChatManagementRpcHandlers = <S extends ChatManagementSchemas>(
 ) =>
   Effect.gen(function* () {
     const entitlementPolicy = yield* EntitlementPolicy;
+
     const authorize = (organizationId: string) =>
       Policy.withPolicy(
         Policy.canPermission(organizationId, "integrations.manage")
@@ -40,6 +41,7 @@ export const makeChatManagementRpcHandlers = <S extends ChatManagementSchemas>(
       connectStart: (input: Parameters<typeof service.connectStart>[0]) =>
         Effect.gen(function* () {
           yield* entitlementPolicy.canUseIntegrations(input.organizationId);
+
           return yield* service.connectStart(input);
         }).pipe(
           authorize(input.organizationId),

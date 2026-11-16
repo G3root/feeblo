@@ -33,6 +33,7 @@ it.effect(
       trustAllHeaders: true,
       trustedProxyCidrs: [],
     });
+
     if (proxyTrustResult._tag === "Failure") {
       return Effect.die(proxyTrustResult.failure);
     }
@@ -40,6 +41,7 @@ it.effect(
     const Route = HttpRouter.add("GET", "/rate-limit", (request) =>
       Effect.gen(function* () {
         const middleware = yield* PublicRpcRateLimitMiddleware;
+
         return yield* middleware(
           Effect.gen(function* () {
             yield* publicRpc({
@@ -47,6 +49,7 @@ it.effect(
               level: "read",
               limit: 1,
             });
+
             return yield* new RateLimitUnavailableError();
           }),
           {
@@ -71,6 +74,7 @@ it.effect(
         )
       )
     );
+
     const RpcRateLimitHttpMiddleware = HttpRouter.middleware<{
       provides: PublicRpcRateLimitMiddleware;
     }>()(
@@ -87,11 +91,14 @@ it.effect(
       Layer.provide(PublicRpcRateLimitMiddlewareLive),
       Layer.provide(RateLimitService.layerMemory)
     );
+
     const TestApp = Route.pipe(
       Layer.provide(RpcRateLimitHttpMiddleware),
       Layer.provide(makeClientIpGlobalMiddleware(proxyTrustResult.success))
     );
+
     const TestRuntime = TestApp.pipe(Layer.provideMerge(HttpRouter.layer));
+
     const executeRequest = (
       router: HttpRouter.HttpRouter,
       clientIp: string
@@ -101,6 +108,7 @@ it.effect(
           headers: { "x-forwarded-for": clientIp },
         })
       ).modify({ remoteAddress: Option.some("10.0.0.4") });
+
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
       return router.asHttpEffect().pipe(
         // A router failure is a defect in a test; `orDie` keeps the error
@@ -131,6 +139,7 @@ it.effect(
       trustAllHeaders: true,
       trustedProxyCidrs: [],
     });
+
     if (proxyTrustResult._tag === "Failure") {
       return Effect.die(proxyTrustResult.failure);
     }
@@ -138,6 +147,7 @@ it.effect(
     const Route = HttpRouter.add("GET", "/no-client-ip", (request) =>
       Effect.gen(function* () {
         const middleware = yield* PublicRpcRateLimitMiddleware;
+
         return yield* middleware(
           Effect.gen(function* () {
             // Never runs: the middleware must fail closed on the missing
@@ -146,6 +156,7 @@ it.effect(
               name: "NoClientIpIntegrationTest",
               level: "read",
             });
+
             // If this sentinel ever surfaces the middleware stopped failing
             // closed and let the handler run — the response would be 200, so
             // the 503-expectation below catches the regression.
@@ -180,6 +191,7 @@ it.effect(
         )
       )
     );
+
     const RpcRateLimitHttpMiddleware = HttpRouter.middleware<{
       provides: PublicRpcRateLimitMiddleware;
     }>()(
@@ -196,10 +208,12 @@ it.effect(
       Layer.provide(PublicRpcRateLimitMiddlewareLive),
       Layer.provide(RateLimitService.layerMemory)
     );
+
     // Deliberately NO makeClientIpGlobalMiddleware: the middleware must refuse
     // the request rather than falling back to a shared global bucket.
     const TestApp = Route.pipe(Layer.provide(RpcRateLimitHttpMiddleware));
     const TestRuntime = TestApp.pipe(Layer.provideMerge(HttpRouter.layer));
+
     const request = HttpServerRequest.fromWeb(
       new Request("http://localhost/no-client-ip")
     );
@@ -207,6 +221,7 @@ it.effect(
     return Effect.gen(function* () {
       const context = yield* Layer.build(TestRuntime);
       const router = Context.get(context, HttpRouter.HttpRouter);
+
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Effect's own `HttpRouter.asHttpEffect` types its failure as `unknown`; the pipe turns it into a defect, which is what a test wants
       const response = yield* router.asHttpEffect().pipe(
         // A router failure is a defect in a test; `orDie` keeps the error

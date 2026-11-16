@@ -10,12 +10,14 @@
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const boxedPrototypeName = <T>(value: T): string | null => {
   if (value === null || value === undefined) return null;
+
   // SAFETY: Object.getPrototypeOf always returns an object or null; every
   // prototype either has a constructor (the built-ins) or is null
   // (Object.create(null)), so the narrowed view is sound.
   const prototype = Object.getPrototypeOf(Object(value)) as {
     constructor?: { name?: string };
   } | null;
+
   return prototype?.constructor?.name ?? null;
 };
 

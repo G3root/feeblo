@@ -111,12 +111,15 @@ describe("AuthorPicker", () => {
     // above the popover, as in the voter flow.)
     await screen.getByLabelText("Name").fill("New Person");
     await screen.getByLabelText("Email").fill("new@example.com");
+
     const submit = screen
       .getByRole("button", { name: /Create & set author/ })
       .element();
+
     if (!(submit instanceof HTMLElement)) {
       throw new Error("Submit button is not an HTML element");
     }
+
     submit.click();
 
     expect(onSelect).toHaveBeenCalledWith({
@@ -130,7 +133,9 @@ describe("AuthorPicker", () => {
       ...customer,
       alreadyVoted: true,
     };
+
     const onSelect = vi.fn();
+
     const screen = await render(
       <AuthorPicker
         display={{ name: "John Doe", avatarUrl: null }}
@@ -166,6 +171,7 @@ describe("AuthorPicker", () => {
 
   it("renders static text when disabled", async () => {
     const onSelect = vi.fn();
+
     const screen = await render(
       <AuthorPicker
         disabled

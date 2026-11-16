@@ -98,6 +98,7 @@ function AuthPageRedirect() {
 function SignedInRedirect() {
   const auth = useResolvedAuth();
   const navigate = useNavigate();
+
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });

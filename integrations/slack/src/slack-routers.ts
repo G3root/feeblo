@@ -107,7 +107,9 @@ const makeSlackCommandRouter = (registry: IntegrationProviderRegistry) =>
         capabilityKey: slackCommandsCapabilityKey,
         provider: slackProviderKey,
       });
+
       const inbound = yield* SlackInboundService;
+
       return yield* router.add("POST", "/slack/commands/feeblo", (request) =>
         respondToSlackInbound(request, inboundHandler, inbound, "slash_command")
       );
@@ -122,7 +124,9 @@ const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
         capabilityKey: slackMessageActionCapabilityKey,
         provider: slackProviderKey,
       });
+
       const inbound = yield* SlackInboundService;
+
       return yield* router.add("POST", "/slack/interactive", (request) =>
         respondToSlackInbound(request, inboundHandler, inbound, "interactive")
       );
@@ -140,6 +144,7 @@ export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
           // request.url is the relative path (e.g.
           // /slack/oauth/callback?code=…); parse it without a base URL.
           const { code, error, state } = parseOAuthCallbackUrl(request.url);
+
           if (error !== null) {
             return HttpServerResponse.redirect(
               settingsRedirect({
@@ -150,6 +155,7 @@ export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           if (code === null || state === null) {
             return HttpServerResponse.redirect(
               settingsRedirect({
@@ -160,10 +166,13 @@ export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           const management = yield* SlackManagementService;
+
           const completed = yield* Effect.exit(
             management.connectComplete({ code, state })
           );
+
           if (Exit.isFailure(completed)) {
             return HttpServerResponse.redirect(
               settingsRedirect({
@@ -174,6 +183,7 @@ export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           return HttpServerResponse.redirect(
             settingsRedirect({
               appUrl,

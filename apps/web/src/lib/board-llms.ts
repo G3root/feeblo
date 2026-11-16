@@ -27,15 +27,18 @@ export interface BoardContent {
  * bounds the response size for a board with thousands of posts.
  */
 const BOARD_LLMS_POST_LIMIT = 50;
+
 const BOARD_LLMS_EXCERPT_LIMIT = 180;
 
 /** Any run of whitespace, collapsed so a line stays one line. */
 const whitespaceRunPattern = /\s+/gu;
+
 /** The characters that end a Markdown link label or list item. */
 const markdownEscapePattern = /([\\[\]])/gu;
 
 const clampLine = (value: string, limit: number) => {
   const collapsed = value.replaceAll(whitespaceRunPattern, " ").trim();
+
   return collapsed.length <= limit
     ? collapsed
     : `${collapsed.slice(0, limit).trimEnd()}…`;
@@ -51,6 +54,7 @@ const escapeMarkdownText = (value: string) =>
 const markdownLine = (label: string, url: string, detail?: string) => {
   const text = escapeMarkdownText(label);
   const suffix = detail === undefined ? "" : `: ${detail}`;
+
   return `- [${text}](${url})${suffix}`;
 };
 
@@ -69,6 +73,7 @@ export function renderBoardLlmsTxt(
   content: BoardContent
 ): string {
   const name = escapeMarkdownText(site.name);
+
   const lines = [
     `# ${name}`,
     "",
@@ -84,6 +89,7 @@ export function renderBoardLlmsTxt(
 
   if (content.boards.length > 0) {
     lines.push("", "## Boards", "");
+
     for (const board of content.boards) {
       lines.push(markdownLine(board.name, `${origin}/b/${board.slug}`));
     }
@@ -95,11 +101,14 @@ export function renderBoardLlmsTxt(
         (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()
       )
       .slice(0, BOARD_LLMS_POST_LIMIT);
+
     const count = recent.length;
+
     const summary =
       count === 1
         ? "The most recently updated post."
         : `The ${count} most recently updated posts.`;
+
     lines.push(
       "",
       "## Feedback posts",
@@ -107,6 +116,7 @@ export function renderBoardLlmsTxt(
       `${summary} The sitemap lists every post URL.`,
       ""
     );
+
     for (const post of recent) {
       lines.push(
         markdownLine(
@@ -120,6 +130,7 @@ export function renderBoardLlmsTxt(
 
   if (site.roadmapVisibility === "PUBLIC" && content.roadmaps.length > 0) {
     lines.push("", "## Roadmap", "");
+
     for (const roadmap of content.roadmaps) {
       lines.push(
         markdownLine(roadmap.name, `${origin}/roadmap/${roadmap.slug}`)
@@ -133,7 +144,9 @@ export function renderBoardLlmsTxt(
         (right.publishedAt ?? right.createdAt).getTime() -
         (left.publishedAt ?? left.createdAt).getTime()
     );
+
     lines.push("", "## Changelog", "");
+
     for (const entry of recent) {
       lines.push(
         markdownLine(entry.title, `${origin}/changelog/${entry.slug}`)

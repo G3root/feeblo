@@ -18,10 +18,13 @@ import { usePostCollections } from "../providers/post-collections-provider";
 
 export function CommentVisibilityDialog() {
   const store = useCommentVisibilityDialogContext();
+
   const {
     collections: { commentCollection },
   } = usePostCollections();
+
   const open = useSelector(store, (state) => state.context.open);
+
   const isInternal = useSelector(
     store,
     (state) => state.context.data.isInternal

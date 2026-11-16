@@ -84,6 +84,7 @@ export const makePublicRpcRateLimiter = ({
     }
 
     const defaults = publicRpcLimits[level];
+
     return rateLimitService
       .consume({
         key: `public-rpc:${name}:${clientIp.address}`,
@@ -170,13 +171,16 @@ export const consumeDashboardRateLimit = (args: {
 }): Effect.Effect<void, RateLimitError> =>
   Effect.gen(function* () {
     const rateLimitService = yield* Effect.serviceOption(RateLimitService);
+
     if (Option.isNone(rateLimitService)) {
       // Handler unit tests run without the rate-limit layer (same rationale
       // as `PublicRpcRateLimiter`'s defaultValue above): skip rather than
       // fail closed, so pure behavior tests need no limiter wiring.
       return;
     }
+
     const preset = dashboardRateLimits[args.name];
+
     return yield* rateLimitService.value
       .consume({
         key: args.key,

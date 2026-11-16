@@ -48,10 +48,12 @@ const isClientStatusError = (error: Error): boolean => {
   // `httpApiStatus` — on the constructor's schema AST. A non-schema
   // constructor has no AST, which `isSchema` rules out.
   if (!Schema.isSchema(error.constructor)) return false;
+
   const status = SchemaAST.resolveAt<unknown>("httpApiStatus")(
     // SAFETY: the guard above proves this is a schema; its `ast` is an AST.
     error.constructor.ast
   );
+
   return isNumber(status) && status >= 400 && status < 500;
 };
 
@@ -63,6 +65,7 @@ const reportableReasons = (cause: Cause.Cause<unknown>) =>
   cause.reasons.filter((reason) => {
     if (reason._tag === "Interrupt") return false;
     const error = reason._tag === "Fail" ? reason.error : reason.defect;
+
     return !(error instanceof Error) || !isClientRejection(error);
   });
 
@@ -78,13 +81,16 @@ const captureCause = (
   context: Context.Context<never>
 ) => {
   const reasons = reportableReasons(cause);
+
   if (reasons.length === 0) return;
   const exception = Cause.squash(Cause.fromReasons(reasons));
   Sentry.withScope((scope) => {
     scope.setTag("product_version", "1");
     const userId = sessionUserId(context);
+
     if (userId !== undefined) scope.setUser({ id: userId });
     const span = Context.getOption(context, Tracer.ParentSpan);
+
     if (Option.isSome(span))
       scope.setContext("trace", {
         trace_id: span.value.traceId,
@@ -115,14 +121,18 @@ export const makeSentryObservability = (options: {
   Layer.unwrap(
     Effect.gen(function* () {
       const dsn = yield* Config.String("SENTRY_DSN").pipe(Config.option);
+
       if (Option.isNone(dsn) || dsn.value.trim().length === 0)
         return Layer.empty;
+
       const environment = yield* Config.String("SENTRY_ENVIRONMENT").pipe(
         Config.withDefault(options.environment)
       );
+
       const release = yield* Config.String("APP_RELEASE").pipe(
         Config.withDefault("dev")
       );
+
       yield* Effect.sync(() =>
         Sentry.init({
           dsn: dsn.value,
@@ -145,9 +155,11 @@ export const makeSentryObservability = (options: {
           // composition root never registers, so nothing is logged by default.
         })
       );
+
       const reporter = ErrorReporter.make(({ cause, fiber }) =>
         captureCause(cause, fiber.context)
       );
+
       return Layer.merge(
         ErrorReporter.layer([reporter], { mergeWithExisting: true }),
         Layer.effectDiscard(

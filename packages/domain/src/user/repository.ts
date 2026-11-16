@@ -20,6 +20,7 @@ import { UserPersistenceError } from "./errors";
 export const hashEmail = (email: string) =>
   Effect.gen(function* () {
     const digest = yield* Digest.Digest;
+
     return yield* digest.digestHex(
       Digest.sha256,
       new TextEncoder().encode(email.toLowerCase().trim())
@@ -29,9 +30,11 @@ export const hashEmail = (email: string) =>
 const generateRandomEmail = (prefix: string) =>
   Effect.gen(function* () {
     const secureRandom = yield* SecureRandom.SecureRandom;
+
     const suffix = Buffer.from(yield* secureRandom.randomBytes(8)).toString(
       "hex"
     );
+
     return `${prefix}-${suffix}@feeblo.com`;
   });
 
@@ -70,6 +73,7 @@ const makeUserRepository = Effect.gen(function* () {
           .from(schema.userTable)
           .where(eq(schema.userTable.id, id))
           .limit(1);
+
         return rows[0] ? Option.some(rows[0]) : Option.none();
       }),
 
@@ -102,6 +106,7 @@ const makeUserRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const emailHash = yield* hashEmail(args.email);
         const normalisedEmail = args.email.toLowerCase().trim();
+
         const rows = yield* db
           .select()
           .from(schema.userTable)
@@ -132,6 +137,7 @@ const makeUserRepository = Effect.gen(function* () {
             schema.userTable.id
           )
           .limit(1);
+
         return rows[0] ? Option.some(rows[0]) : Option.none();
       }),
 
@@ -144,6 +150,7 @@ const makeUserRepository = Effect.gen(function* () {
         // fall back to matching a globally-registered Better Auth user that
         // merely carries an email hash from an earlier SSO login.
         const restrictedToOrganizationId = args.restrictedToOrganizationId;
+
         if (restrictedToOrganizationId == null) {
           return yield* new UserPersistenceError({
             message: "SSO portal upsert requires a restrictedToOrganizationId",
@@ -178,6 +185,7 @@ const makeUserRepository = Effect.gen(function* () {
           // already is the session identity) but is promoted to a clean,
           // verified portal account with a fresh synthetic `sso-` inbox.
           const promotedFromShadow = isShadowUserEmail(existingByHash.email);
+
           const [updated = null] = yield* db
             .update(schema.userTable)
             .set({
@@ -192,11 +200,13 @@ const makeUserRepository = Effect.gen(function* () {
             })
             .where(eq(schema.userTable.id, existingByHash.id))
             .returning();
+
           if (!updated) {
             return yield* new UserPersistenceError({
               message: "SSO user update did not return a row",
             });
           }
+
           return updated;
         }
 
@@ -208,6 +218,7 @@ const makeUserRepository = Effect.gen(function* () {
         // an existing row.
         const id = yield* UserId.generate;
         const now = yield* DateTime.nowAsDate;
+
         const [created = null] = yield* db
           .insert(schema.userTable)
           .values({
@@ -228,9 +239,11 @@ const makeUserRepository = Effect.gen(function* () {
             ],
           })
           .returning();
+
         if (created) {
           return created;
         }
+
         const [winner] = yield* db
           .select({
             email: schema.userTable.email,
@@ -247,13 +260,16 @@ const makeUserRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         if (!winner) {
           return yield* new UserPersistenceError({
             message: "SSO user insert did not return a row",
           });
         }
+
         const winnerUpdatedAt = yield* DateTime.nowAsDate;
         const promotedFromShadow = isShadowUserEmail(winner.email);
+
         const [winnerUpdated = null] = yield* db
           .update(schema.userTable)
           .set({
@@ -268,11 +284,13 @@ const makeUserRepository = Effect.gen(function* () {
           })
           .where(eq(schema.userTable.id, winner.id))
           .returning();
+
         if (!winnerUpdated) {
           return yield* new UserPersistenceError({
             message: "SSO user update did not return a row",
           });
         }
+
         return winnerUpdated;
       }),
 
@@ -316,16 +334,19 @@ const makeUserRepository = Effect.gen(function* () {
 
         if (existingByHash) {
           const updatedAt = yield* DateTime.nowAsDate;
+
           const [updated = null] = yield* db
             .update(schema.userTable)
             .set({ name: args.name, updatedAt })
             .where(eq(schema.userTable.id, existingByHash.id))
             .returning();
+
           if (!updated) {
             return yield* new UserPersistenceError({
               message: "Shadow user update did not return a row",
             });
           }
+
           return updated;
         }
 
@@ -334,6 +355,7 @@ const makeUserRepository = Effect.gen(function* () {
         // race re-reads the winner and applies the standard name update.
         const id = yield* UserId.generate;
         const now = yield* DateTime.nowAsDate;
+
         const [created = null] = yield* db
           .insert(schema.userTable)
           .values({
@@ -353,9 +375,11 @@ const makeUserRepository = Effect.gen(function* () {
             ],
           })
           .returning();
+
         if (created) {
           return created;
         }
+
         const [winner] = yield* db
           .select({ id: schema.userTable.id })
           .from(schema.userTable)
@@ -369,22 +393,27 @@ const makeUserRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         if (!winner) {
           return yield* new UserPersistenceError({
             message: "Shadow user insert did not return a row",
           });
         }
+
         const winnerUpdatedAt = yield* DateTime.nowAsDate;
+
         const [winnerUpdated = null] = yield* db
           .update(schema.userTable)
           .set({ name: args.name, updatedAt: winnerUpdatedAt })
           .where(eq(schema.userTable.id, winner.id))
           .returning();
+
         if (!winnerUpdated) {
           return yield* new UserPersistenceError({
             message: "Shadow user update did not return a row",
           });
         }
+
         return winnerUpdated;
       }),
 
@@ -414,6 +443,7 @@ const makeUserRepository = Effect.gen(function* () {
           .where(eq(schema.userTable.id, userId))
           .limit(1)
           .for("update");
+
         if (!user || !isShadowUserEmail(user.email)) {
           return false;
         }
@@ -439,6 +469,7 @@ const makeUserRepository = Effect.gen(function* () {
         // table, e.g. `asset.userId`.
         const namesAccount = (table: PgTable, column: SQLWrapper) =>
           sql<boolean>`EXISTS (SELECT 1 FROM ${table} WHERE ${column} = ${userId})`;
+
         const [references = null] = yield* db
           .select({
             asset: namesAccount(schema.assetTable, schema.assetTable.userId),
@@ -497,6 +528,7 @@ const makeUserRepository = Effect.gen(function* () {
         yield* db
           .delete(schema.userTable)
           .where(eq(schema.userTable.id, userId));
+
         return true;
       }),
   };

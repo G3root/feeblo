@@ -165,9 +165,11 @@ const makeAuditLogRecorder = Effect.gen(function* () {
     input: TAuditRecordInput
   ) {
     const enabled = yield* AuditLogEnabled;
+
     if (!enabled) {
       return;
     }
+
     const id = yield* AuditLogId.generate;
     const occurredAt = yield* DateTime.nowAsDate;
     yield* repository.insert(toInsertRow(input, id, occurredAt));

@@ -83,33 +83,43 @@ function WebhookDetailContent({
 }) {
   const navigate = useNavigate();
   const editSheetStore = useWebhookEditSheetContext();
+
   const [oneTimeSecret, setOneTimeSecret] = useState<{
     readonly endpointName: string;
     readonly value: string;
   } | null>(null);
+
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
   const endpointsResult = useAtomValue(endpointsAtom(organizationId));
+
   const testDelivery = useAtomSet(testWebhookDeliveryAtom, {
     mode: "promise",
   });
+
   const rotateSecret = useAtomSet(rotateWebhookSecretAtom, {
     mode: "promise",
   });
+
   const pauseEndpoint = useAtomSet(pauseWebhookEndpointAtom, {
     mode: "promise",
   });
+
   const resumeEndpoint = useAtomSet(resumeWebhookEndpointAtom, {
     mode: "promise",
   });
+
   const updateEndpoint = useAtomSet(updateWebhookEndpointAtom, {
     mode: "promise",
   });
+
   const removeEndpoint = useAtomSet(removeWebhookEndpointAtom, {
     mode: "promise",
   });
+
   const refreshEndpoints = useAtomRefresh(endpointsAtom(organizationId));
+
   // Mutations that create or change deliveries (test, retry) bump this to
   // restart the history stream so new rows appear without a manual refresh.
   const refreshDeliveryHistory = useAtomSet(
@@ -118,6 +128,7 @@ function WebhookDetailContent({
 
   const findEndpoint = (value: readonly Endpoint[]) =>
     value.find((candidate) => candidate.id === connectionId) ?? null;
+
   const { endpoint, isLoading, loadFailed } = Result.builder(endpointsResult)
     .onInitial(() => ({ endpoint: null, isLoading: true, loadFailed: false }))
     .onFailure((_, { previousSuccess }) =>
@@ -145,6 +156,7 @@ function WebhookDetailContent({
     // Clear any previous result up front, so an in-flight or failed test never
     // shows stale delivery information.
     setTestResult(null);
+
     try {
       const result = await testDelivery({
         payload: {
@@ -153,6 +165,7 @@ function WebhookDetailContent({
         },
         reactivityKeys: webhookReactivityKeys(organizationId),
       });
+
       setTestResult(`${result.result}: ${result.deliveryId}`);
       toastManager.add({ title: "Test delivery queued", type: "success" });
       refreshDeliveryHistory();
@@ -173,6 +186,7 @@ function WebhookDetailContent({
         },
         reactivityKeys: webhookReactivityKeys(organizationId),
       });
+
       setOneTimeSecret({
         endpointName: endpoint.name,
         value: result.signingSecret,
@@ -227,6 +241,7 @@ function WebhookDetailContent({
     if (!confirmRemove) {
       return;
     }
+
     try {
       await removeEndpoint({
         payload: { connectionId, organizationId },
@@ -500,6 +515,7 @@ function DeliveryHistoryTable({
     () => ({ organizationId, connectionId }),
     [connectionId, organizationId]
   );
+
   const historyResult = useAtomValue(deliveriesAtom(historyArgs));
   const isLoading = useAtomValue(deliveriesLoadingAtom(historyArgs));
   // Writing to the pull atom advances it one page (driven by scrolling to the
@@ -508,9 +524,11 @@ function DeliveryHistoryTable({
   // the component no longer tracks cursors or accumulates pages itself.
   const pull = useAtomSet(deliveriesAtom(historyArgs));
   const refreshHistory = useAtomSet(deliveryHistoryRefreshAtom(historyArgs));
+
   const retryDelivery = useAtomSet(retryWebhookDeliveryAtom, {
     mode: "promise",
   });
+
   useScrollBottom(() => {
     pull();
   });
@@ -586,6 +604,7 @@ function DeliveryHistoryTable({
   const scrollRestoration = useElementScrollRestoration({
     getElement: () => window,
   });
+
   // The virtualizer coordinates rows relative to the first body row, so its
   // scroll margin is the table's offset plus the measured header height.
   // Refs are only attached after commit, so the margin is measured in a
@@ -597,10 +616,12 @@ function DeliveryHistoryTable({
     if (rows.length === 0) {
       return;
     }
+
     setScrollMargin(
       (listRef.current?.offsetTop ?? 0) + (headerRef.current?.offsetHeight ?? 0)
     );
   }, [rows.length]);
+
   const virtualizer = useWindowVirtualizer<HTMLTableRowElement>({
     count: rows.length,
     estimateSize: () => 44,
@@ -614,9 +635,12 @@ function DeliveryHistoryTable({
   // and below keep the table's total height (and the window scrollbar)
   // accurate while the page scrolls.
   const virtualItems = virtualizer.getVirtualItems();
+
   const topSpacer =
     virtualItems.length > 0 ? virtualItems[0].start - scrollMargin : 0;
+
   const lastItem = virtualItems.at(-1);
+
   const bottomSpacer =
     lastItem === undefined
       ? 0
@@ -690,6 +714,7 @@ function DeliveryHistoryTable({
                 ) : null}
                 {virtualItems.map((item) => {
                   const row = rows[item.index];
+
                   // The row list can shrink while a refresh is in flight (the
                   // new page hasn't streamed in yet), leaving stale virtual
                   // items with no backing row; skip those instead of reading
@@ -697,6 +722,7 @@ function DeliveryHistoryTable({
                   if (row === undefined) {
                     return null;
                   }
+
                   return row.kind === "delivery" ? (
                     <DeliveryRow
                       dataIndex={item.index}

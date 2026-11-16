@@ -24,16 +24,19 @@ const BoardIdField = z
   .string()
   .trim()
   .min(1, { error: () => m.agent_real_tuna() });
+
 const ContentField = z
   .string()
   .min(1, { error: () => m.flat_stout_thrush() })
   .max(POST_CONTENT_MAX_LENGTH, {
     error: () => m.upper_sea_thrush({ count: POST_CONTENT_MAX_LENGTH }),
   });
+
 const StatusIdField = z
   .string()
   .trim()
   .min(1, { error: () => m.slow_legal_kitten() });
+
 const TitleField = z
   .string()
   .trim()
@@ -71,19 +74,23 @@ export const postCreateFormOpts = formOptions({
     // own schema; the author key is server-validated.
     onChange: ({ value }) => {
       const fieldErrors: Record<string, string> = {};
+
       const fieldChecks = [
         ["boardId", BoardIdField, value.boardId],
         ["content", ContentField, value.content],
         ["statusId", StatusIdField, value.statusId],
         ["title", TitleField, value.title],
       ] as const;
+
       for (const [key, fieldSchema, fieldValue] of fieldChecks) {
         const parsed = fieldSchema.safeParse(fieldValue);
+
         if (!parsed.success) {
           fieldErrors[key] =
             parsed.error.issues[0]?.message ?? m.sweet_direct_buzzard();
         }
       }
+
       // Field-scoped errors must ride under `fields` (GlobalFormValidationError);
       // a flat record would surface as a single global form error.
       return Object.keys(fieldErrors).length > 0
@@ -138,6 +145,7 @@ export const PostContentField = withForm({
     ...rest
   }) {
     const { organizationId } = usePostCollections();
+
     return (
       <form.AppField name="content">
         {(field) => (
@@ -191,6 +199,7 @@ export const PostBoardField = withForm({
                   if (!nextBoardId) {
                     return;
                   }
+
                   field.handleChange(nextBoardId);
                 }}
               />
@@ -225,6 +234,7 @@ export const PostStatusField = withForm({
                   if (!nextPostStatus) {
                     return;
                   }
+
                   field.handleChange(nextPostStatus.id);
                 }}
                 statuses={statuses}

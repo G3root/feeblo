@@ -36,6 +36,7 @@ describe("email entitlement policy", () => {
 
           const maySubscribe =
             yield* policy.mayCreatePublicEmailSubscriptions(organizationId);
+
           const mayEmailSubscribers =
             yield* policy.mayEmailSubscribers(organizationId);
 
@@ -90,6 +91,7 @@ describe("email entitlement policy", () => {
 
           const maySubscribe =
             yield* policy.mayCreatePublicEmailSubscriptions(organizationId);
+
           const mayEmailSubscribers =
             yield* policy.mayEmailSubscribers(organizationId);
 

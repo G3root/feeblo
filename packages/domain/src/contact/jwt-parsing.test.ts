@@ -17,6 +17,7 @@ const SECRET = new TextEncoder().encode("test-secret");
  * are minted relative to it so the test does not depend on the wall clock.
  */
 const fixtureNow = new Date("2026-08-11T00:00:00.000Z");
+
 const fixtureNowSeconds = Math.floor(fixtureNow.getTime() / 1000);
 
 async function signAndVerify(payload: jose.JWTPayload) {
@@ -136,6 +137,7 @@ describe("JWT payload parsing", () => {
         const error = yield* Effect.flip(
           parsePersonAttributes(verified, [], [])
         );
+
         expect(error).toBeInstanceOf(DataValidationError);
       })
   );
@@ -154,6 +156,7 @@ describe("JWT payload parsing", () => {
         const error = yield* Effect.flip(
           parsePersonAttributes(verified, [], [])
         );
+
         expect(error).toBeInstanceOf(DataValidationError);
       })
   );

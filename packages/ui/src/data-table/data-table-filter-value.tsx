@@ -153,14 +153,18 @@ function SelectFilterValue<TData extends RowData>({
 }: DataTableFilterValueProps<TData>) {
   const [open, setOpen] = React.useState(false);
   const options = getColumnSelectOptions(column.columnDef.meta);
+
   const multiple =
     filter.operator === "inArray" || filter.operator === "notInArray";
+
   const value = getSelectFilterValue(filter);
+
   const selectedValues = Array.isArray(value)
     ? value
     : value === undefined
       ? []
       : [value];
+
   const label = column.columnDef.meta?.label ?? column.id;
 
   function onToggle(nextValue: string) {
@@ -169,12 +173,14 @@ function SelectFilterValue<TData extends RowData>({
         value: selectedValues.includes(nextValue) ? "" : nextValue,
       });
       setOpen(false);
+
       return;
     }
 
     const next = selectedValues.includes(nextValue)
       ? selectedValues.filter((item) => item !== nextValue)
       : [...selectedValues, nextValue];
+
     onFilterUpdate(filter.filterId, { value: next });
   }
 
@@ -223,30 +229,37 @@ function DateFilterValue<TData extends RowData>({
 }: DataTableFilterValueProps<TData>) {
   const [open, setOpen] = React.useState(false);
   const label = column.columnDef.meta?.label ?? column.id;
+
   const isRange =
     filter.operator === "isBetween" || Array.isArray(filter.value);
+
   const [startDate, endDate] = getFilterDates(filter.value);
 
   function onSelect(date: Date | DateRange | undefined) {
     if (date === undefined) {
       onFilterUpdate(filter.filterId, { value: "" });
+
       return;
     }
 
     if ("getTime" in date) {
       onFilterUpdate(filter.filterId, { value: String(date.getTime()) });
       setOpen(false);
+
       return;
     }
 
     const from = date.from ?? date.to;
     const to = date.to ?? date.from;
+
     if (!from && !to) {
       onFilterUpdate(filter.filterId, { value: "" });
+
       return;
     }
 
     const single = from ?? to;
+
     if (!single) return;
 
     onFilterUpdate(filter.filterId, {
@@ -319,6 +332,8 @@ function getDateFilterLabel(
   if (!startDate) return undefined;
 
   const start = getFilterDateValue(startDate);
+
   if (!isRange || !endDate) return start;
+
   return `${start} – ${getFilterDateValue(endDate)}`;
 }

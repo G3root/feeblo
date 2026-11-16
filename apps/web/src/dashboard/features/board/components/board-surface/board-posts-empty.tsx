@@ -28,11 +28,13 @@ export function BoardPostsEmpty({
   organizationId: string;
 }) {
   const store = usePostCreateDialogContext();
+
   const { description, title } = emptyCopy({
     boardId,
     hasFilters,
     myFeedbackView,
   });
+
   // Creating from `Assigned` would land a post the page it was created from
   // does not list: assignment is a triage decision made after the write.
   const canCreate = !hasFilters && myFeedbackView !== "assigned";

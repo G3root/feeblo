@@ -21,9 +21,11 @@ export function Heading({ title, description }: HeadingProps) {
     </header>
   );
 }
+
 export function Body({ children, className }: SectionProps) {
   return <div className={cn("flex flex-col gap-4", className)}>{children}</div>;
 }
+
 export function Actions({ children, className }: SectionProps) {
   return <div className={cn("flex flex-col", className)}>{children}</div>;
 }

@@ -113,6 +113,7 @@ const mapIngestError = (
   ) {
     return cause;
   }
+
   return new EmailProviderFeedbackDataError({
     cause,
     message: "Email provider feedback persistence failed",
@@ -133,11 +134,13 @@ const SNS_HTTPS_URL_PATTERN = /^sns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$/;
 
 const isSnsHttpsUrl = (value: string): boolean => {
   let parsed: URL;
+
   try {
     parsed = new URL(value);
   } catch {
     return false;
   }
+
   return (
     parsed.protocol === "https:" && SNS_HTTPS_URL_PATTERN.test(parsed.hostname)
   );
@@ -151,11 +154,13 @@ const isSnsHttpsUrl = (value: string): boolean => {
  */
 export const buildSnsStringToSign = (envelope: SesSnsEnvelope): string => {
   const parts: string[] = [];
+
   const append = (label: string, value: string | undefined) => {
     if (value !== undefined) {
       parts.push(label, value);
     }
   };
+
   switch (envelope.Type) {
     case "Notification": {
       append("Message", envelope.Message);
@@ -165,6 +170,7 @@ export const buildSnsStringToSign = (envelope: SesSnsEnvelope): string => {
       append("TopicArn", envelope.TopicArn);
       break;
     }
+
     case "SubscriptionConfirmation":
     case "UnsubscribeConfirmation": {
       append("Message", envelope.Message);
@@ -175,10 +181,13 @@ export const buildSnsStringToSign = (envelope: SesSnsEnvelope): string => {
       append("TopicArn", envelope.TopicArn);
       break;
     }
+
     default:
       return envelope satisfies never;
   }
+
   parts.push("Type", envelope.Type);
+
   return `${parts.join("\n")}\n`;
 };
 
@@ -193,6 +202,7 @@ const CERTIFICATE_BLOCK =
 const publicKeyFromSnsPem = (pem: string): NodeCrypto.KeyObject | undefined => {
   try {
     const signerCert = CERTIFICATE_BLOCK.exec(pem)?.[0] ?? pem;
+
     return NodeCrypto.createPublicKey({ key: signerCert, format: "pem" });
   } catch {
     return undefined;
@@ -215,10 +225,13 @@ const verifySnsSignature = (
   ) {
     return false;
   }
+
   const algorithm = SNS_SIGNATURE_ALGORITHMS.get(envelope.SignatureVersion);
+
   if (algorithm === undefined) {
     return false;
   }
+
   try {
     return NodeCrypto.verify(
       algorithm,
@@ -233,6 +246,7 @@ const verifySnsSignature = (
 
 /** Maximum number of signing-certificate responses cached per webhook instance. */
 const SIGNING_CERT_CACHE_MAX_ENTRIES = 8;
+
 /** How long a fetched signing certificate is reused before it is refetched. */
 const SIGNING_CERT_CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -275,6 +289,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
             ),
         })
       );
+
       if (response.status >= 300 && response.status < 400) {
         return yield* new SesWebhookEnvelopeError({
           httpStatus: response.status,
@@ -282,6 +297,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
         });
       }
+
       if (response.status < 200 || response.status >= 300) {
         return yield* new SesWebhookEnvelopeError({
           httpStatus: response.status,
@@ -289,6 +305,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           operation: "SesEmailFeedbackWebhook.fetchSnsSigningCert",
         });
       }
+
       return yield* response.text.pipe(
         Effect.mapError(
           (cause) =>
@@ -330,6 +347,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           operation: "SesEmailFeedbackWebhook.confirmSubscription",
         });
       }
+
       // Subscription confirmation must also not follow redirects — an
       // attacker-controlled SubscribeURL would otherwise be fetched.
       const response = yield* HttpClient.execute(
@@ -366,6 +384,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           operation: "SesEmailFeedbackWebhook.confirmSubscription",
         });
       }
+
       if (response.status < 200 || response.status >= 300) {
         return yield* new SesWebhookConfirmationError({
           httpStatus: response.status,
@@ -382,6 +401,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
     const envelope = yield* decodeSnsEnvelope(rawBody);
 
     const expectedTopicArn = config.expectedTopicArn;
+
     if (Option.isNone(expectedTopicArn)) {
       // The route is only active when the webhook token is configured, and the
       // signed TopicArn cannot be validated without a known topic. Fail closed
@@ -392,6 +412,7 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         operation: "SesEmailFeedbackWebhook.authenticate",
       });
     }
+
     if (envelope.TopicArn !== expectedTopicArn.value) {
       yield* Effect.logWarning(
         "SNS message topic is not the expected email feedback topic"
@@ -401,11 +422,13 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
           topicArn: envelope.TopicArn,
         })
       );
+
       return yield* new SesWebhookEnvelopeError({
         message: "SNS topic is not the expected email feedback topic",
         operation: "SesEmailFeedbackWebhook.authenticate",
       });
     }
+
     if (
       (envelope.SignatureVersion !== "1" &&
         envelope.SignatureVersion !== "2") ||
@@ -417,18 +440,22 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         operation: "SesEmailFeedbackWebhook.authenticate",
       });
     }
+
     if (!isSnsHttpsUrl(envelope.SigningCertURL)) {
       return yield* new SesWebhookEnvelopeError({
         message: "SNS signing certificate URL is not a trusted HTTPS URL",
         operation: "SesEmailFeedbackWebhook.authenticate",
       });
     }
+
     const certPem = yield* fetchSnsSigningCert(envelope.SigningCertURL);
     const publicKey = publicKeyFromSnsPem(certPem);
+
     if (publicKey === undefined || !verifySnsSignature(envelope, publicKey)) {
       yield* Effect.logWarning(
         "SNS message signature verification failed"
       ).pipe(Effect.annotateLogs({ snsMessageId: envelope.MessageId }));
+
       return yield* new SesWebhookEnvelopeError({
         message: "SNS message signature verification failed",
         operation: "SesEmailFeedbackWebhook.authenticate",
@@ -440,21 +467,26 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
         if (envelope.SubscribeURL !== undefined) {
           yield* confirmSubscription(envelope.SubscribeURL);
         }
+
         return { _tag: "Confirmed" as const };
       }
+
       case "UnsubscribeConfirmation":
         return { _tag: "Ignored" as const };
       case "Notification": {
         const notification = yield* parseSesMessage(envelope.Message);
+
         if (notification === undefined) {
           yield* Effect.logWarning(
             "SNS notification did not contain a recognized SES event"
           ).pipe(Effect.annotateLogs({ snsMessageId: envelope.MessageId }));
+
           return { _tag: "Ignored" as const };
         }
 
         const event: ProviderLifecycleEvent | undefined =
           toProviderLifecycleEvent(envelope.MessageId, notification);
+
         if (event === undefined) {
           yield* Effect.logWarning(
             "SES event type is not tracked for provider feedback"
@@ -464,14 +496,17 @@ const makeSesEmailFeedbackWebhook = Effect.gen(function* () {
               eventType: notification.eventType,
             })
           );
+
           return { _tag: "Ignored" as const };
         }
 
         const result = yield* feedback
           .ingest(event)
           .pipe(Effect.mapError(mapIngestError));
+
         return { _tag: "Ingested" as const, result };
       }
+
       default:
         return envelope satisfies never;
     }

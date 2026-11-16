@@ -126,6 +126,7 @@ describe("PostWriteService", () => {
         orderIndex: 1,
         organizationId: fixture.organizationId,
       });
+
       return id;
     });
 
@@ -195,6 +196,7 @@ describe("PostWriteService", () => {
           .select()
           .from(schema.postTable)
           .where(eq(schema.postTable.id, postId));
+
         expect(post?.slug).toBe(slug);
         expect(post?.title).toBe("Dark mode");
         expect(post?.creatorId).toBe(fixture.userId);
@@ -205,6 +207,7 @@ describe("PostWriteService", () => {
           .select({ kind: schema.postActivityTable.kind })
           .from(schema.postActivityTable)
           .where(eq(schema.postActivityTable.postId, postId));
+
         expect(activity.map(({ kind }) => kind)).toEqual(["POST_CREATED"]);
 
         // The creator's own watch-list subscription.
@@ -212,6 +215,7 @@ describe("PostWriteService", () => {
           .select()
           .from(schema.postSubscriptionTable)
           .where(eq(schema.postSubscriptionTable.postId, postId));
+
         expect(subscriptions).toHaveLength(1);
         expect(subscriptions[0]?.userId).toBe(fixture.userId);
 
@@ -223,6 +227,7 @@ describe("PostWriteService", () => {
           .where(
             eq(schema.emailOutboxTable.organizationId, fixture.organizationId)
           );
+
         expect(outbox.map(({ kind }) => kind)).toEqual(["submission.created"]);
 
         // The webhook fact, recorded even though this composition omits the
@@ -260,6 +265,7 @@ describe("PostWriteService", () => {
             .select()
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(post?.title).toBe("Machine post");
           // A key identifies the workspace, never a person: nobody is
           // attributed and nobody is watch-listed.
@@ -270,6 +276,7 @@ describe("PostWriteService", () => {
             .select()
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, postId));
+
           expect(subscriptions).toHaveLength(0);
           expect(recordedIntegrationEvents).toEqual([
             expect.objectContaining({ type: "post.created" }),
@@ -305,6 +312,7 @@ describe("PostWriteService", () => {
             .select()
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           // The post is attributed to the inbound author so creator-based
           // reads and edit/delete permissions work.
           expect(post?.creatorId).toBe(fixture.userId);
@@ -314,6 +322,7 @@ describe("PostWriteService", () => {
             .select()
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, postId));
+
           expect(subscriptions).toHaveLength(0);
         })
     );
@@ -355,6 +364,7 @@ describe("PostWriteService", () => {
           .select()
           .from(schema.postTable)
           .where(eq(schema.postTable.id, postId));
+
         expect(post?.title).toBe("Dark mode v2");
         expect(post?.statusId).toBe(nextStatusId);
 
@@ -362,6 +372,7 @@ describe("PostWriteService", () => {
           .select({ kind: schema.postActivityTable.kind })
           .from(schema.postActivityTable)
           .where(eq(schema.postActivityTable.postId, postId));
+
         expect(activity.map(({ kind }) => kind)).toEqual(
           expect.arrayContaining(["TITLE_CHANGED", "STATUS_CHANGED"])
         );
@@ -406,6 +417,7 @@ describe("PostWriteService", () => {
           .select()
           .from(schema.postTable)
           .where(eq(schema.postTable.id, postId));
+
         expect(post?.assigneeMemberId).toBe(fixture.membershipId);
 
         const activity = yield* db
@@ -416,9 +428,11 @@ describe("PostWriteService", () => {
           })
           .from(schema.postActivityTable)
           .where(eq(schema.postActivityTable.postId, postId));
+
         const assignment = activity.find(
           ({ kind }) => kind === "ASSIGNEE_CHANGED"
         );
+
         expect(assignment?.previousValue).toBeNull();
         expect(assignment?.nextValue).toBe(fixture.membershipId);
 
@@ -436,6 +450,7 @@ describe("PostWriteService", () => {
           .select({ assigneeMemberId: schema.postTable.assigneeMemberId })
           .from(schema.postTable)
           .where(eq(schema.postTable.id, postId));
+
         expect(unassigned?.assigneeMemberId).toBeNull();
       })
     );
@@ -481,6 +496,7 @@ describe("PostWriteService", () => {
           .select({ assigneeMemberId: schema.postTable.assigneeMemberId })
           .from(schema.postTable)
           .where(eq(schema.postTable.id, postId));
+
         expect(post?.assigneeMemberId).toBeNull();
       })
     );

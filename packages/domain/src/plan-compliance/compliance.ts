@@ -30,7 +30,9 @@ import type {
  * tool nobody asked for.
  */
 const RESOURCE_PREVIEW_LIMIT = 200;
+
 const MEMBER_PREVIEW_LIMIT = 100;
+
 const CRM_RESOURCE_PREVIEW_LIMIT = 100;
 
 /**
@@ -95,9 +97,11 @@ const makePlanCompliance = Effect.gen(function* () {
     readonly organizationId: LegidFrom<typeof WorkspaceId>;
   }) {
     const { organizationId } = args;
+
     const { plan } = yield* workspaceRepository.findPlanByOrganizationId({
       organizationId,
     });
+
     const entitlements: PlanEntitlements = PLAN_ENTITLEMENTS[plan];
     const { capabilities, limits } = entitlements;
 
@@ -138,6 +142,7 @@ const makePlanCompliance = Effect.gen(function* () {
 
     const hasPrivateBoards =
       !capabilities.privateBoards && privateBoardCount > 0;
+
     const overBoardLimit =
       limits.feedbackBoards !== null && boardCount > limits.feedbackBoards;
 
@@ -146,6 +151,7 @@ const makePlanCompliance = Effect.gen(function* () {
         args.includeResources && overBoardLimit
           ? yield* boardRepository.findMany({ organizationId })
           : [];
+
       const preview = boards.slice(0, RESOURCE_PREVIEW_LIMIT);
 
       // A private board can sit beyond the general board preview. Fetch the
@@ -158,6 +164,7 @@ const makePlanCompliance = Effect.gen(function* () {
               visibility: "PRIVATE",
             })
           : [];
+
       const privatePreview = privateBoards.slice(0, RESOURCE_PREVIEW_LIMIT);
 
       const postCounts = args.includeResources
@@ -264,7 +271,9 @@ const makePlanCompliance = Effect.gen(function* () {
       const categories = args.includeResources
         ? yield* changelogCategoryRepository.findMany({ organizationId })
         : [];
+
       const preview = categories.slice(0, RESOURCE_PREVIEW_LIMIT);
+
       const linkCounts = args.includeResources
         ? yield* changelogCategoryRepository.countLinksByCategoryIds({
             categoryIds: preview.map((category) => category.id),
@@ -293,6 +302,7 @@ const makePlanCompliance = Effect.gen(function* () {
             limit: CRM_RESOURCE_PREVIEW_LIMIT,
           })
         : [];
+
       const companies = args.includeResources
         ? yield* companyRepository.findManyCompanies(organizationId, {
             limit: CRM_RESOURCE_PREVIEW_LIMIT,

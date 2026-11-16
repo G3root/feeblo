@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema";
 
 export class OgImageRequestValidationError extends Schema.TaggedError<OgImageRequestValidationError>()(
   "OgImageRequestValidationError",
-  { message: Schema.String },
+  { message: Schema.String, cause: Schema.optionalKey(Schema.Defect()) },
   { httpApiStatus: 400, identifier: "OgImageRequestValidationError" }
 ) {}
 

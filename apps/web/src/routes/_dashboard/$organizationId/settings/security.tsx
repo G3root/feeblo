@@ -31,12 +31,14 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async ({ params }) => {
     const session = await getAuthSession();
+
     if (
       session !== null &&
       hasPermission(params.organizationId, "workspace.update")(session)
     ) {
       await dashboardCollections.jwtSecretCollection.preload();
     }
+
     return null;
   },
 });
@@ -51,6 +53,7 @@ function formatDate(date: Date): string {
 
 function RouteComponent() {
   const organizationId = useOrganizationId();
+
   // The page hosts two independent sections: widget SSO is an admin setting,
   // while banning is a manager one. Either grant opens the page; each section
   // gates itself.
@@ -60,14 +63,17 @@ function RouteComponent() {
       hasPermission(organizationId, "userBans.manage")
     )
   );
+
   const { allowed: canManageSso } = usePolicy(
     hasPermission(organizationId, "workspace.update")
   );
+
   const { entitlements, isLoading: isEntitlementsLoading } = useEntitlements();
 
   if (isPolicyPending) {
     return null;
   }
+
   if (!canManageSecurity) {
     return <SettingsAccessDenied />;
   }
@@ -129,6 +135,7 @@ function SsoSection({
   // SAFETY: rotating/generating a secret always leaves exactly one non-revoked
   // secret, and the UI only surfaces copy/revoke actions when one exists.
   const activeSecret = (secrets ?? []).find((s) => s.revokedAt === null)!;
+
   const gracePeriodSecrets = (secrets ?? []).filter(
     (s) => s.revokedAt !== null && s.revokedAt > now
   );
@@ -137,6 +144,7 @@ function SsoSection({
     if (s.revokedAt && (!latest || s.revokedAt > latest)) {
       return s.revokedAt;
     }
+
     return latest;
   }, null);
 
@@ -154,7 +162,9 @@ function SsoSection({
     if (isGeneratingRef.current) {
       return;
     }
+
     isGeneratingRef.current = true;
+
     try {
       // RotateJwtSecret doubles as first-time generation: when no secret
       // exists it revokes nothing and simply creates a new active one.
@@ -167,10 +177,12 @@ function SsoSection({
     } catch {
       trackEvent("sso_secret_generated", { success: false });
       toastManager.add({ title: "Failed to generate secret", type: "error" });
+
       return;
     } finally {
       isGeneratingRef.current = false;
     }
+
     await dashboardCollections.jwtSecretCollection.utils.refetch();
   };
 
@@ -185,8 +197,10 @@ function SsoSection({
     } catch {
       trackEvent("sso_secret_rotated", { success: false });
       toastManager.add({ title: "Failed to rotate secret", type: "error" });
+
       return;
     }
+
     await dashboardCollections.jwtSecretCollection.utils.refetch();
   };
 
@@ -203,8 +217,10 @@ function SsoSection({
     } catch {
       trackEvent("sso_secret_revoked", { success: false });
       toastManager.add({ title: "Failed to revoke secret", type: "error" });
+
       return;
     }
+
     await dashboardCollections.jwtSecretCollection.utils.refetch();
   };
 
@@ -359,8 +375,10 @@ function SsoSection({
                               title: "Failed to revoke secret",
                               type: "error",
                             });
+
                             return;
                           }
+
                           await dashboardCollections.jwtSecretCollection.utils.refetch();
                         }}
                         variant="destructive"

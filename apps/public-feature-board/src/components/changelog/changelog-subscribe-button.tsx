@@ -48,6 +48,7 @@ export function ChangelogSubscribeButton() {
         if (!(organizationId && session)) {
           return undefined;
         }
+
         return q
           .from({ subscription: publicChangelogSubscriptionCollection })
           .where(({ subscription }) =>
@@ -80,6 +81,7 @@ export function ChangelogSubscribeButton() {
         open: true,
         data: { variant: "sign-in" },
       });
+
       return;
     }
 
@@ -91,8 +93,10 @@ export function ChangelogSubscribeButton() {
     // A rejected persistence is caught below so the error does not escape
     // unhandled; the optimistic flip is rolled back by the collection.
     isPersistingRef.current = true;
+
     try {
       const userId = session.user.id;
+
       const key = getChangelogSubscriptionCollectionKey({
         userId,
         organizationId,
@@ -103,6 +107,7 @@ export function ChangelogSubscribeButton() {
         await transaction.when("settled");
       } else {
         const id = await ChangelogSubscriptionId.unsafeGenerate();
+
         const row: TChangelogSubscription = {
           id,
           createdAt: new Date(),
@@ -114,6 +119,7 @@ export function ChangelogSubscribeButton() {
               (value) => value.organizationId === organizationId
             )?.membershipId ?? null,
         };
+
         const transaction = publicChangelogSubscriptionCollection.insert(row);
         await transaction.when("settled");
       }

@@ -9,6 +9,7 @@ vi.hoisted(() => {
   const globalWindow = window as Window & {
     global?: { __ENV?: Record<string, string> };
   };
+
   globalWindow.global = globalWindow.global ?? {};
   globalWindow.global.__ENV = { API_URL: "http://localhost:3000/api" };
 });
@@ -25,6 +26,7 @@ import { clearAuthHintCookie, writeAuthHintToCookie } from "./hint-cookie";
 
 function AuthProbe() {
   const auth = useAuth();
+
   const value =
     auth.status === "authenticated"
       ? `authenticated:${auth.user.email}`
@@ -57,6 +59,7 @@ describe("AuthProvider session revalidation", () => {
       }),
       async () => ({ data: null, error: { message: "Network unavailable" } }),
     ];
+
     let callIndex = 0;
     const getSession = vi.fn(() => responses[callIndex++]());
 
@@ -67,6 +70,7 @@ describe("AuthProvider session revalidation", () => {
         <AuthProbe />
       </AuthProvider>
     );
+
     const authenticated = screen.getByText("authenticated:person@example.com");
 
     await expect.element(authenticated).toBeVisible();
@@ -87,9 +91,11 @@ describe("AuthProvider session revalidation", () => {
     });
 
     let release!: () => void;
+
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+
     overrideSessionGetterForTests(() =>
       gate.then(() => ({
         data: {
@@ -130,6 +136,7 @@ describe("AuthProvider session revalidation", () => {
       },
       error: null,
     }));
+
     overrideSessionGetterForTests(getSession);
 
     const screen = await render(

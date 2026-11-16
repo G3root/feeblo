@@ -61,9 +61,15 @@ export type WorkspaceTraffic = Atom.Success<
 >;
 
 export type InsightsSummary = WorkspaceInsights["summary"];
+
 export type InsightsPoint = WorkspaceInsights["volume"][number];
+
 export type InsightsStatusSlice = WorkspaceInsights["statusMix"][number];
+
 export type InsightsUntouchedPost = WorkspaceInsights["untouchedPosts"][number];
+
 export type InsightsBoard = WorkspaceInsights["topBoards"][number];
+
 export type InsightsTag = WorkspaceInsights["topTags"][number];
+
 export type InsightsVoter = WorkspaceInsights["topVoters"][number];

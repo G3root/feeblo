@@ -17,6 +17,7 @@ export interface OAuthCallbackQuery {
 
 export const parseOAuthCallbackUrl = (url: string): OAuthCallbackQuery => {
   const parsed = new URL(url, "http://localhost");
+
   return {
     code: parsed.searchParams.get("code"),
     error: parsed.searchParams.get("error"),

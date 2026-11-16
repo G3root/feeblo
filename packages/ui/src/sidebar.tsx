@@ -23,10 +23,15 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "./tooltip";
 import { cn } from "./utils";
 
 const SIDEBAR_COOKIE_NAME: string = "sidebar_state";
+
 const SIDEBAR_COOKIE_MAX_AGE: number = 60 * 60 * 24 * 7;
+
 const SIDEBAR_WIDTH: string = "16rem";
+
 const SIDEBAR_WIDTH_MOBILE: string = "18rem";
+
 const SIDEBAR_WIDTH_ICON: string = "3rem";
+
 const SIDEBAR_KEYBOARD_SHORTCUT: string = "b";
 
 const sidebarMenuButtonVariants = cva(
@@ -66,6 +71,7 @@ export const SidebarContext: React.Context<SidebarContextProps | null> =
 
 export function useSidebar(): SidebarContextProps {
   const context = React.useContext(SidebarContext);
+
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider.");
   }
@@ -93,12 +99,14 @@ export function SidebarProvider({
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
+
   const setOpen = React.useCallback(
     async (value: boolean | ((value: boolean) => boolean)) => {
       const openState = isFunction(value)
         ? // SAFETY: the union branch narrowed by isFunction is the updater form.
           (value as (current: boolean) => boolean)(open)
         : value;
+
       if (setOpenProp) {
         setOpenProp(openState);
       } else {
@@ -134,6 +142,7 @@ export function SidebarProvider({
     };
 
     window.addEventListener("keydown", handleKeyDown);
+
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 

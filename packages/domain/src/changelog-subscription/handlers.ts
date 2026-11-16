@@ -217,6 +217,7 @@ export const ChangelogSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     ListChangelogSubscriptionsPublic: listPublicEntry.entry((args) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+
         return yield* listSubscribersEffect(args, {
           userId: session.session.userId,
         });

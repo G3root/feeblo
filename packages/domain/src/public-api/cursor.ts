@@ -54,6 +54,7 @@ export const decodeCursorOrFail = (raw: string | undefined) =>
     }
 
     const decoded = Option.getOrNull(decodeCursor(raw));
+
     if (decoded === null) {
       return yield* invalidRequestError("cursor is not a valid page cursor.");
     }

@@ -33,6 +33,7 @@ const noCalls = () => Effect.die("the program made an unexpected tool call");
 const failureOf = (code: string, limits?: Partial<SandboxLimits>) =>
   Effect.gen(function* () {
     const sandbox = yield* Sandbox;
+
     return yield* sandbox
       .run({ call: noCalls, code, limits })
       .pipe(Effect.flip);
@@ -42,6 +43,7 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("returns the program's value and its logs", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+
       const outcome = yield* sandbox.run({
         call: noCalls,
         code: 'console.log("hello", { a: 1 }); console.warn("careful"); return { ok: true };',
@@ -58,6 +60,7 @@ layer(SandboxLive)("sandbox", (it) => {
     () =>
       Effect.gen(function* () {
         const sandbox = yield* Sandbox;
+
         const outcome = yield* sandbox.run({
           call: ({ input, name }) =>
             name === "echo"
@@ -86,6 +89,7 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("answers a tool call that dies with a failure frame", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+
       const outcome = yield* sandbox.run({
         // A defect is not a typed refusal; without a recovery it kills the
         // forked call and the child waits for an answer that never comes.
@@ -110,6 +114,7 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("hides the host's globals and blocks generated code", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+
       const outcome = yield* sandbox.run({
         call: noCalls,
         code: `
@@ -153,6 +158,7 @@ layer(SandboxLive)("sandbox", (it) => {
     () =>
       Effect.gen(function* () {
         const sandbox = yield* Sandbox;
+
         const outcome = yield* sandbox.run({
           call: noCalls,
           code: `
@@ -182,6 +188,7 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("encodes the result with the captured JSON.stringify", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+
       const outcome = yield* sandbox.run({
         call: noCalls,
         // A replaced stringify would hijack every message the realm sends if
@@ -196,6 +203,7 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("refuses a frame larger than the protocol allows", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+
       const failure = yield* sandbox
         .run({
           call: noCalls,
@@ -206,6 +214,7 @@ layer(SandboxLive)("sandbox", (it) => {
         .pipe(Effect.flip);
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("LIMIT_EXCEEDED");
       expect(failure.message).toContain("frame larger");
@@ -215,6 +224,7 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("stops a program at the memory watchdog", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+
       const failure = yield* sandbox
         .run({
           // The program waits on a call that never answers, so the watchdog
@@ -226,6 +236,7 @@ layer(SandboxLive)("sandbox", (it) => {
         .pipe(Effect.flip);
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("LIMIT_EXCEEDED");
       expect(failure.message).toContain("memory budget");
@@ -237,6 +248,7 @@ layer(SandboxLive)("sandbox", (it) => {
       const failure = yield* failureOf('throw new Error("nope")');
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("CRASHED");
       expect(failure.message).toBe("nope");
@@ -250,6 +262,7 @@ layer(SandboxLive)("sandbox", (it) => {
       });
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("CRASHED");
       expect(failure.message).toContain("timed out");
@@ -275,11 +288,13 @@ layer(SandboxLive)("sandbox", (it) => {
           limits: { wallClockMs: 200 },
         })
         .pipe(Effect.flip, Effect.forkChild);
+
       yield* Deferred.await(called);
       yield* TestClock.adjust("200 millis");
       const failure = yield* Fiber.join(fiber);
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("LIMIT_EXCEEDED");
     })
@@ -303,11 +318,13 @@ layer(SandboxLive)("sandbox", (it) => {
           limits: { wallClockMs: 200 },
         })
         .pipe(Effect.flip, Effect.forkChild);
+
       yield* Deferred.await(called);
       yield* TestClock.adjust("200 millis");
       const failure = yield* Fiber.join(fiber);
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("LIMIT_EXCEEDED");
     })
@@ -412,6 +429,7 @@ layer(SandboxLive)("sandbox", (it) => {
 
       const failure = yield* Fiber.join(fiber);
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("LIMIT_EXCEEDED");
       expect(failure.message).toContain("for a person");
@@ -456,6 +474,7 @@ layer(SandboxLive)("sandbox", (it) => {
 
         const failure = yield* Fiber.join(fiber);
         expect(Schema.is(SandboxError)(failure)).toBe(true);
+
         if (!Schema.is(SandboxError)(failure)) return;
         expect(failure.code).toBe("LIMIT_EXCEEDED");
         expect(failure.message).toContain("for a person");
@@ -469,6 +488,7 @@ layer(SandboxLive)("sandbox", (it) => {
       });
 
       expect(Schema.is(SandboxError)(failure)).toBe(true);
+
       if (!Schema.is(SandboxError)(failure)) return;
       expect(failure.code).toBe("LIMIT_EXCEEDED");
     })
@@ -477,6 +497,7 @@ layer(SandboxLive)("sandbox", (it) => {
   it.effect("stops a program at its tool-call budget", () =>
     Effect.gen(function* () {
       const sandbox = yield* Sandbox;
+
       const outcome = yield* sandbox.run({
         call: ({ name }) => Effect.succeed({ called: name }),
         code: `

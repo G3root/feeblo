@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer";
 interface findByOrganizationIdArgs {
   organizationId: string;
 }
+
 interface findManyArgs {
   limit: number;
   organizationId?: string;
@@ -63,11 +64,13 @@ const makeSiteRepository = Effect.gen(function* () {
 
     findMany: (findManyArgs: findManyArgs) => {
       const where: SQL[] = [];
+
       if (findManyArgs.organizationId) {
         where.push(
           eq(schema.siteTable.organizationId, findManyArgs.organizationId)
         );
       }
+
       if (findManyArgs.subdomain) {
         where.push(eq(schema.siteTable.subdomain, findManyArgs.subdomain));
       }

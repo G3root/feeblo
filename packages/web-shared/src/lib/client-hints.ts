@@ -2,11 +2,13 @@ import { getHintUtils } from "@epic-web/client-hints";
 import { clientHint as timeZoneHint } from "@epic-web/client-hints/time-zone";
 
 export const defaultTimeZone = "America/New_York";
+
 export const timeZoneHintCookieName = timeZoneHint.cookieName;
 
 const isValidTimeZone = (value: string) => {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+
     return value === "UTC" || value.includes("/");
   } catch {
     return false;
@@ -34,5 +36,6 @@ export const getClientTimeZone = (): string | undefined => {
   ) {
     return undefined;
   }
+
   return getHints().timeZone;
 };

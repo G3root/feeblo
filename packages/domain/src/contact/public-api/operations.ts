@@ -149,6 +149,7 @@ export const upsertEndUserOperation = defineOperation(
       // "neither is set" is invalid.
       const hasExternalId = externalId !== undefined && externalId !== null;
       const hasEmail = email !== undefined && email !== null;
+
       if (!(hasExternalId || hasEmail)) {
         return yield* invalidRequestError(
           "Provide an externalId or an email so the end user can be matched."

@@ -63,6 +63,7 @@ describe("public api page cursors", () => {
         // forever, so it is the published refusal instead.
         const result = yield* Effect.result(decodeCursorOrFail("not-a-cursor"));
         expect(Result.isFailure(result)).toBe(true);
+
         if (Result.isFailure(result)) {
           expect(result.failure._tag).toBe("INVALID_REQUEST");
         }

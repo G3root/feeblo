@@ -32,12 +32,19 @@ import { redirect } from "@tanstack/react-router";
 // ---------------------------------------------------------------------------
 
 const AUTH_SIGN_IN_PATH = "/sign-in";
+
 const AUTH_SIGN_UP_PATH = "/sign-up";
+
 const AUTH_EMAIL_VERIFY_PATH = "/email-verify";
+
 const AUTH_FORGOT_PASSWORD_PATH = "/forgot-password";
+
 const AUTH_RESET_PASSWORD_PATH = "/reset-password";
+
 const REGISTER_PATH = "/register";
+
 const INVITATION_PATH_PREFIX = "/invitation/";
+
 const DASHBOARD_SUBDOMAIN = "app";
 
 const DASHBOARD_AUTH_PATHS = new Set([
@@ -47,10 +54,12 @@ const DASHBOARD_AUTH_PATHS = new Set([
   AUTH_FORGOT_PASSWORD_PATH,
   AUTH_RESET_PASSWORD_PATH,
 ]);
+
 const PASSWORD_RESET_PATHS = new Set([
   AUTH_FORGOT_PASSWORD_PATH,
   AUTH_RESET_PASSWORD_PATH,
 ]);
+
 const DASHBOARD_NON_ORG_PATHS = new Set([
   ...DASHBOARD_AUTH_PATHS,
   REGISTER_PATH,
@@ -68,20 +77,24 @@ function normalizePathname(pathname: string) {
   if (pathname.length > 1 && pathname.endsWith("/")) {
     return pathname.slice(0, -1);
   }
+
   return pathname;
 }
 
 function isAppSubdomainHost() {
   const { appRootDomain } = getRuntimePublicEnv();
+
   // Without the configured root domain we cannot tell board hosts from the
   // dashboard host; do not enforce dashboard-only redirects.
   if (!appRootDomain) {
     return false;
   }
+
   const subdomain = extractSubdomain({
     url: window.location.href,
     rootDomain: appRootDomain,
   });
+
   return !subdomain || subdomain.toLowerCase() === DASHBOARD_SUBDOMAIN;
 }
 
@@ -89,6 +102,7 @@ function redirectToSignIn(location: BeforeLoadLocation): never {
   const redirectTo = encodeURIComponent(
     `${location.pathname}${location.searchStr}`
   );
+
   throw redirect({ href: `${AUTH_SIGN_IN_PATH}?redirectTo=${redirectTo}` });
 }
 
@@ -96,6 +110,7 @@ function redirectToRegister(location: BeforeLoadLocation): never {
   const redirectTo = encodeURIComponent(
     `${location.pathname}${location.searchStr}`
   );
+
   throw redirect({ href: `${REGISTER_PATH}?redirectTo=${redirectTo}` });
 }
 
@@ -124,6 +139,7 @@ async function resolveRoutingSession(): Promise<
   // cached failures and confirmed sign-outs, which fall through to the await
   // below — a settled atom resolves there without a network stall.
   let session: AuthClientSession | null = getCachedAuthSession();
+
   if (session === null) {
     try {
       session = await getAuthSession();
@@ -270,6 +286,7 @@ export async function dashboardAuthBeforeLoad({
     if (!isAuthPath) {
       redirectToSignIn(location);
     }
+
     return;
   }
 
@@ -299,6 +316,7 @@ export async function dashboardAuthBeforeLoad({
 
   const [segment] = pathname.slice(1).split("/");
   const pathOrganizationId = segment || null;
+
   if (
     pathOrganizationId &&
     organizations.some((organization) => organization.id === pathOrganizationId)
@@ -315,6 +333,7 @@ export async function dashboardAuthBeforeLoad({
         ? ""
         : pathname.slice(pathOrganizationId.length + 1)
       : "";
+
   throw redirect({
     href: `/${defaultOrganizationId}${suffix}${location.searchStr}`,
   });

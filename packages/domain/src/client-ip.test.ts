@@ -46,6 +46,7 @@ describe("getClientIpFromHeaders", () => {
 
   it("refuses to trust forwarded headers from a peer-less rate-limit fallback even when proxy trust is enabled", () => {
     const trust = proxyTrust([], true);
+
     const headers = Headers.fromInput({
       "cf-connecting-ip": "203.0.113.1",
       "x-forwarded-for": "198.51.100.1",
@@ -75,6 +76,7 @@ describe("getClientIpFromHeaders", () => {
     const headers = Headers.fromInput({
       "cf-connecting-ip": "203.0.113.9",
     });
+
     // v4: 104.16.0.0/13 covers 104.16.0.1; v6: 2606:4700::/32 covers
     // 2606:4700:3037::1. These anchors move only when Cloudflare's published
     // list changes, so a stale/truncated CLOUDFLARE_IP_RANGES fails here.
@@ -100,6 +102,7 @@ describe("getClientIpFromHeaders", () => {
 
   it("walks x-forwarded-for from the right, skipping trusted proxy hops", () => {
     const trust = proxyTrust(["10.0.0.0/8"]);
+
     const headers = Headers.fromInput({
       "x-forwarded-for": " 192.0.2.99, 198.51.100.1, 10.0.0.7 ",
     });
@@ -111,6 +114,7 @@ describe("getClientIpFromHeaders", () => {
 
   it("ignores a malformed x-forwarded-for chain", () => {
     const trust = proxyTrust(["10.0.0.0/8"]);
+
     const headers = Headers.fromInput({
       "x-forwarded-for": "not-an-ip, 10.0.0.7",
     });
@@ -235,6 +239,7 @@ describe("isTrustedProxy", () => {
 
   it("uses the originating forwarded address when every proxy is trusted", () => {
     const trust = proxyTrust([], true);
+
     const headers = Headers.fromInput({
       "x-forwarded-for": "192.0.2.99, 198.51.100.7",
     });
@@ -260,10 +265,13 @@ describe("isTrustedProxy", () => {
   const Ipv4Octet = Schema.Int.pipe(
     Schema.check(Schema.isBetween({ minimum: 0, maximum: 255 }))
   );
+
   const Ipv4Octets = Schema.Tuple([Ipv4Octet, Ipv4Octet, Ipv4Octet, Ipv4Octet]);
+
   const Ipv4PrefixLength = Schema.Int.pipe(
     Schema.check(Schema.isBetween({ minimum: 0, maximum: 32 }))
   );
+
   const Ipv6AddressBytes = Schema.Uint8Array.pipe(
     Schema.check(Schema.isMinLength(16)),
     Schema.check(Schema.isMaxLength(16))
@@ -275,17 +283,22 @@ describe("isTrustedProxy", () => {
     ([networkOctets, candidateOctets, prefixLength]) => {
       const network = networkOctets.join(".");
       const candidate = candidateOctets.join(".");
+
       const networkValue = networkOctets.reduce(
         (value, octet) => value * 256n + BigInt(octet),
         0n
       );
+
       const candidateValue = candidateOctets.reduce(
         (value, octet) => value * 256n + BigInt(octet),
         0n
       );
+
       const prefixDivisor = 2n ** BigInt(32 - prefixLength);
+
       const expected =
         networkValue / prefixDivisor === candidateValue / prefixDivisor;
+
       const trust = proxyTrust([`${network}/${prefixLength}`]);
 
       expect(isTrustedProxy(candidate, trust)).toBe(expected);
@@ -357,6 +370,7 @@ describe("getClientIpFromRequest", () => {
 
   it("ignores cf-connecting-ip from a non-Cloudflare trusted proxy", () => {
     const trust = proxyTrust(["10.0.0.0/8"]);
+
     const request = HttpServerRequest.fromWeb(
       new Request("http://example.com", {
         headers: { "cf-connecting-ip": "198.51.100.1" },
@@ -368,6 +382,7 @@ describe("getClientIpFromRequest", () => {
 
   it("honors forwarding headers only when the peer is a trusted proxy", () => {
     const trust = proxyTrust(["10.0.0.0/8"]);
+
     const request = HttpServerRequest.fromWeb(
       new Request("http://example.com", {
         headers: { "x-forwarded-for": "198.51.100.7" },
@@ -379,6 +394,7 @@ describe("getClientIpFromRequest", () => {
 
   it("discards attacker-supplied addresses left of the trusted forwarding chain", () => {
     const trust = proxyTrust(["10.0.0.0/24"]);
+
     const request = HttpServerRequest.fromWeb(
       new Request("http://example.com", {
         headers: { "x-forwarded-for": "192.0.2.99, 198.51.100.1, 10.0.0.7" },
@@ -390,6 +406,7 @@ describe("getClientIpFromRequest", () => {
 
   it("uses the furthest forwarded address when every forwarding hop is trusted", () => {
     const trust = proxyTrust(["10.0.0.0/24"]);
+
     const request = HttpServerRequest.fromWeb(
       new Request("http://example.com", {
         headers: { "x-forwarded-for": "10.0.0.7, 10.0.0.8" },
@@ -401,6 +418,7 @@ describe("getClientIpFromRequest", () => {
 
   it("falls back to the proxy peer when no forwarding header is present", () => {
     const trust = proxyTrust(["10.0.0.0/8"]);
+
     const request = HttpServerRequest.fromWeb(
       new Request("http://example.com")
     ).modify({ remoteAddress: Option.some("10.0.0.4") });

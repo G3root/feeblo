@@ -10,6 +10,7 @@ describe("subscribe / unsubscribe", () => {
     for (const unsub of cleanups) {
       unsub();
     }
+
     cleanups.length = 0;
     vi.restoreAllMocks();
   });
@@ -69,12 +70,14 @@ describe("subscribe / unsubscribe", () => {
       boardName: "Feature Requests",
       title: "Add dark mode support",
     };
+
     emitWidgetEvent("feedbackSubmitted", data);
 
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const event = callback.mock.calls[0]?.[0] as CustomEvent<
       FeebloEventDetail<"feedbackSubmitted">
     >;
+
     expect(event.detail.data).toEqual(data);
   });
 
@@ -98,6 +101,7 @@ describe("subscribe wildcard (*)", () => {
     for (const unsub of cleanups) {
       unsub();
     }
+
     cleanups.length = 0;
     vi.restoreAllMocks();
   });

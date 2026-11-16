@@ -467,11 +467,14 @@ const containerMemoryBytes = Effect.gen(function* () {
 
   for (const path of CGROUP_MEMORY_PATHS) {
     const contents = yield* fileSystem.readFileString(path).pipe(Effect.option);
+
     if (Option.isSome(contents)) {
       const bytes = Number(contents.value.trim());
+
       if (Number.isSafeInteger(bytes) && bytes > 0) return bytes;
     }
   }
+
   return undefined;
 });
 
@@ -508,6 +511,7 @@ export const NodeSandboxLive = Layer.effect(
     const permits = yield* containerMemoryBytes.pipe(
       Effect.map(maxConcurrentRuns)
     );
+
     const concurrentRuns = yield* Semaphore.make(permits);
 
     const run = Effect.fn("NodeSandbox.run")(function* (
@@ -527,11 +531,13 @@ export const NodeSandboxLive = Layer.effect(
             // on a person are subtracted, the open one included: a human is not
             // the program, so a slow approval is not charged to it.
             const startedAt = yield* monotonicMillis;
+
             const waits = yield* Ref.make<ApprovalWaits>({
               closed: 0,
               depth: 0,
               since: Option.none(),
             });
+
             const overrun = yield* Deferred.make<SandboxError>();
 
             /**
@@ -557,15 +563,18 @@ export const NodeSandboxLive = Layer.effect(
                           since: Option.some(openedAt),
                         }
                   );
+
                   return yield* effect.pipe(
                     Effect.ensuring(
                       Effect.gen(function* () {
                         const closedAt = yield* monotonicMillis;
                         yield* Ref.update(waits, (state) => {
                           const depth = Math.max(0, state.depth - 1);
+
                           if (depth > 0 || Option.isNone(state.since)) {
                             return { ...state, depth };
                           }
+
                           return {
                             closed:
                               state.closed +
@@ -586,6 +595,7 @@ export const NodeSandboxLive = Layer.effect(
                   yield* Effect.sleep(Duration.millis(WALL_CLOCK_TICK_MS));
                   const now = yield* monotonicMillis;
                   const paused = waitedFor(yield* Ref.get(waits), now);
+
                   if (now - startedAt - paused >= limits.wallClockMs) {
                     yield* Deferred.succeed(
                       overrun,
@@ -593,8 +603,10 @@ export const NodeSandboxLive = Layer.effect(
                         `The program exceeded its ${limits.wallClockMs} ms budget.`
                       )
                     );
+
                     return;
                   }
+
                   // Waiting is not charged, but it is not unbounded either:
                   // the child keeps running and the run keeps its concurrency
                   // permit while the answer is pending, so waits whose union
@@ -606,6 +618,7 @@ export const NodeSandboxLive = Layer.effect(
                         `The program waited more than ${limits.maxApprovalWaitMs} ms for a person.`
                       )
                     );
+
                     return;
                   }
                 }
@@ -634,6 +647,7 @@ export const NodeSandboxLive = Layer.effect(
                 { env: {} }
               )
             );
+
             yield* Effect.addFinalizer(() =>
               // A program that starves its own event loop cannot act on SIGTERM,
               // so the forced kill is the only termination the sandbox promises.
@@ -647,12 +661,14 @@ export const NodeSandboxLive = Layer.effect(
             );
 
             const encoder = new TextEncoder();
+
             const write = (message: HostMessage) =>
               Queue.offer(input, encoder.encode(encodeLine(message)));
 
             const state = yield* Ref.make<Option.Option<SandboxOutcome>>(
               Option.none()
             );
+
             const calls = yield* Ref.make<ReadonlyArray<string>>([]);
             const callCount = yield* Ref.make(0);
 
@@ -673,6 +689,7 @@ export const NodeSandboxLive = Layer.effect(
                     "The program exceeded its tool-call budget."
                   );
                 }
+
                 yield* Ref.update(callCount, (count) => count + 1);
                 yield* Ref.update(calls, (names) => [...names, message.name]);
 
@@ -714,6 +731,7 @@ export const NodeSandboxLive = Layer.effect(
                     `The program's result is larger than ${limits.maxResultChars} characters.`
                   );
                 }
+
                 const result = yield* Effect.fromOption(
                   decodeResult(message.result),
                   () =>
@@ -722,6 +740,7 @@ export const NodeSandboxLive = Layer.effect(
                       message: "The program's result is not JSON.",
                     })
                 );
+
                 const called = yield* Ref.get(calls);
                 yield* Ref.set(
                   state,
@@ -731,11 +750,13 @@ export const NodeSandboxLive = Layer.effect(
 
             const handle = Effect.fnUntraced(function* (line: string) {
               const message = decodeChildMessage(line);
+
               if (Option.isNone(message)) {
                 return yield* crash(
                   "The sandbox wrote a message it cannot mean."
                 );
               }
+
               switch (message.value.type) {
                 case "call":
                   return yield* handleCall(message.value);
@@ -763,6 +784,7 @@ export const NodeSandboxLive = Layer.effect(
             // itself and refuses a frame that crosses the bound, so an oversized
             // message is never decoded and never accumulates.
             const pending = yield* Ref.make("");
+
             const pump = Stream.decodeText(child.stdout).pipe(
               Stream.runForEach((chunk) =>
                 Effect.gen(function* () {
@@ -776,12 +798,14 @@ export const NodeSandboxLive = Layer.effect(
                       `The sandbox wrote a frame larger than ${MAX_FRAME_CHARS} characters.`
                     );
                   }
+
                   for (const line of lines) {
                     if (line.length > MAX_FRAME_CHARS) {
                       return yield* limitExceeded(
                         `The sandbox wrote a frame larger than ${MAX_FRAME_CHARS} characters.`
                       );
                     }
+
                     if (line.length > 0) yield* handle(line);
                   }
                 })
@@ -800,6 +824,7 @@ export const NodeSandboxLive = Layer.effect(
 
             if (Option.isSome(exceeded)) {
               yield* child.kill({ forceKillAfter: "250 millis" });
+
               return yield* exceeded.value;
             }
 
@@ -810,6 +835,7 @@ export const NodeSandboxLive = Layer.effect(
                 "The program ended without returning a value."
               );
             }
+
             return outcome.value;
           })
         ).pipe(
@@ -826,6 +852,7 @@ export const NodeSandboxLive = Layer.effect(
           "The sandbox is already running as many programs as this deployment's memory budget allows; retry shortly."
         );
       }
+
       return admitted.value;
     });
 

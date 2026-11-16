@@ -213,10 +213,12 @@ describe("parseContactCustomAttributes", () => {
   it.effect("skips known contact fields", () =>
     Effect.gen(function* () {
       const def = makeContactDef({ key: "email" });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { email: "test@test.com" } },
         [def]
       );
+
       expect(result).toEqual([]);
     })
   );
@@ -227,10 +229,12 @@ describe("parseContactCustomAttributes", () => {
         key: "customField",
         type: "TEXT",
       });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { customField: "hello" } },
         [def]
       );
+
       expect(result).toEqual([
         { definitionId: def.id, key: "customField", value: "hello" },
       ]);
@@ -243,6 +247,7 @@ describe("parseContactCustomAttributes", () => {
         { customFields: { randomKey: "value" } },
         []
       );
+
       expect(result).toEqual([]);
     })
   );
@@ -250,10 +255,12 @@ describe("parseContactCustomAttributes", () => {
   it.effect("ignores array values for custom attributes (scalar-only)", () =>
     Effect.gen(function* () {
       const def = makeContactDef({ key: "tags", type: "TEXT" });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { tags: ["a", "b"] } },
         [def]
       );
+
       expect(result).toEqual([]);
     })
   );
@@ -263,6 +270,7 @@ describe("parseContactCustomAttributes", () => {
     () =>
       Effect.gen(function* () {
         const def = makeContactDef({ key: "address", type: "TEXT" });
+
         const result = yield* parseContactCustomAttributes(
           {
             customFields: {
@@ -272,6 +280,7 @@ describe("parseContactCustomAttributes", () => {
           },
           [def, makeContactDef({ key: "city", type: "TEXT" })]
         );
+
         expect(result).toEqual([
           { definitionId: def.id, key: "city", value: "Berlin" },
         ]);
@@ -285,6 +294,7 @@ describe("parseContactCustomAttributes", () => {
         type: "TEXT",
         isRequired: true,
       });
+
       // The key-presence check passes for any value shape, so a required
       // attribute carrying an object must fail instead of being dropped
       // (which would create contacts without workspace-required data).
@@ -292,6 +302,7 @@ describe("parseContactCustomAttributes", () => {
         { customFields: { requiredField: { nested: true } } },
         [def]
       ).pipe(Effect.flip);
+
       expect(error).toBeInstanceOf(DataValidationError);
     })
   );
@@ -302,6 +313,7 @@ describe("parseContactCustomAttributes", () => {
         key: "requiredField",
         isRequired: true,
       });
+
       const error = yield* Effect.flip(parseContactCustomAttributes({}, [def]));
       expect(error).toBeInstanceOf(DataValidationError);
       expect(error.message).toContain(
@@ -316,12 +328,14 @@ describe("parseContactCustomAttributes", () => {
         key: "age",
         type: "INTEGER",
       });
+
       const error = yield* Effect.flip(
         parseContactCustomAttributes(
           { customFields: { age: "not-a-number" } },
           [def]
         )
       );
+
       expect(error).toBeInstanceOf(DataValidationError);
       expect(error.message).toContain('Invalid value for attribute "age"');
     })
@@ -334,10 +348,12 @@ describe("parseContactCustomAttributes", () => {
         type: "INTEGER",
         config: { min: 1, max: 100 },
       });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { score: 50 } },
         [def]
       );
+
       expect(result).toEqual([
         { definitionId: def.id, key: "score", value: 50 },
       ]);
@@ -351,9 +367,11 @@ describe("parseContactCustomAttributes", () => {
         type: "INTEGER",
         config: { min: 1, max: 100 },
       });
+
       const error = yield* Effect.flip(
         parseContactCustomAttributes({ customFields: { score: 101 } }, [def])
       );
+
       expect(error).toBeInstanceOf(DataValidationError);
     })
   );
@@ -364,10 +382,12 @@ describe("parseContactCustomAttributes", () => {
         key: "subscribed",
         type: "BOOLEAN",
       });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { subscribed: true } },
         [def]
       );
+
       expect(result).toEqual([
         { definitionId: def.id, key: "subscribed", value: true },
       ]);
@@ -380,10 +400,12 @@ describe("parseContactCustomAttributes", () => {
         key: "birthday",
         type: "DATE",
       });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { birthday: "2024-01-15" } },
         [def]
       );
+
       expect(result).toHaveLength(1);
       expect(result[0]?.key).toBe("birthday");
       expect(result[0]?.value).toBeInstanceOf(Date);
@@ -398,12 +420,14 @@ describe("parseContactCustomAttributes", () => {
           key: "birthday",
           type: "DATE",
         });
+
         // A Date instance cannot occur in a JSON JWT payload; like every other
         // non-scalar value it is ignored rather than persisted or failed on.
         const result = yield* parseContactCustomAttributes(
           { customFields: { birthday: invalidDate } },
           [def]
         );
+
         expect(result).toEqual([]);
       })
   );
@@ -414,12 +438,14 @@ describe("parseContactCustomAttributes", () => {
         key: "birthday",
         type: "DATE",
       });
+
       const error = yield* Effect.flip(
         parseContactCustomAttributes(
           { customFields: { birthday: "not-a-date" } },
           [def]
         )
       );
+
       expect(error).toBeInstanceOf(DataValidationError);
       expect(error.message).toContain('Invalid value for attribute "birthday"');
     })
@@ -432,10 +458,12 @@ describe("parseContactCustomAttributes", () => {
         type: "TEXT",
         isRequired: false,
       });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { optionalField: null } },
         [def]
       );
+
       expect(result).toEqual([
         { definitionId: def.id, key: "optionalField", value: null },
       ]);
@@ -446,10 +474,12 @@ describe("parseContactCustomAttributes", () => {
     Effect.gen(function* () {
       const def1 = makeContactDef({ key: "city", type: "TEXT" });
       const def2 = makeContactDef({ key: "age", type: "INTEGER" });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { city: "Paris", age: 30 } },
         [def1, def2]
       );
+
       expect(result).toHaveLength(2);
       expect(result.map((a) => a.key).sort()).toEqual(["age", "city"]);
     })
@@ -462,10 +492,12 @@ describe("parseContactCustomAttributes", () => {
         type: "TEXT",
         config: { pattern: "^[A-Z]{3}$" },
       });
+
       const result = yield* parseContactCustomAttributes(
         { customFields: { code: "ABC" } },
         [def]
       );
+
       expect(result).toEqual([
         { definitionId: def.id, key: "code", value: "ABC" },
       ]);
@@ -479,9 +511,11 @@ describe("parseContactCustomAttributes", () => {
         type: "TEXT",
         config: { pattern: "^[A-Z]{3}$" },
       });
+
       const error = yield* Effect.flip(
         parseContactCustomAttributes({ customFields: { code: "abc" } }, [def])
       );
+
       expect(error).toBeInstanceOf(DataValidationError);
     })
   );
@@ -497,6 +531,7 @@ describe("parseContactCustomAttributes", () => {
       const error = yield* Effect.flip(
         parseContactCustomAttributes({ customFields: { code: "ABC" } }, [def])
       );
+
       expect(error.message).toContain("configured validation pattern");
     })
   );
@@ -513,10 +548,12 @@ describe("parseCompanyCustomAttributes", () => {
   it.effect("skips known company fields (id, name)", () =>
     Effect.gen(function* () {
       const def = makeCompanyDef({ key: "name" });
+
       const result = yield* parseCompanyCustomAttributes(
         { customFields: { id: "123", name: "Acme" } },
         [def]
       );
+
       expect(result).toEqual([]);
     })
   );
@@ -524,10 +561,12 @@ describe("parseCompanyCustomAttributes", () => {
   it.effect("skips known company fields (avatar)", () =>
     Effect.gen(function* () {
       const def = makeCompanyDef({ key: "avatar" });
+
       const result = yield* parseCompanyCustomAttributes(
         { customFields: { avatar: "https://example.com/acme.png" } },
         [def]
       );
+
       expect(result).toEqual([]);
     })
   );
@@ -535,10 +574,12 @@ describe("parseCompanyCustomAttributes", () => {
   it.effect("skips known company fields (createdAt)", () =>
     Effect.gen(function* () {
       const def = makeCompanyDef({ key: "createdAt" });
+
       const result = yield* parseCompanyCustomAttributes(
         { customFields: { createdAt: "2023-05-19T15:35:49.915Z" } },
         [def]
       );
+
       expect(result).toEqual([]);
     })
   );
@@ -549,10 +590,12 @@ describe("parseCompanyCustomAttributes", () => {
         key: "revenue",
         type: "DECIMAL",
       });
+
       const result = yield* parseCompanyCustomAttributes(
         { customFields: { revenue: 99.99 } },
         [def]
       );
+
       expect(result).toEqual([
         { definitionId: def.id, key: "revenue", value: 99.99 },
       ]);
@@ -565,6 +608,7 @@ describe("parseCompanyCustomAttributes", () => {
         key: "industry",
         isRequired: true,
       });
+
       const error = yield* Effect.flip(parseCompanyCustomAttributes({}, [def]));
       expect(error).toBeInstanceOf(DataValidationError);
     })
@@ -582,6 +626,7 @@ describe("parsePersonAttributes", () => {
         contactDefs,
         companyDefs
       );
+
       expect(result.commonFields).toEqual({
         userId: "user_1",
         email: "a@b.com",
@@ -597,6 +642,7 @@ describe("parsePersonAttributes", () => {
       const error = yield* Effect.flip(
         parsePersonAttributes({}, contactDefs, companyDefs)
       );
+
       expect(error).toBeInstanceOf(DataValidationError);
       expect(error.message).toContain("Invalid contact fields");
     })
@@ -607,9 +653,11 @@ describe("parsePersonAttributes", () => {
       // SAFETY: The test intentionally feeds a malformed JWT payload whose `sub`
       // claim is a number; parsing at the boundary keeps the single cast honest.
       const malformedPayload = JSON.parse('{"sub":123}') as JWTPayload;
+
       const error = yield* Effect.flip(
         parsePersonAttributes(malformedPayload, contactDefs, companyDefs)
       );
+
       expect(error).toBeInstanceOf(DataValidationError);
       expect(error.message).toContain("Invalid contact fields");
     })
@@ -618,6 +666,7 @@ describe("parsePersonAttributes", () => {
   it.effect("parses contact custom attributes alongside common fields", () =>
     Effect.gen(function* () {
       const def = makeContactDef({ key: "city", type: "TEXT" });
+
       const result = yield* parsePersonAttributes(
         {
           sub: "user_1",
@@ -628,6 +677,7 @@ describe("parsePersonAttributes", () => {
         [def],
         companyDefs
       );
+
       expect(result.commonFields).toEqual({
         userId: "user_1",
         email: "a@b.com",
@@ -653,6 +703,7 @@ describe("parsePersonAttributes", () => {
         contactDefs,
         companyDefs
       );
+
       expect(result.companies).toHaveLength(2);
       expect(result.companies[0]?.commonFields).toEqual({
         id: "comp_1",
@@ -671,6 +722,7 @@ describe("parsePersonAttributes", () => {
         key: "industry",
         type: "TEXT",
       });
+
       const result = yield* parsePersonAttributes(
         {
           sub: "user_1",
@@ -687,6 +739,7 @@ describe("parsePersonAttributes", () => {
         contactDefs,
         [companyDef]
       );
+
       expect(result.companies).toHaveLength(1);
       expect(result.companies[0]?.commonFields).toEqual({
         id: "comp_1",
@@ -711,6 +764,7 @@ describe("parsePersonAttributes", () => {
           contactDefs,
           companyDefs
         );
+
         expect(result.companies).toEqual([]);
       })
   );
@@ -727,6 +781,7 @@ describe("parsePersonAttributes", () => {
         contactDefs,
         companyDefs
       );
+
       expect(result.companies).toEqual([]);
     })
   );
@@ -736,6 +791,7 @@ describe("parsePersonAttributes", () => {
       const error = yield* Effect.flip(
         parsePersonAttributes(null, contactDefs, companyDefs)
       );
+
       expect(error).toBeInstanceOf(DataValidationError);
     })
   );
@@ -752,6 +808,7 @@ describe("parsePersonAttributes", () => {
         contactDefs,
         companyDefs
       );
+
       expect(result.commonFields).toEqual({
         userId: "user_1",
         email: "a@b.com",

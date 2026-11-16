@@ -5,6 +5,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 /** The organization's changelog categories, oldest first. */
 export function useChangelogCategories(organizationId: string) {
   const { changelogCategoryCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: [
       "changelog-categories",

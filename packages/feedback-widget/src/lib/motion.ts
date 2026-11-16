@@ -15,6 +15,8 @@ export function consumeSurfaceEntry(module: WidgetModule): boolean {
   if (enteredModules.has(module)) {
     return false;
   }
+
   enteredModules.add(module);
+
   return true;
 }

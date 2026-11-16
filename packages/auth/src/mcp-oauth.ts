@@ -57,16 +57,19 @@ const toHeaderRecord = (init: HeadersInit | undefined) => {
   new Headers(init).forEach((value, key) => {
     record[key] = value;
   });
+
   return record;
 };
 
 const stringClaim = (claims: AccessTokenClaims, name: string) => {
   const value = claims[name];
+
   return isString(value) && value.length > 0 ? value : null;
 };
 
 const grantedScopes = (claims: AccessTokenClaims) => {
   const scope = claims.scope;
+
   return isString(scope) ? scope.split(" ").filter(Boolean) : [];
 };
 
@@ -93,15 +96,20 @@ export const parseAccessTokenClaims = (
   claims: AccessTokenClaims
 ): ParsedAccessTokenClaims => {
   const subject = stringClaim(claims, "sub");
+
   const clientId =
     stringClaim(claims, "azp") ?? stringClaim(claims, "client_id");
+
   if (subject === null || clientId === null) {
     return { _tag: "MissingCredential" };
   }
+
   const organizationId = stringClaim(claims, MCP_WORKSPACE_CLAIM);
+
   if (organizationId === null) {
     return { _tag: "MissingWorkspace" };
   }
+
   return {
     _tag: "Parsed",
     clientId,
@@ -128,6 +136,7 @@ export const makeMcpAccessTokenVerifier =
     dpopProof,
   }: McpAccessTokenRequest): Promise<McpAccessTokenVerification> => {
     const { adapter, baseURL, internalAdapter } = await auth.$context;
+
     if (!baseURL) {
       return {
         _tag: "Rejected",
@@ -138,11 +147,13 @@ export const makeMcpAccessTokenVerifier =
     }
 
     const resource = mcpResourceUrl(apiUrl);
+
     // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This is whatever `verifyAccessTokenRequest` threw, and the provider's challenge builder takes it as `unknown`; naming a narrower type would claim a contract the library does not provide.
     const reject = (error: unknown): McpAccessTokenVerification => {
       const challenge = createResourceServerChallenge(error, resource, {
         challengeScopes: PUBLIC_API_SCOPES,
       });
+
       if (challenge === undefined) {
         return {
           _tag: "Rejected",
@@ -151,6 +162,7 @@ export const makeMcpAccessTokenVerifier =
           headers: {},
         };
       }
+
       return {
         _tag: "Rejected",
         status: challenge.statusCode,
@@ -160,6 +172,7 @@ export const makeMcpAccessTokenVerifier =
     };
 
     let claims: AccessTokenClaims;
+
     try {
       claims = await verifyAccessTokenRequest(
         { authorizationHeader, method, url, dpopProofJwt: dpopProof },
@@ -184,6 +197,7 @@ export const makeMcpAccessTokenVerifier =
     }
 
     const parsed = parseAccessTokenClaims(claims);
+
     if (parsed._tag === "MissingCredential") {
       return reject(
         new APIError("UNAUTHORIZED", {
@@ -191,6 +205,7 @@ export const makeMcpAccessTokenVerifier =
         })
       );
     }
+
     // A grant that names no workspace cannot be turned into a caller. The
     // member re-authorizes after choosing one.
     if (parsed._tag === "MissingWorkspace") {
@@ -217,6 +232,7 @@ export const makeMcpAccessTokenVerifier =
         { field: "organizationId", value: parsed.organizationId },
       ],
     });
+
     if (membership === null) {
       return {
         _tag: "Rejected",
@@ -225,6 +241,7 @@ export const makeMcpAccessTokenVerifier =
         headers: {},
       };
     }
+
     if (!roleMayAuthorizeWorkspaceCredential(membership.role)) {
       return {
         _tag: "Rejected",

@@ -140,7 +140,9 @@ const exportPosts = (
       includeArchived: options.includeArchived ?? false,
       organizationId: fixture.organizationId,
     });
+
     const chunks = yield* Stream.runCollect(exportFile.stream);
+
     return {
       csv: chunks.map((chunk) => textDecoder.decode(chunk)).join(""),
       fileName: exportFile.fileName,
@@ -206,10 +208,12 @@ layer(TestLayer)("streamPostCsv", (it) => {
       expect(result.fileName).toMatch(
         /^feedback-posts-\d{4}-\d{2}-\d{2}\.csv$/u
       );
+
       const lines = result.csv
         .replace(/^\uFEFF/u, "")
         .trimEnd()
         .split("\r\n");
+
       expect(lines[0]).toBe(
         "title,content,status,board,tags,eta,author_name,author_email,vote_count,created_at,updated_at,url"
       );
@@ -290,6 +294,7 @@ layer(TestLayer)("streamPostCsv", (it) => {
       const withArchived = yield* exportPosts(fixture, {
         includeArchived: true,
       });
+
       expect(withArchived.csv).toContain("Archived post");
     })
   );
@@ -299,6 +304,7 @@ layer(TestLayer)("streamPostCsv", (it) => {
       const fixture = yield* makeFixture();
       const db = yield* currentDb;
       const now = yield* DateTime.nowAsDate;
+
       const rows = Array.from(
         { length: DATA_EXPORT_MAX_ROWS + 1 },
         (_, index) => ({
@@ -313,7 +319,9 @@ layer(TestLayer)("streamPostCsv", (it) => {
           updatedAt: now,
         })
       );
+
       const chunkSize = 2000;
+
       for (let offset = 0; offset < rows.length; offset += chunkSize) {
         yield* db
           .insert(schema.postTable)
@@ -328,6 +336,7 @@ layer(TestLayer)("streamPostCsv", (it) => {
         .select({ id: schema.postTable.id })
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       expect(count.length).toBe(DATA_EXPORT_MAX_ROWS + 1);
     })
   );
@@ -377,10 +386,12 @@ layer(TestLayer)("streamPostCsv", (it) => {
       expect(result.fileName).toMatch(/^posts-\d{4}-\d{2}-\d{2}\.csv$/u);
       expect(result.csv).toContain("Feedback post");
       expect(result.csv).toContain("Idea post");
+
       const lines = result.csv
         .replace(/^\uFEFF/u, "")
         .trimEnd()
         .split("\r\n");
+
       // Both posts share one instant, so the page order between them is by
       // id; assert by row rather than by position.
       expect(lines.find((line) => line.includes("Feedback post"))).toContain(

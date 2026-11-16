@@ -57,6 +57,7 @@ const AuthTest = Layer.succeed(Auth, {
     }),
     createApiKey: async ({ body }): Promise<ApiKeyAuthCreated> => {
       const createdAt = new Date("2026-09-18T00:00:00.000Z");
+
       return {
         id: "apikey_created",
         name: body.name,
@@ -200,9 +201,11 @@ describe("ApiKeyRpcHandlers", () => {
     });
 
   const DatabaseLive = Database.PgliteDatabaseLive;
+
   const WorkspaceRepositoryLive = WorkspaceRepository.layer.pipe(
     Layer.provide(DatabaseLive)
   );
+
   const EntitlementPolicyLive = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepositoryLive),
     Layer.provide(DatabaseLive)
@@ -302,6 +305,7 @@ describe("ApiKeyRpcHandlers", () => {
                 makeSession(fixture, "owner")
               )
             );
+
           expect(byDefault.summary.scopes).toEqual([
             "boards.read",
             "posts.read",
@@ -333,6 +337,7 @@ describe("ApiKeyRpcHandlers", () => {
                 makeSession(fixture, "owner")
               )
             );
+
           expect(withWrites.summary.scopes).toEqual([
             "tags.read",
             "tags.create",
@@ -349,6 +354,7 @@ describe("ApiKeyRpcHandlers", () => {
           const handlers = yield* ApiKeyRpcHandlersEffect.pipe(
             Effect.provideService(ApiKeyRepository, failAttributionRepository)
           );
+
           const fixture = yield* makeFixture("starter");
 
           const created = yield* handlers
@@ -438,6 +444,7 @@ describe("ApiKeyRpcHandlers", () => {
           .pipe(
             Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
           );
+
         expect(keys).toHaveLength(1);
         expect(keys[0]).toMatchObject({
           id: "apikey_downgraded",
@@ -512,10 +519,12 @@ describe("ApiKeyRpcHandlers", () => {
         expect(error._tag).toBe("NotFoundError");
 
         const db = yield* currentDb;
+
         const rows = yield* db
           .select()
           .from(schema.apiKeyTable)
           .where(eq(schema.apiKeyTable.id, "apikey_theirs_revoke"));
+
         expect(rows).toHaveLength(1);
         expect(rows[0]?.referenceId).toBe(theirs.organizationId);
       })

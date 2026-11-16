@@ -29,10 +29,12 @@ export const FeebloContext = createContext<FeebloContextValue | null>(null);
  */
 export function useFeeblo(): FeebloContextValue {
   const value = useContext(FeebloContext);
+
   if (value === null) {
     throw new Error(
       "[feeblo-sdk-react] `useFeeblo` must be used inside a <FeebloProvider>."
     );
   }
+
   return value;
 }

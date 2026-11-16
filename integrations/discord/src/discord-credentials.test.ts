@@ -20,6 +20,7 @@ describe("discord credential material", () => {
           userToken: "discord-user-token",
         }
       );
+
       expect(ciphertext).not.toContain("state-nonce");
       expect(ciphertext).not.toContain("discord-user-token");
 
@@ -27,10 +28,13 @@ describe("discord credential material", () => {
         encryptionKey,
         ciphertext
       );
+
       expect(decrypted.oauthState).toBe("state-nonce");
+
       if (decrypted.userToken === undefined) {
         throw new Error("expected user token");
       }
+
       expect(Redacted.value(decrypted.userToken)).toBe("discord-user-token");
     })
   );
@@ -42,6 +46,7 @@ describe("discord credential material", () => {
           oauthState: "state-nonce",
         })
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -51,6 +56,7 @@ describe("discord credential material", () => {
       const result = yield* Effect.exit(
         decryptDiscordCredentialMaterial(encryptionKey, "not-ciphertext")
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );

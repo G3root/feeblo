@@ -54,6 +54,7 @@ export function TagSelect({
 
   const updateSelection = async (nextSelected: TagSelectOption[]) => {
     const nextTagIds = new Set(nextSelected.map((tag) => tag.id));
+
     const changedTag = tags.find(
       (tag) => selectedTagIds.has(tag.id) !== nextTagIds.has(tag.id)
     );

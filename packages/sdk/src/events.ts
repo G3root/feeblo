@@ -16,9 +16,11 @@ export function emitWidgetEvent<K extends FeebloEventName>(
   if (logger?.enabled) {
     logger("event", type, data);
   }
+
   if (!isBrowser()) {
     return;
   }
+
   window.dispatchEvent(
     new CustomEvent<FeebloEventDetail<K>>(type, {
       detail: { data, type, namespace: NAMESPACE },
@@ -45,6 +47,7 @@ export function subscribe<E extends FeebloEventName | "*">(
     for (const name of EVENT_NAMES) {
       window.addEventListener(name, listener);
     }
+
     return () => {
       for (const name of EVENT_NAMES) {
         window.removeEventListener(name, listener);
@@ -53,6 +56,7 @@ export function subscribe<E extends FeebloEventName | "*">(
   }
 
   window.addEventListener(target, listener);
+
   return () => window.removeEventListener(target, listener);
 }
 
@@ -76,6 +80,7 @@ export function unsubscribe<E extends FeebloEventName | "*">(
     for (const name of EVENT_NAMES) {
       window.removeEventListener(name, listener);
     }
+
     return;
   }
 

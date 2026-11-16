@@ -102,6 +102,7 @@ export function AuthDialogRoot() {
   const handleBack = useCallback(() => {
     if (step.kind === "otp-verification") {
       setStep({ kind: step.previous });
+
       return;
     }
 
@@ -255,6 +256,7 @@ function SignUpForm({
   onVerify: (email: string) => void;
 }) {
   const turnstile = useTurnstile();
+
   const signUp = useSignUpEmail({
     getCallbackURL: () => getSafeCallbackURL(),
     getCaptchaToken: () => turnstile.token,
@@ -267,6 +269,7 @@ function SignUpForm({
     onSubmit: async ({ value }) => {
       if (turnstile.isEnabled && !turnstile.token) {
         showAuthError(m.small_round_lemming());
+
         return;
       }
 

@@ -5,6 +5,7 @@ export type { ChannelUpdateMessage } from "@feeblo/integration-core";
 import { truncate } from "@feeblo/utils/text";
 
 const TRUNCATED_TITLE_MAX = 150;
+
 const TRUNCATED_CONTEXT_MAX = 3000;
 
 const formatSlackFactLabel = (value: string): string =>
@@ -32,6 +33,7 @@ export const renderChannelUpdateMessageBlocks = (
       },
     },
   ];
+
   const factText = message.facts
     .filter(
       ({ label, value }) => label.trim().length > 0 && value.trim().length > 0
@@ -41,6 +43,7 @@ export const renderChannelUpdateMessageBlocks = (
         `*${formatSlackFactLabel(label.trim())}:* ${value.trim()}`
     )
     .join("   ·   ");
+
   if (factText.length > 0) {
     blocks.push({
       type: "context",
@@ -52,6 +55,7 @@ export const renderChannelUpdateMessageBlocks = (
       ],
     });
   }
+
   blocks.push({
     type: "actions",
     elements: [
@@ -66,6 +70,7 @@ export const renderChannelUpdateMessageBlocks = (
       },
     ],
   });
+
   if (message.actorName !== undefined && message.actorName.length > 0) {
     blocks.push({
       type: "context",
@@ -77,5 +82,6 @@ export const renderChannelUpdateMessageBlocks = (
       ],
     });
   }
+
   return blocks;
 };

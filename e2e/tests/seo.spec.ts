@@ -78,12 +78,14 @@ test.describe("public board SEO", () => {
     expect(sitemapBody).toContain(
       `<loc>${boardUrl}/changelog/${changelogSlug}</loc>`
     );
+
     // The workspace has exactly one post, so its detail URL is the only
     // /p/ entry in the sitemap.
     const postUrl =
       /<loc>([^<]+\/p\/[^<]+)<\/loc>\s*<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/.exec(
         sitemapBody
       )?.[1];
+
     expect(postUrl).toBeTruthy();
 
     // llms.txt indexes the same public content for agents: the board, the
@@ -107,19 +109,23 @@ test.describe("public board SEO", () => {
     expect(postResponse.headers().link).toContain("</llms.txt>");
     expect(postResponse.headers().link).toContain("</sitemap.xml>");
     const postScripts = jsonLdScripts(await postResponse.text());
+
     // Every node must remain parseable JSON: the HTML-delimiter escaping
     // keeps the embedded serialization intact inside the script element.
     for (const script of postScripts) {
       expect(() => JSON.parse(script)).not.toThrow();
     }
+
     expect(postScripts).toContainEqual(
       expect.stringContaining(
         `"@type":"WebSite","name":"${user.workspaceName}"`
       )
     );
+
     const postNode = postScripts.find((script) =>
       script.includes('"@type":"SocialMediaPosting"')
     );
+
     expect(postNode).toBeDefined();
     expect(postNode).toContain(`"headline":"${title}"`);
     expect(postNode).toContain(`"url":"${postUrl}"`);
@@ -141,9 +147,11 @@ test.describe("public board SEO", () => {
     const changelogResponse = await page.request.get(changelogUrl);
     expect(changelogResponse.status()).toBe(200);
     const changelogScripts = jsonLdScripts(await changelogResponse.text());
+
     const articleNode = changelogScripts.find((script) =>
       script.includes('"@type":"Article"')
     );
+
     expect(articleNode).toBeDefined();
     expect(articleNode).toContain(`"headline":"${changelogTitle}"`);
     expect(articleNode).toContain(`"url":"${changelogUrl}"`);
@@ -173,9 +181,11 @@ test.describe("public board SEO", () => {
     const workspace = await createWorkspace(page, user);
 
     await page.goto(`${workspace.organizationUrl}/settings/customize`);
+
     const indexingCard = page
       .locator('[data-slot="switch-card"]')
       .filter({ hasText: "Hide from search engines" });
+
     await indexingCard.getByRole("switch").click();
     await expect(
       page.getByText("Search engine visibility updated")
@@ -206,12 +216,14 @@ test.describe("public board SEO", () => {
     const unknownRobots = await page.request.get(
       `${unknownPublicBoardUrl()}/robots.txt`
     );
+
     expect(unknownRobots.status()).toBe(200);
     expect(await unknownRobots.text()).toContain("Disallow: /");
 
     const unknownLlms = await page.request.get(
       `${unknownPublicBoardUrl()}/llms.txt`
     );
+
     expect(unknownLlms.status()).toBe(404);
   });
 });

@@ -19,6 +19,7 @@ function SubscribeButton({
   ...props
 }: SubscribeButtonProps) {
   const form = useFormContext();
+
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(isSubmitting) => (

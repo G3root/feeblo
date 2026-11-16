@@ -146,9 +146,11 @@ test.describe("public board server rendering", () => {
     const postSlug = new URL(page.url()).pathname
       .split("/")
       .findLast((segment) => segment.length > 0);
+
     const response = await request.get(
       `${publicBoardUrl(user.workspaceName)}/p/${postSlug}`
     );
+
     expect(response.status()).toBe(200);
     const html = await response.text();
 
@@ -176,6 +178,7 @@ test.describe("public board server rendering", () => {
     const localized = await request.get(`${boardUrl}/`, {
       headers: { cookie: "PARAGLIDE_LOCALE=de" },
     });
+
     expect(localized.headers()["cache-control"]).toBe(
       "private, max-age=0, must-revalidate"
     );

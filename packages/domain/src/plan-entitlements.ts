@@ -39,9 +39,11 @@ export type CapabilityFeatureKey =
   | "integrations"
   | "publicApi"
   | "userBans";
+
 export type PlanFeatureKey = LimitFeatureKey | CapabilityFeatureKey;
 
 type PlanLimits = Record<LimitFeatureKey, number | null>;
+
 type PlanCapabilities = Record<CapabilityFeatureKey, boolean>;
 
 export type PlanEntitlements = {

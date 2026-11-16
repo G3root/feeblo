@@ -95,6 +95,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           .from(schema.siteTable)
           .where(eq(schema.siteTable.subdomain, subdomain))
           .limit(1);
+
         return results.length > 0;
       }),
 
@@ -102,15 +103,18 @@ const makeWorkspaceRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         for (let i = 2; i <= 12; i++) {
           const candidate = `${subdomain}-${i}`;
+
           const results = yield* db
             .select({ id: schema.siteTable.id })
             .from(schema.siteTable)
             .where(eq(schema.siteTable.subdomain, candidate))
             .limit(1);
+
           if (results.length === 0) {
             return Option.some(candidate);
           }
         }
+
         return Option.none();
       }),
 
@@ -119,6 +123,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
           const workspaceId = yield* WorkspaceId.generate;
+
           const organization = yield* tx
             .insert(schema.organizationTable)
             .values({
@@ -215,8 +220,10 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             "IN_PROGRESS",
             "COMPLETED",
           ] as const;
+
           for (const [position, type] of defaultRoadmapStatuses.entries()) {
             const statusId = statusIdByType.get(type);
+
             if (!statusId) {
               continue;
             }
@@ -250,6 +257,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               updatedAt: now,
             });
           }
+
           const siteId = yield* SiteId.generate;
           yield* tx.insert(schema.siteTable).values({
             id: siteId,
@@ -298,6 +306,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
     findPlanByOrganizationId: (args: FindPlanByOrganizationIdArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .select({
             organizationId: schema.subscriptionTable.organizationId,
@@ -357,8 +366,10 @@ const makeWorkspaceRepository = Effect.gen(function* () {
       if (organizationIds.length === 0) {
         return Effect.succeed(new Map());
       }
+
       return Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         // `row_number()` rather than `distinct on`: the tie-break is two
         // columns, and ranking per organization states it once in the window's
         // ordering instead of relying on `distinct on` reading the same order.

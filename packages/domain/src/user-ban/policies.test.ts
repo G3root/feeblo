@@ -40,6 +40,7 @@ describe("ParticipationPolicy", () => {
       updatedAt: now,
       userId,
     });
+
     return { email, organizationId, userId };
   });
 
@@ -176,6 +177,7 @@ describe("ParticipationPolicy", () => {
             organizationId: fixture.organizationId,
           })
         );
+
         expect(error._tag).toBe("PolicyDenied");
 
         yield* policy.canSubjectParticipate({

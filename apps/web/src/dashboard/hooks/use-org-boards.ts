@@ -10,6 +10,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function useOrgBoards(organizationId: string) {
   const { boardCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: ["org-boards", boardCollection.id, organizationId],
     query: (q) =>

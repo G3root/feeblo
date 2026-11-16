@@ -78,6 +78,7 @@ describe("publicRpc", () => {
       Effect.gen(function* () {
         const error = yield* Effect.gen(function* () {
           const rateLimitService = yield* RateLimitService;
+
           const limiter = RateLimit.makePublicRpcRateLimiter({
             clientIp: clientIpAddress("198.51.100.1"),
             rateLimitService,

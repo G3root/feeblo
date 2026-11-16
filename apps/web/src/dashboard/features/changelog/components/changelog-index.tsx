@@ -89,13 +89,18 @@ function ChangelogIndexContent({ organizationId }: { organizationId: string }) {
         })
         .orderBy(({ changelog }) => changelog.updatedAt, "desc"),
   });
+
   const visibleChangelogs = changelogsQuery.data ?? [];
+
   const filterLabel =
     statuses.length === 1 ? FILTER_LABELS[statuses[0]] : FILTER_LABELS.all;
+
   const hasSearchFilter = normalizedSearch.length > 0;
+
   const emptyTitle = hasSearchFilter
     ? `No ${filterLabel} match this search`
     : `No ${filterLabel} yet`;
+
   const emptyDescription = getEmptyDescription({
     hasSearchFilter,
     statusesLength: statuses.length,

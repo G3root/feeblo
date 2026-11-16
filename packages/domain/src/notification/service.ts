@@ -65,6 +65,7 @@ const makeNotificationService = Effect.gen(function* () {
           }))
         )
       );
+
       yield* db
         .insert(schema.notificationTable)
         .values(rows)
@@ -90,9 +91,11 @@ const makeNotificationService = Effect.gen(function* () {
       const candidates = [...new Set(userIds)].filter(
         (userId): userId is string => isString(userId)
       );
+
       if (candidates.length === 0) {
         return [];
       }
+
       const members = yield* db
         .select({ userId: schema.memberTable.userId })
         .from(schema.memberTable)
@@ -102,7 +105,9 @@ const makeNotificationService = Effect.gen(function* () {
             inArray(schema.memberTable.userId, candidates)
           )
         );
+
       const memberUserIds = new Set(members.map((member) => member.userId));
+
       return candidates.filter((userId) => memberUserIds.has(userId));
     });
 
@@ -145,18 +150,23 @@ const makeNotificationService = Effect.gen(function* () {
           eq(schema.userTable.id, schema.memberTable.userId)
         )
         .where(eq(schema.memberTable.organizationId, input.organizationId));
+
       const memberUserIds = new Set(members.map((member) => member.userId));
+
       const restrictedUserIds = new Set(
         members
           .filter((member) => member.restrictedToOrganizationId !== null)
           .map((member) => member.userId)
       );
+
       const subscriberUserIds = subscribers.map(
         (subscriber) => subscriber.userId
       );
+
       const memberRecipients = subscriberUserIds.filter(
         (userId) => memberUserIds.has(userId) && !restrictedUserIds.has(userId)
       );
+
       const publicRecipients = subscriberUserIds.filter(
         (userId) => !memberUserIds.has(userId) || restrictedUserIds.has(userId)
       );
@@ -223,9 +233,11 @@ const makeNotificationService = Effect.gen(function* () {
     }: PostNotificationInput) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
+
         if (!context) {
           return;
         }
+
         const recipients = yield* db
           .select({ userId: schema.memberTable.userId })
           .from(schema.memberTable)
@@ -238,6 +250,7 @@ const makeNotificationService = Effect.gen(function* () {
               )
             )
           );
+
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
@@ -267,9 +280,11 @@ const makeNotificationService = Effect.gen(function* () {
     }) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
+
         if (!context) {
           return;
         }
+
         const subscribers = yield* db
           .select({ userId: schema.postSubscriptionTable.userId })
           .from(schema.postSubscriptionTable)
@@ -279,6 +294,7 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, postId)
             )
           );
+
         // A reply also notifies the author of the comment being replied to;
         // create() drops the actor and dedupes, so self-replies stay silent.
         const parentAuthors =
@@ -294,20 +310,24 @@ const makeNotificationService = Effect.gen(function* () {
                     eq(schema.commentTable.postId, postId)
                   )
                 );
+
         // An INTERNAL comment is visible to members only, so non-members
         // (post creator, parent author, or subscribers who never joined)
         // must not be notified; PUBLIC comments keep the existing fan-out.
         const parentAuthorUserIds = parentAuthors.map(
           (parent) => parent.userId
         );
+
         const subscriberUserIds = subscribers.map(
           (subscriber) => subscriber.userId
         );
+
         let recipientUserIds: ReadonlyArray<string | null | undefined> = [
           context.creatorId,
           ...parentAuthorUserIds,
           ...subscriberUserIds,
         ];
+
         if (visibility === "INTERNAL") {
           const candidateUserIds = [
             ...new Set(
@@ -316,6 +336,7 @@ const makeNotificationService = Effect.gen(function* () {
               )
             ),
           ];
+
           if (candidateUserIds.length > 0) {
             const memberRecipients = yield* db
               .select({ userId: schema.memberTable.userId })
@@ -326,9 +347,11 @@ const makeNotificationService = Effect.gen(function* () {
                   inArray(schema.memberTable.userId, candidateUserIds)
                 )
               );
+
             const memberUserIds = new Set(
               memberRecipients.map((member) => member.userId)
             );
+
             recipientUserIds = candidateUserIds.filter((userId) =>
               memberUserIds.has(userId)
             );
@@ -336,6 +359,7 @@ const makeNotificationService = Effect.gen(function* () {
             recipientUserIds = [];
           }
         }
+
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
@@ -357,9 +381,11 @@ const makeNotificationService = Effect.gen(function* () {
     }: PostNotificationInput) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
+
         if (!context) {
           return;
         }
+
         const subscribers = yield* db
           .select({ userId: schema.postSubscriptionTable.userId })
           .from(schema.postSubscriptionTable)
@@ -369,6 +395,7 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, postId)
             )
           );
+
         const secureRandom = yield* SecureRandom.SecureRandom;
         const statusChangedUuid = yield* secureRandom.uuidV4();
         yield* create({
@@ -456,9 +483,11 @@ const makeNotificationService = Effect.gen(function* () {
     }: PostNotificationInput & { readonly deduplicationKey: string }) =>
       Effect.gen(function* () {
         const context = yield* getPostContext({ organizationId, postId });
+
         if (!context) {
           return;
         }
+
         const upvoters = yield* db
           .select({ userId: schema.upvoteTable.userId })
           .from(schema.upvoteTable)
@@ -468,6 +497,7 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.upvoteTable.postId, postId)
             )
           );
+
         yield* create({
           ...(actorUserId === undefined ? undefined : { actorUserId }),
           organizationId,
@@ -505,13 +535,16 @@ const makeNotificationService = Effect.gen(function* () {
           organizationId,
           postId: sourcePostId,
         });
+
         const target = yield* getPostContext({
           organizationId,
           postId: targetPostId,
         });
+
         if (!(source && target)) {
           return;
         }
+
         const subscribers = yield* db
           .select({ userId: schema.postSubscriptionTable.userId })
           .from(schema.postSubscriptionTable)
@@ -521,6 +554,7 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, targetPostId)
             )
           );
+
         const upvoters = yield* db
           .select({ userId: schema.upvoteTable.userId })
           .from(schema.upvoteTable)
@@ -530,6 +564,7 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.upvoteTable.postId, targetPostId)
             )
           );
+
         const secureRandom = yield* SecureRandom.SecureRandom;
         const eventId = yield* secureRandom.uuidV4();
         yield* create({
@@ -578,13 +613,16 @@ const makeNotificationService = Effect.gen(function* () {
           organizationId,
           postId: sourcePostId,
         });
+
         const target = yield* getPostContext({
           organizationId,
           postId: targetPostId,
         });
+
         if (!(source && target)) {
           return;
         }
+
         const subscribers = yield* db
           .select({ userId: schema.postSubscriptionTable.userId })
           .from(schema.postSubscriptionTable)
@@ -594,6 +632,7 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.postSubscriptionTable.postId, sourcePostId)
             )
           );
+
         const upvoters = yield* db
           .select({ userId: schema.upvoteTable.userId })
           .from(schema.upvoteTable)
@@ -603,6 +642,7 @@ const makeNotificationService = Effect.gen(function* () {
               eq(schema.upvoteTable.postId, sourcePostId)
             )
           );
+
         const secureRandom = yield* SecureRandom.SecureRandom;
         const eventId = yield* secureRandom.uuidV4();
         yield* create({
@@ -648,11 +688,13 @@ const makeNotificationService = Effect.gen(function* () {
         // silently restarting the list. Only an absent cursor pages from the
         // top.
         const after = decodeNotificationCursor(cursor);
+
         if (after._tag === "Invalid") {
           return yield* new BadRequestError({
             message: "The notification cursor is invalid.",
           });
         }
+
         return yield* db
           .select({
             id: schema.notificationTable.id,

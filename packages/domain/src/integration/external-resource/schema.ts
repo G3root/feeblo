@@ -35,6 +35,7 @@ export const PostExternalResourceLink = Schema.Struct({
   stateKey: Schema.NullOr(Schema.String),
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
+
 export type PostExternalResourceLink = Schema.Schema.Type<
   typeof PostExternalResourceLink
 >;
@@ -44,6 +45,7 @@ export const PostExternalResourceLinkList = Schema.Struct({
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
 });
+
 export type PostExternalResourceLinkList = Schema.Schema.Type<
   typeof PostExternalResourceLinkList
 >;
@@ -60,6 +62,7 @@ export const ExternalResourceRecord = Schema.Struct({
   stateKey: Schema.NullOr(Schema.String),
   safeMetadata: IntegrationSafeDisplayMetadata,
 });
+
 export type ExternalResourceRecord = Schema.Schema.Type<
   typeof ExternalResourceRecord
 >;
@@ -69,6 +72,7 @@ export const RecordPostExternalResourceLink = Schema.Struct({
   postId: PostId.schema,
   resource: ExternalResourceRecord,
 });
+
 export type RecordPostExternalResourceLink = Schema.Schema.Type<
   typeof RecordPostExternalResourceLink
 >;
@@ -78,6 +82,7 @@ export const RecordedPostExternalResourceLink = Schema.Struct({
   externalResourceId: IntegrationExternalResourceId.schema,
   postExternalResourceLinkId: PostExternalResourceLinkId.schema,
 });
+
 export type RecordedPostExternalResourceLink = Schema.Schema.Type<
   typeof RecordedPostExternalResourceLink
 >;
@@ -88,6 +93,7 @@ export const ExternalResourceCreationReservation = Schema.Struct({
   postId: PostId.schema,
   idempotencyKey: Schema.NonEmptyString,
 });
+
 export type ExternalResourceCreationReservation = Schema.Schema.Type<
   typeof ExternalResourceCreationReservation
 >;
@@ -120,6 +126,7 @@ export const ExternalResourceCreationReservationResult = Schema.Union([
     ),
   }),
 ]);
+
 export type ExternalResourceCreationReservationResult = Schema.Schema.Type<
   typeof ExternalResourceCreationReservationResult
 >;
@@ -131,6 +138,7 @@ export const ExternalResourceCreationCompletion = Schema.Struct({
   externalResourceId: IntegrationExternalResourceId.schema,
   postExternalResourceLinkId: PostExternalResourceLinkId.schema,
 });
+
 export type ExternalResourceCreationCompletion = Schema.Schema.Type<
   typeof ExternalResourceCreationCompletion
 >;
@@ -140,6 +148,7 @@ export const ExternalResourceCreationFailure = Schema.Struct({
   /** The claim this release belongs to; a re-claimed row will not match. */
   reservedAt: Schema.Date,
 });
+
 export type ExternalResourceCreationFailure = Schema.Schema.Type<
   typeof ExternalResourceCreationFailure
 >;

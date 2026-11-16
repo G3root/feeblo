@@ -86,22 +86,28 @@ const source = (file: string) => readFileSync(join(root, file), "utf8");
 const readMapping = (yaml: string, key: string, optional = false): Mapping => {
   const lines = yaml.split("\n");
   const start = lines.findIndex((line) => line === `${key}:`);
+
   if (start === -1) {
     if (optional) return new Map();
     fail(`pnpm-workspace.yaml has no top-level \`${key}:\` block.`);
   }
 
   const entries = new Map<string, string>();
+
   for (const line of lines.slice(start + 1)) {
     if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+
     if (!line.startsWith(" ")) break;
     const entry = /^ {2}("?)([^":]+)\1: (.+)$/.exec(line);
+
     if (entry === null) {
       fail(`Cannot read \`${key}\` entry: ${line}`);
       continue;
     }
+
     entries.set(entry[2] ?? "", (entry[3] ?? "").trim());
   }
+
   return entries;
 };
 
@@ -112,14 +118,24 @@ const readManifests = (): ReadonlyArray<Manifest> => {
   })
     .split("\0")
     .filter(Boolean);
-  return tracked
-    .filter((file) => file === "package.json" || file.endsWith("/package.json"))
-    .map((file) => ({
-      file,
-      // SAFETY: package.json is JSON by definition. Only the dependency maps
-      // above are read, and a field of any other shape reads as absent.
-      json: JSON.parse(source(file)) as ManifestJson,
-    }));
+
+  return (
+    tracked
+      .filter(
+        (file) => file === "package.json" || file.endsWith("/package.json")
+      )
+      // Installed agent skills carry their own `package.json` — the anti-slop
+      // installer ships a copy of the plugin it vendors, with upstream's peer
+      // ranges — and none of them is a workspace package. Their versions are the
+      // skill's business, not the train this file guards.
+      .filter((file) => !file.startsWith(".agents/"))
+      .map((file) => ({
+        file,
+        // SAFETY: package.json is JSON by definition. Only the dependency maps
+        // above are read, and a field of any other shape reads as absent.
+        json: JSON.parse(source(file)) as ManifestJson,
+      }))
+  );
 };
 
 const dependencies = (
@@ -140,33 +156,40 @@ const checkEffectTrain = (
   manifests: ReadonlyArray<Manifest>
 ): ReadonlyArray<string> => {
   const pinned = catalog.get("effect");
+
   if (pinned === undefined)
     return ["pnpm-workspace.yaml catalog has no `effect` entry."];
 
   const failures: Array<string> = [];
+
   if (!exactVersion.test(pinned)) {
     failures.push(
       `  catalog.effect is ${pinned}; the train must be an exact version.`
     );
   }
+
   // Every manifest says `catalog:`, so the catalog is where this train actually
   // lives. A bump that moves `effect` and leaves `@effect/sql-pg` behind is
   // invisible to the manifest loop below.
   for (const [name, spec] of catalog) {
     if (name === "effect" || !effectPackage.test(name)) continue;
+
     if (spec !== pinned) {
       failures.push(
         `  pnpm-workspace.yaml catalog.${name} is ${spec}; the Effect train is ${pinned}.`
       );
     }
   }
+
   for (const manifest of manifests) {
     for (const field of dependencyFields) {
       for (const [name, spec] of Object.entries(
         dependencies(manifest, field)
       )) {
         if (name !== "effect" && !effectPackage.test(name)) continue;
+
         if (spec === "catalog:") continue;
+
         if (spec !== pinned) {
           failures.push(
             `  ${manifest.file} ${field}.${name} is ${spec}; the Effect train is ${pinned}. Use "catalog:".`
@@ -175,14 +198,17 @@ const checkEffectTrain = (
       }
     }
   }
+
   for (const [name, spec] of overrides) {
     if (name !== "effect" && !effectPackage.test(name)) continue;
+
     if (spec !== pinned) {
       failures.push(
         `  pnpm-workspace.yaml overrides.${name} is ${spec}; the Effect train is ${pinned}.`
       );
     }
   }
+
   return group("The Effect train disagrees with itself", failures);
 };
 
@@ -197,15 +223,18 @@ const checkToolchain = (
   const rootManifest = manifests.find(
     (manifest) => manifest.file === "package.json"
   );
+
   if (rootManifest === undefined) return ["No root package.json."];
 
   const dev = dependencies(rootManifest, "devDependencies");
+
   const tools = [
     "@effect/tsgo",
     "oxlint",
     "oxlint-tsgolint",
     "@oxlint/plugins",
   ] as const;
+
   const compiler = catalog.get("tsrs");
   const failures: Array<string> = [];
 
@@ -218,20 +247,25 @@ const checkToolchain = (
   }
 
   const pins = new Map<string, string>();
+
   for (const name of tools) {
     const spec = dev[name];
+
     if (spec === undefined) {
       failures.push(`  root package.json devDependencies.${name} is missing.`);
       continue;
     }
+
     if (!exactVersion.test(spec)) {
       failures.push(
         `  root package.json devDependencies.${name} is ${spec}; the train must be exact.`
       );
       continue;
     }
+
     pins.set(name, spec);
   }
+
   if (
     pins.has("oxlint") &&
     pins.get("oxlint") !== pins.get("@oxlint/plugins")
@@ -240,12 +274,14 @@ const checkToolchain = (
       `  oxlint is ${pins.get("oxlint")} but @oxlint/plugins is ${pins.get("@oxlint/plugins")}; they share a release.`
     );
   }
+
   if (compiler !== undefined) pins.set("tsrs", compiler);
 
   // The compiler is catalogued, so the root declaration must point at the
   // catalog rather than repeat the version — otherwise the catalog could move
   // and the root would keep calling the old binary.
   const rootCompiler = dev["tsrs"];
+
   if (rootCompiler !== "catalog:") {
     failures.push(
       `  root package.json devDependencies.tsrs is ${rootCompiler ?? "missing"}; it must be "catalog:", because the catalog owns the compiler version.`
@@ -257,6 +293,7 @@ const checkToolchain = (
   for (const name of tools) {
     const catalogued = catalog.get(name);
     const pin = pins.get(name);
+
     if (catalogued !== undefined && pin !== undefined && catalogued !== pin) {
       failures.push(
         `  pnpm-workspace.yaml catalog.${name} is ${catalogued}; the root package.json pins ${pin}.`
@@ -269,19 +306,23 @@ const checkToolchain = (
   // one — is a second source, and the next bump moves only one of them.
   for (const manifest of manifests) {
     if (manifest.file === "package.json") continue;
+
     for (const field of dependencyFields) {
       for (const [name, spec] of Object.entries(
         dependencies(manifest, field)
       )) {
         if (!pins.has(name)) continue;
+
         if (spec === "catalog:") {
           if (catalog.get(name) === undefined) {
             failures.push(
               `  ${manifest.file} ${field}.${name} is "catalog:", but the catalog has no ${name} entry.`
             );
           }
+
           continue;
         }
+
         failures.push(
           catalog.has(name)
             ? `  ${manifest.file} ${field}.${name} is ${spec}; ${name} is pinned in the catalog. Use "catalog:".`
@@ -290,41 +331,50 @@ const checkToolchain = (
       }
     }
   }
+
   return group("The compiler train disagrees with itself", failures);
 };
 
 const checkPatches = (patches: Mapping): ReadonlyArray<string> => {
   const failures: Array<string> = [];
+
   for (const [selector, patch] of patches) {
     if (!existsSync(join(root, patch))) {
       failures.push(`  ${selector} names ${patch}, which does not exist.`);
       continue;
     }
+
     const at = selector.lastIndexOf("@");
+
     if (at <= 0) {
       failures.push(`  ${selector} is not a \`name@version\` selector.`);
       continue;
     }
+
     const name = selector.slice(0, at);
     const version = selector.slice(at + 1);
     const installed = join(root, "node_modules", name, "package.json");
+
     if (!existsSync(installed)) {
       failures.push(
         `  ${selector} names a package that is not installed; pnpm applied no patch.`
       );
       continue;
     }
+
     // SAFETY: this is an installed package's own manifest; a missing `version`
     // fails the comparison below rather than passing it.
     const resolved = (
       JSON.parse(readFileSync(installed, "utf8")) as { version?: string }
     ).version;
+
     if (resolved !== version) {
       failures.push(
         `  ${selector} is installed at ${resolved}; the patch does not apply to it.`
       );
     }
   }
+
   return group("A dependency patch is not applied", failures);
 };
 
@@ -338,6 +388,7 @@ const selfTest = () => {
     ["effect", "4.0.0"],
     ["tsrs", "0.20.0-ts7.1.0-beta"],
   ]);
+
   const rootFixture: Manifest = {
     file: "package.json",
     json: {
@@ -350,6 +401,7 @@ const selfTest = () => {
       },
     },
   };
+
   const clean: Manifest = {
     file: "a/package.json",
     json: {
@@ -357,19 +409,23 @@ const selfTest = () => {
       devDependencies: { tsrs: "catalog:" },
     },
   };
+
   const driftedEffect: Manifest = {
     file: "b/package.json",
     json: { dependencies: { "@effect/sql-pg": "4.0.1" } },
   };
+
   const driftedTool: Manifest = {
     file: "c/package.json",
     json: { devDependencies: { tsrs: "0.18.0-ts7.1.0-dev.20261019" } },
   };
+
   // A package may not repeat the pin even when it repeats it correctly.
   const repeatedTool: Manifest = {
     file: "d/package.json",
     json: { devDependencies: { tsrs: "0.20.0-ts7.1.0-beta" } },
   };
+
   // The root may not repeat the catalog version either, and a root that names
   // a version is how the catalog and the installed binary drift apart.
   const driftedRoot: Manifest = {
@@ -384,6 +440,7 @@ const selfTest = () => {
       },
     },
   };
+
   const driftedCatalog = new Map(catalog);
   driftedCatalog.set("@effect/sql-pg", "4.0.1");
   const driftedCatalogTool = new Map(catalog);
@@ -414,9 +471,13 @@ const selfTest = () => {
 selfTest();
 
 const workspace = source("pnpm-workspace.yaml");
+
 const catalog = readMapping(workspace, "catalog");
+
 const overrides = readMapping(workspace, "overrides");
+
 const patches = readMapping(workspace, "patchedDependencies", true);
+
 const manifests = readManifests();
 
 const failures = [
@@ -436,10 +497,12 @@ if (failures.length > 0) {
 const rootManifest = manifests.find(
   (manifest) => manifest.file === "package.json"
 );
+
 const dev =
   rootManifest === undefined
     ? {}
     : dependencies(rootManifest, "devDependencies");
+
 console.log(
   `Toolchain: effect ${catalog.get("effect")}, tsrs ${catalog.get("tsrs")}, ` +
     `oxlint ${dev["oxlint"]}, tsgolint ${dev["oxlint-tsgolint"]}, ` +

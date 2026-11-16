@@ -24,6 +24,7 @@ const collapseIgnoredUrlCharacters = (value: string): string =>
   Array.from(value)
     .filter((char) => {
       const code = char.codePointAt(0) ?? 0;
+
       return code > 0x20;
     })
     .join("");
@@ -32,6 +33,7 @@ const rawUrl = (value: Properties[string]): string => {
   if (Array.isArray(value)) {
     return value.map((entry) => (isString(entry) ? entry : "")).join(" ");
   }
+
   return isString(value) ? value : "";
 };
 
@@ -47,20 +49,25 @@ export const attributeViolations = (html: string): string[] => {
     if (DISALLOWED_TAGS.has(node.tagName)) {
       violations.push(`tag <${node.tagName}>`);
     }
+
     for (const [name, value] of Object.entries(node.properties ?? {})) {
       if (/^on/i.test(name)) {
         violations.push(`${node.tagName}[${name}]`);
       }
+
       if (name === "srcdoc") {
         violations.push(`${node.tagName}[srcdoc]`);
       }
+
       if (name === "href" || name === "src") {
         const url = rawUrl(value);
+
         if (DANGEROUS_SCHEME.test(collapseIgnoredUrlCharacters(url))) {
           violations.push(`${node.tagName}[${name}]=${url}`);
         }
       }
     }
   });
+
   return violations;
 };

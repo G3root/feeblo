@@ -61,6 +61,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
               : undefined
           )
         );
+
       return roadmaps;
     });
 
@@ -195,6 +196,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
               visibility: input.visibility,
               filter: toMutableRoadmapFilter(input.filter),
             };
+
             const insert = (isPrimary: boolean) =>
               db
                 .insert(schema.roadmapTable)
@@ -220,6 +222,7 @@ const makeRoadmapRepository = Effect.gen(function* () {
                     () => db.transaction(() => insert(false))
                   )
                 );
+
               return;
             }
 

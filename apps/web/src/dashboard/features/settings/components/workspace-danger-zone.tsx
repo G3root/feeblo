@@ -16,9 +16,11 @@ import { dashboardCollections } from "~/lib/collections";
  */
 export function DeleteWorkspaceSection() {
   const organizationId = useOrganizationId();
+
   const { allowed: canDelete, isPending } = usePolicy(
     hasPermission(organizationId, "workspace.delete")
   );
+
   // The section reuses the collections `beforeLoad` already preloaded, so the
   // confirmation has the workspace name without another request.
   const organizationQuery = useLiveQuery({
@@ -33,6 +35,7 @@ export function DeleteWorkspaceSection() {
         .where(({ organization }) => eq(organization.id, organizationId))
         .findOne(),
   });
+
   const organization = organizationQuery.data?.organization ?? null;
 
   if (isPending || !canDelete || organization === null) {

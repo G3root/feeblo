@@ -23,6 +23,7 @@ export const GitHubConnection = Schema.Struct({
   lifecycle: IntegrationConnectionLifecycleStatus,
   createdAt: Schema.DateFromString,
 });
+
 export type GitHubConnection = Schema.Schema.Type<typeof GitHubConnection>;
 
 /** A repository available to the authenticated GitHub integration connection. */
@@ -32,6 +33,7 @@ export const GitHubRepository = Schema.Struct({
   fullName: Schema.NonEmptyString,
   private: Schema.Boolean,
 });
+
 export type GitHubRepository = Schema.Schema.Type<typeof GitHubRepository>;
 
 /** Automatic issue publishing settings stored as safe route configuration. */
@@ -42,6 +44,7 @@ export const GitHubPublishSettings = Schema.Struct({
   repositoryOwner: Schema.NullOr(Schema.String),
   repositoryName: Schema.NullOr(Schema.String),
 });
+
 export type GitHubPublishSettings = Schema.Schema.Type<
   typeof GitHubPublishSettings
 >;
@@ -59,6 +62,7 @@ export const GitHubIssueCreateRouteConfiguration = Schema.Struct({
   repositoryName: Schema.optionalKey(Schema.NonEmptyString),
   repositoryOwner: Schema.optionalKey(Schema.NonEmptyString),
 });
+
 export type GitHubIssueCreateRouteConfiguration = Schema.Schema.Type<
   typeof GitHubIssueCreateRouteConfiguration
 >;
@@ -73,6 +77,7 @@ export const GitHubSyncRule = Schema.Struct({
   upvoterNotificationPolicy: GitHubUpvoterNotificationPolicy,
   enabled: Schema.Boolean,
 });
+
 export type GitHubSyncRule = Schema.Schema.Type<typeof GitHubSyncRule>;
 
 /** A GitHub issue normalized by the GitHub provider before generic persistence. */
@@ -87,6 +92,7 @@ export const GitHubResolvedIssue = Schema.Struct({
   /** GitHub issue title, persisted so the linked-resource card matches the provider. */
   title: Schema.String,
 });
+
 export type GitHubResolvedIssue = Schema.Schema.Type<
   typeof GitHubResolvedIssue
 >;
@@ -95,10 +101,13 @@ export type GitHubResolvedIssue = Schema.Schema.Type<
 export const GitHubConnectStart = Schema.Struct({
   organizationId: WorkspaceId.schema,
 });
+
 export type GitHubConnectStart = Schema.Schema.Type<typeof GitHubConnectStart>;
+
 export const GitHubConnectStarted = Schema.Struct({
   authorizeUrl: Schema.URLFromString,
 });
+
 export type GitHubConnectStarted = Schema.Schema.Type<
   typeof GitHubConnectStarted
 >;
@@ -108,6 +117,7 @@ export const GitHubInstallationSetupAction = Schema.Literals([
   "install",
   "update",
 ]);
+
 export type GitHubInstallationSetupAction = Schema.Schema.Type<
   typeof GitHubInstallationSetupAction
 >;
@@ -119,45 +129,59 @@ export const GitHubAppInstallationCallback = Schema.Struct({
   installationId: Schema.NonEmptyString,
   setupAction: GitHubInstallationSetupAction,
 });
+
 export type GitHubAppInstallationCallback = Schema.Schema.Type<
   typeof GitHubAppInstallationCallback
 >;
+
 export const GitHubConnectionList = Schema.Struct({
   organizationId: WorkspaceId.schema,
 });
+
 export type GitHubConnectionList = Schema.Schema.Type<
   typeof GitHubConnectionList
 >;
+
 /** Removes one GitHub App connection from Feeblo without deleting historical issue links. */
 export const GitHubConnectionDisconnect = Schema.Struct({
   organizationId: WorkspaceId.schema,
   connectionId: IntegrationConnectionId.schema,
 });
+
 export type GitHubConnectionDisconnect = Schema.Schema.Type<
   typeof GitHubConnectionDisconnect
 >;
+
 export const GitHubRepositoryList = Schema.Struct({
   organizationId: WorkspaceId.schema,
   connectionId: IntegrationConnectionId.schema,
 });
+
 export type GitHubRepositoryList = Schema.Schema.Type<
   typeof GitHubRepositoryList
 >;
+
 export const GitHubSettingsGet = Schema.Struct({
   organizationId: WorkspaceId.schema,
   connectionId: IntegrationConnectionId.schema,
 });
+
 export type GitHubSettingsGet = Schema.Schema.Type<typeof GitHubSettingsGet>;
+
 export const GitHubSettingsUpdate = Schema.Struct({
   ...GitHubSettingsGet.fields,
   ...GitHubPublishSettings.fields,
 });
+
 export type GitHubSettingsUpdate = Schema.Schema.Type<
   typeof GitHubSettingsUpdate
 >;
+
 /** @alias */
 export const GitHubRuleList = GitHubSettingsGet;
+
 export type GitHubRuleList = Schema.Schema.Type<typeof GitHubRuleList>;
+
 export const GitHubRuleCreate = Schema.Struct({
   ...GitHubSettingsGet.fields,
   issueMatchMode: GitHubIssueMatchMode,
@@ -166,7 +190,9 @@ export const GitHubRuleCreate = Schema.Struct({
   upvoterNotificationPolicy: GitHubUpvoterNotificationPolicy,
   enabled: Schema.Boolean,
 });
+
 export type GitHubRuleCreate = Schema.Schema.Type<typeof GitHubRuleCreate>;
+
 /** Updates the mutable fields of a hard-wired GitHub synchronization rule; the issue-state shape is fixed. */
 export const GitHubRuleUpdate = Schema.Struct({
   ...GitHubSettingsGet.fields,
@@ -175,13 +201,17 @@ export const GitHubRuleUpdate = Schema.Struct({
   upvoterNotificationPolicy: GitHubUpvoterNotificationPolicy,
   enabled: Schema.Boolean,
 });
+
 export type GitHubRuleUpdate = Schema.Schema.Type<typeof GitHubRuleUpdate>;
+
 export const GitHubRuleDelete = Schema.Struct({
   organizationId: WorkspaceId.schema,
   connectionId: IntegrationConnectionId.schema,
   id: GitHubSyncRuleId.schema,
 });
+
 export type GitHubRuleDelete = Schema.Schema.Type<typeof GitHubRuleDelete>;
+
 export const GitHubPostIssueCreate = Schema.Struct({
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
@@ -190,9 +220,11 @@ export const GitHubPostIssueCreate = Schema.Struct({
   repositoryName: Schema.NonEmptyString,
   idempotencyKey: Schema.NonEmptyString,
 });
+
 export type GitHubPostIssueCreate = Schema.Schema.Type<
   typeof GitHubPostIssueCreate
 >;
+
 export const GitHubPostIssueLink = Schema.Struct({
   organizationId: WorkspaceId.schema,
   postId: PostId.schema,
@@ -202,12 +234,15 @@ export const GitHubPostIssueLink = Schema.Struct({
   issueNumber: Schema.Int.check(Schema.isGreaterThan(0)),
   idempotencyKey: Schema.NonEmptyString,
 });
+
 export type GitHubPostIssueLink = Schema.Schema.Type<
   typeof GitHubPostIssueLink
 >;
+
 export const GitHubIntegrationStatus = Schema.Struct({
   configured: Schema.Boolean,
 });
+
 export type GitHubIntegrationStatus = Schema.Schema.Type<
   typeof GitHubIntegrationStatus
 >;

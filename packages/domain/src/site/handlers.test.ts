@@ -188,6 +188,7 @@ describe("SiteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .ListSites({
@@ -209,6 +210,7 @@ describe("SiteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const results = yield* handlers
             .ListSites({
               organizationId: fixture.organizationId,
@@ -241,14 +243,17 @@ describe("SiteRpcHandlers", () => {
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
+
             expect(results[0]?.hidePoweredBy).toBe(false);
 
             yield* addPaidPlan(fixture);
+
             const entitled = yield* handlers
               .ListSites({ organizationId: fixture.organizationId })
               .pipe(
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
+
             expect(entitled[0]?.hidePoweredBy).toBe(true);
           })
       );
@@ -279,6 +284,7 @@ describe("SiteRpcHandlers", () => {
       it.effect("returns empty array for unknown subdomain", () =>
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
+
           const results = yield* handlers.ListSiteSubdomains({
             subdomain: "nonexistent-subdomain-xyz",
           });
@@ -326,6 +332,7 @@ describe("SiteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .UpdateSite({
@@ -452,6 +459,7 @@ describe("SiteRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* SiteRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .HideSitePoweredByBranding({

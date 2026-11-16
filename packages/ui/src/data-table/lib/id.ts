@@ -9,5 +9,6 @@ let nextFilterId = 0;
  */
 export function createFilterId(prefix = "filter"): string {
   nextFilterId += 1;
+
   return `${prefix}-${nextFilterId}`;
 }

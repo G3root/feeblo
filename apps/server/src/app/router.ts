@@ -135,7 +135,9 @@ export const makePublicRouters = ({
   })
     ? inputMailbox
     : undefined;
+
   const DiscoveryRouter = makeAgentDiscoveryRouter(apiUrl);
+
   const RootRouterLive =
     mailbox === undefined
       ? DiscoveryRouter
@@ -145,6 +147,7 @@ export const makePublicRouters = ({
           e2eRoadmapSeedRouter,
           e2eSetPlanRouter
         );
+
   return Layer.merge(RootRouterLive, OgImageRouterLive);
 };
 

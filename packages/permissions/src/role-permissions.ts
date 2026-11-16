@@ -69,6 +69,7 @@ export const ROLE_PERMISSIONS = {
 /** Every permission granted to `role`, including inherited ones. */
 export const permissionsForRole = (role: Role): ReadonlySet<Permission> => {
   const permissions = new Set<Permission>();
+
   // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
   for (const [candidate, rank] of Object.entries(ROLE_RANK) as [
     Role,
@@ -80,17 +81,20 @@ export const permissionsForRole = (role: Role): ReadonlySet<Permission> => {
       }
     }
   }
+
   return permissions;
 };
 
 /** True when `role` grants `permission` directly or through a resource wildcard. */
 export const roleGrants = (role: Role, permission: Permission): boolean => {
   const grants = permissionsForRole(role);
+
   if (grants.has(permission)) {
     return true;
   }
 
   const separator = permission.indexOf(".");
+
   if (separator === -1 || permission.endsWith(".*")) {
     return false;
   }

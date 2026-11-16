@@ -21,6 +21,7 @@ export function createFloatingInstance(
       if (logger?.enabled) {
         logger("positioning", { x, y });
       }
+
       Object.assign(floating.style, {
         left: `${x}px`,
         top: `${y}px`,

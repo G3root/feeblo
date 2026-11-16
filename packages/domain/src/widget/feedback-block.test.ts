@@ -87,6 +87,7 @@ describe("resolveFeedbackContact", () => {
       recurringIntervalCount: 1,
       status: "trialing",
     });
+
     return { organizationId, secret } satisfies Fixture;
   });
 
@@ -94,6 +95,7 @@ describe("resolveFeedbackContact", () => {
     Effect.gen(function* () {
       const now = yield* DateTime.nowAsDate;
       const nowSeconds = Math.floor(now.getTime() / 1000);
+
       return yield* signToken(
         {
           aud: fixture.organizationId,
@@ -120,6 +122,7 @@ describe("resolveFeedbackContact", () => {
   const contactCount = (organizationId: string, email: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select({ total: count() })
         .from(schema.contactTable)
@@ -129,16 +132,19 @@ describe("resolveFeedbackContact", () => {
             eq(schema.contactTable.email, email)
           )
         );
+
       return row?.total ?? 0;
     });
 
   const postCount = (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select({ total: count() })
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, organizationId));
+
       return row?.total ?? 0;
     });
 
@@ -161,6 +167,7 @@ describe("resolveFeedbackContact", () => {
         });
 
         const token = yield* feedbackToken(fixture, email);
+
         const error = yield* Effect.flip(
           resolveFeedbackContact({
             ...(yield* services),
@@ -215,6 +222,7 @@ describe("resolveFeedbackContact", () => {
         });
 
         const token = yield* feedbackToken(fixture, contactEmail);
+
         const error = yield* Effect.flip(
           resolveFeedbackContact({
             ...(yield* services),
@@ -233,6 +241,7 @@ describe("resolveFeedbackContact", () => {
           .select({ userId: schema.contactTable.userId })
           .from(schema.contactTable)
           .where(eq(schema.contactTable.id, contactId));
+
         // The feedback upsert does not unlink an existing account while the
         // ban is being checked, and the denial rolls back its other changes.
         expect(contact?.userId).toBe(userId);
@@ -284,6 +293,7 @@ describe("resolveFeedbackContact", () => {
           });
 
           const token = yield* feedbackToken(fixture, email);
+
           const contact = yield* resolveFeedbackContact({
             ...(yield* services),
             organizationId: fixture.organizationId,

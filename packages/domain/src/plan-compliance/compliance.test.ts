@@ -318,6 +318,7 @@ describe("PlanCompliance", () => {
           includeResources: true,
           organizationId,
         });
+
         const privateBoards = byKind(snapshot, "privateBoards");
 
         expect(privateBoards?.count).toBe(1);
@@ -357,6 +358,7 @@ describe("PlanCompliance", () => {
           includeResources: true,
           organizationId,
         });
+
         const boards = byKind(snapshot, "boards");
         const privateBoards = byKind(snapshot, "privateBoards");
 
@@ -375,17 +377,20 @@ describe("PlanCompliance", () => {
         const { organizationId } = yield* makeOrganization();
         yield* addBoard(organizationId, "Quiet board", "PUBLIC");
         yield* addBoard(organizationId, "Public two", "PUBLIC");
+
         const busyBoardId = yield* addBoard(
           organizationId,
           "Busy board",
           "PUBLIC"
         );
+
         yield* addPost(organizationId, busyBoardId, "A post");
 
         const snapshot = yield* planCompliance.snapshot({
           includeResources: true,
           organizationId,
         });
+
         const resources = byKind(snapshot, "boards")?.resources ?? [];
 
         expect(
@@ -422,6 +427,7 @@ describe("PlanCompliance", () => {
             includeResources: true,
             organizationId,
           });
+
           const privateBoards = byKind(snapshot, "privateBoards");
 
           // The private board is the 201st row, outside the 200-row general
@@ -471,6 +477,7 @@ describe("PlanCompliance", () => {
             includeResources: true,
             organizationId,
           });
+
           const members = byKind(snapshot, "members");
 
           expect(members?.count).toBe(3);
@@ -495,6 +502,7 @@ describe("PlanCompliance", () => {
           includeResources: true,
           organizationId: free.organizationId,
         });
+
         const starterSnapshot = yield* planCompliance.snapshot({
           includeResources: true,
           organizationId: starter.organizationId,
@@ -518,6 +526,7 @@ describe("PlanCompliance", () => {
           includeResources: true,
           organizationId,
         });
+
         const categories = byKind(snapshot, "changelogCategories");
 
         expect(categories?.count).toBe(4);
@@ -534,6 +543,7 @@ describe("PlanCompliance", () => {
         for (let index = 0; index < 6; index++) {
           yield* addContact(organizationId, `Contact ${index}`);
         }
+
         for (let index = 0; index < 5; index++) {
           yield* addCompany(organizationId, `Company ${index}`);
         }
@@ -542,6 +552,7 @@ describe("PlanCompliance", () => {
           includeResources: true,
           organizationId,
         });
+
         const crmEntries = byKind(snapshot, "crmEntries");
 
         expect(crmEntries?.count).toBe(11);
@@ -564,6 +575,7 @@ describe("PlanCompliance", () => {
         for (let index = 0; index < 10; index++) {
           yield* addBoard(organizationId, `Board ${index}`, "PUBLIC");
         }
+
         for (let index = 0; index < 12; index++) {
           yield* addContact(organizationId, `Contact ${index}`);
         }

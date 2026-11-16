@@ -79,63 +79,83 @@ import {
 const OpenApiDocument = Schema.Struct({
   paths: Schema.Record(Schema.String, Schema.Json),
 });
+
 const decodePage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPostPage)
 );
+
 const decodeBoard = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiBoard)
 );
+
 const decodeBoardPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiBoardPage)
 );
+
 const decodeStatuses = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiStatusList)
 );
+
 const decodeActivityPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPostActivityPage)
 );
+
 const decodePost = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPost)
 );
+
 const decodePostTags = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPostTags)
 );
+
 const decodeTag = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiTagDetail)
 );
+
 const decodeTagPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiTagPage)
 );
+
 const decodeChangelog = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiChangelog)
 );
+
 const decodeChangelogPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiChangelogPage)
 );
+
 const decodeCompany = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiCompany)
 );
+
 const decodeCompanyPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiCompanyPage)
 );
+
 const decodeComment = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiComment)
 );
+
 const decodeCommentPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiCommentPage)
 );
+
 const decodeVote = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiVote)
 );
+
 const decodeVotePage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiVotePage)
 );
+
 const decodeEndUser = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiEndUser)
 );
+
 const decodeEndUserPage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiEndUserPage)
 );
+
 const decodeDocument = Schema.decodeUnknownSync(
   Schema.fromJsonString(OpenApiDocument)
 );
@@ -180,14 +200,17 @@ const execute = (
   options: { readonly apiKey?: string; readonly body?: unknown } = {}
 ) => {
   const headers: Record<string, string> = {};
+
   if (options.apiKey !== undefined) {
     headers["x-api-key"] = options.apiKey;
   }
+
   if (options.body !== undefined) {
     headers["content-type"] = "application/json";
   }
 
   const init: RequestInit = { method, headers };
+
   if (options.body !== undefined) {
     init.body = JSON.stringify(options.body);
   }
@@ -195,6 +218,7 @@ const execute = (
   const request = HttpServerRequest.fromWeb(
     new Request(`http://localhost${path}`, init)
   );
+
   // `asHttpEffect` types its failure as `unknown`, and a router failure in a
   // test is a defect: `orDie` makes it fail the test instead of widening the
   // error channel of every request helper below.
@@ -354,6 +378,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/boards/${workspace.boardId}/posts?limit=abc`,
         "fbk_limits"
       );
+
       expect(badLimit.status).toBe(400);
       expect(decodeError(responseBody(badLimit))._tag).toBe("INVALID_REQUEST");
 
@@ -361,12 +386,14 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/boards/${workspace.boardId}/posts?limit=101`,
         "fbk_limits"
       );
+
       expect(tooLarge.status).toBe(400);
 
       const badCursor = yield* executeRequest(
         `/api/v1/boards/${workspace.boardId}/posts?cursor=not-a-cursor`,
         "fbk_limits"
       );
+
       expect(badCursor.status).toBe(400);
       expect(decodeError(responseBody(badCursor))._tag).toBe("INVALID_REQUEST");
     })
@@ -378,6 +405,7 @@ layer(makeTestApp())("public api v1", (it) => {
         postCount: 3,
         withVotesAndComments: true,
       });
+
       registerKey("fbk_happy", workspace.organizationId);
 
       const response = yield* executeRequest(
@@ -415,6 +443,7 @@ layer(makeTestApp())("public api v1", (it) => {
 
       const first = body.data.at(0);
       expect(first).toBeDefined();
+
       if (first === undefined) {
         return;
       }
@@ -440,12 +469,14 @@ layer(makeTestApp())("public api v1", (it) => {
           postCount: 2,
           includeArchivedPost: true,
         });
+
         registerKey("fbk_paging", workspace.organizationId);
 
         const firstPage = yield* executeRequest(
           `/api/v1/boards/${workspace.boardId}/posts?limit=1`,
           "fbk_paging"
         );
+
         const firstBody = decodePage(responseBody(firstPage));
         expect(firstBody.data).toHaveLength(1);
         expect(firstBody.nextCursor).not.toBeNull();
@@ -454,6 +485,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/boards/${workspace.boardId}/posts?limit=1&cursor=${encodeURIComponent(firstBody.nextCursor ?? "")}`,
           "fbk_paging"
         );
+
         const secondBody = decodePage(responseBody(secondPage));
 
         expect(secondBody.data).toHaveLength(1);
@@ -465,6 +497,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/boards/${workspace.boardId}/posts?includeArchived=true`,
           "fbk_paging"
         );
+
         const archivedBody = decodePage(responseBody(withArchived));
         expect(archivedBody.data).toHaveLength(3);
         expect(archivedBody.data.some((post) => post.archivedAt !== null)).toBe(
@@ -491,6 +524,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/boards/${workspace.boardId}/posts`,
         "fbk_detail"
       );
+
       const listBody = decodePage(responseBody(list));
       // Only the detail projection carries `content`.
       expect(listBody.data.at(0)).not.toHaveProperty("content");
@@ -505,6 +539,7 @@ layer(makeTestApp())("public api v1", (it) => {
           postCount: 2,
           includeArchivedPost: true,
         });
+
         registerKey("fbk_posts_list", workspace.organizationId);
 
         // A second board with a newer post, so the workspace list is provably
@@ -538,6 +573,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts",
           "fbk_posts_list"
         );
+
         expect(response.status).toBe(200);
         const page = decodePage(responseBody(response));
         expect(page.data.map((post) => post.id)).toEqual([
@@ -558,6 +594,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts?limit=1",
           "fbk_posts_list"
         );
+
         const firstBody = decodePage(responseBody(firstPage));
         expect(firstBody.data.map((post) => post.id)).toEqual([otherPostId]);
         expect(firstBody.nextCursor).toBeTypeOf("string");
@@ -566,6 +603,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts?limit=1&cursor=${encodeURIComponent(firstBody.nextCursor ?? "")}`,
           "fbk_posts_list"
         );
+
         expect(
           decodePage(responseBody(secondPage)).data.map((post) => post.id)
         ).toEqual([workspace.postId]);
@@ -575,6 +613,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts?includeArchived=true",
           "fbk_posts_list"
         );
+
         expect(
           decodePage(responseBody(withArchived)).data.map((post) => post.title)
         ).toContain("Archived");
@@ -604,6 +643,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/retrieve?id=${workspace.postId}`,
         "fbk_retrieve"
       );
+
       expect(byId.status).toBe(200);
       const fromId = decodePost(responseBody(byId));
       expect(fromId.id).toBe(workspace.postId);
@@ -614,6 +654,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/retrieve?boardId=${workspace.boardId}&slug=post-0`,
         "fbk_retrieve"
       );
+
       expect(bySlug.status).toBe(200);
       expect(decodePost(responseBody(bySlug)).id).toBe(workspace.postId);
 
@@ -623,6 +664,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/retrieve?id=${workspace.postId}&boardId=${workspace.boardId}&slug=post-0`,
         "fbk_retrieve"
       );
+
       expect(allThree.status).toBe(200);
 
       const db = yield* currentDb;
@@ -640,6 +682,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/retrieve?id=${workspace.postId}&boardId=${otherBoardId}`,
         "fbk_retrieve"
       );
+
       expect(wrongBoard.status).toBe(404);
       expect(decodeError(responseBody(wrongBoard))._tag).toBe("NOT_FOUND");
     })
@@ -656,6 +699,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts/retrieve",
           "fbk_retrieve"
         );
+
         expect(nothing.status).toBe(400);
         expect(decodeError(responseBody(nothing))._tag).toBe("INVALID_REQUEST");
 
@@ -664,6 +708,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/retrieve?boardId=${workspace.boardId}`,
           "fbk_retrieve"
         );
+
         expect(boardOnly.status).toBe(400);
 
         // The pairing rule: a slug is only meaningful next to a board.
@@ -671,6 +716,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts/retrieve?slug=post-0",
           "fbk_retrieve"
         );
+
         expect(slugOnly.status).toBe(400);
         expect(decodeError(responseBody(slugOnly)).message).toContain(
           "boardId"
@@ -681,6 +727,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts/retrieve?id=",
           "fbk_retrieve"
         );
+
         expect(blank.status).toBe(400);
       })
   );
@@ -695,6 +742,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/retrieve?id=${theirs.postId}`,
         "fbk_retrieve_mine"
       );
+
       expect(byId.status).toBe(404);
       expect(decodeError(responseBody(byId))._tag).toBe("NOT_FOUND");
 
@@ -703,6 +751,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/retrieve?boardId=${theirs.boardId}&slug=post-0`,
         "fbk_retrieve_mine"
       );
+
       expect(bySlug.status).toBe(404);
     })
   );
@@ -722,6 +771,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/retrieve?id=${workspace.postId}`,
         "fbk_boards_only"
       );
+
       expect(retrieve.status).toBe(403);
       expect(decodeError(responseBody(retrieve)).message).toContain(
         "posts.read"
@@ -740,9 +790,11 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/posts",
         "fbk_audit_denied"
       ).pipe(Effect.provideService(AuditLogEnabled, true));
+
       expect(response.status).toBe(403);
 
       const db = yield* currentDb;
+
       const rows = yield* db
         .select()
         .from(schema.auditLogTable)
@@ -806,6 +858,7 @@ layer(makeTestApp())("public api v1", (it) => {
       });
 
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select({
           creatorId: schema.postTable.creatorId,
@@ -814,6 +867,7 @@ layer(makeTestApp())("public api v1", (it) => {
         })
         .from(schema.postTable)
         .where(eq(schema.postTable.id, post.id));
+
       expect(row?.source).toBe("API");
       expect(row?.creatorId).toBeNull();
       expect(row?.creatorMemberId).toBeNull();
@@ -827,6 +881,7 @@ layer(makeTestApp())("public api v1", (it) => {
         })
         .from(schema.postActivityTable)
         .where(eq(schema.postActivityTable.postId, post.id));
+
       expect(activities.map((activity) => activity.kind)).toEqual([
         "POST_CREATED",
       ]);
@@ -875,6 +930,7 @@ layer(makeTestApp())("public api v1", (it) => {
           statusId: mine.statusId,
         },
       });
+
       // A board from another workspace is a request the caller can fix, not a
       // 404 (the endpoint makes the resource) and not a server error.
       expect(foreignBoard.status).toBe(400);
@@ -891,6 +947,7 @@ layer(makeTestApp())("public api v1", (it) => {
           statusId: "pss_not_a_status",
         },
       });
+
       expect(unknownStatus.status).toBe(400);
       expect(decodeError(responseBody(unknownStatus))._tag).toBe(
         "INVALID_REQUEST"
@@ -910,6 +967,7 @@ layer(makeTestApp())("public api v1", (it) => {
       // The maximum, padded: the old raw-length check would have rejected
       // this, while the dashboard accepts it and stores it trimmed.
       const title = "a".repeat(200);
+
       const padded = yield* executeWrite("POST", "/api/v1/posts", {
         apiKey: "fbk_post_editor",
         body: {
@@ -933,6 +991,7 @@ layer(makeTestApp())("public api v1", (it) => {
           statusId: workspace.statusId,
         },
       });
+
       expect(tooLong.status).toBe(400);
       expect(decodeError(responseBody(tooLong))._tag).toBe("INVALID_REQUEST");
     })
@@ -981,10 +1040,12 @@ layer(makeTestApp())("public api v1", (it) => {
           content: "Body",
           statusId: workspace.statusId,
         };
+
         const first = yield* executeWrite("POST", "/api/v1/posts", {
           apiKey: "fbk_post_editor",
           body,
         });
+
         const second = yield* executeWrite("POST", "/api/v1/posts", {
           apiKey: "fbk_post_editor",
           body,
@@ -1023,6 +1084,7 @@ layer(makeTestApp())("public api v1", (it) => {
           apiKey: "fbk_post_editor",
           body,
         });
+
         expect(created.status).toBe(201);
       }
 
@@ -1030,6 +1092,7 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_post_editor",
         body,
       });
+
       expect(exhausted.status).toBe(409);
       expect(decodeError(responseBody(exhausted))._tag).toBe("CONFLICT");
     })
@@ -1102,6 +1165,7 @@ layer(makeTestApp())("public api v1", (it) => {
           })
           .from(schema.postActivityTable)
           .where(eq(schema.postActivityTable.postId, workspace.postId));
+
         expect(activities.map((activity) => activity.kind).sort()).toEqual([
           "BOARD_CHANGED",
           "CONTENT_CHANGED",
@@ -1159,6 +1223,7 @@ layer(makeTestApp())("public api v1", (it) => {
         })
         .from(schema.postTable)
         .where(eq(schema.postTable.id, post.id));
+
       expect(row?.creatorMemberId).toBeNull();
       expect(row?.creatorId).toBeNull();
       expect(row?.contactId).not.toBeNull();
@@ -1173,6 +1238,7 @@ layer(makeTestApp())("public api v1", (it) => {
         })
         .from(schema.postActivityTable)
         .where(eq(schema.postActivityTable.postId, post.id));
+
       expect(activity?.kind).toBe("POST_CREATED");
       expect(activity?.actorId).toBeNull();
       expect(activity?.metadata).toMatchObject({
@@ -1223,6 +1289,7 @@ layer(makeTestApp())("public api v1", (it) => {
         })
         .from(schema.postTable)
         .where(eq(schema.postTable.id, workspace.postId));
+
       expect(row?.creatorMemberId).toBeNull();
       expect(row?.creatorId).toBeNull();
       expect(row?.contactId).not.toBeNull();
@@ -1238,6 +1305,7 @@ layer(makeTestApp())("public api v1", (it) => {
         })
         .from(schema.postActivityTable)
         .where(eq(schema.postActivityTable.postId, workspace.postId));
+
       expect(activities.map((activity) => activity.kind)).toEqual([
         "AUTHOR_CHANGED",
       ]);
@@ -1420,6 +1488,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${theirs.postId}`,
         { apiKey: "fbk_post_admin", body: { title: "Renamed" } }
       );
+
       expect(update.status).toBe(404);
 
       const remove = yield* executeWrite(
@@ -1427,6 +1496,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${theirs.postId}`,
         { apiKey: "fbk_post_admin" }
       );
+
       expect(remove.status).toBe(404);
       expect(decodeError(responseBody(remove))._tag).toBe("NOT_FOUND");
     })
@@ -1446,6 +1516,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}`,
         { apiKey: "fbk_post_admin" }
       );
+
       expect(removed.status).toBe(204);
       expect(responseBody(removed)).toBe("");
 
@@ -1453,6 +1524,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}`,
         "fbk_post_admin"
       );
+
       expect(read.status).toBe(404);
     })
   );
@@ -1542,6 +1614,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/tags?limit=1",
           "fbk_tags_read"
         );
+
         expect(first.status).toBe(200);
         const firstPage = decodeTagPage(responseBody(first));
         expect(firstPage.data).toHaveLength(1);
@@ -1552,6 +1625,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/tags?limit=1&cursor=${encodeURIComponent(firstPage.nextCursor ?? "")}`,
           "fbk_tags_read"
         );
+
         const secondPage = decodeTagPage(responseBody(second));
         expect(secondPage.data).toHaveLength(1);
         expect(secondPage.data.at(0)?.name).toBe("Old");
@@ -1584,6 +1658,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/tags/${tag.id}`,
         "fbk_tags_write"
       );
+
       expect(fetched.status).toBe(200);
       expect(decodeTag(responseBody(fetched)).id).toBe(tag.id);
     })
@@ -1619,6 +1694,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/tags/tag_scoped",
         "fbk_tags_readonly"
       );
+
       expect(read.status).toBe(200);
     })
   );
@@ -1636,12 +1712,14 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_tags_conflict",
         body: { name: "Bug" },
       });
+
       expect(first.status).toBe(201);
 
       const duplicate = yield* executeWrite("POST", "/api/v1/tags", {
         apiKey: "fbk_tags_conflict",
         body: { name: "Bug" },
       });
+
       expect(duplicate.status).toBe(409);
       expect(decodeError(responseBody(duplicate))._tag).toBe("CONFLICT");
 
@@ -1651,6 +1729,7 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_tags_conflict",
         body: { name: "bug" },
       });
+
       expect(sameSlug.status).toBe(409);
       expect(decodeError(responseBody(sameSlug))._tag).toBe("CONFLICT");
     })
@@ -1692,12 +1771,14 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/tags/tag_rename",
         { apiKey: "fbk_tags_rename", body: { name: "Bug" } }
       );
+
       expect(unchanged.status).toBe(200);
 
       const renamed = yield* executeWrite("PATCH", "/api/v1/tags/tag_rename", {
         apiKey: "fbk_tags_rename",
         body: { name: "Defect" },
       });
+
       expect(renamed.status).toBe(200);
       const tag = decodeTag(responseBody(renamed));
       expect(tag.name).toBe("Defect");
@@ -1707,6 +1788,7 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_tags_rename",
         body: { name: "Feature" },
       });
+
       expect(taken.status).toBe(409);
       expect(decodeError(responseBody(taken))._tag).toBe("CONFLICT");
     })
@@ -1732,6 +1814,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/tags/tag_theirs",
         "fbk_tags_mine"
       );
+
       expect(read.status).toBe(404);
       expect(decodeError(responseBody(read))._tag).toBe("NOT_FOUND");
 
@@ -1739,11 +1822,13 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_tags_mine",
         body: { name: "Mine now" },
       });
+
       expect(rename.status).toBe(404);
 
       const remove = yield* executeWrite("DELETE", "/api/v1/tags/tag_theirs", {
         apiKey: "fbk_tags_mine",
       });
+
       expect(remove.status).toBe(404);
 
       // The tag is untouched: the 404 is a refusal, not a report of what
@@ -1752,6 +1837,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/tags/tag_theirs",
         "fbk_tags_theirs"
       );
+
       expect(owned.status).toBe(200);
       expect(decodeTag(responseBody(owned)).name).toBe("Theirs");
     })
@@ -1778,11 +1864,13 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}`,
         "fbk_tags_delete"
       );
+
       expect(decodePost(responseBody(before)).tags).toHaveLength(1);
 
       const removed = yield* executeWrite("DELETE", "/api/v1/tags/tag_delete", {
         apiKey: "fbk_tags_delete",
       });
+
       expect(removed.status).toBe(204);
       expect(responseBody(removed)).toBe("");
 
@@ -1790,6 +1878,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/tags/tag_delete",
         "fbk_tags_delete"
       );
+
       expect(gone.status).toBe(404);
 
       // `post_tag.tag_id` cascades, so the post stops carrying the tag and
@@ -1798,6 +1887,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}`,
         "fbk_tags_delete"
       );
+
       expect(after.status).toBe(200);
       expect(decodePost(responseBody(after)).tags).toHaveLength(0);
       expect(yield* db.select().from(schema.postTagTable)).toHaveLength(0);
@@ -1838,6 +1928,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}`,
         "fbk_tags_assign"
       );
+
       expect(decodePost(responseBody(post)).tags).toEqual(assigned.data);
 
       // A second call replaces rather than adds.
@@ -1846,6 +1937,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/tags`,
         { apiKey: "fbk_tags_assign", body: { tagIds: ["tag_beta"] } }
       );
+
       expect(decodePostTags(responseBody(replaced)).data).toEqual([
         { id: "tag_beta", name: "Beta" },
       ]);
@@ -1856,6 +1948,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/tags`,
         { apiKey: "fbk_tags_assign", body: { tagIds: [] } }
       );
+
       expect(cleared.status).toBe(200);
       expect(decodePostTags(responseBody(cleared)).data).toEqual([]);
     })
@@ -1996,6 +2089,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}`,
         "fbk_tags_unknown"
       );
+
       expect(decodePost(responseBody(post)).tags).toEqual([]);
     })
   );
@@ -2031,6 +2125,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${theirs.postId}`,
         "fbk_tags_owner"
       );
+
       expect(owned.status).toBe(200);
       expect(decodePost(responseBody(owned)).tags).toEqual([]);
     })
@@ -2066,6 +2161,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { tagIds: ["tag_kept", "tag_added"] },
         }
       );
+
       expect(response.status).toBe(200);
 
       const rows = yield* db
@@ -2083,6 +2179,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const sorted = rows.sort((left, right) =>
         left.tagId.localeCompare(right.tagId)
       );
+
       expect(sorted).toHaveLength(2);
       expect(sorted.at(1)).toEqual({
         id: "ptg_merged",
@@ -2106,9 +2203,11 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/tags",
         "fbk_tags_private"
       );
+
       const raw = responseBody(response);
 
       expect(decodeTagPage(raw).data).toHaveLength(1);
+
       for (const forbidden of [
         "creatorId",
         "creatorMemberId",
@@ -2142,6 +2241,7 @@ layer(makeTestApp())("public api v1", (it) => {
           yield* executeRequest("/api/v1/changelog", "fbk_changelog_read")
         )
       );
+
       // Drafts are listed: the key belongs to the workspace, so it sees what
       // has not shipped yet.
       expect(page.data.map((entry) => entry.id)).toEqual([
@@ -2158,12 +2258,14 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(drafts.data.map((entry) => entry.id)).toEqual(["chg_old"]);
 
       const malformed = yield* executeRequest(
         "/api/v1/changelog?status=nope",
         "fbk_changelog_read"
       );
+
       expect(malformed.status).toBe(400);
       expect(decodeError(responseBody(malformed))._tag).toBe("INVALID_REQUEST");
     })
@@ -2174,6 +2276,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const workspace = yield* seedWorkspace();
       const db = yield* currentDb;
       registerKey("fbk_changelog_labels", workspace.organizationId);
+
       const changelogId = yield* seedChangelog(workspace.organizationId, {
         id: "chg_labelled",
         status: "published",
@@ -2203,6 +2306,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/changelog/${changelogId}`,
         "fbk_changelog_labels"
       );
+
       expect(response.status).toBe(200);
 
       const entry = decodeChangelog(responseBody(response));
@@ -2254,9 +2358,11 @@ layer(makeTestApp())("public api v1", (it) => {
       Effect.gen(function* () {
         const workspace = yield* seedWorkspace();
         const other = yield* seedWorkspace();
+
         const id = yield* seedChangelog(workspace.organizationId, {
           content: "Dark mode is live. Enable it in **Settings**.",
         });
+
         registerKey("fbk_changelog_detail", workspace.organizationId);
         registerKey("fbk_changelog_foreign", other.organizationId);
 
@@ -2265,6 +2371,7 @@ layer(makeTestApp())("public api v1", (it) => {
             yield* executeRequest("/api/v1/changelog", "fbk_changelog_detail")
           )
         );
+
         expect(listed.data[0]).not.toHaveProperty("content");
 
         const detail = decodeChangelog(
@@ -2275,6 +2382,7 @@ layer(makeTestApp())("public api v1", (it) => {
             )
           )
         );
+
         expect(detail.content).toBe(
           "Dark mode is live. Enable it in **Settings**."
         );
@@ -2285,6 +2393,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/changelog/${id}`,
           "fbk_changelog_foreign"
         );
+
         expect(foreign.status).toBe(404);
         expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
       })
@@ -2352,6 +2461,7 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_changelog_conflict",
         body: { title: "UI Kit", content: "Body" },
       });
+
       expect(first.status).toBe(201);
 
       // A different title that slugifies to the same slug is the same
@@ -2360,6 +2470,7 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_changelog_conflict",
         body: { title: "ui-kit", content: "Body" },
       });
+
       expect(sameSlug.status).toBe(409);
       expect(decodeError(responseBody(sameSlug))._tag).toBe("CONFLICT");
     })
@@ -2395,6 +2506,7 @@ layer(makeTestApp())("public api v1", (it) => {
           yield* executeRequest("/api/v1/changelog", "fbk_changelog_editor")
         )
       );
+
       expect(listed.data).toHaveLength(0);
     })
   );
@@ -2430,6 +2542,7 @@ layer(makeTestApp())("public api v1", (it) => {
           before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
           organizationId: workspace.organizationId,
         });
+
         expect(intents.map((intent) => intent.kind)).toEqual([
           "changelog.published",
         ]);
@@ -2441,9 +2554,11 @@ layer(makeTestApp())("public api v1", (it) => {
     () =>
       Effect.gen(function* () {
         const workspace = yield* seedWorkspace();
+
         const id = yield* seedChangelog(workspace.organizationId, {
           status: "draft",
         });
+
         registerKey(
           "fbk_changelog_editor",
           workspace.organizationId,
@@ -2466,6 +2581,7 @@ layer(makeTestApp())("public api v1", (it) => {
             status: "published",
           },
         });
+
         expect(denied.status).toBe(403);
         expect(decodeError(responseBody(denied))._tag).toBe("FORBIDDEN_SCOPE");
 
@@ -2482,6 +2598,7 @@ layer(makeTestApp())("public api v1", (it) => {
             },
           }
         );
+
         expect(published.status).toBe(200);
         expect(decodeChangelog(responseBody(published)).status).toBe(
           "published"
@@ -2498,6 +2615,7 @@ layer(makeTestApp())("public api v1", (it) => {
             status: "published",
           },
         });
+
         expect(edited.status).toBe(200);
         expect(decodeChangelog(responseBody(edited)).title).toBe(
           "Release (edited)"
@@ -2507,6 +2625,7 @@ layer(makeTestApp())("public api v1", (it) => {
           before: dateAt((yield* Clock.currentTimeMillis) + 60_000),
           organizationId: workspace.organizationId,
         });
+
         expect(intents.map((intent) => intent.kind)).toEqual([
           "changelog.published",
         ]);
@@ -2526,6 +2645,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const deleted = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
         apiKey: "fbk_changelog_deleter",
       });
+
       expect(deleted.status).toBe(204);
 
       // Deleting an entry that is already gone is a 404 rather than a
@@ -2534,6 +2654,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const again = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
         apiKey: "fbk_changelog_deleter",
       });
+
       expect(again.status).toBe(404);
       expect(decodeError(responseBody(again))._tag).toBe("NOT_FOUND");
     })
@@ -2543,9 +2664,11 @@ layer(makeTestApp())("public api v1", (it) => {
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
       const other = yield* seedWorkspace();
+
       const id = yield* seedChangelog(other.organizationId, {
         status: "draft",
       });
+
       registerKey(
         "fbk_changelog_writer",
         workspace.organizationId,
@@ -2556,12 +2679,14 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_changelog_writer",
         body: { title: "Hijacked", content: "Body", status: "draft" },
       });
+
       expect(updated.status).toBe(404);
       expect(decodeError(responseBody(updated))._tag).toBe("NOT_FOUND");
 
       const deleted = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
         apiKey: "fbk_changelog_writer",
       });
+
       expect(deleted.status).toBe(404);
 
       // The other workspace's list is untouched.
@@ -2570,6 +2695,7 @@ layer(makeTestApp())("public api v1", (it) => {
           yield* executeRequest("/api/v1/changelog", "fbk_changelog_writer")
         )
       );
+
       expect(list.data).toHaveLength(0);
     })
   );
@@ -2608,12 +2734,14 @@ layer(makeTestApp())("public api v1", (it) => {
       const deleted = yield* executeWrite("DELETE", `/api/v1/changelog/${id}`, {
         apiKey: "fbk_changelog_sweeper",
       });
+
       expect(deleted.status).toBe(204);
 
       const remaining = yield* db
         .select({ id: schema.assetTable.id })
         .from(schema.assetTable)
         .where(eq(schema.assetTable.id, "ast_changelog_orphan"));
+
       expect(remaining).toHaveLength(0);
     })
   );
@@ -2630,9 +2758,11 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/changelog",
         "fbk_changelog_private"
       );
+
       const raw = responseBody(response);
 
       expect(decodeChangelogPage(raw).data).toHaveLength(1);
+
       for (const forbidden of [
         "creatorId",
         "creatorMemberId",
@@ -2657,9 +2787,11 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/companies",
         "fbk_companies_private"
       );
+
       const raw = responseBody(response);
 
       expect(decodeCompanyPage(raw).data).toHaveLength(1);
+
       for (const forbidden of [
         "organizationId",
         "creatorId",
@@ -2701,6 +2833,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/companies?limit=2",
           "fbk_companies_list"
         );
+
         expect(first.status).toBe(200);
         const firstPage = decodeCompanyPage(responseBody(first));
         expect(firstPage.data.map((company) => company.id)).toEqual([
@@ -2713,6 +2846,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/companies?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor ?? "")}`,
           "fbk_companies_list"
         );
+
         const secondPage = decodeCompanyPage(responseBody(second));
         expect(secondPage.data.map((company) => company.id)).toEqual([
           "cmp_old",
@@ -2759,6 +2893,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/companies/${company.id}`,
           "fbk_companies_write"
         );
+
         expect(fetched.status).toBe(200);
         expect(decodeCompany(responseBody(fetched))).toEqual(company);
       })
@@ -2797,6 +2932,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/companies",
           "fbk_companies_readonly"
         );
+
         expect(list.status).toBe(403);
         const listError = decodeError(responseBody(list));
         expect(listError._tag).toBe("FORBIDDEN_SCOPE");
@@ -2837,7 +2973,9 @@ layer(makeTestApp())("public api v1", (it) => {
           .select()
           .from(schema.companyTable)
           .where(eq(schema.companyTable.id, "cmp_scoped"));
+
         expect(row?.name).toBe("Scoped");
+
         // Scoped to this workspace: the database is shared across the tests in
         // this file, so a global count would count other tests' fixtures.
         const mine = yield* db
@@ -2846,6 +2984,7 @@ layer(makeTestApp())("public api v1", (it) => {
           .where(
             eq(schema.companyTable.organizationId, workspace.organizationId)
           );
+
         expect(mine).toHaveLength(1);
       })
   );
@@ -2865,12 +3004,14 @@ layer(makeTestApp())("public api v1", (it) => {
           apiKey: "fbk_companies_conflict",
           body: { name: "Acme", externalId: "crm-1" },
         });
+
         expect(first.status).toBe(201);
 
         const duplicateName = yield* executeWrite("POST", "/api/v1/companies", {
           apiKey: "fbk_companies_conflict",
           body: { name: "Acme" },
         });
+
         expect(duplicateName.status).toBe(409);
         const nameError = decodeError(responseBody(duplicateName));
         expect(nameError._tag).toBe("CONFLICT");
@@ -2886,6 +3027,7 @@ layer(makeTestApp())("public api v1", (it) => {
             body: { name: "Acme Ltd", externalId: "crm-1" },
           }
         );
+
         expect(duplicateExternalId.status).toBe(409);
         expect(
           decodeError(responseBody(duplicateExternalId)).message
@@ -2898,6 +3040,7 @@ layer(makeTestApp())("public api v1", (it) => {
             apiKey: "fbk_companies_conflict",
             body: { name },
           });
+
           expect(unset.status).toBe(201);
         }
       })
@@ -2926,6 +3069,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/companies/cmp_update",
           { apiKey: "fbk_companies_update", body: {} }
         );
+
         expect(empty.status).toBe(400);
         expect(decodeError(responseBody(empty))._tag).toBe("INVALID_REQUEST");
 
@@ -2938,6 +3082,7 @@ layer(makeTestApp())("public api v1", (it) => {
             body: { name: "  New  ", avatar: null },
           }
         );
+
         expect(renamed.status).toBe(200);
         const company = decodeCompany(responseBody(renamed));
         expect(company.name).toBe("New");
@@ -2954,6 +3099,7 @@ layer(makeTestApp())("public api v1", (it) => {
             "/api/v1/companies/cmp_update",
             { apiKey: "fbk_companies_update", body }
           );
+
           expect(unchanged.status).toBe(200);
         }
 
@@ -2962,6 +3108,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/companies/cmp_update",
           { apiKey: "fbk_companies_update", body: { name: "Taken" } }
         );
+
         expect(taken.status).toBe(409);
         expect(decodeError(responseBody(taken))._tag).toBe("CONFLICT");
       })
@@ -2987,6 +3134,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/companies/cmp_theirs",
         "fbk_companies_mine"
       );
+
       expect(read.status).toBe(404);
       expect(decodeError(responseBody(read))._tag).toBe("NOT_FOUND");
 
@@ -2995,6 +3143,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/companies/cmp_theirs",
         { apiKey: "fbk_companies_mine", body: { name: "Mine now" } }
       );
+
       expect(rename.status).toBe(404);
 
       const remove = yield* executeWrite(
@@ -3002,6 +3151,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/companies/cmp_theirs",
         { apiKey: "fbk_companies_mine" }
       );
+
       expect(remove.status).toBe(404);
 
       // The company is untouched, and its owner still sees it under its own
@@ -3010,6 +3160,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/companies/cmp_theirs",
         "fbk_companies_theirs"
       );
+
       expect(owned.status).toBe(200);
       expect(decodeCompany(responseBody(owned)).name).toBe("Theirs");
     })
@@ -3052,13 +3203,16 @@ layer(makeTestApp())("public api v1", (it) => {
         id: "cmp_vanished",
         organizationId: workspace.organizationId,
       });
+
       expect(Option.isNone(raced)).toBe(true);
 
       yield* seedCompany(workspace.organizationId, "cmp_present", "Present");
+
       const deleted = yield* repository.delete({
         id: "cmp_present",
         organizationId: workspace.organizationId,
       });
+
       expect(Option.isSome(deleted)).toBe(true);
       expect(
         Option.isNone(
@@ -3093,6 +3247,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/companies/cmp_delete",
         { apiKey: "fbk_companies_delete" }
       );
+
       expect(removed.status).toBe(204);
       expect(responseBody(removed)).toBe("");
 
@@ -3100,6 +3255,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/companies/cmp_delete",
         "fbk_companies_delete"
       );
+
       expect(gone.status).toBe(404);
 
       // The people who belonged to the company survive it and simply stop
@@ -3108,6 +3264,7 @@ layer(makeTestApp())("public api v1", (it) => {
         .select()
         .from(schema.contactTable)
         .where(eq(schema.contactTable.id, "cnt_linked"));
+
       expect(contact?.companyId).toBeNull();
       expect(contact?.name).toBe("Linked person");
     })
@@ -3162,6 +3319,7 @@ layer(makeTestApp())("public api v1", (it) => {
         const anonymous = yield* execute("POST", "/api/v1/companies", {
           body: { name: 123 },
         });
+
         expect(anonymous.status).toBe(401);
         expect(decodeError(responseBody(anonymous))._tag).toBe(
           "MISSING_API_KEY"
@@ -3174,6 +3332,7 @@ layer(makeTestApp())("public api v1", (it) => {
           .where(
             eq(schema.companyTable.organizationId, workspace.organizationId)
           );
+
         expect(mine).toHaveLength(0);
       })
   );
@@ -3244,6 +3403,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts/pst_missing/comments",
           "fbk_comments_read"
         );
+
         expect(missing.status).toBe(404);
         expect(decodeError(responseBody(missing))._tag).toBe("NOT_FOUND");
       })
@@ -3264,6 +3424,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_theirs",
         "fbk_comments_scoped"
       );
+
       expect(read.status).toBe(404);
       expect(decodeError(responseBody(read))._tag).toBe("NOT_FOUND");
 
@@ -3272,6 +3433,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_theirs",
         { apiKey: "fbk_comments_scoped", body: { content: "Hijacked" } }
       );
+
       expect(update.status).toBe(404);
 
       const remove = yield* executeWrite(
@@ -3279,6 +3441,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_theirs",
         { apiKey: "fbk_comments_scoped" }
       );
+
       expect(remove.status).toBe(404);
     })
   );
@@ -3326,12 +3489,15 @@ layer(makeTestApp())("public api v1", (it) => {
           .from(schema.commentTable)
           .where(eq(schema.commentTable.id, created.id))
           .limit(1);
+
         expect(comment?.memberId).toBeNull();
+
         const [shadow] = yield* db
           .select()
           .from(schema.userTable)
           .where(eq(schema.userTable.id, comment?.userId ?? ""))
           .limit(1);
+
         expect(shadow?.email).toMatch(/^behalf-[0-9a-f]+@feeblo\.com$/);
 
         // The write lands in the post's timeline with no actor, because a
@@ -3347,6 +3513,7 @@ layer(makeTestApp())("public api v1", (it) => {
             )
           )
           .limit(1);
+
         expect(activity).toMatchObject({ actorId: null, actorMemberId: null });
 
         // The comment the response described is the comment a later read
@@ -3355,6 +3522,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/comments/${created.id}`,
           "fbk_comments_write"
         );
+
         expect(again.status).toBe(200);
         expect(decodeComment(responseBody(again)).id).toBe(created.id);
       })
@@ -3417,6 +3585,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_scoped",
         "fbk_comments_readonly"
       );
+
       expect(read.status).toBe(200);
     })
   );
@@ -3566,6 +3735,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_edit",
         { apiKey: "fbk_comments_edit", body: { content: "Body only" } }
       );
+
       expect(bodyOnly.status).toBe(200);
       expect(decodeComment(responseBody(bodyOnly))).toMatchObject({
         visibility: "INTERNAL",
@@ -3615,6 +3785,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { content: "Now public", visibility: "PUBLIC" },
         }
       );
+
       expect(widened.status).toBe(400);
       expect(decodeError(responseBody(widened))._tag).toBe("INVALID_REQUEST");
 
@@ -3623,6 +3794,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_internal_reply",
         "fbk_comments_visibility"
       );
+
       expect(decodeComment(responseBody(after))).toMatchObject({
         content: "Seeded comment",
         visibility: "INTERNAL",
@@ -3637,6 +3809,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { content: "Note to the team", visibility: "INTERNAL" },
         }
       );
+
       expect(narrowed.status).toBe(200);
       expect(decodeComment(responseBody(narrowed)).visibility).toBe("INTERNAL");
 
@@ -3648,6 +3821,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { content: "Visible again", visibility: "PUBLIC" },
         }
       );
+
       expect(reopened.status).toBe(200);
       expect(decodeComment(responseBody(reopened)).visibility).toBe("PUBLIC");
 
@@ -3664,6 +3838,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { content: "Seeded comment", visibility: "INTERNAL" },
         }
       );
+
       expect(narrowedParent.status).toBe(200);
 
       const bodyEdit = yield* executeWrite(
@@ -3674,6 +3849,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { content: "Edited body", visibility: "PUBLIC" },
         }
       );
+
       expect(bodyEdit.status).toBe(200);
       expect(decodeComment(responseBody(bodyEdit))).toMatchObject({
         content: "Edited body\n",
@@ -3704,6 +3880,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { content: "", author: { email: "jane@example.com" } },
         }
       );
+
       expect(created.status).toBe(400);
       expect(decodeError(responseBody(created))._tag).toBe("INVALID_REQUEST");
 
@@ -3712,6 +3889,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_empty",
         { apiKey: "fbk_comments_empty", body: { content: "" } }
       );
+
       expect(updated.status).toBe(400);
       expect(decodeError(responseBody(updated))._tag).toBe("INVALID_REQUEST");
 
@@ -3725,6 +3903,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { content: "   ", author: { email: "jane@example.com" } },
         }
       );
+
       expect(blankCreate.status).toBe(400);
       expect(decodeError(responseBody(blankCreate))._tag).toBe(
         "INVALID_REQUEST"
@@ -3735,6 +3914,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_empty",
         { apiKey: "fbk_comments_empty", body: { content: "   " } }
       );
+
       expect(blankUpdate.status).toBe(400);
       expect(decodeError(responseBody(blankUpdate))._tag).toBe(
         "INVALID_REQUEST"
@@ -3745,6 +3925,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_empty",
         "fbk_comments_empty"
       );
+
       expect(decodeComment(responseBody(after)).content).toBe("Seeded comment");
     })
   );
@@ -3774,12 +3955,14 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_parent",
         { apiKey: "fbk_comments_delete" }
       );
+
       expect(response.status).toBe(204);
 
       const after = yield* executeRequest(
         "/api/v1/comments/cmt_parent",
         "fbk_comments_delete"
       );
+
       expect(after.status).toBe(404);
 
       // `parent_comment_id` cascades, so the reply went with it.
@@ -3787,6 +3970,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_reply",
         "fbk_comments_delete"
       );
+
       expect(reply.status).toBe(404);
     })
   );
@@ -3816,6 +4000,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_first/pin",
         { apiKey: "fbk_comments_pin" }
       );
+
       expect(pinned.status).toBe(200);
       expect(decodeComment(responseBody(pinned)).pinnedAt).not.toBeNull();
 
@@ -3825,6 +4010,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_second/pin",
         { apiKey: "fbk_comments_pin" }
       );
+
       expect(repinned.status).toBe(200);
       expect(decodeComment(responseBody(repinned)).pinnedAt).not.toBeNull();
 
@@ -3832,6 +4018,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_first",
         "fbk_comments_pin"
       );
+
       expect(decodeComment(responseBody(first)).pinnedAt).toBeNull();
 
       const unpinned = yield* executeWrite(
@@ -3839,6 +4026,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_second/unpin",
         { apiKey: "fbk_comments_pin" }
       );
+
       expect(unpinned.status).toBe(200);
       expect(decodeComment(responseBody(unpinned)).pinnedAt).toBeNull();
 
@@ -3849,6 +4037,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/comments/cmt_second/unpin",
         { apiKey: "fbk_comments_pin" }
       );
+
       expect(again.status).toBe(200);
       expect(decodeComment(responseBody(again)).pinnedAt).toBeNull();
     })
@@ -3879,6 +4068,7 @@ layer(makeTestApp())("public api v1", (it) => {
       // `upvote` also carries `userId`, `memberId`, and `mergedFromPostId`;
       // none of them may appear on the wire.
       const body = responseBody(response);
+
       for (const forbidden of [
         "userId",
         "memberId",
@@ -3913,6 +4103,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/votes`,
         { apiKey: "fbk_votes_create", body }
       );
+
       expect(first.status).toBe(201);
       const vote = decodeVote(responseBody(first));
       expect(vote.postId).toBe(workspace.postId);
@@ -3929,6 +4120,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/votes`,
         { apiKey: "fbk_votes_create", body }
       );
+
       expect(second.status).toBe(201);
       expect(decodeVote(responseBody(second)).id).toBe(vote.id);
 
@@ -3936,6 +4128,7 @@ layer(makeTestApp())("public api v1", (it) => {
         .select()
         .from(schema.upvoteTable)
         .where(eq(schema.upvoteTable.postId, workspace.postId));
+
       expect(rows).toHaveLength(1);
 
       // The timeline records the on-behalf add, and a machine key has no
@@ -3944,6 +4137,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/activity`,
         "fbk_votes_create"
       );
+
       expect(activity.status).toBe(200);
       const activityPage = decodeActivityPage(responseBody(activity));
       expect(activityPage.data[0]).toMatchObject({
@@ -3964,17 +4158,20 @@ layer(makeTestApp())("public api v1", (it) => {
       );
 
       const voteId = `upv_${workspace.organizationId}`;
+
       const removed = yield* executeWrite(
         "DELETE",
         `/api/v1/posts/${workspace.postId}/votes/${voteId}`,
         { apiKey: "fbk_votes_delete" }
       );
+
       expect(removed.status).toBe(204);
 
       const rows = yield* db
         .select()
         .from(schema.upvoteTable)
         .where(eq(schema.upvoteTable.id, voteId));
+
       expect(rows).toHaveLength(0);
 
       // Deleting it again is the documented not-found, not a silent success:
@@ -3985,6 +4182,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/votes/${voteId}`,
         { apiKey: "fbk_votes_delete" }
       );
+
       expect(again.status).toBe(404);
       expect(decodeError(responseBody(again))._tag).toBe("NOT_FOUND");
     })
@@ -4021,12 +4219,14 @@ layer(makeTestApp())("public api v1", (it) => {
           postId: workspace.postId,
           voteId: oldVoteId,
         });
+
         expect(removed).toEqual({ removed: false });
 
         const rows = yield* db
           .select({ id: schema.upvoteTable.id })
           .from(schema.upvoteTable)
           .where(eq(schema.upvoteTable.postId, workspace.postId));
+
         expect(rows.map((row) => row.id)).toEqual(["upv_newer"]);
       })
   );
@@ -4045,6 +4245,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { author: { email: "vera@example.com" } },
         }
       );
+
       expect(create.status).toBe(403);
       expect(decodeError(responseBody(create))._tag).toBe("FORBIDDEN_SCOPE");
 
@@ -4053,6 +4254,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/votes/upv_any`,
         { apiKey: "fbk_votes_reader" }
       );
+
       expect(remove.status).toBe(403);
       expect(decodeError(responseBody(remove))._tag).toBe("FORBIDDEN_SCOPE");
     })
@@ -4072,6 +4274,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${theirs.postId}/votes`,
         "fbk_votes_isolation"
       );
+
       expect(list.status).toBe(404);
 
       const create = yield* executeWrite(
@@ -4082,6 +4285,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { author: { email: "vera@example.com" } },
         }
       );
+
       expect(create.status).toBe(404);
       expect(decodeError(responseBody(create))._tag).toBe("NOT_FOUND");
     })
@@ -4109,6 +4313,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { author: { email: "vera@example.com" } },
         }
       );
+
       expect(response.status).toBe(409);
       expect(decodeError(responseBody(response))._tag).toBe("CONFLICT");
 
@@ -4119,6 +4324,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/votes/upv_any`,
         { apiKey: "fbk_votes_locked" }
       );
+
       expect(removed.status).toBe(409);
       expect(decodeError(responseBody(removed))._tag).toBe("CONFLICT");
     })
@@ -4184,6 +4390,7 @@ layer(makeTestApp())("public api v1", (it) => {
           },
         }
       );
+
       expect(vera.status).toBe(201);
       const veraVote = decodeVote(responseBody(vera));
       // The voter's end-user record is what the workspace can join on.
@@ -4197,6 +4404,7 @@ layer(makeTestApp())("public api v1", (it) => {
           body: { author: { email: "sam@example.com", name: "Sam" } },
         }
       );
+
       expect(sam.status).toBe(201);
 
       // A post's list narrowed to one customer: the read-back a reconcile
@@ -4205,6 +4413,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/votes?voterEmail=VERA@example.com`,
         "fbk_votes_filter"
       );
+
       expect(filtered.status).toBe(200);
       const filteredPage = decodeVotePage(responseBody(filtered));
       expect(filteredPage.data).toHaveLength(1);
@@ -4216,12 +4425,14 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/votes?voterId=${veraVote.voterId}`,
         "fbk_votes_filter"
       );
+
       expect(decodeVotePage(responseBody(byContactId)).data).toHaveLength(1);
 
       const byExternalId = yield* executeRequest(
         "/api/v1/votes?voterExternalId=crm-vera",
         "fbk_votes_filter"
       );
+
       expect(decodeVotePage(responseBody(byExternalId)).data).toHaveLength(1);
 
       // The workspace-wide list sees both; the post and board filters narrow
@@ -4233,12 +4444,14 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/votes?postId=${targetPostId}`,
         "fbk_votes_filter"
       );
+
       expect(decodeVotePage(responseBody(onTarget)).data).toHaveLength(1);
 
       const onBoard = yield* executeRequest(
         `/api/v1/votes?boardId=${workspace.boardId}`,
         "fbk_votes_filter"
       );
+
       expect(decodeVotePage(responseBody(onBoard)).data).toHaveLength(2);
 
       // A voter nobody matches is an empty page, not an error; an id that
@@ -4248,6 +4461,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/votes?voterEmail=nobody@example.com",
         "fbk_votes_filter"
       );
+
       expect(nobody.status).toBe(200);
       expect(decodeVotePage(responseBody(nobody)).data).toHaveLength(0);
 
@@ -4255,6 +4469,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/votes?postId=pst_missing",
         "fbk_votes_filter"
       );
+
       expect(missingPost.status).toBe(404);
       expect(decodeError(responseBody(missingPost))._tag).toBe("NOT_FOUND");
 
@@ -4262,6 +4477,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/votes?boardId=brd_missing",
         "fbk_votes_filter"
       );
+
       expect(missingBoard.status).toBe(404);
       expect(decodeError(responseBody(missingBoard))._tag).toBe("NOT_FOUND");
     })
@@ -4279,6 +4495,7 @@ layer(makeTestApp())("public api v1", (it) => {
       // letting the page cursor skip one of the copies.
       const now = yield* DateTime.nowAsDate;
       const userId = `user_voter_${workspace.organizationId}`;
+
       for (const id of ["cnt_dupe_a", "cnt_dupe_b"]) {
         yield* db.insert(schema.contactTable).values({
           id,
@@ -4296,6 +4513,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/votes`,
         "fbk_votes_dupe"
       );
+
       expect(response.status).toBe(200);
       const page = decodeVotePage(responseBody(response));
       expect(page.data).toHaveLength(1);
@@ -4309,12 +4527,14 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/votes?voterId=cnt_dupe_a",
         "fbk_votes_dupe"
       );
+
       expect(decodeVotePage(responseBody(canonical)).data).toHaveLength(1);
 
       const duplicate = yield* executeRequest(
         "/api/v1/votes?voterId=cnt_dupe_b",
         "fbk_votes_dupe"
       );
+
       expect(duplicate.status).toBe(200);
       expect(decodeVotePage(responseBody(duplicate)).data).toHaveLength(0);
 
@@ -4322,6 +4542,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/votes?voterExternalId=crm-b",
         "fbk_votes_dupe"
       );
+
       expect(duplicateExternalId.status).toBe(200);
       expect(
         decodeVotePage(responseBody(duplicateExternalId)).data
@@ -4333,9 +4554,11 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/votes?voterEmail=cnt_dupe_b@example.com",
         "fbk_votes_dupe"
       );
+
       const byDuplicateEmailPage = decodeVotePage(
         responseBody(byDuplicateEmail)
       );
+
       expect(byDuplicateEmailPage.data).toHaveLength(1);
       expect(byDuplicateEmailPage.data[0]?.voterId).toBe("cnt_dupe_a");
     })
@@ -4349,6 +4572,7 @@ layer(makeTestApp())("public api v1", (it) => {
           postCount: 2,
           withVotesAndComments: true,
         });
+
         const db = yield* currentDb;
         const targetPostId = `${workspace.postId}_1`;
         registerKey(
@@ -4362,6 +4586,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${workspace.postId}/merge`,
           { apiKey: "fbk_merge", body: { intoPostId: targetPostId } }
         );
+
         expect(merged.status).toBe(204);
 
         // The source is archived and points at the survivor, and the engagement
@@ -4370,6 +4595,7 @@ layer(makeTestApp())("public api v1", (it) => {
           .select()
           .from(schema.postTable)
           .where(eq(schema.postTable.id, workspace.postId));
+
         expect(source?.mergedIntoPostId).toBe(targetPostId);
         expect(source?.archivedAt).not.toBeNull();
 
@@ -4377,6 +4603,7 @@ layer(makeTestApp())("public api v1", (it) => {
           .select()
           .from(schema.upvoteTable)
           .where(eq(schema.upvoteTable.postId, targetPostId));
+
         expect(movedVotes).toHaveLength(1);
 
         // Both timelines explain the merge, and a machine key has no actor.
@@ -4384,13 +4611,16 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${targetPostId}/activity`,
           "fbk_merge"
         );
+
         expect(
           decodeActivityPage(responseBody(targetActivity)).data[0]
         ).toMatchObject({ actor: null, kind: "POST_MERGED" });
+
         const sourceActivity = yield* executeRequest(
           `/api/v1/posts/${workspace.postId}/activity`,
           "fbk_merge"
         );
+
         expect(
           decodeActivityPage(responseBody(sourceActivity)).data[0]
         ).toMatchObject({ kind: "POST_MERGED_INTO" });
@@ -4403,6 +4633,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${workspace.postId}/merge`,
           { apiKey: "fbk_merge", body: { intoPostId: targetPostId } }
         );
+
         expect(again.status).toBe(409);
         expect(decodeError(responseBody(again))._tag).toBe("CONFLICT");
 
@@ -4411,6 +4642,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${targetPostId}/merge`,
           { apiKey: "fbk_merge", body: { intoPostId: targetPostId } }
         );
+
         expect(self.status).toBe(400);
         expect(decodeError(responseBody(self))._tag).toBe("INVALID_REQUEST");
 
@@ -4419,6 +4651,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${workspace.postId}/merge`,
           { apiKey: "fbk_merge", body: { intoPostId: "pst_missing" } }
         );
+
         expect(missing.status).toBe(404);
         expect(decodeError(responseBody(missing))._tag).toBe("NOT_FOUND");
 
@@ -4428,12 +4661,14 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${workspace.postId}/unmerge`,
           { apiKey: "fbk_merge" }
         );
+
         expect(unmerged.status).toBe(204);
 
         const [restored] = yield* db
           .select()
           .from(schema.postTable)
           .where(eq(schema.postTable.id, workspace.postId));
+
         expect(restored?.mergedIntoPostId).toBeNull();
         expect(restored?.archivedAt).toBeNull();
 
@@ -4441,6 +4676,7 @@ layer(makeTestApp())("public api v1", (it) => {
           .select()
           .from(schema.upvoteTable)
           .where(eq(schema.upvoteTable.postId, workspace.postId));
+
         expect(restoredVotes).toHaveLength(1);
 
         const notMerged = yield* executeWrite(
@@ -4448,6 +4684,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${workspace.postId}/unmerge`,
           { apiKey: "fbk_merge" }
         );
+
         expect(notMerged.status).toBe(409);
         expect(decodeError(responseBody(notMerged))._tag).toBe("CONFLICT");
       })
@@ -4496,6 +4733,7 @@ layer(makeTestApp())("public api v1", (it) => {
             avatarUrl: "https://example.com/ada.png",
           },
         });
+
         expect(created.status).toBe(200);
         const user = decodeEndUser(responseBody(created));
         expect(user).toMatchObject({
@@ -4523,6 +4761,7 @@ layer(makeTestApp())("public api v1", (it) => {
           apiKey: "fbk_end_users",
           body: { email: "ada@example.com", name: "Ada Lovelace" },
         });
+
         expect(updated.status).toBe(200);
         const updatedUser = decodeEndUser(responseBody(updated));
         expect(updatedUser.id).toBe(user.id);
@@ -4533,6 +4772,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/end-users/${user.id}`,
           "fbk_end_users"
         );
+
         expect(byId.status).toBe(200);
         expect(decodeEndUser(responseBody(byId)).externalId).toBe("crm-1");
 
@@ -4540,6 +4780,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/end-users?email=ADA@example.com",
           "fbk_end_users"
         );
+
         expect(list.status).toBe(200);
         expect(decodeEndUserPage(responseBody(list)).data).toHaveLength(1);
 
@@ -4550,12 +4791,14 @@ layer(makeTestApp())("public api v1", (it) => {
           apiKey: "fbk_end_users",
           body: { email: "grace@example.com", name: "Grace" },
         });
+
         expect(grace.status).toBe(200);
 
         const conflict = yield* executeWrite("POST", "/api/v1/end-users", {
           apiKey: "fbk_end_users",
           body: { externalId: "crm-1", email: "grace@example.com" },
         });
+
         expect(conflict.status).toBe(409);
         expect(decodeError(responseBody(conflict))._tag).toBe("CONFLICT");
 
@@ -4565,12 +4808,14 @@ layer(makeTestApp())("public api v1", (it) => {
           apiKey: "fbk_end_users",
           body: { name: "Nobody" },
         });
+
         expect(anonymous.status).toBe(400);
 
         const badCompany = yield* executeWrite("POST", "/api/v1/end-users", {
           apiKey: "fbk_end_users",
           body: { externalId: "crm-2", companyId: "cmp_missing" },
         });
+
         expect(badCompany.status).toBe(400);
 
         // An end user of another workspace is not found, so an id cannot probe.
@@ -4580,10 +4825,12 @@ layer(makeTestApp())("public api v1", (it) => {
           other.organizationId,
           END_USER_MANAGEMENT_KEY_SCOPES
         );
+
         const foreign = yield* executeRequest(
           `/api/v1/end-users/${user.id}`,
           "fbk_end_users_other"
         );
+
         expect(foreign.status).toBe(404);
         expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
       })
@@ -4634,24 +4881,28 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_end_users_rename",
         body: { email: "rename@example.com", name: "New Name" },
       });
+
       expect(renamed.status).toBe(200);
 
       const [shadow] = yield* db
         .select({ name: schema.userTable.name })
         .from(schema.userTable)
         .where(eq(schema.userTable.id, "user_shadow_rename"));
+
       expect(shadow?.name).toBe("New Name");
 
       const renamedReal = yield* executeWrite("POST", "/api/v1/end-users", {
         apiKey: "fbk_end_users_rename",
         body: { email: "rename-real@example.com", name: "CRM Label" },
       });
+
       expect(renamedReal.status).toBe(200);
 
       const [real] = yield* db
         .select({ name: schema.userTable.name })
         .from(schema.userTable)
         .where(eq(schema.userTable.id, "user_real_rename"));
+
       expect(real?.name).toBe("Account Owner");
     })
   );
@@ -4667,6 +4918,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/end-users",
         "fbk_end_users_default"
       );
+
       expect(list.status).toBe(403);
       expect(decodeError(responseBody(list))._tag).toBe("FORBIDDEN_SCOPE");
 
@@ -4674,6 +4926,7 @@ layer(makeTestApp())("public api v1", (it) => {
         apiKey: "fbk_end_users_default",
         body: { email: "ada@example.com" },
       });
+
       expect(upsert.status).toBe(403);
       expect(decodeError(responseBody(upsert))._tag).toBe("FORBIDDEN_SCOPE");
     })
@@ -4743,6 +4996,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/boards?limit=1",
         "fbk_board_reader"
       );
+
       expect(firstResponse.status).toBe(200);
 
       const first = decodeBoardPage(responseBody(firstResponse));
@@ -4753,6 +5007,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/boards?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
         "fbk_board_reader"
       );
+
       expect(secondResponse.status).toBe(200);
 
       const second = decodeBoardPage(responseBody(secondResponse));
@@ -4762,6 +5017,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const byId = new Map(
         [...first.data, ...second.data].map((board) => [board.id, board])
       );
+
       expect([...byId.keys()].sort()).toEqual(
         [privateBoardId, workspace.boardId].sort()
       );
@@ -4792,6 +5048,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/boards/${workspace.boardId}`,
         "fbk_board_getter"
       );
+
       expect(found.status).toBe(200);
 
       const board = decodeBoard(responseBody(found));
@@ -4805,6 +5062,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/boards/${other.boardId}`,
         "fbk_board_getter"
       );
+
       expect(foreign.status).toBe(404);
       expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
 
@@ -4812,6 +5070,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/boards/brd_does_not_exist",
         "fbk_board_getter"
       );
+
       expect(unknown.status).toBe(404);
       expect(decodeError(responseBody(unknown))._tag).toBe("NOT_FOUND");
     })
@@ -4822,12 +5081,15 @@ layer(makeTestApp())("public api v1", (it) => {
       const workspace = yield* seedWorkspace({ postCount: 2 });
       const db = yield* currentDb;
       const now = DateTime.toDate(yield* DateTime.now);
+
       const earlier = DateTime.toDate(
         DateTime.subtract(yield* DateTime.now, { minutes: 30 })
       );
+
       const cutoff = DateTime.toDate(
         DateTime.subtract(yield* DateTime.now, { minutes: 15 })
       );
+
       const longAgo = DateTime.toDate(
         DateTime.subtract(yield* DateTime.now, { days: 1 })
       ).toISOString();
@@ -4890,6 +5152,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(byBoard.data.map((post) => post.id)).toEqual([otherPostId]);
 
       const byTag = decodePage(
@@ -4900,6 +5163,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(byTag.data.map((post) => post.id)).toEqual([workspace.postId]);
 
       // An id that does not exist is a filter that matches nothing, not an
@@ -4912,6 +5176,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(byUnknownTag.data).toEqual([]);
 
       const byChangeTime = decodePage(
@@ -4922,6 +5187,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(byChangeTime.data.map((post) => post.id)).toEqual([otherPostId]);
 
       // A bare date is accepted, and a cutoff older than every row keeps the
@@ -4934,6 +5200,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(wholeWorkspace.data.map((post) => post.id).sort()).toEqual(
         [workspace.postId, `${workspace.postId}_1`, otherPostId].sort()
       );
@@ -4947,6 +5214,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(composed.data.map((post) => post.id)).toEqual([workspace.postId]);
 
       // A malformed filter is the caller's mistake, reported as one rather
@@ -4963,6 +5231,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts?${query}`,
           "fbk_post_filter"
         );
+
         expect(malformed.status, query).toBe(400);
         expect(decodeError(responseBody(malformed))._tag, query).toBe(
           "INVALID_REQUEST"
@@ -4977,6 +5246,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts?${query}`,
           "fbk_post_filter"
         );
+
         expect(emptyTags.status, query).toBe(400);
         expect(decodeError(responseBody(emptyTags))._tag, query).toBe(
           "INVALID_REQUEST"
@@ -4995,6 +5265,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts?updatedAfter=${encodeURIComponent(value)}`,
           "fbk_post_filter"
         );
+
         expect(accepted.status, value).toBe(200);
       }
     })
@@ -5005,9 +5276,11 @@ layer(makeTestApp())("public api v1", (it) => {
       const workspace = yield* seedWorkspace();
       const db = yield* currentDb;
       const nowDateTime = yield* DateTime.now;
+
       const earlier = DateTime.toDate(
         DateTime.subtract(nowDateTime, { minutes: 30 })
       );
+
       const cutoff = DateTime.toDate(
         DateTime.subtract(nowDateTime, { minutes: 15 })
       );
@@ -5035,6 +5308,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(before.data.map((post) => post.id)).toEqual([]);
 
       const assigned = yield* executeWrite(
@@ -5042,6 +5316,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/posts/${workspace.postId}/tags`,
         { apiKey: "fbk_tag_sync", body: { tagIds: ["tag_sync"] } }
       );
+
       expect(assigned.status).toBe(200);
 
       // The tags are part of the post, so the assignment moved its
@@ -5055,6 +5330,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(after.data.map((post) => post.id)).toEqual([workspace.postId]);
       expect(after.data[0]?.tags).toEqual([{ id: "tag_sync", name: "Sync" }]);
     })
@@ -5065,9 +5341,11 @@ layer(makeTestApp())("public api v1", (it) => {
       const workspace = yield* seedWorkspace();
       const db = yield* currentDb;
       const nowDateTime = yield* DateTime.now;
+
       const earlier = DateTime.toDate(
         DateTime.subtract(nowDateTime, { minutes: 30 })
       );
+
       const cutoff = DateTime.toDate(
         DateTime.subtract(nowDateTime, { minutes: 15 })
       );
@@ -5101,11 +5379,13 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(before.data.map((post) => post.id)).toEqual([]);
 
       const deleted = yield* executeWrite("DELETE", "/api/v1/tags/tag_doomed", {
         apiKey: "fbk_tag_delete_sync",
       });
+
       expect(deleted.status).toBe(204);
 
       // Deleting the tag removed it from the post, which changes the post's
@@ -5119,6 +5399,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(after.data.map((post) => post.id)).toEqual([workspace.postId]);
       expect(after.data[0]?.tags).toEqual([]);
     })
@@ -5129,6 +5410,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const workspace = yield* seedWorkspace();
       const db = yield* currentDb;
       const nowDateTime = yield* DateTime.now;
+
       // Stands in for a concurrent writer that committed a later timestamp
       // than the delete samples: the write must keep the later value, because
       // a caller may already have synced through it.
@@ -5157,6 +5439,7 @@ layer(makeTestApp())("public api v1", (it) => {
       const deleted = yield* executeWrite("DELETE", "/api/v1/tags/tag_rewind", {
         apiKey: "fbk_tag_rewind",
       });
+
       expect(deleted.status).toBe(204);
 
       const post = decodePost(
@@ -5167,6 +5450,7 @@ layer(makeTestApp())("public api v1", (it) => {
           )
         )
       );
+
       expect(post.updatedAt.getTime()).toBe(committed.getTime());
       expect(post.tags).toEqual([]);
     })
@@ -5180,8 +5464,10 @@ layer(makeTestApp())("public api v1", (it) => {
         const db = yield* currentDb;
         const nowDateTime = yield* DateTime.now;
         const now = DateTime.toDate(nowDateTime);
+
         const atMinutesAgo = (count: number) =>
           DateTime.toDate(DateTime.subtract(nowDateTime, { minutes: count }));
+
         const threeMinutesAgo = atMinutesAgo(3);
         const twoMinutesAgo = atMinutesAgo(2);
         const oneMinuteAgo = atMinutesAgo(1);
@@ -5253,6 +5539,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${workspace.postId}/activity?limit=2`,
           "fbk_activity"
         );
+
         expect(firstResponse.status).toBe(200);
 
         const first = decodeActivityPage(responseBody(firstResponse));
@@ -5266,6 +5553,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${workspace.postId}/activity?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
           "fbk_activity"
         );
+
         expect(secondResponse.status).toBe(200);
         const second = decodeActivityPage(responseBody(secondResponse));
         expect(second.data.map((entry) => entry.id)).toEqual(["act_created"]);
@@ -5315,6 +5603,7 @@ layer(makeTestApp())("public api v1", (it) => {
           `/api/v1/posts/${other.postId}/activity`,
           "fbk_activity_scoped"
         );
+
         expect(foreign.status).toBe(404);
         expect(decodeError(responseBody(foreign))._tag).toBe("NOT_FOUND");
 
@@ -5322,6 +5611,7 @@ layer(makeTestApp())("public api v1", (it) => {
           "/api/v1/posts/pst_does_not_exist/activity",
           "fbk_activity_scoped"
         );
+
         expect(unknown.status).toBe(404);
         expect(decodeError(responseBody(unknown))._tag).toBe("NOT_FOUND");
       })
@@ -5342,6 +5632,7 @@ layer(makeTestApp())("public api v1", (it) => {
         `/api/v1/boards/${workspace.boardId}`,
         "fbk_no_boards"
       );
+
       expect(get.status).toBe(403);
       expect(decodeError(responseBody(get)).message).toContain("boards.read");
     })
@@ -5374,6 +5665,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/statuses",
         "fbk_status_reader"
       );
+
       expect(response.status).toBe(200);
 
       const list = decodeStatuses(responseBody(response));
@@ -5400,6 +5692,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/statuses",
         "fbk_status_scoped"
       );
+
       expect(response.status).toBe(200);
 
       const list = decodeStatuses(responseBody(response));
@@ -5424,6 +5717,7 @@ layer(makeTestApp())("public api v1", (it) => {
         "/api/v1/statuses",
         "fbk_status_no_posts"
       );
+
       expect(response.status).toBe(403);
       expect(decodeError(responseBody(response))._tag).toBe("FORBIDDEN_SCOPE");
       expect(decodeError(responseBody(response)).message).toContain(
@@ -5451,6 +5745,7 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
             `/api/v1/posts/${workspace.postId}`,
             "fbk_limited"
           );
+
           expect(first.status).toBe(200);
 
           // Every response that reports a budget describes the window it is
@@ -5463,6 +5758,7 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
             `/api/v1/posts/${workspace.postId}`,
             "fbk_limited"
           );
+
           expect(second.status).toBe(429);
           expect(decodeError(responseBody(second))._tag).toBe("RATE_LIMITED");
           expect(second.headers["retry-after"]).toBeDefined();
@@ -5475,10 +5771,12 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           // A different key has its own budget.
           const other = yield* seedWorkspace();
           registerKey("fbk_unlimited", other.organizationId);
+
           const otherResponse = yield* executeRequest(
             `/api/v1/posts/${other.postId}`,
             "fbk_unlimited"
           );
+
           expect(otherResponse.status).toBe(200);
         })
     );
@@ -5496,6 +5794,7 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
             `/api/v1/posts/${workspace.postId}`,
             "fbk_free_limited"
           );
+
           expect(first.status).toBe(403);
           expect(decodeError(responseBody(first))._tag).toBe(
             "PLAN_REQUIRES_UPGRADE"
@@ -5505,6 +5804,7 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
             `/api/v1/posts/${workspace.postId}`,
             "fbk_free_limited"
           );
+
           expect(second.status).toBe(429);
           expect(decodeError(responseBody(second))._tag).toBe("RATE_LIMITED");
         })
@@ -5519,6 +5819,7 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           `/api/v1/posts/${workspace.postId}`,
           "fbk_not_a_key"
         );
+
         expect(rejected.status).toBe(401);
         expect(decodeError(responseBody(rejected))._tag).toBe(
           "INVALID_API_KEY"
@@ -5530,11 +5831,13 @@ layer(makeTestApp({ limit: 1, window: Duration.minutes(1) }))(
           `/api/v1/posts/${workspace.postId}`,
           "fbk_valid_after_invalid"
         );
+
         expect(accepted.status).toBe(200);
       })
     );
   }
 );
+
 /**
  * The CRM entry limit, with a plan that denies one.
  *
@@ -5575,18 +5878,21 @@ layer(
         // Nothing was written, and the refusal is about this write rather
         // than about the key: reading the workspace's companies still works.
         const db = yield* currentDb;
+
         const mine = yield* db
           .select()
           .from(schema.companyTable)
           .where(
             eq(schema.companyTable.organizationId, workspace.organizationId)
           );
+
         expect(mine).toHaveLength(0);
 
         const listed = yield* executeRequest(
           "/api/v1/companies",
           "fbk_crm_denied"
         );
+
         expect(listed.status).toBe(200);
         expect(decodeCompanyPage(responseBody(listed)).data).toHaveLength(0);
       })
@@ -5608,6 +5914,7 @@ layer(
           apiKey: "fbk_crm_denied_users",
           body: { externalId: "crm-1", email: "ada@example.com" },
         });
+
         expect(created.status).toBe(403);
         expect(decodeError(responseBody(created))._tag).toBe(
           "PLAN_REQUIRES_UPGRADE"
@@ -5620,6 +5927,7 @@ layer(
           .where(
             eq(schema.contactTable.organizationId, workspace.organizationId)
           );
+
         expect(rows).toHaveLength(0);
 
         // An update adds nothing to the count the plan caps, so it is not
@@ -5633,10 +5941,12 @@ layer(
           createdAt: now,
           updatedAt: now,
         });
+
         const updated = yield* executeWrite("POST", "/api/v1/end-users", {
           apiKey: "fbk_crm_denied_users",
           body: { email: "grace@example.com", name: "Grace Hopper" },
         });
+
         expect(updated.status).toBe(200);
         expect(decodeEndUser(responseBody(updated)).name).toBe("Grace Hopper");
       })
@@ -5669,6 +5979,7 @@ layer(
         apiKey: "fbk_crm_cap",
         body: { name: "Acme" },
       });
+
       expect(first.status).toBe(201);
 
       // The count the policy reads is the workspace's committed rows, so the
@@ -5677,6 +5988,7 @@ layer(
         apiKey: "fbk_crm_cap",
         body: { name: "Acme Ltd" },
       });
+
       expect(second.status).toBe(403);
       expect(decodeError(responseBody(second))._tag).toBe(
         "PLAN_REQUIRES_UPGRADE"

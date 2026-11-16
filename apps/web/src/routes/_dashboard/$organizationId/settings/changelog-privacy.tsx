@@ -22,15 +22,18 @@ export const Route = createFileRoute(
   component: ChangelogPrivacySettingsPage,
   beforeLoad: async () => {
     await dashboardCollections.siteCollection.preload();
+
     return null;
   },
 });
 
 function ChangelogPrivacySettingsPage() {
   const organizationId = useOrganizationId();
+
   const { allowed: canManagePrivacy, isPending: isPolicyPending } = usePolicy(
     hasPermission(organizationId, "site.update")
   );
+
   const site = useSite();
   const [isPending, startTransition] = useTransition();
 

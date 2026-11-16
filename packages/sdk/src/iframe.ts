@@ -5,6 +5,7 @@ import type { EmbedOptions } from "./types";
 export function resolveBaseUrl(options: EmbedOptions): string {
   const hostname = window.location.hostname;
   const port = window.location.port;
+
   return (
     options.baseUrl ??
     (hostname === "localhost"
@@ -24,19 +25,24 @@ export function createIframe(
   const config = normalizeWidgetConfig(options);
   params.set("mode", config.mode);
   params.set("modules", config.modules.join(","));
+
   if (options.theme) {
     params.set("theme", options.theme);
   }
+
   if (options.locale) {
     params.set("locale", options.locale);
   }
+
   if (options.defaultBoard && supportsBoardSelection(config)) {
     params.set("board", options.defaultBoard);
   }
+
   // The widget targets its postMessages at the host origin. Passing it
   // explicitly (rather than relying on document.referrer) keeps messaging
   // working under Referrer-Policy: no-referrer hosts.
   const hostOrigin = window.location.origin;
+
   if (hostOrigin && hostOrigin !== "null") {
     params.set("hostOrigin", hostOrigin);
   }
@@ -48,9 +54,11 @@ export function createIframe(
   iframe.style.width = "100%";
   iframe.style.height = "100%";
   iframe.style.border = "none";
+
   interface TitleMap {
     readonly [key: string]: Record<string, string>;
   }
+
   const titles: TitleMap = {
     en: {
       feedback: "Feeblo feedback widget",
@@ -58,13 +66,16 @@ export function createIframe(
       hub: "Feeblo Hub",
     },
   };
+
   const language = options.locale?.split("-")[0]?.toLowerCase() ?? "en";
   let defaultTitle = "Feeblo feedback widget";
+
   if (config.mode === "hub") {
     defaultTitle = "Feeblo Hub";
   } else if (config.mode === "updates") {
     defaultTitle = "Feeblo updates widget";
   }
+
   iframe.title = titles[language]?.[config.mode] ?? defaultTitle;
   iframe.setAttribute(
     "sandbox",
@@ -75,6 +86,7 @@ export function createIframe(
   if (logger?.enabled) {
     logger("config", "iframe", { baseUrl, src: iframe.src });
   }
+
   return iframe;
 }
 

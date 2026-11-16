@@ -22,7 +22,9 @@ export const DISCORD_API_BASE_URL = "https://discord.com/api/v10";
 /** Discord OAuth endpoints. */
 export const DISCORD_OAUTH_AUTHORIZE_URL =
   "https://discord.com/oauth2/authorize";
+
 export const DISCORD_OAUTH_TOKEN_URL = `${DISCORD_API_BASE_URL}/oauth2/token`;
+
 export const DISCORD_OAUTH_TOKEN_REVOKE_URL = `${DISCORD_API_BASE_URL}/oauth2/token/revoke`;
 
 /** Maximum Discord API request duration. */
@@ -34,6 +36,7 @@ export const DiscordApiErrorBody = Schema.Struct({
   message: Schema.optionalKey(Schema.String),
   retry_after: Schema.optionalKey(Schema.Finite),
 });
+
 export type DiscordApiErrorBody = Schema.Schema.Type<
   typeof DiscordApiErrorBody
 >;
@@ -65,6 +68,7 @@ export const DiscordOAuthTokenResponse = Schema.Struct({
     })
   ),
 });
+
 export type DiscordOAuthTokenResponse = Schema.Schema.Type<
   typeof DiscordOAuthTokenResponse
 >;
@@ -75,6 +79,7 @@ export const DiscordApplicationResponse = Schema.Struct({
   name: Schema.String,
   description: Schema.optionalKey(Schema.String),
 });
+
 export type DiscordApplicationResponse = Schema.Schema.Type<
   typeof DiscordApplicationResponse
 >;
@@ -86,6 +91,7 @@ export const DiscordChannel = Schema.Struct({
   type: Schema.Int,
   parent_id: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
+
 export type DiscordChannel = Schema.Schema.Type<typeof DiscordChannel>;
 
 /** `channels/{id}/messages` response. */
@@ -94,6 +100,7 @@ export const DiscordMessageResponse = Schema.Struct({
   channel_id: Schema.String,
   content: Schema.String,
 });
+
 export type DiscordMessageResponse = Schema.Schema.Type<
   typeof DiscordMessageResponse
 >;
@@ -104,6 +111,7 @@ export const DiscordGuildCommand = Schema.Struct({
   name: Schema.String,
   type: Schema.Int,
 });
+
 export type DiscordGuildCommand = Schema.Schema.Type<
   typeof DiscordGuildCommand
 >;
@@ -124,6 +132,7 @@ export const classifyDiscordApiError = (
   const status = response.status;
   const decoded = Schema.decodeOption(DiscordApiErrorBody)(response.body ?? {});
   const errorCode = decoded._tag === "Some" ? decoded.value.code : undefined;
+
   if (status === 401) {
     return new IntegrationProviderAuthenticationError({
       message: `Discord rejected authentication during ${context}`,
@@ -131,6 +140,7 @@ export const classifyDiscordApiError = (
       httpStatus: status,
     });
   }
+
   if (status === 403) {
     // Missing Access / Missing Permissions are configuration problems (the
     // bot was not granted the right channel or guild permissions), not
@@ -145,12 +155,14 @@ export const classifyDiscordApiError = (
         httpStatus: status,
       });
     }
+
     return new IntegrationProviderAuthenticationError({
       message: `Discord rejected authentication during ${context}`,
       provider: discordProviderKey,
       httpStatus: status,
     });
   }
+
   if (status === 404) {
     if (errorCode !== undefined && DISCORD_NOT_FOUND_CODES.has(errorCode)) {
       return new IntegrationProviderInvalidConfigurationError({
@@ -159,17 +171,20 @@ export const classifyDiscordApiError = (
         httpStatus: status,
       });
     }
+
     return new IntegrationProviderPermanentRejection({
       message: `Discord rejected ${context}: not found`,
       provider: discordProviderKey,
       httpStatus: status,
     });
   }
+
   if (status === 429) {
     const retryAfterMs =
       decoded._tag === "Some" && decoded.value.retry_after !== undefined
         ? decoded.value.retry_after * 1000
         : undefined;
+
     return new IntegrationProviderRateLimitedError({
       message: `Discord rate limited ${context}`,
       provider: discordProviderKey,
@@ -177,6 +192,7 @@ export const classifyDiscordApiError = (
       httpStatus: status,
     });
   }
+
   if (status !== undefined && status >= 500) {
     return new IntegrationProviderTemporaryFailure({
       message: `Discord temporarily failed during ${context}`,
@@ -184,6 +200,7 @@ export const classifyDiscordApiError = (
       httpStatus: status,
     });
   }
+
   return new IntegrationProviderPermanentRejection({
     message: `Discord rejected ${context}${errorCode === undefined ? "" : `: error ${errorCode}`}`,
     provider: discordProviderKey,
@@ -246,6 +263,7 @@ export const makeDiscordApiClient = (
     }) =>
       Effect.gen(function* () {
         const execute = HttpClient.execute(input.httpRequest);
+
         const response = yield* (
           httpClient === undefined
             ? execute.pipe(
@@ -261,31 +279,39 @@ export const makeDiscordApiClient = (
         ).pipe(
           Effect.mapError(
             () =>
+              // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
               new IntegrationProviderTemporaryFailure({
                 message: `Discord request failed during ${input.context}`,
                 provider: discordProviderKey,
               })
           )
         );
+
         const status = response.status;
+
         if (status < 200 || status >= 300) {
           // Read every error response best-effort so status and Discord's error
           // code participate in the same classification path.
           const bodyResult = yield* Effect.result(response.json);
+
           const body = Result.isSuccess(bodyResult)
             ? bodyResult.success
             : undefined;
+
           return yield* classifyDiscordApiError(
             { body, status },
             input.context
           );
         }
+
         if (input.responseBody === "empty") {
           return undefined;
         }
+
         return yield* response.json.pipe(
           Effect.mapError(
             () =>
+              // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
               new IntegrationProviderPermanentRejection({
                 message: `Discord returned an unexpected response during ${input.context}`,
                 provider: discordProviderKey,
@@ -322,6 +348,7 @@ export const makeDiscordApiClient = (
     Effect.gen(function* () {
       const url = `${DISCORD_API_BASE_URL}${path}`;
       let httpRequest = HttpClientRequest.make(method)(url);
+
       if (botToken !== undefined) {
         httpRequest = HttpClientRequest.setHeader(
           httpRequest,
@@ -329,10 +356,12 @@ export const makeDiscordApiClient = (
           `Bot ${Redacted.value(botToken)}`
         );
       }
+
       if (body !== undefined) {
         httpRequest = yield* HttpClientRequest.bodyJson(httpRequest, body).pipe(
           Effect.mapError(
             () =>
+              // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
               new IntegrationProviderPermanentRejection({
                 message: `Discord ${context} request could not be encoded`,
                 provider: discordProviderKey,
@@ -340,6 +369,7 @@ export const makeDiscordApiClient = (
           )
         );
       }
+
       return yield* request({ httpRequest, context });
     });
 
@@ -353,6 +383,7 @@ export const makeDiscordApiClient = (
           Schema.decodeUnknownEffect(schema)(body).pipe(
             Effect.mapError(
               () =>
+                // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
                 new IntegrationProviderPermanentRejection({
                   message: `Discord ${context} response was invalid`,
                   provider: discordProviderKey,

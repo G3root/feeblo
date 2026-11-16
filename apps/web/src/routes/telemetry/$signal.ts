@@ -15,6 +15,7 @@ import { getServerApiBaseUrl } from "~/lib/server-runtime-public-env";
  * relay; the API half is `apps/server/src/http/browser-telemetry.ts`.
  */
 const maxBodyBytes = 256 * 1024;
+
 const upstreamTimeoutMillis = 5_000;
 
 /** The API base is joined with a path, so one trailing slash is dropped. */
@@ -27,18 +28,23 @@ const empty = (status: number): Response => new Response(null, { status });
 
 const relay = async (signal: string, request: Request): Promise<Response> => {
   if (!isSignal(signal)) return empty(404);
+
   if (!request.headers.get("content-type")?.startsWith("application/json"))
     return empty(415);
   // `Number(null)` is 0, so the header must be checked before it is
   // converted. A body without a length is refused rather than buffered.
   const declaredLength = request.headers.get("content-length");
+
   if (declaredLength === null) return empty(411);
   const length = Number(declaredLength);
+
   if (!Number.isInteger(length) || length < 0 || length > maxBodyBytes)
     return empty(413);
   const body = await readBoundedText(request, maxBodyBytes);
+
   if (body === undefined) return empty(413);
   const apiUrl = getServerApiBaseUrl().replace(trailingSlashPattern, "");
+
   try {
     const upstream = await fetch(`${apiUrl}/api/telemetry/${signal}`, {
       method: "POST",
@@ -46,8 +52,10 @@ const relay = async (signal: string, request: Request): Promise<Response> => {
       body,
       signal: AbortSignal.timeout(upstreamTimeoutMillis),
     });
+
     // Release the body without copying a collector response into the page.
     await upstream.arrayBuffer();
+
     return empty(
       upstream.status >= 400 && upstream.status < 500 ? 502 : upstream.status
     );

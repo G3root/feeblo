@@ -146,6 +146,7 @@ export const resolveFeedbackContact = (input: {
       const secrets = yield* input.jwtSecretRepository.getSecretsForOrg({
         organizationId: input.organizationId,
       });
+
       if (secrets.length === 0) {
         return yield* new UnauthorizedError({
           message: "Organization has no JWT secret configured",
@@ -158,6 +159,7 @@ export const resolveFeedbackContact = (input: {
         yield* input.organizationRepository.findJwtMaxTokenLifetimeMinutes({
           organizationId: input.organizationId,
         });
+
       const maxTokenLifetime = maxTokenLifetimeFromMinutes(
         maxTokenLifetimeMinutes
       );
@@ -168,6 +170,7 @@ export const resolveFeedbackContact = (input: {
         (yield* input.attributeDefinitionRepository.findContactAttributeDefinitions(
           input.organizationId
         )) as readonly TContactAttributeDefinition[];
+
       const companyDefs =
         // SAFETY: the repository contract returns company attribute definitions
         // in the canonical domain shape; the cast bridges the DB-row encoding.
@@ -192,10 +195,12 @@ export const resolveFeedbackContact = (input: {
         input.organizationId,
         parsedContact
       );
+
       yield* input.participation.canSubjectParticipate({
         organizationId: input.organizationId,
         ...(contactId !== undefined && { contactId }),
       });
+
       return contactId;
     })
   ).pipe(
@@ -240,6 +245,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
     Effect.gen(function* () {
       const attributeDefinitionRepository =
         yield* AttributeDefinitionRepository;
+
       const boardRepository = yield* BoardRepository;
       const changelogRepository = yield* ChangelogRepository;
       const companyRepository = yield* CompanyRepository;
@@ -253,6 +259,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
       const postRepository = yield* PostRepository;
       const postEmbeddings = yield* PostEmbeddingService;
       const participation = yield* ParticipationPolicy;
+
       // The same suggestion program the dashboard and public portal RPCs run,
       // with the widget's public-only rule. Its collaborators are captured
       // here so the handler does not build a layer per request.
@@ -308,9 +315,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
               }))
             ),
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Failed to find similar posts",
+                  cause,
                 })
             ),
             withRemapDbErrors("Post", "select"),
@@ -323,6 +331,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
         .handle("listBoards", ({ payload }) =>
           Effect.gen(function* () {
             const repository = yield* BoardRepository;
+
             const boards = yield* repository.findMany({
               organizationId: payload.organizationId,
               visibility: "PUBLIC",
@@ -359,9 +368,10 @@ export const WidgetApiLive = HttpApiBuilder.group(
                     metadata
                   ).pipe(
                     Effect.mapError(
-                      () =>
+                      (cause) =>
                         new DataValidationError({
                           message: "Invalid feedback metadata",
+                          cause,
                         })
                     )
                   );
@@ -384,6 +394,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
             const statuses = yield* postStatusRepository.findMany({
               organizationId,
             });
+
             const defaultStatus = pickDefaultPostStatus(statuses);
 
             if (!defaultStatus) {
@@ -411,6 +422,7 @@ export const WidgetApiLive = HttpApiBuilder.group(
 
             const id = yield* PostId.generate;
             const now = yield* DateTime.nowAsDate;
+
             const slug = yield* writes.create(
               {
                 assetIds: [],

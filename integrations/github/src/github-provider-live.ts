@@ -64,14 +64,18 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
       const domainConfig = yield* GitHubIntegrationConfig;
       const secureRandom = yield* SecureRandom.SecureRandom;
       const api = makeGitHubApiClient();
+
       const installationTokens = yield* makeGitHubInstallationTokenResolver({
         apiClient: api,
         appId: config.githubAppId ?? "",
         privateKey: config.githubPrivateKey,
       });
+
       const integrationKey = config.githubEncryptionKey;
+
       const providerFailure = (operation: string) =>
         new InternalServerError({ message: `GitHub App ${operation} failed.` });
+
       const issueFailure =
         (operation: string) =>
         // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
@@ -81,11 +85,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
               message: `GitHub resource was not found during ${operation}.`,
             });
           }
+
           if (Schema.is(IntegrationProviderAuthenticationError)(failure)) {
             return new UnauthorizedError({
               message: `GitHub authentication failed during ${operation}.`,
             });
           }
+
           if (
             Schema.is(IntegrationProviderInvalidConfigurationError)(failure)
           ) {
@@ -93,15 +99,18 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
               message: `GitHub resource was not found during ${operation}.`,
             });
           }
+
           if (Schema.is(IntegrationProviderPermanentRejection)(failure)) {
             return new BadRequestError({
               message: `GitHub rejected ${operation}.`,
             });
           }
+
           // Rate-limited and temporary/transport failures are indeterminate: the
           // issue may already exist, so callers must retain idempotency state.
           return providerFailure(operation);
         };
+
       const installationIdForConnection = (connectionId: string) =>
         Effect.gen(function* () {
           const [installation] = yield* db
@@ -116,23 +125,28 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             .pipe(
               Effect.mapError(() => providerFailure("installation lookup"))
             );
+
           if (installation === undefined) {
             return yield* new NotFoundError({
               message: "GitHub App installation was not found.",
             });
           }
+
           return installation.installationId;
         });
+
       const installationTokenForConnection = (connectionId: string) =>
         Effect.gen(function* () {
           const installationId =
             yield* installationIdForConnection(connectionId);
+
           // Typed token failures reach issueFailure unchanged so auth failures
           // stay Unauthorized and missing installations stay NotFound.
           return yield* installationTokens.getInstallationAccessToken({
             installationId,
           });
         });
+
       const provider = GitHubProvider.of({
         startInstallation: (organizationId) =>
           Effect.gen(function* () {
@@ -144,13 +158,16 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 message: "GitHub App integration is not configured.",
               });
             }
+
             const id = yield* IntegrationConnectionId.generate.pipe(
               Effect.mapError(() => providerFailure("connection id generation"))
             );
+
             // Through the `SecureRandom` service, not the global: the OAuth
             // state must be substitutable in tests, and Workers forbid random
             // value generation in global scope.
             const nonce = yield* secureRandom.uuidV4();
+
             const state = yield* Schema.encodeEffect(
               Schema.fromJsonString(IntegrationOAuthState)
             )({ connectionId: id, organizationId, nonce }).pipe(
@@ -158,6 +175,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 providerFailure("installation state encoding")
               )
             );
+
             const ciphertext = yield* encryptGitHubCredentialMaterial(
               integrationKey,
               {
@@ -168,6 +186,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 providerFailure("installation state encryption")
               )
             );
+
             yield* db
               .insert(schema.integrationConnectionTable)
               .values({
@@ -183,10 +202,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
               .pipe(
                 Effect.mapError(() => providerFailure("connection creation"))
               );
+
             const installUrl = new URL(
               `https://github.com/apps/${encodeURIComponent(config.githubAppSlug)}/installations/new`
             );
+
             installUrl.searchParams.set("state", state);
+
             return { authorizeUrl: installUrl };
           }),
         completeInstallation: (input) =>
@@ -199,6 +221,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 message: "GitHub App integration is not configured.",
               });
             }
+
             const parsed = yield* Schema.decodeEffect(
               Schema.fromJsonString(IntegrationOAuthState)
             )(input.state).pipe(
@@ -206,6 +229,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 providerFailure("installation state validation")
               )
             );
+
             const [connection] = yield* db
               .select({
                 credentialsCiphertext:
@@ -235,13 +259,16 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                   providerFailure("installation connection lookup")
                 )
               );
+
             if (
               connection?.credentialsCiphertext === null ||
               connection?.credentialsCiphertext === undefined
             ) {
               return yield* providerFailure("installation connection lookup");
             }
+
             const credentialsCiphertext = connection.credentialsCiphertext;
+
             const pending = yield* decryptGitHubCredentialMaterial(
               integrationKey,
               connection.credentialsCiphertext
@@ -250,8 +277,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 providerFailure("installation state decryption")
               )
             );
+
             const expectedState = Buffer.from(pending.installationState ?? "");
             const receivedState = Buffer.from(parsed.nonce);
+
             if (
               expectedState.length === 0 ||
               expectedState.length !== receivedState.length ||
@@ -259,6 +288,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             ) {
               return yield* providerFailure("installation state validation");
             }
+
             const userToken = yield* api
               .exchangeUserAccessToken({
                 clientId: config.githubClientId,
@@ -270,8 +300,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                   providerFailure("installer token exchange")
                 )
               );
+
             const installerAccessToken = Redacted.make(userToken.access_token);
             let installation: GitHubUserInstallation | undefined;
+
             for (let page = 1; installation === undefined; page += 1) {
               const accessible = yield* api
                 .listUserInstallations({
@@ -283,9 +315,11 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                     providerFailure("installer installation verification")
                   )
                 );
+
               installation = accessible.installations.find(
                 (candidate) => String(candidate.id) === input.installationId
               );
+
               if (
                 installation !== undefined ||
                 accessible.installations.length < 100 ||
@@ -294,17 +328,20 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 break;
               }
             }
+
             if (installation === undefined) {
               return yield* new NotFoundError({
                 message:
                   "GitHub App installation is not accessible to the installer.",
               });
             }
+
             if (installation.account === null) {
               return yield* new NotFoundError({
                 message: "GitHub App installation account is unavailable.",
               });
             }
+
             const installationAccount = installation.account;
             yield* db
               .transaction(() =>
@@ -326,11 +363,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                         providerFailure("installation lookup")
                       )
                     );
+
                   const reusedConnectionId =
                     existingInstallation === undefined ||
                     existingInstallation.connectionId === connection.id
                       ? undefined
                       : existingInstallation.connectionId;
+
                   if (reusedConnectionId !== undefined) {
                     const [reusedConnection] = yield* db
                       .select({
@@ -361,6 +400,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                           providerFailure("installation connection lookup")
                         )
                       );
+
                     if (
                       reusedConnection === undefined ||
                       reusedConnection.lifecycle === "connecting"
@@ -369,6 +409,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                         "installation state validation"
                       );
                     }
+
                     yield* db
                       .update(schema.integrationConnectionTable)
                       .set({
@@ -431,8 +472,10 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                           providerFailure("installation persistence")
                         )
                       );
+
                     return;
                   }
+
                   const activated = yield* db
                     .update(schema.integrationConnectionTable)
                     .set({
@@ -464,11 +507,13 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                         providerFailure("connection activation")
                       )
                     );
+
                   if (activated.length === 0) {
                     return yield* providerFailure(
                       "installation state validation"
                     );
                   }
+
                   yield* db
                     .insert(schema.githubInstallationTable)
                     .values({
@@ -501,25 +546,30 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                   providerFailure("installation activation transaction")
                 )
               );
+
             return { organizationId: connection.organizationId };
           }),
         listRepositories: ({ connectionId }) =>
           Effect.gen(function* () {
             const accessToken =
               yield* installationTokenForConnection(connectionId);
+
             const repositories: Array<{
               readonly fullName: string;
               readonly name: string;
               readonly owner: string;
               readonly private: boolean;
             }> = [];
+
             const maximumRepositoryPages = 100;
+
             for (let page = 1; page <= maximumRepositoryPages; page += 1) {
               const result = yield* api
                 .listInstallationRepositories({ accessToken, page })
                 .pipe(
                   Effect.mapError(() => providerFailure("repository listing"))
                 );
+
               repositories.push(
                 ...result.repositories.map((repository) => ({
                   fullName: repository.full_name,
@@ -528,9 +578,11 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                   private: repository.private,
                 }))
               );
+
               if (result.repositories.length === 0) {
                 return repositories;
               }
+
               if (
                 repositories.length >= result.total_count ||
                 result.repositories.length < 100
@@ -538,6 +590,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                 return repositories;
               }
             }
+
             return repositories;
           }).pipe(
             // installationTokenForConnection keeps its typed failures so a
@@ -549,7 +602,9 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
           Effect.gen(function* () {
             const installationId =
               yield* installationIdForConnection(connectionId);
+
             const now = yield* DateTime.nowAsDate;
+
             const appJwt = yield* createGitHubAppJwt({
               appId: config.githubAppId ?? "",
               now,
@@ -557,6 +612,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             }).pipe(
               Effect.mapError(() => providerFailure("App authentication"))
             );
+
             yield* api
               .deleteInstallation({ appJwt, installationId })
               .pipe(
@@ -577,6 +633,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                     postUrl: input.postUrl.toString(),
                   }),
                 });
+
                 // The Feeblo backlink lives in a bot comment, matching the
                 // link-existing-issue flow and the automatic delivery path.
                 yield* api.createIssueBacklinkComment({
@@ -586,6 +643,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                   repositoryName: input.repositoryName,
                   repositoryOwner: input.repositoryOwner,
                 });
+
                 return issue;
               })
             ),
@@ -660,6 +718,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                   ],
                   { concurrency: "unbounded" }
                 );
+
                 if (existingLink.length === 0) {
                   yield* api.createIssueBacklinkComment({
                     accessToken,
@@ -669,6 +728,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
                     issueNumber: input.issueNumber,
                   });
                 }
+
                 return issue;
               })
             ),
@@ -685,6 +745,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             Effect.mapError(issueFailure("issue linking"))
           ),
       });
+
       return provider;
     })
   );

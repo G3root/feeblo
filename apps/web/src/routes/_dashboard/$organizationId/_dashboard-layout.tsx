@@ -13,6 +13,7 @@ export const Route = createFileRoute(
     // …) preload in their own routes so settings/members/billing never pay
     // for board data and vice versa.
     await preloadDashboardShell();
+
     return null;
   },
   component: DashboardLayoutComponent,

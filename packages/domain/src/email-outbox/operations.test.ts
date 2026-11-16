@@ -10,6 +10,7 @@ import { EmailOutboxOperations } from "./operations";
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
   DateTime.toDateUtc(DateTime.makeUnsafe(instant));
+
 const TestLayer = EmailOutboxOperations.layer.pipe(
   Layer.provideMerge(Database.PgliteDatabaseLive)
 );

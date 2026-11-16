@@ -15,6 +15,7 @@ describe("markdownToHtml URL safety", () => {
     const html = markdownToHtml(
       "[click](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==)\n\n![x](data:image/svg+xml,<svg onload=alert(1)>)"
     );
+
     expect(attributeViolations(html)).toEqual([]);
   });
 
@@ -22,6 +23,7 @@ describe("markdownToHtml URL safety", () => {
     const html = markdownToHtml(
       "[a](https://example.com) [b](/pricing) [c](#anchor) [d](mailto:a@b.c)"
     );
+
     expect(html).toContain('href="https://example.com"');
     expect(html).toContain('href="/pricing"');
     expect(html).toContain('href="#anchor"');
@@ -62,6 +64,7 @@ describe("sanitizeMarkdown XSS regression", () => {
     const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
       "[Important update](javascript:alert(document.domain))"
     );
+
     expect(sanitizedMarkdown).not.toContain("javascript:");
     expect(attributeViolations(sanitizedHtml)).toEqual([]);
   });
@@ -70,6 +73,7 @@ describe("sanitizeMarkdown XSS regression", () => {
     const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
       "[x](data:text/html,<script>alert(1)</script>)"
     );
+
     expect(sanitizedMarkdown).not.toContain("data:");
     expect(attributeViolations(sanitizedHtml)).toEqual([]);
   });

@@ -12,12 +12,15 @@ const PolarModeConfig = Config.schema(
 export class PolarConfig extends Context.Service<PolarConfig>()("PolarConfig", {
   make: Effect.gen(function* () {
     const appUrl = yield* Config.String("APP_URL");
+
     const accessToken = yield* Config.Redacted("POLAR_ACCESS_TOKEN").pipe(
       Config.option
     );
+
     const webhookSecret = yield* Config.Redacted("POLAR_WEBHOOK_SECRET").pipe(
       Config.option
     );
+
     const server = yield* PolarModeConfig;
 
     return {

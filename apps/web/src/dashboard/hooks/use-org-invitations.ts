@@ -15,6 +15,7 @@ export function useOrgInvitations({
   enabled: boolean;
 }) {
   const { invitationsCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: [
       "org-invitations",
@@ -26,6 +27,7 @@ export function useOrgInvitations({
       if (!enabled) {
         return undefined;
       }
+
       return q
         .from({ invitation: invitationsCollection })
         .where(({ invitation }) =>

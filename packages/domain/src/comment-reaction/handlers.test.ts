@@ -36,6 +36,7 @@ describe("CommentReactionRpcHandlers", () => {
     statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
+
   const session = (f: Fixture, member = true): Session => ({
     user: {
       id: f.userId,
@@ -55,6 +56,7 @@ describe("CommentReactionRpcHandlers", () => {
         ]
       : [],
   });
+
   const fixture = (
     visibility: "PUBLIC" | "PRIVATE" = "PUBLIC",
     commentVisibility: "PUBLIC" | "INTERNAL" = "PUBLIC"
@@ -131,6 +133,7 @@ describe("CommentReactionRpcHandlers", () => {
         updatedAt: now,
         parentCommentId: null,
       });
+
       return {
         boardId,
         commentId,
@@ -142,10 +145,12 @@ describe("CommentReactionRpcHandlers", () => {
         userId,
       } satisfies Fixture;
     });
+
   const Repositories = Layer.mergeAll(
     PostRepository.layer,
     CommentReactionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
   const FullTestLayer = Layer.mergeAll(
@@ -159,6 +164,7 @@ describe("CommentReactionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* CommentReactionRpcHandlersEffect;
         const f = yield* fixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListCommentReactions({
@@ -167,6 +173,7 @@ describe("CommentReactionRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session(f, false)))
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -174,23 +181,27 @@ describe("CommentReactionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* CommentReactionRpcHandlersEffect;
         const f = yield* fixture();
+
         const input = {
           organizationId: f.organizationId,
           postId: f.postId,
           commentId: f.commentId,
           emoji: "rocket" as const,
         };
+
         expect(
           yield* handlers
             .ToggleCommentReaction(input)
             .pipe(Effect.provideService(CurrentSession, session(f)))
         ).toEqual({ reacted: true, emoji: "rocket" });
+
         const reactions = yield* handlers
           .ListCommentReactions({
             organizationId: f.organizationId,
             slug: f.postSlug,
           })
           .pipe(Effect.provideService(CurrentSession, session(f)));
+
         expect(reactions).toHaveLength(1);
         expect(reactions[0]).toMatchObject({
           commentId: f.commentId,
@@ -261,6 +272,7 @@ describe("CommentReactionRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* CommentReactionRpcHandlersEffect;
           const f = yield* fixture("PRIVATE");
+
           const error = yield* Effect.flip(
             handlers
               .ToggleCommentReactionPublic({
@@ -271,6 +283,7 @@ describe("CommentReactionRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, session(f, false)))
           );
+
           expect(error._tag).toBe("PolicyDenied");
         })
     );
@@ -313,12 +326,14 @@ describe("CommentReactionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* CommentReactionRpcHandlersEffect;
         const f = yield* fixture();
+
         const input = {
           organizationId: f.organizationId,
           postId: f.postId,
           commentId: f.commentId,
           emoji: "rocket" as const,
         };
+
         yield* handlers
           .ToggleCommentReaction(input)
           .pipe(Effect.provideService(CurrentSession, session(f)));
@@ -329,6 +344,7 @@ describe("CommentReactionRpcHandlers", () => {
             slug: f.postSlug,
           })
           .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
         expect(anonymous).toHaveLength(1);
         expect(anonymous[0]).toMatchObject({
           commentId: f.commentId,
@@ -348,6 +364,7 @@ describe("CommentReactionRpcHandlers", () => {
               Option.some(session(f))
             )
           );
+
         expect(own[0]).toMatchObject({
           commentId: f.commentId,
           userId: f.userId,
@@ -358,6 +375,7 @@ describe("CommentReactionRpcHandlers", () => {
         // An authenticated caller who is not the reactor sees the reactor's
         // identifiers redacted, same as an anonymous caller.
         const otherUserId = `other_user_${f.organizationId}`;
+
         const otherSession: Session = {
           user: {
             id: otherUserId,
@@ -369,6 +387,7 @@ describe("CommentReactionRpcHandlers", () => {
           organizations: [{ id: f.organizationId }],
           memberships: [],
         };
+
         const other = yield* handlers
           .ListCommentReactionsPublic({
             organizationId: f.organizationId,
@@ -380,6 +399,7 @@ describe("CommentReactionRpcHandlers", () => {
               Option.some(otherSession)
             )
           );
+
         expect(other).toHaveLength(1);
         expect(other[0]).toMatchObject({
           commentId: f.commentId,
@@ -395,20 +415,24 @@ describe("CommentReactionRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* CommentReactionRpcHandlersEffect;
           const f = yield* fixture("PUBLIC", "INTERNAL");
+
           const input = {
             organizationId: f.organizationId,
             postId: f.postId,
             commentId: f.commentId,
           };
+
           yield* handlers
             .ToggleCommentReaction({ ...input, emoji: "thumbs_up" })
             .pipe(Effect.provideService(CurrentSession, session(f)));
+
           const reactions = yield* handlers
             .ListCommentReactionsPublic({
               organizationId: f.organizationId,
               slug: f.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(reactions).toHaveLength(0);
           expect(
             yield* handlers

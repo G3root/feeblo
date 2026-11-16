@@ -61,6 +61,7 @@ export const makeSlackUserServiceLive = (
           const profile = yield* Effect.exit(
             apiClient.usersInfo({ botToken, userId: slackUserId })
           );
+
           const displayName = Exit.isSuccess(profile)
             ? (profile.value.user.real_name ??
               profile.value.user.profile?.display_name ??
@@ -68,9 +69,11 @@ export const makeSlackUserServiceLive = (
               profile.value.user.name ??
               slackUserId)
             : slackUserId;
+
           const email = Exit.isSuccess(profile)
             ? profile.value.user.profile?.email
             : undefined;
+
           // 1. SSO-style linking: a visible email that matches an existing
           // Feeblo user of this organization reuses that account, so Slack
           // feedback lands on the person's real profile. Matching is scoped
@@ -97,23 +100,28 @@ export const makeSlackUserServiceLive = (
                 )
               )
               .limit(1);
+
             if (match !== undefined) {
               return match.id;
             }
           }
+
           // 2. Stable anonymous identity: the synthetic email derived from the
           // team + slack user id maps every future submission back to the same
           // user, without a dedicated link table. Team-scoped so the same
           // slack id in two workspaces can never collide.
           const syntheticEmail = `slack-${slackTeamId.toLowerCase()}-${slackUserId.toLowerCase()}${SYNTHETIC_SLACK_EMAIL_SUFFIX}`;
+
           const [existing] = yield* db
             .select({ id: schema.userTable.id })
             .from(schema.userTable)
             .where(eq(schema.userTable.email, syntheticEmail))
             .limit(1);
+
           if (existing !== undefined) {
             return existing.id;
           }
+
           // 3. Create the anonymous user. These users never receive
           // transactional email (synthetic address, emailVerified false).
           const userId = yield* UserId.generate;
@@ -126,6 +134,7 @@ export const makeSlackUserServiceLive = (
               name: truncate(displayName, 100),
             })
             .pipe(Effect.ignore);
+
           // Concurrent submissions may create the same user; the insert
           // conflict is ignored and the winner is reused.
           const [winner] = yield* db
@@ -133,6 +142,7 @@ export const makeSlackUserServiceLive = (
             .from(schema.userTable)
             .where(eq(schema.userTable.email, syntheticEmail))
             .limit(1);
+
           return winner?.id ?? userId;
         }).pipe(
           Effect.mapError((error) =>

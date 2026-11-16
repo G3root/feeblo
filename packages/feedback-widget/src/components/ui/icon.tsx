@@ -7,6 +7,7 @@ export function Icon(
   props: ComponentProps<"svg"> & { name: IconName }
 ): JSX.Element {
   const [local, others] = splitProps(props, ["name", "class"]);
+
   return (
     <svg
       aria-hidden="true"

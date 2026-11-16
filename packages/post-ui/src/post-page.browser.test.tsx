@@ -39,10 +39,12 @@ import { createMockCollection } from "./testing/in-memory-collections";
 vi.mock("@feeblo/web-shared/use-auth-state", () => ({
   useAuthState: () => ({ data: null }),
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/runtime", () => ({
   fetchRpc: () => Promise.resolve([]),
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/use-policy", () => ({
   allPolicy: vi.fn(),
@@ -52,26 +54,32 @@ vi.mock("@feeblo/web-shared/use-policy", () => ({
   isUser: vi.fn(),
   usePolicy: () => ({ allowed: false }),
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./comment-display/list", () => ({
   CommentsList: () => <div>comments list</div>,
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./post/post-comment-composer", () => ({
   PostCommentComposer: () => <div>comment composer</div>,
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./post-editor", () => ({
   PostContentUpdateInput: () => <div>post content</div>,
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./post-title-input", () => ({
   PostTitleUpdateInput: () => <h1>post title</h1>,
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./reaction-picker", () => ({
   PostReactionPicker: () => <div>reaction picker</div>,
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./upvote-toggle", () => ({
   UpvoteButton: ({ variant }: { variant?: string }) => (
@@ -80,9 +88,11 @@ vi.mock("./upvote-toggle", () => ({
     </button>
   ),
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("./subscribe-toggle", () => {
   const SubscribeButton = () => <button type="button">subscribe</button>;
+
   return {
     SubscribeButton,
     // The real card wraps the toggle button; keep the button reachable for
@@ -293,6 +303,7 @@ async function renderBanMenu({
  */
 function AdminControls() {
   const { canDeletePost, canModeratePost, isLocked } = usePostCollectionData();
+
   return (
     <>
       {canModeratePost ? (
@@ -370,6 +381,7 @@ describe("PostPage composition", () => {
       authorIsBanned: true,
       canBanAuthor: false,
     });
+
     await screen.getByRole("button", { name: "Comment menu" }).click();
     await expect
       .element(screen.getByRole("menuitem", { name: /^Unban user$/ }))
@@ -381,6 +393,7 @@ describe("PostPage composition", () => {
       authorIsBanned: true,
       authorIsMember: true,
     });
+
     await screen.getByRole("button", { name: "Comment menu" }).click();
     await expect
       .element(screen.getByRole("menuitem", { name: /^Ban user$/ }))
@@ -395,13 +408,16 @@ describe("PostPage composition", () => {
       stubCollections.commentCollection.utils,
       "refetch"
     );
+
     const postRefetch = vi.spyOn(
       stubCollections.postCollection.utils,
       "refetch"
     );
+
     const { screen, userBanActions } = await renderBanMenu({
       authorIsBanned: true,
     });
+
     await screen.getByRole("button", { name: "Comment menu" }).click();
     await screen.getByRole("menuitem", { name: /^Unban user$/ }).click();
 

@@ -94,6 +94,7 @@ const extractSuggestedPostIds = (suggestions: readonly PostSuggestion[]) =>
 function useRefetchMergeData() {
   const { organizationId } = usePostCollectionData();
   const queryClient = useQueryClient();
+
   const {
     commentCollection,
     commentReactionCollection,
@@ -157,6 +158,7 @@ function useRefetchMergeData() {
 export function PostMergeMenu() {
   const { canModeratePost, isArchived, isMerged, organizationId, post } =
     usePostCollectionData();
+
   const { postCollection } = useDashboardCollections();
   const refetchMergeData = useRefetchMergeData();
   const unmergePost = useAtomSet(postUnmergeAtom, { mode: "promise" });
@@ -182,6 +184,7 @@ export function PostMergeMenu() {
         )
         .select(({ candidate }) => ({ id: candidate.id })),
   });
+
   // Merges stay one level deep: a post that has absorbed a merge cannot be a
   // source, so "Merge to existing" would always be rejected here. The
   // repository enforces the same rule.
@@ -193,6 +196,7 @@ export function PostMergeMenu() {
     }
 
     setIsUnmergingThis(true);
+
     try {
       await unmergePost({
         payload: { organizationId, sourcePostId: post.id },
@@ -204,6 +208,7 @@ export function PostMergeMenu() {
         title: parseRpcError(error, "Failed to unmerge post").message,
         type: "error",
       });
+
       return;
     } finally {
       setIsUnmergingThis(false);
@@ -276,7 +281,7 @@ export function PostMergeMenu() {
           )}
         </MenuPopup>
       </Menu>
-      {dialog === null ? null : dialog === "unmerge" ? (
+      {dialog === "unmerge" && (
         <PostUnmergeCommandDialog
           onOpenChange={(open) => {
             if (!open) {
@@ -284,7 +289,8 @@ export function PostMergeMenu() {
             }
           }}
         />
-      ) : (
+      )}
+      {dialog !== null && dialog !== "unmerge" && (
         <PostMergeCommandDialog
           direction={dialog}
           onOpenChange={(open) => {
@@ -306,12 +312,15 @@ function PostMergeCommandDialog({
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const { organizationId, post } = usePostCollectionData();
+
   const { boardCollection, postCollection, postStatusCollection } =
     useDashboardCollections();
+
   const refetchMergeData = useRefetchMergeData();
   const mergePosts = useAtomSet(postMergeAtom, { mode: "promise" });
   const navigate = useNavigate();
   const [isPending, setIsPending] = useState(false);
+
   const [confirmTarget, setConfirmTarget] = useState<MergeCandidate | null>(
     null
   );
@@ -331,6 +340,7 @@ function PostMergeCommandDialog({
       title: post.title,
     })
   );
+
   const suggestedPostIds = useMemo(
     () =>
       Result.builder(suggestionsResult)
@@ -356,6 +366,7 @@ function PostMergeCommandDialog({
           mergedIntoPostId: candidate.mergedIntoPostId,
         })),
   });
+
   const mergeTargetIds = useMemo(
     () =>
       new Set(
@@ -433,6 +444,7 @@ function PostMergeCommandDialog({
         label: candidate.title,
         value: candidate.id,
       }));
+
     // Stable sort keeps the newest-first order inside each group.
     return [...merged].sort(
       (left, right) => Number(right.isSuggested) - Number(left.isSuggested)
@@ -460,6 +472,7 @@ function PostMergeCommandDialog({
         title: parseRpcError(error, "Failed to merge post").message,
         type: "error",
       });
+
       return;
     } finally {
       setIsPending(false);
@@ -501,6 +514,7 @@ function PostMergeCommandDialog({
       direction === "into-this"
         ? `Merge "${confirmTarget.title}" into this post?`
         : `Merge this post into "${confirmTarget.title}"?`;
+
     return (
       <AlertDialog open>
         <AlertDialogPopup>
@@ -605,8 +619,10 @@ function PostUnmergeCommandDialog({
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const { organizationId, post } = usePostCollectionData();
+
   const { boardCollection, postCollection, postStatusCollection } =
     useDashboardCollections();
+
   const refetchMergeData = useRefetchMergeData();
   const unmergePost = useAtomSet(postUnmergeAtom, { mode: "promise" });
   const [isPending, setIsPending] = useState(false);
@@ -669,6 +685,7 @@ function PostUnmergeCommandDialog({
     }
 
     setIsPending(true);
+
     try {
       await unmergePost({
         payload: { organizationId, sourcePostId: candidate.id },
@@ -680,6 +697,7 @@ function PostUnmergeCommandDialog({
         title: parseRpcError(error, "Failed to unmerge post").message,
         type: "error",
       });
+
       return;
     } finally {
       setIsPending(false);

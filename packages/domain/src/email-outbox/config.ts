@@ -22,8 +22,10 @@ const trailingSlashPattern = /\/$/;
  * service keeps the repository free of a config requirement.
  */
 export const submissionWindowBurst = Duration.minutes(5);
+
 /** Hard bound on how far one window's send may slide, from its creation. */
 export const submissionWindowCeiling = Duration.hours(1);
+
 /**
  * Most posts one window stores. A window past this keeps counting without
  * storing, so overflowing it cannot open a second window and double the rate.
@@ -54,25 +56,33 @@ export const postStatusCoalescingWindow = Duration.minutes(5);
 export const workspaceMonthlySendLimitDefault = 25_000;
 
 const AppUrl = Config.schema(Schema.URLFromString, "APP_URL");
+
 const ApiUrl = Config.schema(Schema.URLFromString, "API_URL");
+
 const GlobalDeliveryPaused = Config.Boolean(
   "EMAIL_OUTBOX_GLOBAL_DELIVERY_PAUSED"
 ).pipe(Config.withDefault(false));
+
 const MaxConcurrentSends = Config.Number(
   "EMAIL_OUTBOX_MAX_CONCURRENT_SENDS"
 ).pipe(Config.withDefault(10));
+
 const MonthlySendLimit = Config.Number("EMAIL_OUTBOX_MONTHLY_SEND_LIMIT").pipe(
   Config.withDefault(100_000)
 );
+
 const EstimatedSendCostMicros = Config.Number(
   "EMAIL_OUTBOX_ESTIMATED_SEND_COST_MICROS"
 ).pipe(Config.withDefault(100));
+
 const WorkspaceMonthlySendLimit = Config.Number(
   "EMAIL_OUTBOX_WORKSPACE_MONTHLY_SEND_LIMIT"
 ).pipe(Config.withDefault(workspaceMonthlySendLimitDefault));
+
 const PausedWorkspaceIds = Config.String(
   "EMAIL_OUTBOX_PAUSED_WORKSPACE_IDS"
 ).pipe(Config.withDefault(""));
+
 const AppRootDomain = Config.String("APP_ROOT_DOMAIN").pipe(
   Config.withDefault("")
 );
@@ -81,6 +91,7 @@ const resolveAppRootDomain = (appUrl: URL, configured: string): string => {
   if (configured.trim().length > 0) {
     return configured.replace(trailingSlashPattern, "");
   }
+
   // Fallback to the host of APP_URL (e.g. https://test.feeblo.example → test.feeblo.example)
   // so local/test environments still build a usable public subdomain URL.
   return appUrl.host;
@@ -100,6 +111,7 @@ export class EmailOutboxConfig extends Context.Service<EmailOutboxConfig>()(
       const estimatedSendCostMicros = yield* EstimatedSendCostMicros;
       const pausedWorkspaceIds = yield* PausedWorkspaceIds;
       const workspaceMonthlySendLimit = yield* WorkspaceMonthlySendLimit;
+
       return {
         apiUrl: apiUrl.href.replace(trailingSlashPattern, ""),
         appUrl: appUrl.href.replace(trailingSlashPattern, ""),

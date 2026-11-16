@@ -24,6 +24,7 @@ import type {
 export const BoardRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* BoardRepository;
   const boardPolicy = yield* BoardPolicy;
+
   // const sitePolicy = yield* SitePolicy;
   return {
     ListBoards: (args: TBoardList) =>
@@ -81,6 +82,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
       return Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const isMember = session.memberships.find(
           (membership) => membership.organizationId === args.organizationId
         );
@@ -141,6 +143,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
             }
 
             const previous = currentBoard.value;
+
             // A save that changed nothing is not an event; `fields` is what
             // the reader filters on, so an empty diff is left unrecorded
             // rather than written as an update with no change.
@@ -152,9 +155,11 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
             ];
 
             yield* repository.update(args);
+
             if (fields.length === 0) {
               return;
             }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),

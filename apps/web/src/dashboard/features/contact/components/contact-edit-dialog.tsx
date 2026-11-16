@@ -68,6 +68,7 @@ function ContactEditForm() {
   const { contactCollection } = useDashboardCollections();
   const store = useContactEditDialogContext();
   const contactId = useSelector(store, (state) => state.context.data.contactId);
+
   const { data } = useLiveQuery({
     queryKey: [
       "contact-by-id",
@@ -86,10 +87,12 @@ function ContactEditForm() {
         )
         .findOne(),
   });
+
   const contact = data;
   const definitionsQuery = useContactAttributeDefinitions(organizationId);
   const attributeValuesQuery = useContactAttributeValues(contactId);
   const companiesQuery = useOrgCompanies(organizationId);
+
   // The shared org-companies query is unordered; this picker orders by name.
   const companies = useMemo(
     () =>
@@ -134,6 +137,7 @@ function ContactEditFormFields({
 }) {
   const organizationId = useOrganizationId();
   const store = useContactEditDialogContext();
+
   const form = useAppForm({
     defaultValues: {
       attributes: getCustomAttributeInputValues(definitions, existingValues),
@@ -164,6 +168,7 @@ function ContactEditFormFields({
           title: "Complete all required custom fields",
           type: "error",
         });
+
         return;
       }
 
@@ -176,6 +181,7 @@ function ContactEditFormFields({
             organizationId,
             values: data.value.attributes,
           });
+
         await createContactAction({
           contact: {
             ...contact,

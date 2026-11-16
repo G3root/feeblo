@@ -9,11 +9,13 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await preloadRoadmap();
+
     return null;
   },
 });
 
 function RouteComponent() {
   const { organizationId } = Route.useParams();
+
   return <DashboardRoadmapIndexView organizationId={organizationId} />;
 }

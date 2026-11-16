@@ -80,6 +80,7 @@ function CompanyEditFormLoader({ mode }: { mode: "display" | "edit" }) {
         )
         .findOne(),
   });
+
   const company = data;
   const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
   const valuesQuery = useCompanyAttributeValues(companyId);
@@ -112,6 +113,7 @@ function CompanyEditForm({
   const organizationId = useOrganizationId();
   const store = useCompanyEditDialogContext();
   const isDisplay = mode === "display";
+
   const form = useAppForm({
     defaultValues: {
       attributes: getCustomAttributeInputValues(definitions, existingValues),
@@ -136,6 +138,7 @@ function CompanyEditForm({
           title: "Complete all required custom fields",
           type: "error",
         });
+
         return;
       }
 
@@ -148,6 +151,7 @@ function CompanyEditForm({
             organizationId,
             values: data.value.attributes,
           });
+
         await createCompanyAction({
           company: {
             ...company,

@@ -7,6 +7,7 @@ export type IntegrationDeliveryOutcome =
   | { readonly _tag: "Terminal" };
 
 const retryableHttpStatuses = new Set([408, 409, 425, 429]);
+
 const retryDelaysMs = [
   60_000,
   5 * 60_000,
@@ -74,12 +75,14 @@ export const computeIntegrationRetryDelayMs = ({
   readonly retryAfterMs?: number;
 }): number | undefined => {
   const baseDelayMs = retryDelaysMs[attemptCount - 1];
+
   if (baseDelayMs === undefined) {
     return undefined;
   }
 
   const boundedJitterRatio = Math.min(Math.max(jitterRatio, -0.2), 0.2);
   const jitteredDelayMs = Math.round(baseDelayMs * (1 + boundedJitterRatio));
+
   const boundedRetryAfterMs =
     retryAfterMs === undefined
       ? 0
@@ -113,6 +116,7 @@ export const decideIntegrationDeliveryRetry = ({
       retryAfterMs: outcome.retryAfterMs,
     }),
   });
+
   return delayMs === undefined
     ? { _tag: "Exhausted" }
     : { _tag: "Retry", delayMs };

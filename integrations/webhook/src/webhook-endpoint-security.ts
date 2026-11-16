@@ -19,18 +19,23 @@ export interface ValidatedWebhookEndpoint {
   readonly pinnedAddresses: readonly string[];
   readonly url: URL;
 }
+
 /** Injectable DNS boundary makes mixed-answer and DNS-rebinding policy independently testable. */
 export type WebhookDnsResolver = (
   hostname: string
 ) => Effect.Effect<readonly string[], WebhookEndpointSecurityError>;
 
 const localhostNames = new Set(["localhost", "localhost.", "ip6-localhost"]);
+
 const bracketPattern = /^\[|\]$/g;
+
 const ipv4MappedPattern = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/;
+
 const ipv4MappedHexPattern = /^::ffff:([a-f\d]{1,4}):([a-f\d]{1,4})$/;
 
 /** IPv6 ranges that must never be webhook targets; checked via net.BlockList subnet matching. */
 const ipv6Blocklist = new BlockList();
+
 for (const [network, prefix] of [
   ["::", 128], // unspecified
   ["::1", 128], // loopback
@@ -52,9 +57,11 @@ for (const [network, prefix] of [
 const privateIpv4Address = (address: string): boolean => {
   const octets = address.split(".").map(Number);
   const [first, second] = octets;
+
   if (octets.length !== 4 || first === undefined || second === undefined) {
     return true;
   }
+
   return (
     first === 0 ||
     first === 10 ||
@@ -80,18 +87,24 @@ const privateIpv6Address = (address: string): boolean => {
   ).hostname
     .replace(bracketPattern, "")
     .toLowerCase();
+
   const ipv4Mapped = value.match(ipv4MappedPattern)?.[1];
+
   if (ipv4Mapped !== undefined) {
     return privateIpv4Address(ipv4Mapped);
   }
+
   const mappedHex = value.match(ipv4MappedHexPattern);
+
   if (mappedHex?.[1] !== undefined && mappedHex[2] !== undefined) {
     const high = Number.parseInt(mappedHex[1], 16);
     const low = Number.parseInt(mappedHex[2], 16);
+
     return privateIpv4Address(
       `${Math.floor(high / 256)}.${high % 256}.${Math.floor(low / 256)}.${low % 256}`
     );
   }
+
   return ipv6Blocklist.check(value, "ipv6");
 };
 
@@ -99,12 +112,15 @@ const privateIpv6Address = (address: string): boolean => {
 export const isWebhookPrivateOrReservedAddress = (address: string): boolean => {
   const normalizedAddress = address.replace(bracketPattern, "");
   const family = isIP(normalizedAddress);
+
   if (family === 4) {
     return privateIpv4Address(normalizedAddress);
   }
+
   if (family === 6) {
     return privateIpv6Address(normalizedAddress);
   }
+
   return true;
 };
 
@@ -134,6 +150,7 @@ export const parseWebhookEndpointUrl = (
           })
         );
       }
+
       if (url.protocol !== "https:" && url.protocol !== "http:") {
         return Effect.fail(
           new WebhookEndpointSecurityError({
@@ -141,6 +158,7 @@ export const parseWebhookEndpointUrl = (
           })
         );
       }
+
       if (url.username !== "" || url.password !== "" || url.hash !== "") {
         return Effect.fail(
           new WebhookEndpointSecurityError({
@@ -148,6 +166,7 @@ export const parseWebhookEndpointUrl = (
           })
         );
       }
+
       if (localhostNames.has(url.hostname.toLowerCase())) {
         return privateNetworkAllowed(policy)
           ? Effect.succeed(url)
@@ -157,6 +176,7 @@ export const parseWebhookEndpointUrl = (
               })
             );
       }
+
       if (
         isIP(url.hostname.replace(bracketPattern, "")) !== 0 &&
         isWebhookPrivateOrReservedAddress(url.hostname)
@@ -170,6 +190,7 @@ export const parseWebhookEndpointUrl = (
               })
             );
       }
+
       return Effect.succeed(url);
     })
   );
@@ -195,6 +216,7 @@ export const resolveAndParseWebhookEndpoint = (
     ).pipe(
       Effect.flatMap((records) => {
         const addresses = records;
+
         if (addresses.length === 0) {
           return Effect.fail(
             new WebhookEndpointSecurityError({
@@ -202,6 +224,7 @@ export const resolveAndParseWebhookEndpoint = (
             })
           );
         }
+
         if (
           !privateNetworkAllowed(policy) &&
           addresses.some(isWebhookPrivateOrReservedAddress)
@@ -213,6 +236,7 @@ export const resolveAndParseWebhookEndpoint = (
             })
           );
         }
+
         return Effect.succeed({
           url,
           hostname: url.hostname,
