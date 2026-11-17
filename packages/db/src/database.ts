@@ -11,6 +11,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schedule from "effect/Schedule";
+import type { SqlClient } from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
 
 import { relations } from "./relations";
@@ -236,8 +237,22 @@ export const DatabaseContextLive = Layer.unwrap(
 /**
  * Effect SQL client backing the durable stores that need raw SQL access,
  * currently the cluster workflow engine's message storage.
+ *
+ * The success type is named rather than inferred. Effect 4.1.3 split
+ * `SqlClient` into `Base` and `SqlClient`, so a driver client no longer extends
+ * `SqlClient`, and the two branches are now `Layer<PgClient | SqlClient>` and
+ * `Layer<PgliteClient | SqlClient>` — two layer types `Layer.unwrap` cannot
+ * collapse on its own, because it infers its success from the first union
+ * member it sees. `SqlClient` is what both branches provide and what callers
+ * require, so it is the one type the annotation can name.
  */
-export const SqlClientContextLive = Layer.unwrap(
+export const SqlClientContextLive = Layer.unwrap<
+  SqlClient,
+  Config.ConfigError | SqlError,
+  never,
+  Config.ConfigError,
+  never
+>(
   Effect.map(Config.String("DATABASE_URL"), (url) =>
     isPgliteUrl(url) ? PgliteClientLive : PgClientLive
   )

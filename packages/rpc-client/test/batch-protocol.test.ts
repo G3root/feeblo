@@ -3,6 +3,7 @@ import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as HttpClient from "effect/http/HttpClient";
 import { HttpClientError, TransportError } from "effect/http/HttpClientError";
 import type * as HttpClientRequest from "effect/http/HttpClientRequest";
@@ -117,7 +118,8 @@ const answerOf = (
  * matched by `requestId` rather than by position.
  */
 const answeringClient = (
-  posts: Ref.Ref<ReadonlyArray<string>>
+  posts: Ref.Ref<ReadonlyArray<string>>,
+  urls?: Ref.Ref<ReadonlyArray<string>>
 ): Layer.Layer<
   HttpClient.HttpClient,
   never,
@@ -133,6 +135,10 @@ const answeringClient = (
           const body = bodyOf(request);
           yield* Ref.update(posts, (all) => [...all, body]);
 
+          if (urls !== undefined) {
+            yield* Ref.update(urls, (all) => [...all, request.url]);
+          }
+
           const answers = yield* Effect.forEach(
             framesIn(body).toReversed(),
             (frame) =>
@@ -147,6 +153,157 @@ const answeringClient = (
               status: 200,
               headers: { "content-type": serialization.contentType },
             })
+          );
+        })
+      );
+    })
+  );
+
+/**
+ * A transport that answers each unary frame and then ends the response, the way
+ * the API ends a batch once every request in it is answered. A body carrying a
+ * `Watch` frame instead stays open, the way a stream's response does, after
+ * delivering the chunk the stream produced.
+ */
+const streamingClient = (
+  posts: Ref.Ref<ReadonlyArray<string>>,
+  cancels: { count: number }
+): Layer.Layer<
+  HttpClient.HttpClient,
+  never,
+  RpcSerialization.RpcSerialization
+> =>
+  Layer.effect(
+    HttpClient.HttpClient,
+    Effect.gen(function* () {
+      const serialization = yield* RpcSerialization.RpcSerialization;
+
+      return HttpClient.make((request) =>
+        Effect.gen(function* () {
+          const body = bodyOf(request);
+          yield* Ref.update(posts, (all) => [...all, body]);
+          const frames = framesIn(body);
+
+          const answers = yield* Effect.forEach(frames, (frame) =>
+            frame.tag === "Watch"
+              ? Effect.succeed(
+                  JSON.stringify({
+                    _tag: "Chunk",
+                    requestId: frame.id,
+                    values: ["tick"],
+                  }) + "\n"
+                )
+              : answerOf(frame).pipe(
+                  Effect.map((answer) => JSON.stringify(answer) + "\n")
+                )
+          );
+
+          const encoded = answers.join("");
+          const headers = { "content-type": serialization.contentType };
+
+          return HttpClientResponse.fromWeb(
+            request,
+            frames.some((frame) => frame.tag === "Watch")
+              ? new Response(
+                  new ReadableStream({
+                    start(controller) {
+                      controller.enqueue(new TextEncoder().encode(encoded));
+                    },
+                    cancel() {
+                      cancels.count += 1;
+                    },
+                  }),
+                  { status: 200, headers }
+                )
+              : new Response(encoded, { status: 200, headers })
+          );
+        })
+      );
+    })
+  );
+
+/**
+ * Answers every body with the connection-level `Defect` the server writes when
+ * it cannot read a request body, after a delay long enough that a second
+ * client's request has been sent and is still in flight.
+ */
+const delayedDefectClient = (): Layer.Layer<HttpClient.HttpClient> =>
+  Layer.succeed(
+    HttpClient.HttpClient,
+    HttpClient.make((request) =>
+      Effect.sleep(Duration.millis(50)).pipe(
+        Effect.as(
+          HttpClientResponse.fromWeb(
+            request,
+            new Response(
+              JSON.stringify({
+                _tag: "Defect",
+                defect: { message: "server exploded" },
+              }) + "\n",
+              { status: 200, headers: { "content-type": "application/ndjson" } }
+            )
+          )
+        )
+      )
+    )
+  );
+
+/**
+ * Answers a body that carries a `Watch` with one chunk and leaves the response
+ * open, the way a real watch does. Any other body gets the connection-level
+ * `Defect` the server writes when it cannot read a request body.
+ */
+const defectBesideStreamClient = (
+  posts: Ref.Ref<ReadonlyArray<string>>
+): Layer.Layer<
+  HttpClient.HttpClient,
+  never,
+  RpcSerialization.RpcSerialization
+> =>
+  Layer.effect(
+    HttpClient.HttpClient,
+    Effect.gen(function* () {
+      const serialization = yield* RpcSerialization.RpcSerialization;
+
+      return HttpClient.make((request) =>
+        Effect.gen(function* () {
+          const body = bodyOf(request);
+          yield* Ref.update(posts, (all) => [...all, body]);
+          const frames = framesIn(body);
+          const headers = { "content-type": serialization.contentType };
+          const watching = frames.find((frame) => frame.tag === "Watch");
+
+          if (watching === undefined) {
+            return HttpClientResponse.fromWeb(
+              request,
+              new Response(
+                JSON.stringify({
+                  _tag: "Defect",
+                  defect: { message: "server exploded" },
+                }) + "\n",
+                { status: 200, headers }
+              )
+            );
+          }
+
+          return HttpClientResponse.fromWeb(
+            request,
+            new Response(
+              new ReadableStream({
+                start(controller) {
+                  controller.enqueue(
+                    new TextEncoder().encode(
+                      JSON.stringify({
+                        _tag: "Chunk",
+                        requestId: watching.id,
+                        values: ["tick"],
+                      }) + "\n"
+                    )
+                  );
+                },
+              }),
+              { status: 200, headers }
+            )
           );
         })
       );
@@ -266,7 +423,7 @@ const testLayer = (
   >,
   options?: {
     readonly batchWindow?: Duration.Duration;
-    readonly maxBatchBytes?: number;
+    readonly maxSingleFrameBytes?: number;
     readonly sharesBatch?: (tag: string) => boolean;
   }
 ): Layer.Layer<RpcClient.Protocol> =>
@@ -280,7 +437,11 @@ describe("batched RPC protocol", () => {
   it.live("posts calls that start together as one request", () =>
     Effect.gen(function* () {
       const posts = yield* Ref.make<ReadonlyArray<string>>([]);
-      const context = yield* Layer.build(testLayer(answeringClient(posts)));
+      const urls = yield* Ref.make<ReadonlyArray<string>>([]);
+
+      const context = yield* Layer.build(
+        testLayer(answeringClient(posts, urls))
+      );
 
       const results = yield* Effect.gen(function* () {
         const client = yield* RpcClient.make(TestRpcs);
@@ -304,6 +465,15 @@ describe("batched RPC protocol", () => {
         "Echo",
         "Add",
       ]);
+
+      // The layer prepends its configured URL to every request it posts, and
+      // the protocol posts to the empty path, so `prependUrl` — which "inserts
+      // or trims one slash as needed" — resolves it to the trailing-slash form.
+      // That is upstream's composition, unchanged from the transport this layer
+      // replaced, and the server routes it: `HttpRouter` runs `FindMyWay` with
+      // `ignoreTrailingSlash: true` (trimming both the registered path and the
+      // request), and `apps/server`'s origin check names `/rpc/` explicitly.
+      expect(yield* Ref.get(urls)).toEqual(["http://rpc.test/rpc/"]);
     })
   );
 
@@ -436,12 +606,12 @@ describe("batched RPC protocol", () => {
     })
   );
 
-  it.live("splits a batch at its byte budget", () =>
+  it.live("sends a frame larger than the ceiling alone", () =>
     Effect.gen(function* () {
       const posts = yield* Ref.make<ReadonlyArray<string>>([]);
 
       const context = yield* Layer.build(
-        testLayer(answeringClient(posts), { maxBatchBytes: 1 })
+        testLayer(answeringClient(posts), { maxSingleFrameBytes: 1 })
       );
 
       const results = yield* Effect.gen(function* () {
@@ -455,11 +625,271 @@ describe("batched RPC protocol", () => {
 
       expect(results).toEqual(["one", "two"]);
 
-      // Every frame is over a one-byte budget, so each is a group of one and
-      // fails, if it fails, on its own.
+      // Both frames are over a one-byte ceiling, so neither can take the
+      // other down with it when the API refuses the body.
       const bodies = yield* Ref.get(posts);
       expect(bodies.map((body) => framesIn(body).length)).toEqual([1, 1]);
     })
+  );
+
+  it.live("answers a batched read while a stream stays open", () =>
+    Effect.gen(function* () {
+      const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+      const cancels = { count: 0 };
+
+      const context = yield* Layer.build(
+        testLayer(streamingClient(posts, cancels), {
+          sharesBatch: (tag) => tag !== "Watch",
+        })
+      );
+
+      const total = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+
+        // A watch the dashboard keeps open, started in the same render as the
+        // read. It must not share the read's request: interrupting a batched
+        // stream does not cancel its HTTP request, so this one would keep
+        // pumping long after its atom was disposed.
+        const watching = yield* Stream.runDrain(client.Watch({})).pipe(
+          Effect.forkChild
+        );
+
+        const sum = yield* client.Add({ a: 40, b: 2 });
+        yield* Fiber.interrupt(watching);
+
+        return sum;
+      }).pipe(
+        Effect.timeout(Duration.seconds(5)),
+        Effect.provideContext(context)
+      );
+
+      expect(total).toBe(42);
+
+      // Two requests, one frame each: the watch left from its own fiber and the
+      // read waited out the window alone rather than with it.
+      const bodies = yield* Ref.get(posts);
+      const posted = bodies.map((body) => framesIn(body).map((f) => f.tag));
+      expect(posted.map((tags) => tags.length)).toEqual([1, 1]);
+      expect(posted.flat().sort()).toEqual(["Add", "Watch"]);
+
+      // The watch's response is held open until its caller is interrupted, and
+      // interrupting it has to abort the request rather than leave it pumping.
+      yield* Effect.sleep(Duration.millis(100));
+      expect(cancels.count).toBe(1);
+    })
+  );
+
+  it.live("fails only the exchanges the defect-carrying POST carried", () =>
+    Effect.gen(function* () {
+      const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+
+      const context = yield* Layer.build(
+        testLayer(defectBesideStreamClient(posts), {
+          sharesBatch: (tag) => tag !== "Watch",
+        })
+      );
+
+      const { outcome, watching } = yield* Effect.gen(function* () {
+        const client = yield* RpcClient.make(TestRpcs);
+
+        // An open watch on one protocol and a read on the other: a defect in the
+        // read's body used to die every pending request of the client.
+        const fiber = yield* Stream.runDrain(client.Watch({})).pipe(
+          Effect.forkChild
+        );
+
+        yield* Effect.sleep(Duration.millis(50));
+        const read = yield* client.Add({ a: 1, b: 2 }).pipe(Effect.exit);
+
+        // A fiber that is still running has not finished within the window; a
+        // defect that reached the watch would have ended it with a failure.
+        const finished = yield* Fiber.await(fiber).pipe(
+          Effect.timeoutOption(Duration.millis(200))
+        );
+
+        yield* Fiber.interrupt(fiber);
+
+        return { outcome: read, watching: finished };
+      }).pipe(
+        Effect.timeout(Duration.seconds(5)),
+        Effect.provideContext(context)
+      );
+
+      // The read sees the cause the server sent...
+      expect(Exit.isFailure(outcome)).toBe(true);
+
+      const failure = Exit.isFailure(outcome)
+        ? Cause.findErrorOption(outcome.cause)
+        : Option.none();
+
+      expect(Option.isSome(failure)).toBe(true);
+      const error = Option.getOrThrow(failure);
+      expect(error.reason._tag).toBe("RpcClientDefect");
+
+      if (error.reason._tag === "RpcClientDefect") {
+        expect(String(error.reason.cause)).toContain("server exploded");
+      }
+
+      // ...and the watch never saw it.
+      expect(Option.isNone(watching)).toBe(true);
+
+      const bodies = yield* Ref.get(posts);
+      expect(bodies.map((body) => framesIn(body).map((f) => f.tag))).toEqual([
+        ["Watch"],
+        ["Add"],
+      ]);
+    })
+  );
+
+  it.live(
+    "fails the exchanges in flight on a protocol when one POST reports a defect",
+    () =>
+      Effect.gen(function* () {
+        const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+
+        const context = yield* Layer.build(
+          // Both the watch and the write travel on the unbatched protocol: one
+          // frame per POST, no batch between them.
+          testLayer(defectBesideStreamClient(posts), {
+            sharesBatch: () => false,
+          })
+        );
+
+        const { outcome, watching } = yield* Effect.gen(function* () {
+          const client = yield* RpcClient.make(TestRpcs);
+
+          const fiber = yield* Stream.runDrain(client.Watch({})).pipe(
+            Effect.forkChild
+          );
+
+          yield* Effect.sleep(Duration.millis(50));
+          const read = yield* client.Add({ a: 1, b: 2 }).pipe(Effect.exit);
+
+          const watched = yield* Fiber.await(fiber).pipe(
+            Effect.timeoutOption(Duration.millis(500))
+          );
+
+          return { outcome: read, watching: watched };
+        }).pipe(
+          Effect.timeout(Duration.seconds(5)),
+          Effect.provideContext(context)
+        );
+
+        // Accepted limit: `makeHttpExchange` reports no POST identity, so a
+        // defect fails every exchange in flight on that protocol and client, not
+        // only the one whose body it came from. Both callers fail — with the
+        // cause the server sent — and neither is left pending.
+        expect(Option.isSome(watching)).toBe(true);
+
+        const causes: ReadonlyArray<Exit.Exit<unknown, RpcClientError>> = [
+          outcome,
+          ...Option.toArray(watching),
+        ];
+
+        for (const exit of causes) {
+          expect(Exit.isFailure(exit)).toBe(true);
+
+          const failure = Exit.isFailure(exit)
+            ? Cause.findErrorOption(exit.cause)
+            : Option.none();
+
+          expect(Option.isSome(failure)).toBe(true);
+          const error = Option.getOrThrow(failure);
+          expect(error.reason._tag).toBe("RpcClientDefect");
+
+          if (error.reason._tag === "RpcClientDefect") {
+            expect(String(error.reason.cause)).toContain("server exploded");
+          }
+        }
+      })
+  );
+
+  it.live("keeps each client's pending requests apart", () =>
+    Effect.gen(function* () {
+      const context = yield* Layer.build(testLayer(delayedDefectClient()));
+
+      // Two clients over one protocol layer, the way the dashboard's promise
+      // runtime and its `AtomRpc` runtimes share `rpcProtocolFor`'s layer. Each
+      // gets its own client id, so a defect that names one client's requests
+      // must not consume the other's tracking.
+      const outcomes = yield* Effect.gen(function* () {
+        const a = yield* RpcClient.make(TestRpcs);
+        const b = yield* RpcClient.make(TestRpcs);
+
+        // Both in flight before either defect lands: that is the window in
+        // which a shared tracker lets one client's defect clear the other's.
+        return yield* Effect.all(
+          [
+            a.Add({ a: 1, b: 2 }).pipe(Effect.exit),
+            b.Add({ a: 1, b: 2 }).pipe(Effect.exit),
+          ],
+          { concurrency: "unbounded" }
+        );
+      }).pipe(
+        Effect.timeout(Duration.seconds(5)),
+        Effect.provideContext(context)
+      );
+
+      // Both see the cause the server sent. Without per-client tracking the
+      // first defect consumes the second client's id, and its call fails with
+      // the synthesized "HTTP response ended before RPC request completed".
+      for (const outcome of outcomes) {
+        expect(Exit.isFailure(outcome)).toBe(true);
+
+        const failure = Exit.isFailure(outcome)
+          ? Cause.findErrorOption(outcome.cause)
+          : Option.none();
+
+        expect(Option.isSome(failure)).toBe(true);
+        const error = Option.getOrThrow(failure);
+        expect(error.reason._tag).toBe("RpcClientDefect");
+
+        if (error.reason._tag === "RpcClientDefect") {
+          expect(String(error.reason.cause)).toContain("server exploded");
+        }
+      }
+    })
+  );
+
+  /**
+   * The canary for this module's reason to exist.
+   *
+   * It asserts what upstream does *not* do: a stream that shares a batch keeps
+   * its HTTP request pumping after its caller is interrupted, because the batch
+   * runs in the client's scope and only `Request` frames are forwarded. If this
+   * test starts failing, a release of `effect` learned to cancel a batched
+   * stream — at which point `sharesBatch`, `rpc-kind.ts` and this dispatcher can
+   * all be deleted and `layerProtocolHttp({ batch })` used directly.
+   */
+  it.live(
+    "leaks a batched stream's request when its caller is interrupted",
+    () =>
+      Effect.gen(function* () {
+        const posts = yield* Ref.make<ReadonlyArray<string>>([]);
+        const cancels = { count: 0 };
+
+        const context = yield* Layer.build(
+          testLayer(streamingClient(posts, cancels), {
+            sharesBatch: () => true,
+          })
+        );
+
+        yield* Effect.gen(function* () {
+          const client = yield* RpcClient.make(TestRpcs);
+
+          const watching = yield* Stream.runDrain(client.Watch({})).pipe(
+            Effect.forkChild
+          );
+
+          yield* Effect.sleep(Duration.millis(50));
+          yield* Fiber.interrupt(watching);
+          yield* Effect.sleep(Duration.millis(200));
+        }).pipe(Effect.provideContext(context));
+
+        // Batched: one request, still open after the caller went away.
+        expect(yield* Ref.get(posts)).toHaveLength(1);
+        expect(cancels.count).toBe(0);
+      })
   );
 
   it.live("fails every caller in a batch when the transport drops", () =>
@@ -515,6 +945,8 @@ describe("batched RPC protocol", () => {
         );
       }).pipe(Effect.provideContext(context));
 
+      // The server could not read this body, so every request it carried fails
+      // with the cause the server sent.
       const failures = outcomes.map((outcome) =>
         Exit.isFailure(outcome)
           ? Cause.findErrorOption(outcome.cause)

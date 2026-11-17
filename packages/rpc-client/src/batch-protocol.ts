@@ -1,31 +1,66 @@
 /**
- * An RPC client protocol that sends the reads a surface starts together as one
- * HTTP request.
+ * The browser's HTTP protocol: `effect`'s own batched HTTP protocol for the
+ * frames that may share one request, and its unbatched one for the rest.
  *
  * The dashboard is client-only, and a route's `beforeLoad` starts its
  * collections with `Promise.all`: the post page asks for twelve of them at
  * once. Sent one request each, they are twelve browser requests through the
  * API's global middleware, and the browser's per-origin connection limit queues
- * the last six behind the first. Effect's server does not need to change for
- * this: `RpcServer`'s HTTP protocol decodes every frame in the request body,
- * forks one fiber per request, and streams the answers back interleaved by
- * `requestId`. Only the client sends one frame per POST.
+ * the last six behind the first. Nothing on the server has to change for this:
+ * `RpcServer`'s HTTP protocol decodes every frame in the request body, forks
+ * one fiber per request, and streams the answers back interleaved by
+ * `requestId`. Framing a body of several frames, posting it and routing each
+ * streamed answer back to the caller waiting on its `requestId` is
+ * `RpcClient.makeProtocolHttp`'s job once `batch` is set, so this module does
+ * not implement any of it.
  *
- * A frame is eligible to share a batch only when `sharesBatch` says so, which
- * `index.ts` answers from the RPC's kind: unary reads wait out a short window
- * together, and everything else — a write, a stream — is posted on its own
- * from the caller's fiber. Batching a write would put a mutation in one request
- * with the page's reads, where it would pay the window, share a byte budget and
- * a transport failure with them, and gain nothing — writes are not started in
- * parallel the way a render's reads are. Batching a stream would hold the
- * response open for as long as the stream, in a fiber the resolver owns, and
- * Effect's `RequestResolver` does not interrupt a batch once its run starts.
+ * What upstream cannot express is *which* frames may share a request, and that
+ * decision is the reason this module exists rather than a plain
+ * `layerProtocolHttp({ batch })`. `batch` applies to every frame a protocol
+ * sends, so the caller decides instead: a frame is eligible only when
+ * `sharesBatch` says so, which `index.ts` answers from the RPC's kind. Unary
+ * reads wait out the window and travel together; everything else is posted on
+ * its own from the caller's fiber.
  *
- * A batch is posted as an NDJSON body of the frames that arrived inside the
- * window (at most `maxBatchFrames`, at most `maxBatchBytes`), and each answer
- * is routed back to the caller waiting on its `requestId`. Every failure path
- * fails each request the batch still owes an answer to, so one dropped
- * connection never strands a caller.
+ * - Batching a write would put a mutation in one request with the page's reads,
+ *   where it would pay the window and share a transport failure with them, and
+ *   gain nothing — writes are not started in parallel the way a render's reads
+ *   are.
+ * - Batching a stream leaks the connection. Upstream runs a batch in the
+ *   client's scope rather than in a caller's fiber, and it only forwards
+ *   `Request` frames, so interrupting a stream's caller neither ends the batch
+ *   nor cancels its HTTP request: the response keeps pumping until the client
+ *   itself shuts down. The data-transfer page is where that shows — its watch
+ *   atoms are keyed by filter, so every filter change abandons a stream — and
+ *   the browser's per-origin connection limit turns a handful of abandoned
+ *   watches into a stalled tab. Sent alone, interruption aborts the request.
+ *
+ *   Interrupting a *batched* stream does not stall the page's reads: answers are
+ *   written as their frames arrive, not when the response ends. The leak is the
+ *   whole difference, and `batch-protocol.test.ts` pins both halves so that a
+ *   future Effect release that cancels batched streams says so by failing it, at
+ *   which point this module can go.
+ *
+ * A frame that alone exceeds `maxSingleFrameBytes` is sent alone too: the
+ * server refuses a body past its own limit, so one oversized frame must not
+ * take the batch's other reads down with it. The batch itself is bounded by
+ * upstream's `maxSize` frame count, not by a byte budget this module keeps.
+ *
+ * A `Defect` frame is the one response this module rewrites. Upstream's client
+ * treats it as connection-level and dies every pending request of the client,
+ * so a body the server could not read would kill an unrelated open `Watch` on
+ * the other protocol — and, because two clients can share this layer, another
+ * client's calls too. It is re-expressed as a `ClientProtocolError` naming the
+ * requests that protocol and client still owe an answer to.
+ *
+ * That scope is accepted, not ideal: two `Watch`s, or a watch and a write, both
+ * travel on the unbatched protocol, and a defect in one of their bodies fails
+ * the other as well. `makeHttpExchange` hands the writer a bare frame — the
+ * `Defect` message carries no POST identity and the protocol exposes no hook —
+ * so per-body scope would mean re-implementing the exchange this module exists
+ * to stop maintaining. Nothing is left pending: every affected caller fails
+ * with the cause the server sent. `batch-protocol.test.ts` pins the boundary, so
+ * the day upstream reports which body a frame came from, the test says so.
  *
  * Call it only where the runtime belongs to one request: a batch carries one
  * set of request headers, so a runtime shared by concurrent requests (the
@@ -34,138 +69,57 @@
  * chooses with `hasWindow()` for exactly that reason.
  */
 import { isString } from "@feeblo/utils/runtime-kind";
-import * as Cause from "effect/Cause";
-import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import * as HttpBody from "effect/http/HttpBody";
 import * as HttpClient from "effect/http/HttpClient";
-import type { HttpClientError } from "effect/http/HttpClientError";
-import { HttpClientErrorSchema } from "effect/http/HttpClientError";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Request from "effect/Request";
-import * as RequestResolver from "effect/RequestResolver";
 import * as RpcClient from "effect/rpc/RpcClient";
 import { RpcClientDefect, RpcClientError } from "effect/rpc/RpcClientError";
 import type {
   FromClientEncoded,
   FromServerEncoded,
-  RequestEncoded,
+  ResponseDefectEncoded,
 } from "effect/rpc/RpcMessage";
-import { isTerminalResponse } from "effect/rpc/RpcMessage";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as Schema from "effect/Schema";
-import * as Stream from "effect/Stream";
 
 /** The frames one POST may carry; a burst past it is split across POSTs. */
 const defaultMaxBatchFrames = 32;
 
-/** The encoded bytes one POST may carry; a frame that alone exceeds it travels alone. */
-const defaultMaxBatchBytes = 64 * 1024;
+/** A frame whose own body exceeds this travels alone, where it fails alone. */
+const defaultMaxSingleFrameBytes = 64 * 1024;
 
 /** How long a flush waits for the frames that start behind the first one. */
 const defaultBatchWindow = Duration.millis(2);
 
-const defect = (message: string, cause: unknown) =>
-  new RpcClientError({ reason: new RpcClientDefect({ message, cause }) });
-
-/** The one failure shape a caller sees, whichever layer of the pipe produced it. */
-const toRpcClientError = (
-  error: HttpClientError | RpcClientError
-): RpcClientError =>
-  Schema.is(RpcClientError)(error)
-    ? error
-    : new RpcClientError({
-        reason: HttpClientErrorSchema.fromHttpClientError(error),
-      });
-
-/** The transport or protocol failure a batch's callers all see. */
-const errorOfCause = (cause: Cause.Cause<RpcClientError>): RpcClientError => {
-  const failure = Cause.findErrorOption(cause);
-
-  return Option.isSome(failure)
-    ? failure.value
-    : defect("The batched RPC request failed", Cause.squash(cause));
-};
-
-type FrameParser = ReturnType<
-  RpcSerialization.RpcSerialization["Service"]["makeUnsafe"]
->;
+/** The response writer the client binds to one client id for `run`. */
+type WriteResponse = (message: FromServerEncoded) => Effect.Effect<void>;
 
 /**
- * One frame as the text the batch body is built from. A serialization that
- * frames in bytes cannot drive this protocol, so it dies rather than joining a
- * body it would corrupt.
+ * One protocol and, per client id, the requests it has sent and not yet seen
+ * answered.
+ *
+ * The scope is the protocol *and* the client because neither is enough on its
+ * own. Two clients share one protocol whenever they share the runtime layer —
+ * the dashboard's promise runtime and its `AtomRpc` runtimes do — and a failure
+ * that names one client's requests clears the other's tracking if they share a
+ * set. Within a client, the protocol is the finest scope upstream offers: it
+ * reports nothing about which POST a frame arrived on.
  */
-const encodeFrame = (
-  parser: FrameParser,
-  frame: RequestEncoded
-): Effect.Effect<string> =>
-  Effect.suspend(() => {
-    const encoded = parser.encode(frame);
-
-    return isString(encoded)
-      ? Effect.succeed(encoded)
-      : Effect.die(
-          new Error(
-            "The batched RPC protocol needs a text serialization; only NDJSON is wired for it"
-          )
-        );
-  });
-
-/** One frame a batch owes an answer to. */
-class BatchedFrame extends Request.Class<
-  {
-    readonly clientId: number;
-    readonly requestId: string | number;
-    /** The frame as the batch body carries it, encoded once at the call site. */
-    readonly encoded: string;
-    /** The encoded frame's UTF-8 length, the byte budget's unit. */
-    readonly byteLength: number;
-  },
-  void,
-  RpcClientError
-> {}
-
-/**
- * One frame a group owes an answer to, and the way to release it whatever
- * happens to the group. A batched read wraps a resolver entry; a frame sent on
- * its own wraps the `Deferred` its sender waits on.
- */
-interface PendingFrame {
-  readonly clientId: number;
-  readonly requestId: string | number;
-  /** The frame as the group's body carries it, encoded once at the call site. */
-  readonly encoded: string;
-  /** The encoded frame's UTF-8 length, the byte budget's unit. */
-  readonly byteLength: number;
-  /** Releases the caller's wait; called at most once per frame. */
-  readonly complete: (
-    exit: Exit.Exit<void, RpcClientError>
-  ) => Effect.Effect<void>;
+interface Routed {
+  readonly protocol: RpcClient.Protocol["Service"];
+  readonly pending: Map<number, Set<string | number>>;
 }
 
-const fromEntry = (entry: Request.Entry<BatchedFrame>): PendingFrame => ({
-  // Named rather than spread: `BatchedFrame` is a class, and the spread would
-  // copy only its own fields while suggesting the prototype came along.
-  byteLength: entry.request.byteLength,
-  clientId: entry.request.clientId,
-  encoded: entry.request.encoded,
-  requestId: entry.request.requestId,
-  complete: (exit) => Effect.sync(() => entry.completeUnsafe(exit)),
-});
-
-export const makeProtocolHttpBatch = (options: {
+interface ProtocolHttpBatchOptions {
   readonly url: string;
   /** Frames one POST may carry; a burst past it is split across POSTs. */
   readonly maxBatchFrames?: number | undefined;
-  /** Encoded bytes one POST may carry; a frame that alone exceeds it travels alone. */
-  readonly maxBatchBytes?: number | undefined;
+  /** A frame whose own body exceeds this travels alone, where it fails alone. */
+  readonly maxSingleFrameBytes?: number | undefined;
   /** How long a flush waits for the frames that start behind the first one. */
-  readonly batchWindow?: Duration.Duration | undefined;
+  readonly batchWindow?: Duration.Input | undefined;
   /**
    * Whether the frame's RPC may share a request with the frames beside it.
    * A frame this answers false for is posted on its own from the sender's
@@ -174,7 +128,11 @@ export const makeProtocolHttpBatch = (options: {
    * only unary reads share.
    */
   readonly sharesBatch?: ((tag: string) => boolean) | undefined;
-}): Effect.Effect<
+}
+
+const makeProtocolHttpBatch = (
+  options: ProtocolHttpBatchOptions
+): Effect.Effect<
   RpcClient.Protocol["Service"],
   never,
   RpcSerialization.RpcSerialization | HttpClient.HttpClient
@@ -183,23 +141,65 @@ export const makeProtocolHttpBatch = (options: {
     const http = yield* HttpClient.HttpClient;
     const serialization = yield* RpcSerialization.RpcSerialization;
 
+    const maxSingleFrameBytes = Math.max(
+      1,
+      options.maxSingleFrameBytes ?? defaultMaxSingleFrameBytes
+    );
+
+    const sharesBatch = options.sharesBatch ?? (() => true);
+
+    // `filterStatusOk` runs before either protocol reads a body: a non-2xx
+    // answer (the session middleware's 401, the body limit's 413, a proxy's
+    // 502) is not NDJSON, and without it every caller would see a decode
+    // defect instead of the status the API reported.
     const client = HttpClient.mapRequest(
       http,
       HttpClientRequest.prependUrl(options.url)
     ).pipe(HttpClient.filterStatusOk);
 
-    const maxBatchFrames = Math.max(
-      1,
-      options.maxBatchFrames ?? defaultMaxBatchFrames
-    );
+    // Both protocols reach the same API with the same client; they differ only
+    // in whether the frames they are handed leave together. Upstream keeps one
+    // batch queue per client id inside each, which is what `run` below hands
+    // both of them.
+    const batched: Routed = {
+      pending: new Map(),
+      protocol: yield* RpcClient.makeProtocolHttp(client, {
+        batch: {
+          window: options.batchWindow ?? defaultBatchWindow,
+          maxSize: Math.max(1, options.maxBatchFrames ?? defaultMaxBatchFrames),
+        },
+      }).pipe(
+        Effect.provideService(RpcSerialization.RpcSerialization, serialization)
+      ),
+    };
 
-    const maxBatchBytes = Math.max(
-      1,
-      options.maxBatchBytes ?? defaultMaxBatchBytes
-    );
+    const alone: Routed = {
+      pending: new Map(),
+      protocol: yield* RpcClient.makeProtocolHttp(client).pipe(
+        Effect.provideService(RpcSerialization.RpcSerialization, serialization)
+      ),
+    };
 
-    const batchWindow = options.batchWindow ?? defaultBatchWindow;
-    const sharesBatch = options.sharesBatch ?? (() => true);
+    /**
+     * The requests `clientId` has in flight through `routed`, created on first
+     * use and dropped when that client's `run` ends.
+     */
+    const pendingFor = (
+      routed: Routed,
+      clientId: number
+    ): Set<string | number> => {
+      const existing = routed.pending.get(clientId);
+
+      if (existing !== undefined) {
+        return existing;
+      }
+
+      const created = new Set<string | number>();
+      routed.pending.set(clientId, created);
+
+      return created;
+    };
+
     const encodeText = new TextEncoder();
 
     const decodeDefect = Schema.decodeUnknownEffect(
@@ -207,229 +207,174 @@ export const makeProtocolHttpBatch = (options: {
     );
 
     /**
-     * The server's connection-level defect, decoded with the protocol's own
-     * codec so a caller sees the cause the server reported rather than the
-     * frame that carried it. A frame the codec cannot read stays as it came.
+     * The cause the server reported, as the failure a caller sees. Decoded with
+     * the protocol's own codec so the caller gets the error the server meant
+     * rather than the frame that carried it; a frame the codec cannot read
+     * stays as it came.
      */
-    const serverDefect = (cause: unknown): Effect.Effect<RpcClientError> =>
-      decodeDefect(cause).pipe(
+    const serverDefect = (
+      frame: ResponseDefectEncoded
+    ): Effect.Effect<RpcClientError> =>
+      decodeDefect(frame.defect).pipe(
         Effect.match({
-          onFailure: () => defect("The RPC server reported a defect", cause),
+          onFailure: () =>
+            new RpcClientError({
+              reason: new RpcClientDefect({
+                message: "The RPC server reported a defect",
+                cause: frame.defect,
+              }),
+            }),
           onSuccess: (decoded) =>
-            defect("The RPC server reported a defect", decoded),
+            new RpcClientError({
+              reason: new RpcClientDefect({
+                message: "The RPC server reported a defect",
+                cause: decoded,
+              }),
+            }),
         })
       );
 
-    return yield* RpcClient.Protocol.make((writeResponse) => {
-      /**
-       * Post one group's frames as one body and route the streamed answers
-       * back to the callers they belong to. Every failure inside is turned
-       * into a failure for each request the group still owes an answer to,
-       * so one broken batch never strands a caller.
-       */
-      const sendGroup = (frames: ReadonlyArray<PendingFrame>) =>
-        Effect.gen(function* () {
-          const waiting = new Map(
-            frames.map((frame) => [frame.requestId, frame] as const)
-          );
+    /**
+     * The writer one protocol's responses go through.
+     *
+     * A `Defect` frame is connection-level in the client's model: receiving one
+     * dies *every* pending request for the client, including an open `Watch`
+     * that this POST had nothing to do with. Over HTTP a defect only says the
+     * server could not read the body that carried it, so it is re-expressed as
+     * a `ClientProtocolError` — the frame clients create locally to fail the
+     * requests it names — limited to the exchanges this protocol still owes an
+     * answer to. Every other frame goes through untouched.
+     */
+    const writerFor = (
+      routed: Routed,
+      clientId: number,
+      writeResponse: WriteResponse
+    ): WriteResponse => {
+      const pending = pendingFor(routed, clientId);
 
-          const failWaiting = (error: RpcClientError) =>
-            Effect.gen(function* () {
-              for (const frame of waiting.values()) {
-                yield* frame.complete(Exit.fail(error));
+      return (message) => {
+        switch (message._tag) {
+          case "Exit": {
+            pending.delete(message.requestId);
+
+            return writeResponse(message);
+          }
+
+          case "Defect": {
+            const requestIds = [...pending];
+            pending.clear();
+
+            return Effect.flatMap(serverDefect(message), (error) =>
+              writeResponse({
+                _tag: "ClientProtocolError",
+                error,
+                requestIds,
+              })
+            );
+          }
+
+          case "ClientProtocolError": {
+            if (message.requestIds === undefined) {
+              pending.clear();
+            } else {
+              for (const requestId of message.requestIds) {
+                pending.delete(requestId);
               }
-
-              waiting.clear();
-            });
-
-          yield* Effect.gen(function* () {
-            const parser = serialization.makeUnsafe();
-            let body = "";
-
-            for (const { encoded } of frames) {
-              body += encoded;
             }
 
-            const response = yield* client.post("", {
-              body: HttpBody.text(body, serialization.contentType),
-            });
+            return writeResponse(message);
+          }
 
-            yield* response.stream.pipe(
-              Stream.runForEachArray((chunk) =>
-                Effect.gen(function* () {
-                  // SAFETY: the serialization decodes only the protocol
-                  // frames it encoded; every element is a server message.
-                  const serverFrames = chunk.flatMap(
-                    parser.decode
-                  ) as ReadonlyArray<FromServerEncoded>;
+          default: {
+            return writeResponse(message);
+          }
+        }
+      };
+    };
 
-                  for (const serverFrame of serverFrames) {
-                    switch (serverFrame._tag) {
-                      case "Chunk":
-                      case "Exit": {
-                        const frame = waiting.get(serverFrame.requestId);
+    /**
+     * The frame's own body in bytes, the unit the ceiling is written in.
+     * A serialization that frames in bytes reports no length rather than one
+     * this ceiling would misread; upstream's batch limit is its only bound then.
+     */
+    const bodyBytes = (request: FromClientEncoded): Effect.Effect<number> =>
+      Effect.suspend(() => {
+        const encoded = serialization.makeUnsafe().encode(request);
 
-                        if (frame === undefined) break;
-                        yield* writeResponse(frame.clientId, serverFrame);
+        return Effect.succeed(
+          isString(encoded) ? encodeText.encode(encoded).length : 0
+        );
+      });
 
-                        // A chunk answers a stream, not the request; only
-                        // the terminal frame releases its caller.
-                        if (isTerminalResponse(serverFrame)) {
-                          waiting.delete(serverFrame.requestId);
-                          yield* frame.complete(Exit.succeed(undefined));
-                        }
-
-                        break;
-                      }
-
-                      case "Defect": {
-                        // Connection-level: the server could not read the
-                        // body, so no request in it has an answer coming.
-                        yield* failWaiting(
-                          yield* serverDefect(serverFrame.defect)
-                        );
-                        break;
-                      }
-
-                      case "ClientProtocolError": {
-                        yield* failWaiting(serverFrame.error);
-                        break;
-                      }
-
-                      default: {
-                        break;
-                      }
-                    }
-                  }
-                })
-              )
-            );
-          }).pipe(
-            Effect.mapError(toRpcClientError),
-            Effect.catchCause((cause) => failWaiting(errorOfCause(cause))),
-            Effect.ensuring(
-              failWaiting(
-                // A stream that ended without a terminal frame is the
-                // transport dropping the connection mid-batch; the callers
-                // see it as a failed request rather than waiting forever.
-                defect(
-                  "The HTTP response ended before the RPC request completed",
-                  undefined
-                )
-              )
+    /**
+     * The protocol one frame goes through. Only a frame `sharesBatch` accepts
+     * is a candidate for the batched one, and only while its own body fits the
+     * ceiling; everything else leaves through the unbatched protocol from the
+     * sender's fiber. A non-request frame goes to the unbatched protocol too:
+     * both drop it, and that is the one that does not encode first.
+     */
+    const protocolFor = (request: FromClientEncoded): Effect.Effect<Routed> =>
+      request._tag !== "Request" || !sharesBatch(request.tag)
+        ? Effect.succeed(alone)
+        : bodyBytes(request).pipe(
+            Effect.map((bytes) =>
+              bytes <= maxSingleFrameBytes ? batched : alone
             )
           );
-        });
 
-      /**
-       * One resolver run's frames, split by the byte budget the way
-       * `batchN` already split them by count: the server refuses a body past
-       * its own limit, so an oversized frame must not take the batch's other
-       * reads down with it. A frame larger than the whole budget is a group
-       * of one, and fails alone.
-       */
-      const sendResolved = (
-        entries: ReadonlyArray<Request.Entry<BatchedFrame>>
-      ) =>
-        Effect.gen(function* () {
-          const groups: Array<Array<PendingFrame>> = [];
-          let group: Array<PendingFrame> = [];
-          let bytes = 0;
-
-          for (const entry of entries) {
-            if (
-              group.length > 0 &&
-              bytes + entry.request.byteLength > maxBatchBytes
-            ) {
-              groups.push(group);
-              group = [];
-              bytes = 0;
-            }
-
-            group.push(fromEntry(entry));
-            bytes += entry.request.byteLength;
+    return {
+      // Every frame is answered through the protocol that sent it, and each
+      // keeps the writer for a client id until its own `run` ends, so both
+      // have to hold one. Neither run ever completes, exactly as `run`
+      // promises: the client's writer lives as long as the client does.
+      run: (clientId, writeResponse) =>
+        Effect.raceAll([
+          batched.protocol.run(
+            clientId,
+            writerFor(batched, clientId, writeResponse)
+          ),
+          alone.protocol.run(
+            clientId,
+            writerFor(alone, clientId, writeResponse)
+          ),
+        ]).pipe(
+          // A client's tracker lives exactly as long as that client's run.
+          Effect.ensuring(
+            Effect.sync(() => {
+              batched.pending.delete(clientId);
+              alone.pending.delete(clientId);
+            })
+          )
+        ),
+      send: (clientId, request, transferables) =>
+        Effect.flatMap(protocolFor(request), (routed) => {
+          if (request._tag !== "Request") {
+            return routed.protocol.send(clientId, request, transferables);
           }
 
-          if (group.length > 0) {
-            groups.push(group);
-          }
+          // Registered before the frame leaves, so an answer that arrives
+          // during `send` still has its request in the set the writer scopes a
+          // defect to, and released when `send` ends — including when an
+          // interrupted caller ends it early, which no frame will report.
+          const pending = pendingFor(routed, clientId);
+          pending.add(request.id);
 
-          yield* Effect.forEach(groups, sendGroup, {
-            concurrency: "unbounded",
-            discard: true,
-          });
-        });
-
-      // Only unary reads share a batch: they wait out the window and travel
-      // together. Everything `sharesBatch` rules out is posted by `send` from
-      // the caller's own fiber, because a batch run belongs to the resolver,
-      // which Effect does not interrupt once the run has started — a stream
-      // could then never be cancelled, and a write would outlive its caller.
-      const reads = RequestResolver.make<BatchedFrame>(sendResolved).pipe(
-        RequestResolver.setDelay(batchWindow),
-        RequestResolver.batchN(maxBatchFrames)
-      );
-
-      return Effect.succeed({
-        send: (clientId: number, request: FromClientEncoded) => {
-          if (request._tag !== "Request") return Effect.void;
-
-          return Effect.gen(function* () {
-            const parser = serialization.makeUnsafe();
-            const encoded = yield* encodeFrame(parser, request);
-            const byteLength = encodeText.encode(encoded).length;
-
-            if (sharesBatch(request.tag)) {
-              yield* Effect.request(
-                new BatchedFrame({
-                  clientId,
-                  requestId: request.id,
-                  encoded,
-                  byteLength,
-                }),
-                reads
-              );
-
-              return;
-            }
-
-            const answered = yield* Deferred.make<void, RpcClientError>();
-            yield* sendGroup([
-              {
-                clientId,
-                requestId: request.id,
-                encoded,
-                byteLength,
-                complete: (exit) =>
-                  Deferred.done(answered, exit).pipe(Effect.asVoid),
-              },
-            ]);
-            yield* Deferred.await(answered);
-          });
-        },
-        supportsAck: false,
-        supportsTransferables: false,
-        codecFor: serialization.codecFor,
-      });
-    });
+          return routed.protocol
+            .send(clientId, request, transferables)
+            .pipe(
+              Effect.ensuring(Effect.sync(() => pending.delete(request.id)))
+            );
+        }),
+      supportsAck: batched.protocol.supportsAck,
+      supportsTransferables: batched.protocol.supportsTransferables,
+      codecFor: batched.protocol.codecFor,
+    };
   });
 
-export const layerProtocolHttpBatch = (options: {
-  readonly url: string;
-  /** Frames one POST may carry; a burst past it is split across POSTs. */
-  readonly maxBatchFrames?: number | undefined;
-  /** Encoded bytes one POST may carry; a frame that alone exceeds it travels alone. */
-  readonly maxBatchBytes?: number | undefined;
-  /** How long a flush waits for the frames that start behind the first one. */
-  readonly batchWindow?: Duration.Duration | undefined;
-  /**
-   * Whether the frame's RPC may share a request with the frames beside it.
-   * A frame this answers false for is posted on its own from the sender's
-   * fiber, so interrupting the caller aborts its HTTP request.
-   */
-  readonly sharesBatch?: ((tag: string) => boolean) | undefined;
-}): Layer.Layer<
+export const layerProtocolHttpBatch = (
+  options: ProtocolHttpBatchOptions
+): Layer.Layer<
   RpcClient.Protocol,
   never,
   RpcSerialization.RpcSerialization | HttpClient.HttpClient
-> => Layer.effect(RpcClient.Protocol)(makeProtocolHttpBatch(options));
+> => Layer.effect(RpcClient.Protocol, makeProtocolHttpBatch(options));
