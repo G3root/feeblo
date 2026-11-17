@@ -23,7 +23,7 @@ type PendingStart = {
   readonly fail: () => void;
 };
 
-const createHarness = (redirectTo: string | undefined = undefined) => {
+const createHarness = (redirectTo?: string) => {
   const starts: PendingStart[] = [];
 
   const start: StartSocialSignIn = ({ provider, redirectTo: to }) =>
