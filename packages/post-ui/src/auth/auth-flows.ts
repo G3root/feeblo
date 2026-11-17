@@ -7,7 +7,6 @@ import {
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 
 import { m } from "../paraglide/messages.js";
-import { rememberAuthMethod } from "./last-auth-method";
 
 export type SocialProvider = "github" | "google";
 
@@ -121,11 +120,6 @@ export async function signInWithSocialProvider({
   });
 
   if (!response.error) {
-    // The last-used hint is recorded here rather than at the call sites: this
-    // is the one place a social sign-in is initiated, so the board's auth
-    // dialog and the sign-in page both feed it without knowing it exists.
-    rememberAuthMethod(provider);
-
     return;
   }
 
