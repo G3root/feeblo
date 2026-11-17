@@ -2,7 +2,7 @@ import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMachine } from "@xstate/react";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import {
   helpCenterVoteMachine,
@@ -116,27 +116,6 @@ export function useHelpCenterVote({
     },
   });
 
-  const { reason } = snapshot.context;
-
-  const markHelpful = useCallback(() => vote.mutate(true), [vote]);
-
-  const markUnhelpful = useCallback(() => {
-    // One mutation per press. The machine decides what the settle means: from
-    // anywhere but the prompt it opens the box, and from the prompt it closes
-    // it. Sending an open beforehand would give the box two ways to appear and
-    // let the two disagree about whether a verdict had been recorded yet.
-    vote.mutate(false);
-  }, [vote]);
-
-  const sendReason = useCallback(() => vote.mutate(false), [vote]);
-
-  const closeReason = useCallback(() => send({ type: "CLOSE_REASON" }), [send]);
-
-  const setReason = useCallback(
-    (value: string) => send({ type: "SET_REASON", value }),
-    [send]
-  );
-
   const view = toHelpCenterVoteView(snapshot);
 
   return {
@@ -146,11 +125,15 @@ export function useHelpCenterVote({
       notHelpful: tally?.notHelpfulCount ?? 0,
     },
     isPending: vote.isPending,
-    markHelpful,
-    markUnhelpful,
-    reason,
-    sendReason,
-    closeReason,
-    setReason,
+    reason: snapshot.context.reason,
+    markHelpful: () => vote.mutate(true),
+    // One mutation per press. The machine decides what the settle means: from
+    // anywhere but the prompt it opens the box, and from the prompt it closes
+    // it. Sending an open beforehand would give the box two ways to appear and
+    // let the two disagree about whether a verdict had been recorded yet.
+    markUnhelpful: () => vote.mutate(false),
+    sendReason: () => vote.mutate(false),
+    closeReason: () => send({ type: "CLOSE_REASON" }),
+    setReason: (value: string) => send({ type: "SET_REASON", value }),
   };
 }

@@ -10,230 +10,256 @@ import {
   DialogPopup,
   DialogTitle,
 } from "@feeblo/ui/dialog";
-import { Field, FieldLabel } from "@feeblo/ui/field";
-import { Input } from "@feeblo/ui/input";
-import { Textarea } from "@feeblo/ui/textarea";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { cn } from "@feeblo/ui/utils";
-import { useState } from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
-  DEFAULT_HELP_CENTER_TOPIC_ICON,
+  helpCenterTopicFormOptions,
+  helpCenterTopicFormValues,
+  type HelpCenterTopicFormValues,
+} from "../help-center-forms";
+import {
   HELP_CENTER_TOPIC_ICON_KEYS,
   HelpCenterTopicIcon,
-  isHelpCenterTopicIcon,
-  type THelpCenterTopicIcon,
 } from "./help-center-topic-icons";
 
-export type THelpCenterTopicDraft = {
-  description: string;
-  icon: THelpCenterTopicIcon;
-  name: string;
-};
-
-const emptyDraft = (): THelpCenterTopicDraft => ({
-  description: "",
-  icon: DEFAULT_HELP_CENTER_TOPIC_ICON,
-  name: "",
-});
-
 /**
- * The create and rename dialog for a topic.
+ * The section dialog, as two variants rather than one component with a mode.
  *
- * One component for both because the fields are identical and the difference is
- * only whether the save is an insert or an update. The slug is not a field: the
- * server derives it from the name, and an editor who wants a different URL gets
- * one by renaming rather than by maintaining a separate key by hand.
+ * It used to take `topic?: {…}` — present meant edit, absent meant create — so
+ * every caller had to know that a missing prop was a mode, and the body
+ * branched on `isEditing` five times to say the same thing. The two components
+ * below share the fields and differ in what they submit, which is the only real
+ * difference between them.
+ *
+ * Both mount their form only while open. That is what resets it: a closed
+ * dialog has no form to hold a cancelled draft, so there is no `key` to
+ * remember and no effect to clear it.
  */
-export function HelpCenterTopicDialog({
-  organizationId,
+
+export function CreateHelpCenterTopicDialog({
   onOpenChange,
   open,
-  topic,
+  organizationId,
 }: {
-  organizationId: string;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  topic?:
-    | {
-        description: string | null;
-        icon: string | null;
-        id: string;
-        name: string;
-      }
-    | undefined;
+  organizationId: string;
 }) {
   const { helpCenterTopicCollection } = useDashboardCollections();
-  const isEditing = topic !== undefined;
 
-  /**
-   * The draft is seeded once, from the row this dialog was opened for.
-   *
-   * The caller gives the dialog a `key` that changes with the target, so a
-   * different section mounts a fresh form. That is what keeps this a lazy
-   * `useState` initialiser instead of an effect or an in-render `setState`:
-   * both of those exist to reset state in response to a prop change, and the
-   * `key` makes the prop change a *new component* rather than a change to
-   * react to.
-   */
-  const [draft, setDraft] = useState<THelpCenterTopicDraft>(() =>
-    topic === undefined
-      ? emptyDraft()
-      : {
-          description: topic.description ?? "",
-          icon: isHelpCenterTopicIcon(topic.icon)
-            ? topic.icon
-            : DEFAULT_HELP_CENTER_TOPIC_ICON,
-          name: topic.name,
-        }
+  return (
+    <TopicDialogFrame
+      description="Sections group articles in the help center and in its URL."
+      onOpenChange={onOpenChange}
+      open={open}
+      title="New section"
+    >
+      <TopicFields
+        onSubmit={async (value) => {
+          const id = await HelpCenterTopicId.unsafeGenerate();
+
+          const tx = helpCenterTopicCollection.insert({
+            id,
+            organizationId,
+            name: value.name.trim(),
+            // The server derives the final slug from the name; this value is
+            // the optimistic placeholder the list renders until the refetch.
+            slug: value.name.trim(),
+            description: value.description.trim() || null,
+            icon: value.icon,
+            position: 0,
+            articleCount: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+
+          await tx.when("settled");
+          onOpenChange(false);
+        }}
+        submitLabel="Create section"
+      />
+    </TopicDialogFrame>
   );
+}
 
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async () => {
-    const name = draft.name.trim();
-
-    if (name.length === 0) {
-      setError("A section needs a name.");
-
-      return;
-    }
-
-    setPending(true);
-    setError(null);
-
-    try {
-      const description =
-        draft.description.trim().length === 0 ? null : draft.description.trim();
-
-      // The transaction is awaited through `when("settled")` rather than the
-      // call itself: the collection applies optimistically and only reports the
-      // server's answer — a slug collision, a permission refusal — through the
-      // transaction. Closing the dialog on the optimistic apply would hide a
-      // save that never happened.
-      if (isEditing) {
-        const tx = helpCenterTopicCollection.update(topic.id, (current) => {
-          current.name = name;
-          current.description = description;
-          current.icon = draft.icon;
-        });
-
-        await tx.when("settled");
-      } else {
-        const id = await HelpCenterTopicId.unsafeGenerate();
-
-        const tx = helpCenterTopicCollection.insert({
-          id,
-          organizationId,
-          name,
-          // The server derives the slug from the name; this value is the
-          // optimistic placeholder the list renders until the refetch lands.
-          slug: name,
-          description,
-          icon: draft.icon,
-          position: 0,
-          articleCount: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-
-        await tx.when("settled");
-      }
-
-      onOpenChange(false);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not save the section."
-      );
-    } finally {
-      setPending(false);
-    }
+export function EditHelpCenterTopicDialog({
+  onOpenChange,
+  open,
+  organizationId,
+  topic,
+}: {
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  organizationId: string;
+  topic: {
+    description: string | null;
+    icon: string | null;
+    id: string;
+    name: string;
   };
+}) {
+  const { helpCenterTopicCollection } = useDashboardCollections();
 
+  return (
+    <TopicDialogFrame
+      description="Renaming a section keeps its articles; the URL follows the new name."
+      onOpenChange={onOpenChange}
+      open={open}
+      title="Edit section"
+    >
+      <TopicFields
+        initial={helpCenterTopicFormValues(topic)}
+        onSubmit={async (value) => {
+          const tx = helpCenterTopicCollection.update(topic.id, (current) => {
+            current.name = value.name.trim();
+            current.description = value.description.trim() || null;
+            current.icon = value.icon;
+          });
+
+          await tx.when("settled");
+          onOpenChange(false);
+        }}
+        submitLabel="Save section"
+      />
+    </TopicDialogFrame>
+  );
+}
+
+function TopicDialogFrame({
+  children,
+  description,
+  onOpenChange,
+  open,
+  title,
+}: {
+  children: React.ReactNode;
+  description: string;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  title: string;
+}) {
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogPopup>
         <DialogHeader>
-          <DialogTitle>
-            {isEditing ? "Edit section" : "New section"}
-          </DialogTitle>
-          <DialogDescription>
-            Sections group articles in the help center and in its URL.
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-
-        <DialogPanel className="space-y-5">
-          <Field>
-            <FieldLabel htmlFor="help-center-topic-name">Name</FieldLabel>
-            <Input
-              id="help-center-topic-name"
-              maxLength={100}
-              onChange={(event) =>
-                setDraft((prev) => ({ ...prev, name: event.target.value }))
-              }
-              placeholder="Getting started"
-              value={draft.name}
-            />
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="help-center-topic-description">
-              Description
-            </FieldLabel>
-            <Textarea
-              id="help-center-topic-description"
-              maxLength={500}
-              onChange={(event) =>
-                setDraft((prev) => ({
-                  ...prev,
-                  description: event.target.value,
-                }))
-              }
-              placeholder="What belongs in this section?"
-              rows={3}
-              value={draft.description}
-            />
-          </Field>
-
-          <Field>
-            <FieldLabel>Icon</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              {HELP_CENTER_TOPIC_ICON_KEYS.map((key) => (
-                <button
-                  aria-label={key}
-                  aria-pressed={draft.icon === key}
-                  className={cn(
-                    "flex size-9 items-center justify-center rounded-md border transition-colors",
-                    draft.icon === key
-                      ? "border-primary/50 bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                  key={key}
-                  onClick={() => setDraft((prev) => ({ ...prev, icon: key }))}
-                  type="button"
-                >
-                  <HelpCenterTopicIcon className="size-4" icon={key} />
-                </button>
-              ))}
-            </div>
-          </Field>
-
-          {error === null ? null : (
-            <p className="text-destructive text-sm">{error}</p>
-          )}
-        </DialogPanel>
-
-        <DialogFooter>
-          <DialogClose render={<Button type="button" variant="ghost" />}>
-            Cancel
-          </DialogClose>
-          <Button disabled={pending} onClick={submit} type="button">
-            {isEditing ? "Save section" : "Create section"}
-          </Button>
-        </DialogFooter>
+        {/* Mounted only while open, so the form's defaults are read once per
+            open instead of being reset by an effect. */}
+        {open ? children : null}
       </DialogPopup>
     </Dialog>
+  );
+}
+
+function TopicFields({
+  initial,
+  onSubmit,
+  submitLabel,
+}: {
+  initial?: HelpCenterTopicFormValues | undefined;
+  onSubmit: (value: HelpCenterTopicFormValues) => Promise<void>;
+  submitLabel: string;
+}) {
+  const form = useAppForm({
+    ...helpCenterTopicFormOptions,
+    ...(initial === undefined ? {} : { defaultValues: initial }),
+    onSubmit: async ({ value }) => {
+      try {
+        await onSubmit(value);
+      } catch (cause) {
+        // Rethrowing is what puts the message under the form: TanStack Form
+        // stores a thrown submit error in `errorMap.onSubmit`, so the dialog
+        // stays open with the reason instead of closing on a write the server
+        // refused.
+        throw new Error(
+          cause instanceof Error
+            ? cause.message
+            : "Could not save the section.",
+          { cause }
+        );
+      }
+    },
+  });
+
+  return (
+    <form
+      className="contents"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogPanel className="space-y-5">
+        <form.AppField name="name">
+          {(field) => (
+            <field.TextField
+              label="Name"
+              placeholder="Getting started"
+              maxLength={100}
+            />
+          )}
+        </form.AppField>
+
+        <form.AppField name="description">
+          {(field) => (
+            <field.TextareaField
+              label="Description"
+              placeholder="What belongs in this section?"
+              rows={3}
+              maxLength={500}
+            />
+          )}
+        </form.AppField>
+
+        <form.AppField name="icon">
+          {(field) => (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-sm font-medium">Icon</legend>
+              <div className="flex flex-wrap gap-2">
+                {HELP_CENTER_TOPIC_ICON_KEYS.map((key) => (
+                  <button
+                    aria-label={key}
+                    aria-pressed={field.state.value === key}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-md border transition-colors",
+                      field.state.value === key
+                        ? "border-primary/50 bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                    key={key}
+                    onClick={() => field.handleChange(key)}
+                    type="button"
+                  >
+                    <HelpCenterTopicIcon className="size-4" icon={key} />
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          )}
+        </form.AppField>
+
+        <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
+          {(error) =>
+            error === undefined || error === null ? null : (
+              <p className="text-destructive text-sm">{String(error)}</p>
+            )
+          }
+        </form.Subscribe>
+      </DialogPanel>
+
+      <DialogFooter>
+        <DialogClose render={<Button type="button" variant="ghost" />}>
+          Cancel
+        </DialogClose>
+        <form.SubscribeButton label={submitLabel} variant="default" />
+      </DialogFooter>
+    </form>
   );
 }

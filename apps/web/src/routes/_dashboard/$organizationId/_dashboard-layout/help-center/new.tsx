@@ -26,5 +26,7 @@ function RouteComponent() {
     return <HelpCenterUnavailable />;
   }
 
-  return <HelpCenterArticleEditor organizationId={organizationId} />;
+  return (
+    <HelpCenterArticleEditor mode="create" organizationId={organizationId} />
+  );
 }

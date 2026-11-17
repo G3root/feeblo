@@ -84,16 +84,8 @@ function RouteComponent() {
   return (
     <HelpCenterArticleEditor
       key={article.id}
-      article={{
-        content: article.content,
-        id: article.id,
-        position: article.position,
-        publishedAt: article.publishedAt,
-        slug: article.slug,
-        status: article.status,
-        title: article.title,
-        topicId: article.topicId,
-      }}
+      mode="edit"
+      article={article}
       organizationId={organizationId}
     />
   );

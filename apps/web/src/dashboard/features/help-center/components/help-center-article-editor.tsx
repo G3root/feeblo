@@ -2,90 +2,80 @@ import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-cent
 import { targetStatesFor } from "@feeblo/domain/help-center-article/machine";
 import { HelpCenterArticleId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
-import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
-import { Input } from "@feeblo/ui/input";
+import { FieldDescription, FieldLabel } from "@feeblo/ui/field";
+import { useAppForm } from "@feeblo/ui/hooks/form";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
-import { Textarea } from "@feeblo/ui/textarea";
 import { cn } from "@feeblo/ui/utils";
+import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { ArrowLeft02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useMemo, useState } from "react";
 
-import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+import {
+  helpCenterArticleFormOptions,
+  helpCenterArticleFormValues,
+} from "../help-center-forms";
 import { HelpCenterTopicIcon } from "./help-center-topic-icons";
 
 /**
- * The lifecycle state, taken from the domain rather than restated.
+ * What the editor is editing, as a discriminated union rather than an optional
+ * row.
  *
- * The editor used to declare its own union; a state added to the article
- * lifecycle would have been invisible here until someone remembered to widen
- * it, and the picker would silently stop offering it.
+ * `article?: {...}` made "create" mean "the prop is absent", so the body
+ * branched on `article === undefined` five times and the delete button's
+ * presence was a truthiness test. The two modes now say which one they are, and
+ * a caller cannot read a row without having one.
  */
-type ArticleStatus = THelpCenterArticleState;
+export type HelpCenterArticleEditorProps =
+  | { readonly mode: "create"; readonly organizationId: string }
+  | {
+      readonly article: {
+        readonly content: string;
+        readonly id: string;
+        readonly position: number | null;
+        readonly publishedAt: Date | null;
+        readonly slug: string;
+        readonly status: THelpCenterArticleState;
+        readonly title: string;
+        readonly topicId: string;
+      };
+      readonly mode: "edit";
+      readonly organizationId: string;
+    };
+
+const ARTICLE_FORM_ID = "help-center-article-form";
 
 const STATUS_LABELS = {
   archived: "Archived",
   draft: "Draft",
   published: "Published",
-} as const satisfies Record<ArticleStatus, string>;
+} satisfies Record<THelpCenterArticleState, string>;
 
 /**
  * The article editor.
  *
- * The body is Markdown and the field says so: it is what the column stores, what
- * "copy as Markdown" copies, and what a future file sync round-trips. A rich
- * text editor would have to serialise back to Markdown on every keystroke to
- * keep that promise, which is a separate decision and a separate slice.
+ * The body is Markdown and the field says so: it is what the column stores,
+ * what "copy as Markdown" copies, and what a future file sync round-trips.
  *
- * One component serves create and edit. `article` being absent is the create.
+ * The form is TanStack Form's, which is what removed this component's
+ * `useState` pile: six values, a hand-rolled empty check, and a `pending` flag
+ * that raced the error message. Validation lives in `help-center-forms.ts` next
+ * to the server's bounds, and a rejected write reaches the form's own submit
+ * error rather than a local string.
  */
-export function HelpCenterArticleEditor({
-  article,
-  defaultTopicId,
-  organizationId,
-}: {
-  article?: {
-    content: string;
-    id: string;
-    position: number | null;
-    publishedAt: Date | null;
-    slug: string;
-    status: string;
-    title: string;
-    topicId: string;
-  };
-  defaultTopicId?: string | undefined;
-  organizationId: string;
-}) {
+export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
+  const { organizationId } = props;
+
   const { helpCenterArticleCollection, helpCenterTopicCollection } =
     useDashboardCollections();
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  /**
-   * Drop the route's cached single-article read.
-   *
-   * The editor page holds the body under `["help-center-article", org, id]`.
-   * After this form replaces or removes that article, invalidating would leave
-   * the entry *readable*, so reopening the editor paints the old body until a
-   * refetch lands; removing it makes the next open a load.
-   */
-  const forgetArticle = useCallback(() => {
-    if (article === undefined) {
-      return;
-    }
-
-    queryClient.removeQueries({
-      queryKey: ["help-center-article", organizationId, article.id],
-    });
-  }, [article, organizationId, queryClient]);
 
   const topicsQuery = useLiveQuery({
     queryKey: [
@@ -103,139 +93,122 @@ export function HelpCenterArticleEditor({
 
   const topics = topicsQuery.data ?? [];
 
-  const [title, setTitle] = useState(article?.title ?? "");
-  const [slug, setSlug] = useState(article?.slug ?? "");
-  const [content, setContent] = useState(article?.content ?? "");
-
-  const [topicId, setTopicId] = useState(
-    article?.topicId ?? defaultTopicId ?? ""
-  );
-
-  const [status, setStatus] = useState<ArticleStatus>(
-    isArticleStatus(article?.status) ? article.status : "draft"
-  );
-
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const preview = useMemo(() => content, [content]);
+  const article = props.mode === "edit" ? props.article : undefined;
 
   /**
    * The statuses the lifecycle permits from where this article is now.
    *
-   * Derived from the domain machine rather than listed here, so the editor
-   * cannot offer a move the graph says is unreachable — `draft → archived` is
-   * one, because a page nobody has published is deleted rather than withdrawn.
-   * The server asks the same machine, so this is the picker agreeing with the
-   * write instead of a second opinion.
+   * Derived from the domain machine rather than listed, so the editor cannot
+   * offer a move the graph says is unreachable — `draft → archived` is one,
+   * because a page nobody has published is deleted rather than withdrawn. The
+   * server asks the same machine, so this is the picker agreeing with the write
+   * instead of a second opinion.
    */
-  const offeredStatuses = useMemo(() => {
-    const current: ArticleStatus = isArticleStatus(article?.status)
-      ? article.status
-      : "draft";
+  const currentStatus: THelpCenterArticleState = article?.status ?? "draft";
+  const offeredStatuses = [currentStatus, ...targetStatesFor(currentStatus)];
 
-    return [current, ...targetStatesFor(current)].filter(isArticleStatus);
-  }, [article?.status]);
+  const form = useAppForm({
+    ...helpCenterArticleFormOptions,
+    defaultValues: helpCenterArticleFormValues(article),
+    onSubmit: async ({ value }) => {
+      const topicId = value.topicId;
+      const title = value.title.trim();
+      const slug = value.slug.trim();
 
-  const save = async () => {
-    const trimmedTitle = title.trim();
+      /**
+       * Drop the route's cached single-article read.
+       *
+       * The editor page holds the body under `["help-center-article", org, id]`.
+       * After this form replaces or removes that article, invalidating would
+       * leave the entry *readable*, so reopening would paint the old body
+       * until a refetch landed; removing it makes the next open a load.
+       */
+      const forgetArticle = () => {
+        if (article === undefined) {
+          return;
+        }
 
-    if (trimmedTitle.length === 0) {
-      setError("An article needs a title.");
+        queryClient.removeQueries({
+          queryKey: ["help-center-article", organizationId, article.id],
+        });
+      };
 
-      return;
-    }
-
-    if (topicId.length === 0) {
-      setError("Choose a section for this article.");
-
-      return;
-    }
-
-    setPending(true);
-    setError(null);
-
-    try {
       if (article === undefined) {
         const id = await HelpCenterArticleId.unsafeGenerate();
+
         await fetchRpc((rpc) =>
           rpc.CreateHelpCenterArticle({
             id,
             organizationId,
             topicId,
-            title: trimmedTitle,
+            title,
             // Omitted rather than sent as "": the server derives the slug from
             // the title, and an empty string is refused rather than treated as
             // "no preference".
-            slug: slug.trim().length === 0 ? undefined : slug.trim(),
-            content,
-            status,
-            publishedAt: status === "draft" ? null : new Date(),
+            slug: slug.length === 0 ? undefined : slug,
+            content: value.content,
+            status: value.status,
+            publishedAt: value.status === "draft" ? null : new Date(),
             position: null,
           })
         );
-        await helpCenterArticleCollection.utils.refetch();
-
-        await navigate({
-          params: { organizationId },
-          to: "/$organizationId/help-center",
-        });
-
-        return;
+      } else {
+        await fetchRpc((rpc) =>
+          rpc.UpdateHelpCenterArticle({
+            id: article.id,
+            organizationId,
+            topicId,
+            title,
+            slug: slug.length === 0 ? article.slug : slug,
+            content: value.content,
+            status: value.status,
+            // A flip back to draft clears the date; the server applies the same
+            // rule, and sending the previous date for a non-draft status is what
+            // keeps a typo fix from looking like a new release.
+            publishedAt: value.status === "draft" ? null : article.publishedAt,
+            position: article.position,
+          })
+        );
       }
 
-      await fetchRpc((rpc) =>
-        rpc.UpdateHelpCenterArticle({
-          id: article.id,
-          organizationId,
-          topicId,
-          title: trimmedTitle,
-          slug: slug.trim().length === 0 ? article.slug : slug.trim(),
-          content,
-          status,
-          // A flip back to draft clears the date; the server applies the same
-          // rule, and sending the previous date for a non-draft status is what
-          // keeps a typo fix from looking like a new release.
-          publishedAt: status === "draft" ? null : article.publishedAt,
-          position: article.position,
-        })
-      );
       await helpCenterArticleCollection.utils.refetch();
-
-      // The route caches the single-article read under its own key. Invalidate
-      // alone leaves that entry readable, so reopening the editor would show
-      // the body that was just replaced until the refetch landed. Dropping it
-      // makes the next open a load rather than a stale paint.
       forgetArticle();
-
       await navigate({
         params: { organizationId },
         to: "/$organizationId/help-center",
       });
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not save the article."
-      );
-    } finally {
-      setPending(false);
-    }
-  };
+    },
+  });
 
   const remove = async () => {
     if (article === undefined) {
       return;
     }
 
-    setPending(true);
-
     try {
-      helpCenterArticleCollection.delete(article.id);
+      const tx = helpCenterArticleCollection.delete(article.id);
+
+      // The collection removes the row optimistically and applies the server's
+      // answer through the transaction; awaiting it is what lets a refusal keep
+      // the editor open instead of navigating away from a live article.
+      await tx.when("settled");
+
+      queryClient.removeQueries({
+        queryKey: ["help-center-article", organizationId, article.id],
+      });
       await navigate({
         params: { organizationId },
         to: "/$organizationId/help-center",
       });
-    } finally {
-      setPending(false);
+    } catch (cause) {
+      // Rethrown into the form so one place shows every failure, whether it
+      // came from the save or the delete.
+      throw new Error(
+        cause instanceof Error
+          ? cause.message
+          : "Could not delete the article.",
+        { cause }
+      );
     }
   };
 
@@ -258,135 +231,171 @@ export function HelpCenterArticleEditor({
         </Button>
 
         <div className="flex items-center gap-2">
-          {article === undefined ? null : (
-            <Button
-              disabled={pending}
-              onClick={remove}
-              type="button"
-              variant="ghost"
-            >
+          {props.mode === "create" ? null : (
+            <Button onClick={() => void remove()} type="button" variant="ghost">
               <HugeiconsIcon icon={Delete02Icon} />
               Delete
             </Button>
           )}
-          <Button disabled={pending} onClick={save} type="button">
-            {article === undefined ? "Create article" : "Save changes"}
-          </Button>
+          <form.SubscribeButton
+            // The header is outside the `<form>`, so the button is associated
+            // by id rather than by nesting.
+            form={ARTICLE_FORM_ID}
+            label={props.mode === "create" ? "Create article" : "Save changes"}
+            variant="default"
+          />
         </div>
       </header>
 
-      <Field>
-        <FieldLabel htmlFor="help-center-article-title">Title</FieldLabel>
-        <Input
-          id="help-center-article-title"
-          maxLength={200}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="How do I reset my password?"
-          value={title}
-        />
-      </Field>
-
-      <Field>
-        <FieldLabel htmlFor="help-center-article-slug">URL slug</FieldLabel>
-        <Input
-          id="help-center-article-slug"
-          maxLength={200}
-          onChange={(event) => setSlug(event.target.value)}
-          placeholder="reset-my-password"
-          value={slug}
-        />
-        <FieldDescription>
-          Leave empty to derive it from the title.
-        </FieldDescription>
-      </Field>
-
-      <Field>
-        <FieldLabel>Section</FieldLabel>
-        <div className="flex flex-wrap gap-2">
-          {topics.map((topic) => (
-            <button
-              aria-pressed={topicId === topic.id}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors",
-                topicId === topic.id
-                  ? "border-primary/50 bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-              key={topic.id}
-              onClick={() => setTopicId(topic.id)}
-              type="button"
-            >
-              <HelpCenterTopicIcon className="size-4" icon={topic.icon} />
-              {topic.name}
-            </button>
-          ))}
-        </div>
-        {topics.length === 0 ? (
-          <FieldDescription>
-            Create a section first — every article belongs to one.
-          </FieldDescription>
-        ) : null}
-      </Field>
-
-      <Field>
-        <FieldLabel>Status</FieldLabel>
-        <div className="flex flex-wrap gap-2">
-          {offeredStatuses.map((option) => (
-            <button
-              aria-pressed={status === option}
-              className={cn(
-                "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                status === option
-                  ? "border-primary/50 bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-              key={option}
-              onClick={() => setStatus(option)}
-              type="button"
-            >
-              {STATUS_LABELS[option]}
-            </button>
-          ))}
-        </div>
-        <FieldDescription>
-          Archived articles stay reachable so old links do not break, but the
-          portal marks them as out of date. Only the moves the article's
-          lifecycle allows are offered.
-        </FieldDescription>
-      </Field>
-
-      <Tabs defaultValue="write">
-        <TabsList>
-          <TabsTab value="write">Write</TabsTab>
-          <TabsTab value="preview">Preview</TabsTab>
-        </TabsList>
-        <TabsPanel value="write">
-          <Textarea
-            className="min-h-[28rem] font-mono text-sm"
-            onChange={(event) => setContent(event.target.value)}
-            placeholder={"# Getting started\n\nWrite in Markdown."}
-            value={content}
-          />
-        </TabsPanel>
-        <TabsPanel value="preview">
-          <div className="bg-card min-h-[28rem] rounded-lg border p-6">
-            {preview.trim().length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                Nothing to preview.
-              </p>
-            ) : (
-              <MarkdownContent content={preview} />
+      <form
+        className="contents"
+        id={ARTICLE_FORM_ID}
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void form.handleSubmit();
+        }}
+      >
+        <div className="space-y-5">
+          <form.AppField name="title">
+            {(field) => (
+              <field.TextField
+                label="Title"
+                maxLength={200}
+                placeholder="How do I reset my password?"
+              />
             )}
-          </div>
-        </TabsPanel>
-      </Tabs>
+          </form.AppField>
 
-      {error === null ? null : (
-        <p className="text-destructive text-sm">{error}</p>
-      )}
+          <form.AppField name="slug">
+            {(field) => {
+              const { TextField } = field;
+
+              return (
+                <>
+                  <TextField
+                    label="URL slug"
+                    maxLength={200}
+                    placeholder="reset-my-password"
+                  />
+                  <FieldDescription>
+                    Leave empty to derive it from the title.
+                  </FieldDescription>
+                </>
+              );
+            }}
+          </form.AppField>
+
+          <form.AppField name="topicId">
+            {(field) => (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="text-sm font-medium">Section</legend>
+                <div className="flex flex-wrap gap-2">
+                  {topics.map((topic) => (
+                    <button
+                      aria-pressed={field.state.value === topic.id}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors",
+                        field.state.value === topic.id
+                          ? "border-primary/50 bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                      key={topic.id}
+                      onClick={() => field.handleChange(topic.id)}
+                      type="button"
+                    >
+                      <HelpCenterTopicIcon
+                        className="size-4"
+                        icon={topic.icon}
+                      />
+                      {topic.name}
+                    </button>
+                  ))}
+                </div>
+                {topics.length === 0 ? (
+                  <FieldDescription>
+                    Create a section first — every article belongs to one.
+                  </FieldDescription>
+                ) : null}
+              </fieldset>
+            )}
+          </form.AppField>
+
+          <form.AppField name="status">
+            {(field) => (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="text-sm font-medium">Status</legend>
+                <div className="flex flex-wrap gap-2">
+                  {offeredStatuses.map((option) => (
+                    <button
+                      aria-pressed={field.state.value === option}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                        field.state.value === option
+                          ? "border-primary/50 bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                      key={option}
+                      onClick={() => field.handleChange(option)}
+                      type="button"
+                    >
+                      {STATUS_LABELS[option]}
+                    </button>
+                  ))}
+                </div>
+                <FieldDescription>
+                  Archived articles stay reachable so old links do not break,
+                  but the portal marks them as out of date. Only the moves the
+                  article&apos;s lifecycle allows are offered.
+                </FieldDescription>
+              </fieldset>
+            )}
+          </form.AppField>
+        </div>
+
+        <Tabs className="mt-6" defaultValue="write">
+          <TabsList>
+            <TabsTab value="write">Write</TabsTab>
+            <TabsTab value="preview">Preview</TabsTab>
+          </TabsList>
+          <TabsPanel value="write">
+            <form.AppField name="content">
+              {(field) => (
+                <field.TextareaField
+                  className="min-h-[28rem] font-mono text-sm"
+                  hideLabel
+                  label="Article body"
+                  placeholder={"# Getting started\n\nWrite in Markdown."}
+                />
+              )}
+            </form.AppField>
+          </TabsPanel>
+          <TabsPanel value="preview">
+            <div className="bg-card min-h-[28rem] rounded-lg border p-6">
+              <form.Subscribe selector={(state) => state.values.content}>
+                {(content) =>
+                  content.trim().length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      Nothing to preview.
+                    </p>
+                  ) : (
+                    <MarkdownContent content={content} />
+                  )
+                }
+              </form.Subscribe>
+            </div>
+          </TabsPanel>
+        </Tabs>
+
+        <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
+          {(error) =>
+            error === undefined || error === null ? null : (
+              <p className="text-destructive mt-4 text-sm">{String(error)}</p>
+            )
+          }
+        </form.Subscribe>
+      </form>
     </div>
   );
 }
-
-const isArticleStatus = (value: string | undefined): value is ArticleStatus =>
-  value === "draft" || value === "published" || value === "archived";

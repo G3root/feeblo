@@ -11,7 +11,6 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useMemo } from "react";
 
 /**
  * The portal's help center index.
@@ -44,24 +43,7 @@ export function HelpCenterPage() {
   const topics = topicsQuery.data ?? [];
   const articles = articlesQuery.data ?? [];
 
-  // One pass over the articles, then O(1) per topic. Filtering inside the
-  // topic loop is O(topics × articles) on every render, which is the shape that
-  // shows up as a slow first paint on a workspace with a real help center.
-  const articlesByTopic = useMemo(() => {
-    const byTopic = new Map<string, Array<(typeof articles)[number]>>();
-
-    for (const article of articles) {
-      const bucket = byTopic.get(article.topicId);
-
-      if (bucket === undefined) {
-        byTopic.set(article.topicId, [article]);
-      } else {
-        bucket.push(article);
-      }
-    }
-
-    return byTopic;
-  }, [articles]);
+  const articlesByTopic = groupArticlesByTopic(articles);
 
   if (!enabled) {
     return (
@@ -153,4 +135,30 @@ export function HelpCenterPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * Articles bucketed by topic, in one pass.
+ *
+ * A plain function rather than a `useMemo`: the page re-renders when a query
+ * settles, not on every keystroke, and the list is bounded by what a help
+ * center publishes. Filtering inside the topic loop would be O(topics ×
+ * articles) per render for no benefit.
+ */
+function groupArticlesByTopic<Article extends { readonly topicId: string }>(
+  articles: ReadonlyArray<Article>
+): Map<string, Article[]> {
+  const byTopic = new Map<string, Article[]>();
+
+  for (const article of articles) {
+    const bucket = byTopic.get(article.topicId);
+
+    if (bucket === undefined) {
+      byTopic.set(article.topicId, [article]);
+    } else {
+      bucket.push(article);
+    }
+  }
+
+  return byTopic;
 }

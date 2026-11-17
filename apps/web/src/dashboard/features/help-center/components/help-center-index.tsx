@@ -38,7 +38,10 @@ import { useState } from "react";
 import { usePlan } from "~/hooks/use-plan";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-import { HelpCenterTopicDialog } from "./help-center-topic-dialog";
+import {
+  CreateHelpCenterTopicDialog,
+  EditHelpCenterTopicDialog,
+} from "./help-center-topic-dialog";
 import { HelpCenterTopicIcon } from "./help-center-topic-icons";
 
 /** The collection's own row: `description` and `icon` are nullable columns. */
@@ -237,31 +240,29 @@ export function HelpCenterIndex({
         </SkeletonWrapper>
       </SkeletonLoader>
 
-      {/*
-       * `key` is what seeds the form: a different target is a different
-       * component, so the draft is a `useState` initialiser rather than an
-       * effect or an in-render reset.
-       */}
-      <HelpCenterTopicDialog
-        // Keyed by `open`, not by a constant: the draft is a `useState`
-        // initialiser, so a constant key would reopen the dialog holding
-        // whatever the last cancelled attempt had typed.
-        key={createOpen ? "new-open" : "new-closed"}
+      <CreateHelpCenterTopicDialog
         onOpenChange={setCreateOpen}
         open={createOpen}
         organizationId={organizationId}
       />
-      <HelpCenterTopicDialog
-        key={editing?.id ?? "none"}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditing(null);
-          }
-        }}
-        open={editing !== null}
-        organizationId={organizationId}
-        topic={editing ?? undefined}
-      />
+      {/*
+       * Keyed by the row: a different section is a different component, so the
+       * form mounts fresh with that row's values instead of an effect resetting
+       * the previous one.
+       */}
+      {editing === null ? null : (
+        <EditHelpCenterTopicDialog
+          key={editing.id}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditing(null);
+            }
+          }}
+          open
+          organizationId={organizationId}
+          topic={editing}
+        />
+      )}
       <ConfirmDialog
         confirmLabel="Delete section"
         confirmLoading={deletePending}

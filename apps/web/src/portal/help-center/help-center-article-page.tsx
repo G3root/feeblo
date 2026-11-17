@@ -198,16 +198,14 @@ function VerdictSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium">Was this helpful?</p>
         <div className="flex items-center gap-2">
-          <FeedbackButton
+          <HelpfulVoteButton
             active={vote.verdict === true}
             disabled={vote.isPending || !vote.ready}
-            helpful
             onClick={vote.markHelpful}
           />
-          <FeedbackButton
+          <NotHelpfulVoteButton
             active={vote.verdict === false}
             disabled={vote.isPending || !vote.ready}
-            helpful={false}
             onClick={vote.markUnhelpful}
           />
         </div>
@@ -245,17 +243,44 @@ function VerdictSection({
   );
 }
 
-function FeedbackButton({
-  active,
-  disabled,
-  helpful,
-  onClick,
-}: {
+/**
+ * The two answers, as two components.
+ *
+ * One `FeedbackButton` with a `helpful` boolean meant every caller had to know
+ * which branch of the body a `true` selected, and the icon, the label and the
+ * pressed state were all derived from that one flag. The variants name the
+ * answer; the shell below owns the words neither of them changes.
+ */
+function HelpfulVoteButton(props: VoteButtonProps) {
+  return (
+    <VoteButton {...props}>
+      <HugeiconsIcon icon={ThumbsUpIcon} />
+      Yes
+    </VoteButton>
+  );
+}
+
+function NotHelpfulVoteButton(props: VoteButtonProps) {
+  return (
+    <VoteButton {...props}>
+      <HugeiconsIcon icon={ThumbsDownIcon} />
+      No
+    </VoteButton>
+  );
+}
+
+type VoteButtonProps = {
   active: boolean;
   disabled: boolean;
-  helpful: boolean;
   onClick: () => void;
-}) {
+};
+
+function VoteButton({
+  active,
+  children,
+  disabled,
+  onClick,
+}: VoteButtonProps & { children: React.ReactNode }) {
   return (
     <button
       aria-pressed={active}
@@ -269,8 +294,7 @@ function FeedbackButton({
       onClick={onClick}
       type="button"
     >
-      <HugeiconsIcon icon={helpful ? ThumbsUpIcon : ThumbsDownIcon} />
-      {helpful ? "Yes" : "No"}
+      {children}
     </button>
   );
 }
