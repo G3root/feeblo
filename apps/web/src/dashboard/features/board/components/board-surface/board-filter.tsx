@@ -234,15 +234,16 @@ function useBoardFilterReferenceData(organizationId: string) {
   // would look independently selectable and would toggle together; the lane
   // list still reads every row, because a lane is a real status.
   const postStatuses = useMemo<FilterStatus[]>(() => {
-    const byType = new Map<BoardPostStatus, FilterStatus>();
+    const byType = Map.groupBy(
+      postStatusRows ?? [],
+      (postStatus) => postStatus.type
+    );
 
-    for (const postStatus of postStatusRows ?? []) {
-      if (!byType.has(postStatus.type)) {
-        byType.set(postStatus.type, postStatus);
-      }
-    }
+    return [...byType.values()].flatMap((entries) => {
+      const [first] = entries;
 
-    return [...byType.values()];
+      return first === undefined ? [] : [first];
+    });
   }, [postStatusRows]);
 
   const members = useMemo<FilterMember[]>(() => {

@@ -149,19 +149,17 @@ export const canTransitionChangelog = (
 
 /** Every status `event` can produce, deduplicated. */
 const targetsOf = (event: TChangelogEvent): readonly TChangelogState[] => {
-  const targets = new Set<TChangelogState>();
+  // Only a move counts: an event a state does not handle returns that state,
+  // and counting it would make the target ambiguous.
+  return [
+    ...new Set(
+      CHANGELOG_STATES.flatMap((from) => {
+        const next = stateAfter(from, event);
 
-  for (const from of CHANGELOG_STATES) {
-    const next = stateAfter(from, event);
-
-    // Only a move counts: an event a state does not handle returns that state,
-    // and counting it would make the target ambiguous.
-    if (next !== from) {
-      targets.add(next);
-    }
-  }
-
-  return [...targets];
+        return next === from ? [] : [next];
+      })
+    ),
+  ];
 };
 
 /** Every status `state` can move to, in declaration order. */

@@ -1,4 +1,3 @@
-import type { TContact } from "@feeblo/domain/contact/schema";
 import type { TPostActivityKind } from "@feeblo/domain/post-activity/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
@@ -265,17 +264,21 @@ export function PostActivityList({
     [contacts]
   );
 
-  const contactsByUserId = useMemo(() => {
-    const map = new Map<string, TContact>();
+  const contactsByUserId = useMemo(
+    () =>
+      new Map(
+        [...Map.groupBy(contacts, (contact) => contact.userId)].flatMap(
+          ([userId, entries]) => {
+            if (!userId) return [];
 
-    for (const contact of contacts) {
-      if (contact.userId) {
-        map.set(contact.userId, contact);
-      }
-    }
+            const last = entries.at(-1);
 
-    return map;
-  }, [contacts]);
+            return last === undefined ? [] : [[userId, last] as const];
+          }
+        )
+      ),
+    [contacts]
+  );
 
   const membersByUserId = useMemo(
     () => new Map(members.map((member) => [member.userId, member])),

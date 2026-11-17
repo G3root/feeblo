@@ -84,13 +84,15 @@ export function ChangelogListView({
   });
 
   const links = linksQuery.data ?? [];
-  const categoryIdsByChangelog = new Map<string, string[]>();
 
-  for (const link of links) {
-    const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
-    ids.push(link.categoryId);
-    categoryIdsByChangelog.set(link.changelogId, ids);
-  }
+  const categoryIdsByChangelog = new Map(
+    [...Map.groupBy(links, (link) => link.changelogId)].map(
+      ([changelogId, rows]) => [
+        changelogId,
+        rows.map((link) => link.categoryId),
+      ]
+    )
+  );
 
   return (
     <div className="p-3">

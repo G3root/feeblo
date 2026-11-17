@@ -168,16 +168,14 @@ export function ContactTable({
   const attributeValues = useOrgContactAttributeValues(organizationId);
 
   const attributeValueState = React.useMemo<ContactAttributeValuesState>(() => {
-    const byContact = new Map<string, Map<string, CustomAttributeValue>>();
-
-    for (const value of attributeValues.data) {
-      const values =
-        byContact.get(value.contactId) ??
-        new Map<string, CustomAttributeValue>();
-
-      values.set(value.attributeId, value);
-      byContact.set(value.contactId, values);
-    }
+    const byContact = new Map<string, Map<string, CustomAttributeValue>>(
+      [...Map.groupBy(attributeValues.data, (value) => value.contactId)].map(
+        ([contactId, values]) => [
+          contactId,
+          new Map(values.map((value) => [value.attributeId, value])),
+        ]
+      )
+    );
 
     return {
       byContact,

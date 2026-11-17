@@ -336,17 +336,12 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
         { concurrency: "unbounded" }
       );
 
-      const ids = new Set<string>();
-
-      for (const contact of contacts) {
-        if (contact.userId !== null) {
-          ids.add(contact.userId);
-        }
-      }
-
-      for (const user of emailUsers) {
-        ids.add(user.id);
-      }
+      const ids = new Set([
+        ...contacts.flatMap((contact) =>
+          contact.userId === null ? [] : [contact.userId]
+        ),
+        ...emailUsers.map((user) => user.id),
+      ]);
 
       return Option.some(Array.from(ids));
     });

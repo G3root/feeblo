@@ -63,21 +63,17 @@ function parseQuery(
     return query;
   }
 
-  const parts: string[] = [];
-
-  for (const segment of query.split(":")) {
+  const parts = query.split(":").flatMap((segment) => {
     if (segment.startsWith("max-")) {
       const bp = segment.slice(4);
 
-      if (bp in BREAKPOINTS) {
-        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-        parts.push(resolveMax(bp as Breakpoint));
-      }
-    } else if (segment in BREAKPOINTS) {
-      // SAFETY: The upstream contract guarantees this value here.
-      parts.push(resolveMin(segment as Breakpoint));
+      // SAFETY: `bp` is checked against the breakpoint keys before the cast.
+      return bp in BREAKPOINTS ? [resolveMax(bp as Breakpoint)] : [];
     }
-  }
+
+    // SAFETY: `segment` is checked against the breakpoint keys before the cast.
+    return segment in BREAKPOINTS ? [resolveMin(segment as Breakpoint)] : [];
+  });
 
   return parts.length > 0 ? parts.join(" and ") : query;
 }

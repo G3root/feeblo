@@ -232,33 +232,43 @@ function getCustomAttributeValueChanges<
   const inserts: Array<{
     definition: CustomAttributeDefinition;
     valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
-  }> = [];
+  }> = definitions.flatMap((definition) => {
+    const input = values[definition.id] ?? defaultInputValue(definition);
+    const existingValue = existingByAttributeId.get(definition.id);
+
+    if (existingValue || (input === "" && !definition.isRequired)) {
+      return [];
+    }
+
+    return [
+      {
+        definition,
+        valueColumns: toCustomAttributeValueColumns(definition, input),
+      },
+    ];
+  });
 
   const updates: Array<{
     existingValue: TExistingValue;
     valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
-  }> = [];
-
-  for (const definition of definitions) {
+  }> = definitions.flatMap((definition) => {
     const input = values[definition.id] ?? defaultInputValue(definition);
     const existingValue = existingByAttributeId.get(definition.id);
 
-    if (!existingValue && input === "" && !definition.isRequired) {
-      continue;
+    if (
+      !existingValue ||
+      input === getCustomAttributeInputValue(definition, existingValue)
+    ) {
+      return [];
     }
 
-    const valueColumns = toCustomAttributeValueColumns(definition, input);
-
-    if (existingValue) {
-      if (input !== getCustomAttributeInputValue(definition, existingValue)) {
-        updates.push({ existingValue, valueColumns });
-      }
-
-      continue;
-    }
-
-    inserts.push({ definition, valueColumns });
-  }
+    return [
+      {
+        existingValue,
+        valueColumns: toCustomAttributeValueColumns(definition, input),
+      },
+    ];
+  });
 
   return { inserts, updates };
 }

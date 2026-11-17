@@ -73,8 +73,6 @@ export const postCreateFormOpts = formOptions({
     // exactOptionalPropertyTypes. Each validated field is checked against its
     // own schema; the author key is server-validated.
     onChange: ({ value }) => {
-      const fieldErrors: Record<string, string> = {};
-
       const fieldChecks = [
         ["boardId", BoardIdField, value.boardId],
         ["content", ContentField, value.content],
@@ -82,14 +80,20 @@ export const postCreateFormOpts = formOptions({
         ["title", TitleField, value.title],
       ] as const;
 
-      for (const [key, fieldSchema, fieldValue] of fieldChecks) {
-        const parsed = fieldSchema.safeParse(fieldValue);
+      const fieldErrors = Object.fromEntries(
+        fieldChecks.flatMap(([key, fieldSchema, fieldValue]) => {
+          const parsed = fieldSchema.safeParse(fieldValue);
 
-        if (!parsed.success) {
-          fieldErrors[key] =
-            parsed.error.issues[0]?.message ?? m.sweet_direct_buzzard();
-        }
-      }
+          return parsed.success
+            ? []
+            : [
+                [
+                  key,
+                  parsed.error.issues[0]?.message ?? m.sweet_direct_buzzard(),
+                ] as const,
+              ];
+        })
+      );
 
       // Field-scoped errors must ride under `fields` (GlobalFormValidationError);
       // a flat record would surface as a single global form error.

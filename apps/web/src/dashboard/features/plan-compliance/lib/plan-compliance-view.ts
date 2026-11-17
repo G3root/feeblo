@@ -163,17 +163,16 @@ const violation = (
 const mergeResources = (
   ...findings: ReadonlyArray<TPlanComplianceViolation | undefined>
 ): TPlanComplianceResource[] => {
-  const byKey = new Map<string, TPlanComplianceResource>();
+  const byKey = Map.groupBy(
+    findings.flatMap((finding) => finding?.resources ?? []),
+    resourceKey
+  );
 
-  for (const finding of findings) {
-    for (const resource of finding?.resources ?? []) {
-      if (!byKey.has(resourceKey(resource))) {
-        byKey.set(resourceKey(resource), resource);
-      }
-    }
-  }
+  return [...byKey.values()].flatMap((resources) => {
+    const [first] = resources;
 
-  return [...byKey.values()];
+    return first === undefined ? [] : [first];
+  });
 };
 
 const makeBoardPublic = (

@@ -607,13 +607,12 @@ const makePublicApiPostRepository = Effect.gen(function* () {
         { concurrency: "unbounded" }
       );
 
-      const tagsByPost = new Map<string, { id: string; name: string }[]>();
-
-      for (const tag of tagRows) {
-        const existing = tagsByPost.get(tag.postId) ?? [];
-        existing.push({ id: tag.id, name: tag.name });
-        tagsByPost.set(tag.postId, existing);
-      }
+      const tagsByPost = new Map<string, { id: string; name: string }[]>(
+        [...Map.groupBy(tagRows, (tag) => tag.postId)].map(([postId, rows]) => [
+          postId,
+          rows.map(({ id, name }) => ({ id, name })),
+        ])
+      );
 
       const lastRow = pageRows[pageRows.length - 1];
 

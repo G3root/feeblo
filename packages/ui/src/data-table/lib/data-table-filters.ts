@@ -277,16 +277,14 @@ function compare(
 
   if (Number.isNaN(cell) || Number.isNaN(target)) return false;
 
-  switch (operator) {
-    case "lt":
-      return cell < target;
-    case "lte":
-      return cell <= target;
-    case "gt":
-      return cell > target;
-    default:
-      return cell >= target;
-  }
+  const comparisons: Record<typeof operator, boolean> = {
+    gt: cell > target,
+    gte: cell >= target,
+    lt: cell < target,
+    lte: cell <= target,
+  };
+
+  return comparisons[operator];
 }
 
 function getIsBetween(

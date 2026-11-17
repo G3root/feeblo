@@ -57,13 +57,14 @@ const tunnel = async (request: Request): Promise<Response> => {
     // Sentry's rate-limit answer belongs to the browser SDK, which honours
     // it; the body does not.
     await upstream.arrayBuffer();
-    const headers: Record<string, string> = {};
 
-    for (const name of ["x-sentry-rate-limits", "retry-after"]) {
-      const value = upstream.headers.get(name);
+    const headers = Object.fromEntries(
+      ["x-sentry-rate-limits", "retry-after"].flatMap((name) => {
+        const value = upstream.headers.get(name);
 
-      if (value !== null) headers[name] = value;
-    }
+        return value === null ? [] : [[name, value] as const];
+      })
+    );
 
     return empty(upstream.status, headers);
   } catch {

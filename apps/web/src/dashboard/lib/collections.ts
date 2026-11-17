@@ -182,17 +182,21 @@ export function postCollection(scope: DashboardCollectionScope) {
         }
 
         const { organizationId } = firstMutation.original;
+
         // Deletes can arrive one at a time (row actions) or as one transaction
         // with many mutations (bulk selection). Group them into one bulk RPC
         // per board so both paths share the server call.
-        const postIdsByBoardId = new Map<string, string[]>();
-
-        for (const mutation of transaction.mutations) {
-          const { original: deletedPost } = mutation;
-          const postIds = postIdsByBoardId.get(deletedPost.boardId) ?? [];
-          postIds.push(deletedPost.id);
-          postIdsByBoardId.set(deletedPost.boardId, postIds);
-        }
+        const postIdsByBoardId = new Map(
+          [
+            ...Map.groupBy(
+              transaction.mutations,
+              (mutation) => mutation.original.boardId
+            ),
+          ].map(([boardId, mutations]) => [
+            boardId,
+            mutations.map((mutation) => mutation.original.id),
+          ])
+        );
 
         // Settle every board's RPC before rejecting: `Promise.all` fail-fast
         // would strand a successful board's optimistic deletes behind the
@@ -1122,13 +1126,10 @@ export function postActivityCollection(scope: DashboardCollectionScope) {
           { signal: ctx.signal }
         );
 
-        const merged = new Map(
-          existingData.map((activity) => [activity.id, activity])
-        );
-
-        for (const activity of changes) {
-          merged.set(activity.id, activity);
-        }
+        const merged = new Map([
+          ...existingData.map((activity) => [activity.id, activity] as const),
+          ...changes.map((activity) => [activity.id, activity] as const),
+        ]);
 
         // Preserve the full merged history: the timeline renders every activity
         // and `since` only moves forward, so dropping entries would make that

@@ -327,30 +327,27 @@ export function normalizeColumnFilter(
   };
 }
 
+const plainFilterValueReaders: Record<
+  FilterVariant,
+  (value: DataTableRawValue) => DataTableRawValue
+> = {
+  boolean: (value) => [value],
+  date: (value) =>
+    Array.isArray(value)
+      ? value.map((item) => parseFilterDate(item)?.getTime())
+      : parseFilterDate(value)?.getTime(),
+  number: (value) =>
+    Array.isArray(value)
+      ? value.map((item) => (item === "" ? undefined : Number(item)))
+      : value,
+  select: (value) => (Array.isArray(value) ? value : [value]),
+  text: (value) => value,
+};
+
 export function getPlainFilterValue(
   filter: ColumnFilterItem
 ): DataTableRawValue {
-  const { variant, value } = filter;
-
-  if (variant === "select") {
-    return Array.isArray(value) ? value : [value];
-  }
-
-  if (variant === "number") {
-    return Array.isArray(value)
-      ? value.map((item) => (item === "" ? undefined : Number(item)))
-      : value;
-  }
-
-  if (variant === "date") {
-    return Array.isArray(value)
-      ? value.map((item) => parseFilterDate(item)?.getTime())
-      : parseFilterDate(value)?.getTime();
-  }
-
-  if (variant === "boolean") return [value];
-
-  return value;
+  return plainFilterValueReaders[filter.variant](filter.value);
 }
 
 // The feature's `setColumnFilters` turns every filter into a
@@ -533,31 +530,37 @@ export function getColumnPinningStyle<TData extends RowData>(
 export function getColumnSizingStyle<TData extends RowData>(
   table: Table<DataTableFeatures, TData>
 ): React.CSSProperties {
-  // A `Map` rather than an object literal because the keys are CSS custom
-  // properties, which no object type in this file enumerates.
-  const style = new Map<string, string>([
-    ["minWidth", `${table.getTotalSize()}px`],
-  ]);
+  // CSS custom properties are strings no object type in this file enumerates,
+  // so the entries are built first and read back as `React.CSSProperties`.
+  const sizeEntries = table
+    .getFlatHeaders()
+    .map(
+      (header) =>
+        [
+          getColumnVar(header.column.id, "size"),
+          `${header.getSize()}px`,
+        ] as const
+    );
 
-  for (const header of table.getFlatHeaders()) {
-    style.set(getColumnVar(header.column.id, "size"), `${header.getSize()}px`);
-  }
-
-  for (const { column } of table.getLeafHeaders()) {
+  const offsetEntries = table.getLeafHeaders().flatMap(({ column }) => {
     const isPinned = column.getIsPinned();
 
-    if (!isPinned) continue;
+    if (!isPinned) return [];
 
     const offset =
       isPinned === "start" ? column.getStart("start") : column.getAfter("end");
 
-    style.set(getColumnVar(column.id, "offset"), `${offset}px`);
-  }
+    return [[getColumnVar(column.id, "offset"), `${offset}px`] as const];
+  });
 
-  // SAFETY: every entry is a CSS custom property (`--column-…`) or a known
-  // style key, and every value is a length in `px`; `React.CSSProperties`
-  // accepts an index signature it does not model for custom properties.
-  return Object.fromEntries(style) as React.CSSProperties;
+  // SAFETY: every entry is a CSS custom property (`--column-…`) or `minWidth`,
+  // and every value is a length in `px`; `React.CSSProperties` accepts an
+  // index signature it does not model for custom properties.
+  return Object.fromEntries([
+    ["minWidth", `${table.getTotalSize()}px`],
+    ...sizeEntries,
+    ...offsetEntries,
+  ]) as React.CSSProperties;
 }
 
 export function getIsTableShortcutTarget(

@@ -77,23 +77,24 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
       .where(eq(schema.emailOutboxTable.organizationId, organizationId))
       .groupBy(schema.emailDeliveryTable.state);
 
-    const intentStates = emptyIntentStates();
-
-    for (const row of intents) {
-      const state = yield* Schema.decodeEffect(EmailOutboxState)(
-        row.state
-      ).pipe(
+    const decodedIntents = yield* Effect.forEach(intents, (row) =>
+      Schema.decodeEffect(EmailOutboxState)(row.state).pipe(
         Effect.mapError(
           (cause) =>
             new EmailOutboxInspectionError({
               reason: "Stored email outbox state is invalid",
               cause,
             })
-        )
-      );
+        ),
+        Effect.map((state) => ({ state, total: row.total }))
+      )
+    );
 
-      intentStates[state] += row.total;
-    }
+    const intentStates = decodedIntents.reduce((states, { state, total }) => {
+      states[state] += total;
+
+      return states;
+    }, emptyIntentStates());
 
     const deliveryStates = emptyDeliveryStates();
     let oldestQueuedAt: Date | undefined;

@@ -97,16 +97,8 @@ export const makeSlackCredentialResolver = ({
     }),
 });
 
-const parseFormBody = (rawBody: string) => {
-  const params = new URLSearchParams(rawBody);
-  const result: Record<string, string> = {};
-
-  for (const [key, value] of params.entries()) {
-    result[key] = value;
-  }
-
-  return result;
-};
+const parseFormBody = (rawBody: string) =>
+  Object.fromEntries(new URLSearchParams(rawBody).entries());
 
 /**
  * Creates an inbound capability handler that verifies the Slack request

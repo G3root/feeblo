@@ -541,16 +541,16 @@ export const materializeEmailIntent = (outboxId: string) =>
           // dropped — nobody is emailed about their own action — while a
           // window that mixes authors still reaches each author about the
           // others' posts.
-          const creatorCounts = new Map<string, number>();
+          const rowsWithCreator = rows.filter(
+            (row): row is (typeof rows)[number] & { creatorId: string } =>
+              row.creatorId !== null
+          );
 
-          for (const row of rows) {
-            if (row.creatorId !== null) {
-              creatorCounts.set(
-                row.creatorId,
-                (creatorCounts.get(row.creatorId) ?? 0) + 1
-              );
-            }
-          }
+          const creatorCounts = new Map(
+            [...Map.groupBy(rowsWithCreator, (row) => row.creatorId)].map(
+              ([creatorId, creatorRows]) => [creatorId, creatorRows.length]
+            )
+          );
 
           const soleCreatorUserIds = new Set(
             [...creatorCounts.entries()].flatMap(([userId, count]) =>

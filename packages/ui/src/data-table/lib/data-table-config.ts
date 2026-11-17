@@ -219,14 +219,10 @@ export function createDataTableConfig<
       );
       write(urlKeyOf("search"), globalFilter === "" ? undefined : globalFilter);
 
-      const filtersByColumn = new Map<string, ColumnFilterItem[]>();
-
-      for (const filter of filters) {
-        filtersByColumn.set(filter.id, [
-          ...(filtersByColumn.get(filter.id) ?? []),
-          filter,
-        ]);
-      }
+      const filtersByColumn = Map.groupBy<string, ColumnFilterItem>(
+        filters,
+        (filter) => filter.id
+      );
 
       for (const columnId of filterableIds) {
         const columnFilters = filtersByColumn.get(columnId);
@@ -284,16 +280,13 @@ export function applyColumnConfig<TData extends RowData>(
 export function getColumnConfigs<TData extends RowData>(
   columns: readonly ColumnDef<DataTableFeatures, TData>[]
 ) {
-  const configs: DataTableColumnConfigs = {};
+  return Object.fromEntries(
+    getLeafColumns(columns).flatMap((column) => {
+      const columnId = getColumnId(column);
 
-  for (const column of getLeafColumns(columns)) {
-    const columnId = getColumnId(column);
-
-    if (!columnId) continue;
-    configs[columnId] = getColumnConfig(column);
-  }
-
-  return configs;
+      return columnId ? [[columnId, getColumnConfig(column)] as const] : [];
+    })
+  );
 }
 
 export function getConfigInputKey<TData extends RowData>(

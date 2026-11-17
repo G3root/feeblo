@@ -3,7 +3,6 @@ import type {
   NormalizedUserIdentity,
   UserIdentity,
   WidgetCompany,
-  WidgetFieldValue,
 } from "./types";
 
 const COMPANY_KEYS = ["id", "name", "avatar", "customFields"] as const;
@@ -11,15 +10,14 @@ const COMPANY_KEYS = ["id", "name", "avatar", "customFields"] as const;
 function normalizeCompany(
   company: WidgetCompany
 ): Pick<WidgetCompany, "id" | "name" | "avatar" | "customFields"> {
-  const result: Record<string, WidgetFieldValue> = {};
+  const result = Object.fromEntries(
+    COMPANY_KEYS.flatMap((key) =>
+      company[key] === undefined ? [] : [[key, company[key]] as const]
+    )
+  );
 
-  for (const key of COMPANY_KEYS) {
-    if (company[key] !== undefined) {
-      result[key] = company[key];
-    }
-  }
-
-  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+  // SAFETY: `COMPANY_KEYS` is exactly the picked key set, and every present
+  // value keeps its `WidgetCompany` type.
   return result as Pick<
     WidgetCompany,
     "id" | "name" | "avatar" | "customFields"
@@ -38,19 +36,11 @@ export function normalizeUserIdentity(
     });
   }
 
-  const base: Record<string, WidgetFieldValue> = {};
-
-  for (const key of [
-    "email",
-    "name",
-    "avatar",
-    "token",
-    "customFields",
-  ] as const) {
-    if (rest[key] !== undefined) {
-      base[key] = rest[key];
-    }
-  }
+  const base = Object.fromEntries(
+    (["email", "name", "avatar", "token", "customFields"] as const).flatMap(
+      (key) => (rest[key] === undefined ? [] : [[key, rest[key]] as const])
+    )
+  );
 
   const companies = rest.companies?.map(normalizeCompany);
 

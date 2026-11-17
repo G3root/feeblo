@@ -85,11 +85,11 @@ export const strippedBreadcrumb = <
 
   if (data === undefined) return crumb;
 
-  for (const key of ["from", "to", "url"]) {
+  ["from", "to", "url"].forEach((key) => {
     const value = data[key];
 
     if (isString(value)) data[key] = strippedUrl(value);
-  }
+  });
 
   return crumb;
 };

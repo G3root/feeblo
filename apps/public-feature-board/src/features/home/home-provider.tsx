@@ -279,18 +279,25 @@ export function HomeProvider({ children }: { children: ReactNode }) {
   }, [statusCounts, statuses]);
 
   const boardItems = useMemo(() => {
-    const countMap = new Map<string, number>();
     const boardsById = new Map(boards.map((board) => [board.id, board]));
 
-    for (const bc of boardCounts) {
-      const board = boardsById.get(bc.boardId);
+    const countsBySlug = Map.groupBy(
+      boardCounts.flatMap((bc) => {
+        const board = boardsById.get(bc.boardId);
 
-      if (!board) {
-        continue;
-      }
+        return board === undefined
+          ? []
+          : [{ count: bc.count, slug: board.slug }];
+      }),
+      (entry) => entry.slug
+    );
 
-      countMap.set(board.slug, (countMap.get(board.slug) ?? 0) + bc.count);
-    }
+    const countMap = new Map(
+      [...countsBySlug].map(([slug, entries]) => [
+        slug,
+        entries.reduce((sum, entry) => sum + entry.count, 0),
+      ])
+    );
 
     const totalPosts = boardCounts.reduce((sum, b) => sum + b.count, 0);
 

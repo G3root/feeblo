@@ -144,13 +144,14 @@ function ChangelogContent() {
         .where(({ link }) => eq(link.organizationId, site.organizationId)),
   });
 
-  const categoryIdsByChangelog = new Map<string, string[]>();
-
-  for (const link of categoryLinks) {
-    const ids = categoryIdsByChangelog.get(link.changelogId) ?? [];
-    ids.push(link.categoryId);
-    categoryIdsByChangelog.set(link.changelogId, ids);
-  }
+  const categoryIdsByChangelog = new Map(
+    [...Map.groupBy(categoryLinks, (link) => link.changelogId)].map(
+      ([changelogId, rows]) => [
+        changelogId,
+        rows.map((link) => link.categoryId),
+      ]
+    )
+  );
 
   const changelogs = changelogsQuery.data ?? [];
   const isError = isLiveQueryFailed(changelogsQuery);

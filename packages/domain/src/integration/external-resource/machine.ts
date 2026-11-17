@@ -143,19 +143,17 @@ export const canTransitionCreateRequest = (
 const targetsOf = (
   event: TExternalResourceCreateRequestEvent
 ): readonly TExternalResourceCreateRequestState[] => {
-  const targets = new Set<TExternalResourceCreateRequestState>();
+  // Only a move counts: an event a state does not handle returns that state,
+  // and counting it would make the target ambiguous.
+  return [
+    ...new Set(
+      EXTERNAL_RESOURCE_CREATE_REQUEST_STATES.flatMap((from) => {
+        const next = stateAfter(from, event);
 
-  for (const from of EXTERNAL_RESOURCE_CREATE_REQUEST_STATES) {
-    const next = stateAfter(from, event);
-
-    // Only a move counts: an event a state does not handle returns that state,
-    // and counting it would make the target ambiguous.
-    if (next !== from) {
-      targets.add(next);
-    }
-  }
-
-  return [...targets];
+        return next === from ? [] : [next];
+      })
+    ),
+  ];
 };
 
 /**

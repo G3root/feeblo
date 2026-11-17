@@ -235,36 +235,32 @@ export const engagementSourceStatesFor = (
 const presenceTargetsOf = (
   event: TPostPresenceEvent
 ): readonly TPostPresence[] => {
-  const targets = new Set<TPostPresence>();
+  // Only a move counts: an event a state does not handle returns that state,
+  // and counting it would make the target ambiguous.
+  return [
+    ...new Set(
+      POST_PRESENCE_STATES.flatMap((from) => {
+        const next = presenceAfter(from, event);
 
-  for (const from of POST_PRESENCE_STATES) {
-    const next = presenceAfter(from, event);
-
-    // Only a move counts: an event a state does not handle returns that state,
-    // and counting it would make the target ambiguous.
-    if (next !== from) {
-      targets.add(next);
-    }
-  }
-
-  return [...targets];
+        return next === from ? [] : [next];
+      })
+    ),
+  ];
 };
 
 /** Every engagement `event` can produce, deduplicated. */
 const engagementTargetsOf = (
   event: TPostEngagementEvent
 ): readonly TPostEngagement[] => {
-  const targets = new Set<TPostEngagement>();
+  return [
+    ...new Set(
+      POST_ENGAGEMENT_STATES.flatMap((from) => {
+        const next = engagementAfter(from, event);
 
-  for (const from of POST_ENGAGEMENT_STATES) {
-    const next = engagementAfter(from, event);
-
-    if (next !== from) {
-      targets.add(next);
-    }
-  }
-
-  return [...targets];
+        return next === from ? [] : [next];
+      })
+    ),
+  ];
 };
 
 /**

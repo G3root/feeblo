@@ -617,23 +617,26 @@ export const syncChangelogAssetReferences = ({
               )
             )).slice(0, 1);
 
-    const assetsById = new Map<string, EditorAsset>();
+    const currentIds = new Set(currentAssets.map((asset) => asset.id));
 
-    for (const asset of currentAssets) {
-      assetsById.set(asset.id, asset);
-    }
+    const coverAdditions = coverAssets.filter(
+      (asset) => !currentIds.has(asset.id)
+    );
 
-    for (const asset of coverAssets) {
-      if (!assetsById.has(asset.id)) {
-        assetsById.set(asset.id, asset);
-      }
-    }
+    const coverIds = new Set(coverAdditions.map((asset) => asset.id));
 
-    for (const asset of submittedAssets) {
-      if (!assetsById.has(asset.id) && content.includes(asset.url)) {
-        assetsById.set(asset.id, asset);
-      }
-    }
+    const submittedAdditions = submittedAssets.filter(
+      (asset) =>
+        !currentIds.has(asset.id) &&
+        !coverIds.has(asset.id) &&
+        content.includes(asset.url)
+    );
+
+    const assetsById = new Map<string, EditorAsset>([
+      ...currentAssets.map((asset) => [asset.id, asset] as const),
+      ...coverAdditions.map((asset) => [asset.id, asset] as const),
+      ...submittedAdditions.map((asset) => [asset.id, asset] as const),
+    ]);
 
     yield* syncChangelogReferences({
       changelogId,

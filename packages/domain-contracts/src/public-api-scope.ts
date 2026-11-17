@@ -252,20 +252,14 @@ const splitScope = (scope: PublicApiScope): [string, string] => {
 export const toPublicApiScopeStatements = (
   scopes: readonly PublicApiScope[]
 ): Record<string, string[]> => {
-  const grouped = new Map<string, string[]>();
+  const grouped = Map.groupBy(scopes, (scope) => splitScope(scope)[0]);
 
-  for (const scope of scopes) {
-    const [resource, action] = splitScope(scope);
-    const actions = grouped.get(resource) ?? [];
-
-    if (!actions.includes(action)) {
-      actions.push(action);
-    }
-
-    grouped.set(resource, actions);
-  }
-
-  return Object.fromEntries(grouped);
+  return Object.fromEntries(
+    [...grouped].map(([resource, groupedScopes]) => [
+      resource,
+      [...new Set(groupedScopes.map((scope) => splitScope(scope)[1]))],
+    ])
+  );
 };
 
 /** True when `statements` grant `scope`, directly or through a `*` action. */
