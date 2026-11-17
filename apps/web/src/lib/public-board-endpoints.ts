@@ -276,34 +276,33 @@ async function collectUrls(
   site: TSite,
   origin: string
 ): Promise<ReadonlyArray<SitemapUrl>> {
-  const urls: SitemapUrl[] = [{ loc: `${origin}/` }];
   const { boards, entries, posts, roadmaps } = await collectBoardContent(site);
 
-  if (site.roadmapVisibility === "PUBLIC") {
-    urls.push({ loc: `${origin}/roadmap` });
+  const roadmapUrls =
+    site.roadmapVisibility === "PUBLIC"
+      ? [
+          { loc: `${origin}/roadmap` },
+          ...roadmaps.map((roadmap) => ({
+            loc: `${origin}/roadmap/${roadmap.slug}`,
+            lastmod: toIsoDateOnly(roadmap.updatedAt),
+          })),
+        ]
+      : [];
 
-    for (const roadmap of roadmaps) {
-      urls.push({
-        loc: `${origin}/roadmap/${roadmap.slug}`,
-        lastmod: toIsoDateOnly(roadmap.updatedAt),
-      });
-    }
-  }
+  const changelogUrls =
+    site.changelogVisibility === "PUBLIC"
+      ? [
+          { loc: `${origin}/changelog` },
+          ...entries.map((entry) => ({
+            loc: `${origin}/changelog/${entry.slug}`,
+            lastmod: toIsoDateOnly(entry.updatedAt),
+          })),
+        ]
+      : [];
 
-  if (site.changelogVisibility === "PUBLIC") {
-    urls.push({ loc: `${origin}/changelog` });
-
-    for (const entry of entries) {
-      urls.push({
-        loc: `${origin}/changelog/${entry.slug}`,
-        lastmod: toIsoDateOnly(entry.updatedAt),
-      });
-    }
-  }
-
-  for (const board of boards) {
-    urls.push({ loc: `${origin}/b/${board.slug}` });
-  }
+  const boardUrls = boards.map((board) => ({
+    loc: `${origin}/b/${board.slug}`,
+  }));
 
   // Deterministic order keeps `?page=N` slices stable across requests, so
   // crawlers never see URLs migrate between sitemap pages. Code-unit
@@ -313,14 +312,18 @@ async function collectUrls(
     left.slug < right.slug ? -1 : left.slug > right.slug ? 1 : 0
   );
 
-  for (const post of sortedPosts) {
-    urls.push({
-      loc: `${origin}/p/${post.slug}`,
-      lastmod: toIsoDateOnly(post.updatedAt),
-    });
-  }
+  const postUrls = sortedPosts.map((post) => ({
+    loc: `${origin}/p/${post.slug}`,
+    lastmod: toIsoDateOnly(post.updatedAt),
+  }));
 
-  return urls;
+  return [
+    { loc: `${origin}/` },
+    ...roadmapUrls,
+    ...changelogUrls,
+    ...boardUrls,
+    ...postUrls,
+  ];
 }
 
 /**

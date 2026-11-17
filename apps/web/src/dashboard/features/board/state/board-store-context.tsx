@@ -194,13 +194,12 @@ const createBoardStore = (defaultValue?: BoardStoreDefaultValue) =>
         };
       },
       selectPosts: (context, event: { posts: SelectedBoardPost[] }) => {
-        const selected = new Map(
-          context.selectedPosts.map((entry) => [entry.postId, entry])
-        );
-
-        for (const post of event.posts) {
-          selected.set(post.postId, post);
-        }
+        const selected = new Map([
+          ...context.selectedPosts.map(
+            (entry) => [entry.postId, entry] as const
+          ),
+          ...event.posts.map((post) => [post.postId, post] as const),
+        ]);
 
         return {
           ...context,

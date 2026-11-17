@@ -54,21 +54,15 @@ export function useBoardGroupingData(
     [organizationMembers]
   );
 
-  const postTagsByPostId = useMemo(() => {
-    const map = new Map<string, string[]>();
-
-    for (const row of postTags ?? []) {
-      const tagIds = map.get(row.postId);
-
-      if (tagIds) {
-        tagIds.push(row.tagId);
-      } else {
-        map.set(row.postId, [row.tagId]);
-      }
-    }
-
-    return map;
-  }, [postTags]);
+  const postTagsByPostId = useMemo(
+    () =>
+      new Map(
+        [...Map.groupBy(postTags ?? [], (row) => row.postId)].map(
+          ([postId, rows]) => [postId, rows.map((row) => row.tagId)]
+        )
+      ),
+    [postTags]
+  );
 
   return {
     // A failed read only fails the board when the active grouping actually

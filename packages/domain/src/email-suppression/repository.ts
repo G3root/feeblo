@@ -345,13 +345,6 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
       .where(eq(table.organizationId, organizationId))
       .groupBy(table.reason);
 
-    const result = {
-      administrativeBlock: 0,
-      complaint: 0,
-      hardBounce: 0,
-      total: 0,
-    };
-
     // Every reason the table can hold counts under one of the three classes;
     // a row whose reason is none of the named two is a hard bounce.
     const keyByReason = new Map<string, "administrativeBlock" | "complaint">([
@@ -359,14 +352,22 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
       ["complaint", "complaint"],
     ]);
 
-    for (const row of rows) {
-      const key = keyByReason.get(row.reason) ?? "hardBounce";
+    const sum = (predicate: (row: (typeof rows)[number]) => boolean) =>
+      rows.filter(predicate).reduce((total, row) => total + row.total, 0);
 
-      result[key] += row.total;
-      result.total += row.total;
-    }
+    const administrativeBlock = sum(
+      (row) => row.reason === "administrative_block"
+    );
 
-    return result;
+    const complaint = sum((row) => row.reason === "complaint");
+    const hardBounce = sum((row) => !keyByReason.has(row.reason));
+
+    return {
+      administrativeBlock,
+      complaint,
+      hardBounce,
+      total: administrativeBlock + complaint + hardBounce,
+    };
   });
 
   return {

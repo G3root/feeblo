@@ -72,22 +72,32 @@ function DataTableSortMenuContent<TData extends RowData>({
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
   const { columnLabels, columns } = React.useMemo(() => {
-    const labels = new Map<string, string>();
+    const sortableColumns = table
+      .getAllLeafColumns()
+      .filter((column) => column.getCanSort());
+
     const sortingIds = new Set(sorting.map((item) => item.id));
-    const availableColumns: { id: string; label: string }[] = [];
 
-    for (const column of table.getAllLeafColumns()) {
-      if (!column.getCanSort()) continue;
+    const labels = new Map(
+      sortableColumns.map((column) => [
+        column.id,
+        column.columnDef.meta?.label ?? column.id,
+      ])
+    );
 
-      const label = column.columnDef.meta?.label ?? column.id;
-      labels.set(column.id, label);
-
-      if (!sortingIds.has(column.id)) {
-        availableColumns.push({ id: column.id, label });
-      }
-    }
-
-    return { columnLabels: labels, columns: availableColumns };
+    return {
+      columnLabels: labels,
+      columns: sortableColumns.flatMap((column) =>
+        sortingIds.has(column.id)
+          ? []
+          : [
+              {
+                id: column.id,
+                label: column.columnDef.meta?.label ?? column.id,
+              },
+            ]
+      ),
+    };
   }, [sorting, table]);
 
   const onSortAdd = React.useCallback(() => {

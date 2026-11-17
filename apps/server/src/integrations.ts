@@ -255,19 +255,14 @@ export const makeIntegrationLayers: Effect.Effect<
   // Deliveries are claimed only for capability keys owned by the matching
   // provider; the startup-validated registry supplies each provider's outbound
   // capabilities, so cross-provider or unknown keys are never claimable.
-  const claimableCapabilityKeysByProvider = new Map<
-    string,
-    readonly string[]
-  >();
-
-  for (const manifest of registry.manifests) {
-    claimableCapabilityKeysByProvider.set(
+  const claimableCapabilityKeysByProvider = new Map<string, readonly string[]>(
+    registry.manifests.map((manifest) => [
       manifest.provider,
       manifest.capabilities
         .filter((capability) => capability.direction === "outbound")
-        .map((capability) => capability.key)
-    );
-  }
+        .map((capability) => capability.key),
+    ])
+  );
 
   const workerRepository = yield* makeIntegrationDeliveryWorkerRepository(
     claimableCapabilityKeysByProvider,

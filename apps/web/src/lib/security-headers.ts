@@ -68,33 +68,34 @@ export const isEmbeddedWidgetPath = (pathname: string): boolean =>
 export const parseImageOrigins = (
   values: readonly (string | undefined)[]
 ): readonly string[] => {
-  const origins = new Set<string>();
+  const parseOrigin = (value: string): string | undefined => {
+    try {
+      const url = new URL(value);
 
-  for (const value of values) {
-    if (value === undefined) {
-      continue;
+      return url.protocol === "http:" || url.protocol === "https:"
+        ? url.origin
+        : undefined;
+    } catch {
+      // Not an absolute URL: ignored rather than trusted.
+      return undefined;
     }
+  };
 
-    for (const entry of value.split(",")) {
-      const trimmed = entry.trim();
+  const origins = values.flatMap((value) =>
+    value === undefined
+      ? []
+      : value.split(",").flatMap((entry) => {
+          const trimmed = entry.trim();
 
-      if (trimmed.length === 0) {
-        continue;
-      }
+          if (trimmed.length === 0) return [];
 
-      try {
-        const url = new URL(trimmed);
+          const origin = parseOrigin(trimmed);
 
-        if (url.protocol === "http:" || url.protocol === "https:") {
-          origins.add(url.origin);
-        }
-      } catch {
-        // Not an absolute URL: ignored rather than trusted.
-      }
-    }
-  }
+          return origin === undefined ? [] : [origin];
+        })
+  );
 
-  return [...origins];
+  return [...new Set(origins)];
 };
 
 export interface PageSecurityInput {
@@ -204,22 +205,22 @@ export const applyPageSecurityHeaders = (
 ): Response => {
   const headers = pageSecurityHeaders(input);
 
-  try {
-    for (const [name, value] of Object.entries(headers)) {
+  const setHeaders = (target: Headers) => {
+    Object.entries(headers).forEach(([name, value]) => {
       if (value !== undefined) {
-        response.headers.set(name, value);
+        target.set(name, value);
       }
-    }
+    });
+  };
+
+  try {
+    setHeaders(response.headers);
 
     return response;
   } catch {
     const merged = new Headers(response.headers);
 
-    for (const [name, value] of Object.entries(headers)) {
-      if (value !== undefined) {
-        merged.set(name, value);
-      }
-    }
+    setHeaders(merged);
 
     const body =
       response.status === 204 || response.status === 304 ? null : response.body;

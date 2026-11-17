@@ -253,12 +253,12 @@ export const getPlanFeatureRows = (
   plan: OrganizationPlan
 ): readonly PlanFeatureRow[] => {
   const entitlements: PlanEntitlements = PLAN_ENTITLEMENTS[plan];
-  const rows: PlanFeatureRow[] = [];
 
-  for (const key of LIMIT_FEATURE_ORDER) {
+  const limitRows = LIMIT_FEATURE_ORDER.map((key) => {
     const definition = PLAN_FEATURE_CATALOG[key];
     const limit = entitlements.limits[key];
-    rows.push({
+
+    return {
       key,
       label:
         limit === null
@@ -266,14 +266,14 @@ export const getPlanFeatureRows = (
           : `${limit} ${
               limit === 1 ? definition.singularLabel : definition.pluralLabel
             }`,
-    });
-  }
+    };
+  });
 
-  for (const key of CAPABILITY_FEATURE_ORDER) {
-    if (entitlements.capabilities[key]) {
-      rows.push({ key, label: PLAN_FEATURE_CATALOG[key].label });
-    }
-  }
+  const capabilityRows = CAPABILITY_FEATURE_ORDER.flatMap((key) =>
+    entitlements.capabilities[key]
+      ? [{ key, label: PLAN_FEATURE_CATALOG[key].label }]
+      : []
+  );
 
-  return rows;
+  return [...limitRows, ...capabilityRows];
 };

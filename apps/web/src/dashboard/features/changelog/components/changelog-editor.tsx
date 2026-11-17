@@ -772,13 +772,10 @@ export function ChangelogEditorCategoryField() {
 
   const handleValueChange = async (nextSelected: typeof selectedCategories) => {
     const nextIds = new Set(nextSelected.map((category) => category.id));
-    const nextCategoryIds: string[] = [];
 
-    for (const category of categories) {
-      if (nextIds.has(category.id)) {
-        nextCategoryIds.push(category.id);
-      }
-    }
+    const nextCategoryIds = categories.flatMap((category) =>
+      nextIds.has(category.id) ? [category.id] : []
+    );
 
     await updateCategories(nextCategoryIds);
   };
@@ -799,13 +796,9 @@ export function ChangelogEditorCategoryField() {
         .select(({ link }) => ({ categoryId: link.categoryId }))
     );
 
-    const nextCategoryIds: string[] = [];
-
-    for (const link of currentLinks) {
-      if (link.categoryId !== categoryId) {
-        nextCategoryIds.push(link.categoryId);
-      }
-    }
+    const nextCategoryIds = currentLinks.flatMap((link) =>
+      link.categoryId === categoryId ? [] : [link.categoryId]
+    );
 
     await updateCategories(nextCategoryIds);
   };

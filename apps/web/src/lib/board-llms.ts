@@ -67,6 +67,93 @@ const markdownLine = (label: string, url: string, detail?: string) => {
  * plain text rather than HTML: the llms.txt convention is a text index, and an
  * agent that fetched it already knows how to parse Markdown.
  */
+const renderBoardsSection = (
+  boards: BoardContent["boards"],
+  origin: string
+): string[] =>
+  boards.length === 0
+    ? []
+    : [
+        "",
+        "## Boards",
+        "",
+        ...boards.map((board) =>
+          markdownLine(board.name, `${origin}/b/${board.slug}`)
+        ),
+      ];
+
+const renderPostsSection = (
+  posts: BoardContent["posts"],
+  origin: string
+): string[] => {
+  if (posts.length === 0) return [];
+
+  const recent = posts
+    .toSorted(
+      (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()
+    )
+    .slice(0, BOARD_LLMS_POST_LIMIT);
+
+  const summary =
+    recent.length === 1
+      ? "The most recently updated post."
+      : `The ${recent.length} most recently updated posts.`;
+
+  return [
+    "",
+    "## Feedback posts",
+    "",
+    `${summary} The sitemap lists every post URL.`,
+    "",
+    ...recent.map((post) =>
+      markdownLine(
+        post.title,
+        `${origin}/p/${post.slug}`,
+        clampLine(post.excerpt, BOARD_LLMS_EXCERPT_LIMIT)
+      )
+    ),
+  ];
+};
+
+const renderRoadmapSection = (
+  site: TSite,
+  roadmaps: BoardContent["roadmaps"],
+  origin: string
+): string[] =>
+  site.roadmapVisibility !== "PUBLIC" || roadmaps.length === 0
+    ? []
+    : [
+        "",
+        "## Roadmap",
+        "",
+        ...roadmaps.map((roadmap) =>
+          markdownLine(roadmap.name, `${origin}/roadmap/${roadmap.slug}`)
+        ),
+      ];
+
+const renderChangelogSection = (
+  site: TSite,
+  entries: BoardContent["entries"],
+  origin: string
+): string[] => {
+  if (site.changelogVisibility !== "PUBLIC" || entries.length === 0) return [];
+
+  const recent = entries.toSorted(
+    (left, right) =>
+      (right.publishedAt ?? right.createdAt).getTime() -
+      (left.publishedAt ?? left.createdAt).getTime()
+  );
+
+  return [
+    "",
+    "## Changelog",
+    "",
+    ...recent.map((entry) =>
+      markdownLine(entry.title, `${origin}/changelog/${entry.slug}`)
+    ),
+  ];
+};
+
 export function renderBoardLlmsTxt(
   site: TSite,
   origin: string,
@@ -85,81 +172,15 @@ export function renderBoardLlmsTxt(
       ? [`- Changelog feed: ${origin}/changelog/rss.xml`]
       : []),
     ...(site.hidePoweredBy ? [] : ["- Platform: https://feeblo.com"]),
-  ];
-
-  if (content.boards.length > 0) {
-    lines.push("", "## Boards", "");
-
-    for (const board of content.boards) {
-      lines.push(markdownLine(board.name, `${origin}/b/${board.slug}`));
-    }
-  }
-
-  if (content.posts.length > 0) {
-    const recent = content.posts
-      .toSorted(
-        (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()
-      )
-      .slice(0, BOARD_LLMS_POST_LIMIT);
-
-    const count = recent.length;
-
-    const summary =
-      count === 1
-        ? "The most recently updated post."
-        : `The ${count} most recently updated posts.`;
-
-    lines.push(
-      "",
-      "## Feedback posts",
-      "",
-      `${summary} The sitemap lists every post URL.`,
-      ""
-    );
-
-    for (const post of recent) {
-      lines.push(
-        markdownLine(
-          post.title,
-          `${origin}/p/${post.slug}`,
-          clampLine(post.excerpt, BOARD_LLMS_EXCERPT_LIMIT)
-        )
-      );
-    }
-  }
-
-  if (site.roadmapVisibility === "PUBLIC" && content.roadmaps.length > 0) {
-    lines.push("", "## Roadmap", "");
-
-    for (const roadmap of content.roadmaps) {
-      lines.push(
-        markdownLine(roadmap.name, `${origin}/roadmap/${roadmap.slug}`)
-      );
-    }
-  }
-
-  if (site.changelogVisibility === "PUBLIC" && content.entries.length > 0) {
-    const recent = content.entries.toSorted(
-      (left, right) =>
-        (right.publishedAt ?? right.createdAt).getTime() -
-        (left.publishedAt ?? left.createdAt).getTime()
-    );
-
-    lines.push("", "## Changelog", "");
-
-    for (const entry of recent) {
-      lines.push(
-        markdownLine(entry.title, `${origin}/changelog/${entry.slug}`)
-      );
-    }
-  }
-
-  lines.push(
+    ...renderBoardsSection(content.boards, origin),
+    ...renderPostsSection(content.posts, origin),
+    ...renderRoadmapSection(site, content.roadmaps, origin),
+    ...renderChangelogSection(site, content.entries, origin),
     "",
     "## About this file",
     "",
-    "This is the llms.txt index for a public feedback board. It lists pages a visitor can read without a session. The sitemap carries every public URL, and this file follows the site's visibility settings: a hidden board, roadmap, or changelog is absent here as well."
-  );
+    "This is the llms.txt index for a public feedback board. It lists pages a visitor can read without a session. The sitemap carries every public URL, and this file follows the site's visibility settings: a hidden board, roadmap, or changelog is absent here as well.",
+  ];
 
   return `${lines.join("\n")}\n`;
 }

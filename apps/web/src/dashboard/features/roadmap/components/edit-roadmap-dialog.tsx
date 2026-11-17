@@ -163,25 +163,23 @@ function EditRoadmapFormFields({
 
         const nextIds = new Set(value.columns.map((column) => column.id));
 
-        const mutations: Promise<unknown>[] = [];
-
-        for (const column of columns) {
-          if (!nextIds.has(column.id)) {
-            mutations.push(
-              dashboardCollections.roadmapColumnCollection
-                .delete(column.id)
-                .when("settled")
-            );
-          }
-        }
+        const deletions = columns.flatMap((column) =>
+          nextIds.has(column.id)
+            ? []
+            : [
+                dashboardCollections.roadmapColumnCollection
+                  .delete(column.id)
+                  .when("settled"),
+              ]
+        );
 
         const now = new Date();
 
-        for (const [index, column] of value.columns.entries()) {
+        const upserts = value.columns.flatMap((column, index) => {
           const persisted = persistedById.get(column.id);
 
           if (!persisted) {
-            mutations.push(
+            return [
               dashboardCollections.roadmapColumnCollection
                 .insert({
                   id: column.id,
@@ -192,30 +190,31 @@ function EditRoadmapFormFields({
                   createdAt: now,
                   updatedAt: now,
                 })
-                .when("settled")
-            );
-            continue;
+                .when("settled"),
+            ];
           }
 
           if (
-            persisted.name !== column.name ||
-            persisted.statusId !== column.statusId ||
-            persisted.position !== index
+            persisted.name === column.name &&
+            persisted.statusId === column.statusId &&
+            persisted.position === index
           ) {
-            mutations.push(
-              dashboardCollections.roadmapColumnCollection
-                .update(column.id, (draft) => {
-                  draft.name = column.name;
-                  draft.statusId = column.statusId;
-                  draft.position = index;
-                  draft.updatedAt = now;
-                })
-                .when("settled")
-            );
+            return [];
           }
-        }
 
-        await Promise.all(mutations);
+          return [
+            dashboardCollections.roadmapColumnCollection
+              .update(column.id, (draft) => {
+                draft.name = column.name;
+                draft.statusId = column.statusId;
+                draft.position = index;
+                draft.updatedAt = now;
+              })
+              .when("settled"),
+          ];
+        });
+
+        await Promise.all([...deletions, ...upserts]);
 
         store.send({ type: "toggle" });
         toastManager.add({

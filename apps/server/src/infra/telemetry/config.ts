@@ -110,21 +110,17 @@ const headerRecord = Schema.Record(
   Schema.StringFromUriComponent
 );
 
-const splitHeaders = SchemaGetter.transform((input: string) => {
-  const headers = new Map<string, string>();
+const splitHeaders = SchemaGetter.transform((input: string) =>
+  Object.fromEntries(
+    input.split(",").flatMap((pair) => {
+      const separator = pair.indexOf("=");
 
-  for (const pair of input.split(",")) {
-    const separator = pair.indexOf("=");
-
-    if (separator <= 0) {
-      continue;
-    }
-
-    headers.set(pair.slice(0, separator), pair.slice(separator + 1));
-  }
-
-  return Object.fromEntries(headers);
-});
+      return separator <= 0
+        ? []
+        : [[pair.slice(0, separator), pair.slice(separator + 1)] as const];
+    })
+  )
+);
 
 const OtlpHeaders = Schema.Union([
   headerRecord,

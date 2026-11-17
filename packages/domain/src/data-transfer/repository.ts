@@ -939,13 +939,11 @@ const makeDataTransferRepository = Effect.gen(function* () {
             )
             .orderBy(asc(schema.tagTable.name));
 
-          const tagsByPost = new Map<string, string[]>();
-
-          for (const tag of tagRows) {
-            const names = tagsByPost.get(tag.postId) ?? [];
-            names.push(tag.name);
-            tagsByPost.set(tag.postId, names);
-          }
+          const tagsByPost = new Map(
+            [...Map.groupBy(tagRows, (tag) => tag.postId)].map(
+              ([postId, rows]) => [postId, rows.map((tag) => tag.name)]
+            )
+          );
 
           return posts.map((post): PostCsvSourceRow => ({
             authorEmail: post.contactEmail ?? post.creatorEmail,

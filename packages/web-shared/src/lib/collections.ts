@@ -62,13 +62,7 @@ export function organizationScopedKey(
 ): string[] {
   const key = organizationId ? [scope, organizationId] : [scope];
 
-  for (const part of parts) {
-    if (part) {
-      key.push(part);
-    }
-  }
-
-  return key;
+  return [...key, ...parts.filter((part): part is string => Boolean(part))];
 }
 
 /**

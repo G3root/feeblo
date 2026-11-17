@@ -24,24 +24,20 @@ function findTriggers(): HTMLElement[] {
 }
 
 export function extractTriggerMetadata(element: HTMLElement) {
-  const metadata: Record<string, string> = {};
+  const metadata = Object.fromEntries(
+    Object.keys(element.dataset).flatMap((key) => {
+      if (key === FEEDBACK_DATASET_KEY) return [];
 
-  for (const key of Object.keys(element.dataset)) {
-    if (key === FEEDBACK_DATASET_KEY) {
-      continue;
-    }
-
-    const match = key.match(METADATA_KEY_REGEX);
-
-    if (match?.[1]) {
-      const name = match[1].charAt(0).toLowerCase() + match[1].slice(1);
+      const match = key.match(METADATA_KEY_REGEX);
       const value = element.dataset[key];
 
-      if (value !== undefined) {
-        metadata[name] = value;
-      }
-    }
-  }
+      if (!match?.[1] || value === undefined) return [];
+
+      const name = match[1].charAt(0).toLowerCase() + match[1].slice(1);
+
+      return [[name, value] as const];
+    })
+  );
 
   return metadata;
 }

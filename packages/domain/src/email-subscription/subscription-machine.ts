@@ -224,17 +224,15 @@ export const sourceStatesFor = (
 export const targetStateFor = (
   event: TEmailSubscriptionEvent
 ): TEmailSubscriptionState => {
-  const targets = new Set<TEmailSubscriptionState>();
+  // Only a move counts: an event a state does not handle returns that state,
+  // and counting it would make the target ambiguous.
+  const targets = new Set(
+    EMAIL_SUBSCRIPTION_STATES.flatMap((state) => {
+      const next = stateAfter(state, event);
 
-  for (const state of EMAIL_SUBSCRIPTION_STATES) {
-    const next = stateAfter(state, event);
-
-    // Only a move counts: an event a state does not handle returns that state,
-    // and counting it would make the target ambiguous.
-    if (next !== state && next !== "none") {
-      targets.add(next);
-    }
-  }
+      return next !== state && next !== "none" ? [next] : [];
+    })
+  );
 
   const [target, ...rest] = [...targets];
 

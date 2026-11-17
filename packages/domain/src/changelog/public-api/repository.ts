@@ -245,29 +245,28 @@ const makePublicApiChangelogRepository = Effect.gen(function* () {
         { concurrency: "unbounded" }
       );
 
-      const categories = new Map<string, PublicApiChangelogCategoryEntry[]>();
+      const categories = new Map<string, PublicApiChangelogCategoryEntry[]>(
+        [...Map.groupBy(categoryRows, (row) => row.changelogId)].map(
+          ([changelogId, rows]) => [
+            changelogId,
+            rows.map((row) => ({
+              icon: row.icon,
+              iconType: row.iconType,
+              id: row.id,
+              name: row.name,
+            })),
+          ]
+        )
+      );
 
-      for (const row of categoryRows) {
-        const entries = categories.get(row.changelogId) ?? [];
-        entries.push({
-          icon: row.icon,
-          iconType: row.iconType,
-          id: row.id,
-          name: row.name,
-        });
-        categories.set(row.changelogId, entries);
-      }
-
-      const linkedPosts = new Map<
-        string,
-        PublicApiChangelogLinkedPostEntry[]
-      >();
-
-      for (const row of postRows) {
-        const entries = linkedPosts.get(row.changelogId) ?? [];
-        entries.push({ id: row.id, slug: row.slug, title: row.title });
-        linkedPosts.set(row.changelogId, entries);
-      }
+      const linkedPosts = new Map<string, PublicApiChangelogLinkedPostEntry[]>(
+        [...Map.groupBy(postRows, (row) => row.changelogId)].map(
+          ([changelogId, rows]) => [
+            changelogId,
+            rows.map(({ id, slug, title }) => ({ id, slug, title })),
+          ]
+        )
+      );
 
       return { categories, linkedPosts };
     });
