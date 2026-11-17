@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema";
 
 /** GitHub App installation identifier carried by every app-scoped delivery. */
 export const GitHubInstallationId = Schema.Int.check(Schema.isGreaterThan(0));
+
 export type GitHubInstallationId = Schema.Schema.Type<
   typeof GitHubInstallationId
 >;
@@ -27,6 +28,7 @@ export const GitHubWebhookIssueAction = Schema.Literals([
   "unpinned",
   "untyped",
 ]);
+
 export type GitHubWebhookIssueAction = Schema.Schema.Type<
   typeof GitHubWebhookIssueAction
 >;
@@ -54,6 +56,7 @@ export const GitHubIssueWebhookPayload = Schema.Struct({
     login: Schema.NonEmptyString,
   }),
 });
+
 export type GitHubIssueWebhookPayload = Schema.Schema.Type<
   typeof GitHubIssueWebhookPayload
 >;
@@ -65,6 +68,7 @@ export const GitHubInstallationWebhookAction = Schema.Literals([
   "suspend",
   "unsuspend",
 ]);
+
 export type GitHubInstallationWebhookAction = Schema.Schema.Type<
   typeof GitHubInstallationWebhookAction
 >;
@@ -74,6 +78,7 @@ export const GitHubInstallationWebhookPayload = Schema.Struct({
   action: GitHubInstallationWebhookAction,
   installation: Schema.Struct({ id: GitHubInstallationId }),
 });
+
 export type GitHubInstallationWebhookPayload = Schema.Schema.Type<
   typeof GitHubInstallationWebhookPayload
 >;
@@ -83,6 +88,7 @@ export const GitHubInstallationRepositoriesWebhookPayload = Schema.Struct({
   action: Schema.Literals(["added", "removed"]),
   installation: Schema.Struct({ id: GitHubInstallationId }),
 });
+
 export type GitHubInstallationRepositoriesWebhookPayload = Schema.Schema.Type<
   typeof GitHubInstallationRepositoriesWebhookPayload
 >;
@@ -105,6 +111,7 @@ export const ParsedGitHubInboundRequest = Schema.Union([
     payload: GitHubInstallationRepositoriesWebhookPayload,
   }),
 ]);
+
 export type ParsedGitHubInboundRequest = Schema.Schema.Type<
   typeof ParsedGitHubInboundRequest
 >;

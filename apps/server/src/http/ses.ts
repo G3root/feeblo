@@ -33,6 +33,7 @@ const matchesWebhookToken = (
 ): boolean => {
   const supplied = Buffer.from(suppliedToken);
   const configured = Buffer.from(Redacted.value(configuredToken));
+
   return (
     supplied.length === configured.length &&
     timingSafeEqual(supplied, configured)
@@ -46,6 +47,7 @@ const handleSesFeedback = (
   Effect.gen(function* () {
     const config = yield* EmailProviderFeedbackConfig;
     const configuredToken = config.webhookToken;
+
     if (Option.isNone(configuredToken)) {
       // Feature not configured: stay inert for self-hosted deployments.
       return HttpServerResponse.text("not found", { status: 404 });
@@ -55,8 +57,10 @@ const handleSesFeedback = (
     // work. The limiter fails open on store outages so a Redis problem cannot
     // drop SES feedback deliveries.
     const clientIp = yield* ClientIp;
+
     if (clientIp._tag === "ClientIpAddress") {
       const rateLimitService = yield* RateLimitService;
+
       const exceeded = yield* rateLimitService
         .consume({
           key: `${SES_FEEDBACK_RATE_LIMIT.keyPrefix}:${clientIp.address}`,
@@ -73,6 +77,7 @@ const handleSesFeedback = (
                 ).pipe(Effect.as(false))
           )
         );
+
       if (exceeded) {
         return HttpServerResponse.text("Too many requests", { status: 429 });
       }
@@ -99,6 +104,7 @@ const handleSesFeedback = (
         });
       default:
         outcome satisfies never;
+
         return HttpServerResponse.text("unexpected SES webhook outcome", {
           status: 500,
         });
@@ -164,6 +170,7 @@ export const SesEmailFeedbackRouter = HttpRouter.use((router) =>
         Effect.gen(function* () {
           const params = yield* HttpRouter.params;
           const token = params.token ?? headerToken(request) ?? "";
+
           return yield* handleSesFeedback(request, token);
         })
     );

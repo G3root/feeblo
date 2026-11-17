@@ -63,16 +63,20 @@ const makeFakeSlackApiClient = (
 } => {
   const calls: { readonly method: string }[] = [];
   const failOAuth = { enabled: false, message: "invalid_code" };
+
   const ok = (method: string) => {
     calls.push({ method });
+
     return Effect.succeed({ ok: true as const });
   };
+
   return {
     calls,
     failOAuth,
     authRevoke: () => ok("auth.revoke"),
     authTest: () => {
       calls.push({ method: "auth.test" });
+
       return Effect.succeed({
         bot_id: "B123",
         ok: true as const,
@@ -91,6 +95,7 @@ const makeFakeSlackApiClient = (
       const pageIndex = cursor === undefined ? 0 : Number(cursor) + 1;
       const page = channelPages[pageIndex] ?? [];
       const hasMore = pageIndex + 1 < channelPages.length;
+
       return Effect.succeed({
         channels: [...page],
         ok: true as const,
@@ -101,6 +106,7 @@ const makeFakeSlackApiClient = (
     },
     oauthV2Access: () => {
       calls.push({ method: "oauth.v2.access" });
+
       if (failOAuth.enabled) {
         return Effect.fail(
           new IntegrationProviderPermanentRejection({
@@ -109,6 +115,7 @@ const makeFakeSlackApiClient = (
           })
         );
       }
+
       return Effect.succeed({
         access_token: "xoxb-bot-token",
         app_id: "A123",
@@ -153,11 +160,13 @@ const makeTestLayer = (
   }
 ) => {
   const apiClient = givenClient ?? makeFakeSlackApiClient(channelPages);
+
   const serviceLayer = makeSlackManagementServiceLive(apiClient).pipe(
     Layer.provide(testConfig(configured)),
     Layer.provide(Database.PgliteDatabaseLive),
     Layer.provide(NodeCrypto.layer)
   );
+
   return {
     apiClient,
     layer: Layer.mergeAll(
@@ -177,11 +186,13 @@ const seedOrganization = Effect.gen(function* () {
     name: "Slack management test",
     slug: organizationId,
   });
+
   return organizationId;
 });
 
 const decodeState = (authorizeUrl: URL) => {
   const url = new URL(authorizeUrl);
+
   return Schema.decodeSync(Schema.fromJsonString(SlackOAuthState))(
     url.searchParams.get("state") ?? ""
   );
@@ -196,6 +207,7 @@ describe("slack management service", () => {
           const db = yield* currentDb;
           const organizationId = yield* seedOrganization;
           const service = yield* SlackManagementService;
+
           const { authorizeUrl } = yield* service.connectStart({
             organizationId,
           });
@@ -217,6 +229,7 @@ describe("slack management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, state.connectionId)
             );
+
           expect(connection?.lifecycle).toBe("connecting");
           expect(connection?.credentialsCiphertext).not.toBeNull();
         })
@@ -229,15 +242,18 @@ describe("slack management service", () => {
           const db = yield* currentDb;
           const organizationId = yield* seedOrganization;
           const service = yield* SlackManagementService;
+
           const { authorizeUrl } = yield* service.connectStart({
             organizationId,
           });
+
           const state = decodeState(new URL(authorizeUrl));
 
           const result = yield* service.connectComplete({
             code: "oauth-code",
             state: urlState(authorizeUrl),
           });
+
           expect(result.organizationId).toBe(organizationId);
 
           const [connection] = yield* db
@@ -246,6 +262,7 @@ describe("slack management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, state.connectionId)
             );
+
           expect(connection?.lifecycle).toBe("active");
           expect(connection?.remoteAccountId).toBe("T123");
           expect(connection?.name).toBe("Acme");
@@ -260,6 +277,7 @@ describe("slack management service", () => {
             .where(
               eq(schema.integrationRouteTable.connectionId, state.connectionId)
             );
+
           expect(routes.map((route) => route.capabilityKey).sort()).toEqual([
             "commands",
             "message.action",
@@ -272,6 +290,7 @@ describe("slack management service", () => {
         const organizationId = yield* seedOrganization;
         const service = yield* SlackManagementService;
         yield* service.connectStart({ organizationId });
+
         const bogus = yield* Schema.encodeEffect(
           Schema.fromJsonString(SlackOAuthState)
         )({
@@ -279,9 +298,11 @@ describe("slack management service", () => {
           nonce: "wrong",
           organizationId,
         });
+
         const result = yield* Effect.exit(
           service.connectComplete({ code: "code", state: bogus })
         );
+
         expect(Exit.isFailure(result)).toBe(true);
       })
     );
@@ -293,13 +314,16 @@ describe("slack management service", () => {
         const db = yield* currentDb;
         const organizationId = yield* seedOrganization;
         const service = yield* SlackManagementService;
+
         const { authorizeUrl } = yield* service.connectStart({
           organizationId,
         });
+
         yield* service.connectComplete({
           code: "code",
           state: urlState(new URL(authorizeUrl)),
         });
+
         const [connection] = yield* db
           .select()
           .from(schema.integrationConnectionTable)
@@ -313,15 +337,18 @@ describe("slack management service", () => {
             )
           )
           .limit(1);
+
         if (connection === undefined) {
           throw new Error("expected connection");
         }
+
         const connectionId = asLegid(IntegrationConnectionId)(connection.id);
 
         const channels = yield* service.listChannels({
           connectionId,
           organizationId,
         });
+
         // All visible channels are returned; membership is reported so the
         // UI can hint that private/non-member channels need the bot added.
         expect(channels.map((channel) => channel.id).sort()).toEqual([
@@ -352,10 +379,12 @@ describe("slack management service", () => {
           enabled: true,
           organizationId,
         });
+
         const updated = yield* service.listChannels({
           connectionId,
           organizationId,
         });
+
         expect(
           updated.find((channel) => channel.id === "C2")?.notificationsEnabled
         ).toBe(true);
@@ -370,10 +399,12 @@ describe("slack management service", () => {
           enabled: false,
           organizationId,
         });
+
         const disabled = yield* service.listChannels({
           connectionId,
           organizationId,
         });
+
         expect(
           disabled.find((channel) => channel.id === "C2")?.notificationsEnabled
         ).toBe(false);
@@ -385,13 +416,16 @@ describe("slack management service", () => {
         const db = yield* currentDb;
         const organizationId = yield* seedOrganization;
         const service = yield* SlackManagementService;
+
         const { authorizeUrl } = yield* service.connectStart({
           organizationId,
         });
+
         yield* service.connectComplete({
           code: "code",
           state: urlState(new URL(authorizeUrl)),
         });
+
         const [connection] = yield* db
           .select()
           .from(schema.integrationConnectionTable)
@@ -405,6 +439,7 @@ describe("slack management service", () => {
             )
           )
           .limit(1);
+
         if (connection === undefined) {
           throw new Error("expected connection");
         }
@@ -418,6 +453,7 @@ describe("slack management service", () => {
           .select()
           .from(schema.integrationConnectionTable)
           .where(eq(schema.integrationConnectionTable.id, connection.id));
+
         expect(archived?.lifecycle).toBe("archived");
         expect(archived?.credentialsCiphertext).toBeNull();
 
@@ -463,13 +499,16 @@ describe("slack management service", () => {
           const db = yield* currentDb;
           const organizationId = yield* seedOrganization;
           const service = yield* SlackManagementService;
+
           const { authorizeUrl } = yield* service.connectStart({
             organizationId,
           });
+
           yield* service.connectComplete({
             code: "code",
             state: urlState(new URL(authorizeUrl)),
           });
+
           const [connection] = yield* db
             .select()
             .from(schema.integrationConnectionTable)
@@ -483,13 +522,16 @@ describe("slack management service", () => {
               )
             )
             .limit(1);
+
           if (connection === undefined) {
             throw new Error("expected connection");
           }
+
           const channels = yield* service.listChannels({
             connectionId: asLegid(IntegrationConnectionId)(connection.id),
             organizationId,
           });
+
           expect(channels.map((channel) => channel.id).sort()).toEqual([
             "C1",
             "C2",
@@ -515,13 +557,16 @@ describe("slack management service", () => {
             const db = yield* currentDb;
             const organizationId = yield* seedOrganization;
             const service = yield* SlackManagementService;
+
             const { authorizeUrl } = yield* service.connectStart({
               organizationId,
             });
+
             yield* service.connectComplete({
               code: "code",
               state: urlState(new URL(authorizeUrl)),
             });
+
             const [connection] = yield* db
               .select()
               .from(schema.integrationConnectionTable)
@@ -538,9 +583,11 @@ describe("slack management service", () => {
                 )
               )
               .limit(1);
+
             if (connection === undefined) {
               throw new Error("expected connection");
             }
+
             const connectionId = asLegid(IntegrationConnectionId)(
               connection.id
             );
@@ -560,6 +607,7 @@ describe("slack management service", () => {
               .select()
               .from(schema.integrationConnectionTable)
               .where(eq(schema.integrationConnectionTable.id, connection.id));
+
             expect(afterRetry?.lifecycle).toBe("archived");
             expect(afterRetry?.credentialsCiphertext).toBeNull();
             // The tombstone's missing credentials make the second flow skip
@@ -580,9 +628,11 @@ describe("slack management service", () => {
         Effect.gen(function* () {
           const organizationId = yield* seedOrganization;
           const service = yield* SlackManagementService;
+
           const result = yield* Effect.exit(
             service.connectStart({ organizationId })
           );
+
           expect(Exit.isFailure(result)).toBe(true);
         })
       );

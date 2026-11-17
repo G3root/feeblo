@@ -51,13 +51,17 @@ function upsertReplayClassName(toast: {
   updateKey?: number | undefined;
 }): string | undefined {
   const k = toast.updateKey ?? 0;
+
   if (k <= 0) {
     return undefined;
   }
+
   const isEven = k % 2 === 0;
+
   if (toast.type === "error") {
     return isEven ? "animate-toast-error-even" : "animate-toast-error-odd";
   }
+
   return isEven ? "animate-toast-success-even" : "animate-toast-success-odd";
 }
 
@@ -95,6 +99,7 @@ function Toasts({
               ]
             : // SAFETY: The upstream contract guarantees this value here.
               null;
+
           // SAFETY: The upstream contract guarantees this value here.
           const toastData = toast.data as ToastData | undefined;
 
@@ -210,6 +215,7 @@ function AnchoredToasts({
             ? // SAFETY: The key is a member of the source object's key set in this usage.
               TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
             : null;
+
           // SAFETY: The upstream contract guarantees this value here.
           const toastData = toast.data as ToastData | undefined;
           const tooltipStyle = toastData?.tooltipStyle ?? false;

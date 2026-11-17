@@ -14,6 +14,7 @@ const CHUNK_SIZE = 64 * 1024;
 const makeUnboundedChunkedBody = () => {
   const state = { bytesPulled: 0, cancelled: false };
   const chunk = new Uint8Array(CHUNK_SIZE);
+
   const stream = new ReadableStream<Uint8Array>({
     pull(controller) {
       state.bytesPulled += chunk.byteLength;
@@ -23,6 +24,7 @@ const makeUnboundedChunkedBody = () => {
       state.cancelled = true;
     },
   });
+
   return { stream, state };
 };
 
@@ -32,21 +34,25 @@ describe("handleBetterAuthRequest", () => {
     () =>
       Effect.promise(async () => {
         const { stream, state } = makeUnboundedChunkedBody();
+
         const requestInit = {
           method: "POST",
           headers: { "content-type": "application/octet-stream" },
           body: stream,
           duplex: "half" as const,
         };
+
         const request = new Request(
           "http://localhost/api/auth/sign-in",
           requestInit
         );
 
         let handlerBodyBytes = 0;
+
         const response = await handleBetterAuthRequest({
           handler: async (limited) => {
             handlerBodyBytes = (await limited.arrayBuffer()).byteLength;
+
             return new Response("ok");
           },
           headers: request.headers,
@@ -69,6 +75,7 @@ describe("handleBetterAuthRequest", () => {
   it.live("passes bodies under the limit through untouched", () =>
     Effect.promise(async () => {
       const payload = '{"hello":"world"}';
+
       const request = new Request("http://localhost/api/auth/get-session", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -100,9 +107,11 @@ describe("handleBetterAuthRequest", () => {
         });
 
         let handlerCalled = false;
+
         const response = await handleBetterAuthRequest({
           handler: async () => {
             handlerCalled = true;
+
             return new Response("ok");
           },
           headers: request.headers,

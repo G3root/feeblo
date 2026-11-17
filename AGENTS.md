@@ -98,6 +98,8 @@ Ten `effecttsgo/*` rules are `off` with reasons in that file. Four — `async-fu
 
 `docs/adr/0005` records the ratchet order for what is still a warning.
 
+A second rule set is vendored beside it. `tools/oxlint/anti-slop/` is k-mistele/anti-slop's Oxlint plugin, and `oxlint.config.ts` registers all three of its plugins: the generic rules, `anti-slop-effect` (services, Layers, tagged errors, spans) and `anti-slop-martinfowler` (code smells, at `warn`). Every generic and Effect rule is `error`; eleven are `off`, each with the count it reported and the migration that retires it written beside it and summarised in `docs/adr/0029`. The paid halves — the Jev questions and the diff rules, one model request per file — are not installed. Read `tools/oxlint/anti-slop/UPSTREAM.md` before updating the copy: it records the revision, what was left out, and the procedure.
+
 Before writing, reviewing, or refactoring Effect code, read the installed package's own guide first: `node_modules/effect/AGENTS.md`. It ships with the version in the lockfile, so it is never stale, and it is a better reference than anything written down here.
 
 Tests use `@effect/vitest`:

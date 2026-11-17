@@ -56,6 +56,7 @@ layer(TestLayer)("OgImageRepository", (it) => {
         createdAt: now,
         updatedAt: now,
       });
+
       return { id, slug };
     });
 
@@ -98,6 +99,7 @@ layer(TestLayer)("OgImageRepository", (it) => {
     Effect.gen(function* () {
       const repository = yield* OgImageRepository;
       const fixture = yield* makeFixture();
+
       const post = yield* makePost({
         ...fixture,
         title: "Dark mode",
@@ -137,6 +139,7 @@ layer(TestLayer)("OgImageRepository", (it) => {
     Effect.gen(function* () {
       const repository = yield* OgImageRepository;
       const fixture = yield* makeFixture();
+
       const post = yield* makePost({
         ...fixture,
         title: "Archived idea",
@@ -160,6 +163,7 @@ layer(TestLayer)("OgImageRepository", (it) => {
       // merged row to be archived too — so this post is both. Either predicate
       // excludes it; both are kept because the public post reads keep both.
       const target = yield* makePost({ ...fixture, title: "Surviving idea" });
+
       const post = yield* makePost({
         ...fixture,
         title: "Merged idea",

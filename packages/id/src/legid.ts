@@ -5,10 +5,13 @@ import * as Schema from "effect/Schema";
 import { createId, verifyId } from "legid";
 
 const maxIdLength = 54;
+
 const idRegex = /^[A-Za-z0-9]+$/;
+
 const prefixRegex = /^[a-z]+$/;
 
 export const LegidId = Schema.String.pipe(Schema.brand("LegidId"));
+
 export type LegidId = typeof LegidId.Type;
 
 export type LegidOf<Name extends string> = LegidId & Brand.Brand<Name>;
@@ -208,6 +211,7 @@ export const makeId = <
   // supplied brand is validated below, so the value is always a brand for the
   // legid namespace this factory owns.
   const brand = (options?.brand ?? defaultBrandName(name)) as BrandName;
+
   const brandLegidId = (id: LegidId): LegidOf<BrandName> =>
     // SAFETY: the id was produced by this factory's LegidId schema (or was
     // already verified against it), so adding the factory brand is a
@@ -238,6 +242,7 @@ export const makeId = <
       try: () => createId(legidOptions),
       catch: (cause) => new LegidError({ input: "", message: String(cause) }),
     });
+
     return brandLegidId(LegidId.make(format(id)));
   });
 
@@ -245,6 +250,7 @@ export const makeId = <
     return yield* Effect.gen(function* () {
       const idPart = yield* splitPrefix(input);
       yield* validateLegidFormat(idPart);
+
       // A rejected verification is the answer `false`, not a typed failure, so
       // the rejection enters as a defect and `catchCause` turns every outcome
       // into a boolean.
@@ -295,6 +301,7 @@ export const makeId = <
     parse,
     is: (input): input is LegidOf<BrandName> => {
       const separatorIndex = input.indexOf("_");
+
       if (separatorIndex === -1) {
         return false;
       }

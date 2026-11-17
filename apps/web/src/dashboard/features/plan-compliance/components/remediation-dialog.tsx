@@ -58,6 +58,7 @@ function RemediationDialogPopup({
   readonly pending: boolean;
 }) {
   const [typed, setTyped] = useState("");
+
   const typedMatches =
     !action.requiresTyping ||
     typed.trim().toLowerCase() ===

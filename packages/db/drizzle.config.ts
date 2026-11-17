@@ -7,6 +7,7 @@ dotenv.config({
 
 export default defineConfig({
   schema: [
+    "./src/schema/audit.ts",
     "./src/schema/auth.ts",
     "./src/schema/data-transfer.ts",
     "./src/schema/feedback.ts",

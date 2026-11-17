@@ -15,6 +15,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { PostActivityRepository } from "../post-activity/repository";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -33,6 +35,7 @@ describe("TagRpcHandlers", () => {
     statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
+
   const session = (f: Fixture, role: Role | "none" = "owner"): Session => ({
     user: {
       id: f.userId,
@@ -53,14 +56,17 @@ describe("TagRpcHandlers", () => {
             },
           ],
   });
+
   // A different member of the same organization (not the post/changelog creator).
   type OtherContributor = {
     session: Session;
     membershipId: string;
   };
+
   const otherContributor = (f: Fixture): OtherContributor => {
     const userId = `other_${f.userId}`;
     const membershipId = `other_member_${f.membershipId}`;
+
     return {
       session: {
         user: {
@@ -82,6 +88,7 @@ describe("TagRpcHandlers", () => {
       membershipId,
     };
   };
+
   const fixture = () =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -155,6 +162,7 @@ describe("TagRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       return {
         membershipId,
         organizationId,
@@ -163,19 +171,24 @@ describe("TagRpcHandlers", () => {
         userId,
       } satisfies Fixture;
     });
+
   const Repositories = Layer.mergeAll(
     TagRepository.layer,
     SiteRepository.layer,
     WorkspaceRepository.layer,
-    PostActivityRepository.layer
+    PostActivityRepository.layer,
+    AuditLogRecorder.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = Layer.mergeAll(TagPolicy.layer, SitePolicy.layer).pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(Repositories, Entitlements, Policies);
 
   layer(Layer.merge(TestLayer, Database.PgliteDatabaseLive))(
@@ -202,15 +215,19 @@ describe("TagRpcHandlers", () => {
                 tagIds: [tagId],
               })
               .pipe(Effect.provideService(CurrentSession, session(f)));
+
             const error = yield* Effect.flip(
               handlers
                 .ListTags({ organizationId: f.organizationId })
                 .pipe(Effect.provideService(CurrentSession, session(f, "none")))
             );
+
             expect(error._tag).toBe("PolicyDenied");
+
             const publicTags = yield* handlers.ListTagsPublic({
               organizationId: f.organizationId,
             });
+
             expect(publicTags).toMatchObject([{ id: tagId, name: "Feature" }]);
             expect(publicTags[0]).not.toHaveProperty("type");
             expect(publicTags[0]).not.toHaveProperty("creatorId");
@@ -310,6 +327,7 @@ describe("TagRpcHandlers", () => {
                 organizationId: f.organizationId,
               })
               .pipe(Effect.provideService(CurrentSession, session(f)));
+
             const error = yield* Effect.flip(
               handlers
                 .SetPostTags({
@@ -324,6 +342,7 @@ describe("TagRpcHandlers", () => {
                   )
                 )
             );
+
             expect(error._tag).toBe("PolicyDenied");
             expect(
               yield* handlers
@@ -372,6 +391,7 @@ describe("TagRpcHandlers", () => {
             // Merge the fixture post into a survivor.
             const survivorId = yield* PostId.generate;
             const now = yield* DateTime.nowAsDate;
+
             const [postRow] = yield* db
               .select({
                 boardId: schema.postTable.boardId,
@@ -384,6 +404,7 @@ describe("TagRpcHandlers", () => {
                   eq(schema.postTable.organizationId, f.organizationId)
                 )
               );
+
             yield* db.insert(schema.postTable).values({
               id: survivorId,
               title: "Survivor",
@@ -421,6 +442,7 @@ describe("TagRpcHandlers", () => {
                 organizationId: f.organizationId,
               })
               .pipe(Effect.provideService(CurrentSession, session(f)));
+
             const error = yield* Effect.flip(
               handlers
                 .SetPostTags({
@@ -430,12 +452,15 @@ describe("TagRpcHandlers", () => {
                 })
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             );
+
             expect(error._tag).toBe("PostIsMergedError");
+
             // No tag row was written under the read-only rule.
             const rows = yield* db
               .select({ id: schema.postTagTable.id })
               .from(schema.postTagTable)
               .where(eq(schema.postTagTable.postId, f.postId));
+
             expect(rows).toHaveLength(0);
           })
       );
@@ -446,6 +471,7 @@ describe("TagRpcHandlers", () => {
           const f = yield* fixture();
           const tagA = yield* TagId.generate;
           const tagB = yield* TagId.generate;
+
           for (const tagId of [tagA, tagB]) {
             yield* handlers
               .CreateTag({
@@ -487,6 +513,7 @@ describe("TagRpcHandlers", () => {
                 eq(schema.postActivityTable.nextValue, tagB)
               )
             );
+
           expect(rows).toHaveLength(1);
           expect(rows[0]).toMatchObject({
             kind: "TAG_ADDED",
@@ -495,6 +522,7 @@ describe("TagRpcHandlers", () => {
             actorId: f.userId,
             actorMemberId: f.membershipId,
           });
+
           const addedRows = yield* db
             .select({
               id: schema.postActivityTable.id,
@@ -509,11 +537,13 @@ describe("TagRpcHandlers", () => {
                 eq(schema.postActivityTable.nextValue, tagA)
               )
             );
+
           expect(addedRows).toHaveLength(1);
           expect(addedRows[0]).toMatchObject({
             actorId: f.userId,
             actorMemberId: f.membershipId,
           });
+
           const removedRows = yield* db
             .select({
               id: schema.postActivityTable.id,
@@ -528,6 +558,7 @@ describe("TagRpcHandlers", () => {
                 eq(schema.postActivityTable.nextValue, tagA)
               )
             );
+
           expect(removedRows).toHaveLength(1);
           expect(removedRows[0]).toMatchObject({
             actorId: f.userId,
@@ -632,9 +663,11 @@ describe("TagRpcHandlers", () => {
               .select({ boardId: schema.postTable.boardId })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, f.postId));
+
             if (fixturePost === undefined) {
               return yield* Effect.die("fixture post was not inserted");
             }
+
             yield* db.insert(schema.postTable).values({
               id: survivorPostId,
               title: "Survivor post",
@@ -682,6 +715,88 @@ describe("TagRpcHandlers", () => {
                 .pipe(Effect.provideService(CurrentSession, session(f)))
             ).toHaveLength(1);
           })
+      );
+
+      it.effect("records each tag mutation against the session user", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* TagRpcHandlersEffect;
+          const f = yield* fixture();
+          const tagId = yield* TagId.generate;
+
+          yield* handlers
+            .CreateTag({
+              id: tagId,
+              name: "Old name",
+              organizationId: f.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .UpdateTag({
+              id: tagId,
+              name: "New name",
+              organizationId: f.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .SetPostTags({
+              organizationId: f.organizationId,
+              postId: f.postId,
+              tagIds: [tagId],
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+          yield* handlers
+            .DeleteTag({
+              id: tagId,
+              organizationId: f.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session(f)));
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(eq(schema.auditLogTable.organizationId, f.organizationId));
+
+          expect(rows).toHaveLength(4);
+          const byAction = new Map(rows.map((row) => [row.action, row]));
+
+          expect(byAction.get("tag.created")).toMatchObject({
+            actorRole: "owner",
+            actorType: "user",
+            actorUserId: f.userId,
+            metadata: { name: "Old name" },
+            outcome: "allowed",
+            resourceId: tagId,
+            resourceType: "tag",
+            source: "dashboard",
+          });
+          expect(byAction.get("tag.updated")).toMatchObject({
+            actorType: "user",
+            actorUserId: f.userId,
+            metadata: { name: "New name" },
+            resourceId: tagId,
+            resourceType: "tag",
+          });
+          expect(byAction.get("tag.deleted")).toMatchObject({
+            actorType: "user",
+            actorUserId: f.userId,
+            resourceId: tagId,
+            resourceType: "tag",
+          });
+          // The tag write carries the post it changed: the diff names the tag
+          // list, not the tag row.
+          expect(byAction.get("post.updated")).toMatchObject({
+            actorType: "user",
+            actorUserId: f.userId,
+            changes: {
+              fields: ["tagIds"],
+              before: { tagIds: [] },
+              after: { tagIds: [tagId] },
+            },
+            resourceId: f.postId,
+            resourceType: "post",
+          });
+        }).pipe(Effect.provideService(AuditLogEnabled, true))
       );
     }
   );

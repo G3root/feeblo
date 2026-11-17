@@ -1,4 +1,5 @@
 import { isString } from "@feeblo/utils/runtime-kind";
+
 /**
  * Organization roles — the single source of truth for the role hierarchy.
  *
@@ -69,8 +70,10 @@ export const compareRoles = (a: Role, b: Role): -1 | 0 | 1 => {
   if (ROLE_RANK[a] < ROLE_RANK[b]) {
     return -1;
   }
+
   if (ROLE_RANK[a] > ROLE_RANK[b]) {
     return 1;
   }
+
   return 0;
 };

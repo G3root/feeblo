@@ -101,29 +101,37 @@ const ApprovalAnswer = Schema.Struct({
  * text that people approve without reading.
  */
 const MAX_PROMPT_STRING_CHARS = 80;
+
 const MAX_PROMPT_ARRAY_ITEMS = 5;
+
 const MAX_PROMPT_DEPTH = 4;
 
 const isJsonArray = Schema.is(Schema.Array(Schema.Json));
+
 const isJsonObject = Schema.is(Schema.Record(Schema.String, Schema.Json));
 
 const truncate = (value: Schema.Json, depth: number): Schema.Json => {
   if (isString(value)) {
     const text = String(value);
+
     return text.length > MAX_PROMPT_STRING_CHARS
       ? `${text.slice(0, MAX_PROMPT_STRING_CHARS - 3)}...`
       : text;
   }
+
   if (isJsonArray(value)) {
     const items = value
       .slice(0, MAX_PROMPT_ARRAY_ITEMS)
       .map((item) => truncate(item, depth + 1));
+
     return value.length > MAX_PROMPT_ARRAY_ITEMS
       ? [...items, `... ${value.length - MAX_PROMPT_ARRAY_ITEMS} more`]
       : items;
   }
+
   if (isJsonObject(value)) {
     if (depth >= MAX_PROMPT_DEPTH) return "...";
+
     return Object.fromEntries(
       Object.entries(value).map(([key, member]) => [
         key,
@@ -131,6 +139,7 @@ const truncate = (value: Schema.Json, depth: number): Schema.Json => {
       ])
     );
   }
+
   return value;
 };
 
@@ -177,6 +186,7 @@ export class Approval extends Context.Service<Approval, ApprovalService>()(
       approve: (request) =>
         Effect.gen(function* () {
           const capabilities = yield* McpServer.clientCapabilities;
+
           if (capabilities.elicitation === undefined) {
             return yield* denied(
               request,

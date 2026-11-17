@@ -41,6 +41,7 @@ export function PostTitleInput({ className, ...props }: PostTitleInputProps) {
 
 export function PostTitleUpdateInput() {
   const { canManagePost, isMerged, post, pageType } = usePostCollectionData();
+
   const {
     collections: { postCollection },
     organizationId,
@@ -91,9 +92,11 @@ export function PostTitleUpdateInput() {
 
     if (newValue.trim() === "") {
       toastManager.add({ title: m.ideal_spare_loris(), type: "error" });
+
       if (inputRef.current) {
         inputRef.current.value = defaultValue;
       }
+
       return;
     }
 
@@ -110,6 +113,7 @@ export function PostTitleUpdateInput() {
     } catch {
       trackEvent("post_updated", { field: "title", success: false });
       toastManager.add({ title: m.zippy_ago_chicken(), type: "error" });
+
       if (inputRef.current) {
         inputRef.current.value = defaultValue;
       }

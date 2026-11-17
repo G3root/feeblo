@@ -82,6 +82,14 @@ export default defineConfig({
 
   jsPlugins: [
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
+    {
+      name: "anti-slop-effect",
+      specifier: "./tools/oxlint/anti-slop/effect/index.ts",
+    },
+    {
+      name: "anti-slop-martinfowler",
+      specifier: "./tools/oxlint/anti-slop/martinfowler/index.ts",
+    },
     { name: "effect-tests", specifier: "./tools/oxlint/effect-tests/index.ts" },
     { name: "react-doctor", specifier: "oxlint-plugin-react-doctor" },
   ],
@@ -310,12 +318,21 @@ export default defineConfig({
     // schema that silently lost its fields — fails the gate.
     "typescript/no-generated-empty-object-type": "error",
 
-    // anti-slop
+    // anti-slop, vendored at `tools/oxlint/anti-slop` from
+    // github.com/k-mistele/anti-slop (see its `UPSTREAM.md`). These reject the
+    // low-evidence TypeScript that is easy to write and hard to review: an `as`
+    // with no stated invariant, an `unknown` leaking out of a boundary, a
+    // conditional spread that hides which fields are present. `error` rather
+    // than `warn` because each diagnostic names the fix, so the shape of the
+    // tree is a decision instead of a preference.
+    "oxc/no-accumulating-spread": "error",
+    "anti-slop/max-ternary-depth": ["error", { maxDepth: 2 }],
+    "anti-slop/no-array-filter-map": "error",
     "anti-slop/no-chained-type-assertions": "error",
-    "anti-slop/no-conditional-empty-object-spread": "error",
     "anti-slop/no-known-value-widening": "error",
     "anti-slop/no-module-mocking": "error",
     "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reduce-accumulator-copy": "error",
     "anti-slop/no-reflect-apply": "error",
     "anti-slop/no-reflect-get": "error",
     "anti-slop/no-runtime-typeof": "error",
@@ -325,7 +342,132 @@ export default defineConfig({
     "anti-slop/no-unknown-type-aliases": "error",
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-readable-spacing": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
+
+    // The Effect half of the same plugin. They encode the service and Layer
+    // rules this repo already follows by convention — a tagged error is
+    // matched by tag, a mapping keeps its cause, a service is built by `make`
+    // and advertised by one layer, and every operation is traced — so a new
+    // exception is a finding instead of a review comment.
+    "anti-slop-effect/no-manual-effect-error-tag": "error",
+    "anti-slop-effect/prefer-effect-match": "error",
+    "anti-slop-effect/prefer-tagged-error-handling": "error",
+    "anti-slop-effect/prefer-yield-service": "error",
+    "anti-slop-effect/require-cause-when-narrowing": "error",
+    "anti-slop-effect/require-operation-span": "error",
+
+    // Martin Fowler's code smells from *Refactoring*. They are prompts to look
+    // at a function, not defects on their own, so they warn.
+    "anti-slop-martinfowler/global-data": "warn",
+    "anti-slop-martinfowler/long-function": "warn",
+    "anti-slop-martinfowler/long-parameter-list": "warn",
+    "anti-slop-martinfowler/loops": "warn",
+    "anti-slop-martinfowler/mutable-data": "warn",
+    "anti-slop-martinfowler/mysterious-name": "warn",
+    "anti-slop-martinfowler/repeated-switches": "warn",
+
+    // ---------------------------------------------------------------------
+    // Anti-slop rules whose advice this codebase cannot take without a
+    // migration of its data model or its layer composition. Each is `off` with
+    // the count it reported when it was enabled and what the migration is, so
+    // the decision is visible instead of costing a reviewer 1,000 warnings to
+    // skim (the argument this file already makes for `unstable-api-usage`).
+    // Nothing here is a defect in the code; it is a different design that the
+    // rule cannot express.
+    // ---------------------------------------------------------------------
+
+    // 381. `exactOptionalPropertyTypes` is on in
+    // `packages/config/tsconfig.base.json`, so `{ x?: T }` cannot be built by
+    // assigning `undefined`: a property is either absent or present with a
+    // value. `...(cond && { x })` is how that type is constructed, and it is
+    // the shape the error classes, provider payloads and TanStack DB rows all
+    // need. The rule's replacement ("build the value in separate statements")
+    // means mutation or a builder at every one of those sites.
+    "anti-slop/no-conditional-spread": "off",
+
+    // 298. The rule reports *any* object literal with a `_tag` key, whether or
+    // not a constructor exists for it. This tree models a domain result as a
+    // plain tagged struct — `{ _tag: "Succeeded" }`, `{ _tag: "Written",
+    // intent }` — declared with `Schema.TaggedStruct`/`Schema.Union` and
+    // returned by value; there is no class to construct. 171 of the findings
+    // are test assertions that have to spell the shape out. Effect's errors
+    // are `Schema.TaggedError` classes constructed with `new`, which the rule
+    // does not distinguish from the data.
+    "anti-slop-effect/no-manual-tagged-construction": "off",
+
+    // 48, the type-side half of the same decision: `readonly _tag: "A"` in a
+    // union this package declares. Deriving them from `Schema.TaggedUnion`
+    // would put `effect/Schema` into the bundles ADR 0005 keeps it out of (the
+    // widget, the SDK, `integrations/core`) and its `$match` helper into a
+    // dozen call sites.
+    "anti-slop-effect/no-manual-tagged-type": "off",
+
+    // 142, the read-side half. A plain tagged struct has no `cases`/`guards`
+    // to call, so `x._tag === "Written"` is how it is discriminated and
+    // `switch (x._tag)` is how an exhaustive branch is written. The rule
+    // demands `Match.value(...).pipe(...)` or `Predicate.isTagged` instead,
+    // which is a rewrite of 142 sites for no behavioural change. (The 31
+    // `_tag === "Some"` findings inside those 142 are a different matter and a
+    // fair follow-up: `Option.isSome` is this tree's spelling, used 117 times.)
+    "anti-slop-effect/no-manual-tag-comparison": "off",
+
+    // 42. The composition root provides each service once, but a surface that
+    // is *built* from the environment and invoked later — an
+    // `HttpApiBuilder` handler, an RPC group, a stored MCP tool handler —
+    // cannot inherit the request's context. Those surfaces capture their
+    // collaborators in `make` (`provideInternals` in `comments/service.ts`,
+    // `provideHandlerEnvironment` in `widget/api-live.ts`) so their methods
+    // declare no requirements of their own. The rule wants the requirements to
+    // propagate instead, which would widen every method signature and move the
+    // provision into each route layer. That is a real migration, not a fix.
+    "anti-slop/no-reprovide-ambient-service": "off",
+
+    // 38. The rule is a name heuristic: any project-local `make<Capability>`
+    // import is treated as a service constructor that should have been a
+    // Layer. `make*` is this tree's factory prefix for ordinary values and
+    // layer builders alike, and its first finding is `makeId` — a Legid
+    // constructor in `packages/id`. 13 of the 38 are
+    // `apps/server/src/app/program.ts`, the composition root, whose job is
+    // assembling the layers these functions build.
+    "anti-slop-effect/no-service-constructor-imports": "off",
+
+    // 37. `Layer`s are assembled in the composition root (`apps/server/src/app/
+    // layers.ts`, per ADR 0002), not declared as a `static` on the service
+    // class, so a provider package never depends on server configuration. The
+    // rule wants `static layer = Layer.effect(this, this.make)` inside every
+    // `Context.Service`; adopting it moves 30 services' layer ownership into
+    // their own modules.
+    "anti-slop-effect/require-service-make-layer": "off",
+
+    // 13. Every finding is `Layer.orDie` on a router or toolkit layer whose
+    // construction failure is a programming error (a duplicate route, an
+    // illegal protocol list) rather than a runtime condition to recover from.
+    // `Effect.orDie` inside `make` — the half that hides a real failure — has
+    // no findings and stays `error`.
+    "anti-slop-effect/no-ordie-in-service-construction": "off",
+
+    // 13. Nine of them are the Public API's handler builders taking the
+    // captured `Context<PublicApiDependencies>` described above; the rest pass
+    // a `Layer` to a composition-root factory. Both are the shared-root pattern
+    // in ADR 0007.
+    "anti-slop-effect/no-service-parameters": "off",
+
+    // 14. Every finding is a targeted `oxlint-disable-next-line` carrying its
+    // own reason, which is the pattern AGENTS.md explicitly allows ("a
+    // `oxlint-disable-next-line` with a written reason"), and each sits beside
+    // a `SAFETY:` comment that explains the invariant. This rule exists to stop
+    // suppression drifting away from its reason; in this tree it is already
+    // there.
+    "anti-slop/no-disabled-type-assertion-rules": "off",
+
+    // 8 after excluding `*.test.*` (271). Tests are colocated with the module
+    // they cover — `packages/domain/src/<entity>/handlers.test.ts` — which is
+    // the shape AGENTS.md prescribes, and the remaining 8 are production
+    // modules that export a test layer (`layerTest` in the config modules,
+    // `packages/transactional/src/test-mailer.ts`) because another package's
+    // test builds on it. There is no `test/` tree for the rule to move them to.
+    "anti-slop-effect/no-test-code-in-src": "off",
   },
 
   // Architecture boundary: client-side packages consume domain schemas, never

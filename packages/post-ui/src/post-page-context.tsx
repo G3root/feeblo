@@ -91,11 +91,13 @@ const PostCollectionDataContext = createContext<PostCollectionState | null>(
 
 export function usePostCollectionData() {
   const value = use(PostCollectionDataContext);
+
   if (!value) {
     throw new Error(
       "usePostCollectionData must be used within PostCollectionDataProvider"
     );
   }
+
   return value;
 }
 

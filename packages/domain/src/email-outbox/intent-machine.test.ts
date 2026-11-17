@@ -20,6 +20,7 @@ import {
  */
 
 const ALL = EMAIL_OUTBOX_STATES;
+
 const pairs = ALL.flatMap((from) => ALL.map((to) => [from, to] as const));
 
 /** True when some event takes `from` to `to`. */
@@ -73,10 +74,12 @@ describe("email intent machine", () => {
 
     while (grew) {
       grew = false;
+
       for (const from of EMAIL_INTENT_STATES) {
         if (!reached.has(from)) {
           continue;
         }
+
         for (const to of ALL) {
           if (!reached.has(to) && canMove(from, to)) {
             reached.add(to);

@@ -6,8 +6,10 @@ import * as Effect from "effect/Effect";
 /** Authenticated RPC handlers which authorize `webhooks.manage` before every service call. */
 export const WebhookManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* WebhookManagementService;
+
   const authorize = (organizationId: string) =>
     Policy.withPolicy(Policy.canPermission(organizationId, "webhooks.manage"));
+
   return {
     ListWebhookEndpoints: (
       input: Parameters<typeof service.listEndpoints>[0]

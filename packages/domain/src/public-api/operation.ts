@@ -2,6 +2,7 @@ import type { PublicApiScope } from "@feeblo/domain-contracts/public-api-scope";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import type { AuditLogRecorder } from "../audit-log/recorder";
 import { ForbiddenScopeError } from "./errors";
 import { requirePublicApiScope, type PublicApiCaller } from "./middleware";
 
@@ -134,9 +135,11 @@ export const defineOperation = <
   Input,
   Output,
   Schema.Union<readonly [Failure, typeof ForbiddenScopeError]>,
-  // The scope check runs first and reads the key middleware's caller, so every
-  // operation requires it in addition to its own dependencies.
-  Requirements | PublicApiCaller
+  // The scope check runs first, so every operation requires the key
+  // middleware's caller and — because a refusal is recorded — the audit
+  // writer, in addition to its own dependencies. Both are built with the
+  // surface rather than assembled per operation.
+  Requirements | PublicApiCaller | AuditLogRecorder
 > => {
   const failure = Schema.Union([options.failure, ForbiddenScopeError]);
 

@@ -8,10 +8,13 @@ import * as Schema from "effect/Schema";
 
 /** Provider key owned by the Slack adapter, outside the provider-neutral kernel. */
 export const slackProviderKey = IntegrationProviderKey.make("slack");
+
 export const slackChannelNotificationsCapabilityKey =
   IntegrationCapabilityKey.make("channel.notifications");
+
 export const slackCommandsCapabilityKey =
   IntegrationCapabilityKey.make("commands");
+
 export const slackMessageActionCapabilityKey =
   IntegrationCapabilityKey.make("message.action");
 
@@ -44,6 +47,7 @@ export const SlackChannelNotificationRouteConfiguration = Schema.Struct({
   version: Schema.Literal(1),
   channelId: Schema.NonEmptyString,
 });
+
 export type SlackChannelNotificationRouteConfiguration = Schema.Schema.Type<
   typeof SlackChannelNotificationRouteConfiguration
 >;
@@ -80,6 +84,7 @@ export const slackProviderManifest = IntegrationProviderManifest.make({
 export type SlackConnectionConfiguration = Schema.Schema.Type<
   typeof SlackConnectionConfiguration
 >;
+
 export type SlackInboundRouteConfiguration = Schema.Schema.Type<
   typeof SlackInboundRouteConfiguration
 >;

@@ -42,6 +42,14 @@ export type PublicApiCall = {
   readonly organizationId: string;
   readonly scopes: PublicApiScopeStatements | null;
   readonly rateLimit: PublicApiRateLimit;
+  /**
+   * The credential's name, frozen onto any audit entry it produces.
+   *
+   * Read from the row the verifier already loaded for the scope check, so it
+   * costs nothing; the audit log wants the name the key had when it acted, and
+   * a revoked key cannot be re-read for it later.
+   */
+  readonly label?: string;
 };
 
 /** The credential a caller presented, and the identity it resolves to. */
@@ -215,6 +223,7 @@ export const authenticatePublicApiKey = (
     );
 
     const record = verified.valid ? verified.key : null;
+
     if (record === null) {
       return yield* invalidApiKeyError();
     }
@@ -238,6 +247,7 @@ export const authenticatePublicApiKey = (
     return {
       credential: { _tag: "ApiKey" as const, keyId: record.id },
       organizationId,
+      ...(record.name === null ? undefined : { label: record.name }),
       rateLimit,
       scopes: record.permissions ?? null,
     };

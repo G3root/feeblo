@@ -12,11 +12,13 @@ const PENDING: ImportPlanStatus = {
   label: "",
   type: "PENDING",
 };
+
 const REVIEW: ImportPlanStatus = {
   id: "status-review",
   label: "Under review",
   type: "REVIEW",
 };
+
 const STATUSES = [PENDING, REVIEW];
 
 const FEEDBACK: ImportPlanBoard = {

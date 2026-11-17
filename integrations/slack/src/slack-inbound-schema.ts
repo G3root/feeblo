@@ -18,8 +18,10 @@ export {
 } from "@feeblo/domain-contracts/slack-inbound";
 
 export const SlackOAuthState = IntegrationOAuthState;
+
 export type SlackOAuthState = Schema.Schema.Type<typeof SlackOAuthState>;
 
 /** Canonical Slack interactive callback ids owned by Feeblo. */
 export const SLACK_FEEDBACK_MODAL_CALLBACK_ID = "feeblo_feedback_modal";
+
 export const SLACK_FEEDBACK_MODAL_PRIVATE_METADATA_MAX = 3000;

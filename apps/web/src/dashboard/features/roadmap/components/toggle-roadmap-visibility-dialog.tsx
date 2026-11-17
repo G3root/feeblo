@@ -23,22 +23,27 @@ import { useToggleRoadmapVisibilityDialogContext } from "../dialog-stores";
 export function ToggleRoadmapVisibilityDialog() {
   const store = useToggleRoadmapVisibilityDialogContext();
   const open = useSelector(store, (state) => state.context.open);
+
   const { roadmapId, currentVisibility } = useSelector(
     store,
     (state) => state.context.data
   );
+
   const { entitlements } = useEntitlements();
   const upgradePlanStore = useUpgradePlanDialogContext();
 
   const isPrivate = currentVisibility === "private";
   const nextVisibility = isPrivate ? "public" : "private";
+
   const requiresUpgrade = !(
     isPrivate || entitlements.capabilities.privateRoadmaps
   );
 
   let title = "Make roadmap private?";
+
   let description =
     "Only members of this workspace will be able to view this roadmap.";
+
   let actionLabel = "Make private";
 
   if (isPrivate) {
@@ -57,6 +62,7 @@ export function ToggleRoadmapVisibilityDialog() {
     if (requiresUpgrade) {
       store.send({ type: "toggle" });
       upgradePlanStore.send({ type: "toggle" });
+
       return;
     }
 

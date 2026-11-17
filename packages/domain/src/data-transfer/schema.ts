@@ -218,4 +218,5 @@ export const DataImportUploadFields = {
 };
 
 export const BOARD_IMPORT_DEFAULT_REPORT_LIMIT = 100;
+
 export const BOARD_IMPORT_MAX_REPORT_LIMIT = 500;

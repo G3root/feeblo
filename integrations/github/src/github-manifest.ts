@@ -7,9 +7,11 @@ import {
 import * as Schema from "effect/Schema";
 
 export const githubProviderKey = IntegrationProviderKey.make("github");
+
 export const githubIssueCreateCapabilityKey = IntegrationCapabilityKey.make(
   "github.issue.create"
 );
+
 export const githubIssueWebhookCapabilityKey = IntegrationCapabilityKey.make(
   "github.issue.webhook"
 );
@@ -28,6 +30,7 @@ export const GitHubConnectionConfiguration = Schema.Struct({});
 import { GitHubIssueCreateRouteConfiguration } from "@feeblo/domain-contracts/github-integration";
 
 export { GitHubIssueCreateRouteConfiguration };
+
 export type GitHubIssueCreateRouteConfiguration = Schema.Schema.Type<
   typeof GitHubIssueCreateRouteConfiguration
 >;

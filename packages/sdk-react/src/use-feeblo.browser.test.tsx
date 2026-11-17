@@ -12,6 +12,7 @@ import { StateProbe, TestProvider } from "./test-probes";
 
 function BrokenProbe(): null {
   useFeeblo();
+
   return null;
 }
 
@@ -72,6 +73,7 @@ describe("useFeeblo", () => {
         <StateProbe />
       </TestProvider>
     );
+
     postFromWidget({ event: "READY" });
     const sent = interceptIframePostMessages();
 
@@ -89,6 +91,7 @@ describe("useFeeblo", () => {
         <StateProbe />
       </TestProvider>
     );
+
     postFromWidget({ event: "READY" });
     const sent = interceptIframePostMessages();
 
@@ -98,6 +101,7 @@ describe("useFeeblo", () => {
       const setContext = sent.find(
         (message) => message.event === "SET_CONTEXT"
       );
+
       expect(setContext?.data).toMatchObject({ plan: "pro" });
     });
   });
@@ -108,6 +112,7 @@ describe("useFeeblo", () => {
         <StateProbe />
       </TestProvider>
     );
+
     postFromWidget({ event: "READY" });
     const sent = interceptIframePostMessages();
 
@@ -129,6 +134,7 @@ describe("useFeeblo", () => {
         <StateProbe />
       </TestProvider>
     );
+
     postFromWidget({ event: "READY" });
     const sent = interceptIframePostMessages();
 

@@ -92,6 +92,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
     SetChangelogCategories: (args: TChangelogCategorySet) =>
       Effect.gen(function* () {
         const categoryIds = [...new Set(args.categoryIds)];
+
         // Two independent checks against the same workspace, run together as
         // one round trip. The verdicts are collected rather than raced, so the
         // changelog is still the one reported when both inputs are foreign.
@@ -108,6 +109,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           ],
           { concurrency: "unbounded", mode: "result" }
         );
+
         yield* Effect.fromResult(changelogCheck);
         yield* Effect.fromResult(categoryCheck);
 
@@ -133,6 +135,7 @@ const validateChangelog = ({
 }) =>
   Effect.gen(function* () {
     const repository = yield* ChangelogCategoryRepository;
+
     const exists = yield* repository.hasChangelog({
       changelogId,
       organizationId,
@@ -154,6 +157,7 @@ const validateCategoryIds = ({
 }) =>
   Effect.gen(function* () {
     const repository = yield* ChangelogCategoryRepository;
+
     const count = yield* repository.countExistingCategories({
       organizationId,
       categoryIds,

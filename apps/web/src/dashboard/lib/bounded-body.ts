@@ -14,28 +14,37 @@ export const readBoundedText = async (
   limit: number
 ): Promise<string | undefined> => {
   const reader = request.body?.getReader();
+
   if (reader === undefined) return "";
   const chunks: Uint8Array[] = [];
   let total = 0;
+
   try {
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
       total += value.byteLength;
+
       if (total > limit) {
         await reader.cancel().catch(() => undefined);
+
         return undefined;
       }
+
       chunks.push(value);
     }
   } catch {
     return undefined;
   }
+
   const body = new Uint8Array(total);
   let offset = 0;
+
   for (const chunk of chunks) {
     body.set(chunk, offset);
     offset += chunk.byteLength;
   }
+
   return new TextDecoder().decode(body);
 };

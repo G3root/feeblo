@@ -1,10 +1,14 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import { withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -50,22 +54,54 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
       // unique index roadmap_primary_organizationId_uidx) and falls back to a
       // non-primary create when another roadmap already holds it, so
       // concurrent creates cannot both become primary.
-      repository
-        .create({
-          ...args,
-          isPrimary: true,
-        })
-        .pipe(
-          Policy.withPolicy(
-            roadmapPolicy.canCreate({
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.create({
+              ...args,
+              isPrimary: true,
+            });
+            yield* audit.record({
               organizationId: args.organizationId,
-              visibility: args.visibility,
-            })
-          ),
-          withRemapDbErrors("Roadmap", "create")
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "roadmap.created",
+              resourceId: args.id,
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(
+          roadmapPolicy.canCreate({
+            organizationId: args.organizationId,
+            visibility: args.visibility,
+          })
         ),
+        withRemapDbErrors("Roadmap", "create")
+      ),
     UpdateRoadmap: (args: TRoadmapUpdate) =>
-      repository.update(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.update(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "roadmap.updated",
+              resourceId: args.id,
+              metadata: {
+                isPrimary: args.isPrimary,
+                visibility: args.visibility,
+              },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(
           roadmapPolicy.canUpdate({
             organizationId: args.organizationId,
@@ -80,14 +116,27 @@ export const RoadmapRpcHandlersEffect = Effect.gen(function* () {
       // transaction (see RoadmapRepository.deleteWithPrimaryHandoff), so a
       // concurrent create/delete cannot leave the organization with zero or
       // multiple primary roadmaps.
-      repository
-        .deleteWithPrimaryHandoff(args)
-        .pipe(
-          Policy.withPolicy(
-            roadmapPolicy.canDelete({ organizationId: args.organizationId })
-          ),
-          withRemapDbErrors("Roadmap", "delete")
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.deleteWithPrimaryHandoff(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "roadmap.deleted",
+              resourceId: args.id,
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(
+          roadmapPolicy.canDelete({ organizationId: args.organizationId })
         ),
+        withRemapDbErrors("Roadmap", "delete")
+      ),
   };
 });
 
@@ -99,5 +148,6 @@ export const RoadmapRpcHandlers = RoadmapRpcs.toLayer(
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
   Layer.provide(SiteRepository.layer),
-  Layer.provide(RoadmapRepository.layer)
+  Layer.provide(RoadmapRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );

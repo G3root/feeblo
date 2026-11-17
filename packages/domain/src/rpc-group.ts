@@ -1,5 +1,6 @@
 import { ApiKeyRpcs } from "./api-key/rpcs";
 import { AttributeDefinitionRpcs } from "./attribute-definition/rpcs";
+import { AuditLogRpcs } from "./audit-log/rpcs";
 import { BillingRpcs } from "./billing/rpcs";
 import { BoardRpcs } from "./board/rpcs";
 import { ChangelogCategoryRpcs } from "./changelog-category/rpcs";
@@ -61,6 +62,7 @@ import { WorkspaceRpcs } from "./workspace/rpcs";
  */
 export const RpcGroups = [
   ["Post", PostRpcs],
+  ["AuditLog", AuditLogRpcs],
   ["PostActivity", PostActivityRpcs],
   ["AttributeDefinition", AttributeDefinitionRpcs],
   ["Billing", BillingRpcs],
@@ -131,5 +133,6 @@ export type RpcTagsOf<Group> = Group extends {
  */
 export const AllRpcs = (() => {
   const [first, ...rest] = RpcGroups;
+
   return first[1].merge(...rest.map(([, group]) => group));
 })();

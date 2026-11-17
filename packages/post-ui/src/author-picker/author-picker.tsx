@@ -104,6 +104,7 @@ export function AuthorPicker({
   const [createOpen, setCreateOpen] = useState(false);
 
   const displayValue = display ?? value;
+
   // `describeContactSelection` takes the selection shape (no nulls);
   // normalize the trigger display, which also carries stored post authors.
   const displayName =
@@ -114,6 +115,7 @@ export function AuthorPicker({
           email: displayValue.email ?? undefined,
           name: displayValue.name ?? undefined,
         });
+
   const displayAvatarUrl = displayValue?.avatarUrl ?? null;
   const displayNameAttr = displayValue?.name ?? null;
 

@@ -22,9 +22,11 @@ describe("verifySlackRequestSignature", () => {
   it.effect("accepts a valid signature", () =>
     Effect.gen(function* () {
       const rawBody = "command=/feeblo&text=hello";
+
       const timestamp = String(
         Math.floor((yield* Clock.currentTimeMillis) / 1000)
       );
+
       const result = yield* verifySlackRequestSignature({
         now: yield* Clock.currentTimeMillis,
         rawBody,
@@ -32,6 +34,7 @@ describe("verifySlackRequestSignature", () => {
         signingSecret,
         timestampHeader: timestamp,
       });
+
       expect(result).toBeUndefined();
     })
   );
@@ -47,6 +50,7 @@ describe("verifySlackRequestSignature", () => {
           signatureHeader: undefined,
         })
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -54,6 +58,7 @@ describe("verifySlackRequestSignature", () => {
   it.effect("rejects a stale timestamp outside the freshness window", () =>
     Effect.gen(function* () {
       const rawBody = "{}";
+
       const stale = String(
         Math.floor(
           ((yield* Clock.currentTimeMillis) -
@@ -62,6 +67,7 @@ describe("verifySlackRequestSignature", () => {
             1000
         )
       );
+
       const result = yield* Effect.exit(
         verifySlackRequestSignature({
           now: yield* Clock.currentTimeMillis,
@@ -71,6 +77,7 @@ describe("verifySlackRequestSignature", () => {
           timestampHeader: stale,
         })
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -80,6 +87,7 @@ describe("verifySlackRequestSignature", () => {
       const timestamp = String(
         Math.floor((yield* Clock.currentTimeMillis) / 1000)
       );
+
       const result = yield* Effect.exit(
         verifySlackRequestSignature({
           now: yield* Clock.currentTimeMillis,
@@ -89,6 +97,7 @@ describe("verifySlackRequestSignature", () => {
           timestampHeader: timestamp,
         })
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -98,6 +107,7 @@ describe("verifySlackRequestSignature", () => {
       const timestamp = String(
         Math.floor((yield* Clock.currentTimeMillis) / 1000)
       );
+
       const result = yield* Effect.exit(
         verifySlackRequestSignature({
           now: yield* Clock.currentTimeMillis,
@@ -107,6 +117,7 @@ describe("verifySlackRequestSignature", () => {
           timestampHeader: timestamp,
         })
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );

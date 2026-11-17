@@ -141,6 +141,7 @@ function BoardListLaneHeader({
   lane: BoardPostLane;
 }) {
   const store = useBoardStore();
+
   const laneLabel =
     lane.label || (lane.status ? formatPostStatus(lane.status) : "Posts");
 
@@ -242,6 +243,7 @@ function LaneUnselectMenuItem({ posts }: { posts: BoardPostRow[] }) {
 
 function useLaneSelectedCount(posts: BoardPostRow[]) {
   const selectedPosts = useSelectedPosts();
+
   // One Set per selection change, shared by every lane on the board —
   // previously each lane rebuilt it on every render (lanes × selection).
   const selectedIds = useMemo(

@@ -64,6 +64,7 @@ export const makeIntegrationProviderRegistry = (
 
     for (const registration of registrations) {
       const provider = registration.manifest.provider;
+
       if (registrationsByProvider.has(provider)) {
         return yield* registryValidationFailure({
           message:
@@ -76,6 +77,7 @@ export const makeIntegrationProviderRegistry = (
         string,
         IntegrationCapabilityHandler
       >();
+
       for (const handler of registration.handlers) {
         if (handlersByCapability.has(handler.capabilityKey)) {
           return yield* registryValidationFailure({
@@ -85,6 +87,7 @@ export const makeIntegrationProviderRegistry = (
             provider,
           });
         }
+
         handlersByCapability.set(handler.capabilityKey, handler);
       }
 
@@ -92,6 +95,7 @@ export const makeIntegrationProviderRegistry = (
         string,
         IntegrationInboundCapabilityHandler
       >();
+
       for (const handler of registration.inboundHandlers ?? []) {
         if (inboundHandlersByCapability.has(handler.capabilityKey)) {
           return yield* registryValidationFailure({
@@ -101,6 +105,7 @@ export const makeIntegrationProviderRegistry = (
             provider,
           });
         }
+
         inboundHandlersByCapability.set(handler.capabilityKey, handler);
       }
 
@@ -113,6 +118,7 @@ export const makeIntegrationProviderRegistry = (
             provider,
           });
         }
+
         if (capability.direction === "outbound") {
           if (!handlersByCapability.has(capability.key)) {
             return yield* registryValidationFailure({
@@ -144,6 +150,7 @@ export const makeIntegrationProviderRegistry = (
       const advertisedCapabilities = new Set(
         registration.manifest.capabilities.map((capability) => capability.key)
       );
+
       for (const handler of registration.handlers) {
         if (!advertisedCapabilities.has(handler.capabilityKey)) {
           return yield* registryValidationFailure({
@@ -154,6 +161,7 @@ export const makeIntegrationProviderRegistry = (
           });
         }
       }
+
       for (const handler of registration.inboundHandlers ?? []) {
         if (!advertisedCapabilities.has(handler.capabilityKey)) {
           return yield* registryValidationFailure({

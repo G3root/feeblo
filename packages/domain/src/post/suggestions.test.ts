@@ -23,6 +23,7 @@ import { makePostSuggestions, SUGGESTION_MAX_DISTANCE } from "./suggestions";
  */
 
 const organizationId = asLegid(WorkspaceId)("org_suggestions");
+
 const boardId = asLegid(BoardId)("brd_suggestions");
 
 const createdAt = DateTime.toDateUtc(
@@ -100,13 +101,16 @@ const makeCandidates = (
   ) => readonly CandidateRow[]
 ) => {
   const calls: TPostSuggestionCandidates[] = [];
+
   const candidates = (
     args: TPostSuggestionCandidates
   ): Effect.Effect<readonly CandidateRow[]> => {
     const call = calls.length;
     calls.push(args);
+
     return Effect.succeed([...respond(args, call)]);
   };
+
   return { calls, candidates };
 };
 
@@ -128,13 +132,16 @@ it.effect(
         id: "post_near",
         title: "Export reports",
       });
+
       const far = candidate({
         content: "Use a darker theme",
         distance: SUGGESTION_MAX_DISTANCE + 0.1,
         id: "post_far",
         title: "Dark mode",
       });
+
       const { calls, candidates } = makeCandidates(() => [near, far]);
+
       const search = makePostSuggestions({
         candidates,
         embeddings: semanticEmbeddings([1, 0]),
@@ -168,12 +175,15 @@ it.effect("ranks lexically without embeddings and keeps the pool floor", () =>
       id: "post_billing",
       title: "Add yearly billing",
     });
+
     const unrelated = candidate({
       content: "Use a darker color theme",
       id: "post_dark",
       title: "Dark mode",
     });
+
     const { calls, candidates } = makeCandidates(() => [billing, unrelated]);
+
     const search = makePostSuggestions({
       candidates,
       embeddings: Option.none(),
@@ -207,19 +217,23 @@ it.effect(
         id: "post_far",
         title: "Dark mode",
       });
+
       const billing = candidate({
         content: "Please support annual subscription invoices",
         id: "post_billing",
         title: "Add yearly billing",
       });
+
       const invoices = candidate({
         content: "Invoice history for annual subscriptions",
         id: "post_invoices",
         title: "Billing invoice history",
       });
+
       const { calls, candidates } = makeCandidates((_args, call) =>
         call === 0 ? [far] : [billing, invoices]
       );
+
       const search = makePostSuggestions({
         candidates,
         embeddings: semanticEmbeddings([1, 0]),
@@ -251,7 +265,9 @@ it.effect("logs a failed embedding and still answers lexically", () =>
       id: "post_billing",
       title: "Add yearly billing",
     });
+
     const { calls, candidates } = makeCandidates(() => [billing]);
+
     const search = makePostSuggestions({
       candidates,
       embeddings: Option.some({

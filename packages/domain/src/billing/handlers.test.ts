@@ -45,6 +45,7 @@ describe("BillingRpcHandlers", () => {
     organizationId: string;
     userId: string;
   };
+
   const makeSession = (
     fixture: Fixture,
     role: Session["memberships"][number]["role"] | null
@@ -67,6 +68,7 @@ describe("BillingRpcHandlers", () => {
         ]
       : [],
   });
+
   const makeFixture = () =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -92,8 +94,10 @@ describe("BillingRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
+
   const PolarServiceTest = Layer.succeed(PolarService, {
     client: undefined,
     coreClient: undefined,
@@ -116,12 +120,14 @@ describe("BillingRpcHandlers", () => {
             if (checkoutConfirmation.subscription === null) {
               throw new Error("The test did not provide a subscription");
             }
+
             return checkoutConfirmation.subscription;
           },
         },
         args
       ),
   });
+
   const TestLayer = Layer.mergeAll(
     BillingRepository.layer.pipe(Layer.provide(PolarServiceTest)),
     // Exposed as well as provided: the revocation pass and the handlers read
@@ -134,6 +140,7 @@ describe("BillingRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* BillingRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .CreateBillingCheckout({
@@ -147,6 +154,7 @@ describe("BillingRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -154,6 +162,7 @@ describe("BillingRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* BillingRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .CreateBillingPortal({ organizationId: fixture.organizationId })
@@ -161,6 +170,7 @@ describe("BillingRpcHandlers", () => {
               Effect.provideService(CurrentSession, makeSession(fixture, null))
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -442,6 +452,7 @@ describe("BillingRpcHandlers", () => {
           .where(
             eq(schema.subscriptionTable.organizationId, fixture.organizationId)
           );
+
         expect(rows).toHaveLength(0);
       })
     );
@@ -490,6 +501,7 @@ describe("BillingRpcHandlers", () => {
                 fixture.organizationId
               )
             );
+
           expect(rows).toHaveLength(0);
         })
     );
@@ -529,6 +541,7 @@ describe("BillingRpcHandlers", () => {
                 fixture.organizationId
               )
             );
+
           expect(rows).toHaveLength(0);
         })
     );

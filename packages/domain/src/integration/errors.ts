@@ -16,4 +16,5 @@ export const WebhookManagementErrors = Schema.Union([
   PolicyDeniedError,
   UnauthorizedError,
 ]);
+
 export type WebhookManagementError = typeof WebhookManagementErrors.Type;

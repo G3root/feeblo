@@ -41,7 +41,9 @@ const tokenPrefix = "notification-preference:unsubscribe";
 const ClaimsJson = Schema.fromJsonString(
   NotificationPreferenceUnsubscribeClaims
 );
+
 const encodeClaims = Schema.encodeSync(ClaimsJson);
+
 const decodeClaims = Schema.decodeUnknownOption(ClaimsJson);
 
 const sign = (signingSecret: string, payload: string): string =>
@@ -51,6 +53,7 @@ const sign = (signingSecret: string, payload: string): string =>
 
 const makeNotificationPreferenceTokenService = Effect.gen(function* () {
   const signingSecret = yield* Config.Redacted("AUTH_ENCRYPTION_KEY");
+
   return makeTokenService(Redacted.value(signingSecret));
 });
 
@@ -76,6 +79,7 @@ const makeTokenService = (signingSecret: string) => ({
           encodeClaims({ category, organizationId, userId }),
           "utf8"
         ).toString("base64url");
+
         return Redacted.make(`${payload}.${sign(signingSecret, payload)}`);
       },
       catch: (cause) =>
@@ -95,19 +99,24 @@ const makeTokenService = (signingSecret: string) => ({
     Effect.try({
       try: () => {
         const [payload, signature] = token.split(".");
+
         if (payload === undefined || signature === undefined) {
           return Option.none();
         }
+
         const expected = sign(signingSecret, payload);
         const provided = Buffer.from(signature, "utf8");
         const expectedBuffer = Buffer.from(expected, "utf8");
+
         if (
           provided.length !== expectedBuffer.length ||
           !timingSafeEqual(provided, expectedBuffer)
         ) {
           return Option.none();
         }
+
         const decoded = Buffer.from(payload, "base64url").toString("utf8");
+
         return decodeClaims(decoded);
       },
       catch: (cause) =>

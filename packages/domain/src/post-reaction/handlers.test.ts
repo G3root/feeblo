@@ -33,6 +33,7 @@ describe("PostReactionRpcHandlers", () => {
     postSlug: string;
     userId: string;
   };
+
   const session = (f: Fixture, member = true): Session => ({
     user: {
       id: f.userId,
@@ -52,6 +53,7 @@ describe("PostReactionRpcHandlers", () => {
         ]
       : [],
   });
+
   const fixture = (visibility: "PUBLIC" | "PRIVATE" = "PUBLIC") =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -112,6 +114,7 @@ describe("PostReactionRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       return {
         boardId,
         membershipId,
@@ -121,10 +124,12 @@ describe("PostReactionRpcHandlers", () => {
         userId,
       } satisfies Fixture;
     });
+
   const Repositories = Layer.mergeAll(
     PostRepository.layer,
     PostReactionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
   const FullTestLayer = Layer.mergeAll(
@@ -138,6 +143,7 @@ describe("PostReactionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostReactionRpcHandlersEffect;
         const f = yield* fixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListPostReactions({
@@ -146,6 +152,7 @@ describe("PostReactionRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session(f, false)))
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -153,22 +160,26 @@ describe("PostReactionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostReactionRpcHandlersEffect;
         const f = yield* fixture();
+
         const input = {
           organizationId: f.organizationId,
           postId: f.postId,
           emoji: "thumbs_up" as const,
         };
+
         expect(
           yield* handlers
             .TogglePostReaction(input)
             .pipe(Effect.provideService(CurrentSession, session(f)))
         ).toEqual({ reacted: true, emoji: "thumbs_up" });
+
         const reactions = yield* handlers
           .ListPostReactions({
             organizationId: f.organizationId,
             slug: f.postSlug,
           })
           .pipe(Effect.provideService(CurrentSession, session(f)));
+
         expect(reactions).toHaveLength(1);
         expect(reactions[0]).toMatchObject({
           postId: f.postId,
@@ -187,11 +198,13 @@ describe("PostReactionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostReactionRpcHandlersEffect;
         const f = yield* fixture();
+
         const input = {
           organizationId: f.organizationId,
           postId: f.postId,
           emoji: "rocket" as const,
         };
+
         yield* handlers
           .TogglePostReaction(input)
           .pipe(Effect.provideService(CurrentSession, session(f)));
@@ -202,6 +215,7 @@ describe("PostReactionRpcHandlers", () => {
             slug: f.postSlug,
           })
           .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
         expect(anonymous).toHaveLength(1);
         expect(anonymous[0]).toMatchObject({
           postId: f.postId,
@@ -221,6 +235,7 @@ describe("PostReactionRpcHandlers", () => {
               Option.some(session(f))
             )
           );
+
         expect(own[0]).toMatchObject({
           postId: f.postId,
           userId: f.userId,
@@ -234,6 +249,7 @@ describe("PostReactionRpcHandlers", () => {
         const handlers = yield* PostReactionRpcHandlersEffect;
         const publicFixture = yield* fixture("PUBLIC");
         const privateFixture = yield* fixture("PRIVATE");
+
         const publicResult = yield* handlers
           .TogglePostReactionPublic({
             organizationId: publicFixture.organizationId,
@@ -243,6 +259,7 @@ describe("PostReactionRpcHandlers", () => {
           .pipe(
             Effect.provideService(CurrentSession, session(publicFixture, false))
           );
+
         const privateError = yield* Effect.flip(
           handlers
             .TogglePostReactionPublic({
@@ -257,6 +274,7 @@ describe("PostReactionRpcHandlers", () => {
               )
             )
         );
+
         expect(publicResult).toEqual({ reacted: true, emoji: "fire" });
         expect(privateError._tag).toBe("PolicyDenied");
       })
@@ -321,6 +339,7 @@ describe("PostReactionRpcHandlers", () => {
             slug: f.postSlug,
           })
           .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
         expect(publicReactions).toHaveLength(0);
       })
     );

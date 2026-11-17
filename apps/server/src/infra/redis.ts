@@ -3,6 +3,7 @@ export const redisOptions = (redisUrl: string) => {
   // An absent database number ("redis://host") must not emit `database: 0`,
   // so an empty path segment is kept unparsable instead of coercing to 0.
   const databaseSegment = url.pathname.slice(1);
+
   const database =
     databaseSegment === "" ? Number.NaN : Number(databaseSegment);
 

@@ -51,6 +51,7 @@ function ChangelogCategoryCreateForm() {
     onSubmit: async ({ value }) => {
       try {
         const id = await ChangelogCategoryId.unsafeGenerate();
+
         const tx = changelogCategoryCollection.insert({
           id,
           createdAt: new Date(),

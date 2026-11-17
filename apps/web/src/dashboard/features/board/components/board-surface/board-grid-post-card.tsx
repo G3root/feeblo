@@ -27,6 +27,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
   sortableId,
 }: BoardGridPostCardProps) {
   const navigate = useNavigate();
+
   const { isDragging, ref } = useSortable({
     id: sortableId,
     group: groupId,

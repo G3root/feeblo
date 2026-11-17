@@ -140,10 +140,12 @@ const makeProtocolHttpBatch = (
   Effect.gen(function* () {
     const http = yield* HttpClient.HttpClient;
     const serialization = yield* RpcSerialization.RpcSerialization;
+
     const maxSingleFrameBytes = Math.max(
       1,
       options.maxSingleFrameBytes ?? defaultMaxSingleFrameBytes
     );
+
     const sharesBatch = options.sharesBatch ?? (() => true);
 
     // `filterStatusOk` runs before either protocol reads a body: a non-2xx
@@ -170,6 +172,7 @@ const makeProtocolHttpBatch = (
         Effect.provideService(RpcSerialization.RpcSerialization, serialization)
       ),
     };
+
     const alone: Routed = {
       pending: new Map(),
       protocol: yield* RpcClient.makeProtocolHttp(client).pipe(
@@ -186,15 +189,19 @@ const makeProtocolHttpBatch = (
       clientId: number
     ): Set<string | number> => {
       const existing = routed.pending.get(clientId);
+
       if (existing !== undefined) {
         return existing;
       }
+
       const created = new Set<string | number>();
       routed.pending.set(clientId, created);
+
       return created;
     };
 
     const encodeText = new TextEncoder();
+
     const decodeDefect = Schema.decodeUnknownEffect(
       serialization.codecFor(Schema.Defect())
     );
@@ -244,15 +251,19 @@ const makeProtocolHttpBatch = (
       writeResponse: WriteResponse
     ): WriteResponse => {
       const pending = pendingFor(routed, clientId);
+
       return (message) => {
         switch (message._tag) {
           case "Exit": {
             pending.delete(message.requestId);
+
             return writeResponse(message);
           }
+
           case "Defect": {
             const requestIds = [...pending];
             pending.clear();
+
             return Effect.flatMap(serverDefect(message), (error) =>
               writeResponse({
                 _tag: "ClientProtocolError",
@@ -261,6 +272,7 @@ const makeProtocolHttpBatch = (
               })
             );
           }
+
           case "ClientProtocolError": {
             if (message.requestIds === undefined) {
               pending.clear();
@@ -269,8 +281,10 @@ const makeProtocolHttpBatch = (
                 pending.delete(requestId);
               }
             }
+
             return writeResponse(message);
           }
+
           default: {
             return writeResponse(message);
           }
@@ -286,6 +300,7 @@ const makeProtocolHttpBatch = (
     const bodyBytes = (request: FromClientEncoded): Effect.Effect<number> =>
       Effect.suspend(() => {
         const encoded = serialization.makeUnsafe().encode(request);
+
         return Effect.succeed(
           isString(encoded) ? encodeText.encode(encoded).length : 0
         );
@@ -336,12 +351,14 @@ const makeProtocolHttpBatch = (
           if (request._tag !== "Request") {
             return routed.protocol.send(clientId, request, transferables);
           }
+
           // Registered before the frame leaves, so an answer that arrives
           // during `send` still has its request in the set the writer scopes a
           // defect to, and released when `send` ends — including when an
           // interrupted caller ends it early, which no frame will report.
           const pending = pendingFor(routed, clientId);
           pending.add(request.id);
+
           return routed.protocol
             .send(clientId, request, transferables)
             .pipe(

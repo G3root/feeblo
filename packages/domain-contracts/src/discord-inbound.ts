@@ -5,6 +5,7 @@ export const DiscordPingPayload = Schema.Struct({
   id: Schema.String,
   type: Schema.Literal(1),
 });
+
 export type DiscordPingPayload = Schema.Schema.Type<typeof DiscordPingPayload>;
 
 /** Discord user object carried by interactions (the invoking user, never a secret). */
@@ -13,6 +14,7 @@ export const DiscordInteractionUser = Schema.Struct({
   username: Schema.String,
   global_name: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
+
 export type DiscordInteractionUser = Schema.Schema.Type<
   typeof DiscordInteractionUser
 >;
@@ -22,6 +24,7 @@ export const DiscordInteractionMember = Schema.Struct({
   user: DiscordInteractionUser,
   nick: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
+
 export type DiscordInteractionMember = Schema.Schema.Type<
   typeof DiscordInteractionMember
 >;
@@ -32,6 +35,7 @@ export const DiscordApplicationCommandOption = Schema.Struct({
   type: Schema.Int,
   value: Schema.optionalKey(Schema.Unknown),
 });
+
 export type DiscordApplicationCommandOption = Schema.Schema.Type<
   typeof DiscordApplicationCommandOption
 >;
@@ -41,6 +45,7 @@ export const DiscordResolvedMessage = Schema.Struct({
   id: Schema.String,
   content: Schema.String,
 });
+
 export type DiscordResolvedMessage = Schema.Schema.Type<
   typeof DiscordResolvedMessage
 >;
@@ -60,6 +65,7 @@ export const DiscordApplicationCommandData = Schema.Struct({
     })
   ),
 });
+
 export type DiscordApplicationCommandData = Schema.Schema.Type<
   typeof DiscordApplicationCommandData
 >;
@@ -76,6 +82,7 @@ export const DiscordApplicationCommandPayload = Schema.Struct({
   user: Schema.optionalKey(DiscordInteractionUser),
   token: Schema.String,
 });
+
 export type DiscordApplicationCommandPayload = Schema.Schema.Type<
   typeof DiscordApplicationCommandPayload
 >;
@@ -93,6 +100,7 @@ export const DiscordModalComponentValue = Schema.Union([
     values: Schema.Array(Schema.String),
   }),
 ]);
+
 export type DiscordModalComponentValue = Schema.Schema.Type<
   typeof DiscordModalComponentValue
 >;
@@ -107,6 +115,7 @@ export const DiscordModalSubmitData = Schema.Struct({
     })
   ),
 });
+
 export type DiscordModalSubmitData = Schema.Schema.Type<
   typeof DiscordModalSubmitData
 >;
@@ -123,6 +132,7 @@ export const DiscordModalSubmitPayload = Schema.Struct({
   user: Schema.optionalKey(DiscordInteractionUser),
   token: Schema.String,
 });
+
 export type DiscordModalSubmitPayload = Schema.Schema.Type<
   typeof DiscordModalSubmitPayload
 >;
@@ -138,6 +148,7 @@ export type DiscordModalSubmitPayload = Schema.Schema.Type<
 export const DiscordUnknownInteractionPayload = Schema.Struct({
   type: Schema.Literals([3, 4]),
 });
+
 export type DiscordUnknownInteractionPayload = Schema.Schema.Type<
   typeof DiscordUnknownInteractionPayload
 >;
@@ -149,6 +160,7 @@ export const DiscordInteraction = Schema.Union([
   DiscordModalSubmitPayload,
   DiscordUnknownInteractionPayload,
 ]);
+
 export type DiscordInteraction = Schema.Schema.Type<typeof DiscordInteraction>;
 
 /** Provider-inbound request parsed into a discriminated payload for the domain inbound service. */
@@ -170,6 +182,7 @@ export const ParsedDiscordInboundRequest = Schema.Union([
     payload: DiscordUnknownInteractionPayload,
   }),
 ]);
+
 export type ParsedDiscordInboundRequest = Schema.Schema.Type<
   typeof ParsedDiscordInboundRequest
 >;

@@ -35,10 +35,12 @@ interface WidgetInstallProps {
 export function WidgetInstall({ organizationId }: WidgetInstallProps) {
   const store = useWidgetStore();
   const draft = useSelector(store, (snapshot) => snapshot.context.draft);
+
   const installTab = useSelector(
     store,
     (snapshot) => snapshot.context.installTab
   );
+
   const config = widgetEmbedConfig(draft);
   // The dashboard and the widget iframe are served by the same deployment, so
   // the page's own origin is the host the snippet should point at.

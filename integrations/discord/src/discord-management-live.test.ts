@@ -44,19 +44,23 @@ const makeFakeDiscordApiClient = (
   const calls: { readonly method: string }[] = [];
   const registeredCommands: { name: string; type: number }[] = [];
   let exchangeNumber = 0;
+
   return {
     calls,
     registeredCommands,
     applicationsMe: () => {
       calls.push({ method: "applications.@me" });
+
       return Effect.succeed({ id: "A123", name: "Feeblo" });
     },
     channelsMessagesCreate: () => {
       calls.push({ method: "channels.messages.create" });
+
       return Effect.succeed({ channel_id: "C1", content: "", id: "M1" });
     },
     guildsChannels: () => {
       calls.push({ method: "guilds.channels" });
+
       return Effect.succeed([...channels]);
     },
     guildsCommandsBulkOverwrite: ({ commands }) => {
@@ -66,6 +70,7 @@ const makeFakeDiscordApiClient = (
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
         ...(commands as readonly { name: string; type: number }[])
       );
+
       return Effect.succeed(
         commands.map((command, index) => ({
           id: `command_${index}`,
@@ -78,14 +83,17 @@ const makeFakeDiscordApiClient = (
     },
     guildsLeave: () => {
       calls.push({ method: "guilds.leave" });
+
       return Effect.void;
     },
     oauth2TokenExchange: () => {
       calls.push({ method: "oauth2.token" });
       exchangeNumber += 1;
+
       const exchangedGuildId = isString(guildId)
         ? guildId
         : guildId(exchangeNumber);
+
       return Effect.succeed({
         access_token: "discord-user-token",
         expires_in: 604_800,
@@ -97,6 +105,7 @@ const makeFakeDiscordApiClient = (
     },
     oauth2TokenRevoke: () => {
       calls.push({ method: "oauth2.token.revoke" });
+
       return Effect.void;
     },
   };
@@ -125,11 +134,13 @@ const makeTestLayer = (
   guildId: string | ((exchangeNumber: number) => string) = "G123"
 ) => {
   const apiClient = makeFakeDiscordApiClient(channels, guildId);
+
   const serviceLayer = makeDiscordManagementServiceLive(apiClient).pipe(
     Layer.provide(testConfig(configured)),
     Layer.provide(Database.PgliteDatabaseLive),
     Layer.provide(NodeCrypto.layer)
   );
+
   return {
     apiClient,
     layer: Layer.mergeAll(
@@ -149,11 +160,13 @@ const seedOrganization = Effect.gen(function* () {
     name: "Discord management test",
     slug: organizationId,
   });
+
   return organizationId;
 });
 
 const decodeState = (authorizeUrl: URL) => {
   const url = new URL(authorizeUrl);
+
   return Schema.decodeSync(Schema.fromJsonString(DiscordOAuthState))(
     url.searchParams.get("state") ?? ""
   );
@@ -172,6 +185,7 @@ describe("discord management service", () => {
           const db = yield* currentDb;
           const organizationId = yield* seedOrganization;
           const service = yield* DiscordManagementService;
+
           const { authorizeUrl } = yield* service.connectStart({
             organizationId,
           });
@@ -198,6 +212,7 @@ describe("discord management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, state.connectionId)
             );
+
           expect(connection?.lifecycle).toBe("connecting");
           expect(connection?.credentialsCiphertext).not.toBeNull();
         })
@@ -210,15 +225,18 @@ describe("discord management service", () => {
           const db = yield* currentDb;
           const organizationId = yield* seedOrganization;
           const service = yield* DiscordManagementService;
+
           const { authorizeUrl } = yield* service.connectStart({
             organizationId,
           });
+
           const state = decodeState(new URL(authorizeUrl));
 
           const result = yield* service.connectComplete({
             code: "oauth-code",
             state: urlState(new URL(authorizeUrl)),
           });
+
           expect(result.organizationId).toBe(organizationId);
 
           // Guild-scoped commands are registered as part of the install.
@@ -234,6 +252,7 @@ describe("discord management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, state.connectionId)
             );
+
           expect(connection?.lifecycle).toBe("active");
           expect(connection?.remoteAccountId).toBe("G123");
           expect(connection?.name).toBe("Acme");
@@ -249,6 +268,7 @@ describe("discord management service", () => {
             .where(
               eq(schema.integrationRouteTable.connectionId, state.connectionId)
             );
+
           expect(routes.map((route) => route.capabilityKey)).toEqual([
             "interactions",
           ]);
@@ -261,6 +281,7 @@ describe("discord management service", () => {
         const service = yield* DiscordManagementService;
         const started = yield* service.connectStart({ organizationId });
         const startedState = decodeState(started.authorizeUrl);
+
         const bogus = yield* Schema.encodeEffect(
           Schema.fromJsonString(DiscordOAuthState)
         )({
@@ -268,9 +289,11 @@ describe("discord management service", () => {
           nonce: "wrong",
           organizationId,
         });
+
         const failure = yield* Effect.flip(
           service.connectComplete({ code: "code", state: bogus })
         );
+
         expect(failure).toMatchObject({
           _tag: "BadRequestError",
           message: "Discord OAuth state does not match",
@@ -286,18 +309,22 @@ describe("discord management service", () => {
         Effect.gen(function* () {
           const service = yield* DiscordManagementService;
           const firstOrganizationId = yield* seedOrganization;
+
           const first = yield* service.connectStart({
             organizationId: firstOrganizationId,
           });
+
           yield* service.connectComplete({
             code: "first-code",
             state: urlState(first.authorizeUrl),
           });
 
           const secondOrganizationId = yield* seedOrganization;
+
           const second = yield* service.connectStart({
             organizationId: secondOrganizationId,
           });
+
           const failure = yield* Effect.flip(
             service.connectComplete({
               code: "second-code",
@@ -320,19 +347,23 @@ describe("discord management service", () => {
     true,
     (exchangeNumber) => `GUILD_CHANNELS_${exchangeNumber}`
   );
+
   layer(channelNotificationsFlow.layer)("channel notifications", (it) => {
     it.effect("lists text channels and toggles notifications", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
         const organizationId = yield* seedOrganization;
         const service = yield* DiscordManagementService;
+
         const { authorizeUrl } = yield* service.connectStart({
           organizationId,
         });
+
         yield* service.connectComplete({
           code: "code",
           state: urlState(new URL(authorizeUrl)),
         });
+
         const [connection] = yield* db
           .select()
           .from(schema.integrationConnectionTable)
@@ -346,15 +377,18 @@ describe("discord management service", () => {
             )
           )
           .limit(1);
+
         if (connection === undefined) {
           throw new Error("expected connection");
         }
+
         const connectionId = asLegid(IntegrationConnectionId)(connection.id);
 
         const channels = yield* service.listChannels({
           connectionId,
           organizationId,
         });
+
         // Voice channels and categories are filtered out; only text and
         // announcement channels are selectable.
         expect(channels.map((channel) => channel.id).sort()).toEqual([
@@ -372,10 +406,12 @@ describe("discord management service", () => {
           enabled: true,
           organizationId,
         });
+
         const updated = yield* service.listChannels({
           connectionId,
           organizationId,
         });
+
         expect(
           updated.find((channel) => channel.id === "C2")?.notificationsEnabled
         ).toBe(true);
@@ -389,10 +425,12 @@ describe("discord management service", () => {
           enabled: false,
           organizationId,
         });
+
         const disabled = yield* service.listChannels({
           connectionId,
           organizationId,
         });
+
         expect(
           disabled.find((channel) => channel.id === "C2")?.notificationsEnabled
         ).toBe(false);
@@ -405,6 +443,7 @@ describe("discord management service", () => {
             organizationId,
           })
         );
+
         expect(unknownChannelFailure).toMatchObject({
           _tag: "NotFoundError",
           message: "Discord channel was not found in the connected server",
@@ -417,13 +456,16 @@ describe("discord management service", () => {
         const db = yield* currentDb;
         const organizationId = yield* seedOrganization;
         const service = yield* DiscordManagementService;
+
         const { authorizeUrl } = yield* service.connectStart({
           organizationId,
         });
+
         yield* service.connectComplete({
           code: "code",
           state: urlState(new URL(authorizeUrl)),
         });
+
         const [connection] = yield* db
           .select()
           .from(schema.integrationConnectionTable)
@@ -437,6 +479,7 @@ describe("discord management service", () => {
             )
           )
           .limit(1);
+
         if (connection === undefined) {
           throw new Error("expected connection");
         }
@@ -450,6 +493,7 @@ describe("discord management service", () => {
           .select()
           .from(schema.integrationConnectionTable)
           .where(eq(schema.integrationConnectionTable.id, connection.id));
+
         expect(archived?.lifecycle).toBe("archived");
         expect(archived?.credentialsCiphertext).toBeNull();
 
@@ -471,9 +515,11 @@ describe("discord management service", () => {
         Effect.gen(function* () {
           const organizationId = yield* seedOrganization;
           const service = yield* DiscordManagementService;
+
           const result = yield* Effect.exit(
             service.connectStart({ organizationId })
           );
+
           expect(Exit.isFailure(result)).toBe(true);
         })
       );

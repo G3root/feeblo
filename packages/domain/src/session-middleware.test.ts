@@ -22,6 +22,7 @@ import {
 } from "./session-middleware";
 
 const COOKIE_A = "better-auth.session_token";
+
 const COOKIE_B = "__Secure-better-auth.session_token";
 
 const testSession: Session = {
@@ -52,9 +53,11 @@ const AuthTest = Layer.succeed(Auth, {
     getSession: async ({ headers }) => {
       const parsed = parseCookie(headers.get("cookie") ?? "");
       const [cookieName, token] = Object.entries(parsed)[0] ?? [undefined];
+
       if (cookieName === undefined || token === undefined) {
         return null;
       }
+
       return sessionsByCookieName.get(cookieName) === token
         ? testSession
         : null;
@@ -124,6 +127,7 @@ const executeRequest = (path: string, cookie: string) => {
   const request = HttpServerRequest.fromWeb(
     new Request(`http://localhost${path}`, { headers: { cookie } })
   );
+
   // A router failure is a defect in a test; `orDie` keeps the error channel
   // typed instead of widening it to `unknown`.
   return Effect.flatMap(HttpRouter.HttpRouter, (router) =>
@@ -134,6 +138,7 @@ const executeRequest = (path: string, cookie: string) => {
 
 const responseText = (response: HttpServerResponse.HttpServerResponse) => {
   const body = response.body;
+
   return body._tag === "Uint8Array" ? new TextDecoder().decode(body.body) : "";
 };
 
@@ -146,6 +151,7 @@ layer(TestApp)("session middleware composition", (it) => {
           "/a/whoami",
           `${COOKIE_A}=token-a`
         );
+
         expect(ownCookieA.status).toBe(200);
         // String success schema encodes to a JSON string literal.
         expect(responseText(ownCookieA)).toBe('"session@test.dev"');
@@ -154,6 +160,7 @@ layer(TestApp)("session middleware composition", (it) => {
           "/b/whoami",
           `${COOKIE_B}=token-b`
         );
+
         expect(ownCookieB.status).toBe(200);
         expect(responseText(ownCookieB)).toBe('"session@test.dev"');
 
@@ -162,12 +169,14 @@ layer(TestApp)("session middleware composition", (it) => {
           "/a/whoami",
           `${COOKIE_A}=token-b`
         );
+
         expect(foreignToken.status).toBe(401);
 
         const foreignCookie = yield* executeRequest(
           "/a/whoami",
           `${COOKIE_B}=token-a`
         );
+
         expect(foreignCookie.status).toBe(401);
       })
   );

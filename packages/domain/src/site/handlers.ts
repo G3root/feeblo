@@ -34,6 +34,7 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
       const mayRemoveBranding = yield* entitlementPolicy.mayRemoveBranding(
         site.organizationId
       );
+
       return mayRemoveBranding ? site : { ...site, hidePoweredBy: false };
     });
 
@@ -44,10 +45,13 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           limit: 1,
         });
+
         const site = sites[0];
+
         if (site === undefined) {
           return [];
         }
+
         return [yield* applyBrandingEntitlement(site)];
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -59,7 +63,9 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
           subdomain: args.subdomain,
           limit: 1,
         });
+
         const site = sites[0];
+
         if (site === undefined) {
           return [];
         }

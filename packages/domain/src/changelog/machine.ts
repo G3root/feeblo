@@ -109,6 +109,7 @@ const stateAfter = (
   const [next] = transition(changelogMachine, snapshotFor(state), {
     type: event,
   });
+
   // SAFETY: the machine is flat — every state is a top-level string and every
   // target is one of the three `TChangelogState` members — so a `StateValue`
   // read from it is always a status. `machine.test.ts` walks the whole graph
@@ -125,6 +126,7 @@ const stateAfter = (
  */
 const handles = (state: TChangelogState, event: TChangelogEvent): boolean => {
   const before = snapshotFor(state);
+
   return !isUnhandled(
     before,
     transition(changelogMachine, before, { type: event })
@@ -148,14 +150,17 @@ export const canTransitionChangelog = (
 /** Every status `event` can produce, deduplicated. */
 const targetsOf = (event: TChangelogEvent): readonly TChangelogState[] => {
   const targets = new Set<TChangelogState>();
+
   for (const from of CHANGELOG_STATES) {
     const next = stateAfter(from, event);
+
     // Only a move counts: an event a state does not handle returns that state,
     // and counting it would make the target ambiguous.
     if (next !== from) {
       targets.add(next);
     }
   }
+
   return [...targets];
 };
 
@@ -232,7 +237,9 @@ export const writableChangelogStatus = (
   if (isWritableChangelogStatus(status)) {
     return status;
   }
+
   const unpublished = targetStateFor("unpublish");
+
   // SAFETY: `machine.test.ts` pins `CHANGELOG_WRITE_STATES` to the states with
   // an inbound edge, and `unpublish`'s target is one by construction.
   return isWritableChangelogStatus(unpublished) ? unpublished : "draft";

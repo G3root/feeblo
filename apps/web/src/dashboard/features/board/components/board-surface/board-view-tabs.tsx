@@ -56,10 +56,12 @@ export function BoardViewTabs({
   variant: "board" | "feedback";
 }) {
   const memberId = useCurrentMemberId(organizationId);
+
   const collection = useMemo(
     () => savedViewCollectionFor(organizationId, boardId, memberId),
     [organizationId, boardId, memberId]
   );
+
   const store = useBoardStore();
 
   const { data, isLoadingError } = useLiveQuery({
@@ -69,6 +71,7 @@ export function BoardViewTabs({
         .from({ view: collection })
         .where(({ view }) => eq(view.organizationId, organizationId)),
   });
+
   // Sorted here rather than trusted from the read: a collection is a set, so
   // the array a `queryFn` returned is not an ordering the live query promises
   // to keep. `orderIndex` is what the drag rewrites and `createdAt` breaks the
@@ -140,6 +143,7 @@ export function BoardViewTabs({
         // the board keeps its live query — including any local edit made after
         // the sheet opened.
         store.send({ type: "renameActiveView", name: saved.name });
+
         return;
       }
 
@@ -262,11 +266,13 @@ const duplicateView = async ({
       title: "Only workspace members can duplicate a view",
       type: "error",
     });
+
     return;
   }
 
   try {
     const id = await SavedViewId.unsafeGenerate();
+
     const transaction = collection.insert({
       boardId: view.boardId,
       createdAt: new Date(),

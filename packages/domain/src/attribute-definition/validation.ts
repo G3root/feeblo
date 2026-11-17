@@ -65,12 +65,14 @@ const validateConfig = (
     definition.config ?? {},
     { onExcessProperty: "ignore" }
   );
+
   if (Option.isNone(decodedConfig)) {
     return {
       valid: false,
       error: `Configured validation rules for "${definition.name}" are invalid`,
     };
   }
+
   const config = decodedConfig.value;
 
   switch (definition.type) {
@@ -81,9 +83,11 @@ const validateConfig = (
           error: `Expected text value for "${definition.name}"`,
         };
       }
+
       if (config.pattern === undefined) {
         return { valid: true };
       }
+
       if (isPotentiallyUnsafeRegex(config.pattern)) {
         // Never execute a pattern that can backtrack catastrophically;
         // fail loudly so the misconfiguration surfaces instead.
@@ -92,6 +96,7 @@ const validateConfig = (
           error: `Configured validation pattern for "${definition.name}" is unsafe and was not applied`,
         };
       }
+
       try {
         return new RegExp(config.pattern).test(value)
           ? { valid: true }
@@ -106,6 +111,7 @@ const validateConfig = (
         };
       }
     }
+
     case "INTEGER":
     case "DECIMAL": {
       if (!isNumber(value)) {
@@ -114,20 +120,24 @@ const validateConfig = (
           error: `Expected numeric value for "${definition.name}"`,
         };
       }
+
       if (config.min !== undefined && value < config.min) {
         return {
           valid: false,
           error: `Value for "${definition.name}" is below the configured minimum`,
         };
       }
+
       if (config.max !== undefined && value > config.max) {
         return {
           valid: false,
           error: `Value for "${definition.name}" exceeds the configured maximum`,
         };
       }
+
       return { valid: true };
     }
+
     default:
       return { valid: true };
   }
@@ -150,6 +160,7 @@ export const validateAttributeValue = (
   }
 
   const configResult = validateConfig(definition, value);
+
   if (!configResult.valid) {
     return {
       valid: false,
@@ -171,10 +182,12 @@ export const validateAttributeValueEffect = (
 ): Effect.Effect<void, BadRequestError> =>
   Effect.gen(function* () {
     const result = validateAttributeValue(definition, value);
+
     if (!result.valid) {
       return yield* new BadRequestError({ message: result.error });
     }
   });
+
 /**
  * Maximum length of an attribute validation pattern. Long patterns are never
  * needed for field validation and keep the compiled-regex surface small.
@@ -185,6 +198,7 @@ const MAX_ATTRIBUTE_PATTERN_REPETITION = 100;
 
 /** A single decimal digit, the only backreference number a pattern may carry. */
 const singleDigitPattern = /^[0-9]$/;
+
 /** A repetition bound, which must be a plain decimal integer. */
 const decimalIntegerPattern = /^\d+$/;
 
@@ -207,33 +221,41 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
 
   let inCharClass = false;
   let i = 0;
+
   while (i < pattern.length) {
     const ch = pattern[i];
+
     if (ch === "\\") {
       // Backreferences make matching non-regular and can introduce expensive
       // retry paths. Escaped literals and character classes remain safe.
       if (singleDigitPattern.test(pattern[i + 1] ?? "")) {
         return true;
       }
+
       i += 2;
       continue;
     }
+
     if (inCharClass) {
       if (ch === "]") {
         inCharClass = false;
       }
+
       i += 1;
       continue;
     }
+
     if (ch === "[") {
       inCharClass = true;
       i += 1;
       continue;
     }
+
     if (ch === "{") {
       const end = pattern.indexOf("}", i + 1);
       const repetition = pattern.slice(i + 1, end);
       const repetitionParts = repetition.split(",");
+
       if (
         end === -1 ||
         repetitionParts.length > 2 ||
@@ -244,9 +266,11 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
       ) {
         return true;
       }
+
       i = end + 1;
       continue;
     }
+
     if (
       ch === "(" ||
       ch === ")" ||
@@ -257,8 +281,10 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
     ) {
       return true;
     }
+
     i += 1;
   }
+
   return false;
 };
 
@@ -271,6 +297,7 @@ export const noDuplicateAttributeIds = S.makeFilter<
     if (attributeIds.has(attributeId)) {
       return "attributeValues must not contain duplicate attributeId values";
     }
+
     attributeIds.add(attributeId);
   }
 

@@ -32,9 +32,11 @@ describe("NotificationPreferenceTokenService", () => {
         const tokens = yield* NotificationPreferenceTokenService;
         const token = yield* tokens.deriveToken(claims);
         const [payload, signature] = Redacted.value(token).split(".");
+
         if (payload === undefined || signature === undefined) {
           return yield* Effect.die("Expected a token payload and signature");
         }
+
         const verified = yield* tokens.verifyToken(
           `${payload}.${signature.slice(0, -1)}A`
         );

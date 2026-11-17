@@ -154,6 +154,7 @@ describe("board CSV codec", () => {
         title: "-lookup",
       }),
     ]);
+
     const dataLine = document.split("\r\n")[1] ?? "";
 
     expect(dataLine).toContain('"\'=1+1"');
@@ -222,6 +223,7 @@ describe("board CSV codec", () => {
         title: "=cmd|'/C calc'!A0",
       }),
     ]);
+
     const dataLine = document.split("\r\n")[1] ?? "";
 
     expect(dataLine).toContain('"\'\u0000zero"');
@@ -243,6 +245,7 @@ describe("board CSV codec", () => {
       const bytes = new Uint8Array(2 + text.length * 2);
       bytes[0] = 0xff;
       bytes[1] = 0xfe;
+
       for (let index = 0; index < text.length; index += 1) {
         const code = text.charCodeAt(index);
         bytes[2 + index * 2] = code & 0xff;

@@ -69,4 +69,5 @@ export type TPublicApiOnBehalfAuthor = Schema.Schema.Type<
 >;
 
 export const PUBLIC_API_PAGE_DEFAULT_LIMIT = 25;
+
 export const PUBLIC_API_PAGE_MAX_LIMIT = 100;

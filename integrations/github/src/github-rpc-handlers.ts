@@ -9,10 +9,12 @@ import * as Effect from "effect/Effect";
 export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* GitHubManagementService;
   const entitlementPolicy = yield* EntitlementPolicy;
+
   const authorize = (organizationId: string) =>
     Policy.withPolicy(
       Policy.canPermission(organizationId, "integrations.manage")
     );
+
   return {
     GetGitHubIntegrationStatus: () => service.status,
     ListGitHubConnections: (
@@ -24,6 +26,7 @@ export const GitHubManagementRpcHandlersEffect = Effect.gen(function* () {
         // integrations capability. Existing connections stay manageable, so a
         // downgraded workspace can still disconnect.
         yield* entitlementPolicy.canUseIntegrations(input.organizationId);
+
         return yield* service.connectStart(input);
       }).pipe(
         authorize(input.organizationId),

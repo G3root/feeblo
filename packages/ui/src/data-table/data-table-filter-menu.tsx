@@ -27,6 +27,7 @@ import { createFilterId } from "./lib/id";
 import { SortableList } from "./sortable-list";
 
 const FILTER_SHORTCUT_KEY = "f";
+
 const REMOVE_FILTER_SHORTCUTS: ReadonlySet<string> = new Set([
   "backspace",
   "delete",
@@ -102,6 +103,7 @@ function DataTableFilterMenuContent<TData extends RowData>({
 
   const onFilterAdd = React.useCallback(() => {
     const firstColumn = columns[0];
+
     if (!firstColumn) return;
     table.addColumnFilter({
       ...getDefaultFilter(firstColumn),
@@ -128,12 +130,14 @@ function DataTableFilterMenuContent<TData extends RowData>({
   React.useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (disabled) return;
+
       if (
         !open &&
         !getIsTableShortcutTarget(triggerRef.current, event.target)
       ) {
         return;
       }
+
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
@@ -153,6 +157,7 @@ function DataTableFilterMenuContent<TData extends RowData>({
     }
 
     window.addEventListener("keydown", onKeyDown);
+
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [disabled, open]);
 
@@ -242,6 +247,7 @@ function DataTableFilterMenuContent<TData extends RowData>({
           >
             {(filter, _index, { handleRef, isDragging }) => {
               const column = columns.find((item) => item.id === filter.id);
+
               if (!column) return null;
 
               return (

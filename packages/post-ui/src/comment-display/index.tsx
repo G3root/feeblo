@@ -7,6 +7,7 @@ import { CommentDisplayHeader } from "./header";
 import { CommentDisplayProvider } from "./provider";
 
 export { CommentsList } from "./list";
+
 export { CommentDisplayProvider };
 
 export const CommentDisplay = Object.assign(CommentDisplayComponent, {

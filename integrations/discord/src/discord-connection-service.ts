@@ -58,9 +58,10 @@ const DiscordSafeDisplayMetadata = Schema.Struct({
 const decodeSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(DiscordSafeDisplayMetadata)(value ?? {}).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored Discord display metadata is invalid",
+          cause,
         })
     )
   );
@@ -92,22 +93,26 @@ export const makeDiscordConnectionServiceLive = (
               message: "Discord integration is not configured",
             });
           }
+
           // Through the `SecureRandom` service, not the global: the OAuth state
           // must be substitutable in tests, and Workers forbid random value
           // generation in global scope.
           const nonce = yield* secureRandom.uuidV4();
           const connectionId = yield* IntegrationConnectionId.generate;
+
           const ciphertext = yield* encryptDiscordCredentialMaterial(
             config.encryptionKey,
             { oauthState: nonce }
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Discord credentials could not be encrypted",
+                  cause,
                 })
             )
           );
+
           yield* db.transaction(() =>
             Effect.gen(function* () {
               // A new install attempt replaces any abandoned connecting row so
@@ -142,6 +147,7 @@ export const makeDiscordConnectionServiceLive = (
               });
             })
           );
+
           const state = yield* Schema.encodeEffect(
             Schema.fromJsonString(DiscordOAuthState)
           )({
@@ -150,12 +156,14 @@ export const makeDiscordConnectionServiceLive = (
             organizationId,
           }).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Discord OAuth state could not be encoded",
+                  cause,
                 })
             )
           );
+
           const authorizeUrl = new URL(DISCORD_OAUTH_AUTHORIZE_URL);
           authorizeUrl.searchParams.set("client_id", config.clientId);
           authorizeUrl.searchParams.set("response_type", "code");
@@ -172,6 +180,7 @@ export const makeDiscordConnectionServiceLive = (
             String(config.permissions)
           );
           authorizeUrl.searchParams.set("state", state);
+
           return { authorizeUrl };
         },
         (effect) => effect.pipe(mapManagementError("connect start"))
@@ -189,28 +198,34 @@ export const makeDiscordConnectionServiceLive = (
             Schema.fromJsonString(DiscordOAuthState)
           )(state).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new BadRequestError({
                   message: "Discord OAuth state is invalid",
+                  cause,
                 })
             )
           );
+
           const decodedOrganizationId = yield* Schema.decodeEffect(
             WorkspaceId.schema
           )(decoded.organizationId).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new BadRequestError({
                   message: "Discord OAuth state is invalid",
+                  cause,
                 })
             )
           );
+
           const organizationId = asLegid(WorkspaceId)(decodedOrganizationId);
+
           const [pendingConnection] = yield* findDiscordConnection(
             db,
             decoded.connectionId,
             organizationId
           );
+
           if (
             pendingConnection === undefined ||
             pendingConnection.lifecycle !== "connecting" ||
@@ -220,15 +235,18 @@ export const makeDiscordConnectionServiceLive = (
               message: "Discord connection was not found",
             });
           }
+
           const pendingCredentials = yield* decryptConnectionCredentials(
             config,
             pendingConnection.credentialsCiphertext
           );
+
           if (pendingCredentials.oauthState !== decoded.nonce) {
             return yield* new BadRequestError({
               message: "Discord OAuth state does not match",
             });
           }
+
           // OAuth exchange runs before any transaction: the code is single-use,
           // so Discord itself serializes replays. The guarded connection
           // transition below is the idempotency boundary for concurrent
@@ -241,6 +259,7 @@ export const makeDiscordConnectionServiceLive = (
               redirectUri: config.oauthRedirectUrl,
             })
             .pipe(mapDiscordApiError("OAuth handshake"));
+
           // The `guild` field is present only when the user actually added the
           // bot to a server; without it there is nothing to connect.
           if (oauth.guild === undefined) {
@@ -248,7 +267,9 @@ export const makeDiscordConnectionServiceLive = (
               message: "Discord install did not include a server",
             });
           }
+
           const guild = oauth.guild;
+
           const [connectionForAnotherOrganization] = yield* db
             .select({ id: schema.integrationConnectionTable.id })
             .from(schema.integrationConnectionTable)
@@ -267,17 +288,20 @@ export const makeDiscordConnectionServiceLive = (
               )
             )
             .limit(1);
+
           if (connectionForAnotherOrganization !== undefined) {
             return yield* new BadRequestError({
               message:
                 "Discord server is already connected to another organization",
             });
           }
+
           // Register the guild-scoped commands up front; a failure here aborts
           // the install so the connection never activates without its surface.
           const application = yield* apiClient
             .applicationsMe({ botToken: config.botToken })
             .pipe(mapDiscordApiError("application lookup"));
+
           yield* apiClient
             .guildsCommandsBulkOverwrite({
               applicationId: application.id,
@@ -286,17 +310,20 @@ export const makeDiscordConnectionServiceLive = (
               guildId: guild.id,
             })
             .pipe(mapDiscordApiError("command registration"));
+
           const ciphertext = yield* encryptDiscordCredentialMaterial(
             config.encryptionKey,
             { userToken: oauth.access_token }
           ).pipe(
             Effect.mapError(
-              () =>
+              (cause) =>
                 new InternalServerError({
                   message: "Discord credentials could not be encrypted",
+                  cause,
                 })
             )
           );
+
           return yield* db.transaction(() =>
             Effect.gen(function* () {
               const [connection] = yield* lockDiscordConnection(
@@ -304,6 +331,7 @@ export const makeDiscordConnectionServiceLive = (
                 decoded.connectionId,
                 organizationId
               );
+
               if (
                 connection === undefined ||
                 connection.lifecycle !== "connecting"
@@ -312,20 +340,24 @@ export const makeDiscordConnectionServiceLive = (
                   message: "Discord connection was not found",
                 });
               }
+
               if (connection.credentialsCiphertext === null) {
                 return yield* new NotFoundError({
                   message: "Discord connection was not found",
                 });
               }
+
               const credentials = yield* decryptConnectionCredentials(
                 config,
                 connection.credentialsCiphertext
               );
+
               if (credentials.oauthState !== decoded.nonce) {
                 return yield* new BadRequestError({
                   message: "Discord OAuth state does not match",
                 });
               }
+
               const now = yield* DateTime.nowAsDate;
               // A Discord guild has at most one active connection per
               // organization: archive any pre-existing active connection for
@@ -398,6 +430,7 @@ export const makeDiscordConnectionServiceLive = (
                   safeDisplayMetadata: {},
                 })
                 .onConflictDoNothing();
+
               return { organizationId };
             })
           );
@@ -433,6 +466,7 @@ export const makeDiscordConnectionServiceLive = (
               )
             )
             .orderBy(desc(schema.integrationConnectionTable.createdAt));
+
           return yield* Effect.forEach(rows, (connection) =>
             decodeSafeDisplayMetadata(connection.safeDisplayMetadata).pipe(
               Effect.map((metadata) => ({
@@ -452,6 +486,7 @@ export const makeDiscordConnectionServiceLive = (
         input: S.TDiscordConnectionDisconnect
       ) {
         const { connectionId, organizationId } = input;
+
         const disconnectingConnection = yield* db
           .transaction(() =>
             Effect.gen(function* () {
@@ -460,14 +495,17 @@ export const makeDiscordConnectionServiceLive = (
                 connectionId,
                 organizationId
               );
+
               if (connection === undefined) {
                 return yield* new NotFoundError({
                   message: "Discord connection was not found",
                 });
               }
+
               if (connection.lifecycle === "archived") {
                 return undefined;
               }
+
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
@@ -508,6 +546,7 @@ export const makeDiscordConnectionServiceLive = (
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
+
               return {
                 credentialsCiphertext:
                   connection.credentialsCiphertext ?? undefined,
@@ -516,9 +555,11 @@ export const makeDiscordConnectionServiceLive = (
             })
           )
           .pipe(mapManagementError("disconnect"));
+
         if (disconnectingConnection === undefined) {
           return;
         }
+
         if (disconnectingConnection.guildId !== undefined) {
           const leftGuild = yield* Effect.exit(
             apiClient.guildsLeave({
@@ -526,6 +567,7 @@ export const makeDiscordConnectionServiceLive = (
               guildId: disconnectingConnection.guildId,
             })
           );
+
           if (Exit.isFailure(leftGuild)) {
             yield* db
               .update(schema.integrationConnectionTable)
@@ -542,13 +584,16 @@ export const makeDiscordConnectionServiceLive = (
                 )
               )
               .pipe(mapManagementError("disconnect state update"));
+
             return yield* Effect.failCause(leftGuild.cause).pipe(
               mapDiscordApiError("guild disconnect")
             );
           }
         }
+
         const credentialsCiphertext =
           disconnectingConnection.credentialsCiphertext;
+
         if (credentialsCiphertext === undefined) {
           yield* Effect.logWarning(
             "Discord disconnect had no installer credential to revoke"
@@ -557,6 +602,7 @@ export const makeDiscordConnectionServiceLive = (
           const credentials = yield* Effect.exit(
             decryptConnectionCredentials(config, credentialsCiphertext)
           );
+
           if (Exit.isFailure(credentials)) {
             yield* Effect.logWarning(
               "Could not decrypt Discord credentials for token revocation"
@@ -569,6 +615,7 @@ export const makeDiscordConnectionServiceLive = (
                 userToken: credentials.value.userToken,
               })
             );
+
             if (Exit.isFailure(revoked)) {
               yield* Effect.logWarning(
                 "Discord token revocation failed after guild disconnect"
@@ -576,6 +623,7 @@ export const makeDiscordConnectionServiceLive = (
             }
           }
         }
+
         const now = yield* DateTime.nowAsDate;
         yield* db
           .update(schema.integrationConnectionTable)

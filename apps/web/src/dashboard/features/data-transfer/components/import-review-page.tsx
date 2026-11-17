@@ -122,9 +122,11 @@ function RowDetails({ row }: { readonly row: TDataImportReportRow }) {
   if (row.message !== null) {
     return <span className="text-destructive">{row.message}</span>;
   }
+
   if (row.warnings.length === 0) {
     return <span className="text-muted-foreground">—</span>;
   }
+
   return (
     <span
       className="text-warning-foreground flex flex-col gap-0.5"
@@ -242,7 +244,9 @@ export function ImportReviewPage({
       sort,
     ]
   );
+
   const detailResult = useAtomValue(dataImportDetailAtom(args));
+
   const detail = Result.builder(detailResult)
     .onInitial(() => undefined)
     .onFailure((_, { previousSuccess }) =>
@@ -269,8 +273,10 @@ export function ImportReviewPage({
     if (status === undefined) {
       return;
     }
+
     const previous = previousStatus.current;
     previousStatus.current = status;
+
     if (
       previous === null ||
       !isActiveStatus(previous) ||
@@ -278,14 +284,20 @@ export function ImportReviewPage({
     ) {
       return;
     }
+
+    let title = m.plain_soft_auk();
+    let type: "success" | "error" = "error";
+
+    if (status === "completed") {
+      title = m.proud_fresh_wren();
+      type = "success";
+    } else if (status === "failed") {
+      title = m.brave_plain_crab();
+    }
+
     toastManager.add({
-      title:
-        status === "completed"
-          ? m.proud_fresh_wren()
-          : status === "failed"
-            ? m.brave_plain_crab()
-            : m.plain_soft_auk(),
-      type: status === "completed" ? "success" : "error",
+      title,
+      type,
     });
   }, [status]);
 
@@ -344,6 +356,7 @@ export function ImportReviewPage({
       label: m.plain_brave_crab(),
     },
   ];
+
   const boardItems = [
     { label: m.leafy_calm_jay(), value: ALL_BOARDS },
     ...boards.map((board) => ({
@@ -354,6 +367,7 @@ export function ImportReviewPage({
 
   const handleConfirm = async () => {
     setBusy("confirm");
+
     try {
       await confirmImport({ payload: { id: job.id, organizationId } });
       setConfirmOpen(false);
@@ -366,6 +380,7 @@ export function ImportReviewPage({
 
   const handleCancel = async () => {
     setBusy("cancel");
+
     try {
       await cancelImport({ payload: { id: job.id, organizationId } });
       setCancelOpen(false);
@@ -378,19 +393,24 @@ export function ImportReviewPage({
 
   const handleDownloadProblems = async () => {
     setDownloading(true);
+
     try {
       const url = new URL(
         `${dataTransferApiBase()}/api/data/import/${encodeURIComponent(job.id)}/problems`
       );
+
       url.searchParams.set("organizationId", organizationId);
       const response = await fetch(url, { credentials: "include" });
+
       if (!response.ok) {
         toastManager.add({
           title: (await errorEnvelopeMessage(response)) ?? m.sunny_kind_gecko(),
           type: "error",
         });
+
         return;
       }
+
       await downloadResponse(
         response,
         `${job.fileName.replace(csvFileNamePattern, "")}-import-problems.csv`
@@ -515,9 +535,11 @@ export function ImportReviewPage({
           <div className="flex flex-wrap items-center gap-1">
             {filters.map((entry) => {
               const isActive = search.filter === entry.filter;
+
               if (entry.count === 0 && !isActive) {
                 return null;
               }
+
               return (
                 <Button
                   aria-current={isActive ? "page" : undefined}
@@ -683,6 +705,7 @@ export function ImportReviewPage({
               <ul className="flex flex-col gap-1 px-3 pt-3">
                 {failures.map((group) => {
                   const isActive = search.message === group.message;
+
                   return (
                     <li key={group.message}>
                       <Button

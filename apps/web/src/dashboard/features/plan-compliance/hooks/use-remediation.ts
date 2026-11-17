@@ -25,6 +25,7 @@ import { executeRemediation } from "../lib/remediation";
 export const useRemediation = () => {
   const organizationId = useOrganizationId();
   const collections = useDashboardCollections();
+
   const [pendingAction, setPendingAction] = useState<RemediationAction | null>(
     null
   );
@@ -79,6 +80,7 @@ export const useRemediation = () => {
               "That item no longer exists. Refresh to see the current state.",
             type: "error",
           });
+
           return;
         }
 

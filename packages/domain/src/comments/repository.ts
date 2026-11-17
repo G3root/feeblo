@@ -62,6 +62,7 @@ interface FindManyPublicComments {
   slug: string;
   includeInternal?: boolean;
 }
+
 const makeCommentRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
@@ -96,10 +97,12 @@ const makeCommentRepository = Effect.gen(function* () {
           eq(schema.commentTable.postId, requestedPost.value.id),
           eq(schema.commentTable.mergedFromPostId, requestedPost.value.id)
         );
+
         const where: SQL[] = [
           eq(schema.commentTable.organizationId, organizationId),
           ...(requestedScope ? [requestedScope] : []),
         ];
+
         if (visibility) {
           where.push(eq(schema.commentTable.visibility, visibility));
         }
@@ -217,6 +220,7 @@ const makeCommentRepository = Effect.gen(function* () {
                 resolvedParentCommentId: row.parentCommentId,
               }));
             }
+
             // Guests never see INTERNAL rows, but a hidden intermediary (a
             // comment later toggled INTERNAL) must not orphan its public
             // descendants: each public reply is re-anchored beneath its
@@ -226,13 +230,16 @@ const makeCommentRepository = Effect.gen(function* () {
                 .filter((row) => row.visibility === "INTERNAL")
                 .map((row) => row.id)
             );
+
             const parentIdByCommentId = new Map(
               rows.map((row) => [row.id, row.parentCommentId])
             );
+
             return rows
               .filter((row) => row.visibility === "PUBLIC")
               .map((row) => {
                 let resolvedParentId: string | null = row.parentCommentId;
+
                 while (
                   resolvedParentId !== null &&
                   hiddenIds.has(resolvedParentId)
@@ -240,6 +247,7 @@ const makeCommentRepository = Effect.gen(function* () {
                   resolvedParentId =
                     parentIdByCommentId.get(resolvedParentId) ?? null;
                 }
+
                 return { ...row, resolvedParentCommentId: resolvedParentId };
               });
           })
@@ -247,6 +255,7 @@ const makeCommentRepository = Effect.gen(function* () {
     create: (args: InsertComment) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .insert(schema.commentTable)
           .values({
@@ -274,6 +283,7 @@ const makeCommentRepository = Effect.gen(function* () {
     update: (args: UpdateCommentArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .update(schema.commentTable)
           .set({
@@ -319,6 +329,7 @@ const makeCommentRepository = Effect.gen(function* () {
     pin: (args: PinCommentArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         // Replace the previous single UPDATE (CASE) with explicit steps inside
         // one transaction: lock the post's comments so concurrent pins
         // serialize (and a concurrent delete of the target blocks until this
@@ -354,6 +365,7 @@ const makeCommentRepository = Effect.gen(function* () {
                 )
               )
               .pipe(Effect.map(EffectArray.get(0)));
+
             if (Option.isNone(targetExists)) {
               return Option.none();
             }
@@ -395,6 +407,7 @@ const makeCommentRepository = Effect.gen(function* () {
     unpin: (args: UnpinCommentArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .update(schema.commentTable)
           .set({ pinnedAt: null, updatedAt: now })

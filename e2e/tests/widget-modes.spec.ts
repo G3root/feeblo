@@ -84,6 +84,7 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
           ) => void;
         };
       };
+
       browserGlobal.Feeblo.init("org_widget_modes", {
         baseUrl: host,
         mode: "hub",

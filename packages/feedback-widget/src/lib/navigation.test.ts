@@ -48,6 +48,7 @@ describe("widget tabs", () => {
     const tabs = widgetTabs(
       config({ mode: "hub", modules: ["updates", "feedback"] })
     );
+
     expect(tabs.map((tab) => tab.module)).toEqual(["updates", "feedback"]);
   });
 

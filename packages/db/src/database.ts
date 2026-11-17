@@ -27,6 +27,7 @@ const pgliteDataDir = (url: string): string => {
   if (url.startsWith("pglite:")) {
     return url.slice("pglite:".length);
   }
+
   return url;
 };
 
@@ -292,6 +293,7 @@ export function transaction<A, E, R>(
 ): Effect.Effect<A, E | SqlError, R | Database> {
   return Effect.gen(function* () {
     const db = yield* Database;
+
     return yield* db.transaction(() => effect);
   }).pipe(withTransactionAbortRetry);
 }

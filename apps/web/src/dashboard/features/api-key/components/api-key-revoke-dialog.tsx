@@ -31,6 +31,7 @@ export function ApiKeyRevokeDialog() {
       onConfirm={async () => {
         const { keyId } = store.get().context.data;
         setIsRevoking(true);
+
         try {
           await revokeApiKey({
             payload: { keyId, organizationId },

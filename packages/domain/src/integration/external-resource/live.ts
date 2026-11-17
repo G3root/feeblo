@@ -62,14 +62,17 @@ const creationReservationStaleMs = 60 * 60 * 1000;
 /** Database implementation of provider-neutral external-resource storage. */
 const makeExternalResourceService = Effect.gen(function* () {
   const db = yield* currentDb;
+
   const recordPostLink = (input: RecordPostExternalResourceLink) =>
     db
       .transaction(() =>
         Effect.gen(function* () {
           yield* requireHttpRemoteUrl(input.resource.remoteUrl);
+
           const resourceId = yield* IntegrationExternalResourceId.generate.pipe(
             Effect.mapError(databaseError("identifier generation"))
           );
+
           const [resource] = yield* db
             .insert(schema.integrationExternalResourceTable)
             .values({
@@ -100,14 +103,17 @@ const makeExternalResourceService = Effect.gen(function* () {
             })
             .returning({ id: schema.integrationExternalResourceTable.id })
             .pipe(Effect.mapError(databaseError("resource upsert")));
+
           if (resource === undefined) {
             return yield* new InternalServerError({
               message: "External resource upsert did not return a resource.",
             });
           }
+
           const linkId = yield* PostExternalResourceLinkId.generate.pipe(
             Effect.mapError(databaseError("link identifier generation"))
           );
+
           const [link] = yield* db
             .insert(schema.postExternalResourceLinkTable)
             .values({
@@ -119,6 +125,7 @@ const makeExternalResourceService = Effect.gen(function* () {
             .onConflictDoNothing()
             .returning({ id: schema.postExternalResourceLinkTable.id })
             .pipe(Effect.mapError(databaseError("post link insert")));
+
           if (link !== undefined) {
             return {
               externalResourceId: asLegid(IntegrationExternalResourceId)(
@@ -129,6 +136,7 @@ const makeExternalResourceService = Effect.gen(function* () {
               ),
             };
           }
+
           const existing = yield* db
             .select({ id: schema.postExternalResourceLinkTable.id })
             .from(schema.postExternalResourceLinkTable)
@@ -143,13 +151,16 @@ const makeExternalResourceService = Effect.gen(function* () {
             )
             .limit(1)
             .pipe(Effect.mapError(databaseError("post link lookup")));
+
           const existingLink = existing[0];
+
           if (existingLink === undefined) {
             return yield* new InternalServerError({
               message:
                 "External resource post link was not found after conflict.",
             });
           }
+
           return {
             externalResourceId: asLegid(IntegrationExternalResourceId)(
               resource.id
@@ -211,11 +222,13 @@ const makeExternalResourceService = Effect.gen(function* () {
         const id = yield* ExternalResourceCreateRequestId.generate.pipe(
           Effect.mapError(databaseError("creation identifier generation"))
         );
+
         // The claim's fence. Every claim writes `createdAt` itself — the insert
         // below and the re-claim further down — so the instant handed back to
         // the caller is exactly the instant stored, and
         // `completeCreation`/`failCreation` can match it by equality.
         const claimedAt = yield* DateTime.nowAsDate;
+
         const created = yield* db
           .insert(schema.externalResourceCreateRequestTable)
           .values({
@@ -230,7 +243,9 @@ const makeExternalResourceService = Effect.gen(function* () {
           .onConflictDoNothing()
           .returning({ id: schema.externalResourceCreateRequestTable.id })
           .pipe(Effect.mapError(databaseError("creation reservation")));
+
         const inserted = created[0];
+
         if (inserted !== undefined) {
           return {
             id: asLegid(ExternalResourceCreateRequestId)(inserted.id),
@@ -239,6 +254,7 @@ const makeExternalResourceService = Effect.gen(function* () {
             postExternalResourceLinkId: null,
           };
         }
+
         // The reservation is the idempotency key's mutex, so taking it over is
         // **one** statement. A read followed by a guarded `UPDATE` lets two
         // callers read the same reclaimable row and both believe they won;
@@ -256,6 +272,7 @@ const makeExternalResourceService = Effect.gen(function* () {
             Duration.millis(creationReservationStaleMs)
           )
         );
+
         const [reclaimed] = yield* db
           .update(schema.externalResourceCreateRequestTable)
           .set({
@@ -310,6 +327,7 @@ const makeExternalResourceService = Effect.gen(function* () {
             id: schema.externalResourceCreateRequestTable.id,
           })
           .pipe(Effect.mapError(databaseError("creation reservation reclaim")));
+
         if (reclaimed !== undefined) {
           return {
             id: asLegid(ExternalResourceCreateRequestId)(reclaimed.id),
@@ -349,11 +367,13 @@ const makeExternalResourceService = Effect.gen(function* () {
           )
           .limit(1)
           .pipe(Effect.mapError(databaseError("creation reservation lookup")));
+
         if (existing === undefined || existing.postId !== input.postId) {
           return yield* new InternalServerError({
             message: "External resource creation reservation was not found.",
           });
         }
+
         return {
           id: asLegid(ExternalResourceCreateRequestId)(existing.id),
           reserved: false,
@@ -371,6 +391,7 @@ const makeExternalResourceService = Effect.gen(function* () {
         // Effect is what `effecttsgo/global-date-in-effect` reports, and it is
         // the one thing a `TestClock` test cannot pin.
         const updatedAt = yield* DateTime.nowAsDate;
+
         const released = yield* db
           .update(schema.externalResourceCreateRequestTable)
           .set({ state: targetStateFor("fail"), updatedAt })
@@ -391,6 +412,7 @@ const makeExternalResourceService = Effect.gen(function* () {
           )
           .returning({ id: schema.externalResourceCreateRequestTable.id })
           .pipe(Effect.mapError(databaseError("creation release")));
+
         return released.length === 1;
       }),
     completeCreation: (input) =>
@@ -416,6 +438,7 @@ const makeExternalResourceService = Effect.gen(function* () {
           )
           .returning({ id: schema.externalResourceCreateRequestTable.id })
           .pipe(Effect.mapError(databaseError("creation completion")));
+
         return completed.length === 1;
       }),
   });

@@ -52,14 +52,18 @@ function buildThreads(comments: readonly TComment[]): CommentThread[] {
     const path: TComment[] = [];
     let current = comment;
     let rootId = rootIdByCommentId.get(current.id);
+
     while (rootId === undefined) {
       path.push(current);
+
       // The list carries the nearest visible ancestor (`resolvedParentCommentId`)
       // for callers who cannot see every comment; fall back to the raw parent
       // for rows where the server sent no resolution.
       const parentId =
         current.resolvedParentCommentId ?? current.parentCommentId;
+
       const parent = parentId == null ? undefined : byId.get(parentId);
+
       if (!parent) {
         // Top-level comment, or a reply with no visible ancestor left: it
         // roots its own thread.
@@ -69,19 +73,24 @@ function buildThreads(comments: readonly TComment[]): CommentThread[] {
         rootId = rootIdByCommentId.get(current.id);
       }
     }
+
     for (const node of path) {
       rootIdByCommentId.set(node.id, rootId);
     }
+
     return rootId;
   };
 
   for (const comment of comments) {
     const rootId = resolveRootId(comment);
+
     if (rootId === comment.id) {
       roots.push(comment);
       continue;
     }
+
     const siblings = repliesByRootId.get(rootId);
+
     if (siblings) {
       siblings.push(comment);
     } else {
@@ -93,11 +102,14 @@ function buildThreads(comments: readonly TComment[]): CommentThread[] {
     const replies = (repliesByRootId.get(comment.id) ?? []).sort((a, b) => {
       const pinnedOrder =
         Number(b.pinnedAt != null) - Number(a.pinnedAt != null);
+
       if (pinnedOrder !== 0) {
         return pinnedOrder;
       }
+
       return a.createdAt.getTime() - b.createdAt.getTime();
     });
+
     return { comment, replies };
   });
 }
@@ -112,16 +124,19 @@ function CommentThreadRow({
   const hasPinnedReply = replies.some((reply) => reply.pinnedAt != null);
   const [isExpanded, setIsExpanded] = useState(hasPinnedReply);
   const [prevHasPinnedReply, setPrevHasPinnedReply] = useState(hasPinnedReply);
+
   // Latch open on the false -> true transition (e.g. a reply is pinned
   // after mount). Derived during render instead of an effect: other replies
   // updates keep the current state, manual collapses stick, and an unpin
   // never auto-collapses an expanded thread.
   if (prevHasPinnedReply !== hasPinnedReply) {
     setPrevHasPinnedReply(hasPinnedReply);
+
     if (hasPinnedReply) {
       setIsExpanded(true);
     }
   }
+
   const expandReplies = useCallback(() => setIsExpanded(true), []);
 
   return (
@@ -177,9 +192,11 @@ function CommentThreadRow({
 export function CommentsList() {
   const { data: session } = useAuthState();
   const { organizationId, post, isMember } = usePostCollectionData();
+
   const {
     collections: { commentCollection },
   } = usePostCollections();
+
   const postSlug = post.slug;
 
   // A post's list carries its own comments plus the comments merged away from

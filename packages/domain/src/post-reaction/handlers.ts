@@ -77,6 +77,7 @@ export const PostReactionRpcHandlersEffect = Effect.gen(function* () {
   const toggleReaction = toggleWrite.handlers((surface, args) =>
     Effect.gen(function* () {
       const session = yield* CurrentSession;
+
       const request = {
         emoji: args.emoji,
         organizationId: args.organizationId,

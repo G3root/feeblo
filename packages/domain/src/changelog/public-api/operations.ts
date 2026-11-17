@@ -84,11 +84,13 @@ const parseChangelogWrite = (write: {
 }) =>
   Effect.gen(function* () {
     const title = write.title.trim();
+
     if (title.length === 0) {
       return yield* invalidRequestError("title must not be empty.");
     }
 
     const slug = slugify((write.slug ?? "").trim() || title);
+
     if (slug.length === 0) {
       return yield* invalidRequestError(
         "slug must contain at least one letter or number."
@@ -204,6 +206,7 @@ export const createChangelogOperation = defineOperation(
         ...payload,
         status: payload.status ?? "draft",
       });
+
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         write.content
       );
@@ -245,6 +248,7 @@ export const updateChangelogOperation = defineOperation(
       const repository = yield* PublicApiChangelogRepository;
 
       const write = yield* parseChangelogWrite(payload);
+
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         write.content
       );

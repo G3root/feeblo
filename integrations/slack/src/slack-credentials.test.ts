@@ -17,6 +17,7 @@ describe("slack credential material", () => {
         botToken: "xoxb-secret-token",
         oauthState: "state-nonce",
       });
+
       expect(ciphertext).not.toContain("xoxb-secret-token");
       expect(ciphertext).not.toContain("state-nonce");
 
@@ -24,9 +25,11 @@ describe("slack credential material", () => {
         encryptionKey,
         ciphertext
       );
+
       if (decrypted.botToken === undefined) {
         throw new Error("expected bot token");
       }
+
       expect(Redacted.value(decrypted.botToken)).toBe("xoxb-secret-token");
       expect(decrypted.oauthState).toBe("state-nonce");
     })
@@ -39,6 +42,7 @@ describe("slack credential material", () => {
           botToken: "xoxb-token",
         })
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );
@@ -48,6 +52,7 @@ describe("slack credential material", () => {
       const result = yield* Effect.exit(
         decryptSlackCredentialMaterial(encryptionKey, "not-ciphertext")
       );
+
       expect(Exit.isFailure(result)).toBe(true);
     })
   );

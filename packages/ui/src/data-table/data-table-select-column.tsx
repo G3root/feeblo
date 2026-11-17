@@ -107,6 +107,7 @@ function DataTableSelectCell<TData extends RowData>({
           onClick={(event) => {
             if (row.table.options.enableRowRangeSelection !== true) {
               row.toggleSelected(!isSelected);
+
               return;
             }
 

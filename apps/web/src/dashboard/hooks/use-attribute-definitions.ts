@@ -9,6 +9,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function useContactAttributeDefinitions(organizationId: string) {
   const { contactAttributeDefinitionCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: [
       "attribute-definitions",
@@ -25,6 +26,7 @@ export function useContactAttributeDefinitions(organizationId: string) {
 
 export function useCompanyAttributeDefinitions(organizationId: string) {
   const { companyAttributeDefinitionCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: [
       "attribute-definitions",

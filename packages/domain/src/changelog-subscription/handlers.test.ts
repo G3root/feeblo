@@ -36,13 +36,16 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
     ),
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const SiteRepositories = Layer.mergeAll(
     SiteRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     SiteRepositories,
@@ -84,9 +87,11 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       if (!paid) {
         return organizationId;
       }
+
       const productId = `product_${organizationId}`;
       yield* db.insert(schema.productTable).values({
         id: productId,
@@ -116,6 +121,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       return organizationId;
     });
 
@@ -134,6 +140,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         name: "Test User",
       });
       let membershipId: string | undefined;
+
       if (options.withMembership) {
         membershipId = `member_${options.label ?? ""}${organizationId}`;
         yield* db.insert(schema.memberTable).values({
@@ -144,6 +151,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
           createdAt: yield* DateTime.nowAsDate,
         });
       }
+
       return {
         email,
         userId,
@@ -180,6 +188,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
   const findChangelogRow = (args: { organizationId: string; userId: string }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       return yield* db
         .select()
         .from(schema.changelogSubscriptionTable)
@@ -251,9 +260,11 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* ChangelogSubscriptionRpcHandlersEffect;
           const organizationId = yield* createWorkspace({ paid: true });
+
           const member = yield* createUser(organizationId, {
             withMembership: true,
           });
+
           const session = makeSession({
             ...member,
             organizationId,
@@ -268,6 +279,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
             organizationId,
             userId: member.userId,
           });
+
           expect(row?.memberId).toBe(member.membershipId);
         })
     );
@@ -300,12 +312,15 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* ChangelogSubscriptionRpcHandlersEffect;
         const organizationId = yield* createWorkspace({ paid: true });
+
         const member = yield* createUser(organizationId, {
           withMembership: true,
         });
+
         const visitor = yield* createUser(organizationId, {
           label: "visitor",
         });
+
         const memberSession = makeSession({
           ...member,
           organizationId,
@@ -327,6 +342,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
         const roster = yield* handlers
           .ListChangelogSubscriptions({ organizationId })
           .pipe(Effect.provideService(CurrentSession, memberSession));
+
         expect(roster.map((row) => row.userId).sort()).toEqual(
           [member.userId, visitor.userId].sort()
         );
@@ -340,6 +356,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
               makeSession({ ...visitor, organizationId })
             )
           );
+
         expect(publicRows.map((row) => row.userId)).toEqual([visitor.userId]);
       })
     );
@@ -347,11 +364,14 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
     it.effect("denies subscriptions to a hidden changelog", () =>
       Effect.gen(function* () {
         const handlers = yield* ChangelogSubscriptionRpcHandlersEffect;
+
         const organizationId = yield* createWorkspace({
           changelogVisibility: "HIDDEN",
           paid: true,
         });
+
         const user = yield* createUser(organizationId);
+
         const scoped = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
           effect.pipe(
             Effect.provideService(
@@ -365,6 +385,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
             .CreateChangelogSubscriptionPublic({ organizationId })
             .pipe(scoped)
         );
+
         expect(subscribeError._tag).toBe("PolicyDenied");
 
         const listError = yield* Effect.flip(
@@ -372,6 +393,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
             .ListChangelogSubscriptionsPublic({ organizationId })
             .pipe(scoped)
         );
+
         expect(listError._tag).toBe("PolicyDenied");
       })
     );
@@ -383,6 +405,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
           const handlers = yield* ChangelogSubscriptionRpcHandlersEffect;
           const organizationId = yield* createWorkspace({ paid: true });
           const user = yield* createUser(organizationId);
+
           const restrictedSession: Session = {
             user: {
               id: user.userId,
@@ -400,6 +423,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
               .CreateChangelogSubscriptionPublic({ organizationId })
               .pipe(Effect.provideService(CurrentSession, restrictedSession))
           );
+
           expect(subscribeError._tag).toBe("PolicyDenied");
 
           const listError = yield* Effect.flip(
@@ -407,6 +431,7 @@ describe("ChangelogSubscriptionRpcHandlers", () => {
               .ListChangelogSubscriptionsPublic({ organizationId })
               .pipe(Effect.provideService(CurrentSession, restrictedSession))
           );
+
           expect(listError._tag).toBe("PolicyDenied");
         })
     );

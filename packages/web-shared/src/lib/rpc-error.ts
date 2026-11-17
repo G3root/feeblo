@@ -69,21 +69,29 @@ const ALLOWED_USER_FACING_TAGS = new Set<string>([
 
 function extractUserMessage(cause: unknown): string | undefined {
   const decoded = decodeUserFacingError(cause);
+
   if (Option.isNone(decoded)) {
     return undefined;
   }
+
   const error = decoded.value;
+
   if (!ALLOWED_USER_FACING_TAGS.has(error._tag)) {
     return undefined;
   }
+
   const reason = error.reason?.trim();
+
   if (reason) {
     return reason;
   }
+
   const message = error.message?.trim();
+
   if (message) {
     return message;
   }
+
   return undefined;
 }
 
@@ -92,12 +100,15 @@ function getCauseMessage(cause: Cause.Cause<unknown>): string | undefined {
   // For RpcError the cause is a Cause<E> where E is a tagged domain error
   // like PolicyDeniedError ({ _tag: "PolicyDenied", reason: string }).
   const failureOption = Cause.findErrorOption(cause);
+
   if (Option.isSome(failureOption)) {
     const message = extractUserMessage(failureOption.value);
+
     if (message) {
       return message;
     }
   }
+
   return undefined;
 }
 
@@ -119,11 +130,13 @@ export function parseRpcError<T>(
 ): ParsedRpcError {
   if (error instanceof RpcError) {
     const message = getCauseMessage(error.cause) ?? fallback;
+
     return { cause: error.cause, kind: "rpc", message };
   }
 
   if (Cause.isCause(error)) {
     const message = getCauseMessage(error) ?? fallback;
+
     return { cause: error, kind: "rpc", message };
   }
 
@@ -143,10 +156,12 @@ export function isRpcErrorTag<T>(error: T, tag: string): boolean {
   }
 
   const failure = Cause.findErrorOption(error.cause);
+
   if (Option.isNone(failure)) {
     return false;
   }
 
   const decoded = decodeUserFacingError(failure.value);
+
   return Option.isSome(decoded) && decoded.value._tag === tag;
 }

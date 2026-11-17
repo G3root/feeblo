@@ -78,10 +78,12 @@ describe("telemetry resource identity and log level", () => {
       const config = yield* loadTelemetryConfig({
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
       });
+
       const warn = yield* loadTelemetryConfig({
         FEEBLO_TELEMETRY_LOG_LEVEL: "warn",
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
       });
+
       // A telemetry knob typo must not fail startup.
       const typo = yield* loadTelemetryConfig({
         FEEBLO_TELEMETRY_LOG_LEVEL: "verbose",
@@ -100,11 +102,13 @@ describe("telemetry resource identity and log level", () => {
         HOSTNAME: "container-7",
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
       });
+
       const override = yield* loadTelemetryConfig({
         HOSTNAME: "container-7",
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
         OTEL_RESOURCE_ATTRIBUTES: "service.instance.id=pod-9",
       });
+
       const none = yield* loadTelemetryConfig({
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
       });
@@ -120,6 +124,7 @@ describe("telemetry resource identity and log level", () => {
         HOSTNAME: "",
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
       });
+
       const emptyAttribute = yield* loadTelemetryConfig({
         HOSTNAME: "container-7",
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
@@ -140,6 +145,7 @@ describe("telemetry OTLP endpoints", () => {
       const config = yield* loadTelemetryConfig({
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
       });
+
       const delta = yield* loadTelemetryConfig({
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
         OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE: "delta",

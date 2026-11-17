@@ -51,6 +51,7 @@ export const revokeQueuedSubscription = Effect.fn(
         organizationId: revocation.organizationId,
       }
     );
+
     return;
   }
 
@@ -68,6 +69,7 @@ export const revokeQueuedSubscription = Effect.fn(
         configuredTarget: polarService.target,
       }
     );
+
     return;
   }
 
@@ -116,6 +118,7 @@ export const revokePendingSubscriptionRevocations = Effect.fn(
     yield* Effect.logWarning(
       "Skipping the Polar subscription revocation pass because billing is not configured"
     );
+
     return;
   }
 

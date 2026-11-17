@@ -34,6 +34,7 @@ const noTags = new Map<string, readonly string[]>();
 describe("groupBoardPosts", () => {
   it("keeps status order and drops empty status lanes", () => {
     const planned = post({ id: "planned" });
+
     const completed = post({
       id: "completed",
       status: "COMPLETED",
@@ -87,6 +88,7 @@ describe("groupBoardPosts", () => {
 
   it("orders board lanes by the board's name", () => {
     const zeta = post({ boardId: "board-zeta", boardName: "Zeta", id: "zeta" });
+
     const alpha = post({
       boardId: "board-alpha",
       boardName: "Alpha",

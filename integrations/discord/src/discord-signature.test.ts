@@ -14,13 +14,16 @@ import {
 // keypair is generated inline so the tests never depend on a fixture secret.
 const { publicKeyHex, privateKeyHex } = (() => {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+
   const publicKeyHex = publicKey
     .export({ format: "der", type: "spki" })
     .subarray(-32)
     .toString("hex");
+
   const privateKeyHex = privateKey
     .export({ format: "der", type: "pkcs8" })
     .toString("hex");
+
   return { publicKeyHex, privateKeyHex };
 })();
 
@@ -47,9 +50,11 @@ describe("verifyDiscordRequestSignature", () => {
   it.effect("accepts a valid signature", () =>
     Effect.gen(function* () {
       const rawBody = JSON.stringify({ type: 1 });
+
       const timestamp = String(
         Math.floor((yield* Clock.currentTimeMillis) / 1000)
       );
+
       const result = yield* verifyDiscordRequestSignature({
         now: yield* Clock.currentTimeMillis,
         publicKey: publicKeyHex,
@@ -57,6 +62,7 @@ describe("verifyDiscordRequestSignature", () => {
         signatureHeader: signBody(timestamp, rawBody),
         timestampHeader: timestamp,
       });
+
       expect(result).toBeUndefined();
     })
   );
@@ -75,9 +81,11 @@ describe("verifyDiscordRequestSignature", () => {
 
   it.effect("rejects a stale timestamp outside the freshness window", () => {
     const rawBody = "{}";
+
     const stale = String(
       Math.floor((Date.now() - DISCORD_SIGNATURE_MAX_AGE_MS - 60_000) / 1000)
     );
+
     return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
@@ -92,9 +100,11 @@ describe("verifyDiscordRequestSignature", () => {
   it.effect("rejects a future timestamp outside the freshness window", () => {
     const rawBody = "{}";
     const now = Date.now();
+
     const future = String(
       Math.floor((now + DISCORD_SIGNATURE_MAX_AGE_MS + 60_000) / 1000)
     );
+
     return expectFailure(
       verifyDiscordRequestSignature({
         now,
@@ -108,6 +118,7 @@ describe("verifyDiscordRequestSignature", () => {
 
   it.effect("rejects a tampered body", () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
+
     return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
@@ -121,6 +132,7 @@ describe("verifyDiscordRequestSignature", () => {
 
   it.effect("rejects a non-hex signature", () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
+
     return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),
@@ -134,6 +146,7 @@ describe("verifyDiscordRequestSignature", () => {
 
   it.effect("rejects an invalid public key", () => {
     const timestamp = String(Math.floor(Date.now() / 1000));
+
     return expectFailure(
       verifyDiscordRequestSignature({
         now: Date.now(),

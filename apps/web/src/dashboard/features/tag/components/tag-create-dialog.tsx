@@ -70,6 +70,7 @@ function TagCreateForm({
     onSubmit: async (data) => {
       try {
         const id = await TagId.unsafeGenerate();
+
         const tx = tagCollection.insert({
           id,
           createdAt: new Date(),

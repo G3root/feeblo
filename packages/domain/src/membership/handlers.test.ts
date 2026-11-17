@@ -6,6 +6,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -19,6 +21,7 @@ describe("MembershipRpcHandlers", () => {
     organizationId: string;
     userId: string;
   };
+
   const makeSession = (
     fixture: Fixture,
     role: Session["memberships"][number]["role"] | null = "owner"
@@ -41,6 +44,7 @@ describe("MembershipRpcHandlers", () => {
         ]
       : [],
   });
+
   const makeFixture = () =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -66,8 +70,10 @@ describe("MembershipRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
+
   const addAdmin = (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -85,19 +91,25 @@ describe("MembershipRpcHandlers", () => {
         role: "admin",
         createdAt: yield* DateTime.nowAsDate,
       });
+
       return memberId;
     });
+
   const Repositories = Layer.mergeAll(
+    AuditLogRecorder.layer,
     MembershipRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = MembershipPolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -110,9 +122,11 @@ describe("MembershipRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* MembershipRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const memberships = yield* handlers
           .ListMemberships()
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(memberships).toMatchObject([
           { id: fixture.membershipId, organizationId: fixture.organizationId },
         ]);
@@ -122,6 +136,7 @@ describe("MembershipRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* MembershipRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListOrganizationMembers({ organizationId: fixture.organizationId })
@@ -129,6 +144,7 @@ describe("MembershipRpcHandlers", () => {
               Effect.provideService(CurrentSession, makeSession(fixture, null))
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -330,6 +346,7 @@ describe("MembershipRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(removeError._tag).toBe("PolicyDenied");
 
         const demoteError = yield* Effect.flip(
@@ -341,12 +358,14 @@ describe("MembershipRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(demoteError._tag).toBe("PolicyDenied");
 
         const [otherOwner] = yield* db
           .select({ role: schema.memberTable.role })
           .from(schema.memberTable)
           .where(eq(schema.memberTable.id, otherOwnerMemberId));
+
         expect(otherOwner?.role).toBe("owner");
       })
     );
@@ -469,6 +488,7 @@ describe("MembershipRpcHandlers", () => {
           .select({ id: schema.memberTable.id })
           .from(schema.memberTable)
           .where(eq(schema.memberTable.id, memberId));
+
         expect(remaining).toHaveLength(0);
       })
     );
@@ -509,8 +529,85 @@ describe("MembershipRpcHandlers", () => {
           .select({ id: schema.memberTable.id })
           .from(schema.memberTable)
           .where(eq(schema.memberTable.id, memberId));
+
         expect(remaining).toHaveLength(0);
       })
+    );
+
+    it.effect(
+      "records the role change and the removal against the session user",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* MembershipRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const targetUserId = `member_${fixture.organizationId}`;
+          const targetMemberId = yield* MemberId.generate;
+          yield* db.insert(schema.userTable).values({
+            id: targetUserId,
+            email: `${targetUserId}@example.com`,
+            name: "Regular Member",
+          });
+          yield* db.insert(schema.memberTable).values({
+            id: targetMemberId,
+            organizationId: fixture.organizationId,
+            userId: targetUserId,
+            role: "contributor",
+            createdAt: yield* DateTime.nowAsDate,
+          });
+
+          yield* handlers
+            .UpdateOrganizationMemberRole({
+              organizationId: fixture.organizationId,
+              memberId: targetMemberId,
+              role: "manager",
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .RemoveOrganizationMember({
+              organizationId: fixture.organizationId,
+              memberId: targetMemberId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              eq(schema.auditLogTable.organizationId, fixture.organizationId)
+            );
+
+          expect(rows).toHaveLength(2);
+          const byAction = new Map(rows.map((row) => [row.action, row]));
+
+          // The diff is real: the previous role was read inside the same
+          // transaction as the write, and the entry names the person it moved.
+          expect(byAction.get("member.role_changed")).toMatchObject({
+            actorRole: "owner",
+            actorType: "user",
+            actorUserId: fixture.userId,
+            affectedUserId: targetUserId,
+            changes: {
+              fields: ["role"],
+              before: { role: "contributor" },
+              after: { role: "manager" },
+            },
+            outcome: "allowed",
+            resourceId: targetMemberId,
+            resourceType: "member",
+            source: "dashboard",
+          });
+          // The membership row is gone by the time it commits, so the user it
+          // belonged to is captured before the delete.
+          expect(byAction.get("member.removed")).toMatchObject({
+            actorType: "user",
+            actorUserId: fixture.userId,
+            affectedUserId: targetUserId,
+            resourceId: targetMemberId,
+            resourceType: "member",
+          });
+        }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
   });
 });

@@ -76,7 +76,9 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
     serviceVersion: settings.version,
     attributes: { "deployment.environment.name": settings.environment },
   };
+
   const console = Logger.layer([Logger.withConsoleError(Logger.formatJson)]);
+
   const exporter = (url: string) => ({
     url,
     resource,
@@ -85,19 +87,23 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
     exportInterval: "1 second" as const,
     shutdownTimeout: flushTimeout,
   });
+
   return Layer.effect(
     BrowserTelemetry,
     Effect.gen(function* () {
       const flusher = yield* OtlpExporter.Flusher;
       const run = yield* FiberSet.makeRuntime();
+
       // `hidden` records whether the page was hidden at any point before the route resolved.
       let navigation:
         | { readonly done: Deferred.Deferred<void>; hidden: boolean }
         | undefined;
+
       const flush = flusher.flush.pipe(
         Effect.timeoutOption(flushTimeout),
         Effect.asVoid
       );
+
       const error = (name: string, value: Error) =>
         run(
           Effect.logError(Cause.die(value)).pipe(
@@ -106,6 +112,7 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
             Effect.ignore
           )
         );
+
       // A page-level handler also sees extension and injected-script failures.
       // The same first-party filter Sentry uses decides what belongs to the
       // app, so both reporting paths agree.
@@ -116,6 +123,7 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
         )
           error("ui.error", event.error);
       };
+
       const onRejection = (event: PromiseRejectionEvent) => {
         if (
           event.reason instanceof Error &&
@@ -123,11 +131,14 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
         )
           error("ui.unhandled-rejection", event.reason);
       };
+
       const onHidden = () => {
         if (navigation !== undefined && document.visibilityState === "hidden")
           navigation.hidden = true;
+
         if (document.visibilityState === "hidden") run(flush);
       };
+
       const onPageHide = () => run(flush);
       window.addEventListener("error", onError);
       window.addEventListener("unhandledrejection", onRejection);
@@ -141,6 +152,7 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
           document.removeEventListener("visibilitychange", onHidden);
         })
       );
+
       return {
         flush,
         navigation: (
@@ -150,18 +162,23 @@ const browserTelemetryLayer = (settings: BrowserTelemetrySettings) => {
         ) =>
           Effect.sync(() => {
             if (event.type === "load") return;
+
             if (event.type === "end") {
               if (navigation !== undefined)
                 Deferred.doneUnsafe(navigation.done, Effect.void);
               navigation = undefined;
+
               return;
             }
+
             if (navigation !== undefined)
               Deferred.doneUnsafe(navigation.done, Effect.interrupt);
+
             const current = {
               done: Deferred.makeUnsafe<void>(),
               hidden: document.visibilityState === "hidden",
             };
+
             navigation = current;
             run(
               Deferred.await(current.done).pipe(

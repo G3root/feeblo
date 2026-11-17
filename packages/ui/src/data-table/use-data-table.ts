@@ -113,13 +113,16 @@ function useDataTable<TData extends RowData>({
 }: UseDataTableProps<TData>) {
   const isServer = mode === "server";
   const builtConfig = getIsDataTableConfig(configProp) ? configProp : undefined;
+
   const configInputKey = builtConfig
     ? ""
     : getConfigInputKey(columns, configProp);
+
   const config = React.useMemo(
     () => builtConfig ?? createConfigFromInputKey(configInputKey),
     [builtConfig, configInputKey]
   );
+
   const { enableGlobalFilter, pageSizeOptions, filterVariants } = config;
 
   const [initialTableState] = React.useState<InitialTableState>(() => ({
@@ -144,13 +147,16 @@ function useDataTable<TData extends RowData>({
 
   React.useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
+
     if (hasInlineColumns) {
       console.warn(
         "useDataTable: an inline config ignores `columns`. Pass the config through createDataTableConfig, or set the filter and sorting on the column defs."
       );
     }
+
     if (!builtConfig) return;
     const unmatchedIds = getUnmatchedConfigIds(builtConfig.columns, columns);
+
     if (unmatchedIds.length === 0) return;
     console.warn(
       `useDataTable: the config has no matching column for ${unmatchedIds.map((columnId) => `"${columnId}"`).join(", ")}. Rename the config key or add the column.`
@@ -166,6 +172,7 @@ function useDataTable<TData extends RowData>({
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
+
     pendingRef.current = null;
   }, []);
 
@@ -183,6 +190,7 @@ function useDataTable<TData extends RowData>({
     // The router caught up with the write.
     if (getSearchKey(draft.search) === locationSearchKey) {
       setDraft(null);
+
       return;
     }
 
@@ -207,6 +215,7 @@ function useDataTable<TData extends RowData>({
 
     const pending = pendingRef.current;
     pendingRef.current = null;
+
     if (!pending) return;
 
     void navigate({
@@ -234,8 +243,10 @@ function useDataTable<TData extends RowData>({
       // the URL the chain started from, so an outside navigation is still
       // recognized as one.
       const base = pendingRef.current?.search ?? search;
+
       const baseKey =
         pendingRef.current?.baseKey ?? draft?.baseKey ?? locationSearchKey;
+
       const nextSearch = config.apply(base, {
         ...config.parse(base),
         ...patch,
@@ -251,6 +262,7 @@ function useDataTable<TData extends RowData>({
 
       if (!debounce) {
         flush();
+
         return;
       }
 
@@ -271,6 +283,7 @@ function useDataTable<TData extends RowData>({
 
   function onPaginationChange(updater: Updater<PaginationState>) {
     const next = getNextPagination(updater);
+
     if (
       next.pageIndex === pagination.pageIndex &&
       next.pageSize === pagination.pageSize
@@ -289,6 +302,7 @@ function useDataTable<TData extends RowData>({
 
   function onSortingChange(updater: Updater<SortingState>) {
     const next = getNextSorting(updater);
+
     if (JSON.stringify(next) === JSON.stringify(sorting)) return;
     writeQuery({ sorting: next, page: 1 }, { debounce: false });
   }
@@ -298,6 +312,7 @@ function useDataTable<TData extends RowData>({
 
   function onJoinOperatorChange(updater: Updater<JoinOperator>) {
     const next = getNextJoinOperator(updater);
+
     if (next === joinOperator) return;
     writeQuery({ joinOperator: next, page: 1 }, { debounce: false });
   }
@@ -308,6 +323,7 @@ function useDataTable<TData extends RowData>({
   function onGlobalFilterChange(updater: Updater<DataTableRawValue>) {
     if (!enableGlobalFilter) return;
     const value = getGlobalFilterValue(getNextGlobalFilter(updater));
+
     if (value === globalFilter) return;
 
     writeQuery(
@@ -328,6 +344,7 @@ function useDataTable<TData extends RowData>({
   const [filtersDraft, setFiltersDraft] = React.useState<FiltersDraft | null>(
     null
   );
+
   const columnFilters =
     filtersDraft?.urlFiltersKey === urlColumnFiltersKey
       ? filtersDraft.filters
@@ -341,6 +358,7 @@ function useDataTable<TData extends RowData>({
 
   function onColumnFiltersChange(updater: Updater<ColumnFiltersState>) {
     const filters = getNextColumnFilters(updater);
+
     const activeFilters = getActiveFilters(asFilterItems(filters)).filter(
       (filter) => Object.hasOwn(filterVariants, filter.id)
     );
@@ -423,7 +441,9 @@ function getSearchKey(search: DataTableSearchRecord): string {
 
 function getGlobalFilterValue(value: DataTableRawValue) {
   if (isString(value)) return value;
+
   if (isNumber(value)) return String(value);
+
   return "";
 }
 
@@ -448,11 +468,14 @@ function useChainedUpdate<TValue>(value: TValue) {
 
   return (updater: Updater<TValue>) => {
     const pending = pendingRef.current;
+
     const next = functionalUpdate(
       updater,
       pending?.base === value ? pending.next : value
     );
+
     pendingRef.current = { base: value, next };
+
     return next;
   };
 }

@@ -49,6 +49,7 @@ export const migratePglite = async (databaseUrl: string): Promise<void> => {
 
   try {
     await migrate(db, { migrationsFolder });
+
     for (const statement of concurrentIndexStatements) {
       await pglite.exec(statement);
     }

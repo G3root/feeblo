@@ -79,6 +79,7 @@ describe("MailerConfig sender display names", () => {
         SMTP_FROM_ADDRESS: "noreply@example.test",
         SMTP_FROM_NAME: "Feeblo, Inc",
       });
+
       const quote = yield* loadMailerConfig({
         SMTP_FROM_ADDRESS: "noreply@example.test",
         SMTP_FROM_NAME: 'Nafees "Naf" Nazik',

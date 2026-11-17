@@ -42,9 +42,11 @@ const forwardedClientAddress = (
   resolved: ClientIpValue
 ): string | undefined => {
   const peer = getClientIpFromRequest(request, ClientIpProxyTrustNone);
+
   if (resolved._tag !== "ClientIpAddress" || peer._tag !== "ClientIpAddress") {
     return undefined;
   }
+
   return resolved.address === peer.address ? undefined : resolved.address;
 };
 
@@ -84,6 +86,7 @@ export const PostTrafficApiLive = HttpApiBuilder.group(
             : (payload.country ?? header(request, "cf-ipcountry"));
 
         const repository = yield* PostTrafficRepository;
+
         const record = repository.recordView({
           ...parseUserAgent(userAgent, payload.deviceHint),
           country: COUNTRY_PATTERN.test(country) ? country : "",

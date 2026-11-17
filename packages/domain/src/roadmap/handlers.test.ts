@@ -1,10 +1,13 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { type LegidOf, RoadmapId, SiteId, WorkspaceId } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
@@ -71,6 +74,7 @@ describe("RoadmapRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       if (includeRoadmap) {
         yield* db.insert(schema.roadmapTable).values({
           id: roadmapId,
@@ -142,22 +146,27 @@ describe("RoadmapRpcHandlers", () => {
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = SitePolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const RoadmapPolicies = RoadmapPolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
     Policies,
     RoadmapPolicies,
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
@@ -166,9 +175,11 @@ describe("RoadmapRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapRpcHandlersEffect;
         const fixture = yield* makeFixture("PUBLIC");
+
         const roadmaps = yield* handlers.ListRoadmapsPublic({
           organizationId: fixture.organizationId,
         });
+
         expect(roadmaps).toMatchObject([{ id: fixture.roadmapId }]);
       })
     );
@@ -176,11 +187,13 @@ describe("RoadmapRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* RoadmapRpcHandlersEffect;
         const fixture = yield* makeFixture("HIDDEN");
+
         const error = yield* Effect.flip(
           handlers.ListRoadmapsPublic({
             organizationId: fixture.organizationId,
           })
         );
+
         expect(error).toMatchObject({ _tag: "PolicyDenied" });
       })
     );
@@ -201,6 +214,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === roadmapId)
         ).toMatchObject({
@@ -298,6 +312,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === roadmapId)
         ).toMatchObject({
@@ -384,6 +399,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === roadmapId)
         ).toMatchObject({
@@ -412,6 +428,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === firstId)
         ).toMatchObject({
@@ -494,6 +511,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(
           roadmaps.find((roadmap) => roadmap.id === fixture.roadmapId)
         ).toMatchObject({
@@ -532,6 +550,7 @@ describe("RoadmapRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(
             roadmaps.find((roadmap) => roadmap.id === secondId)
           ).toMatchObject({
@@ -556,6 +575,7 @@ describe("RoadmapRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(roadmaps).toHaveLength(0);
       })
     );
@@ -585,6 +605,7 @@ describe("RoadmapRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(
             roadmaps.find((roadmap) => roadmap.id === fixture.roadmapId)
           ).toMatchObject({
@@ -716,6 +737,40 @@ describe("RoadmapRpcHandlers", () => {
             isPrimary: true,
           });
         })
+    );
+
+    it.effect("records a created roadmap against the session user", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* RoadmapRpcHandlersEffect;
+        const fixture = yield* makeFixture("PUBLIC");
+        const roadmapId = yield* RoadmapId.generate;
+
+        yield* handlers
+          .CreateRoadmap(
+            roadmapCreateInput(fixture, roadmapId, "Second roadmap")
+          )
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          action: "roadmap.created",
+          actorRole: "owner",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceId: roadmapId,
+          resourceType: "roadmap",
+          source: "dashboard",
+        });
+      }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
   });
 });

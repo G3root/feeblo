@@ -8,6 +8,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { InternalServerError } from "../rpc-errors";
 import { Auth, CurrentSession, type Session } from "../session-middleware";
@@ -55,6 +57,7 @@ const AuthTest = Layer.succeed(Auth, {
     }),
     createApiKey: async ({ body }): Promise<ApiKeyAuthCreated> => {
       const createdAt = new Date("2026-09-18T00:00:00.000Z");
+
       return {
         id: "apikey_created",
         name: body.name,
@@ -198,9 +201,11 @@ describe("ApiKeyRpcHandlers", () => {
     });
 
   const DatabaseLive = Database.PgliteDatabaseLive;
+
   const WorkspaceRepositoryLive = WorkspaceRepository.layer.pipe(
     Layer.provide(DatabaseLive)
   );
+
   const EntitlementPolicyLive = EntitlementPolicy.layer.pipe(
     Layer.provide(WorkspaceRepositoryLive),
     Layer.provide(DatabaseLive)
@@ -208,6 +213,7 @@ describe("ApiKeyRpcHandlers", () => {
 
   const TestLayer = Layer.mergeAll(
     DatabaseLive,
+    AuditLogRecorder.layer.pipe(Layer.provide(DatabaseLive)),
     ApiKeyRepository.layer.pipe(Layer.provide(DatabaseLive)),
     ApiKeyPolicy.layer.pipe(
       Layer.provide(EntitlementPolicyLive),
@@ -299,6 +305,7 @@ describe("ApiKeyRpcHandlers", () => {
                 makeSession(fixture, "owner")
               )
             );
+
           expect(byDefault.summary.scopes).toEqual([
             "boards.read",
             "posts.read",
@@ -330,6 +337,7 @@ describe("ApiKeyRpcHandlers", () => {
                 makeSession(fixture, "owner")
               )
             );
+
           expect(withWrites.summary.scopes).toEqual([
             "tags.read",
             "tags.create",
@@ -346,6 +354,7 @@ describe("ApiKeyRpcHandlers", () => {
           const handlers = yield* ApiKeyRpcHandlersEffect.pipe(
             Effect.provideService(ApiKeyRepository, failAttributionRepository)
           );
+
           const fixture = yield* makeFixture("starter");
 
           const created = yield* handlers
@@ -435,6 +444,7 @@ describe("ApiKeyRpcHandlers", () => {
           .pipe(
             Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
           );
+
         expect(keys).toHaveLength(1);
         expect(keys[0]).toMatchObject({
           id: "apikey_downgraded",
@@ -509,10 +519,12 @@ describe("ApiKeyRpcHandlers", () => {
         expect(error._tag).toBe("NotFoundError");
 
         const db = yield* currentDb;
+
         const rows = yield* db
           .select()
           .from(schema.apiKeyTable)
           .where(eq(schema.apiKeyTable.id, "apikey_theirs_revoke"));
+
         expect(rows).toHaveLength(1);
         expect(rows[0]?.referenceId).toBe(theirs.organizationId);
       })
@@ -538,6 +550,49 @@ describe("ApiKeyRpcHandlers", () => {
 
           expect(error._tag).toBe("PolicyDenied");
         })
+    );
+
+    it.effect("records the revoked key when the audit log is on", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ApiKeyRpcHandlersEffect;
+        const fixture = yield* makeFixture("starter");
+        yield* seedKey(fixture, {
+          id: "apikey_revoked",
+          name: "Production",
+          plaintext: "fbk_revoked",
+        });
+
+        yield* handlers
+          .RevokeApiKey({
+            organizationId: fixture.organizationId,
+            keyId: "apikey_revoked",
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture, "owner"))
+          );
+
+        // The revoke is not inside a transaction, so the entry is written best
+        // effort; with the flag on it still lands, naming the key by id.
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          action: "api_key.revoked",
+          actorRole: "owner",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceId: "apikey_revoked",
+          resourceType: "api_key",
+          source: "dashboard",
+        });
+      }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
   });
 });

@@ -19,6 +19,7 @@ it("keeps the error tag in the summary", () => {
       message: "OTEL_EXPORTER_OTLP_HEADERS is invalid",
     })
   );
+
   const summary = failureSummary(Cause.fail(error));
 
   expect(summary).toContain("ConfigError");
@@ -27,6 +28,7 @@ it("keeps the error tag in the summary", () => {
 
 it("redacts bearer tokens quoted back by a config error", () => {
   const token = "glsa_0123456789abcdefghijklmnopqrstuv";
+
   const summary = summaryOf(
     `OTEL_EXPORTER_OTLP_HEADERS is invalid: Authorization=Bearer ${token}`
   );
@@ -37,6 +39,7 @@ it("redacts bearer tokens quoted back by a config error", () => {
 
 it("redacts basic credentials quoted back by a config error", () => {
   const token = "MTIzNDU2NzpnbHNhX2FiY2RlZmdoaWprbG1ub3BxcnN0dXY=";
+
   const summary = summaryOf(
     `OTEL_EXPORTER_OTLP_HEADERS is invalid: Authorization=Basic ${token}`
   );
@@ -47,6 +50,7 @@ it("redacts basic credentials quoted back by a config error", () => {
 
 it("redacts credentials inside a JSON-quoted header record", () => {
   const token = "glsa_0123456789abcdefghijklmnopqrstuv";
+
   const summary = summaryOf(
     `Expected a record, got {"Authorization":"Bearer ${token}"}`
   );
@@ -58,6 +62,7 @@ it("redacts credentials inside a JSON-quoted header record", () => {
 it("redacts URL credentials and secret query values", () => {
   const password = "supersecret";
   const apiKey = "abcdef0123456789";
+
   const summary = summaryOf(
     `Expected an endpoint: https://collector:${password}@otlp.test/v1/traces?api_key=${apiKey}`
   );
@@ -106,6 +111,7 @@ it.effect(
         AUTH_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef",
         FEEBLO_TELEMETRY_LOG_LEVEL: "warn",
       });
+
       const config = yield* ServerConfig.make.pipe(
         Effect.provideService(ConfigProvider.ConfigProvider, provider)
       );

@@ -25,6 +25,7 @@ export const BoardList = S.Struct({
 });
 
 export type TBoardList = S.Schema.Type<typeof BoardList>;
+
 export type TBoardCreate = S.Schema.Type<typeof BoardCreate>;
 
 export const BoardUpdate = S.Struct({
@@ -40,4 +41,5 @@ export const BoardDelete = S.Struct({
 });
 
 export type TBoardUpdate = S.Schema.Type<typeof BoardUpdate>;
+
 export type TBoardDelete = S.Schema.Type<typeof BoardDelete>;

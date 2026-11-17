@@ -56,9 +56,11 @@ export const telemetryLayer = (
   const lifetime = options?.lifetime ?? "process";
   const rpcSpanPrefix = options?.rpcSpanPrefix ?? "RpcServer";
   const shutdownTimeouts = options?.shutdownTimeouts ?? {};
+
   const baseLoggers =
     options?.baseLoggers ??
     Logger.layer([defaultTelemetryLogger], { mergeWithExisting: false });
+
   const environmentAttributes = {
     // `deployment.environment` is the pre-1.27 semantic-convention name;
     // Grafana's Application Observability still filters on it by default.
@@ -66,6 +68,7 @@ export const telemetryLayer = (
     "deployment.environment": config.environment,
     "deployment.environment.name": config.environment,
   };
+
   const resource = {
     serviceName: config.service,
     serviceVersion: config.version,
@@ -79,6 +82,7 @@ export const telemetryLayer = (
             "service.instance.id": config.instanceId,
           },
   };
+
   const signal = (
     target: TelemetryTarget,
     name: keyof typeof shutdownTimeouts,
@@ -88,16 +92,19 @@ export const telemetryLayer = (
     // exports once instead of per interval.
     const exportInterval: Duration.Input =
       lifetime === "event" ? "1 hour" : processExportInterval;
+
     const common = {
       url: target.url,
       resource,
       exportInterval,
       shutdownTimeout: shutdownTimeouts[name] ?? ("3 seconds" as const),
     };
+
     return target.headers === undefined
       ? common
       : { ...common, headers: Redacted.value(target.headers) };
   };
+
   return Layer.mergeAll(
     config.traces === undefined
       ? Layer.empty

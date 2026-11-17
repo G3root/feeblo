@@ -58,9 +58,11 @@ const attemptRetryDecision = (
   if (decision._tag === "Succeeded") {
     return "succeeded" as const;
   }
+
   if (decision._tag === "Retry") {
     return "retry" as const;
   }
+
   return "exhausted" as const;
 };
 
@@ -122,9 +124,11 @@ export const makeIntegrationDeliveryWorkerRepository = (
     ) =>
       Effect.gen(function* () {
         const claimed: ClaimedIntegrationDelivery[] = [];
+
         if (deliveryIds.length === 0) {
           return claimed;
         }
+
         const rows = yield* db
           .select({
             connection: {
@@ -203,14 +207,18 @@ export const makeIntegrationDeliveryWorkerRepository = (
               eq(schema.integrationDeliveryTable.leaseOwner, leaseOwner)
             )
           );
+
         const byId = new Map(
           rows.map((row) => [row.delivery.id, row] as const)
         );
+
         for (const deliveryId of deliveryIds) {
           const row = byId.get(deliveryId);
+
           if (row === undefined) {
             return yield* persistenceError("load_claimed_delivery");
           }
+
           const input = yield* Schema.decodeUnknownEffect(ClaimedProviderInput)(
             {
               connection: {
@@ -270,8 +278,10 @@ export const makeIntegrationDeliveryWorkerRepository = (
           ).pipe(
             Effect.mapError(() => persistenceError("decode_claimed_delivery"))
           );
+
           claimed.push({ input, leaseOwner });
         }
+
         return claimed;
       });
 
@@ -281,6 +291,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
           "claim_due_deliveries",
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             const providerCapabilityConditions = Array.from(
               claimableCapabilityKeysByProvider.entries()
             ).map(([provider, keys]) =>
@@ -300,6 +311,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                 )
               )
             );
+
             const [backlog] = yield* db
               .select({ count: sql<number | bigint>`count(*)` })
               .from(schema.integrationDeliveryTable)
@@ -309,16 +321,20 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   lte(schema.integrationDeliveryTable.nextAttemptAt, now)
                 )
               );
+
             // PGlite decodes the count as a number and the Postgres driver as
             // a bigint; the backlog gauge is number-valued.
             yield* recordIntegrationDeliveryBacklog(
               Number(backlog?.count ?? 0)
             );
+
             const claimableCapabilityConditions =
               providerCapabilityConditions.length === 0
                 ? sql`false`
                 : or(...providerCapabilityConditions);
+
             const planGatedProviderSet = new Set(planGatedProviders);
+
             const claimedIds = yield* db.transaction(() =>
               Effect.gen(function* () {
                 const due = yield* db
@@ -366,6 +382,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     skipLocked: true,
                     of: schema.integrationDeliveryTable,
                   });
+
                 const pausedIds = due
                   .filter(
                     (row) =>
@@ -373,6 +390,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       !row.planEntitled
                   )
                   .map((row) => row.id);
+
                 if (pausedIds.length > 0) {
                   yield* db
                     .update(schema.integrationDeliveryTable)
@@ -389,18 +407,24 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     );
                   yield* recordIntegrationPlanPauses(pausedIds.length);
                 }
+
                 const pausedIdSet = new Set(pausedIds);
+
                 const claimableRows = due.filter(
                   (row) => !pausedIdSet.has(row.id)
                 );
+
                 const leaseExpiresAt = DateTime.fromDateUnsafe(now).pipe(
                   DateTime.addDuration(Duration.millis(leaseDurationMs)),
                   DateTime.toDate
                 );
+
                 const claimableIds = claimableRows.map(({ id }) => id);
+
                 if (claimableIds.length === 0) {
                   return [];
                 }
+
                 // One statement claims the whole batch. Its rows are already
                 // locked by the `FOR UPDATE SKIP LOCKED` select above, so the
                 // `pending` guard cannot lose a race here: a concurrent
@@ -425,9 +449,11 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     attemptCount: schema.integrationDeliveryTable.attemptCount,
                     id: schema.integrationDeliveryTable.id,
                   });
+
                 if (claimed.length === 0) {
                   return [];
                 }
+
                 // The attempt row is the audit trail of the claim, so one
                 // insert carries the whole batch. `UPDATE ... RETURNING`
                 // answers in no particular order; the ids are put back in the
@@ -442,6 +468,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   ),
                   DateTime.toDate
                 );
+
                 const attempts = yield* Effect.forEach(
                   claimed,
                   ({ attemptCount, id }) =>
@@ -455,13 +482,16 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       }))
                     )
                 );
+
                 yield* db
                   .insert(schema.integrationDeliveryAttemptTable)
                   .values(attempts);
                 const claimedIdSet = new Set(claimed.map(({ id }) => id));
+
                 return claimableIds.filter((id) => claimedIdSet.has(id));
               })
             );
+
             return yield* loadClaimedDeliveries(claimedIds, leaseOwner);
           })
         );
@@ -473,6 +503,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
           db.transaction(() =>
             Effect.gen(function* () {
               const now = yield* DateTime.nowAsDate;
+
               const [row] = yield* db
                 .select({ id: schema.integrationDeliveryTable.id })
                 .from(schema.integrationDeliveryTable)
@@ -510,6 +541,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                 // transaction commits first defines whether this request started.
                 .for("update", { of: schema.integrationConnectionTable })
                 .limit(1);
+
               return row !== undefined;
             })
           )
@@ -544,6 +576,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                 )
                 .for("update")
                 .limit(1);
+
               const [leased] = yield* db
                 .select({
                   attemptCount: schema.integrationDeliveryTable.attemptCount,
@@ -565,9 +598,11 @@ export const makeIntegrationDeliveryWorkerRepository = (
                 )
                 .for("update")
                 .limit(1);
+
               if (leased === undefined) {
                 return;
               }
+
               const [attempt] = yield* db
                 .select({
                   id: schema.integrationDeliveryAttemptTable.id,
@@ -588,13 +623,17 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   )
                 )
                 .limit(1);
+
               const jitterSource = yield* Random.next;
+
               const decision = decideIntegrationDeliveryRetry({
                 attemptCount: leased.attemptCount,
                 jitterRatio: jitterSource * 0.4 - 0.2,
                 outcome,
               });
+
               const retryDecision = attemptRetryDecision(decision);
+
               if (attempt !== undefined) {
                 yield* db
                   .update(schema.integrationDeliveryAttemptTable)
@@ -612,6 +651,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     eq(schema.integrationDeliveryAttemptTable.id, attempt.id)
                   );
               }
+
               if (decision._tag === "Succeeded") {
                 if (
                   externalResourceDrafts !== undefined &&
@@ -622,12 +662,14 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       "record_external_resource_drafts"
                     );
                   }
+
                   yield* options.recordExternalResourceDrafts({
                     connection: claimed.input.connection,
                     drafts: externalResourceDrafts,
                     event: claimed.input.event,
                   });
                 }
+
                 yield* db
                   .update(schema.integrationDeliveryTable)
                   .set({
@@ -664,8 +706,10 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       leased.connectionId
                     )
                   );
+
                 return;
               }
+
               if (decision._tag === "Retry") {
                 yield* db
                   .update(schema.integrationDeliveryTable)
@@ -705,8 +749,10 @@ export const makeIntegrationDeliveryWorkerRepository = (
                       leased.connectionId
                     )
                   );
+
                 return;
               }
+
               yield* db
                 .update(schema.integrationDeliveryTable)
                 .set({
@@ -730,6 +776,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     )
                   )
                 );
+
               const [connection] = yield* db
                 .update(schema.integrationConnectionTable)
                 .set({
@@ -745,9 +792,11 @@ export const makeIntegrationDeliveryWorkerRepository = (
                     schema.integrationConnectionTable
                       .consecutiveExhaustedDeliveries,
                 });
+
               if ((connection?.exhaustedCount ?? 0) < 10) {
                 return;
               }
+
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({ lifecycle: "paused", updatedAt: now })
@@ -797,6 +846,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
           db.transaction(() =>
             Effect.gen(function* () {
               const now = yield* DateTime.nowAsDate;
+
               const [row] = yield* db
                 .select({
                   connectionLifecycle:
@@ -833,12 +883,14 @@ export const makeIntegrationDeliveryWorkerRepository = (
                 )
                 .for("update", { of: schema.integrationDeliveryTable })
                 .limit(1);
+
               if (
                 row === undefined ||
                 (row.connectionLifecycle === "active" && row.routeEnabled)
               ) {
                 return;
               }
+
               yield* db
                 .update(schema.integrationDeliveryAttemptTable)
                 .set({
@@ -888,6 +940,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
         db.transaction(() =>
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
+
             const expired = yield* db
               .select({
                 connectionLifecycle:
@@ -921,21 +974,25 @@ export const makeIntegrationDeliveryWorkerRepository = (
                 skipLocked: true,
                 of: schema.integrationDeliveryTable,
               });
+
             if (expired.length === 0) {
               return;
             }
+
             const recoverableIds = expired
               .filter(
                 ({ connectionLifecycle, routeEnabled }) =>
                   connectionLifecycle === "active" && routeEnabled
               )
               .map(({ id }) => id);
+
             const canceledIds = expired
               .filter(
                 ({ connectionLifecycle, routeEnabled }) =>
                   connectionLifecycle !== "active" || !routeEnabled
               )
               .map(({ id }) => id);
+
             const oldestLeaseExpiry = expired.reduce(
               (oldest, delivery) =>
                 delivery.leaseExpiresAt !== null &&
@@ -944,11 +1001,13 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   : oldest,
               now
             );
+
             yield* recordIntegrationRecoveredLeaseAge(
               now.getTime() -
                 oldestLeaseExpiry.getTime() +
                 integrationDeliveryWorkerDefaults.leaseDurationMs
             );
+
             if (recoverableIds.length > 0) {
               yield* db
                 .update(schema.integrationDeliveryAttemptTable)
@@ -983,6 +1042,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   )
                 );
             }
+
             if (canceledIds.length > 0) {
               yield* db
                 .update(schema.integrationDeliveryAttemptTable)
@@ -1017,6 +1077,7 @@ export const makeIntegrationDeliveryWorkerRepository = (
                   )
                 );
             }
+
             yield* recordIntegrationLeaseRecoveries(expired.length);
           })
         )

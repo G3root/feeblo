@@ -62,18 +62,22 @@ const migrationLockWaitMs = 10 * 60 * 1000;
  */
 const acquireMigrationLock = async (connection: postgres.Sql) => {
   const deadline = Date.now() + migrationLockWaitMs;
+
   for (;;) {
     const [result] = await connection.unsafe<Array<{ locked: boolean }>>(
       `SELECT pg_try_advisory_lock(${migrationLockKey}) AS locked`
     );
+
     if (result?.locked === true) {
       return;
     }
+
     if (Date.now() > deadline) {
       throw new Error(
         `Timed out after ${migrationLockWaitMs} ms waiting for another migrator to finish.`
       );
     }
+
     await sleep(1_000);
   }
 };
@@ -100,11 +104,14 @@ const buildIndexConcurrently = async (
      WHERE c.relname = $1`,
     [indexName]
   );
+
   const invalid = existing[0];
+
   if (invalid !== undefined && (!invalid.indisvalid || !invalid.indisready)) {
     console.warn(`Dropping invalid index ${indexName} for rebuild`);
     await connection.unsafe(`DROP INDEX CONCURRENTLY IF EXISTS "${indexName}"`);
   }
+
   await connection.unsafe(createStatement);
 };
 
@@ -245,6 +252,7 @@ const concurrentIndexes = [
 
 const runMigrate = async () => {
   const DB_URL = process.env.DATABASE_URL;
+
   if (!DB_URL) {
     console.log("DATABASE_URL not defined, skipping migrations");
     process.exit(0);
@@ -308,6 +316,7 @@ const runMigrate = async () => {
     // invalid index behind and costs a rebuild.
     await connection.unsafe(`SET lock_timeout = 0`);
     await connection.unsafe(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+
     for (const [indexName, createStatement] of concurrentIndexes) {
       await buildIndexConcurrently(connection, indexName, createStatement);
     }

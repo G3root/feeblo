@@ -48,12 +48,14 @@ export default defineConfig({
         chunkFileNames: "widget-[hash].js",
         assetFileNames: (assetInfo) => {
           const names = assetInfo.names ?? [];
+
           if (
             assetInfo.name?.endsWith(".css") ||
             names.some((name) => name.endsWith(".css"))
           ) {
             return "widget.css";
           }
+
           return "assets/[name]-[hash][extname]";
         },
       },

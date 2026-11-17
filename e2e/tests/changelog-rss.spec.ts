@@ -59,12 +59,14 @@ test.describe("changelog RSS feed", () => {
     const hiddenResponse = await page.request.get(
       `${boardUrl}/changelog/rss.xml`
     );
+
     expect(hiddenResponse.status()).toBe(404);
 
     // An unknown subdomain never serves a feed.
     const unknownResponse = await page.request.get(
       `${unknownPublicBoardUrl()}/changelog/rss.xml`
     );
+
     expect(unknownResponse.status()).toBe(404);
   });
 });

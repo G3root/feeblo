@@ -1,4 +1,5 @@
 const DEFAULT_SESSION_COOKIE_NAME = "better-auth.session_token";
+
 const SECURE_SESSION_COOKIE_NAME = `__Secure-${DEFAULT_SESSION_COOKIE_NAME}`;
 
 /** Pure resolver: no process.env access — callers inject the API URL. */
@@ -6,6 +7,7 @@ export const getSessionCookieNameForUrl = (
   apiUrl: string | undefined
 ): string => {
   const useSecurePrefix = apiUrl ? apiUrl.startsWith("https://") : false;
+
   return useSecurePrefix
     ? SECURE_SESSION_COOKIE_NAME
     : DEFAULT_SESSION_COOKIE_NAME;
@@ -32,9 +34,11 @@ export const getSessionCookieNameForUrl = (
 export const getSessionCookieName = (): string => {
   const apiUrl = process.env.API_URL;
   const nodeEnv = process.env.NODE_ENV;
+
   if (apiUrl !== undefined) {
     return getSessionCookieNameForUrl(apiUrl);
   }
+
   // Fallback only when API_URL is absent (mirrors better-auth's second branch).
   return nodeEnv === "production"
     ? SECURE_SESSION_COOKIE_NAME

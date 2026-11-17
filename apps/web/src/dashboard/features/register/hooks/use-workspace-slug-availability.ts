@@ -34,6 +34,7 @@ export function useWorkspaceSlugAvailability(
   workspaceName: string
 ): WorkspaceSlugAvailability {
   const slug = toWorkspaceSlug(workspaceName);
+
   const [snapshot, send] = useMachine(slugAvailabilityMachine, {
     input: { enabled: slug.length >= MIN_SLUG_LENGTH, slug },
   });

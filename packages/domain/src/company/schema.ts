@@ -63,7 +63,9 @@ export const CompanyDelete = S.Struct({
 });
 
 export type TCompanyCreate = S.Schema.Type<typeof CompanyCreate>;
+
 export type TCompanyUpdate = S.Schema.Type<typeof CompanyUpdate>;
+
 export type TCompanyDelete = S.Schema.Type<typeof CompanyDelete>;
 
 export const Company = S.Struct({

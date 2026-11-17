@@ -132,6 +132,7 @@ function DataTableToolbarFilter<TData extends RowData>({
   column,
 }: DataTableToolbarFilterProps<TData>) {
   const columnMeta = column.columnDef.meta;
+
   if (!columnMeta?.variant) return null;
 
   const title = columnMeta.label ?? column.id;
@@ -240,6 +241,8 @@ function DataTableFilterInput<TData extends RowData>({
 
 function readFilterInputValue(value: DataTableRawValue) {
   if (isString(value) || isNumber(value)) return String(value);
+
   if (Array.isArray(value)) return value.join(",");
+
   return "";
 }

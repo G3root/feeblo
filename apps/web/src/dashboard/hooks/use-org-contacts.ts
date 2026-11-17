@@ -8,6 +8,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function useOrgContacts(organizationId: string) {
   const { contactCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: ["org-contacts", contactCollection.id, organizationId],
     query: (q) =>

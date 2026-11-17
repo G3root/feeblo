@@ -1,9 +1,13 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import type { RpcTagsOf } from "../rpc-group";
+import { CurrentSession } from "../session-middleware";
 import { defineSurfacePair } from "../surface";
 import { PostStatusRepository } from "./repository";
 import { PostStatusRpcs } from "./rpcs";
@@ -23,6 +27,7 @@ type PostStatusRpcTag = RpcTagsOf<typeof PostStatusRpcs>;
 export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* PostStatusRepository;
   const read = (organizationId: string) => Policy.hasMembership(organizationId);
+
   // Statuses are the workspace's own vocabulary, the same kind of thing as
   // tags, changelog categories and roadmap columns, so they are managed at the
   // same level: manager and above.
@@ -57,7 +62,23 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
     ListPostStatuses: listStatuses.dashboard,
     ListPostStatusesPublic: listStatuses.public,
     CreatePostStatus: (args: TPostStatusCreate) =>
-      repository.create(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.create(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post_status.created",
+              resourceId: args.id,
+              metadata: { label: args.label, type: args.type },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(manage(args.organizationId)),
         withRemapDbErrors({
           action: "create",
@@ -75,26 +96,70 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
         })
       ),
     UpdatePostStatus: (args: TPostStatusUpdate) =>
-      repository
-        .update(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("PostStatus", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.update(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post_status.updated",
+              resourceId: args.id,
+              metadata: { label: args.label, type: args.type },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(manage(args.organizationId)),
+        withRemapDbErrors("PostStatus", "update")
+      ),
     SetPostStatusDefault: (args: TPostStatusMakeDefault) =>
-      repository
-        .makeDefault(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("PostStatus", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.makeDefault(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post_status.updated",
+              resourceId: args.id,
+              metadata: { isDefault: true },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(manage(args.organizationId)),
+        withRemapDbErrors("PostStatus", "update")
+      ),
     DeletePostStatus: (args: TPostStatusDelete) =>
-      repository
-        .delete(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("PostStatus", "delete")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+
+        return yield* transaction(
+          Effect.gen(function* () {
+            const removed = yield* repository.delete(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post_status.deleted",
+              resourceId: args.id,
+            });
+
+            return removed;
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(manage(args.organizationId)),
+        withRemapDbErrors("PostStatus", "delete")
+      ),
     PreviewPostStatusDelete: (args: TPostStatusDeletePreview) =>
       repository
         .previewDelete(args)
@@ -103,12 +168,28 @@ export const PostStatusRpcHandlersEffect = Effect.gen(function* () {
           withRemapDbErrors("PostStatus", "select")
         ),
     ReorderPostStatuses: (args: TPostStatusReorder) =>
-      repository
-        .reorder(args)
-        .pipe(
-          Policy.withPolicy(manage(args.organizationId)),
-          withRemapDbErrors("PostStatus", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.reorder(args);
+            // A reorder touches every status at once, so it is one page-level
+            // entry rather than an update per row.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post_status.updated",
+              resourceId: args.organizationId,
+              metadata: { order: args.orderedIds },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(manage(args.organizationId)),
+        withRemapDbErrors("PostStatus", "update")
+      ),
   };
 });
 
@@ -116,5 +197,6 @@ export const PostStatusRpcHandlers = PostStatusRpcs.toLayer(
   PostStatusRpcHandlersEffect
 ).pipe(
   // Layer.provide(SitePolicy.layer),
-  Layer.provide(PostStatusRepository.layer)
+  Layer.provide(PostStatusRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );

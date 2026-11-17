@@ -14,6 +14,7 @@ export function getInitials(name: string | null | undefined): string {
   }
 
   const segments = normalized.split(WHITESPACE_REGEX).slice(0, 2);
+
   return segments.map((segment) => segment.charAt(0).toUpperCase()).join("");
 }
 

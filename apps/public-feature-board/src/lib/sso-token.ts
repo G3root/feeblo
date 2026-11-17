@@ -8,7 +8,9 @@ export const getSsoTokenFromHash = (hash: string): string | null => {
   if (!hash.startsWith("#")) {
     return null;
   }
+
   const params = new URLSearchParams(hash.slice(1));
+
   return params.get("ssoToken");
 };
 

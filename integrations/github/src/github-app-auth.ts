@@ -16,6 +16,7 @@ import { githubProviderKey } from "./github-manifest";
 
 /** GitHub permits App JWTs for at most ten minutes. */
 export const GITHUB_APP_JWT_LIFETIME_SECONDS = 9 * 60;
+
 /** Leave room for transit and clock skew before reusing an installation token. */
 export const GITHUB_INSTALLATION_TOKEN_EXPIRY_SKEW_MS = 5 * 60 * 1000;
 
@@ -37,7 +38,9 @@ export const createGitHubAppJwt = ({
       const normalizedPrivateKey = createPrivateKey(
         Redacted.value(privateKey)
       ).export({ format: "pem", type: "pkcs8" });
+
       const key = await jose.importPKCS8(normalizedPrivateKey, "RS256");
+
       return new jose.SignJWT({})
         .setProtectedHeader({ alg: "RS256", typ: "JWT" })
         .setIssuedAt(Math.floor(now.getTime() / 1000) - 60)
@@ -85,10 +88,12 @@ export const makeGitHubInstallationTokenResolver = ({
             now: now(),
             privateKey,
           });
+
           const minted = yield* apiClient.createInstallationAccessToken({
             appJwt,
             installationId,
           });
+
           if (
             minted.expires_at.getTime() <=
             now().getTime() + GITHUB_INSTALLATION_TOKEN_EXPIRY_SKEW_MS
@@ -99,6 +104,7 @@ export const makeGitHubInstallationTokenResolver = ({
               provider: githubProviderKey,
             });
           }
+
           return {
             expiresAt: minted.expires_at,
             token: Redacted.make(minted.token),
@@ -110,6 +116,7 @@ export const makeGitHubInstallationTokenResolver = ({
           if (Exit.isFailure(exit)) {
             return 0;
           }
+
           return Math.max(
             0,
             exit.value.expiresAt.getTime() -
@@ -119,6 +126,7 @@ export const makeGitHubInstallationTokenResolver = ({
         },
       }
     );
+
     return {
       getInstallationAccessToken: (input) =>
         Cache.get(tokenCache, input.installationId).pipe(

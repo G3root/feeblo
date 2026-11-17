@@ -60,6 +60,7 @@ layer(TestDatabaseLive)("database transactions", (it) => {
           // Direct service access remains the stable root database; transaction
           // routing is handled by Effect SQL rather than by leaking a tx client.
           expect(yield* Database).toBe(capturedDb);
+
           return yield* capturedDb
             .select({ id: transactionTestTable.id })
             .from(transactionTestTable)

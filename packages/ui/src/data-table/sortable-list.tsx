@@ -6,6 +6,7 @@ import * as React from "react";
 import { cn } from "../utils";
 
 const GROUP = "data-table-list";
+
 const TYPE = "data-table-list-item";
 
 interface SortableListProps<TItem> {
@@ -40,6 +41,7 @@ export function SortableList<TItem>({
 }: SortableListProps<TItem>) {
   const onDragEnd: DragDropEventHandlers["onDragEnd"] = (event) => {
     const { source } = event.operation;
+
     if (event.canceled || !source) return;
 
     // The sortable source carries where the row started and where the drop
@@ -48,6 +50,7 @@ export function SortableList<TItem>({
     if (!isSortable(source)) return;
 
     const { initialIndex, index } = source;
+
     if (initialIndex === index) return;
 
     onReorder(moveItem(items, initialIndex, index));
@@ -98,7 +101,9 @@ function SortableRow({ id, index, children }: SortableRowProps) {
 function moveItem<TItem>(items: readonly TItem[], from: number, to: number) {
   const next = [...items];
   const [moved] = next.splice(from, 1);
+
   if (moved === undefined) return next;
   next.splice(to, 0, moved);
+
   return next;
 }

@@ -8,6 +8,7 @@ export class DatabaseConfig extends Context.Service<DatabaseConfig>()(
   {
     make: Effect.gen(function* () {
       const url = yield* Config.Redacted("DATABASE_URL");
+
       return { url } as const;
     }),
   }

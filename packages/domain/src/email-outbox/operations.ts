@@ -19,7 +19,7 @@ const PersistedDate = Schema.Union([Schema.Date, Schema.DateFromString]);
 
 export class EmailOutboxInspectionError extends Schema.TaggedError<EmailOutboxInspectionError>()(
   "EmailOutboxInspectionError",
-  { reason: Schema.String }
+  { reason: Schema.String, cause: Schema.optionalKey(Schema.Defect()) }
 ) {}
 
 const emptyIntentStates = () =>
@@ -62,6 +62,7 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
       .from(schema.emailOutboxTable)
       .where(eq(schema.emailOutboxTable.organizationId, organizationId))
       .groupBy(schema.emailOutboxTable.state);
+
     const deliveries = yield* db
       .select({
         oldestCreatedAt: min(schema.emailDeliveryTable.createdAt),
@@ -77,34 +78,41 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
       .groupBy(schema.emailDeliveryTable.state);
 
     const intentStates = emptyIntentStates();
+
     for (const row of intents) {
       const state = yield* Schema.decodeEffect(EmailOutboxState)(
         row.state
       ).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new EmailOutboxInspectionError({
               reason: "Stored email outbox state is invalid",
+              cause,
             })
         )
       );
+
       intentStates[state] += row.total;
     }
 
     const deliveryStates = emptyDeliveryStates();
     let oldestQueuedAt: Date | undefined;
+
     for (const row of deliveries) {
       const state = yield* Schema.decodeEffect(EmailDeliveryState)(
         row.state
       ).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new EmailOutboxInspectionError({
               reason: "Stored email delivery state is invalid",
+              cause,
             })
         )
       );
+
       deliveryStates[state] += row.total;
+
       if (
         deliveryInFlightStates.includes(state) &&
         row.oldestCreatedAt !== null
@@ -113,12 +121,14 @@ const makeEmailOutboxOperations = Effect.gen(function* () {
           row.oldestCreatedAt
         ).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new EmailOutboxInspectionError({
                 reason: "Stored email delivery timestamp is invalid",
+                cause,
               })
           )
         );
+
         if (oldestQueuedAt === undefined || oldestCreatedAt < oldestQueuedAt) {
           oldestQueuedAt = oldestCreatedAt;
         }

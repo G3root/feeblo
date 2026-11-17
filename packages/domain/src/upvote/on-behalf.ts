@@ -60,6 +60,7 @@ export const addVoteOnBehalf = (args: {
         subject: args.subject,
         action: "voter",
       });
+
       if (subject.userId === null) {
         return yield* new InvalidSubjectError({
           message: "The resolved customer has no account to vote as",
@@ -71,6 +72,7 @@ export const addVoteOnBehalf = (args: {
         postId: args.postId,
         userId: subject.userId,
       });
+
       if (!added.added) {
         return { added: added.added, userId: subject.userId };
       }
@@ -157,6 +159,7 @@ export const recordVoteRemoved = (args: {
 
     const contactId = voter?.contactId;
     const name = voter?.contactName ?? voter?.userName ?? null;
+
     // A shadow's synthetic inbox names nothing reachable, so it is never
     // stored as the voter's address.
     const email =
@@ -209,6 +212,7 @@ export const removeVoteOnBehalf = (args: {
         postId: args.postId,
         userId: args.userId,
       });
+
       if (!removed.removed) {
         return removed;
       }

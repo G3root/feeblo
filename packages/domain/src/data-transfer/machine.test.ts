@@ -74,12 +74,14 @@ describe("data import job machine", () => {
     expect(
       transition(dataImportJobMachine, running, { type: "fail" })[0].value
     ).toBe("failed");
+
     // A terminal job is never moved again by the worker.
     for (const ending of ["completed", "failed"] as const) {
       const snapshot = dataImportJobMachine.resolveState({
         context: {},
         value: ending,
       });
+
       expect(
         transition(dataImportJobMachine, snapshot, { type: "fail" })[0].value
       ).toBe(ending);
@@ -115,6 +117,7 @@ describe("data import job machine", () => {
     const terminal = ALL.filter(isTerminalDataImportStatus);
 
     expect(terminal).toStrictEqual(["completed", "failed", "canceled"]);
+
     for (const status of ALL) {
       expect(isActiveDataImportStatus(status)).toBe(!terminal.includes(status));
     }
@@ -132,10 +135,12 @@ describe("data import job machine", () => {
 
     while (grew) {
       grew = false;
+
       for (const from of DATA_IMPORT_JOB_STATES) {
         if (!reached.has(from)) {
           continue;
         }
+
         for (const to of targetStatesFor(from)) {
           if (!reached.has(to)) {
             reached.add(to);

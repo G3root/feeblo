@@ -41,6 +41,7 @@ export const makeDiscordManagementServiceLive = (
       const config = yield* DiscordIntegrationConfig;
       const connectionService = yield* DiscordConnectionService;
       const channelService = yield* DiscordChannelService;
+
       return DiscordManagementService.of(
         chatManagementServiceRecord<DiscordManagementSchemas>({
           channelService,

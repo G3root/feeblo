@@ -42,6 +42,7 @@ function normalizeApiUrl(apiUrl: string) {
 export const sharesRpcBatch = (tag: string): boolean => {
   if (!isReadRpc(tag)) return false;
   const rpc = AllRpcs.requests.get(tag);
+
   return rpc !== undefined && !RpcSchema.isStreamSchema(rpc.successSchema);
 };
 
@@ -70,16 +71,20 @@ export const rpcProtocolFor = (
 ): Layer.Layer<RpcClient.Protocol> => {
   const normalized = normalizeApiUrl(apiUrl);
   const existing = protocolLayers.get(normalized);
+
   if (existing !== undefined) {
     return existing;
   }
+
   const protocol = createRpcProtocolLive(normalized);
   protocolLayers.set(normalized, protocol);
+
   return protocol;
 };
 
 export const createRpcProtocolLive = (apiUrl: string) => {
   const url = `${normalizeApiUrl(apiUrl)}/rpc`;
+
   // A batch carries one set of request headers, so only a runtime that belongs
   // to one request may batch. The server's runtime is a module-level singleton
   // shared by every concurrent request; batching there would let one request's

@@ -85,6 +85,7 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
         const now = yield* DateTime.nowAsDate;
+
         const resolved = yield* repository.resolveTarget({
           organizationId: args.organizationId,
           target: args.target,
@@ -95,12 +96,14 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
             message: "The person to ban was not found",
           });
         }
+
         if (resolved.status === "member") {
           return yield* new BadRequestError({
             message:
               "Workspace members are managed through membership, not banned",
           });
         }
+
         if (resolved.status === "unresolvable") {
           return yield* new BadRequestError({
             message: "This customer has no account or email address to ban",
@@ -145,6 +148,7 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
                     userId: resolved.userId,
                   })
                 : { comments: 0, posts: 0 };
+
             return { purged, row };
           })
         );
@@ -171,10 +175,12 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
         if (args._tag === "row") {
           return yield* repository.remove(args);
         }
+
         const resolved = yield* repository.resolveTarget({
           organizationId: args.organizationId,
           target: args.target,
         });
+
         // `member` and `not_found` both leave nothing to remove. A member
         // cannot be banned, so a row naming one predates their membership and
         // has no effect; the settings list names that row directly and can
@@ -182,6 +188,7 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
         if (resolved.status !== "ok") {
           return { removed: false };
         }
+
         return yield* repository.removeByFacets({
           email: resolved.email,
           organizationId: args.organizationId,
@@ -201,17 +208,21 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
     GetUserBanStatus: (args: UserBanStatusRequest) =>
       Effect.gen(function* () {
         const session = yield* OptionalCurrentSession;
+
         if (Option.isNone(session)) {
           return { banned: false };
         }
+
         if (Policy.isMember(session.value, args.organizationId)) {
           return { banned: false };
         }
+
         const banned = yield* repository.isBanned({
           email: session.value.user.email,
           organizationId: args.organizationId,
           userId: session.value.session.userId,
         });
+
         return { banned };
       }).pipe(withRemapDbErrors("UserBan", "select")),
   };

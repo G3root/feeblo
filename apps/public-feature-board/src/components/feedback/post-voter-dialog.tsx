@@ -54,12 +54,14 @@ function PostVoterDialogRoot({
 }) {
   const site = useSite();
   const organizationId = site.organizationId;
+
   // The surrounding surface's collection: post detail pages override this
   // with the slug-scoped `publicPostUpvoteCollection`, so the dialog lists
   // only the viewed post's voters instead of syncing every org vote.
   const {
     collections: { upvoteCollection },
   } = usePostCollections();
+
   const { data: upvotes } = usePostUpvotes({
     organizationId,
     postId,

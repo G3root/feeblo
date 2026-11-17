@@ -6,6 +6,7 @@ import { getClientTimeZone } from "./client-hints";
 import { getRuntimePublicEnv } from "./runtime-public-env";
 
 const API_URL = getRuntimePublicEnv().apiUrl;
+
 // In the dev server the injected API_URL is origin-relative ("/api") so auth
 // requests stay same-origin through the Vite proxy and cookies remain
 // first-party on *.localhost subdomains. Better Auth requires an absolute base
@@ -13,6 +14,7 @@ const API_URL = getRuntimePublicEnv().apiUrl;
 // page origin.
 const resolvedApiUrl =
   API_URL?.startsWith("/") && hasWindow() ? window.location.origin : API_URL;
+
 // The auth client is browser-only — every call site is a client component,
 // atom, or event handler — but TanStack Start's route graph still imports this
 // module into the server bundle, and better-auth validates the base URL at
@@ -25,9 +27,13 @@ const baseUrl = resolvedApiUrl
   : "http://localhost/";
 
 export const verificationOtpEndpoint = `${baseUrl}api/auth/verification-otp`;
+
 export const profilePictureUploadEndpoint = `${baseUrl}api/profile/picture`;
+
 export const organizationLogoUploadEndpoint = `${baseUrl}api/organization/logo`;
+
 export const editorMediaUploadEndpoint = `${baseUrl}api/media/upload`;
+
 export const plansEndpoint = `${baseUrl}api/plans`;
 
 export const uploadedEditorMediaSchema = z.object({

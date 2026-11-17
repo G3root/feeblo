@@ -25,13 +25,16 @@ export function CommentDisplayActions() {
     // mirroring the reaction picker's auth handling.
     if (!isReplying && !isAuthenticated) {
       onAuthRequired?.();
+
       return;
     }
+
     if (!isReplying) {
       // Replying from a collapsed thread must reveal where the reply lands:
       // expand the replies accordion before the composer opens.
       thread?.expandReplies();
     }
+
     setIsReplying((prev) => !prev);
   };
 
@@ -66,6 +69,7 @@ export function CommentDisplayActions() {
                 content: value.content,
                 isPrivate: value.isPrivate,
               });
+
               if (created) {
                 setIsReplying(false);
               }

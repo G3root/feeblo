@@ -101,8 +101,10 @@ type CheckoutConfirmationDependencies = {
  */
 const emptyPlanRead = (context: CheckoutConfirmationContext) => {
   const attempts = context.attempts + 1;
+
   const target =
     attempts >= CHECKOUT_POLL_ATTEMPTS ? "#checkoutDelayed" : "waiting";
+
   return { context: { attempts }, target };
 };
 
@@ -164,6 +166,7 @@ export const createCheckoutConfirmationMachine = ({
         id: "readWorkspacePlan",
         run: async ({ input, signal }) => {
           await refetchPlan();
+
           // The actor is stopped when `active` is left; reporting the read it
           // already started would just be ignored, but the signal keeps the
           // intent explicit.
@@ -301,6 +304,7 @@ const confirmCheckout: CheckoutConfirmationDependencies["confirmCheckout"] =
     if (checkoutId === null) {
       return;
     }
+
     await fetchRpc(
       (rpc) => rpc.ConfirmBillingCheckout({ organizationId, checkoutId }),
       { signal }
@@ -344,10 +348,15 @@ export const toCheckoutConfirmationStatus = (
   snapshot: CheckoutConfirmationSnapshot
 ): CheckoutConfirmationStatus => {
   if (snapshot.matches("confirmed")) return "confirmed";
+
   if (snapshot.matches("#checkoutDelayed")) return "delayed";
+
   if (snapshot.matches("#checkoutError")) return "error";
+
   if (snapshot.matches("active")) return "pending";
+
   if (snapshot.context.checkoutId === null) return "hidden";
+
   // `useMachine` starts the actor in an effect, so the first paint still holds
   // `idle`'s snapshot. Answer it from the input the actor was seeded with
   // rather than flashing no alert for a frame on the checkout redirect.

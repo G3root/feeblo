@@ -34,6 +34,7 @@ describe("ResolvePrincipalService", () => {
         slug: organizationId,
         createdAt: yield* DateTime.nowAsDate,
       });
+
       return organizationId;
     });
 
@@ -46,6 +47,7 @@ describe("ResolvePrincipalService", () => {
   }) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const values: typeof schema.userTable.$inferInsert = {
         id: args.id,
         name: args.name ?? args.id,
@@ -53,20 +55,24 @@ describe("ResolvePrincipalService", () => {
         emailHash: hashEmail(args.email),
         emailVerified: args.emailVerified ?? true,
       };
+
       if (args.restrictedToOrganizationId !== undefined) {
         values.restrictedToOrganizationId = args.restrictedToOrganizationId;
       }
+
       yield* db.insert(schema.userTable).values(values);
     });
 
   const getUserById = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const rows = yield* db
         .select()
         .from(schema.userTable)
         .where(eq(schema.userTable.id, id))
         .limit(1);
+
       return rows[0];
     });
 
@@ -89,10 +95,12 @@ describe("ResolvePrincipalService", () => {
   const getContactCount = (organizationId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const rows = yield* db
         .select({ id: schema.contactTable.id })
         .from(schema.contactTable)
         .where(eq(schema.contactTable.organizationId, organizationId));
+
       return rows.length;
     });
 
@@ -101,12 +109,15 @@ describe("ResolvePrincipalService", () => {
       if (id === null) {
         return undefined;
       }
+
       const db = yield* currentDb;
+
       const rows = yield* db
         .select()
         .from(schema.contactTable)
         .where(eq(schema.contactTable.id, id))
         .limit(1);
+
       return rows[0];
     });
 
@@ -164,6 +175,7 @@ describe("ResolvePrincipalService", () => {
             needsUser: false,
             subject: { email: "existing@example.com" },
           });
+
           yield* fillCrm(organizationId, FREE_PLAN_CRM_LIMIT - 1);
 
           const resolved = yield* service.resolve({
@@ -308,12 +320,14 @@ describe("ResolvePrincipalService", () => {
             needsUser: false,
             subject: { email, name: "Jane Enriched" },
           });
+
           expect(resolved.contactId).toBe("contact_enrich_author");
 
           const [post] = yield* db
             .select({ authorName: schema.postTable.authorName })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, "post_enrich_author"));
+
           expect(post?.authorName).toBe("Jane Enriched");
         })
     );
@@ -664,10 +678,12 @@ describe("ResolvePrincipalService", () => {
         Effect.gen(function* () {
           const db = yield* currentDb;
           const service = yield* ResolvePrincipalService;
+
           const [organizationId, otherOrganizationId] = [
             yield* makeOrganization(),
             yield* makeOrganization(),
           ];
+
           const contactId = yield* ContactId.generate;
           yield* db.insert(schema.contactTable).values({
             id: contactId,
@@ -697,6 +713,7 @@ describe("ResolvePrincipalService", () => {
           needsUser: true,
           subject: { email: "jane@example.com", name: "Jane" },
         });
+
         const second = yield* service.resolve({
           organizationId,
           needsUser: true,
@@ -720,6 +737,7 @@ describe("ResolvePrincipalService", () => {
             needsUser: false,
             subject: { email: "jane@example.com", name: "Jane" },
           });
+
           const second = yield* service.resolve({
             organizationId,
             needsUser: false,

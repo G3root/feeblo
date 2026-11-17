@@ -20,6 +20,7 @@ describe("integration delivery retry policy", () => {
         _tag: "Retry",
       });
     }
+
     for (const status of [301, 302, 400, 401, 403, 404, 422]) {
       expect(classifyIntegrationHttpDeliveryStatus(status)).toEqual({
         _tag: "Terminal",

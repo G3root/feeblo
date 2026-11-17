@@ -12,6 +12,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { CurrentSession, type Session } from "../session-middleware";
 import { PostStatusRpcHandlersEffect } from "./handlers";
 import { PostStatusRepository } from "./repository";
@@ -154,8 +156,9 @@ describe("PostStatusRpcHandlers", () => {
       });
     });
 
-  const TestLayer = Layer.merge(
+  const TestLayer = Layer.mergeAll(
     PostStatusRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
@@ -195,6 +198,7 @@ describe("PostStatusRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListPostStatuses({ organizationId: fixture.organizationId })
@@ -211,6 +215,7 @@ describe("PostStatusRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const statusId = yield* insertStatus(fixture, {
           isDefault: true,
           orderIndex: 0,
@@ -239,10 +244,12 @@ describe("PostStatusRpcHandlers", () => {
           orderIndex: 0,
           type: "PENDING",
         });
+
         const doomedId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         const now = yield* DateTime.nowAsDate;
         const db = yield* currentDb;
 
@@ -384,6 +391,7 @@ describe("PostStatusRpcHandlers", () => {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         yield* insertStatus(fixture, { orderIndex: 4, type: "COMPLETED" });
 
         yield* handlers
@@ -420,11 +428,13 @@ describe("PostStatusRpcHandlers", () => {
           const db = yield* currentDb;
           const handlers = yield* PostStatusRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const previousDefaultId = yield* insertStatus(fixture, {
             isDefault: true,
             orderIndex: 0,
             type: "PENDING",
           });
+
           const nextDefaultId = yield* insertStatus(fixture, {
             orderIndex: 1,
             type: "REVIEW",
@@ -481,6 +491,7 @@ describe("PostStatusRpcHandlers", () => {
           orderIndex: 0,
           type: "PENDING",
         });
+
         const nextDefaultId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
@@ -508,6 +519,7 @@ describe("PostStatusRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const defaultId = yield* insertStatus(fixture, {
           isDefault: true,
           orderIndex: 0,
@@ -539,11 +551,13 @@ describe("PostStatusRpcHandlers", () => {
           const db = yield* currentDb;
           const handlers = yield* PostStatusRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const defaultId = yield* insertStatus(fixture, {
             isDefault: true,
             orderIndex: 0,
             type: "PENDING",
           });
+
           const doomedId = yield* insertStatus(fixture, {
             orderIndex: 1,
             type: "REVIEW",
@@ -598,15 +612,18 @@ describe("PostStatusRpcHandlers", () => {
         const db = yield* currentDb;
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const defaultId = yield* insertStatus(fixture, {
           isDefault: true,
           orderIndex: 0,
           type: "PENDING",
         });
+
         const doomedId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         const boundColumnId = yield* RoadmapColumnId.generate;
         const freeColumnId = yield* RoadmapColumnId.generate;
         const now = yield* DateTime.nowAsDate;
@@ -660,14 +677,17 @@ describe("PostStatusRpcHandlers", () => {
         const db = yield* currentDb;
         const handlers = yield* PostStatusRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const firstReviewId = yield* insertStatus(fixture, {
           orderIndex: 1,
           type: "REVIEW",
         });
+
         const secondReviewId = yield* insertStatus(fixture, {
           orderIndex: 2,
           type: "REVIEW",
         });
+
         const completedId = yield* insertStatus(fixture, {
           orderIndex: 3,
           type: "COMPLETED",
@@ -714,10 +734,12 @@ describe("PostStatusRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostStatusRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const firstReviewId = yield* insertStatus(fixture, {
             orderIndex: 1,
             type: "REVIEW",
           });
+
           yield* insertStatus(fixture, { orderIndex: 2, type: "REVIEW" });
 
           const error = yield* Effect.flip(
@@ -737,6 +759,88 @@ describe("PostStatusRpcHandlers", () => {
 
           expect(error._tag).toBe("BadRequestError");
         })
+    );
+
+    it.effect("records a create and still returns the delete summary", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* PostStatusRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        yield* insertStatus(fixture, {
+          isDefault: true,
+          orderIndex: 0,
+          type: "PENDING",
+        });
+        const createdId = yield* PostStatusId.generate;
+
+        const doomedId = yield* insertStatus(fixture, {
+          orderIndex: 1,
+          type: "REVIEW",
+        });
+
+        yield* handlers
+          .CreatePostStatus({
+            id: createdId,
+            organizationId: fixture.organizationId,
+            type: "COMPLETED",
+            label: "Shipped",
+            color: null,
+            orderIndex: 2,
+          })
+          .pipe(
+            Effect.provideService(
+              CurrentSession,
+              makeSession(fixture, "manager")
+            )
+          );
+
+        const result = yield* handlers
+          .DeletePostStatus({
+            id: doomedId,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(
+            Effect.provideService(
+              CurrentSession,
+              makeSession(fixture, "manager")
+            )
+          );
+
+        // Recording the entry must not change what the RPC answers: the
+        // delete still reports what it moved and removed.
+        expect(result).toEqual({
+          movedPostCount: 0,
+          removedRoadmapColumnCount: 0,
+          removedSyncRuleCount: 0,
+        });
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(2);
+        const byAction = new Map(rows.map((row) => [row.action, row]));
+
+        expect(byAction.get("post_status.created")).toMatchObject({
+          actorRole: "manager",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          metadata: { label: "Shipped", type: "COMPLETED" },
+          outcome: "allowed",
+          resourceId: createdId,
+          resourceType: "post_status",
+          source: "dashboard",
+        });
+        expect(byAction.get("post_status.deleted")).toMatchObject({
+          actorType: "user",
+          actorUserId: fixture.userId,
+          resourceId: doomedId,
+          resourceType: "post_status",
+        });
+      }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
   });
 });

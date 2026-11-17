@@ -24,15 +24,18 @@ import {
 } from "../helpers/widget-sso";
 
 const authDialogName = "Sign in / Sign up";
+
 const signInWithEmailButtonName = /^Sign in with email/;
 
 function organizationIdFromUrl(organizationUrl: string): string {
   const organizationId = new URL(organizationUrl).pathname
     .split("/")
     .find(Boolean);
+
   if (!organizationId) {
     throw new Error("Workspace URL did not contain an organization id");
   }
+
   return organizationId;
 }
 
@@ -44,32 +47,39 @@ function organizationIdFromUrl(organizationUrl: string): string {
  */
 async function signInOnPublicBoard(page: Page, user: TestUser) {
   const authDialog = page.getByRole("dialog", { name: authDialogName });
+
   // Subscribe-triggered dialogs are already open; navbar-triggered ones need
   // a click. Wait briefly for the former before falling back to the latter.
   const alreadyOpen = await authDialog
     .waitFor({ state: "visible", timeout: 2_000 })
     .then(() => true)
     .catch(() => false);
+
   if (!alreadyOpen) {
     await page.getByRole("button", { name: authDialogName }).click();
   }
+
   await expect(authDialog).toBeVisible();
 
   await authDialog
     .getByRole("button", { name: signInWithEmailButtonName })
     .click();
+
   const signInDialog = page.getByRole("dialog", {
     name: "Sign in with email",
   });
+
   await signInDialog.getByRole("textbox", { name: "Email" }).fill(user.email);
   await signInDialog
     .getByLabel("Password", { exact: true })
     .fill(user.password);
+
   const signInResponse = page.waitForResponse(
     (response) =>
       response.url().includes("/api/auth/sign-in/email") &&
       response.request().method() === "POST"
   );
+
   await signInDialog
     .getByRole("button", { name: "Sign in", exact: true })
     .click();
@@ -101,6 +111,7 @@ async function openNotificationsMenu(page: Page) {
   await notificationsBell(page).click();
   const menu = page.getByRole("menu");
   await expect(menu).toBeVisible();
+
   return menu;
 }
 
@@ -113,7 +124,9 @@ async function markAllNotificationsRead(page: Page) {
         "MarkAllNotificationsReadPublic"
       )
   );
+
   await page.getByRole("button", { name: "Mark all read" }).click();
+
   return response;
 }
 
@@ -123,9 +136,11 @@ async function inviteMember(
   email: string
 ) {
   await page.goto(`${organizationUrl}/settings/members`);
+
   const form = page.locator("form").filter({
     has: page.getByRole("textbox", { name: "Invite email" }),
   });
+
   await form.getByRole("textbox", { name: "Invite email" }).fill(email);
   await form.getByRole("button", { name: "Invite" }).click();
   await expect(
@@ -226,6 +241,7 @@ test.describe("changelog notifications", () => {
     const firstContext = await browser.newContext();
     const secondContext = await browser.newContext();
     const visitorContext = await browser.newContext();
+
     try {
       await signUpProgrammatically(await firstContext.newPage(), first);
       await signUpProgrammatically(await secondContext.newPage(), second);
@@ -299,14 +315,17 @@ test.describe("changelog notifications", () => {
     await signUpProgrammatically(memberPage, member);
 
     await inviteMember(page, workspace.organizationUrl, member.email);
+
     const invitationEmail = await waitForTestEmail(
       page.context().request,
       member.email
     );
+
     const accepted = await acceptInvitation(
       memberContext,
       invitationIdFromEmail(invitationEmail)
     );
+
     expect(accepted.ok()).toBeTruthy();
 
     try {
@@ -323,6 +342,7 @@ test.describe("changelog notifications", () => {
         slug: `member-notify-${randomUUID().slice(0, 8)}`,
         title: `Member publish ${randomUUID().slice(0, 8)}`,
       };
+
       await memberPage.goto(workspace.organizationUrl);
       await createChangelogDraft(
         memberPage,
@@ -403,6 +423,7 @@ test.describe("changelog notifications", () => {
         slug: `sso-notify-${randomUUID().slice(0, 8)}`,
         title: `SSO notified ${randomUUID().slice(0, 8)}`,
       };
+
       // Publishing happens from the dashboard; the owner page sits on the
       // security settings after the JWT secret setup, so go back first.
       await ownerPage.goto(workspace.organizationUrl);
@@ -504,6 +525,7 @@ test.describe("changelog notifications", () => {
           // Exit envelope per line, so the response text parses to it.
           const foreign = await request(foreignOrganizationId);
           const own = await request(ownOrganizationId);
+
           return { foreign, own };
         },
         {
@@ -516,6 +538,7 @@ test.describe("changelog notifications", () => {
       // A denied Public RPC still answers with a well-formed NDJSON reply,
       // so the HTTP status is asserted before any body inspection.
       expect(crossOrgResult.foreign.status).toBe(200);
+
       // SAFETY: the RPC endpoint answers with at least one NDJSON Exit
       // envelope per request, so the last non-empty line parses to it.
       const foreignExit = JSON.parse(
@@ -525,6 +548,7 @@ test.describe("changelog notifications", () => {
       ) as {
         exit: { _tag: string; cause?: unknown };
       };
+
       expect(foreignExit.exit._tag).toBe("Failure");
 
       // Control: the same call for the visitor's own organization succeeds.
@@ -533,6 +557,7 @@ test.describe("changelog notifications", () => {
       const ownExit = JSON.parse(crossOrgResult.own.body.trim()) as {
         exit: { _tag: string };
       };
+
       expect(ownExit.exit._tag).toBe("Success");
 
       // UI-level guard: landing on workspace B's board terminates the

@@ -143,17 +143,21 @@ describe("ChangelogPostRpcHandlers", () => {
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = SitePolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const ChangelogPolicies = ChangelogPolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -181,6 +185,7 @@ describe("ChangelogPostRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(posts).toMatchObject([
           {
             changelogId: fixture.changelogId,
@@ -230,6 +235,7 @@ describe("ChangelogPostRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(error).toMatchObject({ _tag: "PolicyDenied" });
 
           const posts = yield* handlers
@@ -237,6 +243,7 @@ describe("ChangelogPostRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(posts).toHaveLength(0);
         })
     );

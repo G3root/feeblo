@@ -93,6 +93,7 @@ const clonePrefix = "feeblo-domain-";
  */
 const cloneOwnerPid = (name: string): number | null => {
   const owner = /^feeblo-domain-(\d+)-/.exec(name);
+
   return owner === null ? null : Number(owner[1]);
 };
 
@@ -115,6 +116,7 @@ const cloneOwnerPid = (name: string): number | null => {
 const ownerHasExited = (pid: number): boolean => {
   try {
     process.kill(pid, 0);
+
     return false;
   } catch {
     return true;
@@ -148,6 +150,7 @@ const hashPath = async (path: string, hash: Hash): Promise<void> => {
     for (const entry of (await readdir(path)).sort()) {
       await hashPath(join(path, entry), hash);
     }
+
     return;
   }
 
@@ -209,6 +212,7 @@ const waitForPath = async (
     if (await pathExists(path)) {
       return true;
     }
+
     await delay(250);
   }
 
@@ -225,6 +229,7 @@ const tryClaimLock = async (lockPath: string): Promise<number | null> =>
     async (handle) => {
       const claimed = await handle.stat();
       await handle.close();
+
       return claimed.ino;
     },
     () => null
@@ -269,12 +274,14 @@ const ensureTemplate = async (templateDirectory: string): Promise<string> => {
     }
 
     const lockInode = await tryClaimLock(lockPath);
+
     if (lockInode !== null) {
       try {
         await buildTemplate(templateDirectory);
       } finally {
         await releaseLock(lockPath, lockInode);
       }
+
       return templateDirectory;
     }
 
@@ -378,6 +385,7 @@ const pruneAbandonedDatabases = async (
   await Promise.all(
     candidates.map(async ({ path, removableBefore }) => {
       const info = await stat(path).catch(() => null);
+
       if (info !== null && info.mtimeMs < removableBefore) {
         await rm(path, { force: true, recursive: true }).catch(() => undefined);
       }

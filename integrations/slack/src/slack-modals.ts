@@ -3,8 +3,11 @@ import { truncate } from "@feeblo/utils/text";
 import * as Schema from "effect/Schema";
 
 const TITLE_MAX_LENGTH = 200;
+
 const DETAILS_MAX_LENGTH = 3000;
+
 const SUCCESS_FIELD_TEXT_MAX_LENGTH = 2000;
+
 const SUCCESS_FIELDS_PER_SECTION = 10;
 
 const formatSlackMetadataLabel = (value: string): string =>
@@ -43,7 +46,9 @@ const buildSuccessMetadataBlocks = ({
       }))
       .filter(({ name, value }) => name.length > 0 && value.length > 0),
   ];
+
   const blocks: unknown[] = [];
+
   for (
     let startIndex = 0;
     startIndex < postFields.length;
@@ -59,6 +64,7 @@ const buildSuccessMetadataBlocks = ({
       type: "section",
     });
   }
+
   return blocks;
 };
 

@@ -211,10 +211,12 @@ export const emailDeliveryMessageId = (
 ) =>
   Effect.gen(function* () {
     const digest = yield* Digest.Digest;
+
     const recipientHash = yield* digest.digestHex(
       Digest.sha256,
       new TextEncoder().encode(`${outboxId}:${recipientEmail}`)
     );
+
     return `<email.${recipientHash}@${MESSAGE_ID_DOMAIN}>`;
   });
 
@@ -229,6 +231,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         input.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
         "recordIntent.decodePayload"
       );
+
       if (payload.kind !== input.kind) {
         return yield* dataError(
           "recordIntent.decodePayload",
@@ -237,6 +240,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       }
 
       const id = yield* EmailOutboxId.generate;
+
       const [inserted] = yield* db
         .insert(schema.emailOutboxTable)
         .values({
@@ -286,6 +290,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       input.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
       "upsertPendingStatusChange.decodePayload"
     );
+
     if (payload.kind !== "post.status_changed") {
       return yield* dataError(
         "upsertPendingStatusChange.decodePayload",
@@ -294,6 +299,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
 
     const id = yield* EmailOutboxId.generate;
+
     const values = {
       id,
       organizationId: input.organizationId,
@@ -306,6 +312,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       expiresAt: input.expiresAt,
       state: "pending" as const,
     };
+
     const [inserted] = yield* db
       .insert(schema.emailOutboxTable)
       .values(values)
@@ -314,6 +321,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
 
     if (inserted !== undefined) {
       yield* recordEmailIntentTransition("post.status_changed", "pending");
+
       return {
         _tag: "Written" as const,
         intent: yield* decodeEmailIntent(
@@ -326,6 +334,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
 
     const updatedAt = yield* DateTime.nowAsDate;
+
     const [coalesced] = yield* db
       .update(schema.emailOutboxTable)
       .set({ payload, updatedAt })
@@ -363,6 +372,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
 
     if (retried !== undefined) {
       yield* recordEmailIntentTransition("post.status_changed", "pending");
+
       return {
         _tag: "Written" as const,
         intent: yield* decodeEmailIntent(
@@ -454,18 +464,24 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           row.payload as Schema.Codec.Encoded<typeof EmailIntentPayload>,
           "upsertPendingSubmissionWindow.decodePayload"
         );
+
         if (payload.kind !== "submission.created") {
           return undefined;
         }
+
         const windowPostIds = submissionWindowPostIds(payload);
+
         if (windowPostIds.includes(postId)) {
           return { _tag: "Duplicate" as const };
         }
+
         const ceilingAt = DateTime.addDuration(
           DateTime.fromDateUnsafe(row.createdAt),
           submissionWindowCeiling
         );
+
         const updatedAt = yield* DateTime.nowAsDate;
+
         const rows = yield* db
           .update(schema.emailOutboxTable)
           .set({
@@ -498,6 +514,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           .returning({ id: schema.emailOutboxTable.id });
 
         const updated = rows[0];
+
         return updated === undefined
           ? undefined
           : { _tag: "Written" as const, intentId: updated.id };
@@ -519,18 +536,21 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
 
     if (pending !== undefined) {
       const appended = yield* appendToWindow(pending);
+
       if (appended !== undefined) {
         return appended;
       }
     }
 
     const outboxId = yield* EmailOutboxId.generate;
+
     const payload = {
       kind: "submission.created" as const,
       postId,
       postCount: 1,
       postIds: [postId],
     };
+
     const insertWindow = (deduplicationKey: string) =>
       db
         .insert(schema.emailOutboxTable)
@@ -558,8 +578,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       Math.floor(
         DateTime.toEpochMillis(nowInstant) / submissionWindowBucketMs
       ) * submissionWindowBucketMs;
+
     const bucketedKey = `submission.created:${organizationId}:${bucketStart}`;
     let inserted = (yield* insertWindow(bucketedKey))[0];
+
     if (inserted === undefined) {
       // The bucketed key is taken. That row is this bucket's window, or one
       // that already reached a terminal state in it — which a window cannot do
@@ -580,12 +602,15 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         )
         .limit(1)
         .for("update");
+
       if (conflicting !== undefined) {
         const appended = yield* appendToWindow(conflicting);
+
         if (appended !== undefined) {
           return appended;
         }
       }
+
       inserted = (yield* insertWindow(
         `${bucketedKey}:${DateTime.toEpochMillis(nowInstant)}`
       ))[0];
@@ -599,6 +624,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     }
 
     yield* recordEmailIntentTransition("submission.created", "pending");
+
     return { _tag: "Written" as const, intentId: inserted.id };
   });
 
@@ -638,6 +664,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     id: string
   ) {
     const row = yield* db.query.emailOutboxTable.findFirst({ where: { id } });
+
     return row
       ? yield* decodeEmailIntent(
           // SAFETY: the stored row is the encoded outbox record; the decoder
@@ -666,6 +693,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       .where(eq(schema.emailOutboxTable.id, id))
       .limit(1)
       .for("update");
+
     return row === undefined
       ? undefined
       : yield* decodeEmailIntent(
@@ -681,6 +709,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       const row = yield* db.query.emailDeliveryTable.findFirst({
         where: { id },
       });
+
       return row
         ? yield* decodeEmailDelivery(
             // SAFETY: the stored row is the encoded delivery record; the decoder
@@ -713,6 +742,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       readonly event: TEmailIntentEvent;
     }) {
       const updatedAt = yield* DateTime.nowAsDate;
+
       const rows = yield* db
         .update(schema.emailOutboxTable)
         .set({ state: intentTargetStateFor(event), updatedAt })
@@ -725,6 +755,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
           )
         )
         .returning({ id: schema.emailOutboxTable.id });
+
       return rows.length === 1;
     }
   );
@@ -734,7 +765,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       const recipientEmail = yield* normalizeRecipientEmail(
         input.recipientEmail
       );
+
       const id = yield* EmailDeliveryId.generate;
+
       const [inserted] = yield* db
         .insert(schema.emailDeliveryTable)
         .values({
@@ -810,6 +843,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
       )
       .orderBy(schema.emailDeliveryTable.createdAt)
       .limit(limit);
+
     return yield* Effect.forEach(rows, (row) =>
       decodeEmailDelivery(
         // SAFETY: the stored row is the encoded delivery record; the decoder
@@ -856,6 +890,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     "EmailOutboxRepository.recoverStaleSendingDeliveries"
   )(function* ({ before }: { readonly before: Date }) {
     const updatedAt = yield* DateTime.nowAsDate;
+
     const rows = yield* db
       .update(schema.emailDeliveryTable)
       .set({
@@ -871,8 +906,10 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
+
     yield* recordEmailDeliveryTransition("deferred", rows.length);
     yield* recordEmailReconciliationRecoveries(rows.length);
+
     return rows.map((row) => row.id);
   });
 
@@ -890,6 +927,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     readonly lastError: unknown;
   }) {
     const updatedAt = yield* DateTime.nowAsDate;
+
     const rows = yield* db
       .update(schema.emailDeliveryTable)
       .set({
@@ -916,7 +954,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
+
     yield* recordEmailDeliveryTransition("deferred", rows.length);
+
     // Zero rows means another transition owns the row now; the caller must
     // treat this attempt as stale rather than as the one that scheduled the
     // retry.
@@ -935,6 +975,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     readonly reason: string;
   }) {
     const updatedAt = yield* DateTime.nowAsDate;
+
     const rows = yield* db
       .update(schema.emailDeliveryTable)
       .set({
@@ -955,7 +996,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
+
     yield* recordEmailDeliveryTransition("deferred", rows.length);
+
     return rows.length === 1;
   });
 
@@ -986,7 +1029,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
+
     yield* recordEmailDeliveryTransition("accepted", rows.length);
+
     return rows.length === 1;
   });
 
@@ -1006,6 +1051,7 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
     readonly lastError?: unknown;
   }) {
     const updatedAt = yield* DateTime.nowAsDate;
+
     const rows = yield* db
       .update(schema.emailDeliveryTable)
       .set({
@@ -1024,7 +1070,9 @@ const makeEmailOutboxRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailDeliveryTable.id });
+
     yield* recordEmailDeliveryTransition(state, rows.length);
+
     return rows.length === 1;
   });
 

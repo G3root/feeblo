@@ -43,6 +43,7 @@ export function BoardPosts({
   const ordering = useBoardOrdering();
   const grouping = useBoardGrouping();
   const activeView = useActiveBoardView();
+
   // The store holds the pieces; the live query takes the document. Rebuilding
   // it here is what keeps the hook's input the same shape the row stores, so
   // the filters, the grouping and the ordering cannot be threaded through
@@ -56,12 +57,14 @@ export function BoardPosts({
     }),
     [activeView.filters, grouping, ordering]
   );
+
   const {
     hasError: hasGroupingError,
     members,
     postTagsByPostId,
     tags,
   } = useBoardGroupingData(organizationId, grouping.field);
+
   const { hasError, isLoading, postStatuses, posts } = useBoardPostsData({
     boardId,
     myFeedbackScope,

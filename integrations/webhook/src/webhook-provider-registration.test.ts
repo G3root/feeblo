@@ -61,6 +61,7 @@ const makeDeliveryFixture = () =>
     const routeId = yield* IntegrationRouteId.generate;
     const statusId = yield* PostStatusId.generate;
     const now = DateTime.makeUnsafe(yield* DateTime.nowAsDate);
+
     const input: IntegrationProviderDeliveryInput = {
       connection: {
         credentialGeneration: 1,
@@ -130,6 +131,7 @@ const makeDeliveryFixture = () =>
         safeMetadata: {},
       },
     };
+
     return {
       boardId,
       contactId,
@@ -161,6 +163,7 @@ describe("webhook provider registration", () => {
             }),
         },
       });
+
       const registry = yield* makeIntegrationProviderRegistry([registration]);
       expect(
         registry.getHandler({
@@ -179,12 +182,14 @@ describe("webhook provider registration", () => {
           readonly body: string;
           readonly headers: Record<string, string | string[] | undefined>;
         }) => void = () => undefined;
+
         const received = new Promise<{
           readonly body: string;
           readonly headers: Record<string, string | string[] | undefined>;
         }>((resolve) => {
           receiveRequest = resolve;
         });
+
         const endpointUrl = yield* startTestServer((request, response) => {
           const chunks: Buffer[] = [];
           request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -196,9 +201,12 @@ describe("webhook provider registration", () => {
             response.writeHead(204).end();
           });
         });
+
         const { boardId, contactId, input, now, postId, statusId } =
           yield* makeDeliveryFixture();
+
         const handler = makeRegistration(endpointUrl).handlers[0];
+
         if (handler === undefined) {
           throw new Error("Expected a webhook delivery handler");
         }
@@ -206,9 +214,11 @@ describe("webhook provider registration", () => {
         const result = yield* handler.deliver(input);
         expect(result).toEqual({ httpStatus: 204 });
         const request = yield* Effect.promise(() => received);
+
         const decodedRequest = yield* Schema.decodeEffect(
           Schema.fromJsonString(WebhookExternalPayload)
         )(request.body);
+
         expect(request.headers["content-type"]).toBe("application/json");
         expect(request.headers["x-feeblo-event"]).toBe("post.created");
         expect(decodedRequest).toEqual({
@@ -253,8 +263,10 @@ describe("webhook provider registration", () => {
       const endpointUrl = yield* startTestServer((_request, response) =>
         response.writeHead(500).end()
       );
+
       const { input } = yield* makeDeliveryFixture();
       const handler = makeRegistration(endpointUrl).handlers[0];
+
       if (handler === undefined) {
         throw new Error("Expected a webhook delivery handler");
       }
@@ -274,8 +286,10 @@ describe("webhook provider registration", () => {
         const endpointUrl = yield* startTestServer((_request, response) =>
           response.writeHead(400).end()
         );
+
         const { input } = yield* makeDeliveryFixture();
         const handler = makeRegistration(endpointUrl).handlers[0];
+
         if (handler === undefined) {
           throw new Error("Expected a webhook delivery handler");
         }
@@ -293,8 +307,10 @@ describe("webhook provider registration", () => {
       const endpointUrl = yield* startTestServer((_request, response) =>
         response.writeHead(429, { "retry-after": "120" }).end()
       );
+
       const { input } = yield* makeDeliveryFixture();
       const handler = makeRegistration(endpointUrl).handlers[0];
+
       if (handler === undefined) {
         throw new Error("Expected a webhook delivery handler");
       }

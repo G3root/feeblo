@@ -92,12 +92,15 @@ function DataTableColumnHeaderMenu<TData extends RowData, TValue>({
   function onSortDirectionChange(direction: SortDirection) {
     if (sortDirection === direction) {
       column.clearSorting();
+
       return;
     }
 
     column.table.setSorting((prev) => {
       const sort = { id: column.id, desc: direction === "desc" };
+
       if (!column.getCanMultiSort()) return [sort];
+
       return [sort, ...prev.filter((item) => item.id !== column.id)].slice(
         0,
         column.table.options.maxMultiSortColCount
@@ -158,9 +161,11 @@ function SortDirectionIcon({
   if (direction === "asc") {
     return <HugeiconsIcon icon={ArrowUp01Icon} />;
   }
+
   if (direction === "desc") {
     return <HugeiconsIcon icon={ArrowDown01Icon} />;
   }
+
   return <HugeiconsIcon icon={UnfoldMoreIcon} />;
 }
 
@@ -169,6 +174,8 @@ function getSortDirection(
   columnId: string
 ): SortDirection | "none" {
   const sort = sorting.find((item) => item.id === columnId);
+
   if (!sort) return "none";
+
   return sort.desc ? "desc" : "asc";
 }

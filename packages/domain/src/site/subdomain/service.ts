@@ -52,9 +52,11 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
   {
     make: Effect.gen(function* () {
       const { extraWords } = yield* ProfanityConfig;
+
       const reservedSubdomainsEnv = yield* Config.String(
         "RESERVED_SUBDOMAINS"
       ).pipe(Config.withDefault(""));
+
       const reservedSubdomains = getReservedSubdomains(reservedSubdomainsEnv);
 
       const extraTokenSet = new Set(extraWords);
@@ -88,6 +90,7 @@ export class SubdomainValidationService extends Context.Service<SubdomainValidat
           matches.push(normalized);
         } else {
           const tokens = normalized.split(TOKEN_REGEX).filter(Boolean);
+
           for (const token of tokens) {
             if (leo.check(token) || extraTokenSet.has(token)) {
               matches.push(token);

@@ -134,6 +134,7 @@ function EditRoadmapFormFields({
     onSubmit: async ({ value }) => {
       const oldSlug = roadmap.slug;
       const newSlugifiedValue = slugify(value.name);
+
       try {
         const tx = dashboardCollections.roadmapCollection.update(
           roadmapId,
@@ -159,6 +160,7 @@ function EditRoadmapFormFields({
         const persistedById = new Map(
           columns.map((column) => [column.id, column])
         );
+
         const nextIds = new Set(value.columns.map((column) => column.id));
 
         const mutations: Promise<unknown>[] = [];

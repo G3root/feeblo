@@ -82,7 +82,7 @@ export function createWidgetDraft(theme: WidgetTheme): WidgetDraft {
 export function enabledWidgetModules(
   entries: readonly WidgetModuleEntry[]
 ): WidgetModule[] {
-  return entries.filter((entry) => entry.enabled).map((entry) => entry.id);
+  return entries.flatMap((entry) => (entry.enabled ? [entry.id] : []));
 }
 
 /**
@@ -95,15 +95,18 @@ export function toggleWidgetModule(
   module: WidgetModule
 ): WidgetDraft {
   const enabledCount = draft.modules.filter((entry) => entry.enabled).length;
+
   return {
     ...draft,
     modules: draft.modules.map((entry) => {
       if (entry.id !== module) {
         return entry;
       }
+
       if (entry.enabled && enabledCount === 1) {
         return entry;
       }
+
       return { ...entry, enabled: !entry.enabled };
     }),
   };
@@ -115,6 +118,7 @@ export function moveWidgetModule(
   to: number
 ): WidgetModuleEntry[] {
   const next = [...entries];
+
   if (
     from === to ||
     from < 0 ||
@@ -124,25 +128,32 @@ export function moveWidgetModule(
   ) {
     return next;
   }
+
   const [entry] = next.splice(from, 1);
+
   if (entry === undefined) {
     return next;
   }
+
   next.splice(to, 0, entry);
+
   return next;
 }
 
 /** Map the enabled modules onto the iframe's `mode` plus `modules`. */
 export function widgetEmbedConfig(draft: WidgetDraft): WidgetEmbedConfig {
   const modules = enabledWidgetModules(draft.modules);
+
   const config: WidgetEmbedConfig = {
     mode: modules.length > 1 ? "hub" : (modules[0] ?? "feedback"),
     modules,
     theme: draft.theme,
   };
+
   if (draft.launcher !== "none") {
     config.placement = draft.launcher;
   }
+
   return config;
 }
 
@@ -151,12 +162,15 @@ export function describeWidgetModules(
   modules: readonly WidgetModule[]
 ): string {
   const labels = modules.map((module) => WIDGET_MODULE_LABELS[module]);
+
   if (labels.length === 0) {
     return "No modules";
   }
+
   if (labels.length === 1) {
     return `${labels[0]} only`;
   }
+
   return `${labels.join(" and ")}, with ${labels[0]} first`;
 }
 
@@ -229,6 +243,7 @@ export function buildScriptSnippet(
     `  data-feeblo-organization-id="${target.organizationId}"`,
     `  data-feeblo-base-url="${stripTrailingSlash(target.baseUrl)}"`,
   ];
+
   if (config.mode === "hub") {
     attributes.push(
       `  data-feeblo-mode="hub"`,
@@ -237,10 +252,13 @@ export function buildScriptSnippet(
   } else {
     attributes.push(`  data-feeblo-mode="${config.mode}"`);
   }
+
   if (config.placement !== undefined) {
     attributes.push(`  data-feeblo-placement="${config.placement}"`);
   }
+
   attributes.push(`  data-feeblo-theme="${config.theme}"`);
+
   return `<script\n${attributes.join("\n")}\n></script>`;
 }
 
@@ -254,15 +272,19 @@ function buildReactProviderProps(
     `baseUrl="${stripTrailingSlash(target.baseUrl)}"`,
     `mode="${config.mode}"`,
   ];
+
   if (config.mode === "hub") {
     props.push(
       `modules={[${config.modules.map((module) => `"${module}"`).join(", ")}]}`
     );
   }
+
   if (config.placement !== undefined) {
     props.push(`placement="${config.placement}"`);
   }
+
   props.push(`theme="${config.theme}"`);
+
   return props;
 }
 
@@ -306,6 +328,7 @@ export function buildIdentitySnippet(
       "</FeebloProvider>",
     ].join("\n");
   }
+
   return [
     "<!-- Runs after the SDK script has loaded. -->",
     "<script>",
@@ -367,10 +390,12 @@ export function buildAgentPrompt(
 ): string {
   const baseUrl = stripTrailingSlash(target.baseUrl);
   const securityUrl = `${baseUrl}/${target.organizationId}/settings/security`;
+
   const launcher =
     config.placement === "bottom-left"
       ? "bottom-left corner"
       : "bottom-right corner";
+
   const verification = [
     config.placement === undefined
       ? "- Opening the widget from your own trigger shows the widget."
@@ -378,6 +403,7 @@ export function buildAgentPrompt(
     `- ${describeWidgetModules(config.modules)}.`,
     "- No console errors.",
   ];
+
   if (config.modules.length > 1) {
     verification.splice(
       2,

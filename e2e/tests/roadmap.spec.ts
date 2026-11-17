@@ -9,7 +9,9 @@ import { createTestUser } from "../helpers/test-users";
 import { publicBoardUrl } from "../helpers/urls";
 
 const roadmapUrlPattern = /\/roadmap$/;
+
 const publicPostUrlPattern = /\/p\//;
+
 const roadmapSwitcherUrlPattern = /\/roadmap\/q3-focus$/;
 
 // Lane columns have no accessible role, so scope this implementation-level
@@ -36,6 +38,7 @@ test.describe("roadmap", () => {
         page,
         createTestUser()
       );
+
       const title = `Roadmap post ${randomUUID().slice(0, 8)}`;
       await createPost(page, title, "This post should start in Planned.");
 
@@ -47,11 +50,13 @@ test.describe("roadmap", () => {
       await expect(
         page.getByRole("heading", { name: "Roadmap", exact: true })
       ).toBeVisible();
+
       for (const laneName of ["Planned", "In progress", "Completed"]) {
         await expect(
           page.getByRole("heading", { name: laneName, exact: true })
         ).toBeVisible();
       }
+
       await expect(
         roadmapLane(page, "Planned").getByText("No issues in this stage.")
       ).toBeVisible();

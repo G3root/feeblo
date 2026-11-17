@@ -29,6 +29,7 @@ import { makeDiscordProviderRegistration } from "./discord-provider-registration
 // inline so no fixture secret is needed.
 const { publicKeyHex, privateKeyHex } = (() => {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+
   return {
     publicKeyHex: publicKey
       .export({ format: "der", type: "spki" })
@@ -53,6 +54,7 @@ const signBody = (timestamp: string, rawBody: string) =>
 
 const signedHeaders = (rawBody: string) => {
   const timestamp = String(Math.floor(Date.now() / 1000));
+
   return {
     headers: {
       "x-signature-ed25519": signBody(timestamp, rawBody),
@@ -144,10 +146,12 @@ const makePostMessageSpy = () => {
         readonly embeds: readonly unknown[];
       }
     | undefined;
+
   const apiClient: DiscordApiClient = {
     applicationsMe: () => Effect.succeed({ id: "app_1", name: "Feeblo" }),
     channelsMessagesCreate: ({ channelId, embeds }) => {
       lastCall = { channelId, embeds };
+
       return Effect.succeed({
         channel_id: channelId,
         content: "",
@@ -167,6 +171,7 @@ const makePostMessageSpy = () => {
       }),
     oauth2TokenRevoke: () => Effect.void,
   };
+
   return { apiClient, getLastCall: () => lastCall };
 };
 
@@ -174,15 +179,19 @@ describe("discord provider registration", () => {
   it.effect("posts a channel-update embed for post.created deliveries", () =>
     Effect.gen(function* () {
       const spy = makePostMessageSpy();
+
       const registration = makeDiscordProviderRegistration({
         apiClient: spy.apiClient,
         credentialResolver,
         publicKey: publicKeyHex,
       });
+
       const handler = registration.handlers.find(
         (candidate) => candidate.capabilityKey === "channel.notifications"
       );
+
       expect(handler).toBeDefined();
+
       if (handler === undefined) {
         return;
       }
@@ -192,12 +201,14 @@ describe("discord provider registration", () => {
 
       const call = spy.getLastCall();
       expect(call?.channelId).toBe("123456789012345678");
+
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const embed = call?.embeds[0] as {
         description: string;
         title: string;
         url: string;
       };
+
       expect(embed.title).toBe("Dark mode please");
       expect(embed.description).toContain("**Customer Tier:** Enterprise");
       expect(embed.url).toBe("https://feeblo.example/org/post/ideas/dark-mode");
@@ -207,16 +218,20 @@ describe("discord provider registration", () => {
   it.effect("rejects unsupported event types as invalid configuration", () =>
     Effect.gen(function* () {
       const spy = makePostMessageSpy();
+
       const registration = makeDiscordProviderRegistration({
         apiClient: spy.apiClient,
         credentialResolver,
         publicKey: publicKeyHex,
       });
+
       const handler = registration.handlers[0];
       expect(handler).toBeDefined();
+
       if (handler === undefined) {
         return;
       }
+
       const failure = yield* Effect.flip(
         handler.deliver(
           deliveryInput({
@@ -228,6 +243,7 @@ describe("discord provider registration", () => {
           })
         )
       );
+
       expect(failure._tag).toBe("IntegrationProviderInvalidConfigurationError");
     })
   );
@@ -235,6 +251,7 @@ describe("discord provider registration", () => {
   it.effect("classifies a missing bot token as invalid configuration", () =>
     Effect.gen(function* () {
       const spy = makePostMessageSpy();
+
       const registration = makeDiscordProviderRegistration({
         apiClient: spy.apiClient,
         credentialResolver: {
@@ -248,11 +265,14 @@ describe("discord provider registration", () => {
         },
         publicKey: publicKeyHex,
       });
+
       const handler = registration.handlers[0];
       expect(handler).toBeDefined();
+
       if (handler === undefined) {
         return;
       }
+
       const failure = yield* Effect.flip(handler.deliver(deliveryInput()));
       expect(failure._tag).toBe("IntegrationProviderInvalidConfigurationError");
     })
@@ -264,9 +284,11 @@ describe("discord provider registration", () => {
         credentialResolver,
         publicKey: publicKeyHex,
       });
+
       const interactions = registration.inboundHandlers.find(
         (candidate) => candidate.capabilityKey === "interactions"
       );
+
       expect(interactions).toBeDefined();
 
       const rawBody = JSON.stringify({
@@ -288,12 +310,15 @@ describe("discord provider registration", () => {
       const response = yield* (
         interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
       );
+
       expect(response.status).toBe(200);
+
       // SAFETY: The endpoint/API contract guarantees this response shape.
       const parsed = response.body as {
         kind: string;
         payload: { data: { name: string } };
       };
+
       expect(parsed.kind).toBe("application_command");
       expect(parsed.payload.data.name).toBe("feeblo");
     })
@@ -305,13 +330,17 @@ describe("discord provider registration", () => {
         credentialResolver,
         publicKey: publicKeyHex,
       });
+
       const interactions = registration.inboundHandlers.find(
         (candidate) => candidate.capabilityKey === "interactions"
       );
+
       const rawBody = JSON.stringify({ id: "ping_1", type: 1 });
+
       const response = yield* (
         interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
       );
+
       // SAFETY: The endpoint/API contract guarantees this response shape.
       expect(response.status).toBe(200);
       // SAFETY: The endpoint/API contract guarantees this response shape.
@@ -326,9 +355,11 @@ describe("discord provider registration", () => {
         credentialResolver,
         publicKey: publicKeyHex,
       });
+
       const interactions = registration.inboundHandlers.find(
         (candidate) => candidate.capabilityKey === "interactions"
       );
+
       const rawBody = JSON.stringify({
         id: "interaction_2",
         application_id: "app_1",
@@ -355,10 +386,12 @@ describe("discord provider registration", () => {
         member: { user: { id: "user_1", username: "alice" } },
         token: "token_2",
       });
+
       const response = yield* (
         interactions?.handle(signedHeaders(rawBody)) ?? Effect.never
         // SAFETY: The endpoint/API contract guarantees this response shape.
       );
+
       // SAFETY: The endpoint/API contract guarantees this response shape.
       expect(response.status).toBe(200);
       // SAFETY: The endpoint/API contract guarantees this response shape.
@@ -373,15 +406,18 @@ describe("discord provider registration", () => {
         credentialResolver,
         publicKey: publicKeyHex,
       });
+
       const interactions = registration.inboundHandlers.find(
         (candidate) => candidate.capabilityKey === "interactions"
       );
+
       const response = yield* (
         interactions?.handle({
           headers: {},
           rawBody: JSON.stringify({ type: 1 }),
         }) ?? Effect.never
       );
+
       expect(response.status).toBe(401);
     })
   );
@@ -392,12 +428,15 @@ describe("discord provider registration", () => {
         credentialResolver,
         publicKey: publicKeyHex,
       });
+
       const interactions = registration.inboundHandlers.find(
         (candidate) => candidate.capabilityKey === "interactions"
       );
+
       const response = yield* (
         interactions?.handle(signedHeaders("not-json")) ?? Effect.never
       );
+
       expect(response.status).toBe(400);
     })
   );

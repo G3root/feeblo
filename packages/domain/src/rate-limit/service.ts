@@ -45,6 +45,7 @@ export class RateLimitService extends Context.Service<RateLimitService>()(
           3
         )
       );
+
       const consumePasswordResetOtp = Effect.fn(
         "RateLimitService.consumePasswordResetOtp"
       )((email: string) =>
@@ -54,6 +55,7 @@ export class RateLimitService extends Context.Service<RateLimitService>()(
           3
         )
       );
+
       const consumeSignInOtp = Effect.fn("RateLimitService.consumeSignInOtp")(
         (email: string) =>
           consumeOtp(

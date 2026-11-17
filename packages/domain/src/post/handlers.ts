@@ -426,11 +426,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           slug: args.slug,
         });
+
         if (post === undefined) {
           return yield* new PostNotFoundError({
             message: "Post not found",
           });
         }
+
         return post;
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -448,11 +450,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               organizationId: args.organizationId,
               slug: args.slug,
             });
+
             if (post === undefined) {
               return yield* new PostNotFoundError({
                 message: "Post not found",
               });
             }
+
             return post;
           }),
         redact: redactCreatorIdentity,
@@ -471,6 +475,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           slug: args.slug,
         });
+
         return target?.slug ?? null;
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
@@ -494,10 +499,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     ListPostDeleteEligibility: (args: TPostDeleteEligibilityList) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+
         const rows = yield* repository.findDeletableIds({
           organizationId: args.organizationId,
           userId: session.session.userId,
         });
+
         return { eligibleIds: rows.map((row) => row.id) };
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -508,13 +515,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       (args) =>
         Effect.gen(function* () {
           const viewer = yield* currentPublicViewer;
+
           if (viewer.userId === undefined) {
             return { eligibleIds: [] };
           }
+
           const rows = yield* repository.findDeletableIds({
             organizationId: args.organizationId,
             userId: viewer.userId,
           });
+
           return { eligibleIds: rows.map((row) => row.id) };
         })
     ),
@@ -593,13 +603,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         yield* transaction(
           Effect.gen(function* () {
             const previous = yield* requireNotMergedActivityState(args);
+
             const actor = {
               actorId: session.session.userId,
               actorMemberId: membership?.membershipId ?? null,
               organizationId: args.organizationId,
               postId: args.id,
             };
+
             const activities: PostActivityInput[] = [];
+
             // The activity is emitted on a real move, which is a question for
             // the engagement and presence graphs rather than for the two
             // timestamp columns: `adminUpdate` is an idempotent set, so asking
@@ -614,6 +627,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 kind: args.locked ? "POST_LOCKED" : "POST_UNLOCKED",
               });
             }
+
             if (
               args.archived !== undefined &&
               isArchivedPostPresence(presenceOf(previous)) !== args.archived
@@ -623,6 +637,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 kind: args.archived ? "POST_ARCHIVED" : "POST_UNARCHIVED",
               });
             }
+
             yield* repository.adminUpdate(args);
             yield* activityRepository.createMany(activities);
           })
@@ -678,7 +693,9 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             message: "Source and target posts must be different",
           });
         }
+
         const session = yield* CurrentSession;
+
         // The move, the two timeline entries, the notification, and the email
         // intent are the shared write path (`post/write.ts`), so a merge
         // performed from the dashboard and one performed with an API key

@@ -51,18 +51,21 @@ export const Route = createFileRoute(
   component: BillingSettingsPage,
   beforeLoad: async ({ params }) => {
     const session = await getAuthSession();
+
     if (
       session !== null &&
       hasPermission(params.organizationId, "billing.update")(session)
     ) {
       await dashboardCollections.workspacePlanCollection.preload();
     }
+
     return null;
   },
 });
 
 function BillingSettingsPage() {
   const organizationId = useOrganizationId();
+
   const { allowed: canManageBilling, isPending } = usePolicy(
     hasPermission(organizationId, "billing.update")
   );
@@ -70,6 +73,7 @@ function BillingSettingsPage() {
   if (isPending) {
     return null;
   }
+
   if (!canManageBilling) {
     return <SettingsAccessDenied />;
   }
@@ -83,8 +87,10 @@ function BillingSettingsContent({
   organizationId: string;
 }) {
   const search = Route.useSearch();
+
   const [selectedInterval, setSelectedInterval] =
     useState<BillingInterval>("year");
+
   const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);
 
   const catalog = usePlanCatalog();
@@ -191,15 +197,16 @@ function BillingSettingsContent({
                   {plans.map((plan) => {
                     const selectedProduct = plan[selectedInterval];
                     const isCurrentPlan = plan.planType === currentPlanType;
-                    const ctaLabel = hasPaidPlan
-                      ? "Manage billing"
-                      : isCurrentPlan
-                        ? "Current plan"
-                        : plan.planType === "free"
-                          ? "Unavailable"
-                          : selectedProduct
-                            ? "Upgrade"
-                            : "Unavailable";
+
+                    let ctaLabel = "Unavailable";
+
+                    if (hasPaidPlan) {
+                      ctaLabel = "Manage billing";
+                    } else if (isCurrentPlan) {
+                      ctaLabel = "Current plan";
+                    } else if (plan.planType !== "free" && selectedProduct) {
+                      ctaLabel = "Upgrade";
+                    }
 
                     return (
                       <Card key={plan.planType} size="sm">
@@ -256,6 +263,7 @@ function BillingSettingsContent({
                             onClick={async () => {
                               if (hasPaidPlan) {
                                 setLoadingPlanType(plan.planType);
+
                                 const didStart = await startBillingPortal({
                                   organizationId,
                                 });
@@ -263,6 +271,7 @@ function BillingSettingsContent({
                                 if (!didStart) {
                                   setLoadingPlanType(null);
                                 }
+
                                 return;
                               }
 
@@ -274,6 +283,7 @@ function BillingSettingsContent({
                               }
 
                               setLoadingPlanType(plan.planType);
+
                               const didStart = await startBillingCheckout({
                                 organizationId,
                                 productId: selectedProduct.productId,

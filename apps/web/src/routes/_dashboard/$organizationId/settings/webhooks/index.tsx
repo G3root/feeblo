@@ -15,6 +15,7 @@ export const Route = createFileRoute(
 
 function WebhooksSettingsRoute() {
   const organizationId = useOrganizationId();
+
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "webhooks.manage")
   );
@@ -22,6 +23,7 @@ function WebhooksSettingsRoute() {
   if (isPending) {
     return null;
   }
+
   if (!allowed) {
     return <SettingsAccessDenied />;
   }

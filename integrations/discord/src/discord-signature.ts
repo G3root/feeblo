@@ -49,7 +49,9 @@ export const verifyDiscordRequestSignature = ({
           })
         );
       }
+
       let key: ReturnType<typeof createPublicKey>;
+
       try {
         key = createPublicKey({
           key: Buffer.concat([
@@ -66,12 +68,14 @@ export const verifyDiscordRequestSignature = ({
           })
         );
       }
+
       const valid = verify(
         null,
         Buffer.from(`${timestampHeader}${rawBody}`),
         key,
         Buffer.from(signatureHeader, "hex")
       );
+
       if (!valid) {
         return Effect.fail(
           new IntegrationRequestSignatureError({
@@ -79,6 +83,7 @@ export const verifyDiscordRequestSignature = ({
           })
         );
       }
+
       return Effect.void;
     },
   });

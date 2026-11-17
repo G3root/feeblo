@@ -10,9 +10,12 @@ import {
   NodeServices,
 } from "@effect/platform-node";
 import { Database } from "@feeblo/db";
+import { AuditLogRepository } from "@feeblo/domain/audit-log/repository";
+import { auditLogRetention } from "@feeblo/domain/audit-log/retention";
 import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
@@ -75,6 +78,7 @@ export const makeServerApp = Effect.gen(function* () {
   const config = yield* ServerConfig;
 
   const mailbox = config.e2eTestMailer ? yield* TestMailer.make : undefined;
+
   const makeMailerLayer = (): Layer.Layer<
     Mailer,
     Layer.Error<typeof Mailer.layer>
@@ -82,6 +86,7 @@ export const makeServerApp = Effect.gen(function* () {
 
   const WorkFlowLayer = makeWorkflowLayer(mailbox, makeMailerLayer);
   const RateLimitLayer = makeRateLimitLayer(config);
+
   const AuthLayer = makeAuthLayer(
     config.apiUrl,
     makeMailerLayer,
@@ -94,6 +99,7 @@ export const makeServerApp = Effect.gen(function* () {
   const externalResourceContext = yield* Layer.build(
     ExternalResourceServiceLive
   );
+
   const externalResources = Context.get(
     externalResourceContext,
     ExternalResourceService
@@ -117,10 +123,12 @@ export const makeServerApp = Effect.gen(function* () {
   );
 
   const GitHubConfigLayer = makeGitHubConfigLayer(config);
+
   const SlackConfigLayer = Layer.succeed(
     SlackIntegrationConfig,
     makeSlackIntegrationConfig(config)
   );
+
   const DiscordConfigLayer = Layer.succeed(
     DiscordIntegrationConfig,
     makeDiscordIntegrationConfig(config)
@@ -142,6 +150,7 @@ export const makeServerApp = Effect.gen(function* () {
     mailbox,
     nodeEnv: config.nodeEnv,
   });
+
   const MergedRoutes = makeMergedRoutes({
     appUrl: config.appUrl,
     browserTelemetry: makeBrowserTelemetryRouter({
@@ -151,6 +160,7 @@ export const makeServerApp = Effect.gen(function* () {
     integrationRuntime,
     publicRouters: PublicRouters,
   });
+
   const AllRoutes = withGlobalMiddleware(MergedRoutes, config);
 
   return {
@@ -209,6 +219,7 @@ export const program = Effect.gen(function* () {
       PolarService.layer
     )
   );
+
   yield* subscriptionRevocationMaintenance.pipe(
     Effect.provide(billingRuntime),
     Effect.forkScoped
@@ -223,6 +234,21 @@ export const program = Effect.gen(function* () {
     Effect.forkScoped
   );
 
+  // The audit log owns the one writer allowed to delete from an append-only
+  // table; the sweep says so on its own transaction. It is not scheduled while
+  // the feature is off, though: the recorder writes nothing then, so the table
+  // is empty and a daily pass would only wake the worker to delete nothing.
+  // The flag is the same constant the recorder's `AuditLogEnabled` defaults to,
+  // and the sweep resumes with it — entries written before it was turned off
+  // are swept once it is back on.
+  if (isFeatureEnabled("AUDIT_LOG")) {
+    const auditLogRuntime = yield* Layer.build(AuditLogRepository.layer);
+    yield* auditLogRetention.pipe(
+      Effect.provide(auditLogRuntime),
+      Effect.forkScoped
+    );
+  }
+
   return yield* Layer.launch(server);
 });
 
@@ -231,6 +257,7 @@ export const program = Effect.gen(function* () {
 const ObservabilityLayer = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig;
+
     return makeObservabilityLayer(config);
   })
 ).pipe(Layer.provideMerge(ServerConfig.layer));

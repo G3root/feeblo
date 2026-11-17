@@ -37,6 +37,7 @@ export function WebhookEventSelection({
     >
       {webhookEventTypes.map((eventType) => {
         const id = `${idPrefix}-${eventType}`;
+
         return (
           <div className="flex items-center gap-2" key={eventType}>
             <Checkbox id={id} value={eventType} />

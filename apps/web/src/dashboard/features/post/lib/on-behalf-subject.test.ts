@@ -7,6 +7,7 @@ import {
 } from "./on-behalf-subject";
 
 const NO_CONTACTS = new Map<string, OnBehalfContact>();
+
 const NO_MEMBERS = new Map<string, OnBehalfMember>();
 
 const contact = (id: string, name: string | null, email: string | null) =>

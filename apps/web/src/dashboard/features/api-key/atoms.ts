@@ -29,4 +29,5 @@ export const apiKeysAtom = Atom.family((organizationId: string) =>
 export type ApiKey = Atom.Success<ReturnType<typeof apiKeysAtom>>[number];
 
 export const createApiKeyAtom = DashboardClient.mutation("CreateApiKey");
+
 export const revokeApiKeyAtom = DashboardClient.mutation("RevokeApiKey");

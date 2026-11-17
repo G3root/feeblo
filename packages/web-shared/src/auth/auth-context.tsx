@@ -99,6 +99,7 @@ function AuthProviderClient({
   readonly transitionPending: boolean;
 }) {
   const resolved = useResolvedAuth();
+
   // Read once per mount: the cookie only changes through the atom itself, so
   // a re-render can never observe a fresher hint than the in-flight request.
   //
@@ -111,6 +112,7 @@ function AuthProviderClient({
   const [initialHint, setInitialHint] = useState<AuthUser | null>(() =>
     hydrationSafe ? null : readAuthHintFromCookie()
   );
+
   // The atom can resolve before hydration (a route loader may have awaited it),
   // so the first client render would otherwise see `unauthenticated` while the
   // server rendered `loading`. Hold the server's state until hydration commits,

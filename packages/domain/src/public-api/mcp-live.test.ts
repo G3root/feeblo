@@ -62,15 +62,19 @@ const executeMcp = (options: {
       accept: MCP_ACCEPT,
       "content-type": "application/json",
     });
+
     if (options.apiKey !== undefined) {
       headers.set("x-api-key", options.apiKey);
     }
+
     if (options.authorization !== undefined) {
       headers.set("authorization", options.authorization);
     }
+
     if (options.protocolVersion !== undefined) {
       headers.set("mcp-protocol-version", options.protocolVersion);
     }
+
     if (options.sessionId !== undefined) {
       headers.set("mcp-session-id", options.sessionId);
     }
@@ -82,6 +86,7 @@ const executeMcp = (options: {
         method: "POST",
       })
     );
+
     const handled =
       yield* Deferred.make<HttpServerResponse.HttpServerResponse>();
 
@@ -117,6 +122,7 @@ const decodeJson = Schema.decodeUnknownSync(
 const mcpMessage = (response: HttpServerResponse.HttpServerResponse) =>
   Effect.promise(async () => {
     const text = await HttpServerResponse.toWeb(response).text();
+
     const events = text
       .split("\n")
       .filter((line) => line.startsWith("data: "))
@@ -167,10 +173,13 @@ const openMcpSession = (apiKey: string, path = "/mcp") =>
       body: MCP_INITIALIZE,
       path,
     });
+
     const sessionId = initialized.headers["mcp-session-id"];
+
     if (sessionId === undefined) {
       return yield* Effect.die("the MCP handshake did not open a session");
     }
+
     return sessionId;
   });
 
@@ -195,14 +204,17 @@ const callTool = (
       protocolVersion: MCP_PROTOCOL_VERSION,
       sessionId,
     });
+
     expect(response.status).toBe(200);
 
     const message = decodeMcpMessage(yield* mcpMessage(response));
+
     if (message.result === undefined) {
       return yield* Effect.die(
         `the tool call did not return a result: ${JSON.stringify(message.error)}`
       );
     }
+
     return decodeCallToolResult(message.result);
   });
 
@@ -213,10 +225,13 @@ const openOAuthSession = (authorization: string) =>
       authorization,
       body: MCP_INITIALIZE,
     });
+
     const sessionId = initialized.headers["mcp-session-id"];
+
     if (sessionId === undefined) {
       return yield* Effect.die("the MCP handshake did not open a session");
     }
+
     return sessionId;
   });
 
@@ -239,14 +254,17 @@ const callOAuthTool = (
       protocolVersion: MCP_PROTOCOL_VERSION,
       sessionId,
     });
+
     expect(response.status).toBe(200);
 
     const message = decodeMcpMessage(yield* mcpMessage(response));
+
     if (message.result === undefined) {
       return yield* Effect.die(
         `the tool call did not return a result: ${JSON.stringify(message.error)}`
       );
     }
+
     return decodeCallToolResult(message.result);
   });
 
@@ -267,16 +285,19 @@ layer(
           apiKey: "fbk_mcp_list",
           body: MCP_INITIALIZE,
         });
+
         expect(initialized.status).toBe(200);
         expect(initialized.headers["mcp-session-id"]).toBeDefined();
 
         const sessionId = yield* openMcpSession("fbk_mcp_list");
+
         const listed = yield* executeMcp({
           apiKey: "fbk_mcp_list",
           body: { id: 2, jsonrpc: "2.0", method: "tools/list", params: {} },
           protocolVersion: MCP_PROTOCOL_VERSION,
           sessionId,
         });
+
         expect(listed.status).toBe(200);
 
         const message = decodeMcpMessage(yield* mcpMessage(listed));
@@ -291,6 +312,7 @@ layer(
         const listTagsOperation = PublicApiOperations.find(
           (operation) => operation.name === "listTags"
         );
+
         const listTags = tools.tools.find((tool) => tool.name === "listTags");
         expect(listTags?.description).toBe(listTagsOperation?.description);
         expect(listTags?.annotations?.readOnlyHint).toBe(
@@ -319,6 +341,7 @@ layer(
       const page = yield* Schema.decodeUnknownEffect(PublicApiTagPage)(
         result.structuredContent
       );
+
       expect(page.data.map((tag) => tag.name)).toEqual(["Bug"]);
     })
   );
@@ -347,10 +370,13 @@ layer(
           tagIds: ["tag_mcp_write"],
         }
       );
+
       expect(assigned.isError).toBe(false);
+
       const tags = yield* Schema.decodeUnknownEffect(PublicApiPostTags)(
         assigned.structuredContent
       );
+
       expect(tags.data).toEqual([{ id: "tag_mcp_write", name: "Roadmap" }]);
 
       // A delete declares `Schema.Void`; the toolkit answers with no content
@@ -358,15 +384,18 @@ layer(
       const deleted = yield* callTool(sessionId, "fbk_mcp_write", "deleteTag", {
         tagId: "tag_mcp_write",
       });
+
       expect(deleted.isError).toBe(false);
       expect(deleted.content).toEqual([]);
 
       // The write landed: the same side effect the endpoint produces.
       const db = yield* currentDb;
+
       const remaining = yield* db
         .select()
         .from(schema.tagTable)
         .where(eq(schema.tagTable.id, "tag_mcp_write"));
+
       expect(remaining).toHaveLength(0);
     })
   );
@@ -379,12 +408,14 @@ layer(
       });
 
       const sessionId = yield* openMcpSession("fbk_mcp_scope");
+
       const result = yield* callTool(
         sessionId,
         "fbk_mcp_scope",
         "listTags",
         {}
       );
+
       expect(result.isError).toBe(true);
 
       // The scope is a per-call failure, not a timeout or a protocol error: the
@@ -392,9 +423,11 @@ layer(
       // failure as the tool result's text, which is what a client shows its
       // model so it can pick a key that holds the scope.
       const [content] = result.content;
+
       if (content?.type !== "text") {
         return yield* Effect.die("the refusal carried no text content");
       }
+
       expect(content.text).toContain("tags.read");
     })
   );
@@ -405,6 +438,7 @@ layer(
       registerKey("fbk_mcp_invalid", workspace.organizationId);
 
       const sessionId = yield* openMcpSession("fbk_mcp_invalid");
+
       const response = yield* executeMcp({
         apiKey: "fbk_mcp_invalid",
         body: {
@@ -416,6 +450,7 @@ layer(
         protocolVersion: MCP_PROTOCOL_VERSION,
         sessionId,
       });
+
       expect(response.status).toBe(200);
 
       // A parameter the tool's schema refuses is a protocol error, not an
@@ -437,6 +472,7 @@ layer(
       );
 
       const sessionId = yield* openMcpSession("fbk_mcp_title");
+
       const response = yield* executeMcp({
         apiKey: "fbk_mcp_title",
         body: {
@@ -456,6 +492,7 @@ layer(
         protocolVersion: MCP_PROTOCOL_VERSION,
         sessionId,
       });
+
       expect(response.status).toBe(200);
 
       // The title's bound is the operation input's, not the HTTP payload's:
@@ -473,12 +510,14 @@ layer(
       registerKey("fbk_mcp_statuses", workspace.organizationId);
 
       const sessionId = yield* openMcpSession("fbk_mcp_statuses");
+
       const result = yield* callTool(
         sessionId,
         "fbk_mcp_statuses",
         "listStatuses",
         {}
       );
+
       expect(result.isError).toBe(false);
 
       // The empty input is an object schema rather than an empty struct: the
@@ -487,6 +526,7 @@ layer(
       const statuses = yield* Schema.decodeUnknownEffect(PublicApiStatusList)(
         result.structuredContent
       );
+
       expect(statuses.data.map((status) => status.id)).toEqual([
         workspace.statusId,
       ]);
@@ -500,18 +540,22 @@ layer(
       registerKey("fbk_mcp_date", workspace.organizationId);
 
       const sessionId = yield* openMcpSession("fbk_mcp_date");
+
       const result = yield* callTool(sessionId, "fbk_mcp_date", "listPosts", {
         updatedAfter: "2026-02-30",
       });
+
       expect(result.isError).toBe(true);
 
       // The operation validates the instant, not the HTTP projection, so the
       // tool refuses what the query parameter refuses: a date that does not
       // exist cannot be rolled into March on one surface and not the other.
       const [content] = result.content;
+
       if (content?.type !== "text") {
         return yield* Effect.die("the refusal carried no text content");
       }
+
       expect(content.text).toContain("ISO 8601");
     })
   );
@@ -541,16 +585,20 @@ layer(
       const authorization = mcpBearer("mcp_token_read");
 
       const sessionId = yield* openOAuthSession(authorization);
+
       const listed = yield* executeMcp({
         authorization,
         body: { id: 2, jsonrpc: "2.0", method: "tools/list", params: {} },
         protocolVersion: MCP_PROTOCOL_VERSION,
         sessionId,
       });
+
       expect(listed.status).toBe(200);
+
       const tools = decodeToolList(
         decodeMcpMessage(yield* mcpMessage(listed)).result
       );
+
       expect(tools.tools.length).toBeGreaterThan(0);
     })
   );
@@ -568,12 +616,14 @@ layer(
       const authorization = mcpBearer("mcp_token_identity");
 
       const sessionId = yield* openOAuthSession(authorization);
+
       const result = yield* callOAuthTool(
         sessionId,
         authorization,
         "listTags",
         {}
       );
+
       expect(result.isError).toBe(true);
       expect(JSON.stringify(result.content)).toContain("tags.read");
     })
@@ -585,6 +635,7 @@ layer(
         authorization: mcpBearer("mcp_token_unknown"),
         body: MCP_INITIALIZE,
       });
+
       expect(response.status).toBe(401);
       // The refusal is not the `/api/v1` envelope: it is the challenge an MCP
       // client follows to the authorization server.
@@ -600,6 +651,7 @@ layer(
         apiKey: "fbk_mcp_unknown",
         body: MCP_INITIALIZE,
       });
+
       expect(response.status).toBe(401);
       expect(decodeError(responseBody(response))._tag).toBe("INVALID_API_KEY");
     })
@@ -673,6 +725,7 @@ layer(
       );
 
       const sessionId = yield* openMcpSession("fbk_mcp_gated");
+
       const refused = yield* callTool(sessionId, "fbk_mcp_gated", "deleteTag", {
         tagId: "tag_mcp_gated",
       });
@@ -684,18 +737,22 @@ layer(
       // arrives in on this surface.
       expect(refused.isError).toBe(true);
       const [content] = refused.content;
+
       if (content?.type !== "text") {
         return yield* Effect.die("the refusal carried no text content");
       }
+
       expect(content.text).toContain("refuses destructive MCP calls");
 
       // The point of a server-side gate is that the record survives a client
       // that never asked its user: the tag is still there.
       const db = yield* currentDb;
+
       const remaining = yield* db
         .select()
         .from(schema.tagTable)
         .where(eq(schema.tagTable.id, "tag_mcp_gated"));
+
       expect(remaining).toHaveLength(1);
     })
   );
@@ -715,6 +772,7 @@ layer(
       );
 
       const sessionId = yield* openMcpSession("fbk_mcp_readonly");
+
       const listed = yield* callTool(
         sessionId,
         "fbk_mcp_readonly",
@@ -723,9 +781,11 @@ layer(
       );
 
       expect(listed.isError).toBe(false);
+
       const page = yield* Schema.decodeUnknownEffect(PublicApiTagPage)(
         listed.structuredContent
       );
+
       expect(page.data.map((tag) => tag.name)).toEqual(["Readable"]);
     })
   );
@@ -755,6 +815,7 @@ layer(
         "fbk_code_mode_list",
         "/mcp/code"
       );
+
       const listed = yield* executeMcp({
         apiKey: "fbk_code_mode_list",
         body: { id: 2, jsonrpc: "2.0", method: "tools/list", params: {} },
@@ -762,6 +823,7 @@ layer(
         protocolVersion: MCP_PROTOCOL_VERSION,
         sessionId,
       });
+
       expect(listed.status).toBe(200);
 
       const message = decodeMcpMessage(yield* mcpMessage(listed));
@@ -786,6 +848,7 @@ layer(
         "fbk_code_mode_search",
         "/mcp/code"
       );
+
       const found = yield* callTool(
         sessionId,
         "fbk_code_mode_search",
@@ -795,6 +858,7 @@ layer(
       );
 
       expect(found.isError).toBe(false);
+
       const page = yield* Schema.decodeUnknownEffect(
         Schema.Struct({
           limit: Schema.Int,
@@ -809,6 +873,7 @@ layer(
           total: Schema.Int,
         })
       )(found.structuredContent);
+
       expect(page.matches.map((match) => match.name)).toContain("createTag");
       expect(page.matches[0]?.signature).toContain("(input: {");
     })
@@ -828,6 +893,7 @@ layer(
         "fbk_code_mode_execute",
         "/mcp/code"
       );
+
       const executed = yield* callTool(
         sessionId,
         "fbk_code_mode_execute",
@@ -844,6 +910,7 @@ layer(
       );
 
       expect(executed.isError).toBe(false);
+
       const result = yield* Schema.decodeUnknownEffect(
         Schema.Struct({
           calls: Schema.Array(Schema.String),
@@ -863,6 +930,7 @@ layer(
       // created tag — not the seeded one the program read — is in this
       // workspace.
       const db = yield* currentDb;
+
       const created = yield* db
         .select()
         .from(schema.tagTable)
@@ -872,6 +940,7 @@ layer(
             eq(schema.tagTable.name, "From a program")
           )
         );
+
       expect(created).toHaveLength(1);
     })
   );
@@ -898,6 +967,7 @@ layer(
         "fbk_code_mode_gated",
         "/mcp/code"
       );
+
       const executed = yield* callTool(
         sessionId,
         "fbk_code_mode_gated",
@@ -916,18 +986,22 @@ layer(
       );
 
       expect(executed.isError).toBe(false);
+
       const result = yield* Schema.decodeUnknownEffect(
         Schema.Struct({ result: Schema.Json })
       )(executed.structuredContent);
+
       expect(result.result).toEqual({
         message: "This deployment refuses destructive MCP calls.",
       });
 
       const db = yield* currentDb;
+
       const remaining = yield* db
         .select()
         .from(schema.tagTable)
         .where(eq(schema.tagTable.id, "tag_code_mode_gated"));
+
       expect(remaining).toHaveLength(1);
     })
   );

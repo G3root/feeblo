@@ -29,6 +29,7 @@ export function useCopyToClipboard({
       if (timeoutIdRef.current) {
         clearTimeout(timeoutIdRef.current);
       }
+
       setIsCopied(true);
 
       if (onCopy) {

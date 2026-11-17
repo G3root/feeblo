@@ -34,6 +34,9 @@ export const JwtSecretList = S.Struct({
 });
 
 export type TJwtSecretGetOrCreate = S.Schema.Type<typeof JwtSecretGetOrCreate>;
+
 export type TJwtSecretRevoke = S.Schema.Type<typeof JwtSecretRevoke>;
+
 export type TJwtSecretRotate = S.Schema.Type<typeof JwtSecretRotate>;
+
 export type TJwtSecretList = S.Schema.Type<typeof JwtSecretList>;

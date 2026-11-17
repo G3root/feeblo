@@ -36,10 +36,12 @@ export function ChangelogDetailPage({
   readonly changelogSlug: string;
 }) {
   const site = useSite();
+
   const {
     publicChangelogCategoryLinkCollection,
     publicChangelogDetailCollection,
   } = usePublicCollections();
+
   const changelogQuery = useLiveQuery({
     queryKey: [
       "portal-changelog-detail",
@@ -58,6 +60,7 @@ export function ChangelogDetailPage({
         )
         .findOne(),
   });
+
   // Resolved before the dependent query below: its callback runs during the
   // hook call, so `changelog` has to be initialized by then.
   const changelog = changelogQuery.data;
@@ -86,6 +89,7 @@ export function ChangelogDetailPage({
         .select(({ link }) => ({ categoryId: link.categoryId }));
     },
   });
+
   const categoryIds = categoryLinks.map((link) => link.categoryId);
 
   // Linked posts ship inside the single-entry response (`ChangelogDetail`),

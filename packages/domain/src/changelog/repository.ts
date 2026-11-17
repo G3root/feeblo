@@ -71,6 +71,7 @@ const PUBLIC_CHANGELOG_LIMIT = 100;
 const makeChangelogRepository = Effect.gen(function* () {
   const db = yield* currentDb;
   const effectivePublishedAt = sql<Date>`COALESCE(${schema.changelogTable.publishedAt}, ${schema.changelogTable.createdAt})`;
+
   // Listings are intentionally bounded instead of paginated: findManyPublished
   // returns the newest PUBLIC_CHANGELOG_LIMIT published entries, and clients
   // (dashboard and public-board collections, RSS, widget) render from the full
@@ -269,6 +270,7 @@ const makeChangelogRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const changelogId = id ?? (yield* ChangelogId.generate);
         const now = yield* DateTime.nowAsDate;
+
         const [created] = yield* db
           .insert(schema.changelogTable)
           .values({
@@ -307,6 +309,7 @@ const makeChangelogRepository = Effect.gen(function* () {
     }: TChangelogUpdateInternal) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         const [updated] = yield* db
           .update(schema.changelogTable)
           .set({

@@ -144,6 +144,7 @@ const TAG_OPERATOR_OPTIONS: Array<{
 
 function useBoardFilterState() {
   const store = useBoardStore();
+
   return useSelector(store, (state) => state.context.activeView.filters);
 }
 
@@ -193,6 +194,7 @@ const statusFilterItems = (
   selectedTypes: ReadonlySet<BoardPostStatus>
 ) => {
   const knownTypes = new Set(postStatuses.map((status) => status.type));
+
   const unknownTypes = [...selectedTypes].filter(
     (type) => !knownTypes.has(type)
   );
@@ -260,6 +262,7 @@ function useBoardFilterReferenceData(organizationId: string) {
       if (left.isCurrentUser !== right.isCurrentUser) {
         return left.isCurrentUser ? -1 : 1;
       }
+
       return left.name.localeCompare(right.name);
     });
   }, [organizationMembers, currentMemberId]);
@@ -303,16 +306,19 @@ function useBoardFilterActions(
     // this view" a structural comparison rather than a per-filter one.
     const update = (patch: Partial<TBoardFilters>) =>
       onChange(normalizeBoardFilters({ ...filters, ...patch }));
+
     const toggle = <T,>(list: readonly T[], value: T) =>
       list.includes(value)
         ? list.filter((item) => item !== value)
         : [...list, value];
+
     // `null` means the member list has not loaded yet: an id cannot be called
     // stale until there is a list that failed to resolve it.
     const knownMemberIds =
       knownMembers === null
         ? null
         : new Set(knownMembers.map((member) => member.id));
+
     // A checked id can still be removed at the cap: the limit bounds what a
     // saved view stores, not what the member is allowed to deselect.
     const atFilterLimit = (ids: readonly string[], id: string) =>
@@ -345,6 +351,7 @@ function useBoardFilterActions(
           const next = current.filter((id) => id !== memberId);
 
           update({ assigneeMemberIds: next.length === 0 ? null : next });
+
           return;
         }
 
@@ -423,6 +430,7 @@ function BoardFilterProvider({
   organizationId: string;
 }) {
   const reference = useBoardFilterReferenceData(organizationId);
+
   const actions = useBoardFilterActions(
     filters,
     onChange,
@@ -459,12 +467,14 @@ function BoardFilterRoot({
   const store = useBoardStore();
   const filters = useBoardFilterState();
   const grouping = useBoardGrouping();
+
   const onChange = useCallback(
     (next: TBoardFilters) => {
       store.send({ type: "setFilters", filters: next });
     },
     [store]
   );
+
   const onGroupByChange = useCallback(
     (field: TBoardGroupBy) => {
       store.send({ type: "setGroupBy", field });
@@ -547,6 +557,7 @@ function BoardFilterEditorPanel() {
 
 function BoardFilterSearchInput({ debounce }: { debounce?: number }) {
   const { filters, setSearch } = useBoardFilterContext();
+
   const inputProps = {
     "aria-label": "Search feedback titles",
     // The persisted query rejects a longer term; keeping the input bounded
@@ -595,19 +606,23 @@ function BoardFilterTrigger() {
     toggleStatus,
     toggleTag,
   } = useBoardFilterContext();
+
   const selectedStatuses = new Set(filters.status?.types ?? []);
   const selectedTagIds = new Set(filters.tag?.tagIds ?? []);
   const selectedAssigneeIds = new Set(filters.assigneeMemberIds ?? []);
   const statusItems = statusFilterItems(postStatuses, selectedStatuses);
+
   const otherMembers = members.filter(
     (member) => member.id !== currentMemberId
   );
+
   const unknownAssigneeIds = membersLoaded
     ? unknownSelectedIds(
         selectedAssigneeIds,
         new Set(members.map((member) => member.id))
       )
     : [];
+
   const unknownTagIds = tagsLoaded
     ? unknownSelectedIds(selectedTagIds, new Set(tags.map((tag) => tag.id)))
     : [];
@@ -840,6 +855,7 @@ function BoardFilterStatusGroup() {
     setStatusOperator,
     toggleStatus,
   } = useBoardFilterContext();
+
   const selectedStatuses = new Set(filters.status?.types ?? []);
 
   return (
@@ -887,7 +903,9 @@ function BoardFilterAssigneeGroup() {
     membersLoaded,
     toggleAssignee,
   } = useBoardFilterContext();
+
   const selectedIds = new Set(filters.assigneeMemberIds ?? []);
+
   const unknownIds = membersLoaded
     ? unknownSelectedIds(
         selectedIds,
@@ -935,7 +953,9 @@ function BoardFilterLabelsGroup() {
     tagsLoaded,
     toggleTag,
   } = useBoardFilterContext();
+
   const selectedTagIds = new Set(filters.tag?.tagIds ?? []);
+
   const unknownIds = tagsLoaded
     ? unknownSelectedIds(selectedTagIds, new Set(tags.map((tag) => tag.id)))
     : [];

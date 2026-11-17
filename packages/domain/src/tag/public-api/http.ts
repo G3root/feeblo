@@ -16,6 +16,7 @@ import type { PublicApiDependencies } from "../../public-api/operations";
 
 /** The composed group, so a handler is typed with the group's middleware. */
 type PublicApiGroup = InstanceType<typeof PublicApiTagGroup>;
+
 import { parseLimit } from "../../public-api/parse";
 import {
   createTagOperation,
@@ -110,6 +111,7 @@ export const tagHandlers = (
   listTags: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       return yield* listTagsOperation.handler({
         cursor: query.cursor,
         limit,

@@ -43,6 +43,7 @@ describe("EmailSuppressionRpcHandlers", () => {
         role,
         createdAt: now,
       });
+
       return { memberId, organizationId, role, userId } satisfies Fixture;
     });
 
@@ -98,6 +99,7 @@ describe("EmailSuppressionRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(listed.total).toBe(1);
           expect(listed.items.map((item) => item.email)).toEqual([
             "blocked@example.com",
@@ -108,6 +110,7 @@ describe("EmailSuppressionRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(stats).toEqual({
             administrativeBlock: 1,
             complaint: 0,
@@ -139,6 +142,7 @@ describe("EmailSuppressionRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(listed.total).toBe(1);
           expect(listed.items[0]?.note).toBe("Second report");
         })
@@ -201,6 +205,7 @@ describe("EmailSuppressionRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(listed.items).toHaveLength(0);
         })
       );
@@ -237,6 +242,7 @@ describe("EmailSuppressionRpcHandlers", () => {
                 })
                 .pipe(Effect.provideService(CurrentSession, session(fixture)))
             );
+
             expect(error._tag).toBe("NotFoundError");
 
             const [remaining] = yield* db
@@ -245,6 +251,7 @@ describe("EmailSuppressionRpcHandlers", () => {
               .where(
                 eq(schema.emailSuppressionTable.email, "foreign@example.com")
               );
+
             expect(remaining?.email).toBe("foreign@example.com");
           })
       );
@@ -275,6 +282,7 @@ describe("EmailSuppressionRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
           expect(listed.total).toBe(0);
         })
       );

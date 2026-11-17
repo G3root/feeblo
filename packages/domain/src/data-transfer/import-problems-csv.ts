@@ -27,6 +27,7 @@ const CSV_DELIMITER = ",";
 
 /** The upload's CSV extension, which the download name does not repeat. */
 const csvFileNamePattern = /\.csv$/iu;
+
 /** Anything that is not safe in a `Content-Disposition` name or on disk. */
 const unsafeFileNameCharacterPattern = /[^\p{L}\p{N}._-]+/gu;
 
@@ -107,12 +108,14 @@ export const streamImportProblemsCsv = (input: {
 }) =>
   Effect.gen(function* () {
     const repository = yield* DataTransferRepository;
+
     const job = yield* fromReportStore(
       repository.findJob({
         id: input.id,
         organizationId: input.organizationId,
       })
     );
+
     if (Option.isNone(job)) {
       return yield* new DataImportNotFoundError({
         message: "No import with this id exists in this workspace.",
@@ -136,12 +139,14 @@ export const streamImportProblemsCsv = (input: {
             page.length === PROBLEM_PAGE_SIZE
               ? Option.some(offset + page.length)
               : Option.none<number>();
+
           return [page, next] as const;
         })
       )
     );
 
     const now = yield* DateTime.nowAsDate;
+
     // The upload's own name is what a person recognizes in the download,
     // reduced to characters safe in both the header and a file system.
     const stem =
@@ -149,6 +154,7 @@ export const streamImportProblemsCsv = (input: {
         .replace(csvFileNamePattern, "")
         .replaceAll(unsafeFileNameCharacterPattern, "-")
         .slice(0, 60) || input.id.slice(0, 8);
+
     return {
       fileName: `${stem}-import-problems-${now.toISOString().slice(0, 10)}.csv`,
       stream: Stream.concat(

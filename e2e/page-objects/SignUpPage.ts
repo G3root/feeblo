@@ -29,11 +29,13 @@ export class SignUpPage {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
     await this.confirmPasswordInput.fill(password);
+
     const responsePromise = this.page.waitForResponse(
       (response) =>
         response.url().includes("/api/auth/sign-up/email") &&
         response.request().method() === "POST"
     );
+
     await this.submitButton.click();
     await responsePromise;
   }

@@ -92,6 +92,7 @@ const resourceKey = (resource: TPlanComplianceResource): string =>
  */
 const memberRole = (resource: TPlanComplianceResource): Role | null => {
   const role = resource.detail?.toLowerCase();
+
   return role !== undefined && isRole(role) ? role : null;
 };
 
@@ -342,7 +343,9 @@ export const buildPlanComplianceView = (
     const privateIds = new Set(
       (privateBoards?.resources ?? []).map((resource) => resource.id)
     );
+
     const resources = mergeResources(boards, privateBoards);
+
     const rows = resources.map((resource) => {
       const isPrivate = privateIds.has(resource.id);
 

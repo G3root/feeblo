@@ -17,6 +17,7 @@ export const getSafeCallbackURL = (redirectTo?: string) => {
     redirectTo[1] !== "\\"
       ? redirectTo
       : "/";
+
   const currentOrigin = hasWindow() ? window.location.origin : undefined;
   const appUrl = getRuntimePublicEnv().appUrl;
   const callbackBase = currentOrigin ?? appUrl;
@@ -58,6 +59,7 @@ export async function initializeEmailVerification(email: string) {
     title: m.clean_sleek_racoon(),
     type: "error",
   });
+
   return false;
 }
 
@@ -83,8 +85,10 @@ export async function initializePasswordReset(email: string) {
           // non-null object; the optional-field view only exposes the
           // error-message claim the UI renders.
           const record = body as { error?: { message?: string } };
+
           return record.error?.message;
         }
+
         return undefined;
       })
       .catch(() => undefined);
@@ -93,6 +97,7 @@ export async function initializePasswordReset(email: string) {
       title: serverMessage ?? m.caring_best_alligator(),
       type: "error",
     });
+
     return false;
   }
 

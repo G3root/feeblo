@@ -29,6 +29,7 @@ export function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
           draft.noIndex = value;
         }
       );
+
       await tx.when("settled");
       toastManager.add({
         title: "Search engine visibility updated",
@@ -58,6 +59,7 @@ export function SearchEngineIndexing({ canEdit }: { canEdit: boolean }) {
     </SwitchCard>
   );
 }
+
 export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +79,7 @@ export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
         title: "Name cannot be empty",
         type: "error",
       });
+
       return;
     }
 
@@ -91,6 +94,7 @@ export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
           draft.name = siteName;
         }
       );
+
       await tx.when("settled");
       toastManager.add({
         title: "Site name updated successfully",
@@ -120,6 +124,7 @@ export function PublicPublicSiteNameField({ canEdit }: { canEdit: boolean }) {
     </SettingsItem.Field>
   );
 }
+
 export function HidePoweredByBranding({
   canEdit,
   hasPaidPlan,

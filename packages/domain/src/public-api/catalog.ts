@@ -82,6 +82,7 @@ const printValue = (
   depth: number
 ): string => {
   const decoded = decodeNode(value);
+
   return Option.isNone(decoded)
     ? "unknown"
     : printNode(decoded.value, definitions, depth);
@@ -103,15 +104,18 @@ const printNode = (
   if (depth > MAX_DEPTH) return "unknown";
 
   const ref = node.$ref;
+
   if (ref !== undefined) {
     const name = definitionRef.exec(ref)?.groups?.name;
     const definition = name === undefined ? undefined : definitions[name];
+
     return definition === undefined
       ? "unknown"
       : printNode(definition, definitions, depth + 1);
   }
 
   const union = node.anyOf ?? node.oneOf;
+
   if (union !== undefined) {
     return [
       ...new Set(
@@ -121,6 +125,7 @@ const printNode = (
   }
 
   const intersection = node.allOf;
+
   if (intersection !== undefined) {
     return [
       ...new Set(
@@ -136,6 +141,7 @@ const printNode = (
   if (node.const !== undefined) return printLiteral(node.const);
 
   const declared = node.type;
+
   const types =
     declared === undefined ? [] : isString(declared) ? [declared] : declared;
 
@@ -150,9 +156,11 @@ const printNode = (
   if (node.properties !== undefined) {
     return printObject(node, definitions, depth);
   }
+
   if (node.items !== undefined) {
     return `Array<${printValue(node.items, definitions, depth + 1)}>`;
   }
+
   return "unknown";
 };
 
@@ -213,6 +221,7 @@ const printObject = (
 const printSchema = (schema: Schema.Top): string => {
   const document = Schema.toJsonSchemaDocument(schema);
   const root = decodeNode(document.schema);
+
   return Option.isNone(root)
     ? "unknown"
     : printNode(root.value, decodeDefinitions(document.definitions), 0);
@@ -293,13 +302,17 @@ const scoreEntry = (
   const searchable = `${entry.description} ${entry.signature}`.toLowerCase();
 
   let score = 0;
+
   if (name === normalizedQuery) score += 100;
   else if (name.includes(normalizedQuery)) score += 40;
 
   let matched = 0;
+
   for (const token of tokens) {
     if (name.includes(token)) score += 10;
+
     if (searchable.includes(token)) score += 2;
+
     if (name.includes(token) || searchable.includes(token)) matched += 1;
   }
 
@@ -326,6 +339,7 @@ export const searchCatalog = (
     MAX_SEARCH_LIMIT,
     Math.max(1, Math.trunc(options.limit ?? DEFAULT_SEARCH_LIMIT))
   );
+
   const offset = Math.max(0, Math.trunc(options.offset ?? 0));
   const normalizedQuery = query.trim().toLowerCase();
   const tokens = [...new Set(words(query))];

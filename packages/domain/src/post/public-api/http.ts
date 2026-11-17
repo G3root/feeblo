@@ -194,10 +194,13 @@ export const postHandlers = (
   listBoardPosts: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       const includeArchived = yield* parseIncludeArchived(
         query.includeArchived
       );
+
       const tagIds = yield* parseTagIds(query.tagIds);
+
       return yield* listBoardPostsOperation.handler({
         ...params,
         cursor: query.cursor,
@@ -218,10 +221,13 @@ export const postHandlers = (
   listPosts: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       const includeArchived = yield* parseIncludeArchived(
         query.includeArchived
       );
+
       const tagIds = yield* parseTagIds(query.tagIds);
+
       return yield* listPostsOperation.handler({
         boardId: providedQueryParam(query.boardId),
         cursor: query.cursor,
@@ -265,6 +271,7 @@ export const postHandlers = (
   listPostActivity: (({ params, query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       return yield* listPostActivityOperation.handler({
         ...params,
         cursor: query.cursor,

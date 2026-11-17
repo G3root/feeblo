@@ -59,6 +59,7 @@ describe("classifySlackApiError", () => {
         slackErrorResponse({ ok: false, error }, 200),
         "chat.postMessage"
       );
+
       expect(failure._tag).toBe("IntegrationProviderAuthenticationError");
     }
   });
@@ -75,6 +76,7 @@ describe("classifySlackApiError", () => {
         slackErrorResponse({ ok: false, error }, 200),
         "chat.postMessage"
       );
+
       expect(failure._tag).toBe("IntegrationProviderInvalidConfigurationError");
     }
   });
@@ -111,6 +113,7 @@ describe("classifySlackApiError", () => {
         slackErrorResponse(body, 200),
         "chat.postMessage"
       );
+
       expect(failure._tag).toBe("IntegrationProviderPermanentRejection");
     }
   });

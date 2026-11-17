@@ -4,6 +4,7 @@ import * as Predicate from "effect/Predicate";
 
 /** `filename*=UTF-8''<percent-encoded>`, the RFC 5987 form. */
 const encodedFileNamePattern = /filename\*=UTF-8''([^;]+)/iu;
+
 /** `filename="<name>"`, the form every browser actually sends. */
 const quotedFileNamePattern = /filename="([^"]+)"/iu;
 
@@ -29,6 +30,7 @@ export const errorEnvelopeMessage = async (
   response: Response
 ): Promise<string | null> => {
   const payload: unknown = await response.json().catch(() => null);
+
   return isPlainObject(payload) &&
     Predicate.hasProperty(payload, "message") &&
     isString(payload.message)
@@ -47,7 +49,9 @@ export const fileNameFromContentDisposition = (
   if (header === null) {
     return null;
   }
+
   const encoded = encodedFileNamePattern.exec(header)?.[1];
+
   if (encoded !== undefined) {
     try {
       return decodeURIComponent(encoded);
@@ -55,6 +59,7 @@ export const fileNameFromContentDisposition = (
       return null;
     }
   }
+
   return quotedFileNamePattern.exec(header)?.[1] ?? null;
 };
 

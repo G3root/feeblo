@@ -98,10 +98,12 @@ describe("external resource create request machine", () => {
 
     while (grew) {
       grew = false;
+
       for (const from of ALL) {
         if (!reached.has(from)) {
           continue;
         }
+
         for (const to of ALL) {
           if (canTransitionCreateRequest(from, to) && !reached.has(to)) {
             reached.add(to);

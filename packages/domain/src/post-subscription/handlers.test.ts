@@ -31,6 +31,7 @@ describe("PostSubscriptionRpcHandlers", () => {
     statusId: LegidOf<"PostStatusId">;
     userId: string;
   };
+
   const session = (
     f: Fixture,
     member = true,
@@ -54,6 +55,7 @@ describe("PostSubscriptionRpcHandlers", () => {
         ]
       : [],
   });
+
   const fixture = (visibility: "PUBLIC" | "PRIVATE" = "PUBLIC") =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -114,6 +116,7 @@ describe("PostSubscriptionRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       return {
         membershipId,
         organizationId,
@@ -123,6 +126,7 @@ describe("PostSubscriptionRpcHandlers", () => {
         userId,
       } satisfies Fixture;
     });
+
   const Repositories = Layer.mergeAll(
     PostRepository.layer,
     PostSubscriptionRepository.layer,
@@ -134,6 +138,7 @@ describe("PostSubscriptionRpcHandlers", () => {
       )
     )
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const TestLayer = PostPolicy.layer.pipe(Layer.provideMerge(Repositories));
 
   const FullTestLayer = Layer.mergeAll(
@@ -147,6 +152,7 @@ describe("PostSubscriptionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostSubscriptionRpcHandlersEffect;
         const f = yield* fixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListPostSubscriptions({
@@ -155,6 +161,7 @@ describe("PostSubscriptionRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session(f, false)))
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -162,14 +169,17 @@ describe("PostSubscriptionRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* PostSubscriptionRpcHandlersEffect;
         const f = yield* fixture();
+
         const listInput = {
           organizationId: f.organizationId,
           slug: f.postSlug,
         };
+
         const mutationInput = {
           organizationId: f.organizationId,
           postId: f.postId,
         };
+
         expect(
           yield* handlers
             .CreatePostSubscription(mutationInput)
@@ -192,12 +202,14 @@ describe("PostSubscriptionRpcHandlers", () => {
             .ListPostSubscriptions(listInput)
             .pipe(Effect.provideService(CurrentSession, session(f)))
         ).toHaveLength(0);
+
         const emailSubscription =
           yield* (yield* EmailSubscriptionRepository).findSubscription({
             email: "user@example.com",
             organizationId: f.organizationId,
             topic: { topicId: f.postId, topicType: "post" },
           });
+
         expect(emailSubscription.pipe(Option.getOrUndefined)).toMatchObject({
           state: "unsubscribed",
         });
@@ -209,15 +221,19 @@ describe("PostSubscriptionRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture();
+
           const listInput = {
             organizationId: f.organizationId,
             slug: f.postSlug,
           };
+
           const mutationInput = {
             organizationId: f.organizationId,
             postId: f.postId,
           };
+
           const validSession = session(f);
+
           const invalidEmailSession: Session = {
             ...validSession,
             user: { ...validSession.user, email: "invalid-email" },
@@ -242,15 +258,19 @@ describe("PostSubscriptionRpcHandlers", () => {
         const handlers = yield* PostSubscriptionRpcHandlersEffect;
         const f = yield* fixture("PUBLIC");
         const db = yield* currentDb;
+
         const listInput = {
           organizationId: f.organizationId,
           slug: f.postSlug,
         };
+
         const mutationInput = {
           organizationId: f.organizationId,
           postId: f.postId,
         };
+
         const otherUserId = `other_${f.organizationId}`;
+
         const otherSession: Session = {
           ...session(f, false),
           user: {
@@ -261,6 +281,7 @@ describe("PostSubscriptionRpcHandlers", () => {
           },
           session: { userId: otherUserId, token: "other-token" },
         };
+
         yield* db.insert(schema.userTable).values({
           id: otherUserId,
           email: "other@example.com",
@@ -295,6 +316,7 @@ describe("PostSubscriptionRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture();
+
           const listInput = {
             organizationId: f.organizationId,
             slug: f.postSlug,
@@ -385,14 +407,17 @@ describe("PostSubscriptionRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostSubscriptionRpcHandlersEffect;
           const f = yield* fixture("PRIVATE");
+
           const listInput = {
             organizationId: f.organizationId,
             slug: f.postSlug,
           };
+
           const mutationInput = {
             organizationId: f.organizationId,
             postId: f.postId,
           };
+
           yield* handlers
             .CreatePostSubscription(mutationInput)
             .pipe(Effect.provideService(CurrentSession, session(f)));

@@ -24,6 +24,7 @@ describe("parseRpcError", () => {
       _tag: "BoardNotFoundError",
       message: "Board not found",
     });
+
     const error = new RpcError(cause);
 
     expect(parseRpcError(error)).toEqual({
@@ -38,6 +39,7 @@ describe("parseRpcError", () => {
       _tag: "PolicyDenied",
       reason: "The free plan allows up to 10 CRM entries.",
     });
+
     const error = new RpcError(cause);
 
     expect(parseRpcError(error)).toEqual({
@@ -52,6 +54,7 @@ describe("parseRpcError", () => {
       _tag: "InternalServerError",
       message: "Error creating Contact",
     });
+
     expect(parseRpcError(cause)).toEqual({
       cause,
       kind: "rpc",
@@ -82,15 +85,18 @@ describe("parseRpcError", () => {
       reason: "database credentials leak: postgres://secret",
       message: "sensitive internal stack trace",
     });
+
     expect(parseRpcError(cause)).toEqual({
       cause,
       kind: "rpc",
       message: "Something went wrong. Please try again.",
     });
+
     const sqlCause = Cause.fail({
       _tag: "SqlError",
       reason: "SQLSTATE 42P01: relation secret_table",
     });
+
     expect(parseRpcError(sqlCause, "Fallback message")).toEqual({
       cause: sqlCause,
       kind: "rpc",

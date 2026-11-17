@@ -13,8 +13,11 @@ import { createTestUser } from "../helpers/test-users";
 import { publicBoardUrl } from "../helpers/urls";
 
 const signInWithEmailButtonName = /^Sign in with email/;
+
 const signUpWithEmailButtonName = /^Sign up with email/;
+
 const authDialogName = "Sign in / Sign up";
+
 const authButtonName = "Sign in / Sign up";
 
 async function signInThroughPublicBoard(
@@ -39,6 +42,7 @@ async function signInThroughPublicBoard(
       response.url().includes("/api/auth/sign-in/email") &&
       response.request().method() === "POST"
   );
+
   await signInDialog
     .getByRole("button", { name: "Sign in", exact: true })
     .click();
@@ -117,6 +121,7 @@ test(
           response.url().includes("/api/auth/sign-in/email") &&
           response.request().method() === "POST"
       );
+
       await visitorPage
         .getByRole("button", { name: "Login", exact: true })
         .click();
@@ -161,9 +166,11 @@ test(
       await signInThroughPublicBoard(visitorPage, user.email, user.password);
 
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
+
       const dialog = visitorPage.getByRole("dialog", {
         name: "Create Post",
       });
+
       await expect(dialog).toBeVisible();
 
       await dialog.getByLabel("Post Title").fill(title);
@@ -237,6 +244,7 @@ test(
       const chooserDialog = visitorPage.getByRole("dialog", {
         name: authDialogName,
       });
+
       await chooserDialog
         .getByRole("button", { name: signUpWithEmailButtonName })
         .click();
@@ -244,6 +252,7 @@ test(
       const signUpDialog = visitorPage.getByRole("dialog", {
         name: "Sign up with email",
       });
+
       await signUpDialog
         .getByRole("textbox", { name: "Full name" })
         .fill(visitor.name);
@@ -263,12 +272,14 @@ test(
       const verificationDialog = visitorPage.getByRole("dialog", {
         name: "Verify your email",
       });
+
       await expect(verificationDialog).toBeVisible();
 
       const email = await waitForVerificationEmail(
         visitorPage.request,
         visitor.email
       );
+
       await verificationDialog
         .locator("#otp")
         .fill(verificationCodeFromEmail(email));
@@ -308,9 +319,11 @@ test(
       await waitForHydration(visitorPage);
 
       await visitorPage.getByRole("button", { name: "Give Feedback" }).click();
+
       const authDialog = visitorPage.getByRole("dialog", {
         name: authDialogName,
       });
+
       await expect(authDialog).toBeVisible();
       await visitorPage.keyboard.press("Escape");
       await expect(
@@ -371,12 +384,14 @@ test(
       const upvoteButton = visitorPage.getByRole("button", {
         name: "Upvote",
       });
+
       await expect(upvoteButton).toContainText("0");
       await upvoteButton.click();
 
       const authDialogHeading = visitorPage.getByRole("heading", {
         name: authDialogName,
       });
+
       await expect(authDialogHeading).toBeVisible();
       await visitorPage.keyboard.press("Escape");
       await expect(authDialogHeading).toBeHidden();
@@ -498,9 +513,11 @@ test("a signed-in visitor never paints the sign-in button while the session reso
     // late answer must not flip the rendered result.
     await visitorPage.unroute("**/*.js");
     let releaseProbe!: () => void;
+
     const probeGate = new Promise<void>((resolve) => {
       releaseProbe = resolve;
     });
+
     await visitorPage.route("**/api/auth/get-session**", async (route) => {
       await probeGate;
       await route.continue();
@@ -613,6 +630,7 @@ test(
       const commentCard = visitorPage
         .locator('[data-slot="comment"]')
         .filter({ hasText: comment });
+
       await expect(commentCard).toBeVisible();
 
       // The preload's subset is unloaded well after the first paint; the

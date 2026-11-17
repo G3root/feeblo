@@ -40,6 +40,7 @@ export default {
   async fetch(request: Request) {
     const url = new URL(request.url);
     const dashboard = isDashboardRequest(request);
+
     const securityOptions = {
       // `MEDIA_PUBLIC_BASE_URL` is where uploaded editor media and workspace
       // logos are served from; without it the `img-src` allow-list would blank
@@ -116,6 +117,7 @@ const withRootDiscovery = (response: Response) => {
       .map((value) => value.trim())
       .filter((value) => value !== "")
   );
+
   vary.add("Accept");
   headers.set("Vary", [...vary].join(", "));
 

@@ -12,15 +12,19 @@ export const Route = createFileRoute(
 
 function GitHubIntegrationSettingsRoute() {
   const organizationId = useOrganizationId();
+
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "integrations.manage")
   );
+
   if (isPending) {
     return null;
   }
+
   if (!allowed) {
     return <SettingsAccessDenied />;
   }
+
   return (
     <SettingsLayout.Root size="large">
       <SettingsLayout.Header>

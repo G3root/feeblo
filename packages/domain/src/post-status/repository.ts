@@ -173,6 +173,7 @@ const makePostStatusRepository = Effect.gen(function* () {
             }
 
             const now = yield* DateTime.nowAsDate;
+
             // A status that changes section is appended to the end of its new
             // one: its old position was a position among its old section's rows
             // and means nothing where it is going.
@@ -407,6 +408,7 @@ const makePostStatusRepository = Effect.gen(function* () {
               .orderBy(asc(schema.postStatusTable.orderIndex));
 
             const requested = new Set<string>(orderedIds);
+
             const coversSection =
               orderedIds.length === rows.length &&
               requested.size === orderedIds.length &&
@@ -420,6 +422,7 @@ const makePostStatusRepository = Effect.gen(function* () {
             }
 
             const now = yield* DateTime.nowAsDate;
+
             const positions = rows
               .map((row) => row.orderIndex)
               .toSorted((left, right) => left - right);

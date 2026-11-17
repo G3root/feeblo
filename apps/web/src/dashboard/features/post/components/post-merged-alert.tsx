@@ -37,6 +37,7 @@ export function PostMergedAlert() {
       if (!mergedIntoPostId) {
         return undefined;
       }
+
       return query
         .from({ post: postCollection })
         .join(

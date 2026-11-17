@@ -186,6 +186,7 @@ const makeEntry = <
   body: (surface: Surface, args: TArgs) => Effect.Effect<A, E, R>
 ): SurfaceEntry<TArgs, Config, UniqueViolationError, A, E, R> => {
   const name = surfaceRpcName(operation, surface);
+
   return (args: TArgs) => {
     // SAFETY: once `Config` crosses makeEntry's generic boundary, TS reads
     // its members through the widened `SurfaceConfig` constraint, so every

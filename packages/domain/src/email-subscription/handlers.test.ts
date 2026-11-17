@@ -40,14 +40,17 @@ describe("EmailSubscriptionConsentHandlers", () => {
     WorkspaceRepository.layer,
     EmailSuppressionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const SiteRepositories = Layer.mergeAll(
     SiteRepository.layer,
     WorkspaceRepository.layer,
     EmailSuppressionRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     SiteRepositories,
@@ -89,9 +92,11 @@ describe("EmailSubscriptionConsentHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       if (!paid) {
         return organizationId;
       }
+
       const productId = `product_${organizationId}`;
       yield* db.insert(schema.productTable).values({
         id: productId,
@@ -121,6 +126,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       return organizationId;
     });
 
@@ -138,6 +144,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
               organizationId,
             })
           );
+
           expect(error._tag).toBe("PolicyDenied");
         })
     );
@@ -154,13 +161,16 @@ describe("EmailSubscriptionConsentHandlers", () => {
             email: " Subscriber@Example.com ",
             organizationId,
           });
+
           expect(accepted.verificationRequired).toBe(true);
           expect(Option.isSome(accepted.verificationToken)).toBe(true);
+
           const subscription = yield* repository.findSubscription({
             email: "subscriber@example.com",
             organizationId,
             topic: { topicId: null, topicType: "changelog" },
           });
+
           expect(Option.getOrUndefined(subscription)).toMatchObject({
             state: "pending_verification",
           });
@@ -192,10 +202,12 @@ describe("EmailSubscriptionConsentHandlers", () => {
           // never disclosed, and no verification mail is recorded because it
           // could never activate anything.
           expect(accepted.verificationRequired).toBe(false);
+
           const intents = yield* db
             .select({ id: schema.emailOutboxTable.id })
             .from(schema.emailOutboxTable)
             .where(eq(schema.emailOutboxTable.organizationId, organizationId));
+
           expect(intents).toHaveLength(0);
         })
     );
@@ -222,6 +234,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* EmailSubscriptionConsentHandlersEffect;
           const organizationId = yield* createWorkspace({ paid: true });
+
           for (const email of [
             "subscriber@example.com",
             " SUBSCRIBER@example.com ",
@@ -232,12 +245,14 @@ describe("EmailSubscriptionConsentHandlers", () => {
               organizationId,
             });
           }
+
           const error = yield* Effect.flip(
             handlers.requestChangelogSubscription({
               email: "subscriber@example.com",
               organizationId,
             })
           );
+
           expect(error._tag).toBe("RateLimitExceededError");
         })
     );
@@ -248,10 +263,12 @@ describe("EmailSubscriptionConsentHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* EmailSubscriptionConsentHandlersEffect;
           const organizationId = yield* createWorkspace({ paid: true });
+
           const accepted = yield* handlers.requestChangelogSubscription({
             email: "subscriber@example.com",
             organizationId,
           });
+
           if (
             Option.isNone(accepted.verificationToken) ||
             Option.isNone(accepted.unsubscribeToken)
@@ -260,12 +277,15 @@ describe("EmailSubscriptionConsentHandlers", () => {
               "A new consent request must issue both link tokens"
             );
           }
+
           const verificationToken = Redacted.value(
             accepted.verificationToken.value
           );
+
           const verified = yield* handlers.verifySubscription({
             verificationToken,
           });
+
           expect(verified.verified).toBe(true);
           expect(
             yield* handlers.verifySubscription({ verificationToken })
@@ -274,6 +294,7 @@ describe("EmailSubscriptionConsentHandlers", () => {
           const unsubscribed = yield* handlers.unsubscribe({
             unsubscribeToken: Redacted.value(accepted.unsubscribeToken.value),
           });
+
           expect(unsubscribed).toEqual({ unsubscribed: true });
           expect(
             yield* handlers.unsubscribe({
@@ -288,10 +309,12 @@ describe("EmailSubscriptionConsentHandlers", () => {
         const handlers = yield* EmailSubscriptionConsentHandlersEffect;
         const repository = yield* EmailSubscriptionRepository;
         const organizationId = yield* createWorkspace({ paid: true });
+
         const accepted = yield* handlers.requestChangelogSubscription({
           email: "subscriber@example.com",
           organizationId,
         });
+
         if (
           Option.isNone(accepted.verificationToken) ||
           Option.isNone(accepted.unsubscribeToken)
@@ -300,9 +323,11 @@ describe("EmailSubscriptionConsentHandlers", () => {
             "A new consent request must issue both link tokens"
           );
         }
+
         yield* handlers.verifySubscription({
           verificationToken: Redacted.value(accepted.verificationToken.value),
         });
+
         const post = yield* repository.requestSubscription({
           email: "subscriber@example.com",
           now: yield* DateTime.nowAsDate,
@@ -313,14 +338,17 @@ describe("EmailSubscriptionConsentHandlers", () => {
             (yield* Clock.currentTimeMillis) + 86_400_000
           ),
         });
+
         yield* handlers.unsubscribe({
           unsubscribeToken: Redacted.value(accepted.unsubscribeToken.value),
         });
+
         const changelog = yield* repository.findSubscription({
           email: "subscriber@example.com",
           organizationId,
           topic: { topicId: null, topicType: "changelog" },
         });
+
         expect(Option.getOrUndefined(changelog)).toMatchObject({
           state: "unsubscribed",
         });

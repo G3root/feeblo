@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./audit-log/repository": {
+      "default": "./src/audit-log/repository.ts"
+    },
+    "./audit-log/retention": {
+      "default": "./src/audit-log/retention.ts"
+    },
     "./api-key/errors": {
       "default": "./src/api-key/errors.ts"
     },

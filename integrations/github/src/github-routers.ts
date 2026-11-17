@@ -32,8 +32,10 @@ export const makeGitHubAppInstallationCallbackRouter = (appUrl: string) =>
           const parsed = yield* Effect.exit(
             parseGitHubAppInstallationCallbackUrl(request.url)
           );
+
           if (Exit.isFailure(parsed)) {
             yield* Effect.logError(parsed.cause);
+
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
@@ -43,12 +45,16 @@ export const makeGitHubAppInstallationCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           const management = yield* GitHubManagementService;
+
           const completed = yield* Effect.exit(
             management.connectComplete(parsed.value)
           );
+
           if (Exit.isFailure(completed)) {
             yield* Effect.logError(completed.cause);
+
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
@@ -58,6 +64,7 @@ export const makeGitHubAppInstallationCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           return HttpServerResponse.redirect(
             settingsRedirect({
               appUrl,
@@ -85,7 +92,9 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
         capabilityKey: githubIssueWebhookCapabilityKey,
         provider: githubProviderKey,
       });
+
       const inbound = yield* GitHubInboundService;
+
       return yield* router.add("POST", "/github/app/webhooks", (request) =>
         Effect.flatMap(request.text, (rawBody) =>
           handleVerifiedInbound({
