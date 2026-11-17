@@ -67,10 +67,13 @@ const markdownLine = (label: string, url: string, detail?: string) => {
  * plain text rather than HTML: the llms.txt convention is a text index, and an
  * agent that fetched it already knows how to parse Markdown.
  */
-const renderBoardsSection = (
-  boards: BoardContent["boards"],
-  origin: string
-): string[] =>
+const renderBoardsSection = ({
+  boards,
+  origin,
+}: {
+  boards: BoardContent["boards"];
+  origin: string;
+}): string[] =>
   boards.length === 0
     ? []
     : [
@@ -82,10 +85,13 @@ const renderBoardsSection = (
         ),
       ];
 
-const renderPostsSection = (
-  posts: BoardContent["posts"],
-  origin: string
-): string[] => {
+const renderPostsSection = ({
+  origin,
+  posts,
+}: {
+  origin: string;
+  posts: BoardContent["posts"];
+}): string[] => {
   if (posts.length === 0) return [];
 
   const recent = posts
@@ -115,11 +121,15 @@ const renderPostsSection = (
   ];
 };
 
-const renderRoadmapSection = (
-  site: TSite,
-  roadmaps: BoardContent["roadmaps"],
-  origin: string
-): string[] =>
+const renderRoadmapSection = ({
+  origin,
+  roadmaps,
+  site,
+}: {
+  origin: string;
+  roadmaps: BoardContent["roadmaps"];
+  site: TSite;
+}): string[] =>
   site.roadmapVisibility !== "PUBLIC" || roadmaps.length === 0
     ? []
     : [
@@ -131,11 +141,15 @@ const renderRoadmapSection = (
         ),
       ];
 
-const renderChangelogSection = (
-  site: TSite,
-  entries: BoardContent["entries"],
-  origin: string
-): string[] => {
+const renderChangelogSection = ({
+  entries,
+  origin,
+  site,
+}: {
+  entries: BoardContent["entries"];
+  origin: string;
+  site: TSite;
+}): string[] => {
   if (site.changelogVisibility !== "PUBLIC" || entries.length === 0) return [];
 
   const recent = entries.toSorted(
@@ -172,10 +186,18 @@ export function renderBoardLlmsTxt(
       ? [`- Changelog feed: ${origin}/changelog/rss.xml`]
       : []),
     ...(site.hidePoweredBy ? [] : ["- Platform: https://feeblo.com"]),
-    ...renderBoardsSection(content.boards, origin),
-    ...renderPostsSection(content.posts, origin),
-    ...renderRoadmapSection(site, content.roadmaps, origin),
-    ...renderChangelogSection(site, content.entries, origin),
+    ...renderBoardsSection({ boards: content.boards, origin }),
+    ...renderPostsSection({ origin, posts: content.posts }),
+    ...renderRoadmapSection({
+      origin,
+      roadmaps: content.roadmaps,
+      site,
+    }),
+    ...renderChangelogSection({
+      entries: content.entries,
+      origin,
+      site,
+    }),
     "",
     "## About this file",
     "",
