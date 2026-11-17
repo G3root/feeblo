@@ -282,13 +282,21 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         ),
       };
 
+      // The asset sweep runs once the delete has committed, never inside the
+      // transaction: it touches storage and the asset table, and a rollback
+      // would otherwise leave the post alive with its assets already collected.
+      // The delete and its entries stay in the transaction, where they commit
+      // together.
+      const cleanup = writes.cleanupAfterRemove(args.organizationId);
+
       if (surface === "public") {
         yield* writes.remove(write, memberActor(session, args.organizationId));
+        yield* cleanup;
 
         return;
       }
 
-      return yield* transaction(
+      yield* transaction(
         Effect.gen(function* () {
           const removed = yield* writes.remove(
             write,
@@ -314,6 +322,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           );
         })
       );
+
+      yield* cleanup;
     })
   );
 
@@ -399,7 +409,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const session = yield* CurrentSession;
       const audit = yield* AuditLogRecorder;
 
-      yield* writes.update(
+      const { contentChanged } = yield* writes.update(
         {
           assetIds: args.assetIds,
           content: args.content,
@@ -410,7 +420,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         memberActor(session, args.organizationId)
       );
 
-      if (surface !== "dashboard") {
+      // `contentChanged` is the shared write path's comparison of the stored
+      // body against the prepared one — sanitising can make two different
+      // submissions the same post — so a save that changed nothing writes no
+      // entry.
+      if (surface !== "dashboard" || !contentChanged) {
         return;
       }
 
@@ -440,7 +454,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const session = yield* CurrentSession;
       const audit = yield* AuditLogRecorder;
 
-      yield* writes.update(
+      const { titleChanged } = yield* writes.update(
         {
           id: args.id,
           organizationId: args.organizationId,
@@ -449,7 +463,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         memberActor(session, args.organizationId)
       );
 
-      if (surface !== "dashboard") {
+      if (surface !== "dashboard" || !titleChanged) {
         return;
       }
 
@@ -736,7 +750,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
         yield* transaction(
           Effect.gen(function* () {
-            yield* writes.update(
+            const { etaChanged } = yield* writes.update(
               {
                 etaQuarter: args.etaQuarter,
                 id: args.id,
@@ -744,6 +758,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               },
               memberActor(session, args.organizationId)
             );
+
+            // Re-saving the same quarter changes nothing, and the entry would
+            // claim an edit the row never had.
+            if (!etaChanged) {
+              return;
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -799,7 +820,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
         yield* transaction(
           Effect.gen(function* () {
-            yield* writes.update(
+            const { assigneeChanged } = yield* writes.update(
               {
                 assigneeMemberId: args.assigneeMemberId,
                 id: args.id,
@@ -807,6 +828,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               },
               memberActor(session, args.organizationId)
             );
+
+            if (!assigneeChanged) {
+              return;
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),

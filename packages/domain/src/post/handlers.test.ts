@@ -2354,6 +2354,52 @@ describe("PostRpcHandlers", () => {
           });
         })
       );
+
+      it.effect("records a title save only when the title changed", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .CreatePost(postCreateInput(fixture, postId, "Original title"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const saveTitle = (title: string) =>
+            handlers
+              .UpdatePostTitle({
+                boardId: fixture.boardId,
+                id: postId,
+                organizationId: fixture.organizationId,
+                title,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(AuditLogEnabled, true)
+              );
+
+          // Re-saving the stored title is a no-op the write path already skips;
+          // it must not leave an entry claiming an edit.
+          yield* saveTitle("Original title");
+          yield* saveTitle("Revised title");
+
+          const db = yield* currentDb;
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.resourceId, postId),
+                eq(schema.auditLogTable.action, "post.updated")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.metadata).toMatchObject({ title: "Revised title" });
+        })
+      );
     });
 
     describe("GetPostSuggestions", () => {
