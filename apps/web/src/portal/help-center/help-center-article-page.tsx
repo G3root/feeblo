@@ -1,5 +1,6 @@
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
+import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import { CopyButton } from "@feeblo/ui/copy-button";
 import {
@@ -20,27 +21,38 @@ import {
   ThumbsUpIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+import { useHelpCenterVote } from "./use-help-center-vote";
 
 const VISITOR_KEY = "feeblo_help_visitor_id";
 
 const VIEWED_PREFIX = "feeblo_help_viewed:";
 
 /**
+ * One formatter for every date on the page.
+ *
+ * `toLocaleDateString()` with an options object builds a fresh
+ * `Intl.DateTimeFormat` on every call, and an article page renders a date at
+ * least once. Hoisted so the work happens once per module load rather than once
+ * per render.
+ */
+const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/**
  * The portal's article page.
  *
  * Three things happen here that the design of the tables exists to support:
- *
- * - The body renders from the stored Markdown, so "copy as Markdown" copies the
- *   source rather than scraping the DOM.
- * - A view beacon fires once per article per tab session. The id is generated
- *   per visit and the server deduplicates on it, so a reload is not a second
- *   read.
- * - A vote is keyed to the reader: an account when signed in, otherwise a
- *   random id this browser keeps. Either way it is one row per reader, which is
- *   what makes the two counts sum to one verdict each.
+ * the body renders from the stored Markdown (so "copy as Markdown" copies the
+ * source rather than scraping the DOM), a view beacon fires once per article
+ * per tab session, and the verdict widget is driven by its own machine
+ * (`vote-machine.ts`) rather than by a pile of booleans.
  */
 export function HelpCenterArticlePage({
   articleSlug,
@@ -49,9 +61,6 @@ export function HelpCenterArticlePage({
 }) {
   const site = useSite();
   const organizationId = site.organizationId;
-  const queryClient = useQueryClient();
-  const [reason, setReason] = useState("");
-  const [showReason, setShowReason] = useState(false);
   const enabled = isFeatureEnabled("HELP_CENTER");
 
   const articleQuery = useQuery({
@@ -66,48 +75,7 @@ export function HelpCenterArticlePage({
   const visitorId = useVisitorId();
   const articleId = articleQuery.data?.id;
 
-  useViewBeacon({ articleId, organizationId, visitorId });
-
-  const feedbackQuery = useQuery({
-    queryKey: [
-      "portal-help-center-feedback",
-      organizationId,
-      articleId,
-      visitorId,
-    ],
-    enabled: enabled && articleId !== undefined,
-    queryFn: () =>
-      fetchRpc((rpc) =>
-        rpc.GetHelpCenterArticleFeedbackPublic({
-          organizationId,
-          articleId: articleId ?? "",
-          visitorId,
-        })
-      ),
-  });
-
-  const vote = useMutation({
-    mutationFn: (helpful: boolean) =>
-      fetchRpc((rpc) =>
-        rpc.SetHelpCenterArticleFeedback({
-          organizationId,
-          articleId: articleId ?? "",
-          helpful,
-          reason: helpful ? null : reason.trim() || null,
-          visitorId,
-        })
-      ),
-    onSuccess: (tally) => {
-      queryClient.setQueryData(
-        ["portal-help-center-feedback", organizationId, articleId, visitorId],
-        tally
-      );
-
-      if (tally.mine === true) {
-        setShowReason(false);
-      }
-    },
-  });
+  useViewBeacon({ articleId, organizationId });
 
   if (!enabled) {
     return (
@@ -144,8 +112,6 @@ export function HelpCenterArticlePage({
   }
 
   const article = articleQuery.data;
-  const tally = feedbackQuery.data;
-  const mine = tally?.mine ?? null;
 
   return (
     <article className="mx-auto w-full max-w-3xl py-8">
@@ -172,7 +138,7 @@ export function HelpCenterArticlePage({
           {article.authorName === null ? null : (
             <span>Written by {article.authorName}</span>
           )}
-          <span>Updated {formatDate(article.updatedAt)}</span>
+          <span>Updated {DATE_FORMAT.format(article.updatedAt)}</span>
           <span className="tabular-nums">
             {article.viewCount.toLocaleString()} views
           </span>
@@ -200,60 +166,76 @@ export function HelpCenterArticlePage({
         <MarkdownContent content={article.content} />
       </div>
 
-      <section className="mt-10 border-t pt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium">Was this helpful?</p>
-          <div className="flex items-center gap-2">
-            <FeedbackButton
-              active={mine === true}
-              disabled={vote.isPending || articleId === undefined}
-              helpful
-              onClick={() => vote.mutate(true)}
-            />
-            <FeedbackButton
-              active={mine === false}
-              disabled={vote.isPending || articleId === undefined}
-              helpful={false}
-              onClick={() => {
-                setShowReason(true);
-                vote.mutate(false);
-              }}
-            />
-          </div>
-        </div>
-
-        {showReason && mine === false ? (
-          <div className="mt-3 space-y-2">
-            <Textarea
-              maxLength={2000}
-              onChange={(event) => setReason(event.target.value)}
-              placeholder="What was missing? (optional)"
-              rows={3}
-              value={reason}
-            />
-            <Button
-              disabled={vote.isPending}
-              onClick={() => vote.mutate(false)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Send feedback
-            </Button>
-          </div>
-        ) : null}
-
-        {tally === undefined ? null : (
-          <p className="text-muted-foreground mt-3 text-xs tabular-nums">
-            {tally.helpfulCount + tally.notHelpfulCount === 0
-              ? "No votes yet."
-              : `${tally.helpfulCount} of ${
-                  tally.helpfulCount + tally.notHelpfulCount
-                } readers found this helpful.`}
-          </p>
-        )}
-      </section>
+      <VerdictSection
+        articleId={article.id}
+        organizationId={organizationId}
+        visitorId={visitorId}
+      />
     </article>
+  );
+}
+
+function VerdictSection({
+  articleId,
+  organizationId,
+  visitorId,
+}: {
+  articleId: string;
+  organizationId: string;
+  visitorId: string | undefined;
+}) {
+  const vote = useHelpCenterVote({ articleId, organizationId, visitorId });
+  const total = vote.counts.helpful + vote.counts.notHelpful;
+
+  return (
+    <section className="mt-10 border-t pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-medium">Was this helpful?</p>
+        <div className="flex items-center gap-2">
+          <FeedbackButton
+            active={vote.verdict === true}
+            disabled={vote.isPending || !vote.ready}
+            helpful
+            onClick={vote.markHelpful}
+          />
+          <FeedbackButton
+            active={vote.verdict === false}
+            disabled={vote.isPending || !vote.ready}
+            helpful={false}
+            onClick={vote.markUnhelpful}
+          />
+        </div>
+      </div>
+
+      {vote.reasonOpen ? (
+        <div className="mt-3 space-y-2">
+          <Textarea
+            maxLength={2000}
+            onChange={(event) => vote.setReason(event.target.value)}
+            placeholder="What was missing? (optional)"
+            rows={3}
+            value={vote.reason}
+          />
+          <Button
+            disabled={vote.isPending}
+            onClick={vote.sendReason}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Send feedback
+          </Button>
+        </div>
+      ) : null}
+
+      {!vote.ready ? null : (
+        <p className="text-muted-foreground mt-3 text-xs tabular-nums">
+          {total === 0
+            ? "No votes yet."
+            : `${vote.counts.helpful} of ${total} readers found this helpful.`}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -294,6 +276,10 @@ function FeedbackButton({
  * never leaves this origin except as the vote key, and clearing site data
  * forgets it. It exists because most readers of a help center are not signed
  * in, and without it every anonymous vote would be one per page load.
+ *
+ * Read in an effect rather than a `useState` initialiser because the portal is
+ * server-rendered and `window` does not exist there. Callers gate their
+ * requests on the id being present instead of sending one without it.
  */
 function useVisitorId(): string | undefined {
   const [visitorId, setVisitorId] = useState<string | undefined>(undefined);
@@ -319,18 +305,34 @@ function useVisitorId(): string | undefined {
  * One view per article per tab session.
  *
  * The dedupe is a client-side convenience, not an identity: the server still
- * deduplicates on the beacon's own id, so a page that fires twice — a
- * remount, a retry — is still one read.
+ * deduplicates on the beacon's own id, so a page that fires twice — a remount,
+ * a retry — is still one read.
+ *
+ * Deliberately does not take the visitor id. The beacon carries none, and
+ * depending on it would re-run this effect when the id resolves for no reason.
  */
 function useViewBeacon({
   articleId,
   organizationId,
-  visitorId,
 }: {
   articleId: string | undefined;
   organizationId: string;
-  visitorId: string | undefined;
 }) {
+  const beacon = useCallback(
+    (id: string) =>
+      fetchRpc((rpc) =>
+        rpc.AddHelpCenterArticleView({
+          organizationId,
+          articleId: id,
+          id: crypto.randomUUID(),
+        })
+      ).catch(() => {
+        // A read count is not worth an error surface; the server answers
+        // `accepted: false` for anything it will not count.
+      }),
+    [organizationId]
+  );
+
   useEffect(() => {
     if (!isFeatureEnabled("HELP_CENTER") || articleId === undefined) {
       return;
@@ -343,26 +345,6 @@ function useViewBeacon({
     }
 
     window.sessionStorage.setItem(key, "1");
-
-    void fetchRpc((rpc) =>
-      rpc.AddHelpCenterArticleView({
-        organizationId,
-        articleId,
-        id: crypto.randomUUID(),
-      })
-    ).catch(() => {
-      // A read count is not worth an error surface; the server answers
-      // `accepted: false` for anything it will not count.
-    });
-  }, [articleId, organizationId, visitorId]);
+    void beacon(articleId);
+  }, [articleId, beacon]);
 }
-
-const formatDate = (value: Date | string): string => {
-  const date = value instanceof Date ? value : new Date(value);
-
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-};

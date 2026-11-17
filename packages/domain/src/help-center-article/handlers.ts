@@ -7,7 +7,11 @@ import { HelpCenterTopicRepository } from "../help-center-topic/repository";
 import { helpCenterFeatureGate } from "../help-center/flag";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
-import { NotFoundError, withRemapDbErrors } from "../rpc-errors";
+import {
+  BadRequestError,
+  NotFoundError,
+  withRemapDbErrors,
+} from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -15,6 +19,7 @@ import {
   FailedToDeleteHelpCenterArticleError,
   HelpCenterArticleSlugTakenError,
 } from "./errors";
+import { canTransitionHelpCenterArticle } from "./machine";
 import { HelpCenterArticlePolicy } from "./policies";
 import { HelpCenterArticleRepository } from "./repository";
 import { HelpCenterArticleRpcs } from "./rpcs";
@@ -128,6 +133,21 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
 
         if (previous === undefined) {
           return yield* notFound();
+        }
+
+        // The status is a lifecycle, not a free field: an update asks the same
+        // graph the editor's picker is derived from, so a move the graph calls
+        // unreachable (`draft → archived`, because a page nobody published is
+        // deleted rather than withdrawn) is refused here rather than stored as
+        // a row the machine cannot explain. A create names an initial state and
+        // has no previous state to move from, so it is not subject to this.
+        if (
+          previous.status !== args.status &&
+          !canTransitionHelpCenterArticle(previous.status, args.status)
+        ) {
+          return yield* new BadRequestError({
+            message: `An article cannot move from ${previous.status} to ${args.status}.`,
+          });
         }
 
         const now = yield* DateTime.nowAsDate;

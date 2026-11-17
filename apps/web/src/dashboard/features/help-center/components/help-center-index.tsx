@@ -206,12 +206,19 @@ export function HelpCenterIndex({
         </SkeletonWrapper>
       </SkeletonLoader>
 
+      {/*
+       * `key` is what seeds the form: a different target is a different
+       * component, so the draft is a `useState` initialiser rather than an
+       * effect or an in-render reset.
+       */}
       <HelpCenterTopicDialog
+        key="new"
         onOpenChange={setCreateOpen}
         open={createOpen}
         organizationId={organizationId}
       />
       <HelpCenterTopicDialog
+        key={editing?.id ?? "none"}
         onOpenChange={(open) => {
           if (!open) {
             setEditing(null);

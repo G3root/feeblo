@@ -1,3 +1,4 @@
+import { targetStatesFor } from "@feeblo/domain/help-center-article/machine";
 import { HelpCenterArticleId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
@@ -19,11 +20,11 @@ import { HelpCenterTopicIcon } from "./help-center-topic-icons";
 
 type ArticleStatus = "draft" | "published" | "archived";
 
-const STATUSES = [
-  { label: "Draft", value: "draft" },
-  { label: "Published", value: "published" },
-  { label: "Archived", value: "archived" },
-] as const satisfies ReadonlyArray<{ label: string; value: ArticleStatus }>;
+const STATUS_LABELS = {
+  archived: "Archived",
+  draft: "Draft",
+  published: "Published",
+} as const satisfies Record<ArticleStatus, string>;
 
 /**
  * The article editor.
@@ -90,6 +91,23 @@ export function HelpCenterArticleEditor({
   const [error, setError] = useState<string | null>(null);
 
   const preview = useMemo(() => content, [content]);
+
+  /**
+   * The statuses the lifecycle permits from where this article is now.
+   *
+   * Derived from the domain machine rather than listed here, so the editor
+   * cannot offer a move the graph says is unreachable — `draft → archived` is
+   * one, because a page nobody has published is deleted rather than withdrawn.
+   * The server asks the same machine, so this is the picker agreeing with the
+   * write instead of a second opinion.
+   */
+  const offeredStatuses = useMemo(() => {
+    const current: ArticleStatus = isArticleStatus(article?.status)
+      ? article.status
+      : "draft";
+
+    return [current, ...targetStatesFor(current)].filter(isArticleStatus);
+  }, [article?.status]);
 
   const save = async () => {
     const trimmedTitle = title.trim();
@@ -279,26 +297,27 @@ export function HelpCenterArticleEditor({
       <Field>
         <FieldLabel>Status</FieldLabel>
         <div className="flex flex-wrap gap-2">
-          {STATUSES.map((option) => (
+          {offeredStatuses.map((option) => (
             <button
-              aria-pressed={status === option.value}
+              aria-pressed={status === option}
               className={cn(
                 "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                status === option.value
+                status === option
                   ? "border-primary/50 bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
-              key={option.value}
-              onClick={() => setStatus(option.value)}
+              key={option}
+              onClick={() => setStatus(option)}
               type="button"
             >
-              {option.label}
+              {STATUS_LABELS[option]}
             </button>
           ))}
         </div>
         <FieldDescription>
           Archived articles stay reachable so old links do not break, but the
-          portal marks them as out of date.
+          portal marks them as out of date. Only the moves the article's
+          lifecycle allows are offered.
         </FieldDescription>
       </Field>
 

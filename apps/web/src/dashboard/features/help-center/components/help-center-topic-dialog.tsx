@@ -65,34 +65,32 @@ export function HelpCenterTopicDialog({
     | undefined;
 }) {
   const { helpCenterTopicCollection } = useDashboardCollections();
-  const [draft, setDraft] = useState<THelpCenterTopicDraft>(emptyDraft);
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const isEditing = topic !== undefined;
 
-  // The dialog is remounted per open, so the draft is seeded from the row being
-  // edited rather than reset by an effect that would also clobber typing.
-  const [seededFor, setSeededFor] = useState<string | null>(null);
-  const seedKey = topic?.id ?? "new";
+  /**
+   * The draft is seeded once, from the row this dialog was opened for.
+   *
+   * The caller gives the dialog a `key` that changes with the target, so a
+   * different section mounts a fresh form. That is what keeps this a lazy
+   * `useState` initialiser instead of an effect or an in-render `setState`:
+   * both of those exist to reset state in response to a prop change, and the
+   * `key` makes the prop change a *new component* rather than a change to
+   * react to.
+   */
+  const [draft, setDraft] = useState<THelpCenterTopicDraft>(() =>
+    topic === undefined
+      ? emptyDraft()
+      : {
+          description: topic.description ?? "",
+          icon: isHelpCenterTopicIcon(topic.icon)
+            ? topic.icon
+            : DEFAULT_HELP_CENTER_TOPIC_ICON,
+          name: topic.name,
+        }
+  );
 
-  if (open && seededFor !== seedKey) {
-    setSeededFor(seedKey);
-    setDraft(
-      isEditing
-        ? {
-            description: topic.description ?? "",
-            icon: isHelpCenterTopicIcon(topic.icon)
-              ? topic.icon
-              : DEFAULT_HELP_CENTER_TOPIC_ICON,
-            name: topic.name,
-          }
-        : emptyDraft()
-    );
-  }
-
-  if (!open && seededFor !== null) {
-    setSeededFor(null);
-  }
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     const name = draft.name.trim();
