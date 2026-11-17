@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import {
   Empty,
   EmptyDescription,
@@ -18,7 +19,9 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await preloadHelpCenterEditor();
+    if (isFeatureEnabled("HELP_CENTER")) {
+      await preloadHelpCenterEditor();
+    }
 
     return null;
   },

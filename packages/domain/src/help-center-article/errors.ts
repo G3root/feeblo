@@ -36,6 +36,19 @@ export class HelpCenterArticleSlugTakenError extends Schema.TaggedError<HelpCent
   { httpApiStatus: 409, identifier: "HelpCenterArticleSlugTakenError" }
 ) {}
 
+/**
+ * The article moved while this edit was open.
+ *
+ * The update carries the status the editor observed and only writes rows still
+ * in it, so an editor who saved a draft over a page a colleague published a
+ * moment earlier is told rather than silently reverting the publication.
+ */
+export class HelpCenterArticleChangedError extends Schema.TaggedError<HelpCenterArticleChangedError>()(
+  "HelpCenterArticleChangedError",
+  {},
+  { httpApiStatus: 409, identifier: "HelpCenterArticleChangedError" }
+) {}
+
 export const HelpCenterArticleServiceErrors = Schema.Union([
   UnauthorizedError,
   InternalServerError,
@@ -46,4 +59,5 @@ export const HelpCenterArticleServiceErrors = Schema.Union([
   FailedToUpdateHelpCenterArticleError,
   FailedToDeleteHelpCenterArticleError,
   HelpCenterArticleSlugTakenError,
+  HelpCenterArticleChangedError,
 ]);

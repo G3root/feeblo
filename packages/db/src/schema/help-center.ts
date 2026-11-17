@@ -267,9 +267,17 @@ export const helpCenterArticleFeedbackTable = pgTable(
     articleId: text("article_id")
       .notNull()
       .references(() => helpCenterArticleTable.id, { onDelete: "cascade" }),
-    /** A signed-in reader: a member or an end user with an account. */
+    /**
+     * A signed-in reader: a member or an end user with an account.
+     *
+     * Cascades with the account rather than nulling, because the table's
+     * identity check requires exactly one facet and a nulled `user_id` with no
+     * `visitor_id` would fail it — which would turn "delete this person" into a
+     * constraint violation instead of a delete. A verdict is one reader's
+     * opinion; the account that cast it takes it along.
+     */
     userId: text("user_id").references(() => userTable.id, {
-      onDelete: "set null",
+      onDelete: "cascade",
     }),
     /** An anonymous reader, keyed to a browser-generated id. */
     visitorId: text("visitor_id"),
@@ -321,6 +329,16 @@ export const helpCenterArticleFeedbackTable = pgTable(
     index("help_center_article_feedback_organizationId_idx").on(
       table.organizationId
     ),
+    // The same composite guard the article's topic reference carries: a verdict
+    // cannot name an article in another workspace, whatever a handler does.
+    foreignKey({
+      name: "help_center_article_feedback_article_organization_fk",
+      columns: [table.articleId, table.organizationId],
+      foreignColumns: [
+        helpCenterArticleTable.id,
+        helpCenterArticleTable.organizationId,
+      ],
+    }).onDelete("cascade"),
   ]
 );
 

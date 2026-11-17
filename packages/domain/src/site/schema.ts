@@ -37,7 +37,14 @@ export const SiteUpdate = S.Struct({
   organizationId: WorkspaceId.schema,
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
-  helpCenterVisibility: helpCenterVisibilitySchema,
+  /**
+   * Optional, and only sent when the form actually changed it.
+   *
+   * The site row is written as one payload, so a required field means a rename
+   * carries whatever visibility the client last read — silently reverting a
+   * toggle another member flipped in between.
+   */
+  helpCenterVisibility: S.optional(helpCenterVisibilitySchema),
   noIndex: S.Boolean,
   name: S.String,
 });

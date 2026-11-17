@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -10,7 +11,11 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await preloadHelpCenter();
+    // Nothing is rendered while the flag is off, so preloading both
+    // collections would be a request for a page that cannot use it.
+    if (isFeatureEnabled("HELP_CENTER")) {
+      await preloadHelpCenter();
+    }
 
     return null;
   },

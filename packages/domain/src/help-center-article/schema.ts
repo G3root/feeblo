@@ -1,4 +1,8 @@
 import {
+  HelpCenterArticleState,
+  HelpCenterArticleWriteState,
+} from "@feeblo/domain-contracts/help-center-article";
+import {
   HelpCenterArticleId,
   HelpCenterTopicId,
   WorkspaceId,
@@ -51,7 +55,7 @@ export const HelpCenterArticleSummary = S.Struct({
   slug: S.String,
   title: S.String,
   excerpt: S.String,
-  status: S.String,
+  status: HelpCenterArticleState,
   publishedAt: S.NullOr(S.DateFromString),
   position: S.NullOr(S.Finite),
   source: S.String,
@@ -178,7 +182,7 @@ export const HelpCenterArticleCreate = S.Struct({
   title: ArticleTitle,
   slug: S.optional(ArticleSlug),
   content: ArticleContent,
-  status: S.Literals(["draft", "published", "archived"]),
+  status: HelpCenterArticleWriteState,
   publishedAt: publishedAtWithDefault,
   position: positionWithDefault,
 });
@@ -194,7 +198,7 @@ export const HelpCenterArticleUpdate = S.Struct({
   title: ArticleTitle,
   slug: ArticleSlug,
   content: ArticleContent,
-  status: S.Literals(["draft", "published", "archived"]),
+  status: HelpCenterArticleWriteState,
   publishedAt: publishedAtWithDefault,
   position: positionWithDefault,
 });

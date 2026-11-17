@@ -85,6 +85,11 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
         args: THelpCenterArticleFeedbackGetPublic
       ) =>
         Effect.gen(function* () {
+          // Before the tally, not after: an unreadable article must answer
+          // "not found" rather than a count, which would both describe a page
+          // nobody can open and confirm the draft exists.
+          yield* requireReadableArticle(args);
+
           const identity = yield* resolveIdentity(args.visitorId);
 
           return yield* repository.tally({ ...args, ...identity });

@@ -1556,7 +1556,7 @@ export function siteCollection(scope: DashboardCollectionScope) {
       refetchInterval: Duration.toMillis(Duration.minutes(30)),
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
-        const { modified: updatedSite } = mutation;
+        const { modified: updatedSite, original: previousSite } = mutation;
 
         await fetchRpc((rpc) =>
           rpc.UpdateSite({
@@ -1564,7 +1564,13 @@ export function siteCollection(scope: DashboardCollectionScope) {
             organizationId: updatedSite.organizationId,
             changelogVisibility: updatedSite.changelogVisibility,
             roadmapVisibility: updatedSite.roadmapVisibility,
-            helpCenterVisibility: updatedSite.helpCenterVisibility,
+            // Omitted unless this update is what changed it. Sending the cached
+            // value on every save would let a rename revert a toggle another
+            // member flipped while this page was open.
+            ...(previousSite.helpCenterVisibility !==
+            updatedSite.helpCenterVisibility
+              ? { helpCenterVisibility: updatedSite.helpCenterVisibility }
+              : {}),
             noIndex: updatedSite.noIndex,
             name: updatedSite.name,
           })

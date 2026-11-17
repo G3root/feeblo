@@ -18,7 +18,7 @@ interface findManyArgs {
 
 interface updateArgs {
   changelogVisibility: "PUBLIC" | "HIDDEN";
-  helpCenterVisibility: "PUBLIC" | "HIDDEN";
+  helpCenterVisibility?: "PUBLIC" | "HIDDEN" | undefined;
   id: string;
   name: string;
   noIndex: boolean;
@@ -116,7 +116,11 @@ const makeSiteRepository = Effect.gen(function* () {
           .update(schema.siteTable)
           .set({
             changelogVisibility,
-            helpCenterVisibility,
+            // Only when the caller named it: an absent field means "leave it",
+            // not "set it to what this client happened to read".
+            ...(helpCenterVisibility === undefined
+              ? {}
+              : { helpCenterVisibility }),
             updatedAt: now,
             roadmapVisibility,
             noIndex,

@@ -380,6 +380,33 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
       })
     );
 
+    it.effect("answers NotFound for a draft's tally", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        yield* db
+          .update(schema.helpCenterArticleTable)
+          .set({ status: "draft", publishedAt: null })
+          .where(eq(schema.helpCenterArticleTable.id, fixture.articleId));
+
+        const error = yield* Effect.flip(
+          handlers
+            .GetHelpCenterArticleFeedbackPublic({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              visitorId: visitorIdFor(fixture),
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()))
+        );
+
+        // A count for a page nobody can open is both a wrong number and a
+        // confirmation that the draft exists.
+        expect(error._tag).toBe("NotFoundError");
+      })
+    );
+
     it.effect("keeps the verdict list to managers", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;

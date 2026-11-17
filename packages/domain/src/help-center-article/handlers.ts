@@ -17,6 +17,7 @@ import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
   FailedToDeleteHelpCenterArticleError,
+  HelpCenterArticleChangedError,
   HelpCenterArticleSlugTakenError,
 } from "./errors";
 import { canTransitionHelpCenterArticle } from "./machine";
@@ -165,14 +166,21 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           title: args.title,
         });
 
-        yield* repository.update({
+        const updated = yield* repository.update({
           id: args.id,
           organizationId: args.organizationId,
           topicId: args.topicId,
           position: args.position,
+          // The status read a moment ago. A row that has moved since is a
+          // conflict, not an overwrite.
+          expectedStatus: previous.status,
           now,
           write,
         });
+
+        if (updated.length === 0) {
+          return yield* new HelpCenterArticleChangedError();
+        }
       }).pipe(
         Policy.withPolicy(articlePolicy.canUpdate(args.organizationId)),
         withRemapDbErrors({

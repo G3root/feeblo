@@ -2,6 +2,16 @@ import { HelpCenterTopicId, WorkspaceId } from "@feeblo/id";
 import * as Effect from "effect/Effect";
 import * as S from "effect/Schema";
 
+/**
+ * How many sections one workspace may hold.
+ *
+ * A section is free — the plan counts articles — so this is an abuse bound
+ * rather than a product limit. It exists because a reorder names the whole
+ * list in one write: a cap on the reorder that the create did not share would
+ * let a workspace reach a size it could never reorder.
+ */
+export const HELP_CENTER_TOPIC_LIMIT = 200;
+
 const TopicName = S.Trim.pipe(
   S.check(S.isMinLength(1)),
   S.check(S.isMaxLength(100))

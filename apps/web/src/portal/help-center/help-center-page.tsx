@@ -41,27 +41,6 @@ export function HelpCenterPage() {
       fetchRpc((rpc) => rpc.ListHelpCenterArticlesPublic({ organizationId })),
   });
 
-  if (!enabled) {
-    return (
-      <Empty className="py-16">
-        <EmptyHeader>
-          <EmptyTitle>Not found</EmptyTitle>
-          <EmptyDescription>This page is not available.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
-
-  if (topicsQuery.isPending || articlesQuery.isPending) {
-    return (
-      <div className="mx-auto w-full max-w-3xl space-y-4 py-8">
-        <Skeleton className="h-7 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
-  }
-
   const topics = topicsQuery.data ?? [];
   const articles = articlesQuery.data ?? [];
 
@@ -83,6 +62,27 @@ export function HelpCenterPage() {
 
     return byTopic;
   }, [articles]);
+
+  if (!enabled) {
+    return (
+      <Empty className="py-16">
+        <EmptyHeader>
+          <EmptyTitle>Not found</EmptyTitle>
+          <EmptyDescription>This page is not available.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  if (topicsQuery.isPending || articlesQuery.isPending) {
+    return (
+      <div className="mx-auto w-full max-w-3xl space-y-4 py-8">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
 
   if (topics.length === 0) {
     return (

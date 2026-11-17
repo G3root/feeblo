@@ -78,7 +78,8 @@ CREATE UNIQUE INDEX "help_center_topic_id_organizationId_uidx" ON "help_center_t
 CREATE INDEX "help_center_topic_organizationId_position_idx" ON "help_center_topic" ("organization_id","position");--> statement-breakpoint
 ALTER TABLE "help_center_article_feedback" ADD CONSTRAINT "help_center_article_feedback_7mA1agXS4vCu_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "help_center_article_feedback" ADD CONSTRAINT "help_center_article_feedback_ADsJS0oJx292_fkey" FOREIGN KEY ("article_id") REFERENCES "help_center_article"("id") ON DELETE CASCADE;--> statement-breakpoint
-ALTER TABLE "help_center_article_feedback" ADD CONSTRAINT "help_center_article_feedback_user_id_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE SET NULL;--> statement-breakpoint
+ALTER TABLE "help_center_article_feedback" ADD CONSTRAINT "help_center_article_feedback_user_id_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE CASCADE;--> statement-breakpoint
+ALTER TABLE "help_center_article_feedback" ADD CONSTRAINT "help_center_article_feedback_article_organization_fk" FOREIGN KEY ("article_id","organization_id") REFERENCES "help_center_article"("id","organization_id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "help_center_article" ADD CONSTRAINT "help_center_article_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "help_center_article" ADD CONSTRAINT "help_center_article_creator_member_id_member_id_fkey" FOREIGN KEY ("creator_member_id") REFERENCES "member"("id") ON DELETE SET NULL;--> statement-breakpoint
 ALTER TABLE "help_center_article" ADD CONSTRAINT "help_center_article_topic_organization_fk" FOREIGN KEY ("topic_id","organization_id") REFERENCES "help_center_topic"("id","organization_id") ON DELETE RESTRICT;--> statement-breakpoint

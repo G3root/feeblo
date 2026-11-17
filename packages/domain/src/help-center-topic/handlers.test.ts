@@ -398,6 +398,46 @@ describe("HelpCenterTopicRpcHandlers", () => {
       })
     );
 
+    it.effect("refuses a reorder that omits a section it already has", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterTopicRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+
+        const ids: TopicId[] = [];
+
+        for (const name of ["First", "Second"]) {
+          const id = yield* HelpCenterTopicId.generate;
+          ids.push(id);
+          yield* handlers
+            .CreateHelpCenterTopic({
+              id,
+              organizationId: fixture.organizationId,
+              name,
+              slug: undefined,
+              description: null,
+              icon: null,
+              position: undefined,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+        }
+
+        // Every id in this list belongs to the workspace, so counting only the
+        // owned ids would accept it and leave "Second" at a position that now
+        // collides with "First".
+        const error = yield* Effect.flip(
+          handlers
+            .ReorderHelpCenterTopics({
+              organizationId: fixture.organizationId,
+              topicIds: [ids[0]!],
+            })
+            .pipe(Effect.provideService(CurrentSession, session))
+        );
+
+        expect(error._tag).toBe("BadRequestError");
+      })
+    );
+
     it.effect("rejects a caller without a membership", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterTopicRpcHandlersEffect;

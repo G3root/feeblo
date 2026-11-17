@@ -1,3 +1,4 @@
+import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-center-article";
 import { targetStatesFor } from "@feeblo/domain/help-center-article/machine";
 import { HelpCenterArticleId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
@@ -10,15 +11,23 @@ import { cn } from "@feeblo/ui/utils";
 import { ArrowLeft02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { fetchRpc } from "~/lib/runtime";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { HelpCenterTopicIcon } from "./help-center-topic-icons";
 
-type ArticleStatus = "draft" | "published" | "archived";
+/**
+ * The lifecycle state, taken from the domain rather than restated.
+ *
+ * The editor used to declare its own union; a state added to the article
+ * lifecycle would have been invisible here until someone remembered to widen
+ * it, and the picker would silently stop offering it.
+ */
+type ArticleStatus = THelpCenterArticleState;
 
 const STATUS_LABELS = {
   archived: "Archived",
@@ -58,6 +67,25 @@ export function HelpCenterArticleEditor({
     useDashboardCollections();
 
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  /**
+   * Drop the route's cached single-article read.
+   *
+   * The editor page holds the body under `["help-center-article", org, id]`.
+   * After this form replaces or removes that article, invalidating would leave
+   * the entry *readable*, so reopening the editor paints the old body until a
+   * refetch lands; removing it makes the next open a load.
+   */
+  const forgetArticle = useCallback(() => {
+    if (article === undefined) {
+      return;
+    }
+
+    queryClient.removeQueries({
+      queryKey: ["help-center-article", organizationId, article.id],
+    });
+  }, [article, organizationId, queryClient]);
 
   const topicsQuery = useLiveQuery({
     queryKey: [
@@ -173,6 +201,12 @@ export function HelpCenterArticleEditor({
         })
       );
       await helpCenterArticleCollection.utils.refetch();
+
+      // The route caches the single-article read under its own key. Invalidate
+      // alone leaves that entry readable, so reopening the editor would show
+      // the body that was just replaced until the refetch landed. Dropping it
+      // makes the next open a load rather than a stale paint.
+      forgetArticle();
 
       await navigate({
         params: { organizationId },

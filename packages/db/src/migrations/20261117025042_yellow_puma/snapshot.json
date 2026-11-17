@@ -2,7 +2,7 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "0232ecf1-4ea1-4e4c-8943-f7ed7397b886",
+  "id": "6fd1d92d-f6e5-445d-8ff6-0b57edde8b4e",
   "prevIds": [
     "a3d9fbeb-985c-4b84-a575-fe8ccc2c0874"
   ],
@@ -538,6 +538,31 @@
         "n|col|public.help_center_article_feedback.user_id",
         "n|col|public.user.id",
         "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_feedback"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_feedback.help_center_article_feedback_article_organization_fk",
+        "n|fk|public.help_center_article_feedback.help_center_article_feedback_article_organization_fk",
+        "e|fk|public.help_center_article_feedback.help_center_article_feedback_article_organization_fk",
+        "n|con|public.help_center_article_feedback.help_center_article_feedback_article_organization_fk"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_feedback",
+        "n|sch|public",
+        "n|tbl|public.help_center_article",
+        "n|sch|public",
+        "n|col|public.help_center_article_feedback.article_id",
+        "n|col|public.help_center_article_feedback.organization_id",
+        "n|col|public.help_center_article.id",
+        "n|col|public.help_center_article.organization_id",
+        "e|uniqueness|public.help_center_article.id.organization_id"
       ]
     },
     {
@@ -1949,7 +1974,29 @@
           "id"
         ],
         "onUpdate": "NO ACTION",
-        "onDelete": "SET NULL",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_feedback",
+        "name": "help_center_article_feedback_article_organization_fk",
+        "nameExplicit": true,
+        "columns": [
+          "article_id",
+          "organization_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "help_center_article",
+        "columnsTo": [
+          "id",
+          "organization_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
         "entityType": "fks"
       }
     },

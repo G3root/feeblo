@@ -108,16 +108,23 @@ export function HelpCenterTopicDialog({
       const description =
         draft.description.trim().length === 0 ? null : draft.description.trim();
 
+      // The transaction is awaited through `when("settled")` rather than the
+      // call itself: the collection applies optimistically and only reports the
+      // server's answer — a slug collision, a permission refusal — through the
+      // transaction. Closing the dialog on the optimistic apply would hide a
+      // save that never happened.
       if (isEditing) {
-        helpCenterTopicCollection.update(topic.id, (current) => {
+        const tx = helpCenterTopicCollection.update(topic.id, (current) => {
           current.name = name;
           current.description = description;
           current.icon = draft.icon;
         });
+
+        await tx.when("settled");
       } else {
         const id = await HelpCenterTopicId.unsafeGenerate();
 
-        helpCenterTopicCollection.insert({
+        const tx = helpCenterTopicCollection.insert({
           id,
           organizationId,
           name,
@@ -131,6 +138,8 @@ export function HelpCenterTopicDialog({
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+
+        await tx.when("settled");
       }
 
       onOpenChange(false);

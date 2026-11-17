@@ -1,6 +1,7 @@
 import { PLAN_ENTITLEMENTS } from "@feeblo/domain/plan-entitlements";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import {
   Empty,
   EmptyContent,
@@ -17,6 +18,7 @@ import {
   MenuTrigger,
 } from "@feeblo/ui/menu";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
@@ -71,6 +73,8 @@ export function HelpCenterIndex({
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<THelpCenterTopicRow | null>(null);
+  const [deleting, setDeleting] = useState<THelpCenterTopicRow | null>(null);
+  const [deletePending, setDeletePending] = useState(false);
 
   const topicsQuery = useLiveQuery({
     queryKey: [
@@ -127,6 +131,32 @@ export function HelpCenterIndex({
       bucket.push(article);
     }
   }
+
+  const confirmDeleteSection = async () => {
+    if (deleting === null) {
+      return;
+    }
+
+    setDeletePending(true);
+
+    try {
+      const tx = helpCenterTopicCollection.delete(deleting.id);
+
+      // `when("settled")` is the collection's own report that the server
+      // accepted the write. The optimistic removal has already happened, so a
+      // refusal — a section that gained an article since this page loaded —
+      // has to be surfaced rather than swallowed.
+      await tx.when("settled");
+      setDeleting(null);
+    } catch {
+      toastManager.add({
+        title: "Failed to delete the section",
+        type: "error",
+      });
+    } finally {
+      setDeletePending(false);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -195,6 +225,7 @@ export function HelpCenterIndex({
                   <TopicCard
                     articles={articlesByTopic.get(topic.id) ?? []}
                     canManage={canManage}
+                    onDelete={() => setDeleting(topic)}
                     onEdit={() => setEditing(topic)}
                     organizationId={organizationId}
                     topic={topic}
@@ -212,7 +243,10 @@ export function HelpCenterIndex({
        * effect or an in-render reset.
        */}
       <HelpCenterTopicDialog
-        key="new"
+        // Keyed by `open`, not by a constant: the draft is a `useState`
+        // initialiser, so a constant key would reopen the dialog holding
+        // whatever the last cancelled attempt had typed.
+        key={createOpen ? "new-open" : "new-closed"}
         onOpenChange={setCreateOpen}
         open={createOpen}
         organizationId={organizationId}
@@ -227,6 +261,19 @@ export function HelpCenterIndex({
         open={editing !== null}
         organizationId={organizationId}
         topic={editing ?? undefined}
+      />
+      <ConfirmDialog
+        confirmLabel="Delete section"
+        confirmLoading={deletePending}
+        description="The section disappears from the help center. Sections that still hold articles cannot be deleted."
+        onConfirm={confirmDeleteSection}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleting(null);
+          }
+        }}
+        open={deleting !== null}
+        title={`Delete ${deleting?.name ?? "section"}?`}
       />
     </div>
   );
@@ -262,6 +309,7 @@ function ArticleAllowance({ used }: { used: number }) {
 function TopicCard({
   articles,
   canManage,
+  onDelete,
   onEdit,
   organizationId,
   topic,
@@ -277,6 +325,7 @@ function TopicCard({
     viewCount: number;
   }>;
   canManage: boolean;
+  onDelete: () => void;
   onEdit: () => void;
   organizationId: string;
   topic: THelpCenterTopicRow;
@@ -325,7 +374,7 @@ function TopicCard({
                 <MenuSeparator />
                 <MenuItem
                   disabled={topic.articleCount > 0}
-                  onClick={() => helpCenterTopicCollection.delete(topic.id)}
+                  onClick={onDelete}
                   variant="destructive"
                 >
                   <HugeiconsIcon icon={Delete02Icon} />

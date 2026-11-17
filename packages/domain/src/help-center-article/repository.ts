@@ -261,11 +261,21 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
       })
       .pipe(Effect.asVoid);
 
+  /**
+   * Replace an article's writable fields, but only while it is still in
+   * `expectedStatus`.
+   *
+   * The status travels in the `WHERE` clause rather than being read and
+   * trusted: two editors can have the same draft open, and the one who saves
+   * second must not silently undo the other's publication. An update that
+   * matched nothing reports that, and the caller answers a conflict.
+   */
   const update = ({
     id,
     organizationId,
     topicId,
     position,
+    expectedStatus,
     now,
     write,
   }: {
@@ -273,6 +283,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     organizationId: string;
     topicId: string;
     position: number | null;
+    expectedStatus: THelpCenterArticleState;
     now: Date;
     write: NormalizedHelpCenterArticleWrite;
   }) =>
@@ -290,9 +301,14 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         updatedAt: now,
       })
       .where(
-        and(eq(article.id, id), eq(article.organizationId, organizationId))
+        and(
+          eq(article.id, id),
+          eq(article.organizationId, organizationId),
+          eq(article.status, expectedStatus)
+        )
       )
-      .pipe(Effect.asVoid);
+      .returning({ id: article.id })
+      .pipe(Effect.map((rows) => rows.map((row) => row.id)));
 
   const remove = ({
     organizationId,

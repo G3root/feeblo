@@ -5,7 +5,12 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import type { THelpCenterTopicDelete, THelpCenterTopicReorder } from "./schema";
+import type {
+  THelpCenterTopicCreate,
+  THelpCenterTopicDelete,
+  THelpCenterTopicReorder,
+  THelpCenterTopicUpdate,
+} from "./schema";
 
 const topicColumns = {
   id: schema.helpCenterTopicTable.id,
@@ -33,24 +38,22 @@ const displayOrder = [
  * resolves one before writing). Reusing the wire type would push an `undefined`
  * into the insert under `exactOptionalPropertyTypes`.
  */
-interface TCreateTopic {
-  description: string | null;
-  icon: string | null;
-  id: string;
-  name: string;
-  organizationId: string;
+/**
+ * The create's stored fields: the contract, with `position` made required.
+ *
+ * Derived rather than restated, so a field added to the RPC payload reaches the
+ * insert. Only `position` differs — it is optional on the wire (an omitted
+ * position appends) and always resolved by the handler before the write, which
+ * is what keeps an `undefined` out of the insert under
+ * `exactOptionalPropertyTypes`.
+ */
+type TCreateTopic = Omit<THelpCenterTopicCreate, "position" | "slug"> & {
   position: number;
   slug: string;
-}
+};
 
-interface TUpdateTopic {
-  description: string | null;
-  icon: string | null;
-  id: string;
-  name: string;
-  organizationId: string;
-  slug: string;
-}
+/** The update's stored fields: the contract, unchanged. */
+type TUpdateTopic = THelpCenterTopicUpdate;
 
 const makeHelpCenterTopicRepository = Effect.gen(function* () {
   const db = yield* currentDb;

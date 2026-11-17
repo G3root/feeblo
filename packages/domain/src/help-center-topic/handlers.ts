@@ -17,6 +17,7 @@ import {
 import { HelpCenterTopicPolicy } from "./policies";
 import { HelpCenterTopicRepository } from "./repository";
 import { HelpCenterTopicRpcs } from "./rpcs";
+import { HELP_CENTER_TOPIC_LIMIT } from "./schema";
 import type {
   THelpCenterTopicCreate,
   THelpCenterTopicDelete,
@@ -82,6 +83,14 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
           name: args.name,
         });
 
+        const existing = yield* repository.countByOrganizationId(args);
+
+        if (existing >= HELP_CENTER_TOPIC_LIMIT) {
+          return yield* new BadRequestError({
+            message: `A workspace may hold up to ${HELP_CENTER_TOPIC_LIMIT} help center sections.`,
+          });
+        }
+
         const position =
           args.position ?? (yield* repository.nextPosition(args));
 
@@ -146,13 +155,27 @@ export const HelpCenterTopicRpcHandlersEffect = Effect.gen(function* () {
 
     ReorderHelpCenterTopics: (args: THelpCenterTopicReorder) =>
       Effect.gen(function* () {
-        const owned = yield* repository.findIds(args);
+        const [owned, total] = yield* Effect.all(
+          [
+            repository.findIds(args),
+            repository.countByOrganizationId({
+              organizationId: args.organizationId,
+            }),
+          ],
+          { concurrency: "unbounded" }
+        );
 
-        // A reorder names the whole list. A partial list applied as "these
-        // first" would leave every unnamed topic at a position that now
-        // collides with a named one, and the resulting order would depend on
-        // the tie-break rather than on the drag.
-        if (owned.length !== args.topicIds.length) {
+        // A reorder names the whole list, so it has to equal the workspace in
+        // both directions: every named id must be one this workspace owns
+        // (`owned`, which also refuses duplicates), and every section it owns
+        // must be named (`total`). Checking only the first would accept a
+        // strict subset and leave the omitted sections at positions that now
+        // collide with the named ones, making the result depend on the
+        // tie-break rather than on the drag.
+        if (
+          owned.length !== args.topicIds.length ||
+          args.topicIds.length !== total
+        ) {
           return yield* new BadRequestError({
             message: "Every topic in the workspace must be named exactly once.",
           });

@@ -239,14 +239,19 @@ export const program = Effect.gen(function* () {
   // The help center's read events age out on the same terms, for the same
   // reason: the counter beside them is the number a customer reads and is never
   // pruned, so the events only need to answer the recent window.
-  const helpCenterTrafficRuntime = yield* Layer.build(
-    HelpCenterArticleRepository.layer
-  );
+  //
+  // Off means nothing writes a read event, so the sweep is not scheduled at
+  // all — the same rule the audit-log sweep below applies.
+  if (isFeatureEnabled("HELP_CENTER")) {
+    const helpCenterTrafficRuntime = yield* Layer.build(
+      HelpCenterArticleRepository.layer
+    );
 
-  yield* helpCenterArticleViewRetention.pipe(
-    Effect.provide(helpCenterTrafficRuntime),
-    Effect.forkScoped
-  );
+    yield* helpCenterArticleViewRetention.pipe(
+      Effect.provide(helpCenterTrafficRuntime),
+      Effect.forkScoped
+    );
+  }
 
   // The audit log owns the one writer allowed to delete from an append-only
   // table; the sweep says so on its own transaction. It is not scheduled while

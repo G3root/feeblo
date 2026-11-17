@@ -46,7 +46,7 @@ export function Navbar() {
               ) : null}
               {isFeatureEnabled("HELP_CENTER") &&
               site.helpCenterVisibility === "PUBLIC" ? (
-                <NavTab href={boardPaths.help} label={m.help_center_nav()} />
+                <NavTab href={boardPaths.help} label={m.arable_plane_felix()} />
               ) : null}
             </nav>
           </div>
@@ -72,7 +72,7 @@ export function Navbar() {
           ) : null}
           {isFeatureEnabled("HELP_CENTER") &&
           site.helpCenterVisibility === "PUBLIC" ? (
-            <NavTab href={boardPaths.help} label={m.help_center_nav()} />
+            <NavTab href={boardPaths.help} label={m.arable_plane_felix()} />
           ) : null}
         </nav>
       </div>

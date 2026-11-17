@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { createFileRoute } from "@tanstack/react-router";
 
@@ -10,7 +11,9 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    await preloadHelpCenterEditor();
+    if (isFeatureEnabled("HELP_CENTER")) {
+      await preloadHelpCenterEditor();
+    }
 
     return null;
   },

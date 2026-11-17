@@ -166,7 +166,13 @@ export function HelpCenterArticlePage({
         <MarkdownContent content={article.content} />
       </div>
 
+      {/*
+       * Keyed by the article: the verdict machine adopts one tally per article,
+       * and navigating from `/articles/a` to `/articles/b` keeps this route
+       * mounted. Without the key the widget would show A's verdict on B.
+       */}
       <VerdictSection
+        key={article.id}
         articleId={article.id}
         organizationId={organizationId}
         visitorId={visitorId}
@@ -281,21 +287,44 @@ function FeedbackButton({
  * server-rendered and `window` does not exist there. Callers gate their
  * requests on the id being present instead of sending one without it.
  */
+/**
+ * Where the id lives when `localStorage` refuses to be written.
+ *
+ * Module scope, so it survives a remount within one document even though it
+ * does not survive a reload. Losing it costs one duplicate vote; a crash costs
+ * the whole page.
+ */
+let memoryVisitorId: string | null = null;
+
 function useVisitorId(): string | undefined {
   const [visitorId, setVisitorId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const existing = window.localStorage.getItem(VISITOR_KEY);
+    // Storage access is not guaranteed: Safari's private mode and a browser
+    // with site data disabled both throw from `localStorage`, and a throw
+    // inside an effect unmounts the page. The identity is a convenience, so a
+    // refused write falls back to memory and the reader still gets a working
+    // widget.
+    const resolved = (() => {
+      try {
+        const existing = window.localStorage.getItem(VISITOR_KEY);
 
-    if (existing !== null) {
-      setVisitorId(existing);
+        if (existing !== null) {
+          return existing;
+        }
 
-      return;
-    }
+        const generated = crypto.randomUUID();
+        window.localStorage.setItem(VISITOR_KEY, generated);
 
-    const generated = crypto.randomUUID();
-    window.localStorage.setItem(VISITOR_KEY, generated);
-    setVisitorId(generated);
+        return generated;
+      } catch {
+        memoryVisitorId ??= crypto.randomUUID();
+
+        return memoryVisitorId;
+      }
+    })();
+
+    setVisitorId(resolved);
   }, []);
 
   return visitorId;
@@ -340,11 +369,19 @@ function useViewBeacon({
 
     const key = `${VIEWED_PREFIX}${articleId}`;
 
-    if (window.sessionStorage.getItem(key) !== null) {
-      return;
+    // `sessionStorage` can refuse for the same reasons `localStorage` can. A
+    // refused *read* is treated as "not seen yet" and a refused *write* costs
+    // one extra count on a remount — both are better than losing the view.
+    try {
+      if (window.sessionStorage.getItem(key) !== null) {
+        return;
+      }
+
+      window.sessionStorage.setItem(key, "1");
+    } catch {
+      // Fall through: send the beacon and accept the dedupe we cannot keep.
     }
 
-    window.sessionStorage.setItem(key, "1");
     void beacon(articleId);
   }, [articleId, beacon]);
 }
