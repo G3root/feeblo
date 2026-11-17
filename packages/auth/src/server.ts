@@ -1216,6 +1216,16 @@ export const initAuthHandler = (
 
         lastLoginMethod({
           storeInDatabase: true,
+          // The plugin's default resolver maps `/sign-up/email` and
+          // `/sign-in/email`, but this app verifies the address before a new
+          // account is given a session: the response that actually signs the
+          // person in after an email sign-up is `/email-otp/verify-email`.
+          // Without this, the sign-in page's "Last used" hint would be missing
+          // on the first visit after signing up — the visit it exists for — and
+          // would only appear from the second sign-in onward. Returning `null`
+          // for everything else falls back to the default resolver.
+          customResolveMethod: (ctx) =>
+            ctx.path === "/email-otp/verify-email" ? "email" : null,
         }),
         organization({
           allowUserToCreateOrganization: false,

@@ -187,11 +187,11 @@ function AuthMethodChooser({
       <SocialAuthButtons />
       <FieldSeparator>{m.stout_teary_dove()}</FieldSeparator>
 
-      <Button onClick={() => onSelectEmailStep("email-sign-in")}>
+      <Button onClick={() => onSelectEmailStep("email-sign-in")} size="lg">
         {m.stock_such_porpoise()}
       </Button>
 
-      <Button onClick={() => onSelectEmailStep("email-sign-up")}>
+      <Button onClick={() => onSelectEmailStep("email-sign-up")} size="lg">
         {m.extra_born_bear()}
       </Button>
     </div>

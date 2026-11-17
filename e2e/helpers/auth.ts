@@ -120,7 +120,7 @@ export async function logOut(page: Page, userEmail: string) {
   // Dashboard redirects preserve the return path in a query parameter.
   await page.waitForURL(/\/sign-in(?:\?|$)/);
   await expect(
-    page.getByRole("button", { name: "Login", exact: true })
+    page.getByRole("button", { name: "Sign in", exact: true })
   ).toBeVisible();
 }
 

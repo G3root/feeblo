@@ -75,6 +75,8 @@ function PostVoterDialogRoot({
 
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const voters = upvotes as PostVoter[];
+    // Four faces, then the count — the same number the dashboard's voter panel
+    // shows, so the two post-detail surfaces cannot drift apart.
     const visibleVoters = voters.slice(0, 4);
 
     return {

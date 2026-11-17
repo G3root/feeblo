@@ -106,7 +106,9 @@ test(
         visitorPage.getByRole("textbox", { name: "Email" })
       ).toBeVisible();
       await expect(
-        visitorPage.getByText("Enter your account credentials to continue.")
+        visitorPage.getByText(
+          "Sign in to pick up where your workspace left off."
+        )
       ).toBeVisible();
 
       await visitorPage
@@ -123,7 +125,7 @@ test(
       );
 
       await visitorPage
-        .getByRole("button", { name: "Login", exact: true })
+        .getByRole("button", { name: "Sign in", exact: true })
         .click();
       expect((await signInResponse).ok()).toBeTruthy();
 

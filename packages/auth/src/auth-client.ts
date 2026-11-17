@@ -4,6 +4,7 @@ import {
   adminClient,
   customSessionClient,
   emailOTPClient,
+  lastLoginMethodClient,
   organizationClient,
   twoFactorClient,
 } from "better-auth/client/plugins";
@@ -35,6 +36,13 @@ const buildAuthClientOptions = (
     }),
     twoFactorClient(),
     adminClient(),
+    // The sign-in page's "Last used" hint. The server half
+    // (`lastLoginMethod({ storeInDatabase: true })`) is already enabled in
+    // `server.ts`; this half exposes `getLastUsedLoginMethod()`, which reads
+    // the `better-auth.last_used_login_method` cookie the server writes on
+    // every sign-in. Without it the value is only readable by the next
+    // authenticated request, which is no use on a signed-out page.
+    lastLoginMethodClient(),
     // The MCP authorization server's endpoints (`oauth2.consent`,
     // `oauth2.continue`), used by the consent and workspace-choice pages.
     oauthProviderClient(),

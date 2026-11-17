@@ -15,8 +15,8 @@ export class ResetPasswordPage {
       name: "Continue",
       exact: true,
     });
-    this.passwordInput = page.getByLabel("New Password", { exact: true });
-    this.confirmPasswordInput = page.getByLabel("Confirm Password", {
+    this.passwordInput = page.getByLabel("New password", { exact: true });
+    this.confirmPasswordInput = page.getByLabel("Confirm password", {
       exact: true,
     });
     this.passwordSubmitButton = page.getByRole("button", {

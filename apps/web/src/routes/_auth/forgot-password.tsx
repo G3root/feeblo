@@ -154,16 +154,19 @@ function RouteComponent() {
 
   return (
     <AuthShell
-      description="Enter your account email and we'll send you a code to reset your password."
+      description="Enter the email on your account and we'll send a six-digit code to reset your password."
       footer={
-        <div className="text-center text-sm">
-          Remembered your password?{" "}
-          <Link className="underline underline-offset-4" to="/sign-in">
+        <p>
+          Remembered it?{" "}
+          <Link
+            className="text-foreground font-medium underline-offset-4 hover:underline"
+            to="/sign-in"
+          >
             Sign in
           </Link>
-        </div>
+        </p>
       }
-      title="Forgot password"
+      title="Reset your password"
     >
       <form
         onSubmit={(e) => {
@@ -174,13 +177,22 @@ function RouteComponent() {
       >
         <div className="flex flex-col gap-4">
           <form.AppField name="email">
-            {(field) => <field.TextField label="Email" type="email" />}
+            {(field) => (
+              <field.TextField
+                autoComplete="email"
+                label="Email"
+                placeholder="you@company.com"
+                size="lg"
+                type="email"
+              />
+            )}
           </form.AppField>
 
           <form.AppForm>
             <form.SubscribeButton
               className="w-full"
-              label="Send reset code"
+              label="Send code"
+              size="lg"
               type="submit"
             />
           </form.AppForm>

@@ -1,6 +1,5 @@
 import type { TUpvote } from "@feeblo/domain/upvote/schema";
 import { UpvoteId } from "@feeblo/id";
-import { Button } from "@feeblo/ui/button";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { cn } from "@feeblo/ui/utils";
 import { isLiveQueryPending } from "@feeblo/web-shared/collections";
@@ -16,6 +15,7 @@ import { createContext, type ReactNode, use, useMemo } from "react";
 import { m } from "./paraglide/messages.js";
 import { usePostCollectionData } from "./post-page-context";
 import { usePostCollections } from "./providers/post-collections-provider";
+import { useVoteBurst } from "./upvote-burst-machine";
 
 type UpvoteCollection = Collection<TUpvote, string, any, any>;
 
@@ -93,13 +93,15 @@ function useUpvote({
   const upvoteCount = upvotes?.length ?? 0;
   const isUpvoted = !!userUpvoteQuery.data;
 
-  const onToggle = async () => {
-    if (disabled) return;
+  const onToggle = async (): Promise<UpvoteOutcome> => {
+    if (disabled) {
+      return "noop";
+    }
 
     if (!session) {
       onAuthRequired?.();
 
-      return;
+      return "noop";
     }
 
     const userId = session.user.id;
@@ -117,7 +119,7 @@ function useUpvote({
     await upvoteCollection.utils.refetch({ throwOnError: true });
 
     if (upvoteCollection.has(key) === intendedUpvoted) {
-      return;
+      return "noop";
     }
 
     if (intendedUpvoted) {
@@ -140,10 +142,15 @@ function useUpvote({
       });
 
       await tx.when("settled");
-    } else {
-      const tx = upvoteCollection.delete(key);
-      await tx.when("settled");
+
+      return "cast";
     }
+
+    const tx = upvoteCollection.delete(key);
+
+    await tx.when("settled");
+
+    return "cleared";
   };
 
   return { isLoading, isUpvoted, onToggle, upvoteCount };
@@ -155,13 +162,138 @@ function useUpvote({
 
 type TriggerVariant = "compact" | "default";
 
+/**
+ * What a press did to the vote.
+ *
+ * The trigger needs this to know whether to confirm the press with the ring:
+ * only a vote that was actually cast is worth confirming. `noop` covers the
+ * presses that change nothing — a locked or merged post, a guest sent to the
+ * sign-in dialog, or a retry that finds the row already in the intended state.
+ */
+export type UpvoteOutcome = "cast" | "cleared" | "noop";
+
+/**
+ * Shared trigger geometry and behaviour.
+ *
+ * These are plain `<button>`s rather than `<Button>`, because the two states
+ * need four properties to move together (border, background, text colour, and
+ * the arrow's offset) and layering Tailwind overrides on a `Button` variant
+ * loses that race: `outline` already sets `bg-popover` and `dark:bg-input/32`,
+ * and which of two background utilities wins is decided by Tailwind's internal
+ * sort order, not by the order they appear in the class list.
+ *
+ * `active:scale-[0.96]` is the whole point of the press state: the count is
+ * about to change, and the interface should confirm it heard the press before
+ * the network answers. `pointer-coarse:after:*` reproduces the 44px touch
+ * target the design system's buttons get, since this chip is 40px wide.
+ */
+const triggerBase = cn(
+  "group/upvote relative inline-flex shrink-0 cursor-pointer items-center justify-center",
+  "border font-medium outline-none select-none",
+  "transition-[background-color,border-color,color,scale] duration-150 ease-out",
+  "focus-visible:ring-brand/40 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-1",
+  "active:scale-[0.96]",
+  "disabled:pointer-events-none disabled:opacity-64",
+  "motion-reduce:transition-none motion-reduce:active:scale-100",
+  "pointer-coarse:after:absolute pointer-coarse:after:size-full pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11"
+);
+
+/**
+ * Both grounds use the brand tint for "you voted": the product's one accent
+ * already means "this is the affirmative action", and a vote is the most
+ * affirmative thing on a board.
+ */
+const variantStyles = {
+  compact: {
+    idle: "border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
+    // No gap between arrow and count: the chevron's own box already carries
+    // about a third of its height as padding, so a gap on top of that reads as
+    // two separate objects rather than one stacked symbol.
+    frame: "h-11 min-w-10 flex-col rounded-lg px-1 text-[11px] leading-none",
+    voted:
+      "border-brand/40 bg-brand/12 text-brand hover:bg-brand/16 hover:text-brand",
+  },
+  default: {
+    idle: "border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+    frame: "h-9 gap-1.5 rounded-full px-3.5 text-[13px] leading-none",
+    voted:
+      "border-brand/40 bg-brand/12 text-brand hover:bg-brand/16 hover:text-brand",
+  },
+} satisfies Record<
+  TriggerVariant,
+  { frame: string; idle: string; voted: string }
+>;
+
+/**
+ * A rising count spins its digits up and a falling one spins them down. The
+ * trend is read from the values themselves rather than assumed from
+ * `isUpvoted`, so a vote that arrives from someone else through the live query
+ * animates in the right direction too.
+ */
+const trendFromValues = (oldValue: number, value: number) =>
+  Math.sign(value - oldValue);
+
+/**
+ * Hoisted so the timing object keeps one identity across renders: NumberFlow
+ * applies these as properties, and a fresh object each render would rewrite
+ * them mid-spin.
+ *
+ * NumberFlow's own default spin is 500ms, which is long for a number that
+ * changed because of a click the visitor just made. 340ms still reads as a
+ * roll rather than a swap.
+ */
+const spinTiming: EffectTiming = {
+  duration: 340,
+  easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+};
+
 interface UpvoteTriggerProps {
   variant?: TriggerVariant;
   disabled?: boolean;
   isUpvoted: boolean;
   label?: string;
-  onToggle: () => void | Promise<void>;
+  /**
+   * Runs the toggle and reports what it did. Returning `"cast"` is what earns
+   * the ring; returning nothing is allowed for a caller that does not track
+   * the outcome, and then the press simply is not confirmed.
+   */
+  onToggle: () => UpvoteOutcome | void | Promise<UpvoteOutcome | void>;
   upvoteCount: number;
+}
+
+function UpvoteArrow({
+  bursting,
+  isUpvoted,
+}: {
+  bursting: boolean;
+  isUpvoted: boolean;
+}) {
+  return (
+    <span className="relative flex items-center justify-center">
+      {bursting ? (
+        <span
+          aria-hidden
+          // `motion-reduce:hidden`, not `motion-reduce:animate-none`: the
+          // animation's last frame is `opacity: 0`, so removing the animation
+          // without removing the element leaves a solid ring on screen.
+          className="animate-vote-burst border-brand/60 pointer-events-none absolute top-1/2 left-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border motion-reduce:hidden"
+          data-slot="upvote-burst"
+        />
+      ) : null}
+      <HugeiconsIcon
+        className={cn(
+          "transition-transform duration-200 ease-out",
+          "size-4",
+          // One pixel of lift, kept short: the arrow leaves the baseline the
+          // way a pressed key does, and the state is still readable from the
+          // colour alone for anyone who prefers not to see movement.
+          isUpvoted && "-translate-y-px motion-reduce:translate-y-0"
+        )}
+        icon={ArrowUp01Icon}
+        strokeWidth={2.5}
+      />
+    </span>
+  );
 }
 
 function UpvoteTrigger({
@@ -172,63 +304,58 @@ function UpvoteTrigger({
   onToggle,
   upvoteCount,
 }: UpvoteTriggerProps) {
-  if (variant === "compact") {
-    return (
-      <button
-        aria-label={label}
-        aria-pressed={isUpvoted}
-        className={cn(
-          "flex h-9 w-10 shrink-0 flex-col items-center justify-center rounded-md text-xs transition-colors",
-          disabled ? "cursor-not-allowed" : "cursor-pointer",
-          isUpvoted
-            ? "bg-primary/10 text-primary"
-            : "bg-muted/70 text-muted-foreground hover:bg-muted"
-        )}
-        disabled={disabled}
-        onClick={onToggle}
-        type="button"
-      >
-        <span className="flex items-center gap-1.5">
-          <HugeiconsIcon className="size-3" icon={ArrowUp01Icon} />
-          <NumberFlow
-            className="text-xs leading-none font-medium tabular-nums"
-            style={{ fontVariantNumeric: "tabular-nums" }}
-            value={upvoteCount}
-            willChange
-          />
-        </span>
-      </button>
-    );
-  }
+  const { bursting, cast } = useVoteBurst();
+  const styles = variantStyles[variant];
+
+  const handlePress = async () => {
+    const outcome = await onToggle();
+
+    if (outcome === "cast") {
+      cast();
+    }
+  };
 
   return (
-    <Button
+    <button
       aria-label={label}
       aria-pressed={isUpvoted}
-      className="gap-1.5 rounded-full"
+      className={cn(
+        triggerBase,
+        styles.frame,
+        isUpvoted ? styles.voted : styles.idle
+      )}
+      data-slot="upvote-trigger"
+      data-state={isUpvoted ? "voted" : "idle"}
       disabled={disabled}
-      onClick={onToggle}
-      size="sm"
+      onClick={handlePress}
       type="button"
-      variant={isUpvoted ? "default" : "outline"}
     >
-      <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} />
+      <UpvoteArrow bursting={bursting} isUpvoted={isUpvoted} />
       <NumberFlow
+        className="tabular-nums"
+        respectMotionPreference
+        spinTiming={spinTiming}
         style={{ fontVariantNumeric: "tabular-nums" }}
+        trend={trendFromValues}
         value={upvoteCount}
         willChange
       />
-    </Button>
+    </button>
   );
 }
 
 function UpvoteSkeleton({ variant = "default" }: { variant?: TriggerVariant }) {
   return (
-    <div className="flex h-9 items-center">
+    <div
+      className={cn(
+        "flex items-center",
+        variant === "compact" ? "h-11" : "h-9"
+      )}
+    >
       <Skeleton
         className={
           variant === "compact"
-            ? "h-9 w-10 rounded-md"
+            ? "h-11 w-10 rounded-lg"
             : "h-9 w-20 rounded-full"
         }
       />
@@ -334,7 +461,7 @@ type UpvoteToggleState = {
 };
 
 type UpvoteToggleActions = {
-  onToggle: () => void | Promise<void>;
+  onToggle: () => UpvoteOutcome | void | Promise<UpvoteOutcome | void>;
 };
 
 type UpvoteToggleMeta = {
@@ -366,7 +493,7 @@ type UpvoteToggleProviderProps = {
   disabled?: boolean;
   isUpvoted: boolean;
   label?: string;
-  onToggle: () => void | Promise<void>;
+  onToggle: () => UpvoteOutcome | void | Promise<UpvoteOutcome | void>;
   upvoteCount: number;
 };
 

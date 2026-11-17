@@ -71,7 +71,7 @@ test.describe("authentication", () => {
       await page.goto("/forgot-password");
 
       await expect(
-        page.getByRole("button", { name: "Send reset code", exact: true })
+        page.getByRole("button", { name: "Send code", exact: true })
       ).toBeVisible();
     }
   );
@@ -136,7 +136,7 @@ test.describe("dashboard auth redirects", () => {
       // The deep link is preserved for the post-login redirect.
       await expect(page).toHaveURL(/redirectTo=%2Forg_bogus%2Fboard/);
       await expect(
-        page.getByRole("button", { name: "Login", exact: true })
+        page.getByRole("button", { name: "Sign in", exact: true })
       ).toBeVisible();
     }
   );
