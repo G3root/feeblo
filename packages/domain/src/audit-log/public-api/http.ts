@@ -49,6 +49,7 @@ const parseChoice = <A>(
     }
 
     const decoded = Schema.decodeOption(schema)(raw);
+
     if (Option.isNone(decoded)) {
       return yield* invalidRequestError(`${name} must be ${choices}.`);
     }
@@ -84,24 +85,28 @@ export const auditLogHandlers = (
   listAuditLogEntries: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       const action = yield* parseChoice(
         AuditActionSchema,
         "action",
         "a declared audit action",
         query.action
       );
+
       const outcome = yield* parseChoice(
         AuditOutcome,
         "outcome",
         "allowed or denied",
         query.outcome
       );
+
       const actorType = yield* parseChoice(
         AuditActorType,
         "actorType",
         "user, api_key, oauth_client, or system",
         query.actorType
       );
+
       const kind = yield* parseChoice(
         PublicApiAuditLogKind,
         "kind",

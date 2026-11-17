@@ -17,6 +17,7 @@ export const Route = createFileRoute(
     const session = getCachedAuthSession();
 
     const promises = [dashboardCollections.membersCollection.preload()];
+
     const canListInvitations =
       session !== null &&
       hasPermission(params.organizationId, "members.invite")(session);

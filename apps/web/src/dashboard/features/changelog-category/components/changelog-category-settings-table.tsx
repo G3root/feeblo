@@ -57,11 +57,14 @@ export function ChangelogCategorySettingsTable() {
 
   const categories = categoriesQuery?.data ?? [];
   const plan = planQuery.data?.plan;
+
   const categoryLimit =
     plan === "free"
       ? PLAN_ENTITLEMENTS.free.limits.changelogCategories
       : Number.POSITIVE_INFINITY;
+
   const hasReachedLimit = categories.length >= categoryLimit;
+
   const handleCreate = () =>
     createDialogStore.send({ type: "toggle", data: {} });
 

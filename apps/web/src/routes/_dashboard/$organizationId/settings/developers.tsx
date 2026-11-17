@@ -18,12 +18,15 @@ export const Route = createFileRoute(
 
 function DevelopersSettingsRoute() {
   const organizationId = useOrganizationId();
+
   const { allowed, isPending } = usePolicy(
     hasPermission(organizationId, "apiKeys.manage")
   );
+
   if (isPending) {
     return null;
   }
+
   if (!allowed) {
     return <SettingsAccessDenied />;
   }

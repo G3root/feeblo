@@ -42,10 +42,12 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         return yield* createCrmEntry({
           organizationId: args.organizationId,
           insert: Effect.gen(function* () {
             const attributeValues = args.attributeValues ?? [];
+
             // Share-locked for this transaction: the required-value check, the
             // per-value validation and the upserts below all read one snapshot,
             // so a definition that becomes required while the create runs cannot
@@ -54,6 +56,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
               yield* attributeDefinitionRepository.findCompanyAttributeDefinitionsForShare(
                 args.organizationId
               );
+
             yield* Effect.forEach(
               definitions.filter(
                 (definition) =>
@@ -67,6 +70,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
             );
 
             const company = yield* repository.create(args);
+
             // The definitions were just read for this workspace, so the id map is
             // the existence check: looking each attribute id up again (twice —
             // once as a policy check, once for the row) cost this create two extra
@@ -74,6 +78,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
             const definitionsById = new Map(
               definitions.map((definition) => [definition.id, definition])
             );
+
             yield* Effect.forEach(
               args.attributeValues ?? [],
               (attributeValue) =>
@@ -81,6 +86,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
                   const definition = definitionsById.get(
                     attributeValue.attributeId
                   );
+
                   if (definition === undefined) {
                     return yield* new Policy.PolicyDeniedError();
                   }
@@ -112,6 +118,7 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
               resourceId: company.id,
               metadata: { name: company.name },
             });
+
             return company;
           }),
         });
@@ -123,12 +130,15 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const company = yield* transaction(
           Effect.gen(function* () {
             const updated = yield* repository.update(args);
+
             if (Option.isNone(updated)) {
               return updated;
             }
+
             // The update returns the row it wrote, not the one it replaced, so
             // the new name goes in `metadata` rather than posing as a diff
             // with an empty `before`.
@@ -140,14 +150,17 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
               resourceId: args.id,
               metadata: { name: updated.value.name },
             });
+
             return updated;
           })
         );
+
         if (Option.isNone(company)) {
           return yield* new CompanyNotFoundError({
             message: "Company not found",
           });
         }
+
         return company.value;
       }).pipe(
         Policy.withPolicy(companyPolicy.canUpdate(args)),
@@ -157,12 +170,15 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const deleted = yield* transaction(
           Effect.gen(function* () {
             const company = yield* repository.delete(args);
+
             if (Option.isNone(company)) {
               return company;
             }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -170,9 +186,11 @@ export const CompanyRpcHandlersEffect = Effect.gen(function* () {
               action: "company.deleted",
               resourceId: args.id,
             });
+
             return company;
           })
         );
+
         if (Option.isNone(deleted)) {
           return yield* new CompanyNotFoundError({
             message: "Company not found",

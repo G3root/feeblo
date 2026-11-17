@@ -15,6 +15,7 @@ export interface WidgetView {
 }
 
 const COMPOSE_PATH = /^\/board\/[^/]+\/?$/;
+
 const UPDATE_DETAIL_PATH = /^\/updates\/[^/]+\/?$/;
 
 /**
@@ -26,9 +27,11 @@ export function resolveView(pathname: string): WidgetView {
   if (COMPOSE_PATH.test(pathname)) {
     return { backHref: "/", kind: "push" };
   }
+
   if (UPDATE_DETAIL_PATH.test(pathname)) {
     return { backHref: "/updates", kind: "push" };
   }
+
   return { backHref: null, kind: "root" };
 }
 
@@ -54,6 +57,7 @@ export function widgetTabs(config: WidgetConfig): readonly WidgetTab[] {
   if (config.mode !== "hub" || config.modules.length < 2) {
     return [];
   }
+
   return config.modules.map((module) => ({
     module,
     ...TAB_PRESENTATION[module],

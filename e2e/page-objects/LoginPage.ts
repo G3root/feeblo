@@ -11,7 +11,7 @@ export class LoginPage {
     this.emailInput = page.getByRole("textbox", { name: "Email" });
     this.passwordInput = page.getByLabel("Password", { exact: true });
     this.submitButton = page.getByRole("button", {
-      name: "Login",
+      name: "Sign in",
       exact: true,
     });
   }
@@ -24,6 +24,7 @@ export class LoginPage {
   async login(email: string, password: string) {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
+
     const [response] = await Promise.all([
       this.page.waitForResponse(
         (response) =>
@@ -32,6 +33,7 @@ export class LoginPage {
       ),
       this.submitButton.click(),
     ]);
+
     expect(response.ok()).toBeTruthy();
   }
 }

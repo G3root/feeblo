@@ -155,6 +155,7 @@ const makePublicApiCommentRepository = Effect.gen(function* () {
           eq(schema.commentTable.organizationId, organizationId),
           eq(schema.commentTable.postId, postId),
         ];
+
         if (cursor !== null) {
           conditions.push(
             sql`(${schema.commentTable.createdAt}, ${schema.commentTable.id}) < (${cursor.createdAt}, ${cursor.id})`

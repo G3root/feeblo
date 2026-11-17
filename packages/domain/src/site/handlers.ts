@@ -7,7 +7,7 @@ import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
-import { withRemapDbErrors } from "../rpc-errors";
+import { NotFoundError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { SitePolicy } from "./policies";
@@ -38,6 +38,7 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
       const mayRemoveBranding = yield* entitlementPolicy.mayRemoveBranding(
         site.organizationId
       );
+
       return mayRemoveBranding ? site : { ...site, hidePoweredBy: false };
     });
 
@@ -48,10 +49,13 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           limit: 1,
         });
+
         const site = sites[0];
+
         if (site === undefined) {
           return [];
         }
+
         return [yield* applyBrandingEntitlement(site)];
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -63,7 +67,9 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
           subdomain: args.subdomain,
           limit: 1,
         });
+
         const site = sites[0];
+
         if (site === undefined) {
           return [];
         }
@@ -83,7 +89,12 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.update(args);
+            const { updated } = yield* repository.update(args);
+
+            if (!updated) {
+              return yield* new NotFoundError({ message: "Site not found" });
+            }
+
             // The site row is the workspace's settings, which the catalog
             // models as a singleton: no `resourceId`, and the site id rides in
             // `metadata`. The update returns nothing, so the new values go in
@@ -113,7 +124,13 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.updateHidePoweredByBranding(args);
+            const { updated } =
+              yield* repository.updateHidePoweredByBranding(args);
+
+            if (!updated) {
+              return yield* new NotFoundError({ message: "Site not found" });
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),

@@ -71,6 +71,7 @@ function CompanyCreateForm() {
   const atLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
   const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
   const definitions = definitionsQuery.data ?? [];
+
   const form = useAppForm({
     defaultValues: { attributes: {}, externalId: "", name: "" },
     validators: {
@@ -91,12 +92,14 @@ function CompanyCreateForm() {
           title: "Complete all required custom fields",
           type: "error",
         });
+
         return;
       }
 
       try {
         const companyId = await CompanyId.unsafeGenerate();
         const now = new Date();
+
         const company = {
           id: companyId,
           organizationId,
@@ -108,6 +111,7 @@ function CompanyCreateForm() {
           updatedAt: now,
           source: "DASHBOARD" as const,
         };
+
         const { createAttribute } = await getCompanyCustomAttributeValueChanges(
           {
             companyId,
@@ -117,6 +121,7 @@ function CompanyCreateForm() {
             values: data.value.attributes,
           }
         );
+
         await createCompanyAction({
           company,
           createAttribute,
@@ -135,6 +140,7 @@ function CompanyCreateForm() {
       }
     },
   });
+
   if (atLimit) {
     return (
       <div className="p-6">

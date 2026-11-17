@@ -76,15 +76,20 @@ export function WidgetPreview({ organizationId }: WidgetPreviewProps) {
       if (event.origin !== window.location.origin) {
         return;
       }
+
       const data: unknown = event.data;
+
       if (!(isObject(data) && "event" in data) || !isString(data.event)) {
         return;
       }
+
       if (data.event === "CLOSE") {
         setIsOpen(false);
       }
     };
+
     window.addEventListener("message", handleMessage);
+
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
@@ -240,11 +245,14 @@ function widgetPreviewUrl(
 ): string {
   const params = new URLSearchParams();
   params.set("mode", config.mode);
+
   if (config.mode === "hub") {
     params.set("modules", config.modules.join(","));
   }
+
   params.set("theme", config.theme);
   params.set("hostOrigin", window.location.origin);
   const hash = config.modules[0] === "updates" ? "#/updates" : "#/";
+
   return `/feedback-widget/${organizationId}?${params.toString()}${hash}`;
 }

@@ -135,6 +135,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
     input: UpsertEmailSuppressionInput
   ) {
     const email = yield* parseSuppressionEmail(input.email, "upsert");
+
     const values = {
       email,
       organizationId: input.organizationId,
@@ -199,6 +200,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
       readonly organizationId: string | null;
     }) {
       const email = input.email.trim().toLowerCase();
+
       const [row] = yield* db
         .select({ email: table.email })
         .from(table)
@@ -206,6 +208,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
           and(eq(table.email, email), scopeCondition(input.organizationId))
         )
         .limit(1);
+
       return row !== undefined;
     }
   );
@@ -216,6 +219,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
     readonly organizationId: string;
   }) {
     const email = input.email.trim().toLowerCase();
+
     const [row] = yield* db
       .select()
       .from(table)
@@ -226,6 +230,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
         )
       )
       .limit(1);
+
     return row === undefined ? undefined : yield* decodeRecord(row, "find");
   });
 
@@ -238,9 +243,11 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
         const emails = [
           ...new Set(input.emails.map((email) => email.trim().toLowerCase())),
         ];
+
         if (emails.length === 0) {
           return new Set<string>();
         }
+
         const rows = yield* db
           .select({ email: table.email })
           .from(table)
@@ -250,6 +257,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
               scopeCondition(input.organizationId)
             )
           );
+
         return new Set(rows.map((row) => row.email));
       }
     );
@@ -259,10 +267,12 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
     input: ListEmailSuppressionsInput
   ) {
     const search = input.search?.trim();
+
     const searchCondition =
       search === undefined || search === ""
         ? undefined
         : like(table.email, `%${escapeLikePattern(search.toLowerCase())}%`);
+
     const condition = and(
       eq(table.organizationId, input.organizationId),
       input.reason === undefined ? undefined : eq(table.reason, input.reason),
@@ -288,6 +298,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
     const records = yield* Effect.forEach(items, (item) =>
       decodeRecord(item, "list")
     );
+
     return {
       items: records,
       total: total?.total ?? 0,
@@ -305,6 +316,7 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
       readonly organizationId: string;
     }) {
       const email = input.email.trim().toLowerCase();
+
       const removed = yield* db
         .delete(table)
         .where(
@@ -313,8 +325,14 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
             eq(table.organizationId, input.organizationId)
           )
         )
-        .returning({ email: table.email });
-      return { removed: removed.length > 0 };
+        .returning({ email: table.email, reason: table.reason });
+
+      const [row] = removed;
+
+      return {
+        removed: row !== undefined,
+        reason: row?.reason ?? null,
+      };
     }
   );
 
@@ -333,16 +351,21 @@ const makeEmailSuppressionRepository = Effect.gen(function* () {
       hardBounce: 0,
       total: 0,
     };
+
+    // Every reason the table can hold counts under one of the three classes;
+    // a row whose reason is none of the named two is a hard bounce.
+    const keyByReason = new Map<string, "administrativeBlock" | "complaint">([
+      ["administrative_block", "administrativeBlock"],
+      ["complaint", "complaint"],
+    ]);
+
     for (const row of rows) {
-      const key =
-        row.reason === "complaint"
-          ? "complaint"
-          : row.reason === "administrative_block"
-            ? "administrativeBlock"
-            : "hardBounce";
+      const key = keyByReason.get(row.reason) ?? "hardBounce";
+
       result[key] += row.total;
       result.total += row.total;
     }
+
     return result;
   });
 

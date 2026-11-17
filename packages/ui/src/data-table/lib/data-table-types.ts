@@ -91,7 +91,9 @@ export type SortableColumnId<TColumns extends DataTableColumnConfigs> = Exclude<
 >;
 
 export type FilterVariant = (typeof FILTER_VARIANTS)[number];
+
 export type FilterOperator = keyof typeof FILTER_OPERATORS;
+
 export type JoinOperator = (typeof JOIN_OPERATORS)[number];
 
 export interface FilterOperatorOption {

@@ -116,6 +116,14 @@
       "types": "./src/auth/social-auth-buttons.tsx",
       "default": "./src/auth/social-auth-buttons.tsx"
     },
+    "./last-auth-method": {
+      "types": "./src/auth/last-auth-method.ts",
+      "default": "./src/auth/last-auth-method.ts"
+    },
+    "./last-used-badge": {
+      "types": "./src/auth/last-used-badge.tsx",
+      "default": "./src/auth/last-used-badge.tsx"
+    },
     "./auth-flows": {
       "types": "./src/auth/auth-flows.ts",
       "default": "./src/auth/auth-flows.ts"

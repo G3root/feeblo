@@ -168,6 +168,7 @@ const stageAndConfirm = (
   Effect.gen(function* () {
     const service = yield* DataImportService;
     const session = Effect.provideService(CurrentSession, makeSession(fixture));
+
     const job = yield* service
       .stageBoardImport({
         bytes: new TextEncoder().encode(csv),
@@ -177,21 +178,26 @@ const stageAndConfirm = (
         userId: fixture.userId,
       })
       .pipe(session);
+
     yield* service
       .confirmImport({
         id: job.id,
         organizationId: fixture.organizationId,
       })
       .pipe(session);
+
     return job;
   });
+
 const claim = (leaseOwner: string) =>
   Effect.gen(function* () {
     const repository = yield* DataTransferRepository;
+
     const claimed = yield* repository.claimNextJob({
       leaseDurationMs: 60_000,
       leaseOwner,
     });
+
     return yield* Option.match(claimed, {
       onNone: () =>
         Effect.die("Expected the staged job to be claimable in this test."),
@@ -206,6 +212,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
       Effect.gen(function* () {
         recordedIntegrationEvents.length = 0;
         const fixture = yield* makeFixture();
+
         const job = yield* stageAndConfirm(
           fixture,
           [
@@ -223,10 +230,12 @@ layer(TestLayer)("DataImportWorker", (it) => {
         });
 
         const db = yield* currentDb;
+
         const posts = yield* db
           .select()
           .from(schema.postTable)
           .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
         expect(posts).toHaveLength(2);
         const first = posts.find((post) => post.title === "First post");
         expect(first).toMatchObject({
@@ -241,11 +250,14 @@ layer(TestLayer)("DataImportWorker", (it) => {
           .select()
           .from(schema.tagTable)
           .where(eq(schema.tagTable.organizationId, fixture.organizationId));
+
         expect(tags.map((tag) => tag.name).sort()).toEqual(["Bug", "Feature"]);
+
         const links = yield* db
           .select()
           .from(schema.postTagTable)
           .where(eq(schema.postTagTable.postId, first?.id ?? "missing-post"));
+
         expect(links).toHaveLength(2);
 
         const contacts = yield* db
@@ -254,6 +266,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
           .where(
             eq(schema.contactTable.organizationId, fixture.organizationId)
           );
+
         // Provenance lives on the post (`source: "IMPORT"`). The contact is
         // created by the shared identity resolver, whose `source` column is
         // not part of its input contract.
@@ -270,6 +283,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
               posts.map((post) => post.id)
             )
           );
+
         expect(activities).toHaveLength(2);
         expect(
           activities.every(
@@ -283,13 +297,16 @@ layer(TestLayer)("DataImportWorker", (it) => {
         // integration event, no email intent, no subscription, no in-app
         // notification.
         expect(recordedIntegrationEvents).toEqual([]);
+
         const outbox = yield* db
           .select()
           .from(schema.emailOutboxTable)
           .where(
             eq(schema.emailOutboxTable.organizationId, fixture.organizationId)
           );
+
         expect(outbox).toEqual([]);
+
         const subscriptions = yield* db
           .select()
           .from(schema.postSubscriptionTable)
@@ -299,21 +316,27 @@ layer(TestLayer)("DataImportWorker", (it) => {
               fixture.organizationId
             )
           );
+
         expect(subscriptions).toEqual([]);
+
         const notifications = yield* db
           .select()
           .from(schema.notificationTable)
           .where(
             eq(schema.notificationTable.organizationId, fixture.organizationId)
           );
+
         expect(notifications).toEqual([]);
 
         const repository = yield* DataTransferRepository;
+
         const stored = yield* repository.findJob({
           id: job.id,
           organizationId: fixture.organizationId,
         });
+
         expect(Option.isSome(stored)).toBe(true);
+
         if (Option.isSome(stored)) {
           expect(stored.value.status).toBe("completed");
           expect(stored.value.createdCount).toBe(2);
@@ -342,14 +365,17 @@ layer(TestLayer)("DataImportWorker", (it) => {
       expect(outcome).toMatchObject({ createdCount: 3, errorCount: 0 });
 
       const db = yield* currentDb;
+
       const posts = yield* db
         .select()
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       const boards = yield* db
         .select()
         .from(schema.boardTable)
         .where(eq(schema.boardTable.organizationId, fixture.organizationId));
+
       const boardByName = new Map(
         boards.map((board) => [board.name, board.id])
       );
@@ -389,6 +415,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
         .select()
         .from(schema.boardTable)
         .where(eq(schema.boardTable.organizationId, fixture.organizationId));
+
       const recreated = boards.find((board) => board.name === "Test board");
       expect(recreated).toBeDefined();
       expect(recreated?.id).not.toBe(fixture.boardId);
@@ -397,6 +424,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
         .select()
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       expect(posts).toHaveLength(1);
       expect(posts[0]?.boardId).toBe(recreated?.id);
     })
@@ -426,19 +454,23 @@ layer(TestLayer)("DataImportWorker", (it) => {
           status: "running",
         })
         .where(eq(schema.dataImportJobTable.id, claimOne.job.id));
+
       const stored = yield* repository.findJob({
         id: claimOne.job.id,
         organizationId: fixture.organizationId,
       });
+
       if (Option.isNone(stored)) {
         throw new Error("Expected the job to exist.");
       }
+
       yield* runDataImportPass({ job: stored.value, leaseOwner: "worker-2" });
 
       const posts = yield* db
         .select()
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       expect(posts).toHaveLength(1);
     })
   );
@@ -468,11 +500,14 @@ layer(TestLayer)("DataImportWorker", (it) => {
       expect(outcome.createdCount).toBe(0);
 
       const repository = yield* DataTransferRepository;
+
       const stored = yield* repository.findJob({
         id: job.id,
         organizationId: fixture.organizationId,
       });
+
       expect(Option.isSome(stored)).toBe(true);
+
       if (Option.isSome(stored)) {
         expect(stored.value.status).toBe("running");
       }
@@ -481,6 +516,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
         .select()
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       expect(posts).toEqual([]);
     })
   );
@@ -500,10 +536,12 @@ layer(TestLayer)("DataImportWorker", (it) => {
       yield* runDataImportPass(claimed);
 
       const db = yield* currentDb;
+
       const posts = yield* db
         .select()
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       expect(posts).toEqual([]);
     })
   );
@@ -518,10 +556,12 @@ layer(TestLayer)("DataImportWorker", (it) => {
       yield* runDataImportPass(yield* claim("worker-1"));
 
       const db = yield* currentDb;
+
       const [post] = yield* db
         .select({ id: schema.postTable.id })
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       if (post === undefined) {
         throw new Error("Expected the first import to create a post.");
       }
@@ -530,6 +570,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
         fixture,
         "title\nSecond post\n"
       );
+
       const repository = yield* DataTransferRepository;
       yield* repository.cancelJob({
         id: canceledJob.id,
@@ -540,7 +581,9 @@ layer(TestLayer)("DataImportWorker", (it) => {
         .select({ id: schema.dataImportRowTable.id })
         .from(schema.dataImportRowTable)
         .where(eq(schema.dataImportRowTable.jobId, canceledJob.id));
+
       const rowId = rows[0]?.id;
+
       if (rowId === undefined) {
         throw new Error("Expected the second job's staged row to exist.");
       }
@@ -556,12 +599,14 @@ layer(TestLayer)("DataImportWorker", (it) => {
           rowId,
         })
       );
+
       expect(error._tag).toBe("DataTransferRepositoryError");
 
       const [stored] = yield* db
         .select({ outcome: schema.dataImportRowTable.outcome })
         .from(schema.dataImportRowTable)
         .where(eq(schema.dataImportRowTable.id, rowId));
+
       expect(stored?.outcome).toBe("pending");
     })
   );
@@ -576,10 +621,12 @@ layer(TestLayer)("DataImportWorker", (it) => {
       yield* runDataImportPass(yield* claim("worker-1"));
 
       const db = yield* currentDb;
+
       const [post] = yield* db
         .select({ id: schema.postTable.id })
         .from(schema.postTable)
         .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
       if (post === undefined) {
         throw new Error("Expected the first import to create a post.");
       }
@@ -592,12 +639,15 @@ layer(TestLayer)("DataImportWorker", (it) => {
         .select({ id: schema.dataImportRowTable.id })
         .from(schema.dataImportRowTable)
         .where(eq(schema.dataImportRowTable.jobId, job.id));
+
       const rowId = rows[0]?.id;
+
       if (rowId === undefined) {
         throw new Error("Expected the second job's staged row to exist.");
       }
 
       const repository = yield* DataTransferRepository;
+
       const stale = yield* Effect.flip(
         repository.markRowCreated({
           jobId: job.id,
@@ -606,6 +656,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
           rowId,
         })
       );
+
       expect(stale._tag).toBe("DataTransferRepositoryError");
 
       yield* repository.markRowCreated({
@@ -614,10 +665,12 @@ layer(TestLayer)("DataImportWorker", (it) => {
         postId: post.id,
         rowId,
       });
+
       const [stored] = yield* db
         .select({ outcome: schema.dataImportRowTable.outcome })
         .from(schema.dataImportRowTable)
         .where(eq(schema.dataImportRowTable.id, rowId));
+
       expect(stored?.outcome).toBe("created");
     })
   );
@@ -632,6 +685,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
 
       const repository = yield* DataTransferRepository;
       const db = yield* currentDb;
+
       const rows = yield* db
         .select({
           id: schema.dataImportRowTable.id,
@@ -639,10 +693,13 @@ layer(TestLayer)("DataImportWorker", (it) => {
         })
         .from(schema.dataImportRowTable)
         .where(eq(schema.dataImportRowTable.jobId, job.id));
+
       const row = rows[0];
+
       if (row === undefined) {
         throw new Error("Expected the staged row to exist.");
       }
+
       expect(row.outcome).toBe("created");
 
       // The row is no longer pending, so a pass that lost its lease cannot
@@ -659,6 +716,7 @@ layer(TestLayer)("DataImportWorker", (it) => {
         })
         .from(schema.dataImportRowTable)
         .where(eq(schema.dataImportRowTable.id, row.id));
+
       expect(stored?.outcome).toBe("created");
       expect(stored?.message).toBeNull();
     })
@@ -675,14 +733,18 @@ layer(TestLayer)("DataImportWorker", (it) => {
 
         const repository = yield* DataTransferRepository;
         const db = yield* currentDb;
+
         const rows = yield* db
           .select({ id: schema.dataImportRowTable.id })
           .from(schema.dataImportRowTable)
           .where(eq(schema.dataImportRowTable.jobId, job.id));
+
         const rowId = rows[0]?.id;
+
         if (rowId === undefined) {
           throw new Error("Expected the staged row to exist.");
         }
+
         yield* repository.markRowFailed({ message: "Never applied.", rowId });
 
         yield* repository.cancelJob({
@@ -697,7 +759,9 @@ layer(TestLayer)("DataImportWorker", (it) => {
           id: job.id,
           organizationId: fixture.organizationId,
         });
+
         expect(Option.isSome(stored)).toBe(true);
+
         if (Option.isSome(stored)) {
           expect(stored.value.status).toBe("canceled");
           expect(stored.value.errorCount).toBe(1);

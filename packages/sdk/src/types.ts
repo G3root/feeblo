@@ -60,7 +60,9 @@ export interface SubmittedFeedback {
 }
 
 export type WidgetMode = "feedback" | "updates" | "hub";
+
 export type WidgetModule = Exclude<WidgetMode, "hub">;
+
 export type WidgetPlacement = "bottom-left" | "bottom-right";
 
 export interface EmbedOptions {
@@ -147,6 +149,7 @@ export interface FeebloEventDetail<
 export type FeebloEventListener<K extends FeebloEventName> = (
   event: CustomEvent<FeebloEventDetail<K>>
 ) => void;
+
 export type FeebloOn = {
   <K extends FeebloEventName>(
     event: K,

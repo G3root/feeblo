@@ -239,6 +239,7 @@ const SCOPE_SEPARATOR = ".";
 
 const splitScope = (scope: PublicApiScope): [string, string] => {
   const separator = scope.indexOf(SCOPE_SEPARATOR);
+
   return [scope.slice(0, separator), scope.slice(separator + 1)];
 };
 
@@ -253,14 +254,18 @@ export const toPublicApiScopeStatements = (
   scopes: readonly PublicApiScope[]
 ): Record<string, string[]> => {
   const grouped = new Map<string, string[]>();
+
   for (const scope of scopes) {
     const [resource, action] = splitScope(scope);
     const actions = grouped.get(resource) ?? [];
+
     if (!actions.includes(action)) {
       actions.push(action);
     }
+
     grouped.set(resource, actions);
   }
+
   return Object.fromEntries(grouped);
 };
 
@@ -271,9 +276,11 @@ export const hasPublicApiScope = (
 ): boolean => {
   const [resource, action] = splitScope(scope);
   const granted = statements?.[resource];
+
   if (!Array.isArray(granted)) {
     return false;
   }
+
   return granted.includes(action) || granted.includes("*");
 };
 

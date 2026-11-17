@@ -18,6 +18,7 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await dashboardCollections.postStatusCollection.preload();
+
     return null;
   },
 });

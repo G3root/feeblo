@@ -9,6 +9,7 @@ import * as Layer from "effect/Layer";
 interface findByOrganizationIdArgs {
   organizationId: string;
 }
+
 interface findManyArgs {
   limit: number;
   organizationId?: string;
@@ -61,11 +62,13 @@ const makeSiteRepository = Effect.gen(function* () {
 
     findMany: (findManyArgs: findManyArgs) => {
       const where: SQL[] = [];
+
       if (findManyArgs.organizationId) {
         where.push(
           eq(schema.siteTable.organizationId, findManyArgs.organizationId)
         );
       }
+
       if (findManyArgs.subdomain) {
         where.push(eq(schema.siteTable.subdomain, findManyArgs.subdomain));
       }
@@ -105,7 +108,8 @@ const makeSiteRepository = Effect.gen(function* () {
     }: updateArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+
+        return yield* db
           .update(schema.siteTable)
           .set({
             changelogVisibility,
@@ -120,7 +124,8 @@ const makeSiteRepository = Effect.gen(function* () {
               eq(schema.siteTable.organizationId, organizationId)
             )
           )
-          .pipe(Effect.asVoid);
+          .returning({ id: schema.siteTable.id })
+          .pipe(Effect.map((rows) => ({ updated: rows.length > 0 })));
       }),
     updateHidePoweredByBranding: ({
       hidePoweredBy,
@@ -129,7 +134,8 @@ const makeSiteRepository = Effect.gen(function* () {
     }: updateHidePoweredByBrandingArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+
+        return yield* db
           .update(schema.siteTable)
           .set({
             hidePoweredBy,
@@ -141,7 +147,8 @@ const makeSiteRepository = Effect.gen(function* () {
               eq(schema.siteTable.organizationId, organizationId)
             )
           )
-          .pipe(Effect.asVoid);
+          .returning({ id: schema.siteTable.id })
+          .pipe(Effect.map((rows) => ({ updated: rows.length > 0 })));
       }),
   };
 });

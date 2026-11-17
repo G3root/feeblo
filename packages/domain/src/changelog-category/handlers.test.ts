@@ -29,6 +29,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
     organizationId: string;
     userId: string;
   };
+
   const makeSession = (
     fixture: Fixture,
     options?: { isMember?: boolean; role?: "owner" | "contributor" }
@@ -52,6 +53,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
             },
           ],
   });
+
   const makeFixture = () =>
     Effect.gen(function* () {
       const db = yield* currentDb;
@@ -77,8 +79,10 @@ describe("ChangelogCategoryRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
+
   const makeSite = (
     fixture: Fixture,
     changelogVisibility: "PUBLIC" | "HIDDEN"
@@ -96,6 +100,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         updatedAt: yield* DateTime.nowAsDate,
       });
     });
+
   const insertCategory = (
     fixture: Fixture,
     overrides?: Partial<{ name: string; icon: string }>
@@ -112,8 +117,10 @@ describe("ChangelogCategoryRpcHandlers", () => {
         createdAt: yield* DateTime.nowAsDate,
         updatedAt: yield* DateTime.nowAsDate,
       });
+
       return id;
     });
+
   const insertChangelog = (
     fixture: Fixture,
     status: "draft" | "published" = "draft"
@@ -134,8 +141,10 @@ describe("ChangelogCategoryRpcHandlers", () => {
         createdAt: now,
         updatedAt: now,
       });
+
       return id;
     });
+
   const linkCategory = (
     fixture: Fixture,
     categoryId: string,
@@ -154,19 +163,23 @@ describe("ChangelogCategoryRpcHandlers", () => {
         updatedAt: now,
       });
     });
+
   const Repositories = Layer.mergeAll(
     ChangelogCategoryRepository.layer,
     SiteRepository.layer,
     WorkspaceRepository.layer,
     AuditLogRecorder.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = Layer.mergeAll(
     ChangelogCategoryPolicy.layer,
     SitePolicy.layer
   ).pipe(Layer.provide(Entitlements), Layer.provide(Repositories));
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -189,9 +202,11 @@ describe("ChangelogCategoryRpcHandlers", () => {
             icon: "#22c55e",
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         const categories = yield* handlers
           .ListChangelogCategories({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(categories).toMatchObject([
           {
             id,
@@ -219,10 +234,12 @@ describe("ChangelogCategoryRpcHandlers", () => {
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
         const db = yield* currentDb;
+
         const [category] = yield* db
           .select()
           .from(schema.changelogCategoryTable)
           .where(eq(schema.changelogCategoryTable.id, id));
+
         expect(category).toMatchObject({
           name: "Improved",
           icon: "#3b82f6",
@@ -241,10 +258,49 @@ describe("ChangelogCategoryRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         const categories = yield* handlers
           .ListChangelogCategories({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(categories).toEqual([]);
+      })
+    );
+
+    it.effect("refuses another workspace's category and records nothing", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const mine = yield* makeFixture();
+        const theirs = yield* makeFixture();
+        const id = yield* insertCategory(theirs);
+
+        const failure = yield* Effect.flip(
+          handlers
+            .UpdateChangelogCategory({
+              icon: "#3b82f6",
+              iconType: "color",
+              id,
+              name: "Improved",
+              organizationId: mine.organizationId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(mine)),
+              Effect.provideService(AuditLogEnabled, true)
+            )
+        );
+
+        expect(failure._tag).toBe("ChangelogCategoryNotFoundError");
+
+        // The category was not touched, and an update that matched nothing
+        // must not leave an entry behind.
+        const db = yield* currentDb;
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(eq(schema.auditLogTable.organizationId, mine.organizationId));
+
+        expect(rows).toHaveLength(0);
       })
     );
 
@@ -253,6 +309,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const id = yield* ChangelogCategoryId.generate;
+
         const error = yield* Effect.flip(
           handlers
             .CreateChangelogCategory({
@@ -269,6 +326,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -277,6 +335,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .ListChangelogCategories({ organizationId: fixture.organizationId })
@@ -287,6 +346,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -373,11 +433,13 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;
         const fixture = yield* makeFixture();
         yield* makeSite(fixture, "HIDDEN");
+
         const error = yield* Effect.flip(
           handlers.ListChangelogCategoriesPublic({
             organizationId: fixture.organizationId,
           })
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -386,13 +448,16 @@ describe("ChangelogCategoryRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         for (let index = 0; index < 3; index++) {
           yield* insertCategory(fixture, {
             name: `Category ${index + 1}`,
             icon: "#22c55e",
           });
         }
+
         const id = yield* ChangelogCategoryId.generate;
+
         const error = yield* Effect.flip(
           handlers
             .CreateChangelogCategory({
@@ -404,6 +469,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -413,9 +479,11 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const changelogId = yield* insertChangelog(fixture);
+
         const firstCategoryId = yield* insertCategory(fixture, {
           name: "New",
         });
+
         const secondCategoryId = yield* insertCategory(fixture, {
           name: "Improved",
           icon: "#3b82f6",
@@ -434,6 +502,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(links).toMatchObject([
           { changelogId, categoryId: firstCategoryId },
           { changelogId, categoryId: secondCategoryId },
@@ -446,9 +515,11 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const handlers = yield* ChangelogCategoryRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const changelogId = yield* insertChangelog(fixture);
+
         const firstCategoryId = yield* insertCategory(fixture, {
           name: "New",
         });
+
         const secondCategoryId = yield* insertCategory(fixture, {
           name: "Improved",
           icon: "#3b82f6",
@@ -474,6 +545,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(links.map((link) => link.categoryId)).toEqual([firstCategoryId]);
       })
     );
@@ -512,6 +584,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -537,6 +610,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -547,6 +621,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const fixture = yield* makeFixture();
         yield* makeSite(fixture, "PUBLIC");
         const draftChangelogId = yield* insertChangelog(fixture);
+
         const publishedChangelogId = yield* Effect.gen(function* () {
           const db = yield* currentDb;
           const id = yield* ChangelogId.generate;
@@ -563,8 +638,10 @@ describe("ChangelogCategoryRpcHandlers", () => {
             createdAt: now,
             updatedAt: now,
           });
+
           return id;
         });
+
         const categoryId = yield* insertCategory(fixture);
 
         for (const changelogId of [draftChangelogId, publishedChangelogId]) {
@@ -580,6 +657,7 @@ describe("ChangelogCategoryRpcHandlers", () => {
         const links = yield* handlers.ListChangelogCategoryLinksPublic({
           organizationId: fixture.organizationId,
         });
+
         expect(links.map((link) => link.changelogId)).toEqual([
           publishedChangelogId,
         ]);

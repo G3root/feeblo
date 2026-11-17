@@ -39,6 +39,7 @@ function useCanBulkDeleteSelectedPosts(): boolean {
   const { allowed: canManageAllPosts } = usePolicy(
     hasPermission(organizationId, "posts.*")
   );
+
   const { allowed: isMember } = usePolicy(hasMembership(organizationId));
 
   // Eligibility only concerns contributors: managers bypass the check and
@@ -46,7 +47,9 @@ function useCanBulkDeleteSelectedPosts(): boolean {
   // once per organization; this check is purely client-side.
   const contributorCase =
     !canManageAllPosts && isMember && selectedPostIds.length > 0;
+
   const { deleteEligibilityCollection } = useDashboardCollections();
+
   const { data: eligibleRows } = useLiveQuery({
     // The board surface re-renders on every keystroke/filter change, so this
     // selection-scoped query takes the hot-path escape hatch.
@@ -61,6 +64,7 @@ function useCanBulkDeleteSelectedPosts(): boolean {
       if (!contributorCase || !deleteEligibilityCollection) {
         return undefined;
       }
+
       return q
         .from({ eligibility: deleteEligibilityCollection })
         .where(({ eligibility }) =>
@@ -76,12 +80,15 @@ function useCanBulkDeleteSelectedPosts(): boolean {
   if (canManageAllPosts) {
     return true;
   }
+
   if (!contributorCase || !eligibleRows) {
     return false;
   }
+
   // Every selected post must resolve eligible; a missing row (filtered
   // out, stale selection) simply isn't in the eligible set.
   const eligibleIds = new Set(eligibleRows.map((row) => row.postId));
+
   return selectedPostIds.every((postId) => eligibleIds.has(postId));
 }
 
@@ -165,14 +172,17 @@ export function BoardPostBulkActions() {
 
 function BulkDeleteAlert() {
   const store = useBoardStore();
+
   const { deleteEligibilityCollection, postCollection } =
     useDashboardCollections();
+
   const selectedPostIds = useSelectedPostIds();
   const selectedPosts = useSelectedPosts();
   const open = useSelector(store, (state) => state.context.bulkDeleteOpen);
   const canBulkDelete = useCanBulkDeleteSelectedPosts();
 
   const organizationId = useOrganizationId();
+
   const { allowed: canManageAllPosts } = usePolicy(
     hasPermission(organizationId, "posts.*")
   );
@@ -185,6 +195,7 @@ function BulkDeleteAlert() {
       onConfirm={async () => {
         if (selectedPostIds.length === 0) {
           store.send({ type: "setBulkDeleteOpen", open: false });
+
           return;
         }
 
@@ -218,13 +229,16 @@ function BulkDeleteAlert() {
                   ).map((row) => row.postId)
                 )
               : null;
+
           const deletablePosts =
             freshEligibility === null
               ? selectedPosts
               : selectedPosts.filter((selectedPost) =>
                   freshEligibility.has(selectedPost.postId)
                 );
+
           const skippedCount = selectedPosts.length - deletablePosts.length;
+
           if (deletablePosts.length === 0) {
             trackEvent("post_deleted", {
               mode: "bulk",
@@ -237,6 +251,7 @@ function BulkDeleteAlert() {
             });
             refetchInBackground(deleteEligibilityCollection?.utils.refetch());
             store.send({ type: "setBulkDeleteOpen", open: false });
+
             return;
           }
 

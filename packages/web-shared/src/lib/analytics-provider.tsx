@@ -151,14 +151,17 @@ export type AnalyticsClient = <Name extends AnalyticsEventName>(
   properties: AnalyticsEvents[Name]
 ) => void;
 
-let currentAnalyticsClient: AnalyticsClient | null = null;
+/** The host's sink, once a provider (or a test) installs one. */
+type AnalyticsSinkSlot = { current: AnalyticsClient | null };
+
+const analyticsSink: AnalyticsSinkSlot = { current: null };
 
 /**
  * Imperative injection point — what `AnalyticsProvider` uses, and the hook for
  * non-React hosts (or tests). Pass `null` to restore the no-op default.
  */
 export const setAnalyticsClient = (client: AnalyticsClient | null): void => {
-  currentAnalyticsClient = client;
+  analyticsSink.current = client;
 };
 
 /**
@@ -173,7 +176,7 @@ export const trackEvent = <Name extends AnalyticsEventName>(
     : [properties: AnalyticsEvents[Name]]
 ): void => {
   // SAFETY: Empty-state placeholder for the generic container until real data is set.
-  currentAnalyticsClient?.(name, rest[0] ?? ({} as AnalyticsEvents[Name]));
+  analyticsSink.current?.(name, rest[0] ?? ({} as AnalyticsEvents[Name]));
 };
 
 /**
@@ -186,6 +189,7 @@ export const trackEvent = <Name extends AnalyticsEventName>(
 export const AnalyticsProvider = (
   props: React.PropsWithChildren<{ client?: AnalyticsClient }>
 ) => {
-  currentAnalyticsClient = props.client ?? null;
+  analyticsSink.current = props.client ?? null;
+
   return <>{props.children}</>;
 };

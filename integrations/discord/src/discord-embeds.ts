@@ -21,12 +21,17 @@ export const DISCORD_EMBED_TEXT_MAX = 6000;
 
 /** Discord's maximum embed title length. */
 export const TRUNCATED_TITLE_MAX = 256;
+
 /** Discord's maximum embed description length. */
 export const TRUNCATED_DESCRIPTION_MAX = 4096;
+
 /** Discord's maximum embed footer length. */
 export const TRUNCATED_FOOTER_MAX = 2048;
+
 const TRUNCATED_FACT_LABEL_MAX = 256;
+
 const TRUNCATED_FACT_VALUE_MAX = 1024;
+
 const DISCORD_EMBED_FIELD_MAX = 25;
 
 /** Feeblo brand color rendered as the embed accent. */
@@ -57,6 +62,7 @@ export const renderDiscordFeedbackConfirmationEmbed = (
   const title = truncate(confirmation.title, TRUNCATED_TITLE_MAX);
   const description = "Your feedback was successfully added to Feeblo.";
   const footer = { text: "Only you can see this confirmation." };
+
   const postFields: readonly DiscordEmbedField[] = [
     {
       inline: true,
@@ -90,6 +96,7 @@ export const renderDiscordFeedbackConfirmationEmbed = (
       value: `\`${truncate(confirmation.postId, TRUNCATED_FACT_VALUE_MAX - 2)}\``,
     },
   ];
+
   let remainingTextLength =
     DISCORD_EMBED_TEXT_MAX -
     title.length -
@@ -99,7 +106,9 @@ export const renderDiscordFeedbackConfirmationEmbed = (
       (length, field) => length + field.name.length + field.value.length,
       0
     );
+
   const metadataFields: DiscordEmbedField[] = [];
+
   for (const [metadataName, metadataValue] of Object.entries(
     confirmation.metadata
   )) {
@@ -109,21 +118,27 @@ export const renderDiscordFeedbackConfirmationEmbed = (
     ) {
       break;
     }
+
     const name = truncate(
       formatDiscordMetadataValue(metadataName.trim()),
       TRUNCATED_FACT_LABEL_MAX
     );
+
     const normalizedValue = metadataValue.trim();
+
     if (name.length === 0 || normalizedValue.length === 0) {
       continue;
     }
+
     const availableValueLength = Math.min(
       TRUNCATED_FACT_VALUE_MAX,
       remainingTextLength - name.length
     );
+
     if (availableValueLength <= 0) {
       break;
     }
+
     const value = truncate(normalizedValue, availableValueLength);
     metadataFields.push({ inline: true, name, value });
     remainingTextLength -= name.length + value.length;
@@ -149,6 +164,7 @@ export const renderChannelUpdateMessageEmbed = (
   message: ChannelUpdateMessage
 ): DiscordEmbed => {
   const title = truncate(message.title, TRUNCATED_TITLE_MAX);
+
   const footer =
     message.actorName !== undefined && message.actorName.length > 0
       ? {
@@ -158,6 +174,7 @@ export const renderChannelUpdateMessageEmbed = (
           ),
         }
       : undefined;
+
   const descriptionMax = Math.min(
     TRUNCATED_DESCRIPTION_MAX,
     DISCORD_EMBED_TEXT_MAX - title.length - (footer?.text.length ?? 0)

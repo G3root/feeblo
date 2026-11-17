@@ -77,6 +77,7 @@ describe("makeIntegrationProviderRegistry", () => {
   it.effect("rejects duplicate static provider registrations", () =>
     Effect.gen(function* () {
       const registration = webhookRegistration();
+
       const exit = yield* Effect.exit(
         makeIntegrationProviderRegistry([registration, registration])
       );
@@ -90,6 +91,7 @@ describe("makeIntegrationProviderRegistry", () => {
     () =>
       Effect.gen(function* () {
         const registration = webhookRegistration();
+
         const exit = yield* Effect.exit(
           makeIntegrationProviderRegistry([
             {
@@ -146,6 +148,7 @@ describe("makeIntegrationProviderRegistry", () => {
             ["commands", Schema.Json],
           ]),
         });
+
         const registry = yield* makeIntegrationProviderRegistry([registration]);
 
         expect(
@@ -162,6 +165,7 @@ describe("makeIntegrationProviderRegistry", () => {
     () =>
       Effect.gen(function* () {
         const registration = webhookRegistration();
+
         const exit = yield* Effect.exit(
           makeIntegrationProviderRegistry([
             {

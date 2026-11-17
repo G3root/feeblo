@@ -16,6 +16,7 @@ type ConfigOverrides = {
 const validate = (subdomain: string, overrides?: ConfigOverrides) =>
   Effect.gen(function* () {
     const service = yield* SubdomainValidationService.make;
+
     return yield* service.validate(subdomain);
   }).pipe(
     Effect.provideService(ProfanityConfig, {
@@ -112,6 +113,7 @@ describe("SubdomainValidationService", () => {
           extraWords: ["snarf"],
         })
       );
+
       expect(error).toBeInstanceOf(ProfanityError);
       expect(error.message).toContain("snarf");
 
@@ -121,6 +123,7 @@ describe("SubdomainValidationService", () => {
           extraWords: ["snarf"],
         })
       );
+
       expect(bundledError).toBeInstanceOf(ProfanityError);
     })
   );
@@ -133,6 +136,7 @@ describe("SubdomainValidationService", () => {
           extraWords: ["snarf"],
         })
       );
+
       expect(error).toBeInstanceOf(ProfanityError);
       expect(error.message).toContain("snarf");
 
@@ -151,6 +155,7 @@ describe("SubdomainValidationService", () => {
           extraWords: ["foo-bar"],
         })
       );
+
       expect(error).toBeInstanceOf(ProfanityError);
       expect(error.message).toContain("foo-bar");
 
@@ -159,6 +164,7 @@ describe("SubdomainValidationService", () => {
       const containedResult = yield* validate("prefix-foo-bar-suffix", {
         extraWords: ["foo-bar"],
       });
+
       expect(containedResult.valid).toBe(true);
     })
   );

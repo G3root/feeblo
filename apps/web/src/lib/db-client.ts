@@ -23,6 +23,7 @@ const getBoardPathname = createIsomorphicFn()
   .client(() => () => window.location.pathname)
   .server(() => {
     const { pathname } = new URL(getRequest().url);
+
     return () => pathname;
   });
 
@@ -51,17 +52,26 @@ const getBoardPathname = createIsomorphicFn()
  * `@tanstack/react-start/server` unconditionally is rejected by the
  * `tanstack-start-core:import-protection` plugin.
  */
-export const getDbClient = createIsomorphicFn()
-  .client((getQueryClient: () => QueryClient): DbClient => {
-    browserDbClient ??= new DbClient({
+/** Browser app instance client; see the note above. */
+const getBrowserDbClient = (() => {
+  let client: DbClient | null = null;
+
+  return (getQueryClient: () => QueryClient): DbClient => {
+    client ??= new DbClient({
       [BOARD_QUERY_CLIENT_DEPENDENCY]: getQueryClient(),
       [BOARD_SCOPE_DEPENDENCY]: createBoardScope({
         pathname: getBoardPathname(),
       }),
     });
 
-    return browserDbClient;
-  })
+    return client;
+  };
+})();
+
+export const getDbClient = createIsomorphicFn()
+  .client((getQueryClient: () => QueryClient): DbClient =>
+    getBrowserDbClient(getQueryClient)
+  )
   .server((getQueryClient: () => QueryClient): DbClient => {
     const request = getRequest();
     const existing = requestDbClients.get(request);
@@ -76,13 +86,11 @@ export const getDbClient = createIsomorphicFn()
         pathname: getBoardPathname(),
       }),
     });
+
     requestDbClients.set(request, client);
 
     return client;
   });
-
-/** Browser app instance client; see the note above. */
-let browserDbClient: DbClient | null = null;
 
 /** Per-request clients, keyed by the request they belong to. */
 const requestDbClients = new WeakMap<Request, DbClient>();

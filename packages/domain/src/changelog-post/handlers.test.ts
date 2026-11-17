@@ -147,17 +147,21 @@ describe("ChangelogPostRpcHandlers", () => {
     AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
+
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
   );
+
   const Policies = SitePolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const ChangelogPolicies = ChangelogPolicy.layer.pipe(
     Layer.provide(Entitlements),
     Layer.provide(Repositories)
   );
+
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
@@ -185,6 +189,7 @@ describe("ChangelogPostRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(posts).toMatchObject([
           {
             changelogId: fixture.changelogId,
@@ -234,6 +239,7 @@ describe("ChangelogPostRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(error).toMatchObject({ _tag: "PolicyDenied" });
 
           const posts = yield* handlers
@@ -241,6 +247,7 @@ describe("ChangelogPostRpcHandlers", () => {
               organizationId: fixture.organizationId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(posts).toHaveLength(0);
         })
     );
@@ -249,15 +256,18 @@ describe("ChangelogPostRpcHandlers", () => {
         const handlers = yield* ChangelogPostRpcHandlersEffect;
         const fixture = yield* makeFixture();
         const db = yield* currentDb;
+
         const args = {
           changelogId: fixture.changelogId,
           postId: fixture.postId,
           organizationId: fixture.organizationId,
         };
+
         const provideSession = Effect.provideService(
           CurrentSession,
           makeSession(fixture)
         );
+
         const auditOn = Effect.provideService(AuditLogEnabled, true);
 
         yield* handlers.CreateChangelogPost(args).pipe(provideSession, auditOn);
@@ -289,6 +299,38 @@ describe("ChangelogPostRpcHandlers", () => {
           resourceId: fixture.changelogId,
           resourceType: "changelog",
         });
+      })
+    );
+
+    it.effect("records nothing when the link was already absent", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogPostRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        const args = {
+          changelogId: fixture.changelogId,
+          postId: fixture.postId,
+          organizationId: fixture.organizationId,
+        };
+
+        // Unlinking a post that was never linked changes nothing, so there is
+        // no `linked: false` entry to write.
+        yield* handlers
+          .DeleteChangelogPost(args)
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture)),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(0);
       })
     );
   });

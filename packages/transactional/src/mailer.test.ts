@@ -43,8 +43,10 @@ const sendWith = (
     const context = yield* Layer.build(
       Layer.merge(makeMailerLayer(transport), NodeCrypto.layer)
     );
+
     return yield* Effect.gen(function* () {
       const mailer = yield* Mailer;
+
       return yield* mailer.send(sentMessage);
     }).pipe(Effect.provideContext(context));
   }).pipe(Effect.scoped);
@@ -84,11 +86,13 @@ describe("Mailer", () => {
       Effect.gen(function* () {
         let sentMessageId: string | undefined;
         const { messageId: _omitted, ...withoutMessageId } = message;
+
         const sent = yield* sendWith(
           {
             send: (rendered) =>
               Effect.sync(() => {
                 sentMessageId = rendered.messageId;
+
                 return transportReceipt;
               }),
           },
@@ -135,13 +139,16 @@ describe("Mailer", () => {
     () =>
       Effect.gen(function* () {
         const entityRefIds: string[] = [];
+
         const transport: MailerTransport = {
           send: (rendered) =>
             Effect.sync(() => {
               const entityRefId = rendered.headers?.["X-Entity-Ref-ID"];
+
               if (entityRefId !== undefined) {
                 entityRefIds.push(entityRefId);
               }
+
               return transportReceipt;
             }),
         };
@@ -165,6 +172,7 @@ describe("Mailer", () => {
             send: (rendered) =>
               Effect.sync(() => {
                 capturedHeaders = rendered.headers;
+
                 return transportReceipt;
               }),
           },
@@ -188,6 +196,7 @@ describe("Mailer", () => {
             send: (rendered) =>
               Effect.sync(() => {
                 capturedHeaders = rendered.headers;
+
                 return transportReceipt;
               }),
           },
@@ -363,6 +372,7 @@ describe("classifyPermanentFailure", () => {
       response: "x".repeat(3000),
       responseCode: 450,
     });
+
     expect(temporary).toBeInstanceOf(MailTemporaryDeliveryError);
     expect(temporary).toMatchObject({ smtpStatusCode: 450 });
 
@@ -370,6 +380,7 @@ describe("classifyPermanentFailure", () => {
       response: `550 5.1.1 ${"x".repeat(3000)}`,
       responseCode: 550,
     });
+
     expect(permanent).toBeInstanceOf(MailPermanentDeliveryError);
     expect(permanent).toMatchObject({
       failureClass: "recipient",
@@ -385,6 +396,7 @@ describe("makeNodemailerSendOptions", () => {
       defaultReplyTo: Option.none(),
       message: renderedMessage,
     });
+
     const withOverride = makeNodemailerSendOptions({
       defaultFrom,
       defaultReplyTo: Option.none(),
@@ -432,6 +444,7 @@ describe("makeNodemailerSendOptions", () => {
       defaultReplyTo: Option.some("support@example.test"),
       message: { ...renderedMessage, replyTo: "   " },
     });
+
     const fromConfig = makeNodemailerSendOptions({
       defaultFrom,
       defaultReplyTo: Option.some("   "),

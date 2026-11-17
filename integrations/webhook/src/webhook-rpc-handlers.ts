@@ -17,8 +17,10 @@ import * as Effect from "effect/Effect";
  */
 export const WebhookManagementRpcHandlersEffect = Effect.gen(function* () {
   const service = yield* WebhookManagementService;
+
   const authorize = (organizationId: string) =>
     Policy.withPolicy(Policy.canPermission(organizationId, "webhooks.manage"));
+
   return {
     ListWebhookEndpoints: (
       input: Parameters<typeof service.listEndpoints>[0]

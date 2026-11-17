@@ -84,13 +84,16 @@ function DataTablePaginationContent<TData extends RowData>({
   ...props
 }: DataTablePaginationContentProps<TData>) {
   const pageSizeLabelId = React.useId();
+
   const sizeOptions = pageSizeOptions.includes(pageSize)
     ? pageSizeOptions
     : [...pageSizeOptions, pageSize].toSorted((a, b) => a - b);
+
   const items = sizeOptions.map((size) => ({
     label: String(size),
     value: String(size),
   }));
+
   const pageCount = table.getPageCount();
   const canPreviousPage = table.getCanPreviousPage();
   const canNextPage = table.getCanNextPage();

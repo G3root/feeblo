@@ -95,36 +95,63 @@ const OPERATION_METHODS = ["get", "post", "put", "patch", "delete"] as const;
 const operations = Object.entries(document.paths).flatMap(([path, item]) =>
   OPERATION_METHODS.flatMap((method) => {
     const operation = item[method];
+
     return operation === undefined ? [] : [{ method, operation, path }];
   })
 );
 
 const AUDIT_LOG_PATH = "/api/v1/audit-log";
+
 const BOARDS_PATH = "/api/v1/boards";
+
 const BOARD_PATH = "/api/v1/boards/{boardId}";
+
 const LIST_PATH = "/api/v1/boards/{boardId}/posts";
+
 const POSTS_PATH = "/api/v1/posts";
+
 const RETRIEVE_PATH = "/api/v1/posts/retrieve";
+
 const DETAIL_PATH = "/api/v1/posts/{postId}";
+
 const POST_ACTIVITY_PATH = "/api/v1/posts/{postId}/activity";
+
 const SET_POST_TAGS_PATH = "/api/v1/posts/{postId}/tags";
+
 const STATUSES_PATH = "/api/v1/statuses";
+
 const TAGS_PATH = "/api/v1/tags";
+
 const TAG_PATH = "/api/v1/tags/{tagId}";
+
 const COMPANIES_PATH = "/api/v1/companies";
+
 const COMPANY_PATH = "/api/v1/companies/{companyId}";
+
 const CHANGELOG_PATH = "/api/v1/changelog";
+
 const CHANGELOG_ENTRY_PATH = "/api/v1/changelog/{changelogId}";
+
 const POST_COMMENTS_PATH = "/api/v1/posts/{postId}/comments";
+
 const COMMENT_PATH = "/api/v1/comments/{commentId}";
+
 const PIN_COMMENT_PATH = "/api/v1/comments/{commentId}/pin";
+
 const UNPIN_COMMENT_PATH = "/api/v1/comments/{commentId}/unpin";
+
 const POST_VOTES_PATH = "/api/v1/posts/{postId}/votes";
+
 const VOTE_PATH = "/api/v1/posts/{postId}/votes/{voteId}";
+
 const VOTES_PATH = "/api/v1/votes";
+
 const MERGE_PATH = "/api/v1/posts/{postId}/merge";
+
 const UNMERGE_PATH = "/api/v1/posts/{postId}/unmerge";
+
 const END_USERS_PATH = "/api/v1/end-users";
+
 const END_USER_PATH = "/api/v1/end-users/{endUserId}";
 
 /** The statuses every endpoint of the API can answer with, as the base set. */
@@ -276,6 +303,7 @@ describe("PublicApi contract", () => {
     const names = (operation?.parameters ?? []).map(
       (parameter) => parameter.name
     );
+
     expect(names.sort()).toEqual([
       "action",
       "actorType",
@@ -288,6 +316,7 @@ describe("PublicApi contract", () => {
     ]);
 
     const body = JSON.stringify(responses["200"]);
+
     for (const field of [
       "id",
       "action",
@@ -413,10 +442,13 @@ describe("PublicApi contract", () => {
     // update can both collide on the workspace's slug index.
     const changelogCreateResponses =
       document.paths[CHANGELOG_PATH]?.post?.responses ?? {};
+
     const changelogUpdateResponses =
       document.paths[CHANGELOG_ENTRY_PATH]?.patch?.responses ?? {};
+
     const changelogDeleteResponses =
       document.paths[CHANGELOG_ENTRY_PATH]?.delete?.responses ?? {};
+
     const changelogReadResponses =
       document.paths[CHANGELOG_ENTRY_PATH]?.get?.responses ?? {};
 
@@ -455,6 +487,7 @@ describe("PublicApi contract", () => {
 
   it("documents the workspace post list and the retrieve lookup", () => {
     const listResponses = document.paths[POSTS_PATH]?.get?.responses ?? {};
+
     const retrieveResponses =
       document.paths[RETRIEVE_PATH]?.get?.responses ?? {};
 
@@ -469,6 +502,7 @@ describe("PublicApi contract", () => {
     const listParameters = (
       document.paths[POSTS_PATH]?.get?.parameters ?? []
     ).map((parameter) => parameter.name);
+
     expect(listParameters.sort()).toEqual([
       "boardId",
       "cursor",
@@ -485,6 +519,7 @@ describe("PublicApi contract", () => {
     const boardListParameters = (
       document.paths[LIST_PATH]?.get?.parameters ?? []
     ).map((parameter) => parameter.name);
+
     expect(boardListParameters.sort()).toEqual([
       "boardId",
       "cursor",
@@ -500,6 +535,7 @@ describe("PublicApi contract", () => {
     const retrieveParameters = (
       document.paths[RETRIEVE_PATH]?.get?.parameters ?? []
     ).map((parameter) => parameter.name);
+
     expect(retrieveParameters.sort()).toEqual(["boardId", "id", "slug"]);
 
     const listBody = JSON.stringify(listResponses["200"]);
@@ -509,6 +545,7 @@ describe("PublicApi contract", () => {
   it("documents the post resource and the write endpoints' statuses", () => {
     const createResponses = document.paths[POSTS_PATH]?.post?.responses ?? {};
     const updateResponses = document.paths[DETAIL_PATH]?.patch?.responses ?? {};
+
     const deleteResponses =
       document.paths[DETAIL_PATH]?.delete?.responses ?? {};
 
@@ -535,6 +572,7 @@ describe("PublicApi contract", () => {
     expect(JSON.stringify(updateResponses)).not.toContain("CONFLICT");
 
     const createBody = JSON.stringify(createResponses["201"]);
+
     for (const field of [
       "id",
       "boardId",
@@ -573,6 +611,7 @@ describe("PublicApi contract", () => {
     // A create names the board, the title, the body, and the status it starts
     // in; an update may name any of the writable fields.
     const createRequest = JSON.stringify(document.paths[POSTS_PATH]?.post);
+
     for (const field of [
       "boardId",
       "title",
@@ -585,6 +624,7 @@ describe("PublicApi contract", () => {
     }
 
     const updateRequest = JSON.stringify(document.paths[DETAIL_PATH]?.patch);
+
     for (const field of [
       "title",
       "content",
@@ -629,6 +669,7 @@ describe("PublicApi contract", () => {
     expect(JSON.stringify(responses)).not.toContain("CONFLICT");
 
     const body = JSON.stringify(responses["200"]);
+
     for (const field of ["id", "name", "type", "orderIndex", "color"]) {
       expect(body).toContain(field);
     }
@@ -651,6 +692,7 @@ describe("PublicApi contract", () => {
     expect(JSON.stringify(responses)).not.toContain("CONFLICT");
 
     const body = JSON.stringify(responses["200"]);
+
     for (const field of [
       "id",
       "kind",
@@ -693,6 +735,7 @@ describe("PublicApi contract", () => {
     expect(listBody).toContain("nextCursor");
 
     const body = JSON.stringify(getResponses["200"]);
+
     for (const field of [
       "id",
       "name",
@@ -736,6 +779,7 @@ describe("PublicApi contract", () => {
   it("documents the company resource without an internal identifier", () => {
     const createResponses =
       document.paths[COMPANIES_PATH]?.post?.responses ?? {};
+
     const body = JSON.stringify(createResponses["201"]);
 
     for (const field of [
@@ -767,10 +811,13 @@ describe("PublicApi contract", () => {
   it("documents the company endpoints' statuses, and no conflict on a read", () => {
     const listResponses = document.paths[COMPANIES_PATH]?.get?.responses ?? {};
     const getResponses = document.paths[COMPANY_PATH]?.get?.responses ?? {};
+
     const createResponses =
       document.paths[COMPANIES_PATH]?.post?.responses ?? {};
+
     const updateResponses =
       document.paths[COMPANY_PATH]?.patch?.responses ?? {};
+
     const deleteResponses =
       document.paths[COMPANY_PATH]?.delete?.responses ?? {};
 
@@ -860,6 +907,7 @@ describe("PublicApi contract", () => {
     const listBody = JSON.stringify(
       document.paths[CHANGELOG_PATH]?.get?.responses["200"]
     );
+
     expect(listBody).toContain("excerpt");
   });
 
@@ -905,15 +953,21 @@ describe("PublicApi contract", () => {
   it("documents the comment endpoints' statuses, and no conflict on a read", () => {
     const listResponses =
       document.paths[POST_COMMENTS_PATH]?.get?.responses ?? {};
+
     const createResponses =
       document.paths[POST_COMMENTS_PATH]?.post?.responses ?? {};
+
     const getResponses = document.paths[COMMENT_PATH]?.get?.responses ?? {};
+
     const updateResponses =
       document.paths[COMMENT_PATH]?.patch?.responses ?? {};
+
     const deleteResponses =
       document.paths[COMMENT_PATH]?.delete?.responses ?? {};
+
     const pinResponses =
       document.paths[PIN_COMMENT_PATH]?.post?.responses ?? {};
+
     const unpinResponses =
       document.paths[UNPIN_COMMENT_PATH]?.post?.responses ?? {};
 
@@ -985,6 +1039,7 @@ describe("PublicApi contract", () => {
     ]);
 
     const body = JSON.stringify(createResponses["201"]);
+
     for (const field of ["id", "postId", "voterId", "author", "createdAt"]) {
       expect(body).toContain(field);
     }
@@ -1022,6 +1077,7 @@ describe("PublicApi contract", () => {
     const names = (listOperation?.parameters ?? []).map(
       (parameter) => parameter.name
     );
+
     for (const name of [
       "limit",
       "cursor",
@@ -1038,6 +1094,7 @@ describe("PublicApi contract", () => {
     // member's vote — and still no account identifier or email.
     const body = JSON.stringify(listResponses["200"]);
     expect(body).toContain("voterId");
+
     for (const forbidden of [
       "userId",
       "memberId",
@@ -1050,6 +1107,7 @@ describe("PublicApi contract", () => {
 
   it("documents the merge endpoints and their state conflicts", () => {
     const mergeResponses = document.paths[MERGE_PATH]?.post?.responses ?? {};
+
     const unmergeResponses =
       document.paths[UNMERGE_PATH]?.post?.responses ?? {};
 
@@ -1086,6 +1144,7 @@ describe("PublicApi contract", () => {
     const requestBody = JSON.stringify(
       document.paths[MERGE_PATH]?.post?.requestBody
     );
+
     expect(requestBody).toContain("intoPostId");
   });
 
@@ -1114,6 +1173,7 @@ describe("PublicApi contract", () => {
     ]);
 
     const body = JSON.stringify(upsertResponses["200"]);
+
     for (const field of [
       "id",
       "externalId",
@@ -1141,6 +1201,7 @@ describe("PublicApi contract", () => {
     }
 
     const requestBody = JSON.stringify(upsertOperation?.requestBody);
+
     for (const field of [
       "externalId",
       "email",
@@ -1154,6 +1215,7 @@ describe("PublicApi contract", () => {
     const names = (listOperation?.parameters ?? []).map(
       (parameter) => parameter.name
     );
+
     for (const name of [
       "limit",
       "cursor",

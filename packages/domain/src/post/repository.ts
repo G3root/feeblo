@@ -83,6 +83,15 @@ interface TRestoreMergedEngagement {
 interface TPostDeleteResult {
   deleted: boolean;
   /**
+   * The ids the delete actually removed, in the order the rows came back.
+   *
+   * A caller that audits a deletion has to name these and not the ids it
+   * asked for: the two differ when a post vanished between the caller's read
+   * and this statement, and an entry for a row this delete did not remove is
+   * an entry about something that did not happen.
+   */
+  deletedIds: readonly string[];
+  /**
    * Merged children reverted by the delete (with the survivor they pointed
    * at), so callers can record the reversal on each child's timeline.
    */
@@ -286,6 +295,7 @@ const selectPostListFields = (opts?: {
   // (`opts.authorBan`): the post detail page renders its shell from a list row,
   // so a badge that lived on the detail projection alone would pop in late.
   const { content: _content, ...listFields } = selectPostFields(opts);
+
   return listFields;
 };
 
@@ -720,6 +730,7 @@ const makePostRepository = Effect.gen(function* () {
 
     findMany: ({ boardId, organizationId }: TPostFindMany) => {
       const where: SQL[] = [];
+
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
       }
@@ -748,6 +759,7 @@ const makePostRepository = Effect.gen(function* () {
         eq(schema.postTable.organizationId, organizationId),
         publicPostVisibility,
       ];
+
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
       }
@@ -845,14 +857,18 @@ const makePostRepository = Effect.gen(function* () {
         eq(schema.postTable.organizationId, organizationId),
         activePostVisibility,
       ];
+
       if (boardId) {
         where.push(eq(schema.postTable.boardId, boardId));
       }
+
       if (publicOnly) {
         where.push(eq(schema.boardTable.visibility, "PUBLIC"));
       }
+
       if (embedding) {
         where.push(isNotNull(schema.postTable.embedding));
+
         if (embeddingModel) {
           where.push(eq(schema.postTable.embeddingModel, embeddingModel));
         }
@@ -904,6 +920,7 @@ const makePostRepository = Effect.gen(function* () {
               unlockedPostCondition
             )
           );
+
         return rows.length > 0;
       }),
 
@@ -925,6 +942,7 @@ const makePostRepository = Effect.gen(function* () {
               unlockedPostCondition
             )
           );
+
         return rows.length > 0;
       }),
 
@@ -1081,6 +1099,7 @@ const makePostRepository = Effect.gen(function* () {
       onlyIfNew,
     }: TPostDelete) => {
       const ids = isString(id) ? [id] : id;
+
       const postScope = and(
         inArray(schema.postTable.id, ids),
         eq(schema.postTable.organizationId, organizationId),
@@ -1102,8 +1121,9 @@ const makePostRepository = Effect.gen(function* () {
         // Nothing matched (missing id or wrong org/board) — report "not
         // deleted" instead of vacuously comparing two empty lists.
         if (scannedSurvivors.length === 0) {
-          return { deleted: false, restoredChildren: [] };
+          return { deleted: false, deletedIds: [], restoredChildren: [] };
         }
+
         const survivorIds = scannedSurvivors.map((post) => post.id);
         const survivorIdSet = new Set(survivorIds);
 
@@ -1143,8 +1163,9 @@ const makePostRepository = Effect.gen(function* () {
             post.boardId === boardId &&
             !isMergedPostPresence(presenceOf(post))
         );
+
         if (posts.length !== survivorIds.length) {
-          return { deleted: false, restoredChildren: [] };
+          return { deleted: false, deletedIds: [], restoredChildren: [] };
         }
 
         if (onlyIfNew) {
@@ -1153,7 +1174,7 @@ const makePostRepository = Effect.gen(function* () {
           // only be a caller that asked for the creator scope without one,
           // and it can match nothing.
           if (creatorId === null) {
-            return { deleted: false, restoredChildren: [] };
+            return { deleted: false, deletedIds: [], restoredChildren: [] };
           }
 
           const newPosts = yield* db
@@ -1184,7 +1205,7 @@ const makePostRepository = Effect.gen(function* () {
             );
 
           if (newPosts.length !== posts.length) {
-            return { deleted: false, restoredChildren: [] };
+            return { deleted: false, deletedIds: [], restoredChildren: [] };
           }
         }
 
@@ -1203,12 +1224,14 @@ const makePostRepository = Effect.gen(function* () {
               ? [{ id: row.id, mergedIntoPostId: row.mergedIntoPostId }]
               : []
         );
+
         for (const child of restoredChildren) {
           yield* restoreMergedEngagement({
             organizationId,
             sourcePostId: child.id,
           });
         }
+
         if (restoredChildren.length > 0) {
           const restoredAt = yield* DateTime.nowAsDate;
           yield* db
@@ -1246,6 +1269,7 @@ const makePostRepository = Effect.gen(function* () {
 
         return {
           deleted: deleted.length === posts.length,
+          deletedIds: deleted.map((row) => row.id),
           restoredChildren,
         } satisfies TPostDeleteResult;
       });
@@ -1287,10 +1311,12 @@ const makePostRepository = Effect.gen(function* () {
         // effect is rebuilt lazily per attempt via Effect.suspend. Effect.retry
         // re-executes it, incrementing the counter on each retry.
         let attemptIndex = 0;
+
         const tryCreate = Effect.suspend(() =>
           Effect.gen(function* () {
             const slug =
               attemptIndex === 0 ? baseSlug : `${baseSlug}-${attemptIndex + 1}`;
+
             attemptIndex += 1;
             const now = yield* DateTime.nowAsDate;
 
@@ -1353,6 +1379,7 @@ const makePostRepository = Effect.gen(function* () {
       db.transaction((tx) =>
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+
           // Lock both rows before validating, in id order so two concurrent
           // merges cannot deadlock. The locks serialize every merge on either
           // post, which is what makes the chained-merge and archived checks
@@ -1384,42 +1411,49 @@ const makePostRepository = Effect.gen(function* () {
               reason: "post_not_found",
             });
           }
+
           if (sourcePostId === targetPostId) {
             return yield* new FailedToMergePostError({
               message: "Source and target posts must be different",
               reason: "same_post",
             });
           }
+
           // A merge endpoint must be `listed`: an archived post and an
           // already-merged post are both refused, and the graph says which
           // state each one is in rather than the guard re-testing the two
           // columns.
           const sourcePresence = presenceOf(sourcePost);
           const targetPresence = presenceOf(targetPost);
+
           if (isMergedPostPresence(sourcePresence)) {
             return yield* new FailedToMergePostError({
               message: "Source post is already merged into another post",
               reason: "source_merged",
             });
           }
+
           if (isArchivedPostPresence(sourcePresence)) {
             return yield* new FailedToMergePostError({
               message: "Source post is archived and cannot be merged",
               reason: "source_archived",
             });
           }
+
           if (isMergedPostPresence(targetPresence)) {
             return yield* new FailedToMergePostError({
               message: "Target post is already merged into another post",
               reason: "target_merged",
             });
           }
+
           if (isArchivedPostPresence(targetPresence)) {
             return yield* new FailedToMergePostError({
               message: "Target post is archived and cannot be a merge target",
               reason: "target_archived",
             });
           }
+
           // Chained merges (A into B, then B into C) would strand A under C:
           // unmerging B restores only rows tagged B, and deleting C cascades
           // A's comments and votes away. Reject a source that already absorbed
@@ -1437,6 +1471,7 @@ const makePostRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           if (mergedChild) {
             return yield* new FailedToMergePostError({
               message:
@@ -1460,6 +1495,7 @@ const makePostRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           if (targetPinnedComment) {
             yield* tx
               .update(schema.commentTable)
@@ -1471,6 +1507,7 @@ const makePostRepository = Effect.gen(function* () {
                 )
               );
           }
+
           // `mergedFromPostId` records the source post on every moved row so
           // the survivor can label and link the comment, and so an unmerge or
           // delete can restore it. `coalesce` keeps the earliest origin when
@@ -1524,6 +1561,7 @@ const makePostRepository = Effect.gen(function* () {
             schema.postReactionTable,
             "merge_target_reaction"
           );
+
           yield* tx
             .update(schema.postReactionTable)
             .set({
@@ -1552,10 +1590,12 @@ const makePostRepository = Effect.gen(function* () {
                 )
               )
             );
+
           const targetPostTag = alias(
             schema.postTagTable,
             "merge_target_post_tag"
           );
+
           yield* tx
             .update(schema.postTagTable)
             .set({
@@ -1580,6 +1620,7 @@ const makePostRepository = Effect.gen(function* () {
                 )
               )
             );
+
           // Followers move with the post so subscribers keep receiving
           // updates. A user following both posts keeps the target
           // subscription; the duplicate source row stays on the source and
@@ -1588,6 +1629,7 @@ const makePostRepository = Effect.gen(function* () {
             schema.postSubscriptionTable,
             "merge_target_subscription"
           );
+
           yield* tx
             .update(schema.postSubscriptionTable)
             .set({
@@ -1615,6 +1657,7 @@ const makePostRepository = Effect.gen(function* () {
                 )
               )
             );
+
           // Email subscribers follow the surviving post too, so a merged-away
           // post does not silently orphan their consent. A contact who
           // already has a target-topic row keeps that row (and its explicit
@@ -1624,6 +1667,7 @@ const makePostRepository = Effect.gen(function* () {
             schema.emailSubscriptionTable,
             "merge_target_email_subscription"
           );
+
           yield* tx
             .update(schema.emailSubscriptionTable)
             .set({
@@ -1653,6 +1697,7 @@ const makePostRepository = Effect.gen(function* () {
                 )
               )
             );
+
           // A changelog entry that announced the duplicate follows the
           // surviving post, so the public changelog keeps a resolvable link
           // (merged posts are hidden from public post queries). A post can
@@ -1663,6 +1708,7 @@ const makePostRepository = Effect.gen(function* () {
             schema.changelogPostTable,
             "merge_target_changelog_link"
           );
+
           yield* tx
             .update(schema.changelogPostTable)
             .set({
@@ -1755,6 +1801,7 @@ const makePostRepository = Effect.gen(function* () {
               reason: "post_not_found",
             });
           }
+
           if (!isMergedPostRow(preSource)) {
             return yield* new FailedToMergePostError({
               message: "Post is not merged",
@@ -1781,6 +1828,7 @@ const makePostRepository = Effect.gen(function* () {
             .for("update");
 
           const sourcePost = posts.find((post) => post.id === sourcePostId);
+
           const targetPost = posts.find(
             (post) => post.id === preSource.mergedIntoPostId
           );
@@ -1796,6 +1844,7 @@ const makePostRepository = Effect.gen(function* () {
               reason: "post_not_found",
             });
           }
+
           if (sourcePost.mergedIntoPostId !== preSource.mergedIntoPostId) {
             return yield* new FailedToMergePostError({
               message: "Post is not merged",

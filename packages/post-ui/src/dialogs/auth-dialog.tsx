@@ -102,6 +102,7 @@ export function AuthDialogRoot() {
   const handleBack = useCallback(() => {
     if (step.kind === "otp-verification") {
       setStep({ kind: step.previous });
+
       return;
     }
 
@@ -186,11 +187,11 @@ function AuthMethodChooser({
       <SocialAuthButtons />
       <FieldSeparator>{m.stout_teary_dove()}</FieldSeparator>
 
-      <Button onClick={() => onSelectEmailStep("email-sign-in")}>
+      <Button onClick={() => onSelectEmailStep("email-sign-in")} size="lg">
         {m.stock_such_porpoise()}
       </Button>
 
-      <Button onClick={() => onSelectEmailStep("email-sign-up")}>
+      <Button onClick={() => onSelectEmailStep("email-sign-up")} size="lg">
         {m.extra_born_bear()}
       </Button>
     </div>
@@ -255,6 +256,7 @@ function SignUpForm({
   onVerify: (email: string) => void;
 }) {
   const turnstile = useTurnstile();
+
   const signUp = useSignUpEmail({
     getCallbackURL: () => getSafeCallbackURL(),
     getCaptchaToken: () => turnstile.token,
@@ -267,6 +269,7 @@ function SignUpForm({
     onSubmit: async ({ value }) => {
       if (turnstile.isEnabled && !turnstile.token) {
         showAuthError(m.small_round_lemming());
+
         return;
       }
 

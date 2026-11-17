@@ -46,6 +46,7 @@ describe("public API operations registry", () => {
     const endpointNames = PublicApiGroups.flatMap((group) =>
       Object.keys(group.endpoints)
     ).sort();
+
     const operationNames = PublicApiOperations.map(
       (operation) => operation.name
     ).sort();
@@ -83,6 +84,7 @@ describe("public API operations registry", () => {
       ListEndUsersInput,
       ListVotesInput,
     ];
+
     const pageOutputs = [
       PublicApiAuditLogPage,
       PublicApiBoardPage,
@@ -154,14 +156,20 @@ describe("public API operations registry", () => {
         const operation = PublicApiOperations.find(
           (candidate) => candidate.name === identifier
         );
+
         if (operation === undefined) {
           // oxlint-disable-next-line vitest/no-conditional-expect -- expect.fail is the failure branch of a registry-invariant check, not a skipped assertion: it throws, so the test fails with the identifier that broke the invariant
           return expect.fail(`no operation named ${identifier}`);
         }
 
-        const pathParams = [...endpoint.path.matchAll(/:([^/]+)/g)]
-          .map((match) => match[1])
-          .filter((name): name is string => name !== undefined);
+        const pathParams = [...endpoint.path.matchAll(/:([^/]+)/g)].flatMap(
+          (match) => {
+            const name = match[1];
+
+            return name === undefined ? [] : [name];
+          }
+        );
+
         if (pathParams.length === 0) {
           continue;
         }
@@ -169,22 +177,27 @@ describe("public API operations registry", () => {
         // The endpoint stores its params as the StringTree codec, whose field
         // names are the object AST's property signatures.
         const params = endpoint.params;
+
         if (params === undefined) {
           // oxlint-disable-next-line vitest/no-conditional-expect -- expect.fail is the failure branch of a registry-invariant check, not a skipped assertion: it throws, so the test fails with the identifier that broke the invariant
           return expect.fail(
             `${identifier} has path parameters but no params schema`
           );
         }
+
         const paramsAst = params.ast;
+
         if (!SchemaAST.isObjects(paramsAst)) {
           // oxlint-disable-next-line vitest/no-conditional-expect -- expect.fail is the failure branch of a registry-invariant check, not a skipped assertion: it throws, so the test fails with the identifier that broke the invariant
           return expect.fail(
             `${identifier} has path parameters but its params schema is not an object`
           );
         }
+
         const declared = new Set(
           paramsAst.propertySignatures.map((signature) => signature.name)
         );
+
         if (declared.size === 0) {
           // oxlint-disable-next-line vitest/no-conditional-expect -- expect.fail is the failure branch of a registry-invariant check, not a skipped assertion: it throws, so the test fails with the identifier that broke the invariant
           return expect.fail(

@@ -76,6 +76,7 @@ export const commentCreateFormOpts = formOptions({
     // the author key is server-validated.
     onChange: ({ value }) => {
       const contentParsed = CommentContentField.safeParse(value.content);
+
       if (!contentParsed.success) {
         // Field-scoped errors must ride under `fields`
         // (GlobalFormValidationError); a flat record would surface as a
@@ -87,6 +88,7 @@ export const commentCreateFormOpts = formOptions({
           },
         };
       }
+
       return undefined;
     },
   },
@@ -128,10 +130,12 @@ export function useCreateCommentAction() {
   const { post, organizationId } = usePostCollectionData();
   const postId = post.id;
   const postSlug = post.slug;
+
   const {
     collections: { commentCollection },
     onAuthRequired,
   } = usePostCollections();
+
   const { data: session } = useAuthState();
 
   return useCallback(
@@ -144,6 +148,7 @@ export function useCreateCommentAction() {
     }: TCreateCommentInput) => {
       if (!session) {
         onAuthRequired?.();
+
         return false;
       }
 
@@ -157,12 +162,15 @@ export function useCreateCommentAction() {
       // an on-behalf comment is authored by the picked customer, never by
       // the acting member.
       const onBehalf = author !== undefined && hasOnBehalfAuthorValue(author);
+
       const optimisticUserId = onBehalf
         ? (author?.userId ?? null)
         : session.user.id;
+
       const optimisticAuthorName = onBehalf
         ? (author?.name ?? author?.email ?? session.user.name)
         : session.user.name;
+
       // Mirrors the server's `authorIsMember`, which the picker already
       // knows for an on-behalf subject and the session's memberships give for
       // a self-authored comment.
@@ -210,6 +218,7 @@ export function useCreateCommentAction() {
           title: parseRpcError(error).message,
           type: "error",
         });
+
         return false;
       }
 
@@ -280,6 +289,7 @@ export const CommentComposerField = withForm({
   props: {} as CommentComposerProviderProps & { showStatusUpdate?: boolean },
   render: ({ form, disabled, ...rest }) => {
     const { organizationId } = usePostCollections();
+
     // Mirrors the backend's CommentPolicy gate for CommentCreate.author.
     const commentOnBehalfPolicy = usePolicy(
       hasPermission(organizationId, "comments.createOnBehalf")
@@ -396,5 +406,6 @@ function CommentComposerStatusOptions({
   enabled: boolean;
 }) {
   const statusOptions = useCommentComposerStatusOptions();
+
   return <>{children(enabled ? statusOptions : [])}</>;
 }

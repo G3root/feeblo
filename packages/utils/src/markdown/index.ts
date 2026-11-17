@@ -60,20 +60,27 @@ function createHtmlProcessor() {
 
 type HtmlProcessor = ReturnType<typeof createHtmlProcessor>;
 
-let htmlProcessor: HtmlProcessor | null = null;
+/**
+ * The processor is built at most once per isolate and kept inside this
+ * closure: no other module can read or replace it, and a module that never
+ * renders Markdown never pays for the pipeline.
+ */
+const getHtmlProcessor = (() => {
+  let processor: HtmlProcessor | null = null;
 
-function getHtmlProcessor(): HtmlProcessor {
-  if (!htmlProcessor) {
-    htmlProcessor = createHtmlProcessor();
-  }
-  return htmlProcessor;
-}
+  return (): HtmlProcessor => {
+    processor ??= createHtmlProcessor();
+
+    return processor;
+  };
+})();
 
 // Isolate-local memo for rendered Markdown HTML (RSS feeds, SEO snapshots).
 // Callers key by a content version (e.g. `${id}:${updatedAt}`) so edits
 // re-render; TTL bounds staleness for keys callers reuse across edits.
 // `@isaacs/ttlcache` handles expiry plus LRU eviction across organizations.
 const HTML_CACHE_TTL_MS = 5 * 60 * 1_000;
+
 // 200 entries: a single feed holds at most PUBLIC_CHANGELOG_LIMIT (100)
 // entries, so this covers hot feeds across organizations on an isolate
 // without risking worker memory (values are rendered HTML strings, KBs
@@ -91,10 +98,13 @@ export const markdownToHtmlCached = (
   ttlMs: number = HTML_CACHE_TTL_MS
 ): string => {
   const cached = htmlCache.get(key);
+
   if (cached !== undefined) {
     return cached;
   }
+
   const html = markdownToHtml(markdown);
   htmlCache.set(key, html, { ttl: ttlMs });
+
   return html;
 };

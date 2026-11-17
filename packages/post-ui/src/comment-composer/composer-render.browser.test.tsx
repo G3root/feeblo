@@ -151,6 +151,7 @@ describe("CommentComposer rerender behavior", () => {
 
   it("shows the staged customer and returns authorship on dismiss", async () => {
     const onAuthorClear = vi.fn();
+
     const view = await render(
       <CommentComposerProvider
         authorDisplay="Jane Customer"

@@ -13,6 +13,7 @@ const paraglideProjectDir = fileURLToPath(
 );
 
 const isCloudflareAdapter = process.env.CLOUDFLARE_ADAPTER === "true";
+
 const tanstackPackageRegex = /\/@tanstack\/([^/]+)/;
 
 /**
@@ -110,6 +111,7 @@ function eagerPreloadHints(): Plugin {
       }
 
       const graph = importsByHref;
+
       const next = code.replace(
         rootPreloads,
         (_whole, head: string, body: string, tail: string) => {
@@ -117,6 +119,7 @@ function eagerPreloadHints(): Plugin {
             // SAFETY: the pattern captures one group, so index 1 exists.
             (match) => match[1] as string
           );
+
           const closure = new Set(declared);
           const queue = [...declared];
 
@@ -138,6 +141,7 @@ function eagerPreloadHints(): Plugin {
           // The generated array has no trailing comma, so the first addition
           // needs its own separator.
           const trimmed = body.trimEnd();
+
           const separator =
             trimmed.length === 0 || trimmed.endsWith(",") ? "" : ",";
 
@@ -152,21 +156,23 @@ function eagerPreloadHints(): Plugin {
       // hydration for the page (error #418). Keep the first occurrence — the
       // root array, which is generated first — and drop later repeats.
       const seen = new Set<string>();
+
       const deduped = next.replace(
         /(preloads:\s*\[)([\s\S]*?)(\])/g,
         (_whole, head: string, body: string, tail: string) => {
-          const kept = [...body.matchAll(/"([^"]+)"/g)]
-            .map(
-              // SAFETY: the pattern captures one group, so index 1 exists.
-              (match) => match[1] as string
-            )
-            .filter((href) => {
-              if (seen.has(href)) {
-                return false;
-              }
-              seen.add(href);
-              return true;
-            });
+          const kept = [...body.matchAll(/"([^"]+)"/g)].flatMap((match) => {
+            // SAFETY: the pattern captures one group, so index 1 exists.
+            const href = match[1] as string;
+
+            if (seen.has(href)) {
+              return [];
+            }
+
+            seen.add(href);
+
+            return [href];
+          });
+
           const entries = kept
             .map((href) => `\n\t\t\t${JSON.stringify(href)},`)
             .join("");
@@ -205,10 +211,12 @@ export default defineConfig({
           if (path.startsWith("/api//api/")) {
             return path.slice("/api/".length);
           }
+
           // The RPC client prefixes its /rpc endpoint with the API base.
           if (path === "/api/rpc" || path === "/api/rpc/") {
             return path.slice("/api".length);
           }
+
           // Everything else (better-auth /api/auth/*, uploads, verification
           // OTP) already carries the API's full path — pass it through.
           return path;
@@ -327,30 +335,37 @@ export default defineConfig({
 
           if (id.includes("/@tanstack/")) {
             const match = tanstackPackageRegex.exec(id);
+
             if (match) {
               const name = match[1];
+
               // react-store and react-router have a circular dependency,
               // so keep them in the same chunk to avoid circular chunk warnings.
               if (name === "react-store") {
                 return "tanstack-react-router-vendor";
               }
+
               // form-core is only used through @tanstack/react-form; putting it
               // in its own chunk leaves an empty chunk after tree-shaking.
               if (name === "form-core") {
                 return "tanstack-react-form-vendor";
               }
+
               // Thin re-export / leaf wrappers: co-locate each with the chunk it
               // actually shares code with, so tree-shaking doesn't leave
               // near-empty chunks and extra requests on the dashboard.
               if (name === "react-query") {
                 return "tanstack-query-core-vendor";
               }
+
               if (name === "react-db") {
                 return "tanstack-db-vendor";
               }
+
               if (name === "history") {
                 return "tanstack-react-router-vendor";
               }
+
               // Keep the Pacer packages together in their own vendor chunk
               // instead of coupling them to the router vendor.
               if (
@@ -360,6 +375,7 @@ export default defineConfig({
               ) {
                 return "pacer-vendor";
               }
+
               return `tanstack-${name}-vendor`;
             }
           }

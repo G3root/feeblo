@@ -1,6 +1,7 @@
 import type { TPlanPricing } from "@feeblo/domain/pricing/schema";
 
 export type BillingInterval = "month" | "year";
+
 export type PlanType = "free" | "starter" | "professional";
 
 /** A purchasable price for one plan and billing interval, from /api/plans. */
@@ -95,5 +96,6 @@ export const isPaidPlan = (plan?: PlanType): boolean => {
   if (!plan || plan === "free") {
     return false;
   }
+
   return true;
 };

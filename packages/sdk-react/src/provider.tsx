@@ -86,9 +86,11 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
   const handleSelfClose = useCallback(() => {
     closeRef.current?.();
   }, []);
+
   const handleError = useCallback((error: EmbedError) => {
     errorRef.current?.(error);
   }, []);
+
   const handleHeightChange = useCallback((height: number) => {
     heightRef.current?.(height);
   }, []);
@@ -113,6 +115,7 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     theme,
     root,
   } = props;
+
   const configKey = useMemo(
     () =>
       JSON.stringify([
@@ -157,12 +160,15 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
       root,
       theme,
     };
+
     const next = Feeblo.init(organizationId, options);
+
     // Replay the remembered identity onto the fresh embed; without this an
     // imperative identify() would be lost across recreation.
     if (identityRef.current !== undefined) {
       next.identify(identityRef.current);
     }
+
     setWidget(next);
 
     return () => {
@@ -184,9 +190,11 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     const unsubscribeReady = Feeblo.on("widgetReady", () => {
       setIsReady(true);
     });
+
     const unsubscribeOpened = Feeblo.on("widgetOpened", () => {
       setIsOpen(true);
     });
+
     const unsubscribeClosed = Feeblo.on("widgetClosed", () => {
       setIsOpen(false);
     });
@@ -203,6 +211,7 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
     if (widget === null || user === undefined) {
       return;
     }
+
     identityRef.current = user;
     widget.identify(user);
   }, [widget, user]);
@@ -216,31 +225,40 @@ export function FeebloProvider(props: FeebloProviderProps): ReactNode {
 
   const open = useCallback(() => {
     const widget = widgetRef.current;
+
     if (!widget) {
       return;
     }
+
     widget.open();
     setIsOpen(true);
   }, []);
+
   const close = useCallback(() => {
     widgetRef.current?.close();
     setIsOpen(false);
   }, []);
+
   const openModule = useCallback((module: WidgetModule) => {
     const widget = widgetRef.current;
+
     if (!widget) {
       return;
     }
+
     widget.openModule(module);
     setIsOpen(true);
   }, []);
+
   const setBoard = useCallback((board: string) => {
     widgetRef.current?.setBoard(board);
   }, []);
+
   const identify = useCallback((identity: UserIdentity) => {
     identityRef.current = identity;
     widgetRef.current?.identify(identity);
   }, []);
+
   const metadata = useCallback((patch: Record<string, string | null>) => {
     widgetRef.current?.metadata(patch);
   }, []);

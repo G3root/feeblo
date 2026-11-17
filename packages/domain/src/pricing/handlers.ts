@@ -18,7 +18,9 @@ import type { TPlanPrice, TPlansResponse } from "./schema";
 // is plenty fresh while stale-while-revalidate absorbs marketing-site
 // traffic spikes.
 const browserCacheDuration = Duration.hours(1);
+
 const staleCacheDuration = Duration.days(1);
+
 const plansCacheControl = [
   "public",
   `max-age=${Duration.toSeconds(browserCacheDuration)}`,
@@ -26,7 +28,9 @@ const plansCacheControl = [
 ].join(", ");
 
 const PLANS_CACHE_KEY = "plans-catalog";
+
 const PLANS_CACHE_TTL_MS = 60_000;
+
 const plansResponseCache = new TTLCache<string, TPlansResponse>({ max: 1 });
 
 const withPlansHeaders = (body: TPlansResponse) =>
@@ -77,12 +81,15 @@ const firstPositivePrice = (product: PricingProduct): TPlanPrice | null => {
 
   for (const entry of product.prices) {
     const decoded = Schema.decodeUnknownOption(PolarProductPrice)(entry);
+
     if (decoded._tag !== "Some") {
       continue;
     }
+
     const { value } = decoded;
     const amount = value.priceAmount ?? value.price_amount;
     const currency = value.priceCurrency ?? value.price_currency;
+
     if (amount !== undefined && amount > 0 && currency !== undefined) {
       return {
         productId: product.id,
@@ -124,6 +131,7 @@ export const buildPlansResponse = (
     }
 
     const price = firstPositivePrice(product);
+
     if (!price) {
       continue;
     }
@@ -132,6 +140,7 @@ export const buildPlansResponse = (
       month: null,
       year: null,
     };
+
     if (slot[product.recurringInterval] === null) {
       slot[product.recurringInterval] = price;
       pricesByPlan.set(product.metadata.plan, slot);
@@ -145,6 +154,7 @@ export const buildPlansResponse = (
       // Plans are ordered good→best, so each higher plan is a superset of the
       // one before it and the label points at the previous plan.
       const previousKey = index > 0 ? PLAN_KEYS[index - 1] : undefined;
+
       return {
         key,
         name: PLAN_DISPLAY_NAMES[key],
@@ -175,16 +185,20 @@ export const PricingHandlersEffect = Effect.gen(function* () {
         // origin traffic (marketing spikes, billing pages) that CDN
         // stale-while-revalidate never sees.
         const cached = plansResponseCache.get(PLANS_CACHE_KEY);
+
         if (cached !== undefined) {
           return withPlansHeaders(cached);
         }
+
         const products = yield* workspaceRepository
           .findProducts()
           .pipe(withRemapDbErrors("Product", "select"));
+
         const body = buildPlansResponse(products);
         plansResponseCache.set(PLANS_CACHE_KEY, body, {
           ttl: PLANS_CACHE_TTL_MS,
         });
+
         return withPlansHeaders(body);
       }),
   };

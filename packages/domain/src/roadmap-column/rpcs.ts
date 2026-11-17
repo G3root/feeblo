@@ -12,6 +12,7 @@ import {
   RoadmapColumnUpdate,
   StatusRoadmapColumn,
 } from "./schema";
+
 export class RoadmapColumnRpcs extends RpcGroup.make(
   Rpc.make("ListRoadmapColumns", {
     success: S.Array(StatusRoadmapColumn),

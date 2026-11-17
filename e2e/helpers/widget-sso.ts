@@ -28,7 +28,9 @@ export function signWidgetToken(
   const header = Buffer.from(
     JSON.stringify({ alg: "HS256", typ: "JWT" })
   ).toString("base64url");
+
   const now = Math.floor(Date.now() / 1000);
+
   const payload = Buffer.from(
     JSON.stringify({
       // `sub` is the standard JWT subject claim used as the contact's stable
@@ -44,8 +46,10 @@ export function signWidgetToken(
       aud: organizationId,
     })
   ).toString("base64url");
+
   const unsignedToken = `${header}.${payload}`;
   const key = Buffer.from(secret, "hex");
+
   const signature = createHmac("sha256", key)
     .update(unsignedToken)
     .digest("base64url");
@@ -69,9 +73,11 @@ export async function copyWorkspaceJwtSecret(
   await page.goto(`/${organizationId}/settings/security`);
 
   const copySecretButton = page.getByRole("button", { name: "Copy Secret" });
+
   const generateSecretButton = page.getByRole("button", {
     name: "Generate Secret",
   });
+
   // Secret creation is explicit: a fresh workspace has no active JWT secret,
   // so the page offers "Generate Secret" until an admin creates one. Generate
   // it when needed so the "Copy Secret" button is present.
@@ -79,6 +85,7 @@ export async function copyWorkspaceJwtSecret(
     copySecretButton.waitFor({ state: "visible" }),
     generateSecretButton.waitFor({ state: "visible" }),
   ]);
+
   if (await generateSecretButton.isVisible()) {
     await generateSecretButton.click();
     await expect(page.getByText("Secret generated successfully")).toBeVisible();
@@ -96,9 +103,12 @@ export async function copyWorkspaceJwtSecret(
         navigator: { clipboard: { readText: () => Promise<string> } };
       }
     ).navigator;
+
     return browserNavigator.clipboard.readText();
   });
+
   expect(secret).toHaveLength(64);
+
   return secret;
 }
 
@@ -142,6 +152,7 @@ export async function signInRestrictedSsoVisitor(
   await page.evaluate(
     ({ host, orgId, userId, userEmail, userName, ssoToken }) => {
       type WidgetHandle = { close: () => WidgetHandle };
+
       // SAFETY: the SDK bundle above registers Feeblo on the page global
       // before this evaluate step runs.
       const browserGlobal = globalThis as typeof globalThis & {
@@ -186,6 +197,7 @@ export async function signInRestrictedSsoVisitor(
       response.url() === `${apiUrl()}/api/auth/sign-in/jwt-auto-login` &&
       response.request().method() === "POST"
   );
+
   await page.getByRole("link", { name: "Open public board" }).click();
 
   const response = await autoLoginResponse;

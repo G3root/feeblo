@@ -86,6 +86,7 @@ const makeCompanyRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const id = args.id ?? (yield* CompanyId.generate);
         const now = yield* DateTime.nowAsDate;
+
         const [created] = yield* db
           .insert(schema.companyTable)
           .values({
@@ -114,12 +115,14 @@ const makeCompanyRepository = Effect.gen(function* () {
             message: "A company with this name already exists",
           });
         }
+
         return created;
       }),
 
     update: (args: TCompanyUpdateInput) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         const [updated] = yield* db
           .update(schema.companyTable)
           .set({
@@ -171,6 +174,7 @@ const makeCompanyRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         return company !== undefined;
       }),
 
@@ -196,10 +200,12 @@ const makeCompanyRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           if (byExternalId !== undefined) {
             return Option.some(byExternalId);
           }
         }
+
         const [byName] = yield* db
           .select()
           .from(schema.companyTable)
@@ -210,6 +216,7 @@ const makeCompanyRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         return Option.fromNullishOr(byName);
       }),
 
@@ -230,6 +237,7 @@ const makeCompanyRepository = Effect.gen(function* () {
     ) =>
       Effect.gen(function* () {
         const { existing } = args;
+
         if (args.externalId && existing.externalId !== args.externalId) {
           const [other] = yield* db
             .select({ id: schema.companyTable.id })
@@ -241,12 +249,14 @@ const makeCompanyRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           if (other !== undefined && other.id !== existing.id) {
             return yield* new FailedToUpdateCompanyError();
           }
         }
 
         const now = yield* DateTime.nowAsDate;
+
         const [updated = null] = yield* db
           .update(schema.companyTable)
           .set({
@@ -259,9 +269,11 @@ const makeCompanyRepository = Effect.gen(function* () {
           })
           .where(eq(schema.companyTable.id, existing.id))
           .returning();
+
         if (!updated) {
           return yield* new FailedToUpdateCompanyError();
         }
+
         return updated;
       }),
 
@@ -277,6 +289,7 @@ const makeCompanyRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const id = yield* CompanyId.generate;
         const now = yield* DateTime.nowAsDate;
+
         const [created = null] = yield* db
           .insert(schema.companyTable)
           .values({
@@ -292,6 +305,7 @@ const makeCompanyRepository = Effect.gen(function* () {
           })
           .onConflictDoNothing()
           .returning();
+
         return Option.fromNullishOr(created);
       }),
 

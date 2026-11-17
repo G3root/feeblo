@@ -23,6 +23,7 @@ describe("UserBanRepository", () => {
       slug: organizationId,
       createdAt: now,
     });
+
     return organizationId;
   });
 
@@ -36,6 +37,7 @@ describe("UserBanRepository", () => {
         email,
         name: `User ${suffix}`,
       });
+
       return { email, id };
     });
 
@@ -57,6 +59,7 @@ describe("UserBanRepository", () => {
         updatedAt: now,
         userId: input.userId,
       });
+
       return id;
     });
 
@@ -149,6 +152,7 @@ describe("UserBanRepository", () => {
           offset: 0,
           organizationId,
         });
+
         expect(listed.total).toBe(1);
 
         // The identity the operator just banned is still banned, with no
@@ -194,6 +198,7 @@ describe("UserBanRepository", () => {
           offset: 0,
           organizationId,
         });
+
         expect(listed.total).toBe(1);
         expect(listed.items[0]).toMatchObject({
           email: account.email,
@@ -255,14 +260,17 @@ describe("UserBanRepository", () => {
           organizationId,
           target: { _tag: "user", userId: account.id },
         });
+
         expect(resolved).toMatchObject({
           email: account.email,
           status: "ok",
           userId: account.id,
         });
+
         if (resolved.status !== "ok") {
           return;
         }
+
         yield* repository.upsert({
           createdByMemberId: null,
           email: resolved.email,
@@ -283,6 +291,7 @@ describe("UserBanRepository", () => {
           offset: 0,
           organizationId,
         })).items;
+
         expect(row).toMatchObject({ email: account.email, userId: null });
         expect(
           yield* repository.isBanned({ email: account.email, organizationId })
@@ -331,6 +340,7 @@ describe("UserBanRepository", () => {
         const second = yield* createUser("shared-second");
         const sharedEmail = "shared-address@example.com";
         const now = yield* DateTime.nowAsDate;
+
         const earlier = DateTime.toDateUtc(
           DateTime.makeUnsafe(now.getTime() - 60_000)
         );
@@ -369,6 +379,7 @@ describe("UserBanRepository", () => {
           offset: 0,
           organizationId,
         });
+
         expect(listed.total).toBe(2);
         const listedUserIds = listed.items.map((row) => row.userId);
         expect(listedUserIds).toContain(first.id);
@@ -440,11 +451,13 @@ describe("UserBanRepository", () => {
           email: named.email,
           userId: named.id,
         });
+
         const listed = yield* repository.list({
           limit: 10,
           offset: 0,
           organizationId,
         });
+
         expect(listed.total).toBe(2);
         expect(listed.items.find((row) => row.userId === owner.id)?.email).toBe(
           sharedEmail
@@ -460,11 +473,13 @@ describe("UserBanRepository", () => {
         const repository = yield* UserBanRepository;
         const organizationId = yield* createOrganization();
         const account = yield* createUser("contact");
+
         const contactId = yield* createContact({
           email: account.email,
           organizationId,
           userId: account.id,
         });
+
         const member = yield* createUser("member");
         const now = yield* DateTime.nowAsDate;
         const db = yield* currentDb;
@@ -480,6 +495,7 @@ describe("UserBanRepository", () => {
           organizationId,
           target: { _tag: "contact", contactId },
         });
+
         expect(resolved).toMatchObject({
           email: account.email,
           status: "ok",
@@ -490,12 +506,14 @@ describe("UserBanRepository", () => {
           organizationId,
           target: { _tag: "user", userId: member.id },
         });
+
         expect(memberTarget).toEqual({ status: "member" });
 
         const missing = yield* repository.resolveTarget({
           organizationId,
           target: { _tag: "user", userId: asLegid(UserId)("missing") },
         });
+
         expect(missing).toEqual({ status: "not_found" });
       })
     );
@@ -559,6 +577,7 @@ describe("UserBanRepository", () => {
           organizationId,
           userId: null,
         });
+
         expect(
           yield* repository.resolveTarget({
             organizationId,
@@ -612,6 +631,7 @@ describe("UserBanRepository", () => {
             role: "manager",
             userId: member.id,
           });
+
           const contactId = yield* createContact({
             email: member.email,
             organizationId,
@@ -650,6 +670,7 @@ describe("UserBanRepository", () => {
           role: "manager",
           userId: member.id,
         });
+
         // The contact's account is not a member, but the address it carries
         // belongs to one. The membership check has to follow the address, not
         // just the linked account.
@@ -866,6 +887,7 @@ describe("UserBanRepository", () => {
           reason: null,
           userId: account.id,
         });
+
         const [row] = (yield* repository.list({
           limit: 10,
           offset: 0,

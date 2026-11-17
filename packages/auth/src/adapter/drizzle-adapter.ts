@@ -1,4 +1,4 @@
-/* eslint-disable anti-slop/no-known-value-widening, anti-slop/no-runtime-typeof, anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion -- Vendored Better Auth Drizzle adapter (upstream code, kept close to source). */
+/* eslint-disable anti-slop/no-known-value-widening, anti-slop/no-runtime-typeof, anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns, anti-slop/no-unsafe-dictionary-type, anti-slop/require-safety-comment-for-type-assertion, anti-slop-martinfowler/loops, anti-slop-martinfowler/repeated-switches -- Vendored Better Auth Drizzle adapter (upstream code, kept close to source; its loops and repeated switches are upstream's shape, not this repo's). */
 import type { BetterAuthOptions } from "@better-auth/core";
 import type {
   AdapterFactoryCustomizeAdapterCreator,
@@ -59,6 +59,7 @@ function getAffectedRowCount(
   context: { model: string; where: Where[] }
 ): number {
   let count: unknown = 0;
+
   if (result && typeof result === "object" && "rowCount" in result) {
     // node-postgres / neon expose `rowCount`.
     count = (result as { rowCount: unknown }).rowCount;
@@ -80,6 +81,7 @@ function getAffectedRowCount(
   } else if (hasDriverRowCount(result)) {
     count = readDriverRowCount(result);
   }
+
   if (typeof count !== "number" || !Number.isFinite(count)) {
     logger.error(
       `[Drizzle Adapter] The result of the ${operation} operation is not a finite number. This is likely a bug in the adapter. Please report this issue to the Better Auth team.`,
@@ -89,6 +91,7 @@ function getAffectedRowCount(
       `Drizzle adapter ${operation} returned an invalid affected row count`
     );
   }
+
   return count;
 }
 
@@ -96,13 +99,17 @@ function readDriverRowCount(result: unknown): unknown {
   if (!result || typeof result !== "object") {
     return undefined;
   }
+
   const driverResult = result as Record<string, unknown>;
+
   if ("affectedRows" in driverResult) {
     return driverResult.affectedRows;
   }
+
   if ("rowsAffected" in driverResult) {
     return driverResult.rowsAffected;
   }
+
   if ("changes" in driverResult) {
     return driverResult.changes;
   }
@@ -111,6 +118,7 @@ function readDriverRowCount(result: unknown): unknown {
   // @see https://developers.cloudflare.com/d1/worker-api/return-object/
   if ("meta" in driverResult) {
     const meta = driverResult.meta;
+
     if (meta && typeof meta === "object" && "changes" in meta) {
       return meta.changes;
     }
@@ -195,6 +203,7 @@ export const drizzleAdapter = (
 
   let lazyOptions: BetterAuthOptions | null = null;
   let mysqlNoIdWarned = false;
+
   const createCustomAdapter =
     (
       dbOrTx: EffectPgDatabase,
@@ -223,19 +232,24 @@ export const drizzleAdapter = (
         // session }` on `db._` — the raw schema is never retained. Requiring
         // `config.schema` keeps the failure mode explicit.
         const schema = config.schema;
+
         if (!schema) {
           throw new BetterAuthError(
             "Drizzle adapter failed to initialize. Schema not found. Please provide a schema object in the adapter options object."
           );
         }
+
         const schemaModel = schema[model];
+
         if (!schemaModel) {
           throw new BetterAuthError(
             `[# Drizzle Adapter]: The model "${model}" was not found in the schema object. Please pass the schema directly to the adapter options.`
           );
         }
+
         return schemaModel;
       }
+
       const withReturning = async (
         model: string,
         builder: any,
@@ -244,32 +258,39 @@ export const drizzleAdapter = (
       ) => {
         if (config.provider !== "mysql") {
           const c: any[] = await runQuery(builder.returning());
+
           return c[0];
         }
+
         await runQuery(builder.execute());
         const schemaModel = getSchema(model);
         const builderVal = builder.config?.values;
+
         if (where?.length) {
           const updatedWhere = where.map((w) => {
             if (data[w.field] !== undefined) {
               return { ...w, value: data[w.field] };
             }
+
             return w;
           });
 
           const clause = convertWhereClause(updatedWhere, model);
+
           const res: any[] = await runQuery(
             dbt
               .select()
               .from(schemaModel)
               .where(...clause)
           );
+
           return res[0];
         }
 
         const fetchInserted = async (tx: any) => {
           // 1. Known id from the Drizzle builder internals
           const builderId = builderVal?.[0]?.id?.value;
+
           if (builderId) {
             const res: any[] = await runQuery(
               tx
@@ -278,6 +299,7 @@ export const drizzleAdapter = (
                 .where(eq(schemaModel.id, builderId))
                 .limit(1)
             );
+
             return res[0] ?? null;
           }
 
@@ -290,6 +312,7 @@ export const drizzleAdapter = (
                 .where(eq(schemaModel.id, data.id))
                 .limit(1)
             );
+
             return res[0] ?? null;
           }
 
@@ -304,7 +327,9 @@ export const drizzleAdapter = (
                 .from(schemaModel)
                 .limit(1)
             );
+
             const lastId = lastInsertId[0]?.id;
+
             if (lastId) {
               const res: any[] = await runQuery(
                 tx
@@ -313,28 +338,35 @@ export const drizzleAdapter = (
                   .where(eq(schemaModel.id, lastId))
                   .limit(1)
               );
+
               return res[0] ?? null;
             }
           }
 
           // 4. Unique column lookup via Better Auth schema
           const modelSchema = baSchema[getDefaultModelName(model)]?.fields;
+
           if (modelSchema) {
             for (const [fieldKey, fieldAttr] of Object.entries(modelSchema)) {
               if (!fieldAttr.unique) {
                 continue;
               }
+
               const dbFieldName = getFieldName({
                 model,
                 field: fieldKey,
               });
+
               const val = data[dbFieldName];
+
               if (val === undefined || val === null) {
                 continue;
               }
+
               if (!schemaModel[dbFieldName]) {
                 continue;
               }
+
               const res: any[] = await runQuery(
                 tx
                   .select()
@@ -342,6 +374,7 @@ export const drizzleAdapter = (
                   .where(eq(schemaModel[dbFieldName], val))
                   .limit(1)
               );
+
               if (res[0]) {
                 return res[0];
               }
@@ -350,22 +383,27 @@ export const drizzleAdapter = (
 
           // 5. Full-field match (last resort) — LIMIT 2 to detect ambiguity
           const conditions: SQL<unknown>[] = [];
+
           for (const [key, val] of Object.entries(data)) {
             if (val === undefined || !schemaModel[key]) {
               continue;
             }
+
             conditions.push(
               val === null
                 ? isNull(schemaModel[key])
                 : eq(schemaModel[key], val)
             );
           }
+
           if (conditions.length > 0) {
             const combined = and(...conditions);
+
             if (combined) {
               const res: any[] = await runQuery(
                 tx.select().from(schemaModel).where(combined).limit(2)
               );
+
               if (res.length === 1) {
                 return res[0];
               }
@@ -376,36 +414,46 @@ export const drizzleAdapter = (
             `[Drizzle Adapter] Unable to safely identify the inserted "${model}" row on MySQL. ` +
               'Enable Better Auth ID generation or use generateId: "serial" for reliable behavior.'
           );
+
           return null;
         };
 
         if (inTransaction) {
           return fetchInserted(dbt);
         }
+
         return runQuery(
           Effect.promise(() => dbt.transaction((tx: any) => fetchInserted(tx)))
         );
       };
+
       function convertWhereClause(
         where: Where[],
         model: string
       ): SQL<unknown>[] {
         const schemaModel = getSchema(model);
+
         if (!where) {
           return [];
         }
+
         if (where.length === 1) {
           const w = where[0];
+
           if (!w) {
             return [];
           }
+
           const field = getFieldName({ model, field: w.field });
+
           if (!schemaModel[field]) {
             throw new BetterAuthError(
               `The field "${w.field}" does not exist in the schema for the model "${model}". Please update your schema.`
             );
           }
+
           const mode = w.mode ?? "sensitive";
+
           const isInsensitive =
             mode === "insensitive" &&
             (typeof w.value === "string" ||
@@ -418,26 +466,32 @@ export const drizzleAdapter = (
                 `The value for the field "${w.field}" must be an array when using the "in" operator.`
               );
             }
+
             if (isInsensitive) {
               return [
                 insensitiveInArray(schemaModel[field], w.value as string[]),
               ];
             }
+
             return [inArray(schemaModel[field], w.value)];
           }
+
           if (w.operator === "not_in") {
             if (!Array.isArray(w.value)) {
               throw new BetterAuthError(
                 `The value for the field "${w.field}" must be an array when using the "not_in" operator.`
               );
             }
+
             if (isInsensitive) {
               return [
                 insensitiveNotInArray(schemaModel[field], w.value as string[]),
               ];
             }
+
             return [notInArray(schemaModel[field], w.value)];
           }
+
           if (w.operator === "contains") {
             if (isInsensitive && typeof w.value === "string") {
               return [
@@ -448,8 +502,10 @@ export const drizzleAdapter = (
                 ),
               ];
             }
+
             return [like(schemaModel[field], `%${String(w.value)}%`)];
           }
+
           if (w.operator === "starts_with") {
             if (isInsensitive && typeof w.value === "string") {
               return [
@@ -460,8 +516,10 @@ export const drizzleAdapter = (
                 ),
               ];
             }
+
             return [like(schemaModel[field], `${String(w.value)}%`)];
           }
+
           if (w.operator === "ends_with") {
             if (isInsensitive && typeof w.value === "string") {
               return [
@@ -472,6 +530,7 @@ export const drizzleAdapter = (
                 ),
               ];
             }
+
             return [like(schemaModel[field], `%${String(w.value)}`)];
           }
 
@@ -487,9 +546,11 @@ export const drizzleAdapter = (
             if (w.value === null) {
               return [isNotNull(schemaModel[field])];
             }
+
             if (isInsensitive && typeof w.value === "string") {
               return [insensitiveNe(schemaModel[field], w.value)];
             }
+
             return [ne(schemaModel[field], w.value)];
           }
 
@@ -506,20 +567,25 @@ export const drizzleAdapter = (
           if (w.value === null) {
             return [isNull(schemaModel[field])];
           }
+
           if (isInsensitive && typeof w.value === "string") {
             return [insensitiveEq(schemaModel[field], w.value)];
           }
+
           return [eq(schemaModel[field], w.value)];
         }
+
         const andGroup = where.filter(
           (w) => w.connector === "AND" || !w.connector
         );
+
         const orGroup = where.filter((w) => w.connector === "OR");
 
         const andClause = and(
           ...andGroup.map((w) => {
             const field = getFieldName({ model, field: w.field });
             const mode = w.mode ?? "sensitive";
+
             const isInsensitive =
               mode === "insensitive" &&
               (typeof w.value === "string" ||
@@ -532,28 +598,34 @@ export const drizzleAdapter = (
                   `The value for the field "${w.field}" must be an array when using the "in" operator.`
                 );
               }
+
               if (isInsensitive) {
                 return insensitiveInArray(
                   schemaModel[field],
                   w.value as string[]
                 );
               }
+
               return inArray(schemaModel[field], w.value);
             }
+
             if (w.operator === "not_in") {
               if (!Array.isArray(w.value)) {
                 throw new BetterAuthError(
                   `The value for the field "${w.field}" must be an array when using the "not_in" operator.`
                 );
               }
+
               if (isInsensitive) {
                 return insensitiveNotInArray(
                   schemaModel[field],
                   w.value as string[]
                 );
               }
+
               return notInArray(schemaModel[field], w.value);
             }
+
             if (w.operator === "contains") {
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveIlike(
@@ -562,8 +634,10 @@ export const drizzleAdapter = (
                   config.provider
                 );
               }
+
               return like(schemaModel[field], `%${String(w.value)}%`);
             }
+
             if (w.operator === "starts_with") {
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveIlike(
@@ -572,8 +646,10 @@ export const drizzleAdapter = (
                   config.provider
                 );
               }
+
               return like(schemaModel[field], `${String(w.value)}%`);
             }
+
             if (w.operator === "ends_with") {
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveIlike(
@@ -582,27 +658,35 @@ export const drizzleAdapter = (
                   config.provider
                 );
               }
+
               return like(schemaModel[field], `%${String(w.value)}`);
             }
+
             if (w.operator === "lt") {
               return lt(schemaModel[field], w.value);
             }
+
             if (w.operator === "lte") {
               return lte(schemaModel[field], w.value);
             }
+
             if (w.operator === "gt") {
               return gt(schemaModel[field], w.value);
             }
+
             if (w.operator === "gte") {
               return gte(schemaModel[field], w.value);
             }
+
             if (w.operator === "ne") {
               if (w.value === null) {
                 return isNotNull(schemaModel[field]);
               }
+
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveNe(schemaModel[field], w.value);
               }
+
               return ne(schemaModel[field], w.value);
             }
 
@@ -619,15 +703,19 @@ export const drizzleAdapter = (
             return eq(schemaModel[field], w.value);
           })
         );
+
         const orClause = or(
           ...orGroup.map((w) => {
             const field = getFieldName({ model, field: w.field });
+
             if (!schemaModel[field]) {
               throw new BetterAuthError(
                 `The field "${w.field}" does not exist in the schema for the model "${model}". Please update your schema.`
               );
             }
+
             const mode = w.mode ?? "sensitive";
+
             const isInsensitive =
               mode === "insensitive" &&
               (typeof w.value === "string" ||
@@ -640,28 +728,34 @@ export const drizzleAdapter = (
                   `The value for the field "${w.field}" must be an array when using the "in" operator.`
                 );
               }
+
               if (isInsensitive) {
                 return insensitiveInArray(
                   schemaModel[field],
                   w.value as string[]
                 );
               }
+
               return inArray(schemaModel[field], w.value);
             }
+
             if (w.operator === "not_in") {
               if (!Array.isArray(w.value)) {
                 throw new BetterAuthError(
                   `The value for the field "${w.field}" must be an array when using the "not_in" operator.`
                 );
               }
+
               if (isInsensitive) {
                 return insensitiveNotInArray(
                   schemaModel[field],
                   w.value as string[]
                 );
               }
+
               return notInArray(schemaModel[field], w.value);
             }
+
             if (w.operator === "contains") {
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveIlike(
@@ -670,8 +764,10 @@ export const drizzleAdapter = (
                   config.provider
                 );
               }
+
               return like(schemaModel[field], `%${String(w.value)}%`);
             }
+
             if (w.operator === "starts_with") {
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveIlike(
@@ -680,8 +776,10 @@ export const drizzleAdapter = (
                   config.provider
                 );
               }
+
               return like(schemaModel[field], `${String(w.value)}%`);
             }
+
             if (w.operator === "ends_with") {
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveIlike(
@@ -690,27 +788,35 @@ export const drizzleAdapter = (
                   config.provider
                 );
               }
+
               return like(schemaModel[field], `%${String(w.value)}`);
             }
+
             if (w.operator === "lt") {
               return lt(schemaModel[field], w.value);
             }
+
             if (w.operator === "lte") {
               return lte(schemaModel[field], w.value);
             }
+
             if (w.operator === "gt") {
               return gt(schemaModel[field], w.value);
             }
+
             if (w.operator === "gte") {
               return gte(schemaModel[field], w.value);
             }
+
             if (w.operator === "ne") {
               if (w.value === null) {
                 return isNotNull(schemaModel[field]);
               }
+
               if (isInsensitive && typeof w.value === "string") {
                 return insensitiveNe(schemaModel[field], w.value);
               }
+
               return ne(schemaModel[field], w.value);
             }
 
@@ -723,6 +829,7 @@ export const drizzleAdapter = (
             if (isInsensitive && typeof w.value === "string") {
               return insensitiveEq(schemaModel[field], w.value);
             }
+
             return eq(schemaModel[field], w.value);
           })
         );
@@ -730,14 +837,18 @@ export const drizzleAdapter = (
         if (andGroup.length && orGroup.length) {
           return [and(andClause!, orClause!)!];
         }
+
         if (andGroup.length) {
           return [andClause!];
         }
+
         if (orGroup.length) {
           return [orClause!];
         }
+
         return [];
       }
+
       function checkMissingFields(
         schema: Record<string, any>,
         model: string,
@@ -748,13 +859,16 @@ export const drizzleAdapter = (
             "Drizzle adapter failed to initialize. Drizzle Schema not found. Please provide a schema object in the adapter options object."
           );
         }
+
         for (const key in values) {
           let fieldName: string;
+
           try {
             fieldName = getFieldName({ model, field: key });
           } catch {
             fieldName = key;
           }
+
           if (!schema[fieldName]) {
             throw new BetterAuthError(
               `The field "${key}" does not exist in the "${model}" Drizzle schema. Please update your drizzle schema or re-generate using "npx auth@latest generate".`
@@ -779,12 +893,14 @@ export const drizzleAdapter = (
         if (!dbt.query) {
           return null;
         }
+
         if (dbt.query[model]) {
           return model;
         }
 
         if (config.usePlural) {
           const plural = `${model}s`;
+
           if (dbt.query[plural]) {
             return plural;
           }
@@ -792,6 +908,7 @@ export const drizzleAdapter = (
 
         if (config.schema) {
           const targetTable = config.schema[model];
+
           if (targetTable) {
             // EffectPgDatabase does not expose the raw schema on `db._` (the
             // reference adapter scans `db._.fullSchema` there). Each relational
@@ -814,6 +931,7 @@ export const drizzleAdapter = (
           checkMissingFields(schemaModel, model, values);
           const builder = dbt.insert(schemaModel).values(values);
           const returned = await withReturning(model, builder, values);
+
           return returned;
         },
         async findOne({ model, where, select, join }) {
@@ -822,6 +940,7 @@ export const drizzleAdapter = (
 
           if (join) {
             const queryModel = getQueryModel(model);
+
             if (dbt.query && queryModel) {
               let includes:
                 | Record<string, { limit: number } | boolean>
@@ -830,20 +949,24 @@ export const drizzleAdapter = (
               const pluralJoinResults: string[] = [];
               includes = {};
               const joinEntries = Object.entries(join);
+
               for (const [model, joinAttr] of joinEntries) {
                 const limit =
                   joinAttr.limit ??
                   options.advanced?.database?.defaultFindManyLimit ??
                   100;
+
                 const isUnique = joinAttr.relation === "one-to-one";
                 const pluralSuffix = isUnique || config.usePlural ? "" : "s";
                 includes[`${model}${pluralSuffix}`] = isUnique
                   ? true
                   : { limit };
+
                 if (!isUnique) {
                   pluralJoinResults.push(`${model}${pluralSuffix}`);
                 }
               }
+
               const query = dbt.query[queryModel].findFirst({
                 where: clause[0],
                 columns:
@@ -851,6 +974,7 @@ export const drizzleAdapter = (
                     ? select.reduce(
                         (acc: Record<string, boolean>, field: string) => {
                           acc[getFieldName({ model, field })] = true;
+
                           return acc;
                         },
                         {} as Record<string, boolean>
@@ -858,6 +982,7 @@ export const drizzleAdapter = (
                     : undefined,
                 with: includes,
               });
+
               const res: any = await runQuery(query);
 
               if (res) {
@@ -865,14 +990,18 @@ export const drizzleAdapter = (
                   const singularKey = config.usePlural
                     ? pluralJoinResult
                     : pluralJoinResult.slice(0, -1);
+
                   res[singularKey] = res[pluralJoinResult];
+
                   if (pluralJoinResult !== singularKey) {
                     delete res[pluralJoinResult];
                   }
                 }
               }
+
               return res;
             }
+
             logger.error(
               `[# Drizzle Adapter]: The model "${model}" was not found in the query object. Please update your Drizzle schema to include relations or re-generate using "npx auth@latest generate".`
             );
@@ -888,6 +1017,7 @@ export const drizzleAdapter = (
                       Object.assign(acc, {
                         [fieldName]: schemaModel[fieldName],
                       });
+
                       return acc;
                     },
                     {} as Record<string, unknown>
@@ -902,6 +1032,7 @@ export const drizzleAdapter = (
           if (!res.length) {
             return null;
           }
+
           return res[0];
         },
         async findMany({ model, where, sortBy, limit, select, offset, join }) {
@@ -911,6 +1042,7 @@ export const drizzleAdapter = (
 
           if (join) {
             const queryModel = getQueryModel(model);
+
             if (dbt.query && queryModel) {
               let includes:
                 | Record<string, { limit: number } | boolean>
@@ -919,21 +1051,27 @@ export const drizzleAdapter = (
               const pluralJoinResults: string[] = [];
               includes = {};
               const joinEntries = Object.entries(join);
+
               for (const [model, joinAttr] of joinEntries) {
                 const isUnique = joinAttr.relation === "one-to-one";
+
                 const limit =
                   joinAttr.limit ??
                   options.advanced?.database?.defaultFindManyLimit ??
                   100;
+
                 const pluralSuffix = isUnique || config.usePlural ? "" : "s";
                 includes[`${model}${pluralSuffix}`] = isUnique
                   ? true
                   : { limit };
+
                 if (!isUnique) {
                   pluralJoinResults.push(`${model}${pluralSuffix}`);
                 }
               }
+
               let orderBy: SQL<unknown>[] | undefined;
+
               if (sortBy?.field) {
                 orderBy = [
                   sortFn(
@@ -941,6 +1079,7 @@ export const drizzleAdapter = (
                   ),
                 ];
               }
+
               const query = dbt.query[queryModel].findMany({
                 where: clause[0],
                 with: includes,
@@ -949,6 +1088,7 @@ export const drizzleAdapter = (
                     ? select.reduce(
                         (acc: Record<string, boolean>, field: string) => {
                           acc[getFieldName({ model, field })] = true;
+
                           return acc;
                         },
                         {} as Record<string, boolean>
@@ -958,23 +1098,29 @@ export const drizzleAdapter = (
                 offset: offset ?? 0,
                 orderBy,
               });
+
               const res: any[] = await runQuery(query);
+
               if (res) {
                 for (const item of res) {
                   for (const pluralJoinResult of pluralJoinResults) {
                     const singularKey = config.usePlural
                       ? pluralJoinResult
                       : pluralJoinResult.slice(0, -1);
+
                     if (singularKey === pluralJoinResult) {
                       continue;
                     }
+
                     item[singularKey] = item[pluralJoinResult];
                     delete item[pluralJoinResult];
                   }
                 }
               }
+
               return res;
             }
+
             logger.error(
               `[# Drizzle Adapter]: The model "${model}" was not found in the query object. Please update your Drizzle schema to include relations or re-generate using "npx auth@latest generate".`
             );
@@ -990,6 +1136,7 @@ export const drizzleAdapter = (
                       Object.assign(acc, {
                         [fieldName]: schemaModel[fieldName],
                       });
+
                       return acc;
                     },
                     {} as Record<string, unknown>
@@ -1016,42 +1163,51 @@ export const drizzleAdapter = (
           }
 
           const res: any[] = await runQuery(builder.where(...clause));
+
           return res;
         },
         async count({ model, where }) {
           const schemaModel = getSchema(model);
           const clause = where ? convertWhereClause(where, model) : [];
+
           const res: any[] = await runQuery(
             dbt
               .select({ count: count() })
               .from(schemaModel)
               .where(...clause)
           );
+
           return res[0].count;
         },
         async update({ model, where, update: values }) {
           const schemaModel = getSchema(model);
           const clause = convertWhereClause(where, model);
+
           const builder: any = dbt
             .update(schemaModel)
             .set(values)
             .where(...clause);
+
           return await withReturning(model, builder, values as any, where);
         },
         async updateMany({ model, where, update: values }) {
           const schemaModel = getSchema(model);
           const clause = convertWhereClause(where, model);
+
           const builder: any = dbt
             .update(schemaModel)
             .set(values)
             .where(...clause);
+
           const res = await runQuery(builder);
+
           return getAffectedRowCount(res, "updateMany", { model, where });
         },
         async delete({ model, where }) {
           const schemaModel = getSchema(model);
           const clause = convertWhereClause(where, model);
           const builder: any = dbt.delete(schemaModel).where(...clause);
+
           return await runQuery(builder);
         },
         async deleteMany({ model, where }) {
@@ -1059,6 +1215,7 @@ export const drizzleAdapter = (
           const clause = convertWhereClause(where, model);
           const builder: any = dbt.delete(schemaModel).where(...clause);
           const res = await runQuery(builder);
+
           return getAffectedRowCount(res, "deleteMany", { model, where });
         },
         async consumeOne({ model, where }) {
@@ -1080,26 +1237,35 @@ export const drizzleAdapter = (
                   .for("update")
                   .limit(1)
               );
+
               const target = rows[0];
+
               if (!target) {
                 return null;
               }
+
               const targetId = target[idField] ?? (target as any).id;
+
               if (targetId === undefined || targetId === null || !idColumn) {
                 return null;
               }
+
               const delRes = await runQuery(
                 tx.delete(schemaModel).where(eq(idColumn, targetId))
               );
+
               const countRows = getAffectedRowCount(delRes, "consumeOne", {
                 model,
                 where,
               });
+
               return countRows > 0 ? (target as any) : null;
             };
+
             if (inTransaction) {
               return claimFromTransaction(dbt);
             }
+
             return runQuery(
               Effect.promise(() =>
                 dbt.transaction((tx: any) => claimFromTransaction(tx))
@@ -1110,17 +1276,20 @@ export const drizzleAdapter = (
           if (!idColumn) {
             return null;
           }
+
           const targetIds: any = dbt
             .select({ id: idColumn })
             .from(schemaModel)
             .where(...clause)
             .limit(1);
+
           const deleted: any[] = await runQuery(
             dbt
               .delete(schemaModel)
               .where(inArray(idColumn, targetIds))
               .returning()
           );
+
           return (deleted[0] as any) ?? null;
         },
         async incrementOne({ model, where, increment, set }) {
@@ -1134,24 +1303,30 @@ export const drizzleAdapter = (
           // the mutation is pinned to a single id so a non-unique guard cannot
           // touch more than one row (single-row contract, like consumeOne).
           const assignments: Record<string, unknown> = {};
+
           for (const [field, delta] of Object.entries(increment)) {
             const columnName = getFieldName({ model, field });
             const column = schemaModel[columnName];
+
             if (!column) {
               throw new BetterAuthError(
                 `The field "${field}" does not exist in the schema for the model "${model}". Please update your schema.`
               );
             }
+
             assignments[columnName] = sql`${column} + ${sql.param(delta)}`;
           }
+
           if (set) {
             for (const [field, value] of Object.entries(set)) {
               const columnName = getFieldName({ model, field });
+
               if (!schemaModel[columnName]) {
                 throw new BetterAuthError(
                   `The field "${field}" does not exist in the schema for the model "${model}". Please update your schema.`
                 );
               }
+
               assignments[columnName] = value;
             }
           }
@@ -1169,20 +1344,26 @@ export const drizzleAdapter = (
                   .for("update")
                   .limit(1)
               );
+
               const target = rows[0];
+
               if (!target) {
                 return null;
               }
+
               const targetId = target[idField] ?? (target as any).id;
+
               if (targetId === undefined || targetId === null || !idColumn) {
                 return null;
               }
+
               await runQuery(
                 tx
                   .update(schemaModel)
                   .set(assignments)
                   .where(eq(idColumn, targetId))
               );
+
               const updated: any[] = await runQuery(
                 tx
                   .select()
@@ -1190,11 +1371,14 @@ export const drizzleAdapter = (
                   .where(eq(idColumn, targetId))
                   .limit(1)
               );
+
               return (updated[0] as any) ?? null;
             };
+
             if (inTransaction) {
               return mutateInTransaction(dbt);
             }
+
             return runQuery(
               Effect.promise(() =>
                 dbt.transaction((tx: any) => mutateInTransaction(tx))
@@ -1205,6 +1389,7 @@ export const drizzleAdapter = (
           if (!idColumn) {
             return null;
           }
+
           // Pin the update to one selected id so a non-unique guard mutates at
           // most one row, mirroring consumeOne's single-row selection.
           const targetIds: any = dbt
@@ -1212,6 +1397,7 @@ export const drizzleAdapter = (
             .from(schemaModel)
             .where(...clause)
             .limit(1);
+
           const updated: any[] = await runQuery(
             dbt
               .update(schemaModel)
@@ -1219,11 +1405,13 @@ export const drizzleAdapter = (
               .where(inArray(idColumn, targetIds))
               .returning()
           );
+
           return (updated[0] as any) ?? null;
         },
         options: config,
       };
     };
+
   let adapterOptions: AdapterFactoryOptions | null = null;
   adapterOptions = {
     config: {
@@ -1241,8 +1429,10 @@ export const drizzleAdapter = (
           if (data === null || data === undefined) {
             return data;
           }
+
           return new Date(data);
         }
+
         return data;
       },
       transaction:
@@ -1257,6 +1447,7 @@ export const drizzleAdapter = (
                     },
                     adapter: createCustomAdapter(tx, true),
                   })(lazyOptions!);
+
                   return Effect.promise(() => Promise.resolve(cb(adapter)));
                 })
               )
@@ -1265,8 +1456,10 @@ export const drizzleAdapter = (
     adapter: createCustomAdapter(db),
   };
   const adapter = createAdapterFactory(adapterOptions);
+
   return (options: BetterAuthOptions): DBAdapter<BetterAuthOptions> => {
     lazyOptions = options;
+
     return adapter(options);
   };
 };

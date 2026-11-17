@@ -25,6 +25,7 @@ const Endpoint = Schema.String.check(
     (value) => {
       try {
         const url = new URL(value);
+
         return (
           ["http:", "https:"].includes(url.protocol) &&
           url.username === "" &&
@@ -45,6 +46,7 @@ export const TelemetryTarget = Schema.Struct({
     Schema.RedactedFromValue(Schema.Record(Schema.String, Schema.String))
   ),
 });
+
 export type TelemetryTarget = typeof TelemetryTarget.Type;
 
 /** The log levels `FEEBLO_TELEMETRY_LOG_LEVEL` accepts, in effect's spelling. */
@@ -92,6 +94,7 @@ export const TelemetryConfig = Schema.Struct({
   /** Whether parentless `sql.*` spans are kept; false is a debugging escape hatch. */
   dropRootSpans: Schema.Boolean,
 });
+
 export type TelemetryConfig = typeof TelemetryConfig.Type;
 
 /**
@@ -109,13 +112,17 @@ const headerRecord = Schema.Record(
 
 const splitHeaders = SchemaGetter.transform((input: string) => {
   const headers = new Map<string, string>();
+
   for (const pair of input.split(",")) {
     const separator = pair.indexOf("=");
+
     if (separator <= 0) {
       continue;
     }
+
     headers.set(pair.slice(0, separator), pair.slice(separator + 1));
   }
+
   return Object.fromEntries(headers);
 });
 
@@ -160,63 +167,81 @@ export const telemetryConfig = (options: {
     const base = yield* Config.URL("OTEL_EXPORTER_OTLP_ENDPOINT").pipe(
       Config.option
     );
+
     const service = yield* Config.String("OTEL_SERVICE_NAME").pipe(
       Config.withDefault(options.service)
     );
+
     const version = yield* Config.String("APP_RELEASE").pipe(
       Config.withDefault("dev")
     );
+
     const metricsProtocol = yield* Config.String(
       "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL"
     ).pipe(Config.withDefault("http/protobuf"));
+
     const metricsTemporality = yield* Config.String(
       "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"
     ).pipe(Config.withDefault("cumulative"));
+
     const sampleRate = yield* Config.Number(
       "FEEBLO_TELEMETRY_TRACES_SAMPLE_RATE"
     ).pipe(Config.withDefault(1));
+
     const dropRootSpans = yield* Config.Boolean(
       "FEEBLO_TELEMETRY_DROP_ROOT_SPANS"
     ).pipe(Config.withDefault(true));
+
     const logLevel = yield* Config.String("FEEBLO_TELEMETRY_LOG_LEVEL").pipe(
       Config.withDefault("Info")
     );
+
     const resourceAttributes: Record<string, string> = yield* Config.Record(
       Schema.String,
       Schema.StringFromUriComponent,
       "OTEL_RESOURCE_ATTRIBUTES"
     ).pipe(Config.withDefault({}));
+
     const hostname = yield* Config.NonEmptyString("HOSTNAME").pipe(
       Config.option
     );
+
     const instanceId =
       nonEmpty(resourceAttributes["service.instance.id"]) ??
       Option.getOrUndefined(hostname);
+
     const target = (signal: "TRACES" | "LOGS" | "METRICS") =>
       Effect.gen(function* () {
         const endpoint = yield* Config.URL(
           `OTEL_EXPORTER_OTLP_${signal}_ENDPOINT`
         ).pipe(Config.option);
+
         let url = Option.getOrUndefined(endpoint)?.href;
+
         if (url === undefined && Option.isSome(base)) {
           const resolved = new URL(base.value.href);
           resolved.pathname = `${resolved.pathname.replace(trailingSlashPattern, "")}/v1/${signal.toLowerCase()}`;
           url = resolved.href;
         }
+
         if (url === undefined) {
           return undefined;
         }
+
         const headers = yield* otlpHeaders(
           `OTEL_EXPORTER_OTLP_${signal}_HEADERS`
         ).pipe(
           Config.orElse(() => otlpHeaders("OTEL_EXPORTER_OTLP_HEADERS")),
           Config.option
         );
+
         if (Option.isNone(headers)) {
           return { url };
         }
+
         return { url, headers: headers.value };
       });
+
     return yield* Schema.decodeUnknownEffect(TelemetryConfig)({
       service,
       version,

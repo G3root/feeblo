@@ -9,6 +9,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function useOrgTags(organizationId: string) {
   const { tagCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: ["org-tags", tagCollection.id, organizationId],
     query: (q) =>

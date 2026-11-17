@@ -4,6 +4,7 @@ import {
   adminClient,
   customSessionClient,
   emailOTPClient,
+  lastLoginMethodClient,
   organizationClient,
   twoFactorClient,
 } from "better-auth/client/plugins";
@@ -35,6 +36,13 @@ const buildAuthClientOptions = (
     }),
     twoFactorClient(),
     adminClient(),
+    // The sign-in page's "Last used" hint. The server half
+    // (`lastLoginMethod({ storeInDatabase: true })`) is already enabled in
+    // `server.ts`; this half exposes `getLastUsedLoginMethod()`, which reads
+    // the `better-auth.last_used_login_method` cookie the server writes on
+    // every sign-in. Without it the value is only readable by the next
+    // authenticated request, which is no use on a signed-out page.
+    lastLoginMethodClient(),
     // The MCP authorization server's endpoints (`oauth2.consent`,
     // `oauth2.continue`), used by the consent and workspace-choice pages.
     oauthProviderClient(),
@@ -44,9 +52,11 @@ const buildAuthClientOptions = (
   fetchOptions: {
     onRequest(context: any) {
       const timeZone = options?.getTimeZone?.();
+
       if (timeZone) {
         context.headers.set(clientTimeZoneHeader, timeZone);
       }
+
       return context;
     },
   },
@@ -71,13 +81,16 @@ export const createVanillaAuthClient = (
 ) => createVanillaAuthClientBase(buildAuthClientOptions(baseURL, options));
 
 export type TAuthClient = ReturnType<typeof createAuthClient>;
+
 export type AuthClientSession = NonNullable<
   TAuthClient["$Infer"]["Session"]
 > & {
   memberships: AuthClientMembership[];
   organizations: AuthClientOrganization[];
 };
+
 export type AuthClientSessionData = AuthClientSession["session"];
+
 export type AuthClientUser = AuthClientSession["user"];
 
 export const authStateSchema = z.object({

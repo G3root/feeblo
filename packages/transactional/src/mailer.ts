@@ -242,6 +242,7 @@ export const classifyPermanentFailure = (args: {
   // happens before any recipient is named, whatever enhanced code the server
   // chose to attach.
   const command = args.command?.trim().toUpperCase();
+
   if (command !== undefined && command.startsWith("MAIL")) {
     return "sender";
   }
@@ -250,6 +251,7 @@ export const classifyPermanentFailure = (args: {
     args.response === undefined
       ? undefined
       : enhancedStatusCodePattern.exec(args.response);
+
   const subject = enhanced?.[2] === undefined ? undefined : Number(enhanced[2]);
   const detail = enhanced?.[3] === undefined ? undefined : Number(enhanced[3]);
 
@@ -259,10 +261,12 @@ export const classifyPermanentFailure = (args: {
       // facts; the other 5.1.x codes are addressing failures of the recipient.
       return detail === 7 || detail === 8 ? "sender" : "recipient";
     }
+
     // 5.2.1 = mailbox disabled; 5.2.2 = mailbox full.
     if (subject === 2 && (detail === 1 || detail === 2)) {
       return "recipient";
     }
+
     // 5.2.3, 5.3.x, 5.6.x, 5.7.x all describe the message or the sending host.
     return "message";
   }
@@ -283,7 +287,9 @@ const isMailboxFullResponse = (response: string | undefined): boolean => {
   if (response === undefined) {
     return false;
   }
+
   const enhanced = enhancedStatusCodePattern.exec(response);
+
   return enhanced?.[2] === "2" && enhanced[3] === "2";
 };
 
@@ -295,10 +301,12 @@ const temporaryNodemailerCodes = new Set([
   "ESOCKET",
   "ETIMEDOUT",
 ]);
+
 const smtpResponseCodePattern = /^(\d{3})\b/;
 
 const smtpResponseCode = (response: string): number | undefined => {
   const match = smtpResponseCodePattern.exec(response);
+
   if (!match?.[1]) {
     return undefined;
   }
@@ -317,10 +325,12 @@ export const classifyNodemailerFailure = (
   const details = Option.getOrUndefined(
     Schema.decodeUnknownOption(NodemailerErrorDetails)(cause)
   );
+
   // The reply is inspected and never persisted, so cap it here rather than in
   // the decoder, where an over-limit value would also discard `responseCode`.
   const response = details?.response?.slice(0, 2048);
   const smtpStatusCode = details?.responseCode;
+
   const diagnostics = {
     cause,
     message: "SMTP provider submission failed",
@@ -333,11 +343,13 @@ export const classifyNodemailerFailure = (
     if (smtpStatusCode >= 400 && smtpStatusCode < 500) {
       return new MailTemporaryDeliveryError({ ...diagnostics, smtpStatusCode });
     }
+
     if (smtpStatusCode >= 500 && isMailboxFullResponse(response)) {
       // A full mailbox is a 5xx in SMTP semantics but a temporary condition in
       // practice; suppressing it would permanently drop a deliverable address.
       return new MailTemporaryDeliveryError({ ...diagnostics, smtpStatusCode });
     }
+
     if (smtpStatusCode >= 500) {
       return new MailPermanentDeliveryError({
         ...diagnostics,
@@ -388,6 +400,7 @@ const findEntityRefIdHeaderName = (
 const makeMailerService = (transport: MailerTransport): MailerService => ({
   send: Effect.fn("Mailer.send")(function* (message: MailMessage) {
     const secureRandom = yield* SecureRandom.SecureRandom;
+
     const html = yield* Effect.tryPromise({
       try: () => render(message.react),
       catch: (cause) =>
@@ -397,6 +410,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
           operation: "Mailer.send.renderHtml",
         }),
     });
+
     const text = yield* Effect.try({
       try: () => toPlainText(html),
       catch: (cause) =>
@@ -406,6 +420,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
           operation: "Mailer.send.renderText",
         }),
     });
+
     // Every message leaves with a Message-ID on a domain the deployment
     // controls. Without one, nodemailer falls back to a timestamp observed on
     // the sending host, which is both an unpredictable identifier and a
@@ -433,6 +448,7 @@ const makeMailerService = (transport: MailerTransport): MailerService => ({
       html,
       text,
     });
+
     return toMailSendResult(receipt, messageId);
   }),
 });
@@ -457,6 +473,7 @@ export const makeNodemailerSendOptions = (args: {
 }): SendMailOptions => {
   const { message } = args;
   const configuredReplyTo = Option.getOrUndefined(args.defaultReplyTo);
+
   // Blank counts as unset: an empty header is not a reply address, and
   // emitting one is worse than inheriting the configured default.
   const replyTo =

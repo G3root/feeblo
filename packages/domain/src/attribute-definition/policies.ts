@@ -29,8 +29,6 @@ const makeAttributeDefinitionPolicy = Effect.gen(function* () {
       contactBelongsToOrganization(args)
     );
 
-  const canDeleteContact = canUpdateContact;
-
   const canCreateCompany = (organizationId: string) =>
     Policy.canPermission(organizationId, "companies.*");
 
@@ -40,17 +38,17 @@ const makeAttributeDefinitionPolicy = Effect.gen(function* () {
       companyBelongsToOrganization(args)
     );
 
-  const canDeleteCompany = canUpdateCompany;
-
   return {
     contactBelongsToOrganization,
     companyBelongsToOrganization,
     canCreateContact,
     canUpdateContact,
-    canDeleteContact,
+    /** Deleting an attribute definition needs the same access as updating it. */
+    canDeleteContact: canUpdateContact,
     canCreateCompany,
     canUpdateCompany,
-    canDeleteCompany,
+    /** Deleting an attribute definition needs the same access as updating it. */
+    canDeleteCompany: canUpdateCompany,
   };
 });
 

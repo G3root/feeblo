@@ -66,6 +66,7 @@ const decodeAuditLogCursorOrFail = (raw: string | undefined) =>
         Buffer.from(raw, "base64url").toString("utf8")
       )
     );
+
     if (decoded === null) {
       return yield* invalidRequestError("cursor is not a valid page cursor.");
     }
@@ -84,6 +85,7 @@ const decodeAuditLogCursorOrFail = (raw: string | undefined) =>
 const parseInstant = (raw: string | undefined, name: "since" | "until") =>
   Effect.gen(function* () {
     const trimmed = raw?.trim();
+
     if (trimmed === undefined || trimmed.length === 0) {
       return undefined;
     }
@@ -97,6 +99,7 @@ const parseInstant = (raw: string | undefined, name: "since" | "until") =>
     const decoded = Option.getOrNull(
       Schema.decodeOption(Schema.DateFromString)(trimmed)
     );
+
     if (decoded === null) {
       // Unreachable while the shape and calendar checks above hold; kept so
       // the decoder remains the authority on what an instant is.

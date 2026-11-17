@@ -10,6 +10,7 @@ describe("CreateContact", () => {
     Effect.gen(function* () {
       const organizationId = yield* WorkspaceId.generate;
       const attributeId = yield* ContactAttributeDefinitionId.generate;
+
       const error = yield* Effect.flip(
         Schema.decodeEffect(ContactCreate)({
           organizationId,

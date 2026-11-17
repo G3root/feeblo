@@ -18,6 +18,7 @@ const listen = (server: ReturnType<typeof createServer>) =>
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
+
       if (address !== null && isObject(address)) {
         resolve(address.port);
       }
@@ -36,6 +37,7 @@ const verifyStandardWebhookSignature = (
   const deliveryId = webhook.headers["webhook-id"];
   const timestamp = webhook.headers["webhook-timestamp"];
   const signatureHeader = webhook.headers["webhook-signature"];
+
   if (
     !isString(deliveryId) ||
     !isString(timestamp) ||
@@ -44,18 +46,23 @@ const verifyStandardWebhookSignature = (
   ) {
     return false;
   }
+
   const expected = createHmac(
     "sha256",
     Buffer.from(secret.slice("whsec_".length), "base64")
   )
     .update(`${deliveryId}.${timestamp}.${webhook.body}`)
     .digest();
+
   return signatureHeader.split(" ").some((versionedSignature) => {
     const [version, encoded] = versionedSignature.split(",");
+
     if (version !== "v1" || encoded === undefined) {
       return false;
     }
+
     const actual = Buffer.from(encoded, "base64");
+
     return (
       actual.length === expected.length && timingSafeEqual(actual, expected)
     );
@@ -67,16 +74,21 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
 }) => {
   const receivedWebhooks: ReceivedWebhook[] = [];
   const webhookWaiters = new Map<number, (webhook: ReceivedWebhook) => void>();
+
   const waitForWebhook = (index: number) => {
     const received = receivedWebhooks[index];
+
     if (received !== undefined) {
       return Promise.resolve(received);
     }
+
     return new Promise<ReceivedWebhook>((resolve) => {
       webhookWaiters.set(index, resolve);
     });
   };
+
   let receiverStatus = 204;
+
   const receiver = createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -85,6 +97,7 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
         body: Buffer.concat(chunks).toString("utf8"),
         headers: request.headers,
       };
+
       const index = receivedWebhooks.push(webhook) - 1;
       webhookWaiters.get(index)?.(webhook);
       webhookWaiters.delete(index);
@@ -93,11 +106,14 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
   });
 
   const port = await listen(receiver);
+
   try {
     const owner = await createAuthenticatedWorkspace(page);
+
     const organizationId = new URL(owner.organizationUrl).pathname
       .split("/")
       .find(Boolean);
+
     if (!organizationId) {
       throw new Error("Workspace URL did not contain an organization id");
     }
@@ -125,6 +141,7 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     const endpoint = page
       .getByRole("article")
       .filter({ hasText: "Product events" });
+
     await expect(endpoint).toContainText("127.0.0.1");
 
     // The list page is an index; management happens on the detail page.
@@ -134,15 +151,18 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     ).toBeVisible();
 
     const history = page.getByLabel("Webhook delivery history");
+
     const refreshHistory = async () => {
       await history.getByRole("button", { name: "Refresh" }).click();
     };
+
     // Polls a specific delivery row instead of the whole card, so unrelated
     // endpoint/header text or another row's text cannot satisfy the wait.
     const refreshHistoryUntil = async (expected: string, row: Locator) => {
       await expect
         .poll(async () => {
           await refreshHistory();
+
           return (await row.allTextContents()).join(" ");
         })
         .toContain(expected);
@@ -167,11 +187,13 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     const deliveryRow = history
       .getByRole("row")
       .filter({ hasText: "webhook.test" });
+
     await refreshHistoryUntil("succeeded", deliveryRow);
 
     receiverStatus = 400;
     await page.getByRole("button", { name: "Test", exact: true }).click();
     const failedWebhook = await waitForWebhook(1);
+
     // The exhausted row is the second, failing delivery. Capture its unique
     // "Started at" timestamp as stable text before the retry flips its state
     // to succeeded, so the row stays addressable once both deliveries read
@@ -179,12 +201,16 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     const exhaustedRow = history
       .getByRole("row")
       .filter({ hasText: "exhausted" });
+
     await refreshHistoryUntil("exhausted", exhaustedRow);
+
     const retriedStartedAt =
       (await exhaustedRow.getByRole("cell").nth(3).textContent()) ?? "";
+
     const retriedRow = history
       .getByRole("row")
       .filter({ hasText: retriedStartedAt });
+
     await expect(
       retriedRow.getByRole("button", { name: "Retry" })
     ).toBeVisible();
@@ -198,12 +224,14 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
     await expect
       .poll(async () => {
         await refreshHistory();
+
         return (await retriedRow.allTextContents()).join(" ");
       })
       .toContain("succeeded");
     await expect
       .poll(async () => {
         await refreshHistory();
+
         return (
           await retriedRow.getByRole("cell").nth(2).allTextContents()
         ).join("");
@@ -233,9 +261,11 @@ test("owner manages an endpoint and receives a signed test delivery", async ({
       .click();
 
     await page.getByRole("button", { name: "Remove" }).click();
+
     const removal = page.getByRole("alertdialog", {
       name: "Remove webhook endpoint?",
     });
+
     await expect(removal).toContainText("erased immediately");
     await removal.getByRole("button", { name: "Remove endpoint" }).click();
     await expect(

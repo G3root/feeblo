@@ -53,6 +53,7 @@ describe("data-feeblo-link", () => {
       undefined,
       { allowedOrigins: ["https://feedback.example.com"] }
     );
+
     child.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     stop();
 
@@ -105,6 +106,7 @@ describe("data-feeblo-link", () => {
       undefined,
       { allowedOrigins: ["https://feedback.example.com"] }
     );
+
     link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     stop();
 
@@ -121,6 +123,7 @@ describe("data-feeblo-link", () => {
     const stop = startLinkAuthentication({
       getAutoLoginToken: () => "signed.jwt.token",
     });
+
     link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     stop();
 
@@ -136,6 +139,7 @@ describe("data-feeblo-link", () => {
     const stop = startLinkAuthentication({
       getAutoLoginToken: () => "signed.jwt.token",
     });
+
     link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     stop();
 
@@ -155,6 +159,7 @@ describe("data-feeblo-link", () => {
     const stop = startLinkAuthentication({
       getAutoLoginToken: () => undefined,
     });
+
     link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     stop();
 

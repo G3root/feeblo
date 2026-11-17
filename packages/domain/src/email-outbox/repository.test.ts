@@ -47,9 +47,11 @@ describe("EmailOutboxRepository", () => {
         const repository = yield* EmailOutboxRepository;
 
         yield* createOrganization(organizationId);
+
         const first = yield* repository.recordIntent(
           submissionIntent(organizationId)
         );
+
         const duplicate = yield* repository.recordIntent(
           submissionIntent(organizationId)
         );
@@ -95,6 +97,7 @@ describe("EmailOutboxRepository", () => {
           );
 
           expect(error._tag).toBe("EmailOutboxDataError");
+
           if (error._tag === "EmailOutboxDataError") {
             expect(error.operation).toBe("findPending.decodeIntent");
           }
@@ -160,6 +163,7 @@ describe("EmailOutboxRepository", () => {
                 `post.status_changed:${organizationId}:pst_status:window`
               )
             );
+
           const repeatedWindow = yield* repository.upsertPendingStatusChange({
             aggregateId: "pst_status",
             aggregateType: "post",
@@ -202,11 +206,13 @@ describe("EmailOutboxRepository", () => {
           const repository = yield* EmailOutboxRepository;
 
           yield* createOrganization(organizationId);
+
           const opened = yield* repository.upsertPendingSubmissionWindow({
             now: dateAt("2026-08-09T10:02:00.000Z"),
             organizationId,
             postId: "pst_first",
           });
+
           if (opened._tag !== "Written") {
             return yield* Effect.die("Expected an opened window");
           }
@@ -215,6 +221,7 @@ describe("EmailOutboxRepository", () => {
             before: dateAt("2026-08-10"),
             organizationId,
           });
+
           expect(first?.payload).toEqual({
             kind: "submission.created",
             postCount: 1,
@@ -237,6 +244,7 @@ describe("EmailOutboxRepository", () => {
             organizationId,
             postId: "pst_second",
           });
+
           expect(appended).toEqual({
             _tag: "Written",
             intentId: opened.intentId,
@@ -246,6 +254,7 @@ describe("EmailOutboxRepository", () => {
             before: dateAt("2026-08-10"),
             organizationId,
           });
+
           expect(slid?.payload).toEqual({
             kind: "submission.created",
             postCount: 2,
@@ -261,10 +270,12 @@ describe("EmailOutboxRepository", () => {
             organizationId,
             postId: "pst_third",
           });
+
           const [capped] = yield* repository.findPending({
             before: dateAt("2026-08-11"),
             organizationId,
           });
+
           expect(capped?.scheduledAt).toEqual(
             dateAt("2026-08-09T11:02:00.000Z")
           );
@@ -278,11 +289,13 @@ describe("EmailOutboxRepository", () => {
         const repository = yield* EmailOutboxRepository;
 
         yield* createOrganization(organizationId);
+
         const opened = yield* repository.upsertPendingSubmissionWindow({
           now: dateAt("2026-08-09T10:02:00.000Z"),
           organizationId,
           postId: "pst_replay",
         });
+
         const replay = yield* repository.upsertPendingSubmissionWindow({
           now: dateAt("2026-08-09T10:03:00.000Z"),
           organizationId,
@@ -290,10 +303,12 @@ describe("EmailOutboxRepository", () => {
         });
 
         expect(replay).toEqual({ _tag: "Duplicate" });
+
         const [intent] = yield* repository.findPending({
           before: dateAt("2026-08-10"),
           organizationId,
         });
+
         expect(intent?.id).toBe(opened.intentId);
         expect(intent?.payload).toEqual({
           kind: "submission.created",
@@ -312,14 +327,17 @@ describe("EmailOutboxRepository", () => {
         const db = yield* currentDb;
 
         yield* createOrganization(organizationId);
+
         const first = yield* repository.upsertPendingSubmissionWindow({
           now: dateAt("2026-08-09T10:02:00.000Z"),
           organizationId,
           postId: "pst_sent",
         });
+
         if (first._tag !== "Written") {
           return yield* Effect.die("Expected an opened window");
         }
+
         yield* db
           .update(schema.emailOutboxTable)
           .set({ state: "materialized" })
@@ -333,10 +351,12 @@ describe("EmailOutboxRepository", () => {
 
         expect(next._tag).toBe("Written");
         expect(next.intentId).not.toBe(first.intentId);
+
         const [intent] = yield* repository.findPending({
           before: dateAt("2026-08-10"),
           organizationId,
         });
+
         expect(intent?.payload).toEqual({
           kind: "submission.created",
           postCount: 1,
@@ -352,6 +372,7 @@ describe("EmailOutboxRepository", () => {
         const repository = yield* EmailOutboxRepository;
         const db = yield* currentDb;
         const openedAt = dateAt("2026-08-09T10:02:00.000Z");
+
         const fullPostIds = Array.from(
           { length: submissionWindowMaxPosts },
           (_, index) => `pst_full_${index}`
@@ -390,10 +411,12 @@ describe("EmailOutboxRepository", () => {
           _tag: "Written",
           intentId: "eob_full_window",
         });
+
         const [intent] = yield* repository.findPending({
           before: dateAt("2026-08-10"),
           organizationId,
         });
+
         expect(intent?.payload).toEqual({
           kind: "submission.created",
           postCount: submissionWindowMaxPosts + 1,
@@ -441,10 +464,12 @@ describe("EmailOutboxRepository", () => {
           });
 
           expect(opened._tag).toBe("Written");
+
           const [intent] = yield* repository.findPending({
             before: dateAt("2026-08-10"),
             organizationId,
           });
+
           expect(intent?.deduplicationKey).toBe(
             `submission.created:${organizationId}:${bucketStart}:${now.getTime()}`
           );
@@ -492,6 +517,7 @@ describe("EmailOutboxRepository", () => {
             organizationId,
             postId: "pst_other_kind",
           });
+
           if (opened._tag !== "Written") {
             return yield* Effect.die("Expected an opened window");
           }
@@ -524,6 +550,7 @@ describe("EmailOutboxRepository", () => {
                 yield* repository.recordIntent(
                   submissionIntent(organizationId)
                 );
+
                 return yield* Effect.fail(
                   "abort email outbox test transaction"
                 );
@@ -532,10 +559,12 @@ describe("EmailOutboxRepository", () => {
           );
 
           const db = yield* currentDb;
+
           const rolledBackOrganizations = yield* db
             .select({ id: schema.organizationTable.id })
             .from(schema.organizationTable)
             .where(eq(schema.organizationTable.id, organizationId));
+
           const rolledBackIntents = yield* db
             .select({ id: schema.emailOutboxTable.id })
             .from(schema.emailOutboxTable)
@@ -555,6 +584,7 @@ describe("EmailOutboxRepository", () => {
             .select({ id: schema.emailOutboxTable.id })
             .from(schema.emailOutboxTable)
             .where(eq(schema.emailOutboxTable.organizationId, commitId));
+
           expect(committedIntents).toHaveLength(1);
         })
     );

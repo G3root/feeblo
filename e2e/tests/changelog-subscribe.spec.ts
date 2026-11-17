@@ -6,6 +6,7 @@ import { openChangelogPage } from "../helpers/changelog";
 import { createTestUser } from "../helpers/test-users";
 
 const signInWithEmailButtonName = /^Sign in with email/;
+
 const authDialogName = "Sign in / Sign up";
 
 test.describe("changelog email subscription", () => {
@@ -31,18 +32,22 @@ test.describe("changelog email subscription", () => {
     await authDialog
       .getByRole("button", { name: signInWithEmailButtonName })
       .click();
+
     const signInDialog = page.getByRole("dialog", {
       name: "Sign in with email",
     });
+
     await signInDialog.getByRole("textbox", { name: "Email" }).fill(user.email);
     await signInDialog
       .getByLabel("Password", { exact: true })
       .fill(user.password);
+
     const signInResponse = page.waitForResponse(
       (response) =>
         response.url().includes("/api/auth/sign-in/email") &&
         response.request().method() === "POST"
     );
+
     await signInDialog
       .getByRole("button", { name: "Sign in", exact: true })
       .click();
@@ -63,6 +68,7 @@ test.describe("changelog email subscription", () => {
           "CreateChangelogSubscriptionPublic"
         )
     );
+
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
     expect((await subscribeResponse).ok()).toBeTruthy();
     // The anchored success toast is only added once persistence has fully
@@ -82,6 +88,7 @@ test.describe("changelog email subscription", () => {
           "DeleteChangelogSubscriptionPublic"
         )
     );
+
     await page
       .getByRole("button", { name: "Unsubscribe", exact: true })
       .click();

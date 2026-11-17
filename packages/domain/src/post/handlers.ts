@@ -1,7 +1,5 @@
-import { currentDb, schema, transaction } from "@feeblo/db";
+import { transaction } from "@feeblo/db";
 import * as Permissions from "@feeblo/permissions";
-import { isString } from "@feeblo/utils/runtime-kind";
-import { and, eq, inArray } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
@@ -136,23 +134,6 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
    * entries are written for the rows the delete could have removed rather than
    * for whatever the client sent.
    */
-  const requestedPostIds = (args: TPostDelete) =>
-    Effect.gen(function* () {
-      const db = yield* currentDb;
-      const ids = isString(args.id) ? [args.id] : args.id;
-      const rows = yield* db
-        .select({ id: schema.postTable.id })
-        .from(schema.postTable)
-        .where(
-          and(
-            inArray(schema.postTable.id, ids),
-            eq(schema.postTable.organizationId, args.organizationId),
-            eq(schema.postTable.boardId, args.boardId)
-          )
-        );
-      return rows.map((row) => row.id);
-    });
-
   /**
    * Re-attributes a post to a resolved on-behalf subject.
    *
@@ -291,6 +272,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     Effect.gen(function* () {
       const session = yield* CurrentSession;
       const audit = yield* AuditLogRecorder;
+
       const write = {
         ...args,
         mayDeleteEngaged: Permissions.can(
@@ -300,23 +282,34 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         ),
       };
 
+      // The asset sweep runs once the delete has committed, never inside the
+      // transaction: it touches storage and the asset table, and a rollback
+      // would otherwise leave the post alive with its assets already collected.
+      // The delete and its entries stay in the transaction, where they commit
+      // together.
+      const cleanup = writes.cleanupAfterRemove(args.organizationId);
+
       if (surface === "public") {
-        return yield* writes.remove(
-          write,
-          memberActor(session, args.organizationId)
-        );
+        yield* writes.remove(write, memberActor(session, args.organizationId));
+        yield* cleanup;
+
+        return;
       }
 
-      return yield* transaction(
+      yield* transaction(
         Effect.gen(function* () {
-          const ids = yield* requestedPostIds(args);
-          yield* writes.remove(
+          const removed = yield* writes.remove(
             write,
             memberActor(session, args.organizationId)
           );
+
           const actor = actorFromSession(session, args.organizationId);
+          // The ids the delete removed, not the ids the request asked for:
+          // the pre-read and the delete are two statements, and a post that
+          // vanished between them must not leave an entry claiming it was
+          // deleted.
           yield* Effect.forEach(
-            ids,
+            removed.deletedIds,
             (id) =>
               audit.record({
                 organizationId: args.organizationId,
@@ -329,6 +322,8 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           );
         })
       );
+
+      yield* cleanup;
     })
   );
 
@@ -339,18 +334,24 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
       return yield* transaction(
         Effect.gen(function* () {
-          // Read first, in this transaction: the board and status the post
-          // carried are the half of the diff the update no longer knows. Both
-          // are the same two columns the policy already judged, so a move or a
-          // status change is what the entry names, not the whole row.
+          // Read first, in this transaction, and under the row lock the
+          // activity-state read takes: the board and status the post carried
+          // are the half of the diff the update no longer knows, and two
+          // concurrent saves would otherwise diff from the same stale row.
           let previous:
             | { readonly boardId: string; readonly statusId: string }
             | undefined;
+
           if (surface === "dashboard") {
-            previous = yield* repository.findLocationIds({
+            const state = yield* repository.findActivityState({
               id: args.id,
               organizationId: args.organizationId,
             });
+
+            previous =
+              state === undefined
+                ? undefined
+                : { boardId: state.boardId, statusId: state.statusId };
           }
 
           yield* writes.update(
@@ -368,6 +369,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           }
 
           const actor = actorFromSession(session, args.organizationId);
+
           if (previous.boardId !== args.boardId) {
             yield* audit.record({
               organizationId: args.organizationId,
@@ -382,6 +384,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               },
             });
           }
+
           if (previous.statusId !== args.statusId) {
             yield* audit.record({
               organizationId: args.organizationId,
@@ -406,7 +409,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const session = yield* CurrentSession;
       const audit = yield* AuditLogRecorder;
 
-      yield* writes.update(
+      const { contentChanged } = yield* writes.update(
         {
           assetIds: args.assetIds,
           content: args.content,
@@ -417,7 +420,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         memberActor(session, args.organizationId)
       );
 
-      if (surface !== "dashboard") {
+      // `contentChanged` is the shared write path's comparison of the stored
+      // body against the prepared one — sanitising can make two different
+      // submissions the same post — so a save that changed nothing writes no
+      // entry.
+      if (surface !== "dashboard" || !contentChanged) {
         return;
       }
 
@@ -447,7 +454,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       const session = yield* CurrentSession;
       const audit = yield* AuditLogRecorder;
 
-      yield* writes.update(
+      const { titleChanged } = yield* writes.update(
         {
           id: args.id,
           organizationId: args.organizationId,
@@ -456,7 +463,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         memberActor(session, args.organizationId)
       );
 
-      if (surface !== "dashboard") {
+      if (surface !== "dashboard" || !titleChanged) {
         return;
       }
 
@@ -617,11 +624,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           slug: args.slug,
         });
+
         if (post === undefined) {
           return yield* new PostNotFoundError({
             message: "Post not found",
           });
         }
+
         return post;
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -639,11 +648,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               organizationId: args.organizationId,
               slug: args.slug,
             });
+
             if (post === undefined) {
               return yield* new PostNotFoundError({
                 message: "Post not found",
               });
             }
+
             return post;
           }),
         redact: redactCreatorIdentity,
@@ -662,6 +673,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           slug: args.slug,
         });
+
         return target?.slug ?? null;
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
@@ -685,10 +697,12 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     ListPostDeleteEligibility: (args: TPostDeleteEligibilityList) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+
         const rows = yield* repository.findDeletableIds({
           organizationId: args.organizationId,
           userId: session.session.userId,
         });
+
         return { eligibleIds: rows.map((row) => row.id) };
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
@@ -699,13 +713,16 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       (args) =>
         Effect.gen(function* () {
           const viewer = yield* currentPublicViewer;
+
           if (viewer.userId === undefined) {
             return { eligibleIds: [] };
           }
+
           const rows = yield* repository.findDeletableIds({
             organizationId: args.organizationId,
             userId: viewer.userId,
           });
+
           return { eligibleIds: rows.map((row) => row.id) };
         })
     ),
@@ -733,7 +750,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
         yield* transaction(
           Effect.gen(function* () {
-            yield* writes.update(
+            const { etaChanged } = yield* writes.update(
               {
                 etaQuarter: args.etaQuarter,
                 id: args.id,
@@ -741,6 +758,13 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               },
               memberActor(session, args.organizationId)
             );
+
+            // Re-saving the same quarter changes nothing, and the entry would
+            // claim an edit the row never had.
+            if (!etaChanged) {
+              return;
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -796,7 +820,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
         yield* transaction(
           Effect.gen(function* () {
-            yield* writes.update(
+            const { assigneeChanged } = yield* writes.update(
               {
                 assigneeMemberId: args.assigneeMemberId,
                 id: args.id,
@@ -804,6 +828,11 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               },
               memberActor(session, args.organizationId)
             );
+
+            if (!assigneeChanged) {
+              return;
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -835,12 +864,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         yield* transaction(
           Effect.gen(function* () {
             const previous = yield* requireNotMergedActivityState(args);
+
             const actor = {
               actorId: session.session.userId,
               actorMemberId: membership?.membershipId ?? null,
               organizationId: args.organizationId,
               postId: args.id,
             };
+
             // The activity is emitted on a real move, which is a question for
             // the engagement and presence graphs rather than for the two
             // timestamp columns: `adminUpdate` is an idempotent set, so asking
@@ -848,30 +879,38 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             // itself twice. The audit entry answers the same question from the
             // same answer, so a no-op admin update writes neither.
             const nextLocked = args.locked;
+
             const lockedChanged =
               nextLocked !== undefined &&
               engagementOf(previous) !== engagementForLock(nextLocked);
+
             const nextArchived = args.archived;
+
             const archivedChanged =
               nextArchived !== undefined &&
               isArchivedPostPresence(presenceOf(previous)) !== nextArchived;
+
             const activities: PostActivityInput[] = [];
+
             if (lockedChanged) {
               activities.push({
                 ...actor,
                 kind: args.locked ? "POST_LOCKED" : "POST_UNLOCKED",
               });
             }
+
             if (archivedChanged) {
               activities.push({
                 ...actor,
                 kind: args.archived ? "POST_ARCHIVED" : "POST_UNARCHIVED",
               });
             }
+
             yield* repository.adminUpdate(args);
             yield* activityRepository.createMany(activities);
 
             const auditActor = actorFromSession(session, args.organizationId);
+
             if (lockedChanged) {
               yield* audit.record({
                 organizationId: args.organizationId,
@@ -888,6 +927,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
                 },
               });
             }
+
             if (archivedChanged) {
               yield* audit.record({
                 organizationId: args.organizationId,
@@ -972,6 +1012,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
             message: "Source and target posts must be different",
           });
         }
+
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
         // The move, the two timeline entries, the notification, and the email

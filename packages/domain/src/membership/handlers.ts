@@ -87,14 +87,17 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
                     memberId,
                     organizationId,
                   });
+
                   yield* repository.updateMemberRole({
                     organizationId,
                     memberId,
                     role,
                   });
+
                   if (Option.isNone(previous)) {
                     return;
                   }
+
                   yield* audit.record({
                     organizationId,
                     actor: actorFromSession(session, organizationId),
@@ -147,6 +150,7 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
             if (Option.isNone(target)) {
               return;
             }
+
             yield* audit.record({
               organizationId,
               actor: actorFromSession(session, organizationId),
@@ -172,10 +176,19 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.cancelInvitation({
+            const { cancelled } = yield* repository.cancelInvitation({
               organizationId,
               invitationId,
             });
+
+            // An id that matched nothing — a typo, or another workspace's
+            // invitation — changed nothing, and the RPC answers success either
+            // way. Recording it would put a withdrawal in the log that never
+            // happened.
+            if (!cancelled) {
+              return;
+            }
+
             // Cancelling an invitation withdraws an authority the workspace
             // already granted, so it is an entry even though nobody was ever a
             // member: the invitation id is the resource, and the invitee never

@@ -79,6 +79,7 @@ const seedOrganization = Effect.gen(function* () {
     name: "Webhook management test",
     slug: organizationId,
   });
+
   return organizationId;
 });
 
@@ -103,11 +104,13 @@ describe("webhook management service", () => {
           const db = yield* currentDb;
           const organizationId = yield* seedOrganization;
           const service = yield* WebhookManagementService;
+
           const error = yield* Effect.flip(
             service.createEndpoint(
               createEndpointInput(organizationId, "http://127.0.0.1:8080/hook")
             )
           );
+
           expect(error._tag).toBe("BadRequestError");
           expect(
             yield* db
@@ -153,6 +156,7 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, created.endpoint.id)
             );
+
           expect(connection?.credentialsCiphertext).not.toContain(endpointUrl);
           expect(connection?.lifecycle).toBe("active");
           expect(connection?.credentialGeneration).toBe(1);
@@ -163,6 +167,7 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
+
           expect(route?.enabled).toBe(true);
           expect(route?.eventTypes).toEqual(["post.created"]);
 
@@ -184,6 +189,7 @@ describe("webhook management service", () => {
           const db = yield* currentDb;
           const service = yield* WebhookManagementService;
           const organizationId = yield* seedOrganization;
+
           const created = yield* service.createEndpoint(
             createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
           );
@@ -195,6 +201,7 @@ describe("webhook management service", () => {
             name: "Renamed endpoint",
             organizationId,
           });
+
           expect(updated.name).toBe("Renamed endpoint");
           expect(updated.eventTypes).toEqual(["post.status_changed"]);
           expect(updated.hostname).toBe("127.0.0.1");
@@ -205,6 +212,7 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, created.endpoint.id)
             );
+
           expect(connection?.credentialsCiphertext).not.toContain(
             "127.0.0.1:8080/moved"
           );
@@ -216,6 +224,7 @@ describe("webhook management service", () => {
             webhookTestConfig.encryptionKey,
             connection?.credentialsCiphertext ?? ""
           );
+
           expect(Redacted.value(decrypted.endpointUrl)).toBe(
             "https://127.0.0.1:8080/moved"
           );
@@ -229,6 +238,7 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
+
           expect(route?.eventTypes).toEqual(["post.status_changed"]);
         })
     );
@@ -240,15 +250,18 @@ describe("webhook management service", () => {
           const db = yield* currentDb;
           const service = yield* WebhookManagementService;
           const organizationId = yield* seedOrganization;
+
           const created = yield* service.createEndpoint(
             createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
           );
+
           const [storedRoute] = yield* db
             .select({ id: schema.integrationRouteTable.id })
             .from(schema.integrationRouteTable)
             .where(
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
+
           const deliveryId = yield* IntegrationDeliveryId.generate;
           const eventId = yield* IntegrationEventId.generate;
           const now = yield* DateTime.nowAsDate;
@@ -287,37 +300,46 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, created.endpoint.id)
             );
+
           expect(connection?.lifecycle).toBe("paused");
+
           const [route] = yield* db
             .select()
             .from(schema.integrationRouteTable)
             .where(
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
+
           expect(route?.enabled).toBe(false);
+
           const [delivery] = yield* db
             .select()
             .from(schema.integrationDeliveryTable)
             .where(eq(schema.integrationDeliveryTable.id, deliveryId));
+
           expect(delivery?.state).toBe("canceled");
 
           yield* service.resumeEndpoint({
             connectionId: created.endpoint.id,
             organizationId,
           });
+
           const [resumed] = yield* db
             .select()
             .from(schema.integrationConnectionTable)
             .where(
               eq(schema.integrationConnectionTable.id, created.endpoint.id)
             );
+
           expect(resumed?.lifecycle).toBe("active");
+
           const [enabledRoute] = yield* db
             .select()
             .from(schema.integrationRouteTable)
             .where(
               eq(schema.integrationRouteTable.connectionId, created.endpoint.id)
             );
+
           expect(enabledRoute?.enabled).toBe(true);
         })
     );
@@ -329,6 +351,7 @@ describe("webhook management service", () => {
           const db = yield* currentDb;
           const service = yield* WebhookManagementService;
           const organizationId = yield* seedOrganization;
+
           const created = yield* service.createEndpoint(
             createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
           );
@@ -337,6 +360,7 @@ describe("webhook management service", () => {
             connectionId: created.endpoint.id,
             organizationId,
           });
+
           expect(rotated.signingSecret).toMatch(signingSecretPattern);
           expect(rotated.signingSecret).not.toBe(created.signingSecret);
 
@@ -346,11 +370,14 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, created.endpoint.id)
             );
+
           expect(connection?.credentialGeneration).toBe(2);
+
           const decrypted = yield* decryptWebhookCredentialMaterial(
             webhookTestConfig.encryptionKey,
             connection?.credentialsCiphertext ?? ""
           );
+
           expect(Redacted.value(decrypted.signingKeyring.current)).toBe(
             rotated.signingSecret
           );
@@ -367,9 +394,11 @@ describe("webhook management service", () => {
         const db = yield* currentDb;
         const service = yield* WebhookManagementService;
         const organizationId = yield* seedOrganization;
+
         const created = yield* service.createEndpoint(
           createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
         );
+
         yield* service.pauseEndpoint({
           connectionId: created.endpoint.id,
           organizationId,
@@ -379,18 +408,22 @@ describe("webhook management service", () => {
           connectionId: created.endpoint.id,
           organizationId,
         });
+
         expect(rotated.signingSecret).toMatch(signingSecretPattern);
 
         const [connection] = yield* db
           .select()
           .from(schema.integrationConnectionTable)
           .where(eq(schema.integrationConnectionTable.id, created.endpoint.id));
+
         expect(connection?.lifecycle).toBe("paused");
         expect(connection?.credentialGeneration).toBe(2);
+
         const decrypted = yield* decryptWebhookCredentialMaterial(
           webhookTestConfig.encryptionKey,
           connection?.credentialsCiphertext ?? ""
         );
+
         expect(Redacted.value(decrypted.signingKeyring.current)).toBe(
           rotated.signingSecret
         );
@@ -404,6 +437,7 @@ describe("webhook management service", () => {
           const db = yield* currentDb;
           const service = yield* WebhookManagementService;
           const organizationId = yield* seedOrganization;
+
           const created = yield* service.createEndpoint(
             createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
           );
@@ -419,6 +453,7 @@ describe("webhook management service", () => {
             .where(
               eq(schema.integrationConnectionTable.id, created.endpoint.id)
             );
+
           expect(connection?.lifecycle).toBe("archived");
           expect(connection?.credentialsCiphertext).toBeNull();
           expect(connection?.archivedAt).not.toBeNull();
@@ -434,6 +469,7 @@ describe("webhook management service", () => {
         const service = yield* WebhookManagementService;
         const organizationId = yield* seedOrganization;
         const foreignOrganizationId = yield* seedOrganization;
+
         const created = yield* service.createEndpoint(
           createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
         );
@@ -441,6 +477,7 @@ describe("webhook management service", () => {
         const listed = yield* service.listEndpoints({
           organizationId: foreignOrganizationId,
         });
+
         expect(listed).toHaveLength(0);
 
         const notFound = yield* Effect.flip(
@@ -450,6 +487,7 @@ describe("webhook management service", () => {
             organizationId: foreignOrganizationId,
           })
         );
+
         expect(notFound._tag).toBe("NotFoundError");
 
         const pauseError = yield* Effect.flip(
@@ -458,12 +496,14 @@ describe("webhook management service", () => {
             organizationId: foreignOrganizationId,
           })
         );
+
         expect(pauseError._tag).toBe("NotFoundError");
 
         const [connection] = yield* db
           .select()
           .from(schema.integrationConnectionTable)
           .where(eq(schema.integrationConnectionTable.id, created.endpoint.id));
+
         expect(connection?.lifecycle).toBe("active");
       })
     );
@@ -477,6 +517,7 @@ describe("webhook management service", () => {
           const db = yield* currentDb;
           const service = yield* WebhookManagementService;
           const organizationId = yield* seedOrganization;
+
           const created = yield* service.createEndpoint(
             createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
           );
@@ -485,12 +526,14 @@ describe("webhook management service", () => {
             connectionId: created.endpoint.id,
             organizationId,
           });
+
           expect(queued.result).toBe("queued");
 
           const [delivery] = yield* db
             .select()
             .from(schema.integrationDeliveryTable)
             .where(eq(schema.integrationDeliveryTable.id, queued.deliveryId));
+
           expect(delivery?.state).toBe("pending");
           expect(delivery?.connectionId).toBe(created.endpoint.id);
 
@@ -498,6 +541,7 @@ describe("webhook management service", () => {
             connectionId: created.endpoint.id,
             organizationId,
           });
+
           expect(history.items).toHaveLength(1);
           expect(history.nextCursor).toBeNull();
           expect(history.items[0]).toMatchObject({
@@ -516,17 +560,21 @@ describe("webhook management service", () => {
           const db = yield* currentDb;
           const service = yield* WebhookManagementService;
           const organizationId = yield* seedOrganization;
+
           const created = yield* service.createEndpoint(
             createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
           );
+
           const first = yield* service.sendTestDelivery({
             connectionId: created.endpoint.id,
             organizationId,
           });
+
           const second = yield* service.sendTestDelivery({
             connectionId: created.endpoint.id,
             organizationId,
           });
+
           // Force identical creation timestamps so the cursor must disambiguate
           // by delivery ID rather than by time alone.
           const sameTime = dateAt("2026-08-11T00:00:00.000Z");
@@ -544,6 +592,7 @@ describe("webhook management service", () => {
             limit: 1,
             organizationId,
           });
+
           expect(pageOne.items).toHaveLength(1);
           expect(pageOne.nextCursor).not.toBeNull();
 
@@ -553,6 +602,7 @@ describe("webhook management service", () => {
             limit: 1,
             organizationId,
           });
+
           expect(pageTwo.items).toHaveLength(1);
           expect(pageTwo.nextCursor).toBeNull();
 
@@ -569,6 +619,7 @@ describe("webhook management service", () => {
               organizationId,
             })
           );
+
           expect(malformed._tag).toBe("BadRequestError");
         })
     );
@@ -578,9 +629,11 @@ describe("webhook management service", () => {
         const db = yield* currentDb;
         const service = yield* WebhookManagementService;
         const organizationId = yield* seedOrganization;
+
         const created = yield* service.createEndpoint(
           createEndpointInput(organizationId, "https://127.0.0.1:8080/hook")
         );
+
         const queued = yield* service.sendTestDelivery({
           connectionId: created.endpoint.id,
           organizationId,
@@ -592,6 +645,7 @@ describe("webhook management service", () => {
             organizationId,
           })
         );
+
         expect(notExhausted._tag).toBe("NotFoundError");
 
         const now = yield* DateTime.nowAsDate;
@@ -608,10 +662,12 @@ describe("webhook management service", () => {
           deliveryId: queued.deliveryId,
           organizationId,
         });
+
         const [retried] = yield* db
           .select()
           .from(schema.integrationDeliveryTable)
           .where(eq(schema.integrationDeliveryTable.id, queued.deliveryId));
+
         expect(retried?.state).toBe("pending");
         expect(retried?.exhaustedAt).toBeNull();
         expect(retried?.attemptCount).toBe(0);
@@ -623,6 +679,7 @@ describe("webhook management service", () => {
           connectionId: created.endpoint.id,
           organizationId,
         });
+
         yield* db
           .update(schema.integrationDeliveryTable)
           .set({ exhaustedAt: now, state: "exhausted", updatedAt: now })
@@ -633,12 +690,14 @@ describe("webhook management service", () => {
           connectionId: created.endpoint.id,
           organizationId,
         });
+
         const pausedError = yield* Effect.flip(
           service.retryDelivery({
             deliveryId: pausedTarget.deliveryId,
             organizationId,
           })
         );
+
         expect(pausedError._tag).toBe("BadRequestError");
       })
     );

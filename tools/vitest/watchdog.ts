@@ -24,7 +24,12 @@ const defaultDeadlineMs = 10 * 60 * 1000;
  */
 const maxTimerMs = 2_147_483_647;
 
-let watchdog: ChildProcess | undefined;
+/** The child watching this run; `undefined` before `setup` and after teardown. */
+type WatchdogRun = { child: ChildProcess | undefined };
+
+const watchdogRun: WatchdogRun = {
+  child: undefined,
+};
 
 export function setup(project: TestProject): void {
   const configured = process.env.FEEBLO_TEST_DEADLINE_MS;
@@ -37,16 +42,18 @@ export function setup(project: TestProject): void {
   }
 
   const deadlineMs = explicit ? Number(configured) : defaultDeadlineMs;
+
   if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
     return;
   }
+
   if (deadlineMs > maxTimerMs) {
     throw new Error(
       `FEEBLO_TEST_DEADLINE_MS must be at most ${maxTimerMs}ms: setTimeout cannot represent a longer delay and would fire after 1ms instead.`
     );
   }
 
-  watchdog = spawn(
+  const child = spawn(
     process.execPath,
     [
       fileURLToPath(new URL("./watchdog-child.mjs", import.meta.url)),
@@ -55,16 +62,20 @@ export function setup(project: TestProject): void {
     ],
     { detached: true, stdio: ["ignore", "inherit", "inherit"] }
   );
+
+  watchdogRun.child = child;
   // A failed spawn emits `error`; without a listener that becomes an unhandled
-  // event and takes the runner down before the tests start.
-  watchdog.once("error", (error) => {
+  // event and takes the runner down before the tests start. The handler answers
+  // about this child, not about whichever process the slot holds later.
+  child.once("error", (error) => {
     console.error(`[vitest-watchdog] could not start: ${error.message}`);
-    watchdog = undefined;
+
+    if (watchdogRun.child === child) watchdogRun.child = undefined;
   });
-  watchdog.unref();
+  child.unref();
 }
 
 export function teardown(): void {
-  watchdog?.kill();
-  watchdog = undefined;
+  watchdogRun.child?.kill();
+  watchdogRun.child = undefined;
 }

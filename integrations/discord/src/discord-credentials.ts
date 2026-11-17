@@ -24,6 +24,7 @@ export const DiscordEncryptedCredentialMaterial = Schema.Struct({
   /** Discord user token from the OAuth handshake; unused by V1 and stored for future account linking. */
   userToken: Schema.optionalKey(Schema.String),
 });
+
 export type DiscordEncryptedCredentialMaterial = Schema.Schema.Type<
   typeof DiscordEncryptedCredentialMaterial
 >;

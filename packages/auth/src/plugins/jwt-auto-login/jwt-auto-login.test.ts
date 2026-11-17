@@ -37,14 +37,18 @@ function stripSessionCookie(
   sessionCookiePrefix = "better-auth.session_token"
 ): Headers {
   const result = new Headers(headers);
+
   const kept = (headers.get("cookie") ?? "")
     .split(";")
     .map((part) => part.trim())
     .filter((part) => part && !part.startsWith(sessionCookiePrefix));
+
   result.delete("cookie");
+
   if (kept.length) {
     result.set("cookie", kept.join("; "));
   }
+
   return result;
 }
 
@@ -59,6 +63,7 @@ type SchemaUserField = {
 const testSecret = "better-auth-secret-that-is-long-enough-for-validation-test";
 
 let testIdToken: string;
+
 let handlers: ReturnType<typeof http.post>[];
 
 const server = setupServer();
@@ -81,6 +86,7 @@ beforeAll(async () => {
     given_name: "First",
     family_name: "Last",
   };
+
   testIdToken = await signJWT(data, testSecret);
 
   handlers = [
@@ -120,11 +126,13 @@ describe("jwtAutoLogin", async () => {
             },
             async createSsoUser({ organizationId }) {
               const ctx = await _auth.$context;
+
               const user = await ctx.internalAdapter.createUser({
                 name: "Widget User",
                 email: `widget-${organizationId}@example.com`,
                 restrictedToOrganizationId: organizationId,
               });
+
               return { name: user.name, userId: user.id };
             },
           }),
@@ -148,9 +156,11 @@ describe("jwtAutoLogin", async () => {
         onSuccess: sessionSetter(testHeaders),
       },
     });
+
     const session = await client.getSession({
       fetchOptions: { headers: testHeaders },
     });
+
     expect(session.data?.session).toBeDefined();
     expect(session.data?.user.restrictedToOrganizationId).toBe("org-1");
   });
@@ -169,6 +179,7 @@ describe("jwtAutoLogin", async () => {
     const session = await client.getSession({
       fetchOptions: { headers: persistentHeaders },
     });
+
     expect(session.data?.session).toBeDefined();
     expect(session.data?.user.restrictedToOrganizationId).toBe("org-2");
 
@@ -308,6 +319,7 @@ describe("jwtAutoLogin", async () => {
         onSuccess: cookieSetter(localHeaders),
       },
     });
+
     const state = new URL(signInRes.data?.url || "").searchParams.get("state");
     await client.$fetch("/callback/google", {
       query: { state, code: "test" },
@@ -327,9 +339,11 @@ describe("jwtAutoLogin", async () => {
       token: "valid-jwt",
       fetchOptions: { onSuccess: sessionSetter(anonHeaders) },
     });
+
     const session = await client.getSession({
       fetchOptions: { headers: anonHeaders },
     });
+
     expect(session.data?.user.restrictedToOrganizationId).toBe("org-expo");
 
     const signInRes = await client.signIn.social({
@@ -340,6 +354,7 @@ describe("jwtAutoLogin", async () => {
         headers: anonHeaders,
       },
     });
+
     const state = new URL(signInRes.data?.url || "").searchParams.get("state");
 
     await client.$fetch("/callback/google", {
@@ -354,15 +369,18 @@ describe("jwtAutoLogin", async () => {
     linkAccountFn.mockClear();
 
     const victimHeaders = new Headers();
+
     const victim = await client.signIn.jwtAutoLogin({
       organizationId: "org-victim",
       token: "valid-jwt",
       fetchOptions: { onSuccess: sessionSetter(victimHeaders) },
     });
+
     const victimId = victim.data?.user.id;
     expect(victimId).toBeTruthy();
 
     const attackerHeaders = new Headers();
+
     const signInRes = await client.signIn.social({
       provider: "google",
       callbackURL: "/dashboard",
@@ -372,6 +390,7 @@ describe("jwtAutoLogin", async () => {
         headers: attackerHeaders,
       },
     });
+
     const state = new URL(signInRes.data?.url || "").searchParams.get("state");
     await client.$fetch("/callback/google", {
       query: { state, code: "test" },
@@ -406,11 +425,13 @@ describe("jwtAutoLogin", async () => {
             },
             async createSsoUser({ organizationId }) {
               const ctx = await _localAuth.$context;
+
               const user = await ctx.internalAdapter.createUser({
                 name: "Widget User",
                 email: `widget-verify-${organizationId}@example.com`,
                 restrictedToOrganizationId: organizationId,
               });
+
               return { name: user.name, userId: user.id };
             },
           }),
@@ -539,12 +560,15 @@ describe("jwtAutoLogin", async () => {
   describe("cleanup safeguards", () => {
     it("does not delete when the new session is still restricted", async () => {
       const { getSessionFromCtx } = mockSessionApi();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: {
           id: "restricted-user",
@@ -570,13 +594,16 @@ describe("jwtAutoLogin", async () => {
 
     it("deletes the previous restricted user when linking a new account", async () => {
       const { getSessionFromCtx } = mockSessionApi();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
       const deleteUserSessions = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: {
           id: "linked-user",
@@ -605,13 +632,16 @@ describe("jwtAutoLogin", async () => {
     it("does not link or clean up when the new session belongs to the same user", async () => {
       const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "same-user", restrictedToOrganizationId: null },
         deleteUser,
@@ -631,13 +661,16 @@ describe("jwtAutoLogin", async () => {
     it("does not link or clean up when the new session is still anonymous", async () => {
       const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: {
           id: "another-anon",
@@ -660,14 +693,17 @@ describe("jwtAutoLogin", async () => {
     it("skips cleanup when onLinkAccount throws", async () => {
       const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn().mockRejectedValue(new Error("link failed"));
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
       const deleteUserSessions = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "linked-user", restrictedToOrganizationId: null },
         deleteUser,
@@ -690,14 +726,17 @@ describe("jwtAutoLogin", async () => {
     it("logs and continues when cleanup throws", async () => {
       const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn().mockRejectedValue(new Error("db gone"));
       const deleteUserSessions = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "linked-user", restrictedToOrganizationId: null },
         deleteUser,
@@ -721,11 +760,13 @@ describe("jwtAutoLogin", async () => {
   describe("before hook", () => {
     it("adds oauth server context when the session is restricted", async () => {
       const { getSessionFromCtx, addOAuthServerContext } = mockSessionApi();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         addOAuthServerContext,
       });
+
       const handler = plugin.hooks?.before?.[0]?.handler;
 
       getSessionFromCtx.mockResolvedValue({
@@ -744,11 +785,13 @@ describe("jwtAutoLogin", async () => {
 
     it("does not add oauth server context when the session is not restricted", async () => {
       const { getSessionFromCtx, addOAuthServerContext } = mockSessionApi();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         addOAuthServerContext,
       });
+
       const handler = plugin.hooks?.before?.[0]?.handler;
 
       getSessionFromCtx.mockResolvedValue({
@@ -765,11 +808,13 @@ describe("jwtAutoLogin", async () => {
 
     it("does not add oauth server context when there is no session", async () => {
       const { getSessionFromCtx, addOAuthServerContext } = mockSessionApi();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         addOAuthServerContext,
       });
+
       const handler = plugin.hooks?.before?.[0]?.handler;
 
       getSessionFromCtx.mockResolvedValue(null);
@@ -786,13 +831,16 @@ describe("jwtAutoLogin", async () => {
     it("returns early when the response has no session cookie", async () => {
       const { getSessionFromCtx } = mockSessionApi();
       const onLinkAccount = vi.fn();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "linked-user", restrictedToOrganizationId: null },
         deleteUser,
@@ -811,14 +859,17 @@ describe("jwtAutoLogin", async () => {
     it("returns early when no cookie session and no oauth state", async () => {
       const { getSessionFromCtx, getOAuthState } = mockSessionApi();
       const onLinkAccount = vi.fn();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         getOAuthState,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "linked-user", restrictedToOrganizationId: null },
         deleteUser,
@@ -836,17 +887,21 @@ describe("jwtAutoLogin", async () => {
     it("returns early when the oauth-state user is not restricted", async () => {
       const { getSessionFromCtx, getOAuthState } = mockSessionApi();
       const onLinkAccount = vi.fn();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         getOAuthState,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const findUserById = vi
         .fn()
         .mockResolvedValue({ id: "u", restrictedToOrganizationId: null });
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "linked-user", restrictedToOrganizationId: null },
         deleteUser,
@@ -868,18 +923,23 @@ describe("jwtAutoLogin", async () => {
     it("returns early when the oauth-state user has no active sessions", async () => {
       const { getSessionFromCtx, getOAuthState } = mockSessionApi();
       const onLinkAccount = vi.fn();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
         getOAuthState,
         onLinkAccount,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const findUserById = vi
         .fn()
         .mockResolvedValue({ id: "u", restrictedToOrganizationId: "org-1" });
+
       const listSessions = vi.fn().mockResolvedValue([]);
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "linked-user", restrictedToOrganizationId: null },
         deleteUser,
@@ -903,12 +963,15 @@ describe("jwtAutoLogin", async () => {
 
     it("throws when the auto-login path is reached without a new session", async () => {
       const { getSessionFromCtx } = mockSessionApi();
+
       const plugin = jwtAutoLogin({
         createSsoUser: vi.fn(),
         getSessionFromCtx,
       });
+
       const handler = plugin.hooks?.after?.[0]?.handler;
       const deleteUser = vi.fn();
+
       const ctx = createMiddlewareContext({
         newSessionUser: { id: "anon", restrictedToOrganizationId: "org-1" },
         deleteUser,
@@ -995,6 +1058,7 @@ describe("jwtAutoLogin", async () => {
       getSessionFromCtx.mockResolvedValue(null);
 
       let _localAuth: any = null;
+
       const { client: localClient, auth: localAuth } = await getTestInstance(
         {
           plugins: [
@@ -1002,11 +1066,13 @@ describe("jwtAutoLogin", async () => {
               getSessionFromCtx,
               async createSsoUser({ organizationId }) {
                 const ctx = await _localAuth.$context;
+
                 const user = await ctx.internalAdapter.createUser({
                   name: "Widget User",
                   email: `session-fail-${organizationId}@example.com`,
                   restrictedToOrganizationId: organizationId,
                 });
+
                 return { name: user.name, userId: user.id };
               },
             }),
@@ -1017,6 +1083,7 @@ describe("jwtAutoLogin", async () => {
           disableTestUser: true,
         }
       );
+
       _localAuth = localAuth;
 
       const ctx = await localAuth.$context;
@@ -1036,6 +1103,7 @@ describe("jwtAutoLogin", async () => {
   describe("schema", () => {
     it("declares the restrictedToOrganizationId user field", () => {
       const plugin = jwtAutoLogin({ createSsoUser: vi.fn() });
+
       // SAFETY: the plugin schema declares the restrictedToOrganizationId user
       // field; the cast only narrows to the schema field shape it exposes.
       const field = (
@@ -1043,6 +1111,7 @@ describe("jwtAutoLogin", async () => {
           user: { fields: Record<string, SchemaUserField> };
         }
       ).user.fields.restrictedToOrganizationId;
+
       expect(field).toBeDefined();
       expect(field?.type).toBe("string");
       expect(field?.required).toBe(false);

@@ -29,6 +29,7 @@ export function insensitiveInArray(
   if (values.length === 0) {
     return sql`false`;
   }
+
   return sql`LOWER(${column}) IN (${sql.join(
     values.map((v) => sql`LOWER(${v})`),
     sql`, `
@@ -45,6 +46,7 @@ export function insensitiveNotInArray(
   if (values.length === 0) {
     return sql`true`;
   }
+
   return sql`LOWER(${column}) NOT IN (${sql.join(
     values.map((v) => sql`LOWER(${v})`),
     sql`, `

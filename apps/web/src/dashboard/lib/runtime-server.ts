@@ -10,12 +10,15 @@ import { getServerApiBaseUrl } from "./server-runtime-public-env";
 // from it) would see `undefined`. The API origin is deployment-wide, so the
 // lazily-created runtime is cached for the isolate once the first request
 // resolves it.
-let runtime: ReturnType<typeof createRuntime> | null = null;
+const getRuntime = (() => {
+  let runtime: ReturnType<typeof createRuntime> | null = null;
 
-function getRuntime() {
-  runtime ??= createRuntime(getServerApiBaseUrl());
-  return runtime;
-}
+  return (): ReturnType<typeof createRuntime> => {
+    runtime ??= createRuntime(getServerApiBaseUrl());
+
+    return runtime;
+  };
+})();
 
 async function runEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -29,11 +32,13 @@ async function runEffect<A, E, R>(
     effect as Effect.Effect<A, E, never>,
     { signal: options?.signal }
   );
+
   if (Exit.isFailure(result)) {
     // The same error shape the browser runtime throws: `parseRpcError` reads
     // the tag off the cause, which a `Cause.pretty` string would lose.
     throw new RpcError(result.cause);
   }
+
   return result.value;
 }
 

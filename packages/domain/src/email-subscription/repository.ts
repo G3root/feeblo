@@ -124,6 +124,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           )
         )
         .limit(1);
+
       return row === undefined
         ? Option.none<Contact>()
         : Option.some(yield* decodeContact(row, "findContact"));
@@ -144,6 +145,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           )
         )
         .limit(1);
+
       return row === undefined
         ? Option.none<Subscription>()
         : Option.some(yield* decodeSubscription(row, "findSubscription"));
@@ -177,6 +179,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         )
         .limit(1)
         .for("update");
+
       return row === undefined
         ? Option.none<Subscription>()
         : Option.some(yield* decodeSubscription(row, "findSubscription"));
@@ -191,6 +194,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const deferredNoAccess = input.deferredNoAccess === true;
 
     const contactId = yield* EmailContactId.generate;
+
     const [createdContact] = yield* db
       .insert(schema.emailContactTable)
       .values({
@@ -210,6 +214,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         ],
       })
       .returning();
+
     const contact =
       createdContact === undefined
         ? yield* findContact(input.organizationId, email).pipe(
@@ -245,12 +250,14 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               })
               .where(eq(schema.emailContactTable.id, contact.id))
               .returning();
+
             if (updated === undefined) {
               return yield* dataError(
                 "requestSubscription.verifyContact",
                 "Email contact update did not return a row"
               );
             }
+
             return yield* decodeContact(
               updated,
               "requestSubscription.verifyContact"
@@ -262,7 +269,9 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       persistedContact.id,
       input.topic
     );
+
     const priorSubscription = Option.getOrUndefined(existingSubscription);
+
     if (priorSubscription?.state === "unsubscribed" && !alreadyVerified) {
       return {
         contact: persistedContact,
@@ -271,12 +280,15 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         verificationToken: Option.none<EmailSubscriptionToken>(),
       };
     }
+
     const state = nextStateForRequest(priorSubscription?.state, {
       alreadyVerified,
       deferredNoAccess,
     });
+
     const subscriptionId =
       priorSubscription?.id ?? (yield* EmailSubscriptionId.generate);
+
     const unsubscribeToken =
       priorSubscription === undefined
         ? Option.some(
@@ -286,9 +298,11 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
             })
           )
         : Option.none<EmailSubscriptionToken>();
+
     const unsubscribeTokenHash = Option.isSome(unsubscribeToken)
       ? yield* hashEmailSubscriptionToken(unsubscribeToken.value)
       : null;
+
     const verificationToken =
       state === "pending_verification"
         ? Option.some(
@@ -298,6 +312,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
             })
           )
         : Option.none<EmailSubscriptionToken>();
+
     const verificationTokenHash = Option.isSome(verificationToken)
       ? yield* hashEmailSubscriptionToken(verificationToken.value)
       : null;
@@ -338,12 +353,14 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           })
           .where(eq(schema.emailSubscriptionTable.id, prior.id))
           .returning();
+
         if (updated === undefined) {
           return yield* dataError(
             "requestSubscription.updateSubscription",
             "Email subscription update did not return a row"
           );
         }
+
         return yield* decodeSubscription(
           updated,
           "requestSubscription.updateSubscription"
@@ -397,6 +414,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               ],
             })
             .returning();
+
           if (created !== undefined) {
             return {
               subscription: yield* decodeSubscription(
@@ -407,10 +425,12 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
               verificationToken,
             };
           }
+
           const winner = yield* findSubscriptionForContactForUpdate(
             persistedContact.id,
             input.topic
           );
+
           return yield* Option.match(winner, {
             onNone: () =>
               dataError(
@@ -431,10 +451,12 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                     verificationToken: Option.none<EmailSubscriptionToken>(),
                   };
                 }
+
                 const winnerState = nextStateForRequest(winner.state, {
                   alreadyVerified,
                   deferredNoAccess,
                 });
+
                 // A fresh verification token is derived from the winner's own
                 // id and its hash is what the row stores, so the token this
                 // request returns names the stored row — never the losing
@@ -450,6 +472,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                         })
                       )
                     : Option.none<EmailSubscriptionToken>();
+
                 const winnerVerificationTokenHash = Option.isSome(
                   winnerVerificationToken
                 )
@@ -457,6 +480,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                       winnerVerificationToken.value
                     )
                   : null;
+
                 const updatedSubscription = yield* applySubscriptionState(
                   winner,
                   {
@@ -464,6 +488,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
                     verificationTokenHash: winnerVerificationTokenHash,
                   }
                 );
+
                 return {
                   subscription: updatedSubscription,
                   unsubscribeToken: Option.none<EmailSubscriptionToken>(),
@@ -486,6 +511,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
   )(function* (input: FindEmailSubscriptionInput) {
     const email = yield* parseEmailAddress(input.email, "findSubscription");
     const contact = yield* findContact(input.organizationId, email);
+
     return Option.isSome(contact)
       ? yield* findSubscriptionForContact(contact.value.id, input.topic)
       : Option.none<Subscription>();
@@ -497,6 +523,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
     const tokenHash = yield* hashEmailSubscriptionToken(
       redactEmailSubscriptionToken(input.verificationToken)
     );
+
     const [subscription] = yield* db
       .select({
         contactId: schema.emailSubscriptionTable.contactId,
@@ -508,15 +535,18 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       .from(schema.emailSubscriptionTable)
       .where(eq(schema.emailSubscriptionTable.verificationTokenHash, tokenHash))
       .limit(1);
+
     if (subscription === undefined) {
       return { _tag: "Invalid" as const };
     }
+
     if (
       subscription.state === "active" ||
       subscription.state === "paused_by_plan"
     ) {
       return { _tag: "AlreadyVerified" as const };
     }
+
     if (
       subscription.state !== "pending_verification" ||
       subscription.verificationExpiresAt === null ||
@@ -543,6 +573,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         )
       )
       .returning();
+
     if (updated === undefined) {
       // The guarded `UPDATE` matched nothing, which has two causes worth
       // telling apart: another request verified this subscription between the
@@ -554,23 +585,28 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         .from(schema.emailSubscriptionTable)
         .where(eq(schema.emailSubscriptionTable.id, subscription.id))
         .limit(1);
+
       const reread =
         current === undefined
           ? undefined
           : yield* decodeSubscription(current, "verifySubscription.reread");
+
       if (reread?.state === "active" || reread?.state === "paused_by_plan") {
         return { _tag: "AlreadyVerified" as const };
       }
+
       // Consent withdrawn under the request: the sequential path answers
       // `Expired` for exactly this state, and the raced path must agree.
       if (reread?.state === "unsubscribed") {
         return { _tag: "Expired" as const };
       }
+
       return yield* dataError(
         "verifySubscription",
         "Email subscription verification did not return a row"
       );
     }
+
     yield* db
       .update(schema.emailContactTable)
       .set({
@@ -579,6 +615,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         updatedAt: input.now,
       })
       .where(eq(schema.emailContactTable.id, subscription.contactId));
+
     return { _tag: "Verified" as const };
   });
 
@@ -587,6 +624,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
       const tokenHash = yield* hashEmailSubscriptionToken(
         redactEmailSubscriptionToken(input.unsubscribeToken)
       );
+
       // A full-row read with its decoder, not the column projection the
       // neighbouring reads got: this method is the one seam where projecting
       // the columns collapses inference across the handler layer with
@@ -602,13 +640,17 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           eq(schema.emailSubscriptionTable.unsubscribeTokenHash, tokenHash)
         )
         .limit(1);
+
       if (row === undefined) {
         return { _tag: "Invalid" as const };
       }
+
       const subscription = yield* decodeSubscription(row, "unsubscribe");
+
       if (subscription.state === "unsubscribed") {
         return { _tag: "AlreadyUnsubscribed" as const };
       }
+
       const [updated] = yield* db
         .update(schema.emailSubscriptionTable)
         .set({
@@ -628,12 +670,14 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           )
         )
         .returning();
+
       if (updated === undefined) {
         // The pre-write read above lost a race: the row reached `unsubscribed`,
         // the only state that cannot take this event, between the read and
         // this write — the caller's outcome, reached twice.
         return { _tag: "AlreadyUnsubscribed" as const };
       }
+
       return { _tag: "Unsubscribed" as const };
     }
   );
@@ -670,15 +714,19 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           eq(schema.emailContactTable.userId, userId)
         )
       );
+
     if (rows.length === 0) {
       return { _tag: "NotSubscribed" as const };
     }
+
     const subscribedIds = rows.flatMap((row) =>
       row.state === "unsubscribed" ? [] : [row.id]
     );
+
     if (subscribedIds.length === 0) {
       return { _tag: "AlreadyUnsubscribed" as const };
     }
+
     const updated = yield* db
       .update(schema.emailSubscriptionTable)
       .set({
@@ -695,6 +743,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailSubscriptionTable.id });
+
     return updated.length === 0
       ? { _tag: "AlreadyUnsubscribed" as const }
       : { _tag: "Unsubscribed" as const };
@@ -743,9 +792,11 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           ]
         : []),
     ];
+
     if (contactClauses.length === 0) {
       return { unsubscribed: 0 };
     }
+
     const contacts = yield* db
       .select({ id: schema.emailContactTable.id })
       .from(schema.emailContactTable)
@@ -755,9 +806,11 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           or(...contactClauses)
         )
       );
+
     if (contacts.length === 0) {
       return { unsubscribed: 0 };
     }
+
     const updated = yield* db
       .update(schema.emailSubscriptionTable)
       .set({
@@ -778,6 +831,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailSubscriptionTable.id });
+
     return { unsubscribed: updated.length };
   });
 
@@ -810,6 +864,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
             )
           )
           .returning({ id: schema.emailSubscriptionTable.id });
+
     const resumed = eligible
       ? yield* db
           .update(schema.emailSubscriptionTable)
@@ -827,6 +882,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           )
           .returning({ id: schema.emailSubscriptionTable.id })
       : [];
+
     return { paused: paused.length, resumed: resumed.length };
   });
 
@@ -844,6 +900,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           "paused_by_plan",
         ])
       );
+
     return rows.map((row) => row.organizationId);
   });
 
@@ -884,9 +941,11 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           sql`lower(${schema.emailContactTable.email}) = lower(${email})`
         )
       );
+
     if (contacts.length === 0) {
       return { unsubscribed: 0 };
     }
+
     const updated = yield* db
       .update(schema.emailSubscriptionTable)
       .set({
@@ -905,6 +964,7 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         )
       )
       .returning({ id: schema.emailSubscriptionTable.id });
+
     return { unsubscribed: updated.length };
   });
 

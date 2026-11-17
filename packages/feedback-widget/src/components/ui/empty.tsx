@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils";
 
 export function Empty(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
+
   return (
     <div
       class={cn(
@@ -18,6 +19,7 @@ export function Empty(props: ComponentProps<"div">) {
 
 export function EmptyHeader(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
+
   return (
     <div
       class={cn("flex max-w-sm flex-col items-center gap-2", local.class)}
@@ -29,6 +31,7 @@ export function EmptyHeader(props: ComponentProps<"div">) {
 
 export function EmptyTitle(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
+
   return (
     <div
       class={cn("font-heading text-lg font-medium tracking-tight", local.class)}
@@ -40,6 +43,7 @@ export function EmptyTitle(props: ComponentProps<"div">) {
 
 export function EmptyDescription(props: ComponentProps<"div">) {
   const [local, others] = splitProps(props, ["class"]);
+
   return (
     <div
       class={cn(

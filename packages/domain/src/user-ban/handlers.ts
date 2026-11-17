@@ -88,6 +88,7 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
         const membership = Policy.getMembership(session, args.organizationId);
         const audit = yield* AuditLogRecorder;
         const now = yield* DateTime.nowAsDate;
+
         const resolved = yield* repository.resolveTarget({
           organizationId: args.organizationId,
           target: args.target,
@@ -98,12 +99,14 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
             message: "The person to ban was not found",
           });
         }
+
         if (resolved.status === "member") {
           return yield* new BadRequestError({
             message:
               "Workspace members are managed through membership, not banned",
           });
         }
+
         if (resolved.status === "unresolvable") {
           return yield* new BadRequestError({
             message: "This customer has no account or email address to ban",
@@ -148,6 +151,7 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
                     userId: resolved.userId,
                   })
                 : { comments: 0, posts: 0 };
+
             // In the ban's transaction, so the entry and the ban commit
             // together. The banned person is the subject of the record, not
             // the operator: an address-only ban has no account, so there is
@@ -160,13 +164,17 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
               ...(resolved.userId !== null && {
                 affectedUserId: resolved.userId,
               }),
+              // The address stays in the ban row, which is mutable and
+              // deleted with the ban. The entry is append-only, so it carries
+              // the subject's id and the shape of the action instead: a copy of
+              // the address here would outlive every mechanism that removes it.
               metadata: {
                 deletedComments: purged.comments,
                 deletedPosts: purged.posts,
-                email: resolved.email,
                 reason: args.reason ?? null,
               },
             });
+
             return { purged, row };
           })
         );
@@ -192,10 +200,12 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const result = yield* transaction(
           Effect.gen(function* () {
             if (args._tag === "row") {
               const removed = yield* repository.remove(args);
+
               // Only a delete that matched a row is an event; a stale id is
               // reported as NotFound below and leaves the log alone. The row
               // names the ban, not the person it was made against, so this
@@ -209,12 +219,15 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
                   resourceId: args.id,
                 });
               }
+
               return removed;
             }
+
             const resolved = yield* repository.resolveTarget({
               organizationId: args.organizationId,
               target: args.target,
             });
+
             // `member` and `not_found` both leave nothing to remove. A member
             // cannot be banned, so a row naming one predates their membership
             // and has no effect; the settings list names that row directly and
@@ -222,11 +235,13 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
             if (resolved.status !== "ok") {
               return { removed: false };
             }
+
             const removed = yield* repository.removeByFacets({
               email: resolved.email,
               organizationId: args.organizationId,
               userId: resolved.userId,
             });
+
             if (removed.removed) {
               // This branch resolved the person it is lifting the ban from, so
               // the affected user is known here where the row-id branch's is
@@ -239,12 +254,15 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
                 ...(resolved.userId !== null && {
                   affectedUserId: resolved.userId,
                 }),
-                metadata: { email: resolved.email },
+                // No address, for the reason given on the ban entry.
+                metadata: {},
               });
             }
+
             return removed;
           })
         );
+
         if (!result.removed) {
           return yield* new NotFoundError({ message: "Ban not found" });
         }
@@ -257,17 +275,21 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
     GetUserBanStatus: (args: UserBanStatusRequest) =>
       Effect.gen(function* () {
         const session = yield* OptionalCurrentSession;
+
         if (Option.isNone(session)) {
           return { banned: false };
         }
+
         if (Policy.isMember(session.value, args.organizationId)) {
           return { banned: false };
         }
+
         const banned = yield* repository.isBanned({
           email: session.value.user.email,
           organizationId: args.organizationId,
           userId: session.value.session.userId,
         });
+
         return { banned };
       }).pipe(withRemapDbErrors("UserBan", "select")),
   };

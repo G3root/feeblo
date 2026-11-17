@@ -2,6 +2,7 @@ import { EmbedError } from "./errors";
 import type { WidgetMode, WidgetModule, WidgetPlacement } from "./types";
 
 const DEFAULT_MODULES: WidgetModule[] = ["feedback", "updates"];
+
 // The lookup sets accept `PropertyKey` because `normalizeWidgetConfig`
 // validates values from plain-JavaScript callers: a Symbol must reach
 // `invalidConfig` as `INVALID_CONFIG` instead of throwing a coercion TypeError.
@@ -10,7 +11,9 @@ const MODES: ReadonlySet<PropertyKey> = new Set<WidgetMode>([
   "updates",
   "hub",
 ]);
+
 const MODULES = new Set<WidgetModule>(DEFAULT_MODULES);
+
 const PLACEMENTS: ReadonlySet<PropertyKey> = new Set<WidgetPlacement>([
   "bottom-left",
   "bottom-right",
@@ -38,6 +41,7 @@ function parseMode(value: PropertyKey): WidgetMode {
   if (!isWidgetMode(value)) {
     invalidConfig(`[feeblo-sdk] Invalid widget mode: ${String(value)}.`);
   }
+
   return value;
 }
 
@@ -45,6 +49,7 @@ function parsePlacement(value: PropertyKey): WidgetPlacement {
   if (!isWidgetPlacement(value)) {
     invalidConfig(`[feeblo-sdk] Invalid widget placement: ${String(value)}.`);
   }
+
   return value;
 }
 
@@ -54,6 +59,7 @@ export function normalizeWidgetConfig(options: {
   placement?: PropertyKey | undefined;
 }): NormalizedWidgetConfig {
   const mode = parseMode(options.mode ?? "feedback");
+
   const placement = options.placement
     ? parsePlacement(options.placement)
     : undefined;
@@ -64,12 +70,15 @@ export function normalizeWidgetConfig(options: {
 
   const modules =
     mode === "hub" ? (options.modules ?? DEFAULT_MODULES) : [mode];
+
   if (modules.length === 0) {
     invalidConfig("[feeblo-sdk] Hub must enable at least one module.");
   }
+
   if (modules.some((module) => !MODULES.has(module))) {
     invalidConfig("[feeblo-sdk] Hub modules must be `feedback` or `updates`.");
   }
+
   if (new Set(modules).size !== modules.length) {
     invalidConfig("[feeblo-sdk] Hub modules cannot contain duplicates.");
   }

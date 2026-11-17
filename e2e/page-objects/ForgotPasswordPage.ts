@@ -9,7 +9,7 @@ export class ForgotPasswordPage {
     this.page = page;
     this.emailInput = page.getByRole("textbox", { name: "Email" });
     this.submitButton = page.getByRole("button", {
-      name: "Send reset code",
+      name: "Send code",
       exact: true,
     });
   }
@@ -21,11 +21,13 @@ export class ForgotPasswordPage {
 
   async requestReset(email: string) {
     await this.emailInput.fill(email);
+
     const responsePromise = this.page.waitForResponse(
       (response) =>
         response.url().includes("/api/auth/email-otp/request-password-reset") &&
         response.request().method() === "POST"
     );
+
     await this.submitButton.click();
     await responsePromise;
   }

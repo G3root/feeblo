@@ -18,11 +18,13 @@ import { isBrowser } from "./utils";
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const boxedKind = <T>(value: T): string | null => {
   if (value === null || value === undefined) return null;
+
   // SAFETY: Object.getPrototypeOf always returns an object or null; every
   // prototype carries a constructor whose name identifies the built-in.
   const prototype = Object.getPrototypeOf(Object(value)) as {
     constructor?: { name?: string };
   } | null;
+
   return prototype?.constructor?.name ?? null;
 };
 
@@ -32,6 +34,7 @@ const isStringValue = <T>(value: T): value is T & string =>
 // oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- the type parameter is how this helper accepts any value without spelling `unknown`, which `anti-slop/no-unknown-parameters` bans (the established spelling is `packages/utils/src/runtime-kind.ts`); the parameter is used once by construction
 const isObjectValue = <T>(value: T): boolean => {
   const kind = boxedKind(value);
+
   return (
     kind !== null &&
     kind !== "String" &&
@@ -51,9 +54,11 @@ const isObjectValue = <T>(value: T): boolean => {
  */
 function resolveAutoLoginOrigins(options: EmbedOptions): string[] {
   const origins = new Set<string>();
+
   const addOrigin = (value: string) => {
     try {
       const origin = new URL(value, window.location.href).origin;
+
       if (origin !== "null") {
         origins.add(origin);
       }
@@ -61,21 +66,38 @@ function resolveAutoLoginOrigins(options: EmbedOptions): string[] {
       // Ignore malformed configuration values.
     }
   };
+
   addOrigin(window.location.origin);
   addOrigin(resolveBaseUrl(options));
+
   for (const origin of options.autoLoginOrigins ?? []) {
     addOrigin(origin);
   }
+
   return [...origins];
 }
 
-let currentEmbed: Embed | null = null;
-let currentOrgId: string | null = null;
-let globalCleanup: (() => void) | null = null;
-let linkCleanup: (() => void) | null = null;
+/**
+ * The widget this module owns and the cleanups its listeners installed. One
+ * record, written only by the functions below: an embed, the origin it was
+ * initialized for, and the two teardown hooks that must run with it.
+ */
+type WidgetInstance = {
+  embed: Embed | null;
+  globalCleanup: (() => void) | null;
+  linkCleanup: (() => void) | null;
+  orgId: string | null;
+};
+
+const instance: WidgetInstance = {
+  embed: null,
+  globalCleanup: null,
+  linkCleanup: null,
+  orgId: null,
+};
 
 function setupGlobalListeners(): void {
-  if (globalCleanup) {
+  if (instance.globalCleanup) {
     return;
   }
 
@@ -83,6 +105,7 @@ function setupGlobalListeners(): void {
     // SAFETY: the message contract is established by the guards below (object
     // value, FeebloWidget target, non-empty data) before any field is read.
     const msg = e.data as ExternalMessageData;
+
     if (
       !msg ||
       !isObjectValue(msg) ||
@@ -91,22 +114,25 @@ function setupGlobalListeners(): void {
     ) {
       return;
     }
-    if (msg.data.action === "openFeedbackWidget" && currentEmbed) {
+
+    if (msg.data.action === "openFeedbackWidget" && instance.embed) {
       if (msg.data.setBoard) {
-        currentEmbed.setBoard(msg.data.setBoard);
+        instance.embed.setBoard(msg.data.setBoard);
       }
-      currentEmbed.openModule("feedback");
-      if (!currentEmbed.isOpenState()) {
-        currentEmbed.open();
+
+      instance.embed.openModule("feedback");
+
+      if (!instance.embed.isOpenState()) {
+        instance.embed.open();
       }
     }
   };
 
   window.addEventListener("message", handleExternalMessage);
 
-  globalCleanup = () => {
+  instance.globalCleanup = () => {
     window.removeEventListener("message", handleExternalMessage);
-    globalCleanup = null;
+    instance.globalCleanup = null;
   };
 }
 
@@ -118,14 +144,16 @@ export function destroyInstance(embed: Embed | null): void {
   if (!embed) {
     return;
   }
+
   embed.destroy();
-  if (currentEmbed === embed) {
+
+  if (instance.embed === embed) {
     stopTriggerScanning();
-    linkCleanup?.();
-    linkCleanup = null;
-    globalCleanup?.();
-    currentEmbed = null;
-    currentOrgId = null;
+    instance.linkCleanup?.();
+    instance.linkCleanup = null;
+    instance.globalCleanup?.();
+    instance.embed = null;
+    instance.orgId = null;
   }
 }
 
@@ -133,33 +161,40 @@ function createWidgetProxy(embed: Embed): FeebloWidget {
   const widget: FeebloWidget = {
     identify: (identity) => {
       embed.identify(identity);
+
       return widget;
     },
     setBoard: (board) => {
       embed.setBoard(board);
+
       return widget;
     },
     metadata: (patch) => {
       embed.metadata(patch);
+
       return widget;
     },
     isOpen: () => embed.isOpenState(),
     open: (trigger, metadata) => {
       embed.open(trigger, metadata);
+
       return widget;
     },
     openModule: (module) => {
       embed.openModule(module);
+
       return widget;
     },
     close: () => {
       embed.close();
+
       return widget;
     },
     destroy: () => {
       destroyInstance(embed);
     },
   };
+
   return widget;
 }
 
@@ -174,6 +209,7 @@ function noopWidget(): FeebloWidget {
     destroy: () => undefined,
     isOpen: () => false,
   };
+
   return self;
 }
 
@@ -190,6 +226,7 @@ export function init(
   options?: EmbedOptions
 ): FeebloWidget;
 export function init(config: InitConfig): FeebloWidget;
+// oxlint-disable-next-line anti-slop-martinfowler/mysterious-name -- `feeblo.init(...)` is the published entry point (embed snippet, README, host script tags), so its name is the package's public shape, not a description of this function.
 export function init(
   orgIdOrConfig: (string | OrganizationId) | InitConfig,
   options: EmbedOptions = {}
@@ -221,28 +258,30 @@ export function init(
 
   const normalizedConfig = normalizeWidgetConfig(resolvedOptions);
   const nextConfigKey = widgetConfigKey(normalizedConfig);
+
   if (
-    currentEmbed &&
-    currentOrgId === organizationId &&
-    currentEmbed.getConfigKey() === nextConfigKey
+    instance.embed &&
+    instance.orgId === organizationId &&
+    instance.embed.getConfigKey() === nextConfigKey
   ) {
     if (resolvedOptions.user) {
-      currentEmbed.identify(resolvedOptions.user);
+      instance.embed.identify(resolvedOptions.user);
     }
-    return createWidgetProxy(currentEmbed);
+
+    return createWidgetProxy(instance.embed);
   }
 
-  if (currentEmbed) {
-    destroyInstance(currentEmbed);
+  if (instance.embed) {
+    destroyInstance(instance.embed);
   }
 
   const embed = new Embed(organizationId, resolvedOptions, normalizedConfig);
-  currentEmbed = embed;
-  currentOrgId = organizationId;
+  instance.embed = embed;
+  instance.orgId = organizationId;
 
   setupGlobalListeners();
   startTriggerScanning(embed, embed.logger);
-  linkCleanup = startLinkAuthentication(embed, embed.logger, {
+  instance.linkCleanup = startLinkAuthentication(embed, embed.logger, {
     allowedOrigins: resolveAutoLoginOrigins(resolvedOptions),
   });
 
@@ -254,5 +293,5 @@ export function init(
 }
 
 export function getCurrentEmbed(): Embed | null {
-  return currentEmbed;
+  return instance.embed;
 }

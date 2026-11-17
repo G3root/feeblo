@@ -73,11 +73,13 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     GetChangelogPublic: (args: TChangelogGet) =>
       Effect.gen(function* () {
         const entry = yield* repository.findPublishedBySlug(args);
+
         if (entry === undefined) {
           return yield* new ChangelogNotFoundError({
             message: "Changelog entry not found",
           });
         }
+
         // Embedded so the public detail page renders its "shipped" list from
         // this single response instead of syncing every post and changelog
         // link in the organization.
@@ -85,6 +87,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           changelogId: entry.id,
           organizationId: args.organizationId,
         });
+
         return { ...entry, posts };
       }).pipe(
         RateLimit.withPublicRpcRateLimit({
@@ -101,6 +104,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
+
       return Effect.gen(function* () {
         // A live entry needs its publication date. The Public API has always
         // refused a publish without one; the dashboard relied on its publish
@@ -111,8 +115,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             message: "A published changelog entry needs a publication date.",
           });
         }
+
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
           userId: session.session.userId,
@@ -120,11 +126,12 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           assetIds: args.assetIds,
           coverImageUrl: args.coverImage,
         });
+
         const isMember = Policy.getMembership(session, args.organizationId);
 
         const outboxId = yield* transaction(
           Effect.gen(function* () {
-            yield* repository.create({
+            const created = yield* repository.create({
               ...args,
               content: prepared.content,
               coverImage: prepared.coverImage,
@@ -132,6 +139,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               ...(isMember && { creatorMemberId: isMember.membershipId }),
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
+
             // In the same transaction as the entry it describes, so a create
             // that fails anywhere below leaves no audit row claiming it
             // happened. `metadata` rather than `changes`: there is no previous
@@ -142,12 +150,16 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               source: "dashboard",
               action: "changelog.created",
               resourceId: args.id,
+              // The stored slug, not the submitted one: the repository derives
+              // it from the title when the caller left it empty, and the entry
+              // should name the entry as it exists.
               metadata: {
                 title: args.title,
-                slug: args.slug,
+                slug: created?.slug ?? args.slug,
                 status: args.status,
               },
             });
+
             const createdOutboxId = isPublishedChangelogStatus(args.status)
               ? yield* publication.recordPublishedIntent({
                   actorUserId: session.session.userId,
@@ -155,6 +167,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                   organizationId: args.organizationId,
                 })
               : undefined;
+
             if (isPublishedChangelogStatus(args.status)) {
               yield* publication.notifyPublished({
                 ...(isMember && { actorUserId: session.session.userId }),
@@ -164,6 +177,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 title: args.title,
               });
             }
+
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -173,6 +187,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               assetIds: args.assetIds,
               coverImageUrl: prepared.coverImage,
             });
+
             return createdOutboxId;
           })
         ).pipe(
@@ -181,6 +196,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           ),
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
+
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(changelogPolicy.canCreate(args.organizationId)),
@@ -194,7 +210,17 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.delete(args);
+            const deleted = yield* repository.delete(args);
+
+            // `canDelete` proved the caller may delete, not that there was
+            // anything to delete. A row that is already gone (or never was in
+            // this workspace) is a 404, and nothing is recorded for it.
+            if (!deleted) {
+              return yield* new ChangelogNotFoundError({
+                message: "Changelog entry not found",
+              });
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -232,15 +258,18 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
+
       return Effect.gen(function* () {
         if (publishesWithoutTimestamp(args)) {
           return yield* new BadRequestError({
             message: "A published changelog entry needs a publication date.",
           });
         }
+
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
         const membership = Policy.getMembership(session, args.organizationId);
+
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
           userId: session.session.userId,
@@ -255,6 +284,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               id: args.id,
               organizationId: args.organizationId,
             });
+
             // The pre-transaction policy saw the row exist, so a `undefined`
             // here means it was deleted while this request was in flight.
             // Failing now (rather than letting the no-op update "succeed")
@@ -266,17 +296,20 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 message: "Changelog entry not found",
               });
             }
+
             const updated = yield* repository.update({
               ...args,
               content: prepared.content,
               coverImage: prepared.coverImage,
               excerpt: htmlToExcerpt(sanitizedHtml),
             });
+
             if (updated === undefined) {
               return yield* new ChangelogNotFoundError({
                 message: "Changelog entry not found",
               });
             }
+
             // The update returns the row it wrote, not the one it replaced,
             // so the new values go in `metadata` rather than posing as a diff
             // with an empty `before`.
@@ -288,7 +321,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               resourceId: args.id,
               metadata: {
                 title: args.title,
-                slug: args.slug,
+                slug: updated.slug,
                 status: args.status,
               },
             });
@@ -296,6 +329,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
             // transition, not to the value: a save that leaves a live entry
             // live changes nothing and must not announce itself twice.
             const publishedNow = publishesNow(previousStatus, args.status);
+
             // A publish is its own audited event, recorded beside the update
             // that carried it; a save that leaves a live entry live is only an
             // update. `resourceId` is the same entry, so the reader can follow
@@ -307,9 +341,10 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 source: "dashboard",
                 action: "changelog.published",
                 resourceId: args.id,
-                metadata: { title: args.title, slug: args.slug },
+                metadata: { title: args.title, slug: updated.slug },
               });
             }
+
             const createdOutboxId = publishedNow
               ? yield* publication.recordPublishedIntent({
                   actorUserId: session.session.userId,
@@ -317,6 +352,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                   organizationId: args.organizationId,
                 })
               : undefined;
+
             if (publishedNow) {
               yield* publication.notifyPublished({
                 ...(membership && { actorUserId: session.session.userId }),
@@ -326,6 +362,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
                 title: args.title,
               });
             }
+
             yield* commitPreparedEditorAssets(prepared.promotions);
             yield* syncChangelogAssetReferences({
               changelogId: args.id,
@@ -335,6 +372,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               assetIds: args.assetIds,
               coverImageUrl: prepared.coverImage,
             });
+
             return createdOutboxId;
           })
         ).pipe(
@@ -343,6 +381,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           ),
           Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
         );
+
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
       }).pipe(
         Policy.withPolicy(

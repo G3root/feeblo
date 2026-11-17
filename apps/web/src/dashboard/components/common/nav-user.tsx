@@ -40,6 +40,7 @@ export function NavUser() {
   const user = auth.status === "authenticated" ? auth.user : null;
   const navigate = useNavigate();
   const organizationId = useOrganizationId();
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -101,6 +102,7 @@ export function NavUser() {
 
 function ThemeMenu() {
   const { themeMode, setTheme } = useTheme();
+
   return (
     <MenuSub>
       <MenuSubTrigger>

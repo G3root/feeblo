@@ -154,7 +154,13 @@ Sixty-seven actions, every one of them declared in the catalog and every declare
 | `integration` (Slack, Discord, GitHub) | connected, updated, disconnected |
 | `public-api` | `api.request` |
 
-The invariant is easy to re-check: `AUDIT_ACTIONS` in the contracts package and a grep for `action: "…"` across `packages/domain/src` and `integrations/*/src` should name the same set. Adding a verb and its writer in one change is what keeps that true; removing a writer means removing its verb.
+Two rules govern the catalog, and only one of them is absolute.
+
+**A writer may only record an action the catalog declares.** `AUDIT_ACTIONS` and a grep for `action: "…"` across `packages/domain/src` and `integrations/*/src` must agree in that direction at all times — otherwise an entry lands with a verb no reader can label or filter on.
+
+**A declared action may have no writer.** Entries outlive the code that writes them, so deleting a verb that already has rows would orphan them outside every filter. Adding a writer is what adds a verb; removing a writer leaves its verbs in place.
+
+The two sets are therefore identical only at the rollout that introduced them. From then on the catalog is append-only, and the direction that matters is the first one.
 
 Deliberately not recorded: portal and widget writes (the `*Public` twins are end-user actions, which `post_activity` covers), votes and reactions, saved views, webhook delivery attempts and retries, the billing portal, and workspace creation (there is no workspace yet to scope the entry to).
 

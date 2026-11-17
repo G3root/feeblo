@@ -16,6 +16,7 @@ import { UnbanAuthorButton } from "./unban-author-button";
 export function CommentDisplayDropdown() {
   const { canBanAuthors, canModeratePost, canUnbanAuthors } =
     usePostCollectionData();
+
   const { state } = useCommentDisplay();
 
   if (state.disabled || !(canModeratePost || state.isAuthor)) {
@@ -28,6 +29,7 @@ export function CommentDisplayDropdown() {
   // unban action instead.
   const canBanAuthor =
     canBanAuthors && !state.authorIsMember && !state.authorIsBanned;
+
   const canUnbanAuthor =
     canUnbanAuthors && !state.authorIsMember && state.authorIsBanned;
 

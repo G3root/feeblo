@@ -24,4 +24,5 @@ export type ReviewSearch = z.infer<typeof reviewSearchSchema>;
 
 /** The report window a link that names no window gets. */
 export const DEFAULT_REVIEW_PAGE_SIZE = 100;
+
 export const DEFAULT_REVIEW_SORT = "row_asc" as const;

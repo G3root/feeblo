@@ -25,11 +25,14 @@ import { githubProviderKey } from "./github-manifest";
 
 /** GitHub's public REST API origin. */
 export const GITHUB_API_BASE_URL = "https://api.github.com";
+
 /** GitHub endpoint used only to verify the administrator completing setup. */
 export const GITHUB_OAUTH_TOKEN_URL =
   "https://github.com/login/oauth/access_token";
+
 /** Per-request upper bound for GitHub REST API calls. */
 export const GITHUB_API_REQUEST_TIMEOUT_MS = 10_000;
+
 /** GitHub App installation ids are positive decimal integers. */
 const GITHUB_INSTALLATION_ID_PATTERN = /^[1-9]\d*$/;
 
@@ -38,6 +41,7 @@ export const GitHubInstallationAccessToken = Schema.Struct({
   expires_at: Schema.DateFromString,
   token: Schema.NonEmptyString,
 });
+
 export interface GitHubInstallationAccessToken extends Schema.Schema.Type<
   typeof GitHubInstallationAccessToken
 > {}
@@ -47,6 +51,7 @@ export const GitHubUserAccessToken = Schema.Struct({
   access_token: Schema.NonEmptyString,
   token_type: Schema.String,
 });
+
 export interface GitHubUserAccessToken extends Schema.Schema.Type<
   typeof GitHubUserAccessToken
 > {}
@@ -57,6 +62,7 @@ export const GitHubInstallationAccount = Schema.Struct({
   login: Schema.NonEmptyString,
   type: Schema.Literals(["Organization", "User"]),
 });
+
 export interface GitHubInstallationAccount extends Schema.Schema.Type<
   typeof GitHubInstallationAccount
 > {}
@@ -68,6 +74,7 @@ export const GitHubUserInstallation = Schema.Struct({
   repository_selection: Schema.Literals(["all", "selected"]),
   suspended_at: Schema.NullOr(Schema.DateFromString),
 });
+
 export interface GitHubUserInstallation extends Schema.Schema.Type<
   typeof GitHubUserInstallation
 > {}
@@ -77,6 +84,7 @@ export const GitHubUserInstallations = Schema.Struct({
   installations: Schema.Array(GitHubUserInstallation),
   total_count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
 export interface GitHubUserInstallations extends Schema.Schema.Type<
   typeof GitHubUserInstallations
 > {}
@@ -89,6 +97,7 @@ export const GitHubRepository = Schema.Struct({
   owner: Schema.Struct({ login: Schema.NonEmptyString }),
   private: Schema.Boolean,
 });
+
 export interface GitHubRepository extends Schema.Schema.Type<
   typeof GitHubRepository
 > {}
@@ -98,6 +107,7 @@ export const GitHubInstallationRepositories = Schema.Struct({
   repositories: Schema.Array(GitHubRepository),
   total_count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
 export interface GitHubInstallationRepositories extends Schema.Schema.Type<
   typeof GitHubInstallationRepositories
 > {}
@@ -111,6 +121,7 @@ export const GitHubIssue = Schema.Struct({
   state: Schema.Literals(["open", "closed"]),
   title: Schema.String,
 });
+
 export interface GitHubIssue extends Schema.Schema.Type<typeof GitHubIssue> {}
 
 /** Formats the bot-authored comment linking a GitHub issue back to its Feeblo post. */
@@ -130,6 +141,7 @@ export const classifyGitHubApiError = (
   context: string
 ): GitHubApiFailure => {
   const status = response.status;
+
   if (status === 401) {
     return new IntegrationProviderAuthenticationError({
       message: `GitHub rejected authentication during ${context}`,
@@ -137,6 +149,7 @@ export const classifyGitHubApiError = (
       httpStatus: status,
     });
   }
+
   const isRateLimited403 =
     status === 403 &&
     response.headers !== undefined &&
@@ -144,6 +157,7 @@ export const classifyGitHubApiError = (
       Option.getOrUndefined
     ) === "0" ||
       Headers.has(response.headers, "retry-after"));
+
   if (isRateLimited403 || status === 429) {
     return new IntegrationProviderRateLimitedError({
       message: `GitHub rate limited ${context}`,
@@ -151,6 +165,7 @@ export const classifyGitHubApiError = (
       ...(status === undefined ? undefined : { httpStatus: status }),
     });
   }
+
   if (status !== undefined && status >= 500) {
     return new IntegrationProviderTemporaryFailure({
       message: `GitHub temporarily failed during ${context}`,
@@ -158,6 +173,7 @@ export const classifyGitHubApiError = (
       httpStatus: status,
     });
   }
+
   if (status === 404 || status === 410) {
     return new IntegrationProviderInvalidConfigurationError({
       message: `GitHub repository, installation, or issue was not found during ${context}`,
@@ -165,6 +181,7 @@ export const classifyGitHubApiError = (
       httpStatus: status,
     });
   }
+
   return new IntegrationProviderPermanentRejection({
     message: `GitHub rejected ${context}`,
     provider: githubProviderKey,
@@ -259,7 +276,9 @@ const mapSdkError =
         provider: githubProviderKey,
       });
     }
+
     const detail = sdkErrorMessage(error) ?? `GitHub rejected ${context}`;
+
     switch (sdkErrorTag(error)) {
       case "Unauthorized":
         return new IntegrationProviderAuthenticationError({
@@ -275,6 +294,7 @@ const mapSdkError =
         });
       case "TooManyRequests": {
         const retryAfterMs = sdkRetryAfterMs(error);
+
         return new IntegrationProviderRateLimitedError({
           message: detail,
           provider: githubProviderKey,
@@ -282,6 +302,7 @@ const mapSdkError =
           ...(retryAfterMs === undefined ? undefined : { retryAfterMs }),
         });
       }
+
       case "BadRequest":
         return new IntegrationProviderPermanentRejection({
           message: detail,
@@ -423,6 +444,7 @@ const decodeSdkResponse =
     Schema.decodeUnknownEffect(schema)(value).pipe(
       Effect.mapError(
         () =>
+          // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
           new IntegrationProviderTemporaryFailure({
             message: `GitHub ${context} response was invalid`,
             provider: githubProviderKey,
@@ -468,17 +490,20 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
       ).pipe(
         Effect.mapError(
           () =>
+            // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
             new IntegrationProviderPermanentRejection({
               message: "GitHub setup user-token request could not be encoded",
               provider: githubProviderKey,
             })
         )
       );
+
       const response = yield* HttpClient.execute(httpRequest).pipe(
         // eslint-disable-next-line effecttsgo/strict-effect-provide -- provider client pins its transport
         Effect.provide(FetchHttpClient.layer),
         Effect.mapError(
           () =>
+            // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
             new IntegrationProviderTemporaryFailure({
               message: "GitHub request failed during setup user-token exchange",
               provider: githubProviderKey,
@@ -496,15 +521,18 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
             ),
         })
       );
+
       if (response.status < 200 || response.status >= 300) {
         return yield* classifyGitHubApiError(
           { headers: response.headers, status: response.status },
           "setup user-token exchange"
         );
       }
+
       const body = yield* response.json.pipe(
         Effect.mapError(
           () =>
+            // oxlint-disable-next-line anti-slop-effect/require-cause-when-narrowing -- provider failures carry a provider-safe summary only: the dropped cause can carry the endpoint URL, request metadata or SQL that must stay out of persisted and logged failures
             new IntegrationProviderPermanentRejection({
               message:
                 "GitHub returned an invalid response during setup user-token exchange",
@@ -513,6 +541,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
             })
         )
       );
+
       return yield* decodeSdkResponse(
         GitHubUserAccessToken,
         "setup user-token exchange"
@@ -671,6 +700,7 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
           )({
             installations: response.installations.map((installation) => {
               const account = installation.account;
+
               if (account === null) {
                 return {
                   account: null,
@@ -679,7 +709,9 @@ export const makeGitHubApiClient = (): GitHubApiClient => {
                   suspended_at: installation.suspended_at,
                 };
               }
+
               const isUserAccount = "login" in account;
+
               return {
                 account: {
                   id: account.id,

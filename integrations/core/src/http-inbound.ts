@@ -34,6 +34,7 @@ export const settingsRedirect = (input: {
     input.organizationId === undefined
       ? `${input.appUrl}/settings/integrations`
       : `${input.appUrl}/${input.organizationId}/settings/integrations`;
+
   return `${base}?${input.provider}=${input.status}&message=${encodeURIComponent(input.message)}`;
 };
 
@@ -71,6 +72,7 @@ export const handleVerifiedInbound = <A, I, E, R>(input: {
       HttpServerResponse.text("not found", { status: 404 })
     );
   }
+
   return Effect.flatMap(
     input.handler.handle({ headers: input.headers, rawBody: input.rawBody }),
     (response) => {
@@ -81,6 +83,7 @@ export const handleVerifiedInbound = <A, I, E, R>(input: {
           })
         );
       }
+
       // The inbound handler already signature-verified the payload; decode
       // the body at the boundary so the domain service receives a typed
       // request. A malformed body is still a client error, not a crash.

@@ -73,9 +73,10 @@ export const decryptChatCredentials = <Material, DecryptError>({
 }): Effect.Effect<Material, InternalServerError> =>
   decrypt(config.encryptionKey, ciphertext).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: `${label} credentials could not be decrypted`,
+          cause,
         })
     )
   );

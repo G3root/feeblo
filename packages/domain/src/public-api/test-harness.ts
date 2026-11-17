@@ -94,6 +94,7 @@ const AuthTest = Layer.succeed(Auth, {
     verifyMcpAccessToken: async ({ authorizationHeader }) => {
       const token = authorizationHeader.replace(/^Bearer\s+/i, "");
       const claims = acceptedMcpTokens.get(token);
+
       if (claims === undefined) {
         return {
           _tag: "Rejected" as const,
@@ -105,6 +106,7 @@ const AuthTest = Layer.succeed(Auth, {
           },
         };
       }
+
       return { _tag: "Verified" as const, claims };
     },
     createApiKey: unusedApiKeyMethod(),
@@ -116,6 +118,7 @@ const AuthTest = Layer.succeed(Auth, {
       }
 
       const record = acceptedKeys.get(body.key);
+
       return record === undefined
         ? { valid: false as const, key: null }
         : { valid: true as const, key: record };
@@ -161,6 +164,7 @@ export const makePublicApiDependencies = (
             canCreateCrmEntry: ({ crmEntryCount }) =>
               Effect.gen(function* () {
                 const count = yield* crmEntryCount;
+
                 if (count >= crmEntryLimit) {
                   return yield* new PolicyDeniedError({
                     reason: "The plan has no room.",
@@ -251,6 +255,7 @@ export const responseBody = (
   response: HttpServerResponse.HttpServerResponse
 ) => {
   const body = response.body;
+
   return body._tag === "Uint8Array" ? new TextDecoder().decode(body.body) : "";
 };
 
@@ -284,6 +289,7 @@ export const seedTag = (
       createdAt,
       updatedAt: createdAt,
     });
+
     return id;
   });
 
@@ -320,6 +326,7 @@ export const seedChangelog = (
       createdAt: now,
       updatedAt: now,
     });
+
     return id;
   });
 
@@ -350,6 +357,7 @@ export const seedCompany = (
       createdAt,
       updatedAt: createdAt,
     });
+
     return id;
   });
 
@@ -454,6 +462,7 @@ export const seedWorkspace = (
     });
 
     const postCount = options.postCount ?? 1;
+
     for (let index = 0; index < postCount; index += 1) {
       yield* db.insert(schema.postTable).values({
         id: index === 0 ? postId : `${postId}_${index}`,

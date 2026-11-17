@@ -28,6 +28,7 @@ import { useState } from "react";
 import { m } from "./paraglide/messages.js";
 
 const REFRESH_MS = 30_000;
+
 const LIST_LIMIT = 20;
 
 type NotificationRow = {
@@ -208,8 +209,10 @@ export function NotificationsMenu({
   const navigate = (href: string) => {
     if (onNavigate) {
       onNavigate(href);
+
       return;
     }
+
     window.location.assign(href);
   };
 
@@ -256,6 +259,7 @@ export function NotificationsMenu({
           ) : (
             rows.map((notification) => {
               const isUnread = !notification.readAt;
+
               return (
                 <MenuItem
                   className={cn(
@@ -268,6 +272,7 @@ export function NotificationsMenu({
                     if (isUnread) {
                       markRead.mutate(notification.id);
                     }
+
                     navigate(notification.href);
                   }}
                 >

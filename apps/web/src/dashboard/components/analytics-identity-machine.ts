@@ -136,7 +136,9 @@ export const createAnalyticsIdentityMachine = (sink: AnalyticsIdentitySink) =>
                 // nothing to forget, so this is not a transition at all.
                 return undefined;
               }
+
               enq(args.actions.forget);
+
               return { context: { identity: null } };
             }
 
@@ -148,7 +150,9 @@ export const createAnalyticsIdentityMachine = (sink: AnalyticsIdentitySink) =>
             if (restored !== null && restored !== event.session.userId) {
               enq(args.actions.forget);
             }
+
             enq(args.actions.identify, event.session);
+
             return {
               context: { identity: event.session },
               target: "identified",
@@ -162,21 +166,27 @@ export const createAnalyticsIdentityMachine = (sink: AnalyticsIdentitySink) =>
         on: {
           SESSION: (args, enq) => {
             const { context, event } = args;
+
             if (event.session === null) {
               enq(args.actions.forget);
+
               return { context: { identity: null }, target: "unidentified" };
             }
+
             if (event.session.userId === context.identity?.userId) {
               // The same person, with traits that may have changed (a rename
               // elsewhere in the app). Re-sending the traits keeps the profile
               // current without mooting its identity.
               enq(args.actions.identify, event.session);
+
               return { context: { identity: event.session } };
             }
+
             // A different person on the same browser: forget first, so nothing
             // the second user does can land on the first user's profile.
             enq(args.actions.forget);
             enq(args.actions.identify, event.session);
+
             return { context: { identity: event.session } };
           },
         },

@@ -22,14 +22,17 @@ import { useCommentComposerState } from "./store";
  */
 export function CommentOptionsMenu() {
   const { actions, meta, state } = useCommentComposer();
+
   const statusUpdateId = useCommentComposerState(
     (context) => context.statusUpdateId
   );
+
   const isDisabled = useCommentComposerIsDisabled();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const showAuthor = state.showAuthorToggle;
   const showStatus = state.statusOptions.length > 0;
+
   if (!showAuthor && !showStatus) {
     return null;
   }
@@ -39,6 +42,7 @@ export function CommentOptionsMenu() {
       ? null
       : (state.statusOptions.find((option) => option.id === statusUpdateId) ??
         null);
+
   const authorSelected = state.authorDisplay !== null;
   const statusSelected = selectedStatus !== null;
   const canCreateAuthor = actions.onAuthorCreate !== undefined;

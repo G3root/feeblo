@@ -31,16 +31,18 @@ function normalizeApiUrl(apiUrl: string) {
  * Whether a tag's frames may share one HTTP request: a read may, unless it
  * streams.
  *
- * A stream is sent alone on purpose. Its response stays open for as long as the
- * stream, and a batch's response is pumped by the resolver's fiber, which
- * Effect does not interrupt once the run has started — so closing the stream's
- * scope (disposing an atom, leaving a route) would leave the HTTP request open.
- * `batch-protocol.ts` posts everything this rules out from the caller's own
- * fiber, where interruption aborts the request.
+ * A stream is sent alone on purpose. Upstream runs a batch in the client's scope
+ * and forwards only `Request` frames, so interrupting a batched stream neither
+ * ends the batch nor cancels its HTTP request — the response keeps pumping until
+ * the client shuts down. Disposing an atom or leaving a route would leak a
+ * connection, and the data-transfer page opens a new watch per filter. Sent
+ * through the unbatched protocol, from the caller's own fiber, interruption
+ * aborts the request.
  */
 export const sharesRpcBatch = (tag: string): boolean => {
   if (!isReadRpc(tag)) return false;
   const rpc = AllRpcs.requests.get(tag);
+
   return rpc !== undefined && !RpcSchema.isStreamSchema(rpc.successSchema);
 };
 
@@ -69,16 +71,20 @@ export const rpcProtocolFor = (
 ): Layer.Layer<RpcClient.Protocol> => {
   const normalized = normalizeApiUrl(apiUrl);
   const existing = protocolLayers.get(normalized);
+
   if (existing !== undefined) {
     return existing;
   }
+
   const protocol = createRpcProtocolLive(normalized);
   protocolLayers.set(normalized, protocol);
+
   return protocol;
 };
 
 export const createRpcProtocolLive = (apiUrl: string) => {
   const url = `${normalizeApiUrl(apiUrl)}/rpc`;
+
   // A batch carries one set of request headers, so only a runtime that belongs
   // to one request may batch. The server's runtime is a module-level singleton
   // shared by every concurrent request; batching there would let one request's

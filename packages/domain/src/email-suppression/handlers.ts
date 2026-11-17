@@ -116,6 +116,7 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
+
         const added = yield* transaction(
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
@@ -140,12 +141,15 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
               action: "email_suppression.added",
               metadata: { reason: "administrative_block" },
             });
+
             return yield* repository
               .find({ email, organizationId })
               .pipe(Effect.flatMap(failIfMissing));
           })
         );
+
         yield* recordEmailSuppression("administrative_block", "manual");
+
         return toSummary(added);
       }).pipe(
         Effect.catchTags({
@@ -176,26 +180,31 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            // Read before removing: the stored reason is the only context the
-            // entry can carry. The address is deliberately absent for the
-            // reason given in `AddEmailSuppression`.
-            const existing = yield* repository
+            // The read is the not-found check: a row that does not exist, and
+            // one owned by another workspace, answer the same way.
+            yield* repository
               .find({ email, organizationId })
               .pipe(remapDataError, Effect.flatMap(failIfMissing));
+
             const result = yield* repository
               .remove({ email, organizationId })
               .pipe(remapDataError);
+
             if (!result.removed) {
               return yield* new NotFoundError({
                 message: "Suppression not found",
               });
             }
+
+            // The reason comes from the row the delete removed, not the row
+            // read before it: a concurrent write between the two would
+            // otherwise put the old reason on the entry.
             yield* audit.record({
               organizationId,
               actor: actorFromSession(session, organizationId),
               source: "dashboard",
               action: "email_suppression.removed",
-              metadata: { reason: existing.reason },
+              metadata: { reason: result.reason },
             });
           })
         );

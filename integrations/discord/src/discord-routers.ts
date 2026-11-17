@@ -71,7 +71,9 @@ const makeDiscordInteractionsRouter = (registry: IntegrationProviderRegistry) =>
         capabilityKey: discordInteractionsCapabilityKey,
         provider: discordProviderKey,
       });
+
       const inbound = yield* DiscordInboundService;
+
       return yield* router.add("POST", "/discord/interactions", (request) =>
         Effect.flatMap(request.text, (rawBody) =>
           handleVerifiedInbound({
@@ -119,6 +121,7 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
           // request.url is the relative path (e.g.
           // /discord/oauth/callback?code=…); parse it without a base URL.
           const { code, error, state } = parseOAuthCallbackUrl(request.url);
+
           if (error !== null) {
             return HttpServerResponse.redirect(
               settingsRedirect({
@@ -130,6 +133,7 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           if (code === null || state === null) {
             return HttpServerResponse.redirect(
               settingsRedirect({
@@ -141,10 +145,13 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           const management = yield* DiscordManagementService;
+
           const completed = yield* Effect.exit(
             management.connectComplete({ code, state })
           );
+
           if (Exit.isFailure(completed)) {
             return HttpServerResponse.redirect(
               settingsRedirect({
@@ -155,6 +162,7 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
               })
             );
           }
+
           return HttpServerResponse.redirect(
             settingsRedirect({
               appUrl,

@@ -130,12 +130,15 @@ export function PostCollectionDataProvider({
   userBanActions,
 }: PostCollectionDataProviderProps) {
   const { data: session } = useAuthState();
+
   const { allowed: canManageAllPosts } = usePolicy(
     hasPermission(organizationId, "posts.*")
   );
+
   const { allowed: isPostCreator } = usePolicy(
     allPolicy(hasMembership(organizationId), isUser(post?.creatorId ?? ""))
   );
+
   // Backend mirror: PostPolicy.canUpdate = hasMembership AND
   // (posts.* OR post creator). PostPolicy.canDelete additionally requires
   // an untouched post for contributors. Posts.* (lock/archive/merge) is manager+
@@ -147,12 +150,14 @@ export function PostCollectionDataProvider({
       allPolicy(hasMembership(organizationId), isUser(post?.creatorId ?? ""))
     )
   );
+
   // List rows carry no delete hint; contributor affordances subscribe to
   // the injected eligibility collection for the viewed post instead. Card
   // lists therefore never fetch per-card eligibility.
   const {
     collections: { deleteEligibilityCollection },
   } = usePostCollections();
+
   const contributorCase = isPostCreator && !canManageAllPosts;
 
   const resolved = {

@@ -171,6 +171,22 @@ export type SurfaceHandlers<
  * replaces the db-family members. Passing `surface` to the factory keeps the
  * policy's `source` welded to the entry that answers it.
  */
+type SurfaceEntryInput<
+  TArgs,
+  Config extends SurfaceConfig<TArgs>,
+  UniqueViolationError,
+  A,
+  E,
+  R,
+> = {
+  /** The surface's body, run after its policy and limiter. */
+  readonly body: (surface: Surface, args: TArgs) => Effect.Effect<A, E, R>;
+  readonly config: Config;
+  readonly operation: string;
+  readonly remap: RemapDbErrorsConfig<UniqueViolationError>;
+  readonly surface: Surface;
+};
+
 const makeEntry = <
   TArgs,
   Config extends SurfaceConfig<TArgs>,
@@ -179,13 +195,11 @@ const makeEntry = <
   E,
   R,
 >(
-  remap: RemapDbErrorsConfig<UniqueViolationError>,
-  operation: string,
-  config: Config,
-  surface: Surface,
-  body: (surface: Surface, args: TArgs) => Effect.Effect<A, E, R>
+  input: SurfaceEntryInput<TArgs, Config, UniqueViolationError, A, E, R>
 ): SurfaceEntry<TArgs, Config, UniqueViolationError, A, E, R> => {
+  const { body, config, operation, remap, surface } = input;
   const name = surfaceRpcName(operation, surface);
+
   return (args: TArgs) => {
     // SAFETY: once `Config` crosses makeEntry's generic boundary, TS reads
     // its members through the widened `SurfaceConfig` constraint, so every
@@ -296,20 +310,20 @@ export const defineSurfacePair =
     dashboard: pair.dashboard,
     public: pair.public,
     handlers: (body) => ({
-      dashboard: makeEntry(
-        pair.remap,
-        pair.operation,
-        pair.dashboard,
-        "dashboard",
-        body
-      ),
-      public: makeEntry(
-        pair.remap,
-        pair.operation,
-        pair.public,
-        "public",
-        body
-      ),
+      dashboard: makeEntry({
+        body,
+        config: pair.dashboard,
+        operation: pair.operation,
+        remap: pair.remap,
+        surface: "dashboard",
+      }),
+      public: makeEntry({
+        body,
+        config: pair.public,
+        operation: pair.operation,
+        remap: pair.remap,
+        surface: "public",
+      }),
     }),
   });
 
@@ -360,11 +374,11 @@ export const definePublicEntry =
     operation: entry.operation,
     config: entry.config,
     entry: (body) =>
-      makeEntry(
-        entry.remap,
-        entry.operation,
-        entry.config,
-        "public",
-        (_surface, args) => body(args)
-      ),
+      makeEntry({
+        body: (_surface, args) => body(args),
+        config: entry.config,
+        operation: entry.operation,
+        remap: entry.remap,
+        surface: "public",
+      }),
   });

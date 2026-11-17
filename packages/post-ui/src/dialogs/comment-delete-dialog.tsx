@@ -9,9 +9,11 @@ import { usePostCollections } from "../providers/post-collections-provider";
 
 export function CommentDeleteDialog() {
   const store = useCommentDeleteDialogContext();
+
   const {
     collections: { commentCollection },
   } = usePostCollections();
+
   const open = useSelector(store, (state) => state.context.open);
 
   return (

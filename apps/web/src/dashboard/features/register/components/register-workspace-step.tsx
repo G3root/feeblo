@@ -24,14 +24,23 @@ const appRootDomain = getRuntimePublicEnv().appRootDomain;
 /** A slug suggestion is hyphenated; the label reads as words. */
 const slugSeparatorPattern = /-/g;
 
-function renderSlugFooter(
-  slug: string,
-  slugStatus: "idle" | "checking" | "available" | "taken" | "error",
-  suggestion: string | null,
-  reason: string | null,
+/** What the slug field's footer renders, taken from the step's own state. */
+type SlugFooterInput = {
+  readonly reason: string | null;
+  readonly slug: string;
+  readonly slugStatus: "idle" | "checking" | "available" | "taken" | "error";
+  readonly suggestion: string | null;
   /** Accepts the suggested name; every path that changes the name goes through it. */
-  onUseSuggestion: (suggestion: string) => void
-) {
+  readonly useSuggestion: (suggestion: string) => void;
+};
+
+function renderSlugFooter({
+  reason,
+  slug,
+  slugStatus,
+  suggestion,
+  useSuggestion,
+}: SlugFooterInput) {
   if (slug.length < MIN_SLUG_LENGTH) {
     return (
       <FieldDescription>
@@ -40,9 +49,11 @@ function renderSlugFooter(
       </FieldDescription>
     );
   }
+
   if (slugStatus === "checking") {
     return <FieldDescription>Checking availability…</FieldDescription>;
   }
+
   if (slugStatus === "available") {
     return (
       <FieldDescription className="text-emerald-600">
@@ -50,6 +61,7 @@ function renderSlugFooter(
       </FieldDescription>
     );
   }
+
   if (slugStatus === "taken") {
     return (
       <div className="flex flex-col gap-2">
@@ -58,7 +70,7 @@ function renderSlugFooter(
           <div className="flex items-center gap-2">
             <Button
               onClick={() =>
-                onUseSuggestion(suggestion.replace(slugSeparatorPattern, " "))
+                useSuggestion(suggestion.replace(slugSeparatorPattern, " "))
               }
               size="sm"
               type="button"
@@ -72,9 +84,11 @@ function renderSlugFooter(
       </div>
     );
   }
+
   if (slugStatus === "error") {
     return <FieldError>Could not check availability. Try again.</FieldError>;
   }
+
   return null;
 }
 
@@ -88,8 +102,10 @@ export const RegisterWorkspaceStep = withForm({
     );
 
     const slug = toWorkspaceSlug(workspaceName);
+
     const { availability, reportWorkspaceName } =
       useWorkspaceSlugAvailability(workspaceName);
+
     const { status: slugStatus, suggestion, reason } = availability;
 
     /**
@@ -107,6 +123,7 @@ export const RegisterWorkspaceStep = withForm({
           {(field) => {
             const isInvalid =
               field.state.meta.isTouched && !field.state.meta.isValid;
+
             return (
               <Field data-invalid={isInvalid}>
                 <FieldLabel htmlFor={field.name}>Workspace Name</FieldLabel>
@@ -144,7 +161,13 @@ export const RegisterWorkspaceStep = withForm({
               <InputGroupText>.{appRootDomain}</InputGroupText>
             </InputGroupAddon>
           </InputGroup>
-          {renderSlugFooter(slug, slugStatus, suggestion, reason, chooseName)}
+          {renderSlugFooter({
+            reason,
+            slug,
+            slugStatus,
+            suggestion,
+            useSuggestion: chooseName,
+          })}
         </Field>
       </div>
     );

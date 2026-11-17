@@ -21,6 +21,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function PostMergedPosts() {
   const { organizationId, post } = usePostCollectionData();
+
   const { boardCollection, postCollection, postStatusCollection } =
     useDashboardCollections();
 

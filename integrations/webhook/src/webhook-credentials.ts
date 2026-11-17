@@ -22,6 +22,7 @@ export const WebhookEncryptedCredentialMaterial = Schema.Struct({
     ),
   }),
 });
+
 export type WebhookEncryptedCredentialMaterial = Schema.Schema.Type<
   typeof WebhookEncryptedCredentialMaterial
 >;
@@ -50,17 +51,20 @@ export const encryptWebhookCredentialMaterial = (
 > =>
   Effect.gen(function* () {
     const key = yield* validateWebhookEncryptionKey(encryptionKey);
+
     const encoded = yield* Schema.encodeEffect(
       Schema.fromJsonString(WebhookEncryptedCredentialMaterial)
     )(credentials).pipe(
       Effect.mapError(
-        () =>
+        (cause) =>
           new WebhookCredentialEncryptionError({
             operation: "encrypt",
             reason: "Webhook credentials could not be encoded",
+            cause,
           })
       )
     );
+
     return yield* encryptWebhookCredential(key, Redacted.make(encoded));
   });
 
@@ -105,10 +109,11 @@ export const decryptWebhookCredentialMaterial = (
               },
             })),
             Effect.mapError(
-              () =>
+              (cause) =>
                 new WebhookCredentialEncryptionError({
                   operation: "decrypt",
                   reason: "Encrypted webhook credentials are malformed",
+                  cause,
                 })
             )
           )

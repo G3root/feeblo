@@ -56,14 +56,20 @@ export function matchesFilter(
 
     case "eq":
       if (variant === "boolean") return getBooleanString(cellValue) === value;
+
       if (isDate) return getIsSameDay(cellValue, value);
+
       if (isNumeric) return parseNumber(cellValue) === parseNumber(value);
+
       return stringifyFilterValue(cellValue) === String(value);
 
     case "ne":
       if (variant === "boolean") return getBooleanString(cellValue) !== value;
+
       if (isDate) return !getIsSameDay(cellValue, value);
+
       if (isNumeric) return parseNumber(cellValue) !== parseNumber(value);
+
       return stringifyFilterValue(cellValue) !== String(value);
 
     case "inArray":
@@ -103,7 +109,9 @@ export const dataTableFilterFn = constructFilterFn({
     const meta = row.table.getColumn(columnId)?.columnDef.meta as
       | DataTableColumnMeta
       | undefined;
+
     const variant = getFilterVariant(meta);
+
     // SAFETY: TanStack types a filter value as `unknown`; this feature's own
     // filter parsers are the only writers of it, and they write a raw value.
     const item = createPlainFilter(
@@ -111,6 +119,7 @@ export const dataTableFilterFn = constructFilterFn({
       variant,
       filterValue as DataTableRawValue
     );
+
     return !item || matchesFilter(dataValue, item);
   },
   autoRemove: (value) => value === undefined,
@@ -122,6 +131,7 @@ export function createDataTableFilteredRowModel<
 >() {
   return (table: Table<TFeatures, TData>) => {
     const instance = asFilteringTable(table);
+
     let previous:
       | {
           rows: RowModel<TFeatures, TData>;
@@ -129,6 +139,7 @@ export function createDataTableFilteredRowModel<
           result: RowModel<TFeatures, TData>;
         }
       | undefined;
+
     let shouldResetPageIndex = false;
 
     return tableMemo({
@@ -144,12 +155,14 @@ export function createDataTableFilteredRowModel<
       fn: () => {
         const rows = table.getPreFilteredRowModel();
         const key = getFilteringKey(instance);
+
         if (previous && previous.rows === rows && previous.key === key) {
           return previous.result;
         }
 
         shouldResetPageIndex = previous !== undefined;
         previous = { rows, key, result: getFilteredRowModel(rows, instance) };
+
         return previous.result;
       },
       onAfterUpdate: () => {
@@ -198,14 +211,18 @@ function getLowercaseText(value: DataTableRawValue) {
  */
 function getBooleanString(value: DataTableRawValue): string | undefined {
   if (value === true || value === "true") return "true";
+
   if (value === false || value === "false") return "false";
+
   return undefined;
 }
 
 function getIsSameDay(cellValue: DataTableRawValue, value: DataTableRawValue) {
   const cell = parseTime(cellValue);
   const target = parseTime(value);
+
   if (Number.isNaN(cell) || Number.isNaN(target)) return false;
+
   return cell >= startOfDay(target) && cell <= endOfDay(target);
 }
 
@@ -216,12 +233,14 @@ function parseTime(value: DataTableRawValue) {
 function startOfDay(time: number) {
   const date = new Date(time);
   date.setHours(0, 0, 0, 0);
+
   return date.getTime();
 }
 
 function endOfDay(time: number) {
   const date = new Date(time);
   date.setHours(23, 59, 59, 999);
+
   return date.getTime();
 }
 
@@ -229,6 +248,7 @@ function parseNumber(value: DataTableRawValue) {
   if (value === "" || value === null || value === undefined) {
     return Number.NaN;
   }
+
   return isNumber(value) ? value : Number(value);
 }
 
@@ -283,11 +303,13 @@ function getIsBetween(
   if (!hasStart && !hasEnd) return true;
 
   const cell = isDate ? parseTime(cellValue) : parseNumber(cellValue);
+
   if (Number.isNaN(cell)) return false;
 
   if (isDate) {
     const start = hasStart ? startOfDay(parseTime(rawStart)) : null;
     const end = hasEnd ? endOfDay(parseTime(rawEnd)) : null;
+
     return (start === null || cell >= start) && (end === null || cell <= end);
   }
 
@@ -380,6 +402,7 @@ function getFilteredRowModel<
   )) {
     const column = instance.getColumn(filter.id);
     const test = column ? getFilterTest(column, filter) : null;
+
     if (!test) continue;
     testsByColumn.set(filter.id, [
       ...(testsByColumn.get(filter.id) ?? []),
@@ -400,6 +423,7 @@ function getFilteredRowModel<
             ? tests.some((test) => test(row))
             : tests.every((test) => test(row));
       }
+
       if (globalTests.length > 0) {
         results[GLOBAL_FILTER_ID] = globalTests.some((test) => test(row));
       }
@@ -430,6 +454,7 @@ function getFilterTest<TFeatures extends TableFeatures, TData extends RowData>(
   ) {
     const plainValue = getPlainFilterValue(filter);
     const value = filterFn.resolveFilterValue?.(plainValue) ?? plainValue;
+
     return (row) => filterFn(row, column.id, value);
   }
 
@@ -492,7 +517,9 @@ function filterRows<TFeatures extends TableFeatures, TData extends RowData>(
       undefined,
       row.parentId
     );
+
     setFilterResults(copy, filterResultsByRow.get(row));
+
     return copy;
   }
 
@@ -500,6 +527,7 @@ function filterRows<TFeatures extends TableFeatures, TData extends RowData>(
     for (const subRow of subRows) {
       flatRows.push(subRow);
       rowsById[subRow.id] = subRow;
+
       if (subRow.subRows.length) addToFlat(subRow.subRows);
     }
   }
@@ -515,6 +543,7 @@ function filterRows<TFeatures extends TableFeatures, TData extends RowData>(
 
       if (row.subRows.length && depth < maxDepth) {
         copy.subRows = fromLeafs(row.subRows, depth + 1);
+
         if (copy.subRows.length || passes(copy)) filtered.push(copy);
       } else if (passes(copy)) {
         copy.subRows = row.subRows;
@@ -544,6 +573,7 @@ function filterRows<TFeatures extends TableFeatures, TData extends RowData>(
         filtered.push(row);
         flatRows.push(row);
         rowsById[row.id] = row;
+
         if (row.subRows.length) addToFlat(row.subRows);
       }
     }
@@ -554,6 +584,7 @@ function filterRows<TFeatures extends TableFeatures, TData extends RowData>(
   if (instance.options.filterFromLeafRows) {
     const filtered = fromLeafs(rows, 0);
     addToFlat(filtered);
+
     return { rows: filtered, flatRows, rowsById };
   }
 
@@ -577,6 +608,7 @@ function getRowPasses<TFeatures extends TableFeatures, TData extends RowData>(
   const columnIds = Object.keys(results).filter(
     (id) => id !== GLOBAL_FILTER_ID && id !== excludedColumnId
   );
+
   if (columnIds.length === 0) return true;
 
   return joinOperator === "or"
@@ -593,11 +625,13 @@ function getFacetedRowModel<
   instance: FilteringInstance<TFeatures, TData>
 ): RowModel<TFeatures, TData> {
   const globalFilter = instance.atoms.globalFilter?.get();
+
   const hasGlobalFilter =
     columnId !== GLOBAL_FILTER_ID &&
     globalFilter !== undefined &&
     globalFilter !== null &&
     globalFilter !== "";
+
   const hasOtherFilters =
     hasGlobalFilter ||
     (instance.atoms.columnFilters?.get() ?? []).some(

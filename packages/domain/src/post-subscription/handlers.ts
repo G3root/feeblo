@@ -233,6 +233,7 @@ export const PostSubscriptionRpcHandlersEffect = Effect.gen(function* () {
     ListPostSubscriptionsPublic: listPublicEntry.entry((args) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
+
         return yield* listSubscribersEffect(args, {
           publicOnly: true,
           userId: session.session.userId,

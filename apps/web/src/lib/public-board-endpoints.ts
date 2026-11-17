@@ -27,6 +27,7 @@ const XML_CACHE_CONTROL = "public, max-age=300, s-maxage=300";
 
 /** A complete decimal integer; `parseInt` alone would accept trailing junk. */
 const decimalIntegerPattern = /^\d+$/;
+
 /** The five characters XML escaping replaces. */
 const xmlEscapePattern = /["&'<>]/g;
 
@@ -41,6 +42,7 @@ export async function resolveBoardSite(
   request: Request
 ): Promise<TSite | null> {
   const subdomain = resolveSubdomain(request);
+
   return subdomain ? resolveSite(subdomain) : null;
 }
 
@@ -133,6 +135,7 @@ const AI_CRAWLER_GROUPS = [
  */
 export async function handleBoardRobots(request: Request) {
   let site: TSite | null;
+
   try {
     site = await resolveBoardSite(request);
   } catch {
@@ -190,6 +193,7 @@ const xmlResponse = (body: string) =>
 export async function handleBoardSitemap(request: Request) {
   const url = new URL(request.url);
   let site: TSite | null;
+
   try {
     site = await resolveBoardSite(request);
   } catch {
@@ -217,6 +221,7 @@ export async function handleBoardSitemap(request: Request) {
   }
 
   const pageParam = url.searchParams.get("page");
+
   // Only a complete decimal integer selects a page slice: `Number.parseInt`
   // accepts trailing junk ("1junk") and decimals ("1.5") as page 1, which
   // would duplicate the base sitemap instead of the documented 404. A
@@ -228,6 +233,7 @@ export async function handleBoardSitemap(request: Request) {
       : decimalIntegerPattern.test(pageParam)
         ? Number.parseInt(pageParam, 10)
         : Number.NaN;
+
   const xml = renderSitemap(urls, origin, page);
 
   if (xml === null) {
@@ -275,6 +281,7 @@ async function collectUrls(
 
   if (site.roadmapVisibility === "PUBLIC") {
     urls.push({ loc: `${origin}/roadmap` });
+
     for (const roadmap of roadmaps) {
       urls.push({
         loc: `${origin}/roadmap/${roadmap.slug}`,
@@ -285,6 +292,7 @@ async function collectUrls(
 
   if (site.changelogVisibility === "PUBLIC") {
     urls.push({ loc: `${origin}/changelog` });
+
     for (const entry of entries) {
       urls.push({
         loc: `${origin}/changelog/${entry.slug}`,
@@ -304,6 +312,7 @@ async function collectUrls(
   const sortedPosts = posts.toSorted((left, right) =>
     left.slug < right.slug ? -1 : left.slug > right.slug ? 1 : 0
   );
+
   for (const post of sortedPosts) {
     urls.push({
       loc: `${origin}/p/${post.slug}`,
@@ -324,6 +333,7 @@ async function collectUrls(
  */
 export async function handleBoardLlmsTxt(request: Request) {
   let site: TSite | null;
+
   try {
     site = await resolveBoardSite(request);
   } catch {
@@ -335,6 +345,7 @@ export async function handleBoardLlmsTxt(request: Request) {
   }
 
   let content: BoardContent;
+
   try {
     content = await collectBoardContent(site);
   } catch {
@@ -393,6 +404,7 @@ const escapeCdata = (value: string): string =>
  */
 export async function handleBoardRss(request: Request) {
   let site: TSite | null;
+
   try {
     site = await resolveBoardSite(request);
   } catch {
@@ -408,6 +420,7 @@ export async function handleBoardRss(request: Request) {
   const feedUrl = `${changelogUrl}/rss.xml`;
 
   let changelogs: readonly TChangelog[];
+
   try {
     changelogs = await fetchRpcServer((rpc) =>
       rpc.ListChangelogsPublic({ organizationId: site.organizationId })

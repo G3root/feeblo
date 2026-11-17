@@ -38,6 +38,7 @@ describe("renderChannelUpdateMessageEmbed", () => {
       ...message,
       title: "x".repeat(300),
     });
+
     expect(embed.title.length).toBeLessThanOrEqual(256);
     expect(embed.title.endsWith("…")).toBe(true);
   });
@@ -51,6 +52,7 @@ describe("renderChannelUpdateMessageEmbed", () => {
         value: "v".repeat(1024),
       })),
     });
+
     expect(embed.description?.length).toBeLessThanOrEqual(4096);
     expect(embed.footer?.text.length).toBeLessThanOrEqual(2048);
     expect(embed.footer?.text.startsWith("Posted by ")).toBe(true);
@@ -85,6 +87,7 @@ describe("renderChannelUpdateMessageEmbed", () => {
       ...message,
       facts: [],
     });
+
     expect(embed).not.toHaveProperty("description");
   });
 });

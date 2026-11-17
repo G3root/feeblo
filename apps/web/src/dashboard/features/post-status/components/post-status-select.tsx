@@ -17,9 +17,11 @@ export function PostStatusSelect({
   triggerClassName?: string;
 }) {
   const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
+
   const { allowed: canChangeStatus } = usePolicy(
     hasPermission(organizationId, "posts.status")
   );
+
   const isDisabled = disabled || isLocked || isMerged || !canChangeStatus;
   const { postCollection } = useDashboardCollections();
 
@@ -37,10 +39,12 @@ export function PostStatusSelect({
         if (!nextPostStatus || isDisabled) {
           return;
         }
+
         try {
           const tx = postCollection.update(post.id, (draft) => {
             draft.statusId = nextPostStatus.id;
           });
+
           await tx.when("settled");
           trackEvent("post_updated", { field: "status", success: true });
 

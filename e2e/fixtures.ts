@@ -3,6 +3,7 @@ import { test as base } from "@playwright/test";
 import { readServerManifest, type WorkerServer } from "./servers";
 
 export { expect } from "@playwright/test";
+
 export type { Browser, BrowserContext, Locator, Page } from "@playwright/test";
 
 type WorkerFixtures = {
@@ -31,6 +32,7 @@ export const test = base.extend<{ baseURL: string }, WorkerFixtures>({
     // oxlint-disable-next-line eslint/no-empty-pattern -- Playwright requires the empty destructuring pattern here; naming the parameter breaks registration.
     async ({}, use, workerInfo) => {
       const manifestFile = process.env.E2E_SERVERS_FILE;
+
       if (manifestFile === undefined || manifestFile === "") {
         throw new Error(
           "The e2e servers are not running. Run the suite through Playwright so global-setup.ts starts them."
@@ -43,6 +45,7 @@ export const test = base.extend<{ baseURL: string }, WorkerFixtures>({
       // guaranteed distinct across workers running at the same time. The slot
       // maps to the same server across restarts.
       const server = manifest.servers[workerInfo.parallelIndex];
+
       if (server === undefined) {
         throw new Error(
           `No e2e server is registered for worker slot ${workerInfo.parallelIndex}.`

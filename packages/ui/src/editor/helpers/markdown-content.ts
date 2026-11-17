@@ -52,5 +52,6 @@ export const getMarkdownContent = (editor: Editor<EditorExtension>): string => {
 
   const { doc } = editor.view.state;
   const html = htmlFromNode(doc, { DOMSerializer: ListDOMSerializer });
+
   return htmlToMarkdown(html);
 };

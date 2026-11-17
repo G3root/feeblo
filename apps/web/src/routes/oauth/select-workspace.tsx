@@ -29,14 +29,17 @@ type Workspace = { readonly id: string; readonly name: string };
 const mayAuthorizeWorkspace = (role: string): boolean =>
   role.split(",").some((entry) => {
     const candidate = entry.trim();
+
     return isRole(candidate) && roleGrants(candidate, "apiKeys.manage");
   });
 
 function SelectWorkspacePage() {
   const auth = useResolvedAuth();
+
   const [workspaces, setWorkspaces] = useState<readonly Workspace[] | null>(
     null
   );
+
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,20 +49,26 @@ function SelectWorkspacePage() {
     if (!isAuthenticated) {
       return;
     }
+
     let cancelled = false;
     void (async () => {
       const result = await authClient.organization.list();
+
       if (cancelled) {
         return;
       }
+
       if (result.error) {
         setError(
           result.error.message ?? "Your workspaces could not be loaded."
         );
+
         return;
       }
+
       setWorkspaces(result.data ?? []);
     })();
+
     return () => {
       cancelled = true;
     };
@@ -72,20 +81,25 @@ function SelectWorkspacePage() {
     const active = await authClient.organization.setActive({
       organizationId,
     });
+
     if (active.error) {
       setError(active.error.message ?? "That workspace could not be selected.");
       setPendingId(null);
+
       return;
     }
 
     const continued = await authClient.oauth2.continue({ postLogin: true });
+
     if (continued.error) {
       setError(
         continued.error.message ?? "The authorization could not be continued."
       );
       setPendingId(null);
+
       return;
     }
+
     if (continued.data?.url) {
       window.location.assign(continued.data.url);
     }
@@ -102,6 +116,7 @@ function SelectWorkspacePage() {
             .map((membership) => membership.organizationId)
         )
       : new Set<string>();
+
   const visibleWorkspaces =
     workspaces?.filter((workspace) =>
       authorizedOrganizationIds.has(workspace.id)

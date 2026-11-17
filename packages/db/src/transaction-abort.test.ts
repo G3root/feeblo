@@ -24,6 +24,7 @@ const driverFailure = (code: string) =>
  */
 const causeWrappedFailure = (code: string) => {
   const failure = Cause.fail({ code, detail: "aborted" });
+
   return { "~effect/Cause": "~effect/Cause", reasons: failure.reasons };
 };
 
@@ -60,12 +61,15 @@ describe("withTransactionAbortRetry", () => {
   it.live("re-runs a transaction Postgres aborted and succeeds", () =>
     Effect.gen(function* () {
       const attempts = yield* Ref.make(0);
+
       const result = yield* withTransactionAbortRetry(
         Effect.gen(function* () {
           const attempt = yield* Ref.updateAndGet(attempts, (n) => n + 1);
+
           if (attempt === 1) {
             return yield* driverFailure("40P01");
           }
+
           return attempt;
         })
       );
@@ -113,6 +117,7 @@ describe("withTransactionAbortRetry", () => {
   it.live("gives up after two retries and surfaces the last failure", () =>
     Effect.gen(function* () {
       const attempts = yield* Ref.make(0);
+
       const exit = yield* withTransactionAbortRetry(
         failedTransaction(driverFailure("40001"), attempts)
       ).pipe(Effect.exit);
@@ -193,6 +198,7 @@ describe("attachCause", () => {
         new Error("recorder"),
         driverFailure("40P01")
       );
+
       const event = attachCause(new Error("event"), recorder);
       const intent = attachCause(new Error("intent"), event);
       const operation = attachCause(new Error("operation"), intent);

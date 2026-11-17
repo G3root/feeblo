@@ -36,6 +36,7 @@ const dateAt = (instant: number): Date =>
 
 describe("UserBanRpcHandlers", () => {
   const DatabaseLayer = Database.PgliteDatabaseLive;
+
   const TestLayer = Layer.mergeAll(
     DatabaseLayer,
     UserBanRpcHandlers.pipe(Layer.provide(DatabaseLayer)),
@@ -106,6 +107,7 @@ describe("UserBanRpcHandlers", () => {
         orderIndex: 0,
         organizationId,
       });
+
       if (plan === "starter") {
         const productId = `prod_ban_${organizationId}`;
         yield* db.insert(schema.productTable).values({
@@ -133,6 +135,7 @@ describe("UserBanRpcHandlers", () => {
           status: "active",
         });
       }
+
       return {
         boardId,
         memberId,
@@ -168,6 +171,7 @@ describe("UserBanRpcHandlers", () => {
         restrictedToOrganizationId:
           input.restricted === false ? null : input.organizationId,
       });
+
       return { email, id };
     });
 
@@ -188,6 +192,7 @@ describe("UserBanRpcHandlers", () => {
         title: `Post ${id}`,
         updatedAt: now,
       });
+
       return id;
     });
 
@@ -212,6 +217,7 @@ describe("UserBanRpcHandlers", () => {
         userId: input.authorId,
         visibility: "PUBLIC",
       });
+
       return id;
     });
 
@@ -281,6 +287,7 @@ describe("UserBanRpcHandlers", () => {
             search: "banned@",
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.total).toBe(1);
         expect(listed.items[0]?.email).toBe("banned@example.com");
 
@@ -300,6 +307,7 @@ describe("UserBanRpcHandlers", () => {
               )
             )
           );
+
         expect(status.banned).toBe(true);
 
         yield* handlers
@@ -326,6 +334,7 @@ describe("UserBanRpcHandlers", () => {
               )
             )
           );
+
         expect(after.banned).toBe(false);
       })
     );
@@ -343,6 +352,7 @@ describe("UserBanRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)))
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -360,6 +370,7 @@ describe("UserBanRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)))
         );
+
         expect(error._tag).toBe("BadRequestError");
         expect(error.message).toContain("membership");
       })
@@ -378,6 +389,7 @@ describe("UserBanRpcHandlers", () => {
             })
             .pipe(Effect.provideService(CurrentSession, session(fixture)))
         );
+
         expect(error).toMatchObject({
           _tag: "PolicyDenied",
           reason: "Banning users requires the Starter plan or higher.",
@@ -392,6 +404,7 @@ describe("UserBanRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.total).toBe(0);
       })
     );
@@ -400,6 +413,7 @@ describe("UserBanRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* UserBanRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         // No contact row and no restricted identity: the comment itself is
         // the proof that this person participated here. This is the shape the
         // seed data has, and the shape a public-board signup has.
@@ -408,7 +422,9 @@ describe("UserBanRpcHandlers", () => {
           restricted: false,
           suffix: "commenter",
         });
+
         const postId = yield* createPost(fixture, fixture.userId);
+
         const commentId = yield* createComment({
           authorId: author.id,
           fixture,
@@ -435,11 +451,13 @@ describe("UserBanRpcHandlers", () => {
         const handlers = yield* UserBanRpcHandlersEffect;
         const posts = yield* PostRepository;
         const fixture = yield* makeFixture();
+
         const author = yield* createEndUser({
           organizationId: fixture.organizationId,
           restricted: false,
           suffix: "lift",
         });
+
         const postId = yield* createPost(fixture, author.id);
 
         yield* handlers
@@ -466,12 +484,14 @@ describe("UserBanRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.total).toBe(0);
 
         const post = yield* posts.findBySlug({
           organizationId: fixture.organizationId,
           slug: `slug-${postId}`,
         });
+
         expect(post?.authorIsBanned).toBe(false);
 
         // Lifting a ban that is not there is the same NotFound a stale id
@@ -486,6 +506,7 @@ describe("UserBanRpcHandlers", () => {
             Effect.provideService(CurrentSession, session(fixture)),
             Effect.flip
           );
+
         expect(again).toMatchObject({ _tag: "NotFoundError" });
       })
     );
@@ -496,11 +517,13 @@ describe("UserBanRpcHandlers", () => {
         const handlers = yield* UserBanRpcHandlersEffect;
         const posts = yield* PostRepository;
         const fixture = yield* makeFixture();
+
         const author = yield* createEndUser({
           organizationId: fixture.organizationId,
           restricted: false,
           suffix: "linked",
         });
+
         const contactEmail = "linked-contact@example.com";
         const now = yield* DateTime.nowAsDate;
 
@@ -539,6 +562,7 @@ describe("UserBanRpcHandlers", () => {
           organizationId: fixture.organizationId,
           slug,
         });
+
         expect(before?.authorIsBanned).toBe(true);
 
         yield* handlers
@@ -553,6 +577,7 @@ describe("UserBanRpcHandlers", () => {
           organizationId: fixture.organizationId,
           slug,
         });
+
         expect(after?.authorIsBanned).toBe(false);
 
         const listed = yield* handlers
@@ -562,6 +587,7 @@ describe("UserBanRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(CurrentSession, session(fixture)));
+
         expect(listed.total).toBe(0);
       })
     );
@@ -570,11 +596,13 @@ describe("UserBanRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* UserBanRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const author = yield* createEndUser({
           organizationId: fixture.organizationId,
           restricted: false,
           suffix: "poster",
         });
+
         const postId = yield* createPost(fixture, author.id);
 
         const result = yield* handlers
@@ -598,17 +626,21 @@ describe("UserBanRpcHandlers", () => {
         const handlers = yield* UserBanRpcHandlersEffect;
         const db = yield* currentDb;
         const fixture = yield* makeFixture();
+
         const banned = yield* createEndUser({
           organizationId: fixture.organizationId,
           restricted: false,
           suffix: "voter",
         });
+
         const other = yield* createEndUser({
           organizationId: fixture.organizationId,
           restricted: false,
           suffix: "bystander",
         });
+
         const postId = yield* createPost(fixture, fixture.userId);
+
         const commentId = yield* createComment({
           authorId: banned.id,
           fixture,
@@ -623,6 +655,7 @@ describe("UserBanRpcHandlers", () => {
             postId,
             userId,
           });
+
         yield* addUpvote(banned.id);
         yield* addUpvote(other.id);
 
@@ -673,6 +706,7 @@ describe("UserBanRpcHandlers", () => {
           .select({ userId: schema.upvoteTable.userId })
           .from(schema.upvoteTable)
           .where(eq(schema.upvoteTable.organizationId, fixture.organizationId));
+
         expect(remainingUpvotes.map((row) => row.userId)).toEqual([other.id]);
 
         const remainingPostSubscriptions = yield* db
@@ -684,6 +718,7 @@ describe("UserBanRpcHandlers", () => {
               fixture.organizationId
             )
           );
+
         expect(remainingPostSubscriptions.map((row) => row.userId)).toEqual([
           other.id,
         ]);
@@ -697,6 +732,7 @@ describe("UserBanRpcHandlers", () => {
               fixture.organizationId
             )
           );
+
         expect(remainingChangelogSubscriptions).toEqual([]);
 
         const [emailSubscription] = yield* db
@@ -708,6 +744,7 @@ describe("UserBanRpcHandlers", () => {
               fixture.organizationId
             )
           );
+
         expect(emailSubscription?.state).toBe("unsubscribed");
       })
     );
@@ -719,10 +756,12 @@ describe("UserBanRpcHandlers", () => {
           const handlers = yield* UserBanRpcHandlersEffect;
           const db = yield* currentDb;
           const fixture = yield* makeFixture();
+
           const banned = yield* createEndUser({
             organizationId: fixture.organizationId,
             suffix: "banned",
           });
+
           const other = yield* createEndUser({
             organizationId: fixture.organizationId,
             suffix: "other",
@@ -751,18 +790,21 @@ describe("UserBanRpcHandlers", () => {
               mergedIntoPostId: otherPostId,
             })
             .where(eq(schema.postTable.id, controlPostId));
+
           const bannedCommentId = yield* createComment({
             authorId: banned.id,
             fixture,
             parentCommentId: null,
             postId: otherPostId,
           });
+
           const replyId = yield* createComment({
             authorId: other.id,
             fixture,
             parentCommentId: bannedCommentId,
             postId: otherPostId,
           });
+
           const otherCommentId = yield* createComment({
             authorId: other.id,
             fixture,
@@ -785,6 +827,7 @@ describe("UserBanRpcHandlers", () => {
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
           const remainingPostIds = remainingPosts.map((row) => row.id);
           expect(remainingPostIds).toHaveLength(3);
           expect(remainingPostIds).toEqual(
@@ -800,6 +843,7 @@ describe("UserBanRpcHandlers", () => {
             })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, mergedPostId));
+
           expect(mergedPost).toEqual({
             mergedAt: null,
             mergedIntoPostId: null,
@@ -811,6 +855,7 @@ describe("UserBanRpcHandlers", () => {
             .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, controlPostId));
+
           expect(controlPost?.mergedIntoPostId).toBe(otherPostId);
 
           const remainingComments = yield* db
@@ -822,6 +867,7 @@ describe("UserBanRpcHandlers", () => {
             .where(
               eq(schema.commentTable.organizationId, fixture.organizationId)
             );
+
           const remainingIds = remainingComments.map((row) => row.id);
           expect(remainingIds).not.toContain(bannedCommentId);
           expect(remainingIds).toEqual(
@@ -840,11 +886,14 @@ describe("UserBanRpcHandlers", () => {
         const handlers = yield* UserBanRpcHandlersEffect;
         const db = yield* currentDb;
         const fixture = yield* makeFixture();
+
         const banned = yield* createEndUser({
           organizationId: fixture.organizationId,
           suffix: "kept",
         });
+
         const postId = yield* createPost(fixture, fixture.userId);
+
         const commentId = yield* createComment({
           authorId: banned.id,
           fixture,
@@ -861,6 +910,7 @@ describe("UserBanRpcHandlers", () => {
 
         expect(result.deletedComments).toBe(0);
         expect(result.deletedPosts).toBe(0);
+
         const [comment] = yield* db
           .select({ id: schema.commentTable.id })
           .from(schema.commentTable)
@@ -870,6 +920,7 @@ describe("UserBanRpcHandlers", () => {
               eq(schema.commentTable.organizationId, fixture.organizationId)
             )
           );
+
         expect(comment?.id).toBe(commentId);
       })
     );
@@ -884,6 +935,7 @@ describe("UserBanRpcHandlers", () => {
             organizationId: fixture.organizationId,
           })
           .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
         expect(status.banned).toBe(false);
       })
     );
@@ -900,18 +952,22 @@ describe("UserBanRpcHandlers", () => {
         const posts = yield* PostRepository;
         const comments = yield* CommentRepository;
         const fixture = yield* makeFixture();
+
         const author = yield* createEndUser({
           organizationId: fixture.organizationId,
           restricted: false,
           suffix: "flagged",
         });
+
         const postId = yield* createPost(fixture, author.id);
+
         const commentId = yield* createComment({
           authorId: author.id,
           fixture,
           parentCommentId: null,
           postId,
         });
+
         // `createPost` builds the slug from the id; the read below is by slug.
         const slug = `slug-${postId}`;
 
@@ -919,6 +975,7 @@ describe("UserBanRpcHandlers", () => {
           organizationId: fixture.organizationId,
           slug,
         });
+
         expect(beforeDetail?.authorIsBanned).toBe(false);
 
         yield* handlers
@@ -932,29 +989,34 @@ describe("UserBanRpcHandlers", () => {
           organizationId: fixture.organizationId,
           slug,
         });
+
         expect(detail?.authorIsBanned).toBe(true);
 
         const [listRow] = yield* posts.findMany({
           organizationId: fixture.organizationId,
         });
+
         expect(listRow?.authorIsBanned).toBe(true);
 
         const [dashboardComment] = yield* comments.findMany({
           organizationId: fixture.organizationId,
           slug,
         });
+
         expect(dashboardComment?.authorIsBanned).toBe(true);
 
         const publicPost = yield* posts.findPublicBySlug({
           organizationId: fixture.organizationId,
           slug,
         });
+
         expect(publicPost?.authorIsBanned).toBeNull();
 
         const [publicComment] = yield* comments.findManyPublic({
           organizationId: fixture.organizationId,
           slug,
         });
+
         expect(publicComment?.authorIsBanned).toBeNull();
       })
     );
@@ -1012,6 +1074,7 @@ describe("UserBanRpcHandlers", () => {
           restricted: false,
           suffix: "badged-contact",
         });
+
         const nonmemberContactEmail = "badged-contact@example.com";
         const nonmemberContactId = `contact_nonmember_${nonmember.id}`;
         yield* db.insert(schema.contactTable).values({
@@ -1044,6 +1107,7 @@ describe("UserBanRpcHandlers", () => {
         const rows = yield* posts.findMany({
           organizationId: fixture.organizationId,
         });
+
         const byId = new Map(rows.map((row) => [row.id, row]));
         expect(byId.get(portalPostId)?.authorIsBanned).toBe(false);
         expect(byId.get(attributedPostId)?.authorIsBanned).toBe(false);
@@ -1060,11 +1124,13 @@ describe("UserBanRpcHandlers", () => {
           const posts = yield* PostRepository;
           const fixture = yield* makeFixture();
           const now = yield* DateTime.nowAsDate;
+
           const owner = yield* createEndUser({
             organizationId: fixture.organizationId,
             restricted: false,
             suffix: "badged-owner",
           });
+
           const contactId = `contact_owner_${owner.id}`;
           yield* db.insert(schema.contactTable).values({
             createdAt: now,
@@ -1094,6 +1160,7 @@ describe("UserBanRpcHandlers", () => {
           const [row] = yield* posts.findMany({
             organizationId: fixture.organizationId,
           });
+
           expect(row?.authorIsBanned).toBe(true);
         })
     );
@@ -1105,17 +1172,21 @@ describe("UserBanRpcHandlers", () => {
           const db = yield* currentDb;
           const handlers = yield* UserBanRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const withSession = Effect.provideService(
             CurrentSession,
             session(fixture)
           );
+
           const audited = Effect.provideService(AuditLogEnabled, true);
+
           // A portal account, so the target resolves to an account the entry
           // can name as the affected user.
           const author = yield* createEndUser({
             organizationId: fixture.organizationId,
             suffix: "audit",
           });
+
           const target = { _tag: "user", userId: author.id } as const;
 
           yield* handlers
@@ -1139,7 +1210,7 @@ describe("UserBanRpcHandlers", () => {
             actorType: "user",
             actorUserId: fixture.userId,
             affectedUserId: author.id,
-            metadata: { email: author.email, reason: "Abuse report" },
+            metadata: { reason: "Abuse report" },
             outcome: "allowed",
             resourceType: "user_ban",
             source: "dashboard",
@@ -1164,6 +1235,7 @@ describe("UserBanRpcHandlers", () => {
               })
               .pipe(withSession, audited)
           );
+
           expect(stale._tag).toBe("NotFoundError");
 
           const after = yield* db
@@ -1172,6 +1244,7 @@ describe("UserBanRpcHandlers", () => {
             .where(
               eq(schema.auditLogTable.organizationId, fixture.organizationId)
             );
+
           expect(after).toHaveLength(2);
           expect(
             after.find((row) => row.action === "user_ban.removed")

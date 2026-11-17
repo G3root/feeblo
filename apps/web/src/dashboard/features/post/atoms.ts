@@ -36,6 +36,7 @@ export const postSuggestionsAtom = Atom.family((args: PostSuggestionsArgs) =>
 );
 
 export const postMergeAtom = DashboardClient.mutation("MergePost");
+
 export const postUnmergeAtom = DashboardClient.mutation("UnmergePost");
 
 export type PostViewCountArgs = {

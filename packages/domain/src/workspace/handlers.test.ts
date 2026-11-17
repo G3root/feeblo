@@ -115,6 +115,7 @@ describe("WorkspaceRpcHandlers", () => {
             })
           );
         }
+
         return Effect.succeed({
           valid: true as const,
           message: "Subdomain is valid",
@@ -169,6 +170,7 @@ describe("WorkspaceRpcHandlers", () => {
               .select()
               .from(schema.organizationTable)
               .where(eq(schema.organizationTable.id, result.organizationId));
+
             expect(orgs).toHaveLength(1);
             expect(orgs[0]?.name).toBe("My Awesome Workspace");
             expect(orgs[0]?.slug).toBe("my-awesome-workspace");
@@ -180,6 +182,7 @@ describe("WorkspaceRpcHandlers", () => {
               .where(
                 eq(schema.memberTable.organizationId, result.organizationId)
               );
+
             expect(members).toHaveLength(1);
             expect(members[0]?.userId).toBe(userId);
             expect(members[0]?.role).toBe("owner");
@@ -191,6 +194,7 @@ describe("WorkspaceRpcHandlers", () => {
               .where(
                 eq(schema.boardTable.organizationId, result.organizationId)
               );
+
             expect(boards).toHaveLength(2);
             const boardNames = boards.map((b) => b.name);
             expect(boardNames).toContain("Bugs 🐞");
@@ -203,6 +207,7 @@ describe("WorkspaceRpcHandlers", () => {
               .where(
                 eq(schema.postStatusTable.organizationId, result.organizationId)
               );
+
             expect(statuses).toHaveLength(6);
 
             // Verify default post tags were created
@@ -210,6 +215,7 @@ describe("WorkspaceRpcHandlers", () => {
               .select()
               .from(schema.tagTable)
               .where(eq(schema.tagTable.organizationId, result.organizationId));
+
             expect(tags).toHaveLength(2);
             expect(tags.map((tag) => tag.name)).toEqual(
               expect.arrayContaining(["High Priority", "Low Priority"])
@@ -222,6 +228,7 @@ describe("WorkspaceRpcHandlers", () => {
               .where(
                 eq(schema.roadmapTable.organizationId, result.organizationId)
               );
+
             expect(roadmaps).toHaveLength(1);
             expect(roadmaps[0]).toMatchObject({
               isPrimary: true,
@@ -235,6 +242,7 @@ describe("WorkspaceRpcHandlers", () => {
               .from(schema.roadmapColumnTable)
               .where(eq(schema.roadmapColumnTable.roadmapId, roadmaps[0]!.id))
               .orderBy(schema.roadmapColumnTable.position);
+
             expect(columns.map((column) => column.name)).toEqual([
               "Planned",
               "In progress",
@@ -244,6 +252,7 @@ describe("WorkspaceRpcHandlers", () => {
             const statusTypeById = new Map(
               statuses.map((status) => [status.id, status.type])
             );
+
             expect(
               columns.map((column) =>
                 column.config.type === "status"
@@ -259,6 +268,7 @@ describe("WorkspaceRpcHandlers", () => {
               .where(
                 eq(schema.siteTable.organizationId, result.organizationId)
               );
+
             expect(sites).toHaveLength(1);
             expect(sites[0]?.subdomain).toBe("my-awesome-workspace");
             expect(sites[0]?.name).toBe("My Awesome Workspace");
@@ -271,6 +281,7 @@ describe("WorkspaceRpcHandlers", () => {
           Effect.gen(function* () {
             const handlers = yield* WorkspaceRpcHandlersEffect;
             const fixture = yield* makeFixture();
+
             const error = yield* Effect.flip(
               handlers
                 .CreateWorkspace({ workspaceName: "a" })
@@ -329,6 +340,7 @@ describe("WorkspaceRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const products = yield* handlers
             .ListWorkspaceProducts()
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -429,6 +441,7 @@ describe("WorkspaceRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const plan = yield* handlers
             .GetWorkspacePlan({ organizationId: fixture.organizationId })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -444,6 +457,7 @@ describe("WorkspaceRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .GetWorkspacePlan({ organizationId: fixture.organizationId })
@@ -621,6 +635,7 @@ describe("WorkspaceRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const result = yield* handlers
             .CheckWorkspaceSlug({ slug: "my-unique-slug" })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
@@ -637,6 +652,7 @@ describe("WorkspaceRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const result = yield* handlers
             .CheckWorkspaceSlug({ slug: "app" })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));

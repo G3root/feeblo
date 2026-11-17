@@ -72,10 +72,12 @@ describe("toProviderLifecycleEvent", () => {
       mail: deliveryNotification().mail,
       reject: { reason: "Bad content" },
     };
+
     const event = toProviderLifecycleEvent(
       "sns-reject-acceptance",
       notification
     );
+
     expect(event?.type).toBe("failed");
     expect(event?.acceptedAt).toBeUndefined();
   });
@@ -84,10 +86,12 @@ describe("toProviderLifecycleEvent", () => {
     const notification = deliveryNotification({
       mail: { ...deliveryNotification().mail, timestamp: "not-a-date" },
     });
+
     const event = toProviderLifecycleEvent(
       "sns-delivery-invalid-mail",
       notification
     );
+
     expect(event?.type).toBe("delivered");
     expect(event?.acceptedAt).toBeUndefined();
   });
@@ -108,6 +112,7 @@ describe("toProviderLifecycleEvent", () => {
         ],
       },
     });
+
     expect(
       toProviderLifecycleEvent("sns-delivery-2", notification)?.messageId
     ).toBe("<email.custom@notifications.feeblo>");
@@ -115,9 +120,11 @@ describe("toProviderLifecycleEvent", () => {
 
   it("falls back to SES-assigned ids when no Message-ID header is present", () => {
     const mail = deliveryNotification().mail;
+
     const notification = deliveryNotification({
       mail: { timestamp: mail.timestamp, messageId: mail.messageId },
     });
+
     expect(
       toProviderLifecycleEvent("sns-delivery-3", notification)?.messageId
     ).toBe("<01000178a3125d21-000000>");
@@ -133,6 +140,7 @@ describe("toProviderLifecycleEvent", () => {
         },
       },
     });
+
     expect(
       toProviderLifecycleEvent("sns-delivery-4", notification)?.messageId
     ).toBe("<email.fallback@notifications.feeblo>");
@@ -144,6 +152,7 @@ describe("toProviderLifecycleEvent", () => {
         commonHeaders: {},
       },
     });
+
     expect(
       toProviderLifecycleEvent("sns-delivery-5", withoutCommonHeaders)
         ?.messageId
@@ -158,6 +167,7 @@ describe("toProviderLifecycleEvent", () => {
         commonHeaders: { messageId: "   " },
       },
     });
+
     expect(
       toProviderLifecycleEvent("sns-delivery-7", notification)?.messageId
     ).toBe("<01000178a3125d21-000000>");
@@ -181,6 +191,7 @@ describe("toProviderLifecycleEvent", () => {
         ],
       },
     };
+
     expect(
       toProviderLifecycleEvent("sns-bounce-1", notification)
     ).toMatchObject({
@@ -205,6 +216,7 @@ describe("toProviderLifecycleEvent", () => {
         timestamp: "2026-08-18T00:00:01.000Z",
       },
     };
+
     expect(
       toProviderLifecycleEvent("sns-bounce-2", notification)
     ).toMatchObject({ type: "bounced", bounceType: "soft" });
@@ -215,6 +227,7 @@ describe("toProviderLifecycleEvent", () => {
       eventType: "Bounce",
       mail: deliveryNotification().mail,
     };
+
     expect(
       toProviderLifecycleEvent("sns-bounce-missing", notification)
     ).toMatchObject({ type: "bounced", bounceType: "undetermined" });
@@ -231,6 +244,7 @@ describe("toProviderLifecycleEvent", () => {
         timestamp: "2026-08-18T00:00:03.000Z",
       },
     };
+
     expect(toProviderLifecycleEvent("sns-delay-1", notification)).toMatchObject(
       {
         eventId: "sns-delay-1",
@@ -248,6 +262,7 @@ describe("toProviderLifecycleEvent", () => {
       eventType: "Subscription",
       mail: deliveryNotification().mail,
     };
+
     expect(
       toProviderLifecycleEvent("sns-subscription-1", notification)
     ).toBeUndefined();
@@ -260,6 +275,7 @@ describe("toProviderLifecycleEvent", () => {
         timestamp: "not-a-date",
       },
     });
+
     expect(
       toProviderLifecycleEvent("sns-delivery-6", notification)
     ).toMatchObject({
@@ -270,11 +286,13 @@ describe("toProviderLifecycleEvent", () => {
 
   it("keeps a valid event time when all timestamps are invalid", () => {
     const before = new Date();
+
     const notification: SesEventNotification = {
       eventType: "Reject",
       mail: { ...deliveryNotification().mail, timestamp: "not-a-date" },
       reject: { reason: "Bad content" },
     };
+
     const event = toProviderLifecycleEvent("sns-reject-2", notification);
     expect(event).toBeDefined();
     const occurredAt = event?.occurredAt;
@@ -298,6 +316,7 @@ describe("toProviderLifecycleEvent", () => {
         timestamp: "2026-08-18T00:00:01.000Z",
       },
     };
+
     expect(
       toProviderLifecycleEvent("sns-bounce-3", notification)
     ).toMatchObject({ type: "bounced", bounceType: "undetermined" });
@@ -317,6 +336,7 @@ describe("toProviderLifecycleEvent", () => {
         bouncedRecipients: [{ action: "failed" }],
       },
     });
+
     expect(bounced?.recipients).toEqual(["envelope@example.com"]);
 
     const reported = toProviderLifecycleEvent("sns-recipients-2", {
@@ -334,6 +354,7 @@ describe("toProviderLifecycleEvent", () => {
         ],
       },
     });
+
     expect(reported?.recipients).toEqual(["bounced@example.com"]);
   });
 
@@ -347,6 +368,7 @@ describe("toProviderLifecycleEvent", () => {
         ],
       },
     });
+
     expect(
       toProviderLifecycleEvent("sns-delivery-correlation", notification)
         ?.deliveryId
@@ -363,6 +385,7 @@ describe("toProviderLifecycleEvent", () => {
         complainedRecipients: [{ emailAddress: "feedback@example.com" }],
       },
     };
+
     expect(
       toProviderLifecycleEvent("sns-complaint-1", notification)
     ).toMatchObject({
@@ -379,6 +402,7 @@ describe("toProviderLifecycleEvent", () => {
       mail: deliveryNotification().mail,
       reject: { reason: "Bad content" },
     };
+
     expect(
       toProviderLifecycleEvent("sns-reject-1", notification)
     ).toMatchObject({

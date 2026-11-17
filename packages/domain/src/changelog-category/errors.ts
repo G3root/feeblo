@@ -7,6 +7,12 @@ import {
   UnauthorizedError,
 } from "../rpc-errors";
 
+export class ChangelogCategoryNotFoundError extends Schema.TaggedError<ChangelogCategoryNotFoundError>()(
+  "ChangelogCategoryNotFoundError",
+  { message: Schema.optional(Schema.String) },
+  { httpApiStatus: 404, identifier: "ChangelogCategoryNotFoundError" }
+) {}
+
 export class FailedToCreateChangelogCategoryError extends Schema.TaggedError<FailedToCreateChangelogCategoryError>()(
   "FailedToCreateChangelogCategoryError",
   {},
@@ -30,6 +36,7 @@ export const ChangelogCategoryServiceErrors = Schema.Union([
   InternalServerError,
   PolicyDeniedError,
   BadRequestError,
+  ChangelogCategoryNotFoundError,
   FailedToCreateChangelogCategoryError,
   FailedToUpdateChangelogCategoryError,
   FailedToDeleteChangelogCategoryError,

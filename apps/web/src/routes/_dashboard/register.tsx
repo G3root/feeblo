@@ -64,6 +64,7 @@ function RegisterRoute() {
           // return to this page through the switcher.
           refreshCreationState();
           await refetch();
+
           if (search.redirectTo !== undefined) {
             // The guard sends an org-less visitor here with the path it
             // bounced, so resume it now that a workspace exists — otherwise
@@ -71,12 +72,15 @@ function RegisterRoute() {
             // protocol-relative and absolute values, so the search param
             // cannot turn this into an open redirect.
             window.location.assign(getSafeCallbackURL(search.redirectTo));
+
             return;
           }
+
           void navigate({
             to: "/$organizationId",
             params: { organizationId: result.organizationId },
           });
+
           return;
         }
       } catch (error) {
@@ -85,6 +89,7 @@ function RegisterRoute() {
           title: parseRpcError(error, "Failed to create workspace").message,
           type: "error",
         });
+
         return;
       }
     },

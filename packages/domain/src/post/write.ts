@@ -289,6 +289,7 @@ const makePostWriteService = Effect.gen(function* () {
     Context.add(S3UploadService, s3),
     Context.add(UserRepository, userRepository)
   );
+
   const provideWriteEnvironment = Effect.provideContext(environment);
 
   /** The actor columns a timeline entry records. A key is not a member. */
@@ -321,6 +322,7 @@ const makePostWriteService = Effect.gen(function* () {
       const organizationId = yield* WorkspaceId.parse(args.organizationId);
       const postId = yield* PostId.parse(args.postId);
       const statusId = yield* PostStatusId.parse(args.statusId);
+
       // The event carries the same metadata the post row stores, so a webhook
       // consumer sees what the dashboard does. Empty objects stay absent, as
       // the recorder itself decides.
@@ -330,6 +332,7 @@ const makePostWriteService = Effect.gen(function* () {
           : Object.keys(args.metadata).length === 0
             ? undefined
             : args.metadata;
+
       const previousStatusId =
         args.previousStatusId === undefined
           ? undefined
@@ -388,9 +391,11 @@ const makePostWriteService = Effect.gen(function* () {
       // rather than a failure.
       const embeddingService =
         yield* Effect.serviceOption(PostEmbeddingService);
+
       if (Option.isNone(embeddingService)) {
         return;
       }
+
       yield* schedulePostEmbeddingBestEffort({
         content,
         embeddingService: embeddingService.value,
@@ -442,9 +447,11 @@ const makePostWriteService = Effect.gen(function* () {
         id: args.boardId,
         organizationId: args.organizationId,
       });
+
       if (board._tag === "None") {
         return yield* new BadRequestError({ message: "Board not found" });
       }
+
       return board.value;
     });
 
@@ -454,11 +461,13 @@ const makePostWriteService = Effect.gen(function* () {
         id: args.statusId,
         organizationId: args.organizationId,
       });
+
       if (status === undefined) {
         return yield* new BadRequestError({
           message: "Post status not found",
         });
       }
+
       return status;
     });
 
@@ -544,6 +553,7 @@ const makePostWriteService = Effect.gen(function* () {
       const { sanitizedMarkdown, sanitizedHtml } = sanitizeMarkdown(
         args.content
       );
+
       const prepared = yield* prepareEditorAssetContent({
         organizationId: args.organizationId,
         ...(userId !== null && { userId }),
@@ -576,7 +586,9 @@ const makePostWriteService = Effect.gen(function* () {
                   subject: args.author,
                   action: "post author",
                 });
+
           const onBehalfMetadata = toOnBehalfMetadata(subject);
+
           const persistedSlug = yield* repository.create({
             ...write,
             content: prepared.content,
@@ -610,6 +622,7 @@ const makePostWriteService = Effect.gen(function* () {
                   creatorMemberId: member.memberId,
                 }),
           });
+
           yield* commitPreparedEditorAssets(prepared.promotions);
           yield* syncPostAssetReferences({
             postId: args.id,
@@ -627,6 +640,7 @@ const makePostWriteService = Effect.gen(function* () {
             ...(onBehalfMetadata && { metadata: onBehalfMetadata }),
           });
           let outboxId: string | undefined;
+
           if (!backfill) {
             yield* recordPostIntegrationEvent({
               actor,
@@ -649,6 +663,7 @@ const makePostWriteService = Effect.gen(function* () {
             // attributes the post to its resolved author without watch-listing
             // them.
             const subscriptionNow = yield* DateTime.nowAsDate;
+
             if (subject === undefined) {
               const creator =
                 member !== null
@@ -658,6 +673,7 @@ const makePostWriteService = Effect.gen(function* () {
                       userId: member.userId,
                     }
                   : undefined;
+
               if (creator !== undefined) {
                 yield* subscriptionRepository.subscribe({
                   organizationId: args.organizationId,
@@ -667,6 +683,7 @@ const makePostWriteService = Effect.gen(function* () {
                     memberId: creator.memberId,
                   }),
                 });
+
                 if (creator.email !== undefined) {
                   yield* emailSubscriptions
                     .requestSubscription({
@@ -705,6 +722,7 @@ const makePostWriteService = Effect.gen(function* () {
                   userId: subject.userId,
                 });
               }
+
               yield* subscribeOnBehalfSubject({
                 organizationId: args.organizationId,
                 topicId: args.id,
@@ -731,6 +749,7 @@ const makePostWriteService = Effect.gen(function* () {
                   )
                 )
               );
+
             yield* Option.match(notifications, {
               onNone: () => Effect.void,
               onSome: (service) =>
@@ -756,6 +775,7 @@ const makePostWriteService = Effect.gen(function* () {
       );
 
       yield* wakeEmailOutboxBestEffort(persisted.outboxId, args.organizationId);
+
       if (!backfill) {
         yield* scheduleEmbedding({
           content: prepared.content,
@@ -797,12 +817,14 @@ const makePostWriteService = Effect.gen(function* () {
           organizationId: args.organizationId,
         });
       }
+
       if (args.assigneeMemberId !== undefined) {
         yield* requireAssignee({
           assigneeMemberId: args.assigneeMemberId,
           organizationId: args.organizationId,
         });
       }
+
       // Fetched once and reused below, so the status-change branch does not
       // read it again inside the transaction. A status's type is fixed when the
       // workspace is created — there is no RPC that changes it — so the value
@@ -817,6 +839,7 @@ const makePostWriteService = Effect.gen(function* () {
 
       const sanitized =
         args.content === undefined ? undefined : sanitizeMarkdown(args.content);
+
       const prepared =
         sanitized === undefined
           ? undefined
@@ -855,15 +878,20 @@ const makePostWriteService = Effect.gen(function* () {
 
         const titleChanged =
           args.title !== undefined && previous.title !== args.title;
+
         const contentChanged =
           prepared !== undefined && previous.content !== prepared.content;
+
         const statusChanged =
           args.statusId !== undefined && previous.statusId !== args.statusId;
+
         const boardChanged =
           args.boardId !== undefined && previous.boardId !== args.boardId;
+
         const etaChanged =
           args.etaQuarter !== undefined &&
           previous.etaQuarter !== args.etaQuarter;
+
         const assigneeChanged =
           args.assigneeMemberId !== undefined &&
           previous.assigneeMemberId !== args.assigneeMemberId;
@@ -872,6 +900,7 @@ const makePostWriteService = Effect.gen(function* () {
         finalContent = prepared?.content ?? previous.content;
 
         const activities: PostActivityInput[] = [];
+
         if (titleChanged) {
           activities.push({
             ...columns,
@@ -882,6 +911,7 @@ const makePostWriteService = Effect.gen(function* () {
             nextTitle: args.title,
           });
         }
+
         if (contentChanged) {
           activities.push({
             ...columns,
@@ -890,6 +920,7 @@ const makePostWriteService = Effect.gen(function* () {
             postId: args.id,
           });
         }
+
         if (statusChanged) {
           activities.push({
             ...columns,
@@ -900,6 +931,7 @@ const makePostWriteService = Effect.gen(function* () {
             nextStatusId: args.statusId,
           });
         }
+
         if (boardChanged) {
           activities.push({
             ...columns,
@@ -910,6 +942,7 @@ const makePostWriteService = Effect.gen(function* () {
             nextBoardId: args.boardId,
           });
         }
+
         if (etaChanged) {
           activities.push({
             ...columns,
@@ -920,6 +953,7 @@ const makePostWriteService = Effect.gen(function* () {
             nextEta: args.etaQuarter,
           });
         }
+
         if (assigneeChanged) {
           activities.push({
             ...columns,
@@ -938,6 +972,7 @@ const makePostWriteService = Effect.gen(function* () {
           assigneeChanged ||
           args.statusId !== undefined ||
           args.boardId !== undefined;
+
         if (writesRow) {
           yield* repository.update({
             id: args.id,
@@ -1015,17 +1050,20 @@ const makePostWriteService = Effect.gen(function* () {
             // from the new subject's are retired, so a shared address survives
             // for the fresh subscribe below.
             const subscriptionNow = yield* DateTime.nowAsDate;
+
             const retiredUserId =
               previous.creatorId !== null &&
               previous.creatorId !== subject.userId
                 ? previous.creatorId
                 : null;
+
             // The in-app follower row carries no source, so it cannot be told
             // apart from a follow its owner chose on purpose. It is left in
             // place: silently dropping a member's own follow is worse than a
             // stale follow they can toggle off, and for a customer the row is
             // inert (in-app notifications are member-only).
             let retiredContactEmail: string | null = null;
+
             if (
               previous.contactId !== null &&
               previous.contactId !== subject.contactId
@@ -1035,8 +1073,10 @@ const makePostWriteService = Effect.gen(function* () {
                 .from(schema.contactTable)
                 .where(eq(schema.contactTable.id, previous.contactId))
                 .limit(1);
+
               retiredContactEmail = previousContact?.email ?? null;
             }
+
             if (retiredUserId !== null || retiredContactEmail !== null) {
               yield* emailSubscriptions.unsubscribePreviousAuthorTopic({
                 contactEmail: retiredContactEmail,
@@ -1051,6 +1091,7 @@ const makePostWriteService = Effect.gen(function* () {
                 userId: retiredUserId,
               });
             }
+
             if (subject.userId !== null) {
               yield* subscriptionRepository.subscribe({
                 organizationId: args.organizationId,
@@ -1058,6 +1099,7 @@ const makePostWriteService = Effect.gen(function* () {
                 userId: subject.userId,
               });
             }
+
             yield* subscribeOnBehalfSubject({
               organizationId: args.organizationId,
               topicId: args.id,
@@ -1104,9 +1146,22 @@ const makePostWriteService = Effect.gen(function* () {
         }
 
         embeddingNeeded = titleChanged || contentChanged;
+
+        // The flags travel so a caller that records a change can record only
+        // what changed. `contentChanged` compares the stored body with the
+        // prepared one, not with the bytes the caller sent: sanitising can make
+        // two different bodies the same post, and the opposite.
+        return {
+          assigneeChanged,
+          boardChanged,
+          contentChanged,
+          etaChanged,
+          statusChanged,
+          titleChanged,
+        };
       });
 
-      yield* transaction(write).pipe(
+      const changes = yield* transaction(write).pipe(
         prepared === undefined
           ? (effect) => effect
           : (effect) =>
@@ -1121,6 +1176,7 @@ const makePostWriteService = Effect.gen(function* () {
       );
 
       yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
+
       if (embeddingNeeded) {
         yield* scheduleEmbedding({
           content: finalContent,
@@ -1129,6 +1185,8 @@ const makePostWriteService = Effect.gen(function* () {
           title: finalTitle,
         });
       }
+
+      return changes;
     });
 
   /**
@@ -1151,6 +1209,7 @@ const makePostWriteService = Effect.gen(function* () {
             creatorId: columns.actorId,
             onlyIfNew: !args.mayDeleteEngaged,
           });
+
           // Deleting a survivor reverts its merged children so the FK cannot
           // block the delete and no post is orphaned. Record the reversal on
           // each child's timeline, mirroring `UnmergePost`.
@@ -1165,6 +1224,7 @@ const makePostWriteService = Effect.gen(function* () {
               }))
             );
           }
+
           return outcome;
         })
       );
@@ -1184,19 +1244,27 @@ const makePostWriteService = Effect.gen(function* () {
         });
       }
 
-      return undefined;
-    }).pipe(
-      Effect.tap(() =>
-        cleanupOrphanedEditorAssets({
-          organizationId: args.organizationId,
-        }).pipe(
-          Effect.catch((cause) =>
-            Effect.logWarning(
-              "Failed to clean up orphaned editor assets",
-              cause
-            ).pipe(Effect.annotateLogs({ organizationId: args.organizationId }))
-          )
-        )
+      // The outcome travels: `removePost` audits the ids this delete removed,
+      // not the ids the request asked for.
+      return result;
+    });
+
+  /**
+   * Sweeps the editor assets a delete orphaned.
+   *
+   * Called by the delete's caller *after* its transaction commits, never from
+   * inside one: the sweep touches storage and the asset table, and running it
+   * before the commit would collect the assets of a post whose delete then
+   * rolled back. Best effort — the delete it follows has already happened, so
+   * a failed sweep logs rather than failing the caller.
+   */
+  const cleanupAfterRemove = (organizationId: string) =>
+    cleanupOrphanedEditorAssets({ organizationId }).pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning(
+          "Failed to clean up orphaned editor assets",
+          cause
+        ).pipe(Effect.annotateLogs({ organizationId }))
       )
     );
 
@@ -1252,6 +1320,7 @@ const makePostWriteService = Effect.gen(function* () {
               }),
           });
           const now = yield* DateTime.nowAsDate;
+
           const result = yield* emailOutbox
             .recordIntent({
               aggregateId: args.sourcePostId,
@@ -1281,9 +1350,11 @@ const makePostWriteService = Effect.gen(function* () {
                 )
               )
             );
+
           return result._tag === "Inserted" ? result.intent.id : undefined;
         })
       );
+
       yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
     });
 
@@ -1324,6 +1395,7 @@ const makePostWriteService = Effect.gen(function* () {
               }),
           });
           const now = yield* DateTime.nowAsDate;
+
           const result = yield* emailOutbox
             .recordIntent({
               aggregateId: args.sourcePostId,
@@ -1355,9 +1427,11 @@ const makePostWriteService = Effect.gen(function* () {
                 )
               )
             );
+
           return result._tag === "Inserted" ? result.intent.id : undefined;
         })
       );
+
       yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
     });
 
@@ -1381,6 +1455,13 @@ const makePostWriteService = Effect.gen(function* () {
     ) {
       return yield* remove(args, actor).pipe(provideWriteEnvironment);
     }),
+    cleanupAfterRemove: Effect.fn("PostWriteService.cleanupAfterRemove")(
+      function* (organizationId: string) {
+        return yield* cleanupAfterRemove(organizationId).pipe(
+          provideWriteEnvironment
+        );
+      }
+    ),
     unmerge: Effect.fn("PostWriteService.unmerge")(function* (
       args: PostUnmergeWrite,
       actor: PostWriteActor

@@ -45,6 +45,7 @@ export function useProviderConnect({
   const isActive = useRef(true);
   useEffect(() => {
     isActive.current = true;
+
     return () => {
       isActive.current = false;
     };
@@ -54,18 +55,22 @@ export function useProviderConnect({
     send({ type: "REQUEST" });
     void (async () => {
       let authorizeUrl: URL;
+
       try {
         ({ authorizeUrl } = await authorize());
       } catch {
         toastManager.add({ title: failureTitle, type: "error" });
         send({ type: "FAILED" });
+
         return;
       }
+
       // Checked after the await, because the request can outlive the page that
       // started it.
       if (!isActive.current) {
         return;
       }
+
       // Announced before the navigation so the actor is already in
       // `redirecting` if the browser refuses to leave; the state's timeout is
       // what brings the button back.

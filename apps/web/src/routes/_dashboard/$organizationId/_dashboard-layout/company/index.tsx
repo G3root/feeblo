@@ -56,6 +56,7 @@ export const Route = createFileRoute(
   component: RouteComponent,
   beforeLoad: async () => {
     await preloadCompanies();
+
     return null;
   },
 });
@@ -81,6 +82,7 @@ function CompanyPage() {
   const editDialogStore = useCompanyEditDialogContext();
   const deleteDialogStore = useCompanyDeleteDialogContext();
   const companiesQuery = useOrgCompanies(organizationId);
+
   // The shared org-companies query is unordered; this table keeps its
   // most-recently-updated-first order locally.
   const companies = useMemo(
@@ -92,6 +94,7 @@ function CompanyPage() {
       ),
     [companiesQuery.data]
   );
+
   const { data: contacts } = useOrgContacts(organizationId);
   const definitionsQuery = useCompanyAttributeDefinitions(organizationId);
   const definitions = definitionsQuery.data ?? [];
@@ -101,11 +104,14 @@ function CompanyPage() {
   const totalCrmEntries = companies.length + contacts.length;
   const hasReachedCrmLimit = crmLimit !== null && totalCrmEntries >= crmLimit;
   const upgradePlanStore = useUpgradePlanDialogContext();
+
   const openCreateDialog = () => {
     if (hasReachedCrmLimit) {
       upgradePlanStore.send({ type: "toggle" });
+
       return;
     }
+
     createDialogStore.send({ type: "toggle" });
   };
 
@@ -333,6 +339,7 @@ function CompanyAttributeCells({
   definitions: CustomAttributeDefinition[];
 }) {
   const valuesQuery = useCompanyAttributeValues(companyId);
+
   const valuesByAttributeId = new Map(
     (valuesQuery.data ?? []).map((value) => [value.attributeId, value])
   );

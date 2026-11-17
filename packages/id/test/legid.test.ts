@@ -137,6 +137,7 @@ describe("makeId", () => {
         const id = yield* factory.generate;
         const replacement = id.endsWith("0") ? "1" : "0";
         const tampered = `${id.slice(0, -1)}${replacement}`;
+
         const result = yield* factory
           .parse(tampered)
           .pipe(
@@ -237,6 +238,7 @@ describe("makeId", () => {
         { id: "pst_aB3xY9kQ2rMn", title: "Hello" },
         { id: "pst_bC4zZ0lQ3sNo", title: "World" },
       ];
+
       const branded = asLegidArrayById(factory)(raw);
 
       expect(branded).toBe(raw);
@@ -255,6 +257,7 @@ describe("namespacing across factories", () => {
     () =>
       Effect.gen(function* () {
         const post = makeId("post", "pst", { approximateLength: 12 });
+
         const comment = makeId("comment", "cmt", {
           approximateLength: 12,
         });

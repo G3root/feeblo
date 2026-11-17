@@ -71,6 +71,7 @@ export const renameSyntheticAccount = (args: {
       .from(schema.userTable)
       .where(eq(schema.userTable.id, args.userId))
       .limit(1);
+
     if (!user || !isSyntheticEmail(user.email)) {
       return false;
     }
@@ -79,6 +80,7 @@ export const renameSyntheticAccount = (args: {
       .update(schema.userTable)
       .set({ name: args.name, updatedAt: args.now })
       .where(eq(schema.userTable.id, args.userId));
+
     return true;
   });
 
@@ -139,6 +141,7 @@ const refreshShadowEmailHash = (args: {
       .from(schema.userTable)
       .where(eq(schema.userTable.id, args.userId))
       .limit(1);
+
     if (
       !user ||
       !isShadowUserEmail(user.email) ||
@@ -148,6 +151,7 @@ const refreshShadowEmailHash = (args: {
     }
 
     const emailHash = yield* hashEmail(args.email);
+
     const [existing] = yield* args.db
       .select({ id: schema.userTable.id })
       .from(schema.userTable)
@@ -172,6 +176,7 @@ const refreshShadowEmailHash = (args: {
           Effect.fail(new FailedToUpdateContactError())
         )
       );
+
       return true;
     }
 
@@ -179,6 +184,7 @@ const refreshShadowEmailHash = (args: {
       .update(schema.userTable)
       .set({ emailHash, updatedAt: args.now })
       .where(eq(schema.userTable.id, args.userId));
+
     return true;
   });
 
@@ -200,6 +206,7 @@ const makeContactRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const id = args.id ?? (yield* ContactId.generate);
         const now = yield* DateTime.nowAsDate;
+
         const [created] = yield* db
           .insert(schema.contactTable)
           .values({
@@ -228,6 +235,7 @@ const makeContactRepository = Effect.gen(function* () {
             message: "A contact with this email already exists",
           });
         }
+
         return created;
       }),
 
@@ -235,6 +243,7 @@ const makeContactRepository = Effect.gen(function* () {
       db.transaction((tx) =>
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
+
           const [updated] = yield* tx
             .update(schema.contactTable)
             .set({
@@ -260,6 +269,7 @@ const makeContactRepository = Effect.gen(function* () {
             .returning();
 
           const contact = Option.fromNullishOr(updated);
+
           // A rename must reach the account that renders the customer's
           // attributed content, or comments and votes keep the old name.
           if (
@@ -275,6 +285,7 @@ const makeContactRepository = Effect.gen(function* () {
               userId: contact.value.userId,
             });
           }
+
           // The post-level display snapshot follows the CRM too. It is only
           // read once the live contact is gone, so leaving it stale would bring
           // the old name back at exactly the wrong moment. An email change
@@ -290,6 +301,7 @@ const makeContactRepository = Effect.gen(function* () {
               contact: contact.value,
             });
           }
+
           // The shadow's hash is the proof identity linking uses for a shadow
           // whose contact is later deleted. A corrected address must move the
           // hash too, or the superseded address can still claim the account.
@@ -306,6 +318,7 @@ const makeContactRepository = Effect.gen(function* () {
               userId: contact.value.userId,
             });
           }
+
           return contact;
         })
       ),
@@ -340,6 +353,7 @@ const makeContactRepository = Effect.gen(function* () {
             )
           )
           .limit(1);
+
         return contact !== undefined;
       }),
 
@@ -422,10 +436,12 @@ const makeContactRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           if (byExternalId !== undefined) {
             return Option.some(byExternalId);
           }
         }
+
         if (args.email) {
           const [byEmail] = yield* db
             .select()
@@ -437,8 +453,10 @@ const makeContactRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           return Option.fromNullishOr(byEmail);
         }
+
         return Option.none<Contact>();
       }),
 
@@ -458,6 +476,7 @@ const makeContactRepository = Effect.gen(function* () {
     ) =>
       Effect.gen(function* () {
         const { existing } = args;
+
         if (args.email && existing.email !== args.email) {
           const [emailHolder] = yield* db
             .select({ id: schema.contactTable.id })
@@ -469,10 +488,12 @@ const makeContactRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           if (emailHolder !== undefined && emailHolder.id !== existing.id) {
             return yield* new FailedToUpdateContactError();
           }
         }
+
         if (args.externalId && existing.externalId !== args.externalId) {
           const [externalIdHolder] = yield* db
             .select({ id: schema.contactTable.id })
@@ -484,6 +505,7 @@ const makeContactRepository = Effect.gen(function* () {
               )
             )
             .limit(1);
+
           if (
             externalIdHolder !== undefined &&
             externalIdHolder.id !== existing.id
@@ -493,6 +515,7 @@ const makeContactRepository = Effect.gen(function* () {
         }
 
         const now = yield* DateTime.nowAsDate;
+
         // Refresh the shadow the contact points at *before* the update swaps
         // in the SSO identity: `updated.userId` would be that identity, which
         // is not the account holding the old address hash. When the new
@@ -526,15 +549,18 @@ const makeContactRepository = Effect.gen(function* () {
           })
           .where(eq(schema.contactTable.id, existing.id))
           .returning();
+
         if (!updated) {
           return yield* new FailedToUpdateContactError();
         }
+
         if (
           (args.name !== undefined && updated.name !== existing.name) ||
           (args.email !== undefined && updated.email !== existing.email)
         ) {
           yield* refreshPostAuthorFallback({ db, contact: updated });
         }
+
         return updated;
       }),
 
@@ -550,6 +576,7 @@ const makeContactRepository = Effect.gen(function* () {
       Effect.gen(function* () {
         const id = yield* ContactId.generate;
         const now = yield* DateTime.nowAsDate;
+
         const [created = null] = yield* db
           .insert(schema.contactTable)
           .values({
@@ -568,6 +595,7 @@ const makeContactRepository = Effect.gen(function* () {
           })
           .onConflictDoNothing()
           .returning();
+
         return Option.fromNullishOr(created);
       }),
 
@@ -622,6 +650,7 @@ const makeContactRepository = Effect.gen(function* () {
                   restrictedToOrganizationId:
                     link.accountRestrictedToOrganizationId ?? null,
                 };
+
           // `PUBLIC` only affects the unrestricted-global branch: the CRM page
           // has no post, so this is the most that account can be promised.
           const verdict = evaluateOrganizationAccess({
@@ -666,6 +695,7 @@ const makeContactRepository = Effect.gen(function* () {
      */
     search: (args: ContactSearchArgs) => {
       const trimmed = args.query.trim();
+
       if (trimmed.length < 2) {
         return Effect.succeed([]);
       }
@@ -696,6 +726,7 @@ const makeContactRepository = Effect.gen(function* () {
       const postTableName = getTableName(schema.postTable);
       const boardTableName = getTableName(schema.boardTable);
       const upvoteTableName = getTableName(schema.upvoteTable);
+
       const publicBoardProbe = sql`EXISTS (
         SELECT 1 FROM ${sql.identifier(postTableName)} p
         JOIN ${sql.identifier(boardTableName)} b ON b.id = p.board_id
@@ -842,6 +873,7 @@ const makeContactRepository = Effect.gen(function* () {
         // the member row: no duplicate entries, and members never read as
         // customers.
         const memberUserIds = new Set(members.map((m) => m.userId));
+
         const customers = contacts.filter(
           (c) => c.userId == null || !memberUserIds.has(c.userId)
         );
@@ -857,6 +889,7 @@ const makeContactRepository = Effect.gen(function* () {
             if (a.rank !== b.rank) return a.rank - b.rank;
             const aLabel = labelOf(a.name, a.email);
             const bLabel = labelOf(b.name, b.email);
+
             return aLabel < bLabel ? -1 : aLabel > bLabel ? 1 : 0;
           })
           .map(({ rank: _rank, ...result }) => result)

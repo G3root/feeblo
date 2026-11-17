@@ -36,6 +36,7 @@ export class EmailSubscriptionInputError extends Schema.TaggedError<EmailSubscri
   {
     operation: Schema.String,
     reason: Schema.String,
+    cause: Schema.optionalKey(Schema.Defect()),
   }
 ) {}
 
@@ -53,10 +54,11 @@ export const parseEmailAddress = (
 ): Effect.Effect<EmailAddress, EmailSubscriptionInputError> =>
   Schema.decodeEffect(EmailAddress)(normalizeEmailAddress(input)).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new EmailSubscriptionInputError({
           operation,
           reason: "Email address is invalid",
+          cause,
         })
     )
   );

@@ -22,6 +22,7 @@ const withCollector = <A, E, R>(
       readonly close: Effect.Effect<void>;
     }>((resume) => {
       const requests: Array<string> = [];
+
       const server = createServer((request, response) => {
         let body = "";
         request.on("data", (chunk: Buffer) => {
@@ -33,12 +34,16 @@ const withCollector = <A, E, R>(
           response.end("{}");
         });
       });
+
       server.listen(0, "127.0.0.1", () => {
         const address = server.address();
+
         if (address === null || isString(address)) {
           resume(Effect.die(new Error("Expected a TCP address")));
+
           return;
         }
+
         resume(
           Effect.succeed({
             url: `http://127.0.0.1:${address.port}`,
@@ -91,6 +96,7 @@ it.live("exports a span to the configured OTLP endpoint", () =>
         tracesSampleRate: 1,
         version: "test",
       });
+
       // Build the layer in the test's own scope so closing it flushes the
       // exporter before the collector is asserted.
       yield* Effect.scoped(
@@ -124,6 +130,7 @@ it.live("exports a span to the configured OTLP endpoint", () =>
       const attributes =
         (yield* decodeResourceSpans(payload)).resourceSpans[0]?.resource
           .attributes ?? [];
+
       expect(attributes).toEqual(
         expect.arrayContaining([
           { key: "deployment.environment", value: { stringValue: "test" } },
@@ -155,6 +162,7 @@ it.live("exports metrics recorded outside the exporter's context", () =>
         tracesSampleRate: 1,
         version: "test",
       });
+
       yield* Effect.scoped(
         Effect.gen(function* () {
           const context = yield* Layer.build(layer);

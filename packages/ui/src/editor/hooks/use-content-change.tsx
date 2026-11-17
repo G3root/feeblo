@@ -18,6 +18,7 @@ import type { EditorExtension } from "../extension";
 import { getMarkdownContent } from "../helpers/markdown-content";
 
 const DEBOUNCE_CHARS_THRESHOLD = 3000;
+
 const DEBOUNCE_DELAY = 500;
 
 const useContentChange = (

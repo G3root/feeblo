@@ -78,6 +78,7 @@ const resultForOutcome = (
   outcome: Extract<TestMailerOutcome, { readonly _tag: "accepted" }> | undefined
 ): MailSendResult => {
   const accepted = outcome?.accepted ?? true;
+
   return {
     accepted,
     messageId: message.messageId ?? defaultMessageId(attempt),
@@ -110,6 +111,7 @@ const mailerLayer = Layer.effect(
               operation: "TestMailer.renderHtml",
             }),
         });
+
         const text = yield* Effect.try({
           try: () => toPlainText(html),
           catch: (cause) =>
@@ -119,13 +121,16 @@ const mailerLayer = Layer.effect(
               operation: "TestMailer.renderText",
             }),
         });
+
         const attempt = yield* Ref.modify(mailbox, (state) => {
           const [nextOutcome, ...remainingOutcomes] = state.outcomes;
+
           const resolvedOutcome =
             nextOutcome ??
             (state.failDelivery
               ? ({ _tag: "temporaryFailure" } as const)
               : ({ _tag: "accepted" } as const));
+
           const failed = resolvedOutcome._tag !== "accepted";
 
           return [
@@ -221,6 +226,7 @@ export const resetTestMailer = (options?: {
 
 export const testMailerState = Effect.gen(function* () {
   const mailbox = yield* TestMailer;
+
   return yield* Ref.get(mailbox);
 });
 

@@ -15,6 +15,7 @@ import { ForgotPasswordPage } from "../page-objects/ForgotPasswordPage";
 import { ResetPasswordPage } from "../page-objects/ResetPasswordPage";
 
 const RESET_PASSWORD_URL = /\/reset-password/;
+
 const SIGN_IN_URL = /\/sign-in/;
 
 test.describe("authentication", () => {
@@ -70,7 +71,7 @@ test.describe("authentication", () => {
       await page.goto("/forgot-password");
 
       await expect(
-        page.getByRole("button", { name: "Send reset code", exact: true })
+        page.getByRole("button", { name: "Send code", exact: true })
       ).toBeVisible();
     }
   );
@@ -135,7 +136,7 @@ test.describe("dashboard auth redirects", () => {
       // The deep link is preserved for the post-login redirect.
       await expect(page).toHaveURL(/redirectTo=%2Forg_bogus%2Fboard/);
       await expect(
-        page.getByRole("button", { name: "Login", exact: true })
+        page.getByRole("button", { name: "Sign in", exact: true })
       ).toBeVisible();
     }
   );
@@ -154,6 +155,7 @@ test.describe("dashboard auth redirects", () => {
     { tag: "@critical" },
     async ({ page }) => {
       const user = createTestUser();
+
       const { organizationUrl } = await createAuthenticatedWorkspace(
         page,
         user

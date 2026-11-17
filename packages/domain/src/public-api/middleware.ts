@@ -91,10 +91,12 @@ export class ApiKeyAuthMiddleware extends HttpApiMiddleware.Service<
 export const requirePublicApiScope = (scope: PublicApiScope) =>
   Effect.gen(function* () {
     const caller = yield* PublicApiCaller;
+
     if (!hasPublicApiScope(caller.scopes, scope)) {
       // The one place every operation passes through, so it is the one place a
       // refused credential can be recorded without a per-endpoint edit.
       yield* recordScopeDenial(caller, scope);
+
       return yield* forbiddenScopeError(scope);
     }
   });
@@ -153,6 +155,7 @@ export const makeApiKeyAuthMiddlewareLive = (
             // instant that is still ahead of the caller.
             const now = yield* Clock.currentTimeMillis;
             const headers = publicApiRateLimitHeaders(call.rateLimit, now);
+
             return yield* effect.pipe(
               Effect.provideService(PublicApiCaller, call),
               Effect.map((response) =>
@@ -240,6 +243,7 @@ export const rejectRequest = (
   error: HttpApiSchemaError
 ): Effect.Effect<never, HttpApiSchemaError | InvalidRequestError> => {
   const message = requestSchemaErrorMessage(error);
+
   return message === undefined
     ? Effect.fail(error)
     : ErrorReporter.report(Cause.fail(error)).pipe(

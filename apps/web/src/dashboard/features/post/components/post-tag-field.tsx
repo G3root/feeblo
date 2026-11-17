@@ -24,6 +24,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
 
 export function PostTagField() {
   const { post, organizationId, isLocked, isMerged } = usePostCollectionData();
+
   // Backend mirror: TagPolicy.canSetPostTags = membership AND
   // (posts.* OR tags.* OR post creator). Contributors keep the tag field on
   // their own posts; everyone else needs manager-level posts/tags grants.
@@ -34,6 +35,7 @@ export function PostTagField() {
       allPolicy(hasMembership(organizationId), isUser(post.creatorId ?? ""))
     )
   );
+
   const { allowed: canCreateTags } = usePolicy(
     hasPermission(organizationId, "tags.create")
   );
@@ -49,6 +51,7 @@ export function PostTagField() {
       if (!post.id) {
         return undefined;
       }
+
       return q
         .from({ tags: postTagCollection })
         .where(({ tags }) =>
@@ -70,10 +73,13 @@ export function PostTagField() {
     if (disabled) {
       return;
     }
+
     if (!postTags) {
       return;
     }
+
     const currentTagIds = postTags.map((tag) => tag.tagId);
+
     const newTagIds = isSelected
       ? currentTagIds?.filter((id) => id !== option.id)
       : [...currentTagIds, option.id];
@@ -91,6 +97,7 @@ export function PostTagField() {
         title: "Failed to update tags",
         type: "error",
       });
+
       return;
     }
 

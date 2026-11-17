@@ -1,4 +1,9 @@
-let nextFilterId = 0;
+/** The next id to hand out; the counter lives in this closure and nowhere else. */
+const nextFilterId = (() => {
+  let next = 0;
+
+  return (): number => ++next;
+})();
 
 /**
  * A unique id for a filter row that has not been through the URL yet.
@@ -8,6 +13,5 @@ let nextFilterId = 0;
  * randomness that a hydration test would have to pin.
  */
 export function createFilterId(prefix = "filter"): string {
-  nextFilterId += 1;
-  return `${prefix}-${nextFilterId}`;
+  return `${prefix}-${nextFilterId()}`;
 }

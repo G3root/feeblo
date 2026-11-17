@@ -31,14 +31,17 @@ describe("GitHub App authentication", () => {
       Effect.gen(function* () {
         const privateKey = yield* makePrivateKey();
         const now = dateAt("2030-01-01T00:00:00Z");
+
         const token = yield* createGitHubAppJwt({
           appId: "1234",
           now,
           privateKey: Redacted.make(privateKey),
         });
+
         const protectedHeader = jose.decodeProtectedHeader(
           Redacted.value(token)
         );
+
         const claims = jose.decodeJwt(Redacted.value(token));
         expect(protectedHeader.alg).toBe("RS256");
         expect(claims.iss).toBe("1234");
@@ -58,11 +61,13 @@ describe("GitHub App authentication", () => {
           privateKeyEncoding: { format: "pem", type: "pkcs1" },
           publicKeyEncoding: { format: "pem", type: "spki" },
         });
+
         const result = yield* createGitHubAppJwt({
           appId: "1234",
           now: dateAt("2030-01-01T00:00:00Z"),
           privateKey: Redacted.make(privateKey),
         });
+
         expect(jose.decodeProtectedHeader(Redacted.value(result)).alg).toBe(
           "RS256"
         );
@@ -74,9 +79,11 @@ describe("GitHub App authentication", () => {
       const privateKey = yield* makePrivateKey();
       const now = dateAt("2030-01-01T00:00:00Z");
       let minted = 0;
+
       const apiClient: GitHubApiClient = {
         createInstallationAccessToken: () => {
           minted += 1;
+
           return Effect.succeed({
             expires_at: new Date(now.getTime() + 60 * 60 * 1000),
             token: `ghs_token_${minted}`,
@@ -90,16 +97,19 @@ describe("GitHub App authentication", () => {
         listInstallationRepositories: () => Effect.die("unused"),
         listUserInstallations: () => Effect.die("unused"),
       };
+
       const resolver = yield* makeGitHubInstallationTokenResolver({
         apiClient,
         appId: "1234",
         now: () => now,
         privateKey: Redacted.make(privateKey),
       });
+
       const [first, second] = yield* Effect.all([
         resolver.getInstallationAccessToken({ installationId: "9" }),
         resolver.getInstallationAccessToken({ installationId: "9" }),
       ]);
+
       expect(Redacted.value(first)).toBe("ghs_token_1");
       expect(Redacted.value(second)).toBe("ghs_token_1");
       expect(minted).toBe(1);
@@ -111,6 +121,7 @@ describe("GitHub App authentication", () => {
     () => {
       let currentTime = new Date("2030-01-01T00:00:00Z");
       let minted = 0;
+
       const fakeClock: Clock.Clock = {
         currentTimeMillis: Effect.sync(() => currentTime.getTime()),
         currentTimeMillisUnsafe: () => currentTime.getTime(),
@@ -126,9 +137,11 @@ describe("GitHub App authentication", () => {
           BigInt(currentTime.getTime()) * 1_000_000n,
         sleep: () => Effect.void,
       };
+
       const apiClient: GitHubApiClient = {
         createInstallationAccessToken: () => {
           minted += 1;
+
           return Effect.succeed({
             expires_at: new Date(currentTime.getTime() + 60 * 60 * 1000),
             token: `ghs_token_${minted}`,
@@ -142,18 +155,23 @@ describe("GitHub App authentication", () => {
         listInstallationRepositories: () => Effect.die("unused"),
         listUserInstallations: () => Effect.die("unused"),
       };
+
       return Effect.gen(function* () {
         const privateKey = yield* makePrivateKey();
+
         const resolver = yield* makeGitHubInstallationTokenResolver({
           apiClient,
           appId: "1234",
           now: () => currentTime,
           privateKey: Redacted.make(privateKey),
         });
+
         const first = yield* resolver.getInstallationAccessToken({
           installationId: "9",
         });
+
         currentTime = dateAt(currentTime.getTime() + 61 * 60 * 1000);
+
         const second = yield* resolver.getInstallationAccessToken({
           installationId: "9",
         });

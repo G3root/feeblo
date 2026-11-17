@@ -30,6 +30,7 @@ test.describe("over-plan gate", () => {
     request,
   }) => {
     const owner = await createAuthenticatedWorkspace(page);
+
     const organizationId = new URL(owner.organizationUrl).pathname
       .split("/")
       .find(Boolean);
@@ -81,6 +82,7 @@ test.describe("over-plan gate", () => {
     const secretBoardRow = page
       .getByRole("listitem")
       .filter({ hasText: "Secret board" });
+
     await expect(secretBoardRow).toBeVisible();
     await expect(secretBoardRow.getByText("Private")).toBeVisible();
     await expect(
@@ -92,6 +94,7 @@ test.describe("over-plan gate", () => {
     const publicResponse = await request.get(
       publicBoardUrl(owner.workspaceName)
     );
+
     expect(publicResponse.status()).toBe(200);
     const publicHtml = await publicResponse.text();
     expect(publicHtml).toContain(owner.workspaceName);
@@ -122,6 +125,7 @@ test.describe("over-plan gate", () => {
     const confirmButton = confirmDialog.getByRole("button", {
       name: "Make public",
     });
+
     await expect(confirmButton).toBeDisabled();
 
     await confirmDialog.getByRole("textbox").fill("Secret board");
@@ -134,6 +138,7 @@ test.describe("over-plan gate", () => {
     const publicSecretRow = page
       .getByRole("listitem")
       .filter({ hasText: "Secret board" });
+
     await expect(publicSecretRow.getByText("Private")).toBeHidden();
     await expect(
       page.getByText("3 of 2 boards", { exact: false })
@@ -142,6 +147,7 @@ test.describe("over-plan gate", () => {
     const overLimitRow = page
       .getByRole("listitem")
       .filter({ hasText: "Bugs 🐞" });
+
     await overLimitRow.getByRole("button", { name: "Delete" }).click();
 
     const deleteDialog = page.getByRole("alertdialog");
@@ -150,6 +156,7 @@ test.describe("over-plan gate", () => {
     const deleteButton = deleteDialog.getByRole("button", {
       name: "Delete board",
     });
+
     await expect(deleteButton).toBeDisabled();
     await deleteDialog.getByRole("textbox").fill("Bugs 🐞");
     await expect(deleteButton).toBeEnabled();

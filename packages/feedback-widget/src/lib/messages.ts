@@ -6,6 +6,7 @@ import { isSupportedLocale } from "./config";
 import type { WidgetIdentity } from "./identity";
 
 export type IdentityData = WidgetIdentity;
+
 export type PublicIdentityData = Omit<IdentityData, "token">;
 
 export type ParentMessage =
@@ -52,21 +53,27 @@ export function isParentMessage<T>(
   const record = isObject(value)
     ? (value as { event?: unknown; data?: unknown })
     : undefined;
+
   if (record === undefined || !("event" in record)) {
     return false;
   }
+
   const event = record.event;
+
   if (!isString(event) || !PARENT_EVENT_NAMES.has(event)) {
     return false;
   }
+
   if (event === "SHOW" || event === "HIDE") {
     return true;
   }
 
   const data = record.data;
+
   if (Array.isArray(data) || !isObject(data)) {
     return false;
   }
+
   // SAFETY: isObject + Array.isArray establish that `data` is a plain
   // non-array object; the optional-field view only exposes the claims the
   // guard inspects, all of which are strings in the accepted message shapes.
@@ -102,6 +109,7 @@ export function isParentMessage<T>(
       // malformed identity at the iframe boundary instead of storing it.
       return isWidgetIdentity(data);
   }
+
   return false;
 }
 
@@ -113,9 +121,11 @@ export function isParentMessage<T>(
  */
 function resolveParentOrigin(): string | null {
   const param = new URLSearchParams(window.location.search).get("hostOrigin");
+
   if (param) {
     try {
       const origin = new URL(param).origin;
+
       if (origin !== "null") {
         return origin;
       }
@@ -123,9 +133,11 @@ function resolveParentOrigin(): string | null {
       // ignore malformed param
     }
   }
+
   if (document.referrer) {
     try {
       const origin = new URL(document.referrer).origin;
+
       if (origin !== "null") {
         return origin;
       }
@@ -133,27 +145,33 @@ function resolveParentOrigin(): string | null {
       // ignore malformed referrer
     }
   }
+
   return null;
 }
-
-let cachedParentOrigin: string | null | undefined;
 
 /**
  * Lazily resolved parent origin, shared by all message senders/listeners.
  * `window.location` and `document.referrer` are stable for a widget document,
- * so URL parsing happens at most once per widget instance.
+ * so URL parsing happens at most once per widget instance, and the cached
+ * value lives only in this closure.
  */
-function getParentOrigin(): string | null {
-  if (cachedParentOrigin === undefined) {
-    cachedParentOrigin = resolveParentOrigin();
-  }
-  return cachedParentOrigin;
-}
+const getParentOrigin = (() => {
+  let cached: string | null | undefined;
+
+  return (): string | null => {
+    if (cached === undefined) {
+      cached = resolveParentOrigin();
+    }
+
+    return cached;
+  };
+})();
 
 export function sendToParent(message: ChildMessage): void {
   if (!hasWindow() || window.parent === window) {
     return;
   }
+
   window.parent.postMessage(message, getParentOrigin() ?? "*");
 }
 
@@ -161,15 +179,20 @@ export function subscribeToParentMessages(
   handler: (message: ParentMessage) => void
 ): () => void {
   const parentOrigin = getParentOrigin();
+
   const listener = (e: MessageEvent<unknown>) => {
     if (e.source !== window.parent || !isParentMessage(e.data)) {
       return;
     }
+
     if (parentOrigin !== null && e.origin !== parentOrigin) {
       return;
     }
+
     handler(e.data);
   };
+
   window.addEventListener("message", listener);
+
   return () => window.removeEventListener("message", listener);
 }

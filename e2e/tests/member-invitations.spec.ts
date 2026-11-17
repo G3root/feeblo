@@ -39,6 +39,7 @@ async function giveRoomForAnotherMember(
     .find((segment) => segment.length > 0);
 
   expect(organizationId).toBeDefined();
+
   if (organizationId === undefined) {
     throw new Error("Workspace URL did not contain an organization id");
   }
@@ -60,11 +61,14 @@ async function inviteMember(
   });
 
   await form.getByRole("textbox", { name: "Invite email" }).fill(email);
+
   if (role !== "manager") {
     await form.getByRole("combobox").click();
     await page.getByRole("option", { name: role }).click();
   }
+
   await form.getByRole("button", { name: "Invite" }).click();
+
   if (expectSuccess) {
     await expect(
       page.getByText("Invitation sent", { exact: true })
@@ -78,6 +82,7 @@ async function createSignedInUser(
 ): Promise<Page> {
   const page = await context.newPage();
   await signUpProgrammatically(page, user);
+
   return page;
 }
 
@@ -151,6 +156,7 @@ test.describe("member invitations", () => {
     const form = page.locator("form").filter({
       has: page.getByRole("textbox", { name: "Invite email" }),
     });
+
     await expect(form.getByRole("button", { name: "Invite" })).toBeDisabled();
   });
 
@@ -215,10 +221,12 @@ test.describe("member invitations", () => {
 
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
+
       const email = await waitForTestEmail(
         page.context().request,
         invitee.email
       );
+
       const invitationId = invitationIdFromEmail(email);
 
       const forbidden = await respondToInvitation(
@@ -226,6 +234,7 @@ test.describe("member invitations", () => {
         invitationId,
         "accept"
       );
+
       expect(forbidden.status()).toBe(403);
 
       const accepted = await respondToInvitation(
@@ -233,6 +242,7 @@ test.describe("member invitations", () => {
         invitationId,
         "accept"
       );
+
       expect(accepted.ok()).toBeTruthy();
 
       await page.reload();
@@ -263,6 +273,7 @@ test.describe("member invitations", () => {
       await createSignedInUser(inviteeContext, invitee);
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
+
       const email = await waitForTestEmail(
         page.context().request,
         invitee.email
@@ -273,6 +284,7 @@ test.describe("member invitations", () => {
         invitationIdFromEmail(email),
         "reject"
       );
+
       expect(rejected.ok()).toBeTruthy();
 
       await page.reload();
@@ -296,6 +308,7 @@ test.describe("member invitations", () => {
       await createSignedInUser(inviteeContext, invitee);
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
+
       const email = await waitForTestEmail(
         page.context().request,
         invitee.email
@@ -305,6 +318,7 @@ test.describe("member invitations", () => {
         .getByText(invitee.email, { exact: true })
         .locator("..")
         .locator("..");
+
       await invitationRow.getByRole("button").click();
       await expect(
         page.getByText("Invitation revoked", { exact: true })
@@ -318,6 +332,7 @@ test.describe("member invitations", () => {
         invitationIdFromEmail(email),
         "accept"
       );
+
       expect(accepted.ok()).toBeFalsy();
     } finally {
       await inviteeContext.close();
@@ -334,10 +349,12 @@ test.describe("member invitations", () => {
       await page.goto(membersUrl(owner.organizationUrl));
 
       await inviteMember(page, member.email);
+
       const memberEmail = await waitForTestEmail(
         page.context().request,
         member.email
       );
+
       expect(
         (
           await respondToInvitation(
@@ -367,10 +384,12 @@ test.describe("member invitations", () => {
       await page.goto(membersUrl(owner.organizationUrl));
 
       await inviteMember(page, admin.email, "admin");
+
       const adminEmail = await waitForTestEmail(
         page.context().request,
         admin.email
       );
+
       expect(
         (
           await respondToInvitation(
@@ -402,10 +421,12 @@ test.describe("member invitations", () => {
       const inviteePage = await createSignedInUser(inviteeContext, invitee);
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
+
       const email = await waitForTestEmail(
         page.context().request,
         invitee.email
       );
+
       const invitationPath = `/invitation/${invitationIdFromEmail(email)}`;
 
       await inviteePage.goto(invitationPath);
@@ -446,10 +467,12 @@ test.describe("member invitations", () => {
       await createSignedInUser(inviteeContext, invitee);
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
+
       const email = await waitForTestEmail(
         page.context().request,
         invitee.email
       );
+
       const invitationPath = `/invitation/${invitationIdFromEmail(email)}`;
 
       const anonymousPage = await anonymousContext.newPage();
@@ -482,6 +505,7 @@ test.describe("member invitations", () => {
       const inviteePage = await createSignedInUser(inviteeContext, invitee);
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
+
       const email = await waitForTestEmail(
         page.context().request,
         invitee.email
@@ -516,10 +540,12 @@ test.describe("member invitations", () => {
       await giveRoomForAnotherMember(page, owner.organizationUrl);
       await page.goto(membersUrl(owner.organizationUrl));
       await inviteMember(page, invitee.email);
+
       const firstEmail = await waitForTestEmail(
         page.context().request,
         invitee.email
       );
+
       expect(
         (
           await respondToInvitation(

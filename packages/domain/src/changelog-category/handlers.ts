@@ -12,6 +12,7 @@ import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
+import { ChangelogCategoryNotFoundError } from "./errors";
 import { ChangelogCategoryPolicy } from "./policies";
 import { ChangelogCategoryRepository } from "./repository";
 import { ChangelogCategoryRpcs } from "./rpcs";
@@ -101,9 +102,19 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.update(args);
-            // The update returns nothing, so the new values go in `metadata`
-            // rather than posing as a diff with an empty `before`.
+            const { updated } = yield* repository.update(args);
+
+            // Another workspace's category, or one deleted since the page
+            // loaded, matches nothing. The RPC answers 404 and the log stays
+            // quiet, because nothing was updated.
+            if (!updated) {
+              return yield* new ChangelogCategoryNotFoundError({
+                message: "Changelog category not found",
+              });
+            }
+
+            // The update reports only that it matched, so the new values go in
+            // `metadata` rather than posing as a diff with an empty `before`.
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -129,7 +140,16 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.delete(args);
+            const { deleted } = yield* repository.delete(args);
+
+            // Same as the update: a delete that matched nothing is a 404, not
+            // an entry about a category that still exists.
+            if (!deleted) {
+              return yield* new ChangelogCategoryNotFoundError({
+                message: "Changelog category not found",
+              });
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),
@@ -149,6 +169,7 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
         const categoryIds = [...new Set(args.categoryIds)];
+
         // Two independent checks against the same workspace, run together as
         // one round trip. The verdicts are collected rather than raced, so the
         // changelog is still the one reported when both inputs are foreign.
@@ -165,11 +186,27 @@ export const ChangelogCategoryRpcHandlersEffect = Effect.gen(function* () {
           ],
           { concurrency: "unbounded", mode: "result" }
         );
+
         yield* Effect.fromResult(changelogCheck);
         yield* Effect.fromResult(categoryCheck);
 
         yield* transaction(
           Effect.gen(function* () {
+            // Locked and re-checked inside the transaction that replaces the
+            // links: the check above ran before it, so a delete racing this
+            // write could otherwise leave an entry naming an entry that is
+            // gone. The lock is held through the audit write.
+            const stillThere = yield* repository.lockChangelog({
+              changelogId: args.changelogId,
+              organizationId: args.organizationId,
+            });
+
+            if (!stillThere) {
+              return yield* new Policy.PolicyDeniedError({
+                reason: "Changelog does not belong to this organization",
+              });
+            }
+
             yield* repository.setChangelogCategories({ ...args, categoryIds });
             // Filing an entry under categories changes the entry, not the
             // category rows, so this is `changelog.updated` with the changelog
@@ -207,6 +244,7 @@ const validateChangelog = ({
 }) =>
   Effect.gen(function* () {
     const repository = yield* ChangelogCategoryRepository;
+
     const exists = yield* repository.hasChangelog({
       changelogId,
       organizationId,
@@ -228,6 +266,7 @@ const validateCategoryIds = ({
 }) =>
   Effect.gen(function* () {
     const repository = yield* ChangelogCategoryRepository;
+
     const count = yield* repository.countExistingCategories({
       organizationId,
       categoryIds,

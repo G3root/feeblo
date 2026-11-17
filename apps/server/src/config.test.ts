@@ -121,11 +121,13 @@ describe("ServerConfig integration worker concurrency", () => {
       const zero = yield* Effect.exit(
         loadServerConfig({ INTEGRATION_CONNECTION_CONCURRENCY: "0" })
       );
+
       expect(Exit.isFailure(zero)).toBe(true);
 
       const globalZero = yield* Effect.exit(
         loadServerConfig({ INTEGRATION_GLOBAL_CONCURRENCY: "0" })
       );
+
       expect(Exit.isFailure(globalZero)).toBe(true);
 
       const nonNumeric = yield* Effect.exit(
@@ -134,6 +136,7 @@ describe("ServerConfig integration worker concurrency", () => {
           INTEGRATION_GLOBAL_CONCURRENCY: "abc",
         })
       );
+
       expect(Exit.isFailure(nonNumeric)).toBe(true);
     })
   );

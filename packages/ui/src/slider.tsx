@@ -16,9 +16,11 @@ export function Slider({
     if (value !== undefined) {
       return Array.isArray(value) ? value : [value];
     }
+
     if (defaultValue !== undefined) {
       return Array.isArray(defaultValue) ? defaultValue : [defaultValue];
     }
+
     return [min];
   }, [value, defaultValue, min]);
 

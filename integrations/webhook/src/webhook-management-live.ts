@@ -52,6 +52,7 @@ import {
 } from "./webhook-manifest";
 
 const retentionMs = 30 * 24 * 60 * 60 * 1000;
+
 const subscribableEventTypes = SUBSCRIBABLE_INTEGRATION_EVENT_TYPES;
 
 const WebhookSafeDisplayMetadata = Schema.Struct({ hostname: Schema.String });
@@ -59,9 +60,10 @@ const WebhookSafeDisplayMetadata = Schema.Struct({ hostname: Schema.String });
 const decodeWebhookSafeDisplayMetadata = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(WebhookSafeDisplayMetadata)(value).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored webhook display metadata is invalid",
+          cause,
         })
     )
   );
@@ -69,9 +71,10 @@ const decodeWebhookSafeDisplayMetadata = (value: Schema.Json) =>
 const decodeWebhookRouteEventSelection = (value: Schema.Json) =>
   Schema.decodeUnknownEffect(IntegrationRouteEventSelection)(value).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new InternalServerError({
           message: "Stored webhook event selection is invalid",
+          cause,
         })
     )
   );
@@ -93,6 +96,7 @@ const endpointHealth = (connection: {
   if (connection.lifecycle === "paused") {
     return "paused" as const;
   }
+
   if (
     connection.lastFailedAt !== null &&
     (connection.lastSucceededAt === null ||
@@ -100,6 +104,7 @@ const endpointHealth = (connection: {
   ) {
     return "failing" as const;
   }
+
   return "healthy" as const;
 };
 
@@ -118,21 +123,29 @@ const decodeHistoryCursor = (
   if (cursor === undefined) {
     return Effect.succeedNone;
   }
+
   const separatorIndex = cursor.lastIndexOf("~");
+
   const timePart =
     separatorIndex === -1 ? undefined : cursor.slice(0, separatorIndex);
+
   const idPart =
     separatorIndex === -1 ? undefined : cursor.slice(separatorIndex + 1);
+
   if (timePart === undefined || idPart === undefined || idPart.length === 0) {
     return Effect.fail(
       new BadRequestError({ message: "Webhook history cursor is invalid" })
     );
   }
+
   return Schema.decodeEffect(Schema.DateFromString)(timePart).pipe(
     Effect.map((beforeTime) => Option.some({ beforeId: idPart, beforeTime })),
     Effect.mapError(
-      () =>
-        new BadRequestError({ message: "Webhook history cursor is invalid" })
+      (cause) =>
+        new BadRequestError({
+          message: "Webhook history cursor is invalid",
+          cause,
+        })
     )
   );
 };
@@ -143,6 +156,7 @@ export const WebhookManagementServiceLive = Layer.effect(
   Effect.gen(function* () {
     const db = yield* currentDb;
     const audit = yield* AuditLogRecorder;
+
     const { encryptionKey, endpointSecurityPolicy } =
       yield* WebhookIntegrationConfig;
 
@@ -208,6 +222,7 @@ export const WebhookManagementServiceLive = Layer.effect(
             )
           )
           .orderBy(desc(schema.integrationConnectionTable.createdAt));
+
         return yield* Effect.forEach(rows, ({ connection, route }) =>
           Effect.all({
             metadata: decodeWebhookSafeDisplayMetadata(
@@ -247,13 +262,16 @@ export const WebhookManagementServiceLive = Layer.effect(
           endpointSecurityPolicy
         ).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new BadRequestError({
                 message: "Webhook endpoint URL is not allowed",
+                cause,
               })
           )
         );
+
         const signingSecret = yield* generateWebhookSigningSecret;
+
         const ciphertext = yield* encryptWebhookCredentialMaterial(
           encryptionKey,
           {
@@ -262,12 +280,14 @@ export const WebhookManagementServiceLive = Layer.effect(
           }
         ).pipe(
           Effect.mapError(
-            () =>
+            (cause) =>
               new InternalServerError({
                 message: "Webhook credentials could not be encrypted",
+                cause,
               })
           )
         );
+
         const connectionId = yield* IntegrationConnectionId.generate;
         const routeId = yield* IntegrationRouteId.generate;
         yield* db.transaction(() =>
@@ -310,6 +330,7 @@ export const WebhookManagementServiceLive = Layer.effect(
             });
           })
         );
+
         return {
           endpoint: {
             eventTypes: [...input.eventTypes],
@@ -343,18 +364,21 @@ export const WebhookManagementServiceLive = Layer.effect(
                 endpointSecurityPolicy
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new BadRequestError({
                       message: "Webhook endpoint URL is not allowed",
+                      cause,
                     })
                 )
               );
+
         return yield* db.transaction(() =>
           Effect.gen(function* () {
             const [existing] = yield* lockWebhookConnection(
               input.connectionId,
               input.organizationId
             );
+
             if (
               existing === undefined ||
               (existing.lifecycle !== "active" &&
@@ -364,10 +388,17 @@ export const WebhookManagementServiceLive = Layer.effect(
                 message: "Webhook endpoint was not found",
               });
             }
+
             let { hostname } = yield* decodeWebhookSafeDisplayMetadata(
               existing.safeDisplayMetadata ?? {}
             );
+
             const previousHostname = hostname;
+            // Set below, when the submitted URL is decrypted beside the stored
+            // one. The hostname cannot stand in for it: a webhook moved from
+            // `/a` to `/b` on the same host sends to a different place.
+            let destinationChanged = false;
+
             // Read before the writes below: the diff needs what the endpoint
             // carried before this save, and the read after the update returns
             // the row it wrote.
@@ -387,27 +418,40 @@ export const WebhookManagementServiceLive = Layer.effect(
                 )
               )
               .limit(1);
+
             const previousEventTypes = yield* decodeWebhookRouteEventSelection(
               routeBefore?.eventTypes ?? []
             );
+
             let credentialsCiphertext = existing.credentialsCiphertext;
+
             if (input.endpointUrl !== undefined && validated !== undefined) {
               if (credentialsCiphertext === null) {
                 return yield* new NotFoundError({
                   message: "Webhook endpoint was not found",
                 });
               }
+
               const credentials = yield* decryptWebhookCredentialMaterial(
                 encryptionKey,
                 credentialsCiphertext
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be decrypted",
+                      cause,
                     })
                 )
               );
+
+              // Storage keeps the submitted string verbatim, so a difference
+              // is a real change even when only the path moved. Neither URL
+              // reaches the entry: the hostname already names the endpoint, and
+              // a path can carry a per-endpoint token.
+              destinationChanged =
+                Redacted.value(credentials.endpointUrl) !== input.endpointUrl;
+
               credentialsCiphertext = yield* encryptWebhookCredentialMaterial(
                 encryptionKey,
                 {
@@ -428,14 +472,16 @@ export const WebhookManagementServiceLive = Layer.effect(
                 }
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be encrypted",
+                      cause,
                     })
                 )
               );
               hostname = validated.hostname;
             }
+
             yield* db
               .update(schema.integrationConnectionTable)
               .set({
@@ -454,6 +500,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   )
                 )
               );
+
             if (input.eventTypes !== undefined) {
               yield* db
                 .update(schema.integrationRouteTable)
@@ -471,6 +518,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   )
                 );
             }
+
             const [route] = yield* db
               .select({
                 eventTypes: schema.integrationRouteTable.eventTypes,
@@ -489,24 +537,30 @@ export const WebhookManagementServiceLive = Layer.effect(
                 )
               )
               .limit(1);
+
             const selectedEventTypes = yield* decodeWebhookRouteEventSelection(
               route?.eventTypes ?? []
             );
+
             const eventTypes = subscribableEventTypes.filter((type) =>
               selectedEventTypes.includes(type)
             );
+
             const name = input.name ?? existing.name;
+
             // The endpoint row and its route were both read inside this
             // transaction, so the diff is decided from the same snapshot the
             // write replaced. A save that changed nothing is not an event.
             const fields = [
               ...(existing.name === name ? [] : ["name"]),
               ...(previousHostname === hostname ? [] : ["hostname"]),
+              ...(destinationChanged ? ["destination"] : []),
               ...(previousEventTypes.length === eventTypes.length &&
               previousEventTypes.every((type) => eventTypes.includes(type))
                 ? []
                 : ["eventTypes"]),
             ];
+
             if (fields.length > 0) {
               yield* recordProviderChange(audit, {
                 organizationId: input.organizationId,
@@ -523,6 +577,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 },
               });
             }
+
             return {
               eventTypes,
               health: endpointHealth(existing),
@@ -551,6 +606,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 input.connectionId,
                 input.organizationId
               );
+
               if (
                 connection === undefined ||
                 (connection.lifecycle !== "active" &&
@@ -560,6 +616,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   message: "Webhook endpoint was not found",
                 });
               }
+
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
@@ -632,6 +689,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 input.connectionId,
                 input.organizationId
               );
+
               if (
                 connection === undefined ||
                 (connection.lifecycle !== "active" &&
@@ -641,6 +699,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   message: "Webhook endpoint was not found",
                 });
               }
+
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
@@ -701,14 +760,17 @@ export const WebhookManagementServiceLive = Layer.effect(
                 input.connectionId,
                 input.organizationId
               );
+
               if (connection === undefined) {
                 return yield* new NotFoundError({
                   message: "Webhook endpoint was not found",
                 });
               }
+
               if (connection.lifecycle === "archived") {
                 return;
               }
+
               const now = yield* DateTime.nowAsDate;
               yield* db
                 .update(schema.integrationConnectionTable)
@@ -792,6 +854,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 input.connectionId,
                 input.organizationId
               );
+
               if (
                 connection?.credentialsCiphertext === null ||
                 connection?.credentialsCiphertext === undefined ||
@@ -802,20 +865,24 @@ export const WebhookManagementServiceLive = Layer.effect(
                   message: "Webhook endpoint was not found",
                 });
               }
+
               const credentials = yield* decryptWebhookCredentialMaterial(
                 encryptionKey,
                 connection.credentialsCiphertext
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be decrypted",
+                      cause,
                     })
                 )
               );
+
               const keyring = yield* rotateWebhookSigningKeyring(
                 credentials.signingKeyring
               );
+
               const ciphertext = yield* encryptWebhookCredentialMaterial(
                 encryptionKey,
                 {
@@ -834,12 +901,14 @@ export const WebhookManagementServiceLive = Layer.effect(
                 }
               ).pipe(
                 Effect.mapError(
-                  () =>
+                  (cause) =>
                     new InternalServerError({
                       message: "Webhook credentials could not be encrypted",
+                      cause,
                     })
                 )
               );
+
               yield* db
                 .update(schema.integrationConnectionTable)
                 .set({
@@ -871,6 +940,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   name: connection.name,
                 },
               });
+
               return { signingSecret: Redacted.value(keyring.current) };
             })
           )
@@ -884,6 +954,7 @@ export const WebhookManagementServiceLive = Layer.effect(
         readonly organizationId: string;
       }) {
         const { connectionId, organizationId } = input;
+
         return yield* db
           .transaction(() =>
             Effect.gen(function* () {
@@ -891,6 +962,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 input.connectionId,
                 input.organizationId
               );
+
               if (
                 connection === undefined ||
                 connection.lifecycle !== "active"
@@ -899,6 +971,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   message: "Webhook endpoint was not found",
                 });
               }
+
               const [route] = yield* db
                 .select({
                   enabled: schema.integrationRouteTable.enabled,
@@ -918,11 +991,13 @@ export const WebhookManagementServiceLive = Layer.effect(
                   )
                 )
                 .limit(1);
+
               if (route === undefined || !route.enabled) {
                 return yield* new NotFoundError({
                   message: "Webhook endpoint was not found",
                 });
               }
+
               const eventId = yield* IntegrationEventId.generate;
               const deliveryId = yield* IntegrationDeliveryId.generate;
               const boardId = yield* BoardId.generate;
@@ -978,6 +1053,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 routeId: route.id,
                 state: "pending",
               });
+
               return { deliveryId, result: "queued" as const };
             })
           )
@@ -996,6 +1072,7 @@ export const WebhookManagementServiceLive = Layer.effect(
       }) {
         const before = yield* decodeHistoryCursor(input.cursor);
         const pageSize = Math.min(Math.max(input.limit ?? 20, 1), 100);
+
         const rows = yield* db
           .select({
             delivery: {
@@ -1053,12 +1130,15 @@ export const WebhookManagementServiceLive = Layer.effect(
             desc(schema.integrationDeliveryTable.id)
           )
           .limit(pageSize + 1);
+
         const pageRows = rows.slice(0, pageSize);
         const lastPageRow = pageRows.at(-1);
+
         const nextCursor =
           rows.length > pageRows.length && lastPageRow !== undefined
             ? encodeHistoryCursor(lastPageRow.delivery)
             : null;
+
         const attempts =
           pageRows.length === 0
             ? []
@@ -1084,6 +1164,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                 .orderBy(
                   desc(schema.integrationDeliveryAttemptTable.startedAt)
                 );
+
         return yield* Schema.decodeEffect(WebhookDeliveryHistoryPage)({
           items: pageRows.map(({ delivery, event }) => ({
             attempts: attempts
@@ -1110,8 +1191,11 @@ export const WebhookManagementServiceLive = Layer.effect(
           nextCursor,
         }).pipe(
           Effect.mapError(
-            () =>
-              new InternalServerError({ message: "Webhook history is invalid" })
+            (cause) =>
+              new InternalServerError({
+                message: "Webhook history is invalid",
+                cause,
+              })
           )
         );
       },
@@ -1143,16 +1227,19 @@ export const WebhookManagementServiceLive = Layer.effect(
                   )
                 )
                 .limit(1);
+
               if (delivery === undefined) {
                 return yield* new NotFoundError({
                   message:
                     "Webhook delivery was not found or is unavailable for retry",
                 });
               }
+
               const [connection] = yield* lockWebhookConnection(
                 delivery.connectionId,
                 input.organizationId
               );
+
               const [route] = yield* db
                 .select({ enabled: schema.integrationRouteTable.enabled })
                 .from(schema.integrationRouteTable)
@@ -1166,6 +1253,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                   )
                 )
                 .limit(1);
+
               if (
                 connection?.lifecycle !== "active" ||
                 route?.enabled !== true
@@ -1175,6 +1263,7 @@ export const WebhookManagementServiceLive = Layer.effect(
                     "Resume the webhook endpoint before retrying delivery",
                 });
               }
+
               const now = yield* DateTime.nowAsDate;
               // The delivery ID and its attempt numbering continue across the
               // manual retry: the worker's next claim creates the next attempt

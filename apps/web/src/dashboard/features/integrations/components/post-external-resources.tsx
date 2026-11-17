@@ -28,8 +28,10 @@ export function PostExternalResources({
     organizationId,
     postId,
   });
+
   const resourcesResult = useAtomValue(resourcesAtom);
   const refreshResources = useAtomRefresh(resourcesAtom);
+
   const { resources, loadFailed } = Result.builder(resourcesResult)
     .onInitial(() => ({ resources: null, loadFailed: false }))
     .onFailure((_, { previousSuccess }) =>
@@ -40,6 +42,7 @@ export function PostExternalResources({
     )
     .onSuccess((value) => ({ resources: value, loadFailed: false }))
     .exhaustive();
+
   return (
     <section aria-labelledby="post-external-resources-heading">
       <div className="flex items-center justify-between gap-2">
@@ -99,11 +102,13 @@ function PostExternalResourceList({
       </div>
     );
   }
+
   if (resources === null) {
     return (
       <p className="text-muted-foreground text-sm">Loading linked resources…</p>
     );
   }
+
   if (resources.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
@@ -111,10 +116,12 @@ function PostExternalResourceList({
       </p>
     );
   }
+
   const resourceGroups = Map.groupBy(
     resources,
     (resource) => resource.provider
   );
+
   return (
     <div className="grid gap-4">
       {[...resourceGroups.values()].map((providerResources) => (
@@ -133,6 +140,7 @@ function PostExternalResourceProviderGroup({
   readonly resources: readonly PostExternalResourceLink[];
 }) {
   const providerDisplayName = resources[0]?.providerDisplayName ?? "External";
+
   return (
     <div className="grid gap-2">
       <h3 className="text-muted-foreground text-xs font-medium">
@@ -161,9 +169,11 @@ function PostExternalResourceCard({
 }) {
   const resourceLabel =
     resource.title ?? resource.displayKey ?? resource.resourceType;
+
   const resourceDetails = [resource.resourceType, resource.displayKey]
     .filter((value): value is string => value !== null)
     .join(" · ");
+
   const content = (
     <>
       <span className="min-w-0">
@@ -181,7 +191,9 @@ function PostExternalResourceCard({
       )}
     </>
   );
+
   const href = resource.remoteUrl.toString();
+
   const className =
     "hover:bg-muted flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm";
 

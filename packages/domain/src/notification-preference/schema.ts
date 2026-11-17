@@ -74,8 +74,9 @@ export const resolveNotificationPreferenceState = (
   rows: readonly StoredNotificationPreference[]
 ): TNotificationPreferenceState => {
   const disabled = new Set(
-    rows.filter((row) => !row.enabled).map((row) => row.category)
+    rows.flatMap((row) => (row.enabled ? [] : [row.category]))
   );
+
   return {
     pausedAll: disabled.has("all"),
     categories: {

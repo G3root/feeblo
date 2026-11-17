@@ -25,19 +25,24 @@ function findTriggers(): HTMLElement[] {
 
 export function extractTriggerMetadata(element: HTMLElement) {
   const metadata: Record<string, string> = {};
+
   for (const key of Object.keys(element.dataset)) {
     if (key === FEEDBACK_DATASET_KEY) {
       continue;
     }
+
     const match = key.match(METADATA_KEY_REGEX);
+
     if (match?.[1]) {
       const name = match[1].charAt(0).toLowerCase() + match[1].slice(1);
       const value = element.dataset[key];
+
       if (value !== undefined) {
         metadata[name] = value;
       }
     }
   }
+
   return metadata;
 }
 
@@ -46,7 +51,9 @@ export function bindTriggers(target: TriggerTarget, logger?: Logger): void {
     if (trigger.dataset.feebloBound === "true") {
       continue;
     }
+
     trigger.dataset.feebloBound = "true";
+
     if (logger?.enabled) {
       logger("trigger", "bound", trigger);
     }
@@ -55,12 +62,15 @@ export function bindTriggers(target: TriggerTarget, logger?: Logger): void {
       event.preventDefault();
       event.stopPropagation();
       const metadata = extractTriggerMetadata(trigger);
+
       if (logger?.enabled) {
         logger("trigger", "click", metadata);
       }
+
       if (metadata.board) {
         target.setBoard(metadata.board);
       }
+
       target.open(trigger, metadata);
     };
 
@@ -68,22 +78,28 @@ export function bindTriggers(target: TriggerTarget, logger?: Logger): void {
   }
 }
 
-let triggerScanInterval: ReturnType<typeof setInterval> | null = null;
+/** The scan timer while one is running; only the two functions below touch it. */
+type TriggerScanSession = { interval: ReturnType<typeof setInterval> | null };
+
+const scanning: TriggerScanSession = {
+  interval: null,
+};
 
 export function startTriggerScanning(
   target: TriggerTarget,
   logger?: Logger
 ): void {
-  if (triggerScanInterval) {
+  if (scanning.interval !== null) {
     return;
   }
-  triggerScanInterval = setInterval(() => bindTriggers(target, logger), 1000);
+
+  scanning.interval = setInterval(() => bindTriggers(target, logger), 1000);
   bindTriggers(target, logger);
 }
 
 export function stopTriggerScanning(): void {
-  if (triggerScanInterval) {
-    clearInterval(triggerScanInterval);
-    triggerScanInterval = null;
+  if (scanning.interval !== null) {
+    clearInterval(scanning.interval);
+    scanning.interval = null;
   }
 }

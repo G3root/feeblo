@@ -31,6 +31,7 @@ export type CustomAttributeValue = {
 };
 
 export type CustomAttributeInputValue = boolean | string;
+
 export type CustomAttributeInputValues = Record<
   string,
   CustomAttributeInputValue | undefined
@@ -150,6 +151,7 @@ export function hasMissingRequiredCustomAttributeValues(
 ) {
   return definitions.some((definition) => {
     const value = values[definition.id] ?? defaultInputValue(definition);
+
     return definition.isRequired && value === "";
   });
 }
@@ -226,10 +228,12 @@ function getCustomAttributeValueChanges<
   const existingByAttributeId = new Map(
     existingValues.map((value) => [value.attributeId, value])
   );
+
   const inserts: Array<{
     definition: CustomAttributeDefinition;
     valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
   }> = [];
+
   const updates: Array<{
     existingValue: TExistingValue;
     valueColumns: ReturnType<typeof toCustomAttributeValueColumns>;
@@ -244,10 +248,12 @@ function getCustomAttributeValueChanges<
     }
 
     const valueColumns = toCustomAttributeValueColumns(definition, input);
+
     if (existingValue) {
       if (input !== getCustomAttributeInputValue(definition, existingValue)) {
         updates.push({ existingValue, valueColumns });
       }
+
       continue;
     }
 
@@ -284,6 +290,7 @@ export async function getContactCustomAttributeValueChanges({
     existingValues,
     values,
   });
+
   const insertValues = await Promise.all(
     inserts.map(async ({ definition, valueColumns }) => ({
       id: await ContactAttributeValueId.unsafeGenerate(),
@@ -295,6 +302,7 @@ export async function getContactCustomAttributeValueChanges({
       ...valueColumns,
     }))
   );
+
   return {
     createAttribute: insertValues,
     upsertAttribute: updates.map(({ existingValue, valueColumns }) => ({
@@ -332,6 +340,7 @@ export async function getCompanyCustomAttributeValueChanges({
     existingValues,
     values,
   });
+
   const insertValues = await Promise.all(
     inserts.map(async ({ definition, valueColumns }) => ({
       id: await CompanyAttributeValueId.unsafeGenerate(),
@@ -343,6 +352,7 @@ export async function getCompanyCustomAttributeValueChanges({
       ...valueColumns,
     }))
   );
+
   return {
     createAttribute: insertValues,
     upsertAttribute: updates.map(({ existingValue, valueColumns }) => ({
@@ -426,6 +436,7 @@ export async function createContactAction(
         ),
     ]);
   }
+
   await Promise.all([
     dashboardCollections.contactCollection.utils.refetch(),
     dashboardCollections.contactAttributeValueCollection.utils.refetch(),
@@ -475,6 +486,7 @@ export async function createCompanyAction(
         ),
     ]);
   }
+
   await Promise.all([
     dashboardCollections.companyCollection.utils.refetch(),
     dashboardCollections.companyAttributeValueCollection.utils.refetch(),

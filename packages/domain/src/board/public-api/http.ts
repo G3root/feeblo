@@ -61,6 +61,7 @@ export const boardHandlers = (
   listBoards: (({ query }) =>
     Effect.gen(function* () {
       const limit = yield* parseLimit(query.limit);
+
       return yield* listBoardsOperation.handler({
         cursor: query.cursor,
         limit,

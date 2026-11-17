@@ -221,11 +221,15 @@ export type TWidgetBootEnv = S.Schema.Type<typeof WidgetBootEnv>;
  * other half of one declaration.
  */
 export const decodeWidgetBoards = S.decodeUnknownSync(S.Array(WidgetBoard));
+
 export const decodeWidgetUpdates = S.decodeUnknownSync(S.Array(WidgetUpdate));
+
 export const decodeWidgetSuggestions = S.decodeUnknownSync(
   S.Array(WidgetSuggestion)
 );
+
 export const decodeWidgetError = S.decodeUnknownSync(WidgetError);
+
 export const decodeWidgetBootEnv = S.decodeUnknownSync(WidgetBootEnv);
 
 /**

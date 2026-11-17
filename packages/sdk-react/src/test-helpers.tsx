@@ -41,9 +41,11 @@ export function postFromWidget(message: WidgetToHostMessage): void {
  */
 export function interceptIframePostMessages(): SentMessage[] {
   const iframe = document.querySelector("iframe");
+
   if (iframe === null) {
     throw new Error("No embed iframe found to intercept.");
   }
+
   const sent: SentMessage[] = [];
   Object.defineProperty(iframe, "contentWindow", {
     configurable: true,
@@ -53,6 +55,7 @@ export function interceptIframePostMessages(): SentMessage[] {
       },
     },
   });
+
   return sent;
 }
 
@@ -79,6 +82,7 @@ export class ErrorCatcher extends Component<
     if (this.state.error !== null) {
       return <output>{this.state.error.message}</output>;
     }
+
     return this.props.children;
   }
 }

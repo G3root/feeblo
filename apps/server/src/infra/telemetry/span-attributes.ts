@@ -54,6 +54,7 @@ export const httpSpanAttributeAllowlist: ReadonlySet<string> = new Set([
 /** Record this attribute? HTTP names must be allowlisted; product names pass through. */
 export const spanAttributeAllowed = (key: string): boolean => {
   const name = key.toLowerCase();
+
   return (
     !httpNamespaces.some((namespace) => name.startsWith(namespace)) ||
     httpSpanAttributeAllowlist.has(name)
@@ -80,13 +81,16 @@ const compareSpecificity = (
   b: ReadonlyArray<string>
 ): number => {
   const length = Math.min(a.length, b.length);
+
   for (let index = 0; index < length; index += 1) {
     const left = a[index]?.startsWith(":") ?? false;
     const right = b[index]?.startsWith(":") ?? false;
+
     if (left !== right) {
       return left ? 1 : -1;
     }
   }
+
   return a.length - b.length;
 };
 
@@ -103,8 +107,10 @@ export const routeTemplates = (templates: Iterable<`/${string}`>) => {
   const known = [...new Set(templates)]
     .map((template) => ({ template, segments: template.split("/") }))
     .sort((a, b) => compareSpecificity(a.segments, b.segments));
+
   const match = (path: string) => {
     const segments = path.split("/");
+
     return known.find(
       (route) =>
         route.segments.length === segments.length &&
@@ -115,10 +121,12 @@ export const routeTemplates = (templates: Iterable<`/${string}`>) => {
         )
     )?.template;
   };
+
   return {
     match,
     record: (path: string) => {
       const template = match(path);
+
       return template === undefined ? Effect.void : recordRoute(template);
     },
   };
@@ -144,6 +152,7 @@ const allowedEntries = (attributes: SpanAttributeMap): SpanAttributeMap =>
 const allowlistedSpan = (span: Tracer.Span): Tracer.Span => {
   let path = false;
   let route: string | undefined;
+
   return {
     _tag: "Span",
     get name() {
@@ -181,17 +190,22 @@ const allowlistedSpan = (span: Tracer.Span): Tracer.Span => {
       if (!spanAttributeAllowed(key)) {
         return;
       }
+
       if (key === "url.path" && isString(value)) {
         path = true;
         span.attribute(key, route ?? value);
+
         return;
       }
+
       if (key === "http.route" && isString(value)) {
         route = value;
+
         if (path) {
           span.attribute("url.path", value);
         }
       }
+
       span.attribute(key, value);
     },
     event: (name, startTime, attributes) =>
@@ -238,6 +252,7 @@ export const allowedSpans = (
 ): Tracer.Tracer => {
   const sampleRate = Math.min(1, Math.max(0, options?.sampleRate ?? 1));
   const dropRootSpans = options?.dropRootSpans ?? rootSpanNoise;
+
   const span = (
     spanOptions: Parameters<Tracer.Tracer["span"]>[0]
   ): Tracer.Span => {
@@ -251,8 +266,10 @@ export const allowedSpans = (
         !dropRootSpans.has(spanOptions.name) &&
         // oxlint-disable-next-line effecttsgo/global-random -- ratio sampling is a synchronous span-creation decision and cannot read Effect's Random service
         Math.random() < sampleRate;
+
     return allowlistedSpan(tracer.span({ ...spanOptions, sampled }));
   };
+
   return tracer.context === undefined
     ? { span }
     : { span, context: tracer.context };

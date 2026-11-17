@@ -305,4 +305,5 @@ export const oauthClientAssertionTable = pgTable("oauth_client_assertion", {
 });
 
 export type OAuthClient = typeof oauthClientTable.$inferSelect;
+
 export type OAuthConsent = typeof oauthConsentTable.$inferSelect;

@@ -67,6 +67,7 @@ function RouteComponent() {
         .from({ changelog: changelogCollection })
         .where(({ changelog }) => eq(changelog.organizationId, organizationId)),
   });
+
   const changelogs = changelogsQuery.data ?? [];
   const matched = changelogs.find((row) => row.slug === changelogSlug);
 
@@ -85,13 +86,16 @@ function RouteComponent() {
   // `(organizationId, slug)` is unique, so once recorded the same slug keeps
   // resolving to the same row and the condition goes false.
   const [resolved, setResolved] = useState<SlugResolution | null>(null);
+
   if (matched !== undefined && resolved?.forSlug !== changelogSlug) {
     setResolved({ forSlug: changelogSlug, id: matched.id });
   }
+
   const renamedRow =
     matched === undefined && resolved?.forSlug === changelogSlug
       ? changelogs.find((row) => row.id === resolved.id)
       : undefined;
+
   const changelog = matched ?? renamedRow;
 
   if (changelogsQuery.isLoading) {

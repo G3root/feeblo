@@ -21,7 +21,9 @@ export function ChangelogCompletedPosts({
 }) {
   const { changelogPostCollection, postCollection, postStatusCollection } =
     useDashboardCollections();
+
   const { changelog, isOwner } = useChangelogEditorContext();
+
   const completedPostsQuery = useLiveQuery({
     // The heaviest IR in the changelog editor; keying it skips rebuilding the
     // join/having shape on every editor render.
@@ -64,6 +66,7 @@ export function ChangelogCompletedPosts({
           title: post.title,
         })),
   });
+
   const completedPosts = completedPostsQuery.data ?? [];
 
   const updateAssignment = async ({
@@ -84,6 +87,7 @@ export function ChangelogCompletedPosts({
         : changelogPostCollection.delete(
             getChangelogPostKey({ changelogId: changelog.id, postId })
           );
+
       await tx.when("settled");
     } catch {
       toastManager.add({

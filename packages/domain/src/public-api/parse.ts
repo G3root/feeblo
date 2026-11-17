@@ -38,6 +38,7 @@ export const parseLimit = (raw: string | undefined) =>
     }
 
     const limit = Number(raw);
+
     if (limit < 1 || limit > PUBLIC_API_PAGE_MAX_LIMIT) {
       return yield* invalidRequestError(
         `limit must be between 1 and ${PUBLIC_API_PAGE_MAX_LIMIT}.`
@@ -51,9 +52,11 @@ export const parseIncludeArchived = (raw: string | undefined) => {
   if (raw === undefined || raw.length === 0 || raw === "false") {
     return Effect.succeed(false);
   }
+
   if (raw === "true") {
     return Effect.succeed(true);
   }
+
   return Effect.fail(
     invalidRequestError("includeArchived must be true or false.")
   );
@@ -86,6 +89,7 @@ export const parseTagIds = (raw: string | undefined) =>
     // operation's input schema is a non-empty array, so the empty case is
     // unrepresentable past this point rather than merely unreachable.
     const [first, ...rest] = tagIds;
+
     if (first === undefined) {
       return yield* invalidRequestError(
         "tagIds must be a comma-separated list of tag ids."
@@ -93,6 +97,7 @@ export const parseTagIds = (raw: string | undefined) =>
     }
 
     const nonEmpty: readonly [string, ...string[]] = [first, ...rest];
+
     return nonEmpty;
   });
 
@@ -116,6 +121,7 @@ const daysInMonth = (year: number, month: number): number => {
   if (month === 2) {
     return isLeapYear(year) ? 29 : 28;
   }
+
   return [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] ?? 0;
 };
 
@@ -135,6 +141,7 @@ const daysInMonth = (year: number, month: number): number => {
  */
 export const isIsoDateOrTimestamp = (value: string): boolean => {
   const match = ISO_DATE_OR_DATETIME.exec(value);
+
   if (match === null) {
     return false;
   }
@@ -146,15 +153,19 @@ export const isIsoDateOrTimestamp = (value: string): boolean => {
   if (monthNumber < 1 || monthNumber > 12) {
     return false;
   }
+
   if (dayNumber < 1 || dayNumber > daysInMonth(Number(year), monthNumber)) {
     return false;
   }
+
   if (hour !== undefined && Number(hour) > 23) {
     return false;
   }
+
   if (minute !== undefined && Number(minute) > 59) {
     return false;
   }
+
   if (second !== undefined && Number(second) > 59) {
     return false;
   }
@@ -183,6 +194,7 @@ const UPDATED_AFTER_INVALID =
 export const parseUpdatedAfter = (raw: string | undefined) =>
   Effect.gen(function* () {
     const trimmed = raw?.trim();
+
     if (trimmed === undefined || trimmed.length === 0) {
       return null;
     }
@@ -192,6 +204,7 @@ export const parseUpdatedAfter = (raw: string | undefined) =>
     }
 
     const decoded = Option.getOrNull(decodeUpdatedAfter(trimmed));
+
     if (decoded === null) {
       // Unreachable while the shape and calendar checks above hold; kept so
       // the decoder remains the authority on what an instant is rather than
@@ -213,9 +226,11 @@ export const parseUpdatedAfter = (raw: string | undefined) =>
 export const parseName = (raw: string) =>
   Effect.gen(function* () {
     const name = raw.trim();
+
     if (name.length === 0) {
       return yield* invalidRequestError("name must not be empty.");
     }
+
     return name;
   });
 
@@ -231,9 +246,11 @@ export const parseName = (raw: string) =>
 export const parseTitle = (raw: string) =>
   Effect.gen(function* () {
     const title = raw.trim();
+
     if (title.length === 0) {
       return yield* invalidRequestError("title must not be empty.");
     }
+
     return title;
   });
 
@@ -246,5 +263,6 @@ export const parseTitle = (raw: string) =>
  */
 export const providedQueryParam = (raw: string | undefined) => {
   const trimmed = raw?.trim();
+
   return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
 };

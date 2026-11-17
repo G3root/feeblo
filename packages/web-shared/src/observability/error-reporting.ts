@@ -55,6 +55,7 @@ const errorTypePattern = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/;
 /** Tie every event in this document to the same page load when one exists. */
 const pageTag = (): { page_id?: string } => {
   const id = browserPageId();
+
   return id === undefined ? {} : { page_id: id };
 };
 
@@ -66,9 +67,11 @@ const pageTag = (): { page_id?: string } => {
  */
 export const strippedUrl = (value: string): string => {
   const url = URL.parse(value, "https://feeblo.invalid");
+
   if (url === null) return value;
   url.search = "";
   url.hash = "";
+
   return url.origin === "https://feeblo.invalid" ? url.pathname : url.href;
 };
 
@@ -79,16 +82,17 @@ export const strippedBreadcrumb = <
   crumb: A
 ): A => {
   const data = crumb.data;
+
   if (data === undefined) return crumb;
+
   for (const key of ["from", "to", "url"]) {
     const value = data[key];
+
     if (isString(value)) data[key] = strippedUrl(value);
   }
+
   return crumb;
 };
-
-let started = false;
-let scripts = "";
 
 /**
  * The error type recorded on an event and on the product-analytics event.
@@ -104,6 +108,7 @@ export const errorType = <T>(error: T): string => {
       : isPlainObject(error) && "_tag" in error && isString(error._tag)
         ? error._tag
         : "UnknownError";
+
   return isString(candidate) && errorTypePattern.test(candidate)
     ? candidate
     : "UnknownError";
@@ -123,13 +128,16 @@ export const captureBrowserError = <T>(
 ): void => {
   // Product analytics listens independently of Sentry: a deployment may
   // configure Databuddy without an error tracker, and the event is still useful.
-  if (started) {
+  if (Sentry.getClient() !== undefined) {
     if (tags === undefined) Sentry.captureException(error);
     else Sentry.captureException(error, { tags });
   }
+
   const detail = { error_type: errorType(error) };
   const id = browserPageId();
+
   if (id !== undefined) Object.assign(detail, { page_id: id });
+
   if (tags !== undefined) Object.assign(detail, { tags });
   window.dispatchEvent(new CustomEvent(operationFailedEvent, { detail }));
 };
@@ -138,7 +146,7 @@ export const captureBrowserError = <T>(
 export const setErrorReportingUser = (
   user: ErrorReportingUser | null
 ): void => {
-  if (!started) return;
+  if (Sentry.getClient() === undefined) return;
   Sentry.setUser(user === null ? null : { id: user.id });
 };
 
@@ -168,8 +176,11 @@ export const reactErrorHandlers = {
 export const startErrorReporting = (
   settings: BrowserErrorReportingSettings
 ): void => {
-  if (started || settings.dsn.length === 0) return;
-  scripts = settings.scripts;
+  if (Sentry.getClient() !== undefined || settings.dsn.length === 0) return;
+  // Captured by `beforeSend` below: the loader snippet decides which failures
+  // are first-party, and nothing outside this call needs it.
+  const scripts = settings.scripts;
+
   const options: Parameters<typeof Sentry.init>[0] = {
     dsn: settings.dsn,
     environment: settings.environment,
@@ -201,26 +212,30 @@ export const startErrorReporting = (
         !firstPartyFailure(hint.originalException, scripts)
       )
         return null;
+
       if (event.request) {
         delete event.request.cookies;
         delete event.request.headers;
         delete event.request.data;
+
         if (event.request.url)
           event.request.url = strippedUrl(event.request.url);
       }
+
       if (event.breadcrumbs)
         event.breadcrumbs = event.breadcrumbs.map(strippedBreadcrumb);
+
       return event;
     },
   };
+
   if (settings.tunnel !== undefined) options.tunnel = settings.tunnel;
   Sentry.init(options);
-  started = true;
 };
 
 /** Boot failures are reported after early initialization, with no entry data attached. */
 export const reportBootFailure = <T>(error: T): void => {
-  if (started) Sentry.captureException(error);
+  if (Sentry.getClient() !== undefined) Sentry.captureException(error);
 };
 
 export { scriptDirectory };

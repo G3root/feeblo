@@ -13,8 +13,10 @@ const htmlEntityMap: HtmlEntityMap = {
 
 /** `&amp;`, `&#38;`, and `&#x26;`: the three ways HTML spells an entity. */
 const htmlEntityPattern = /&(#\d+|#x[\da-f]+|[a-z]+);/gi;
+
 /** A tag, which an excerpt drops in favour of a space. */
 const htmlTagPattern = /<[^>]+>/g;
+
 /** Any run of whitespace, collapsed so the excerpt stays one line. */
 const whitespaceRunPattern = /\s+/g;
 

@@ -26,9 +26,11 @@ describe("consumeDashboardRateLimit", () => {
           name: "contact-search",
           limit: 1,
         });
+
         const second = yield* Effect.flip(
           consumeDashboardRateLimit({ key, name: "contact-search", limit: 1 })
         );
+
         expect(second).toBeInstanceOf(RateLimitExceededError);
       })
     );

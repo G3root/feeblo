@@ -64,6 +64,7 @@ describe("JwtSecretRpcHandlers", () => {
         role: "owner",
         createdAt: now,
       });
+
       return { membershipId, organizationId, userId } satisfies Fixture;
     });
 
@@ -80,9 +81,11 @@ describe("JwtSecretRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* JwtSecretRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const secrets = yield* handlers
           .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(secrets).toHaveLength(0);
       })
     );
@@ -100,6 +103,7 @@ describe("JwtSecretRpcHandlers", () => {
         const secrets = yield* handlers
           .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(secrets).toHaveLength(1);
         expect(secrets[0]).toMatchObject({
           organizationId: fixture.organizationId,
@@ -113,6 +117,7 @@ describe("JwtSecretRpcHandlers", () => {
       Effect.gen(function* () {
         const handlers = yield* JwtSecretRpcHandlersEffect;
         const fixture = yield* makeFixture();
+
         const error = yield* Effect.flip(
           handlers
             .RotateJwtSecret({ organizationId: fixture.organizationId })
@@ -123,6 +128,7 @@ describe("JwtSecretRpcHandlers", () => {
               )
             )
         );
+
         expect(error._tag).toBe("PolicyDenied");
       })
     );
@@ -137,6 +143,7 @@ describe("JwtSecretRpcHandlers", () => {
         yield* handlers
           .RotateJwtSecret({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         const initial = yield* handlers
           .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
@@ -144,9 +151,11 @@ describe("JwtSecretRpcHandlers", () => {
         yield* handlers
           .RotateJwtSecret({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         const rotated = yield* handlers
           .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         expect(rotated).toHaveLength(2);
         expect(
           rotated.find((secret) => secret.revokedAt === null)?.id
@@ -164,10 +173,13 @@ describe("JwtSecretRpcHandlers", () => {
         yield* handlers
           .RotateJwtSecret({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         const secrets = yield* handlers
           .ListJwtSecrets({ organizationId: fixture.organizationId })
           .pipe(Effect.provideService(CurrentSession, session));
+
         const active = secrets.find((secret) => secret.revokedAt === null);
+
         if (active === undefined) {
           return yield* Effect.die("expected an active secret");
         }
@@ -198,8 +210,32 @@ describe("JwtSecretRpcHandlers", () => {
           resourceType: "jwt_secret",
           source: "dashboard",
         });
-        // The entry names the secret by id only; the generated value must not
-        // appear anywhere in the stored row.
+        // The entry names the secret by id only, and the recorder's redaction
+        // must not swallow the identifier: `secretId` as a key would have
+        // matched its credential-shaped-name rule and stored `[redacted]`.
+        expect(rows[0]?.metadata).toEqual({ id: active.id });
+
+        // A second revoke inside the 24h grace window finds the secret already
+        // revoked and changes nothing, so it must not add an entry.
+        yield* handlers
+          .RevokeJwtSecret({
+            organizationId: fixture.organizationId,
+            secretId: yield* JwtSecretId.parse(active.id),
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, session),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const afterRetry = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(afterRetry).toHaveLength(1);
+        // The generated value must not appear anywhere in the stored row.
         expect(JSON.stringify(rows[0])).not.toContain(active.secret);
       })
     );

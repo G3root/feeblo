@@ -30,8 +30,10 @@ const randomHex = (length: number): string =>
  * their row ids and emails from a per-test counter instead of literals.
  */
 let testRun = 0;
+
 const nextTestRun = (): number => {
   testRun += 1;
+
   return testRun;
 };
 
@@ -51,6 +53,7 @@ describe("identity linking", () => {
         slug: organizationId,
         createdAt: yield* DateTime.nowAsDate,
       });
+
       return organizationId;
     });
 
@@ -146,6 +149,7 @@ describe("identity linking", () => {
         orderIndex: 0,
         organizationId,
       });
+
       return { boardId, statusId };
     });
 
@@ -279,39 +283,46 @@ describe("identity linking", () => {
   const getUserById = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select()
         .from(schema.userTable)
         .where(eq(schema.userTable.id, id))
         .limit(1);
+
       return row;
     });
 
   const getContactById = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select()
         .from(schema.contactTable)
         .where(eq(schema.contactTable.id, id))
         .limit(1);
+
       return row;
     });
 
   const getPostById = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select()
         .from(schema.postTable)
         .where(eq(schema.postTable.id, id))
         .limit(1);
+
       return row;
     });
 
   const listUpvotesForPost = (postId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       return yield* db
         .select({ userId: schema.upvoteTable.userId })
         .from(schema.upvoteTable)
@@ -321,6 +332,7 @@ describe("identity linking", () => {
   const listPostSubscriptionsForPost = (postId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       return yield* db
         .select({ userId: schema.postSubscriptionTable.userId })
         .from(schema.postSubscriptionTable)
@@ -330,22 +342,26 @@ describe("identity linking", () => {
   const getEmailSubscriptionById = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select()
         .from(schema.emailSubscriptionTable)
         .where(eq(schema.emailSubscriptionTable.id, `email_sub_${id}`))
         .limit(1);
+
       return row;
     });
 
   const getEmailContactById = (id: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       const [row] = yield* db
         .select()
         .from(schema.emailContactTable)
         .where(eq(schema.emailContactTable.id, `email_contact_${id}`))
         .limit(1);
+
       return row;
     });
 
@@ -427,10 +443,12 @@ describe("identity linking", () => {
         expect(yield* listUpvotesForPost(`post_${n}`)).toEqual([
           { userId: real },
         ]);
+
         const [comment] = yield* db
           .select()
           .from(schema.commentTable)
           .where(eq(schema.commentTable.id, `comment_${n}`));
+
         expect(comment?.userId).toBe(real);
         expect(yield* listPostSubscriptionsForPost(`post_${n}`)).toEqual([
           { userId: real },
@@ -609,8 +627,10 @@ describe("identity linking", () => {
             email: `jane.${n}@example.com`,
             userId: shadow,
           });
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,
@@ -663,8 +683,10 @@ describe("identity linking", () => {
             email: `jane.${n}@example.com`,
             userId: shadow,
           });
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,
@@ -736,6 +758,7 @@ describe("identity linking", () => {
           realUserId: "user_same",
           deleteShadowUser: true,
         });
+
         expect(counts).toEqual({
           contacts: 0,
           posts: 0,
@@ -766,8 +789,10 @@ describe("identity linking", () => {
             email: `jane.${n}@example.com`,
             organizationId,
           });
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,
@@ -804,8 +829,10 @@ describe("identity linking", () => {
           const organizationId = yield* makeOrganization();
           const email = `member.${n}@example.com`;
           const real = `real_member_${n}`;
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,
@@ -861,8 +888,10 @@ describe("identity linking", () => {
           const organizationId = yield* makeOrganization();
           const email = `global.${n}@example.com`;
           const real = `real_global_${n}`;
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           // A private board fails the unrestricted-global branch of the
           // eligibility rule, so nothing may activate.
           yield* db
@@ -909,8 +938,10 @@ describe("identity linking", () => {
           const organizationId = yield* makeOrganization();
           const email = `global.public.${n}@example.com`;
           const real = `real_global_public_${n}`;
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,
@@ -952,8 +983,10 @@ describe("identity linking", () => {
           const organizationId = yield* makeOrganization();
           const email = `global.archived.${n}@example.com`;
           const real = `real_global_archived_${n}`;
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,
@@ -1003,8 +1036,10 @@ describe("identity linking", () => {
           const organizationId = yield* makeOrganization();
           const email = `portal.${n}@example.com`;
           const portal = `sso_portal_${n}`;
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,
@@ -1089,10 +1124,12 @@ describe("identity linking", () => {
       () =>
         Effect.gen(function* () {
           const n = nextTestRun();
+
           const [org1, org2] = [
             yield* makeOrganization(),
             yield* makeOrganization(),
           ];
+
           const real = `real_${n}`;
           const email = `jane.${n}@example.com`;
           yield* insertRealUser({ id: real, email });
@@ -1106,6 +1143,7 @@ describe("identity linking", () => {
             organizationId: org2,
             userId: real,
           });
+
           for (const [index, organizationId] of [org1, org2].entries()) {
             yield* insertShadowUser({
               id: `shadow_${n}_${index}`,
@@ -1118,8 +1156,10 @@ describe("identity linking", () => {
               email,
               userId: `shadow_${n}_${index}`,
             });
+
             const { boardId, statusId } =
               yield* makeBoardAndStatus(organizationId);
+
             yield* insertPost({
               id: `post_${n}_${index}`,
               organizationId,
@@ -1155,8 +1195,10 @@ describe("identity linking", () => {
           const shadow = `shadow_orphan_${n}`;
           yield* insertRealUser({ id: real, email });
           yield* insertShadowUser({ id: shadow, email, organizationId });
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_orphan_${n}`,
             organizationId,
@@ -1200,8 +1242,10 @@ describe("identity linking", () => {
             email: `stale.${n}@example.com`,
             organizationId,
           });
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_corrected_${n}`,
             organizationId,
@@ -1251,8 +1295,10 @@ describe("identity linking", () => {
             email: `orphan.sub.${n}@example.com`,
             organizationId,
           });
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_deferred_${n}`,
             organizationId,
@@ -1310,8 +1356,10 @@ describe("identity linking", () => {
             email: `jane.${n}@example.com`,
             userId: shadow,
           });
+
           const { boardId, statusId } =
             yield* makeBoardAndStatus(organizationId);
+
           yield* insertPost({
             id: `post_${n}`,
             organizationId,

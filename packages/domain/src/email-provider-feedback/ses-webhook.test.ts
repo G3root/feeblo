@@ -28,8 +28,10 @@ import {
 } from "./ses-webhook";
 
 const TEST_TOPIC_ARN = "arn:aws:sns:us-east-1:123456789012:feeblo-mail-events";
+
 const SIGNING_CERT_URL =
   "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem";
+
 const SIGNING_CERT_CHAIN_URL =
   "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-chain.pem";
 
@@ -119,6 +121,7 @@ const TEST_SIGNING_KEY = NodeCrypto.createPrivateKey(SIGNING_KEY_PEM);
 const parseJsonObject = Schema.decodeUnknownSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))
 );
+
 const stringifyJson = Schema.encodeSync(Schema.fromJsonString(Schema.Json));
 
 type TestEnvelope = { readonly Type: string } & Record<string, string>;
@@ -128,6 +131,7 @@ const signEnvelope = (
   signatureVersion: "1" | "2" = "1"
 ): string => {
   const algorithm = signatureVersion === "2" ? "sha256" : "sha1";
+
   const Signature = NodeCrypto.sign(
     algorithm,
     Buffer.from(
@@ -140,6 +144,7 @@ const signEnvelope = (
     ),
     TEST_SIGNING_KEY
   ).toString("base64");
+
   return stringifyJson({
     ...envelope,
     Signature,
@@ -187,11 +192,14 @@ const expectFailed = <E>(exit: Exit.Exit<unknown, E>): E => {
     const failures = exit.cause.reasons
       .filter(Cause.isFailReason)
       .map((reason) => reason.error);
+
     const [error] = failures;
     expect(error).toBeDefined();
+
     // SAFETY: Exit fail-reason errors conform to the caller's expected type E.
     return error as E;
   }
+
   throw new Error("expected the effect to fail, but it exited successfully");
 };
 
@@ -215,19 +223,23 @@ const requestUrl = (input: RequestInfo | URL): string => {
   if (isString(input)) {
     return input;
   }
+
   return input instanceof URL ? input.href : input.url;
 };
 
 const fetchStub = asFetch((input: RequestInfo | URL): Promise<Response> => {
   const url = requestUrl(input);
+
   if (url === SIGNING_CERT_URL) {
     return Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }));
   }
+
   if (url === SIGNING_CERT_CHAIN_URL) {
     return Promise.resolve(
       new Response(SIGNING_CERT_CHAIN_PEM, { status: 200 })
     );
   }
+
   return Promise.resolve(new Response("Not Found", { status: 404 }));
 });
 
@@ -235,9 +247,11 @@ const fetchStub = asFetch((input: RequestInfo | URL): Promise<Response> => {
 // records the signing-certificate fetch and the confirmation GET. Built
 // before makeWebhookLayer so it is wired through the fetchImpl argument.
 const subscriptionConfirmationRequests: string[] = [];
+
 const SubscriptionConfirmationFetch = asFetch(
   (input: RequestInfo | URL): Promise<Response> => {
     subscriptionConfirmationRequests.push(requestUrl(input));
+
     return requestUrl(input) === SIGNING_CERT_URL
       ? Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }))
       : Promise.resolve(
@@ -251,13 +265,17 @@ const SubscriptionConfirmationFetch = asFetch(
  * message reused the cached PEM instead of paying another network request.
  */
 let signingCertFetchCount = 0;
+
 const CountingSigningCertFetch = asFetch(
   (input: RequestInfo | URL): Promise<Response> => {
     const url = requestUrl(input);
+
     if (url === SIGNING_CERT_URL) {
       signingCertFetchCount += 1;
+
       return Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }));
     }
+
     return Promise.resolve(
       new Response("Subscription Confirmed", { status: 200 })
     );
@@ -270,16 +288,21 @@ const CountingSigningCertFetch = asFetch(
  * retry instead of replaying the cached failure.
  */
 let failNextSigningCertFetch = true;
+
 const FlakySigningCertFetch = asFetch(
   (input: RequestInfo | URL): Promise<Response> => {
     const url = requestUrl(input);
+
     if (url === SIGNING_CERT_URL) {
       if (failNextSigningCertFetch) {
         failNextSigningCertFetch = false;
+
         return Promise.resolve(new Response("unavailable", { status: 503 }));
       }
+
       return Promise.resolve(new Response(SIGNING_CERT_PEM, { status: 200 }));
     }
+
     return Promise.resolve(
       new Response("Subscription Confirmed", { status: 200 })
     );
@@ -402,10 +425,12 @@ describe("SesEmailFeedbackWebhook", () => {
             _tag: "Ingested",
             result: { _tag: "Processed", deliveryUpdated: true },
           });
+
           const [stored] = yield* db
             .select({ state: schema.emailDeliveryTable.state })
             .from(schema.emailDeliveryTable)
             .where(eq(schema.emailDeliveryTable.id, delivery.deliveryId));
+
           expect(stored?.state).toBe("delivered");
         })
     );
@@ -446,10 +471,12 @@ describe("SesEmailFeedbackWebhook", () => {
           _tag: "Ingested",
           result: { _tag: "Processed", suppressed: true },
         });
+
         const [suppression] = yield* db
           .select({ reason: schema.emailSuppressionTable.reason })
           .from(schema.emailSuppressionTable)
           .where(eq(schema.emailSuppressionTable.email, "bounce@example.com"));
+
         expect(suppression?.reason).toBe("hard_bounce");
       })
     );
@@ -503,6 +530,7 @@ describe("SesEmailFeedbackWebhook", () => {
           Effect.gen(function* () {
             subscriptionConfirmationRequests.length = 0;
             const webhook = yield* SesEmailFeedbackWebhook;
+
             const subscribeUrl =
               "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=abc123";
 
@@ -535,6 +563,7 @@ describe("SesEmailFeedbackWebhook", () => {
                   "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=cache-1"
                 )
               );
+
               const second = yield* webhook.handle(
                 snsSubscriptionConfirmation(
                   "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=cache-2"
@@ -598,6 +627,7 @@ describe("SesEmailFeedbackWebhook", () => {
         () =>
           Effect.gen(function* () {
             const webhook = yield* SesEmailFeedbackWebhook;
+
             const subscribeUrl =
               "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=abc123";
 
@@ -642,8 +672,10 @@ describe("SesEmailFeedbackWebhook", () => {
                     })
                   )
                   .pipe(Effect.forkChild);
+
                 yield* Effect.yieldNow;
                 yield* TestClock.adjust("11 seconds");
+
                 return yield* Fiber.join(fiber);
               })
             );
@@ -666,6 +698,7 @@ describe("SesEmailFeedbackWebhook", () => {
               new Response(SIGNING_CERT_PEM, { status: 200 })
             );
           }
+
           // Never resolves so the confirmation GET races the virtual timeout.
           return new Promise<Response>(() => {});
         })
@@ -676,6 +709,7 @@ describe("SesEmailFeedbackWebhook", () => {
         () =>
           Effect.gen(function* () {
             const webhook = yield* SesEmailFeedbackWebhook;
+
             const subscribeUrl =
               "https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&Token=abc123";
 
@@ -684,8 +718,10 @@ describe("SesEmailFeedbackWebhook", () => {
                 const fiber = yield* webhook
                   .handle(snsSubscriptionConfirmation(subscribeUrl))
                   .pipe(Effect.forkChild);
+
                 yield* Effect.yieldNow;
                 yield* TestClock.adjust("11 seconds");
+
                 return yield* Fiber.join(fiber);
               })
             );
@@ -735,10 +771,12 @@ describe("SesEmailFeedbackWebhook", () => {
             mail: { timestamp: "2026-08-18T00:00:00.000Z", messageId: "x" },
           })
         );
+
         const tamperedEnvelope = {
           ...tampered,
           Message: stringifyJson({ eventType: "Delivery" }),
         };
+
         const outcome = yield* webhook
           .handle(stringifyJson(tamperedEnvelope))
           .pipe(Effect.exit);
@@ -758,10 +796,12 @@ describe("SesEmailFeedbackWebhook", () => {
             mail: { timestamp: "2026-08-18T00:00:00.000Z", messageId: "x" },
           })
         );
+
         const unsupportedEnvelope = {
           ...unsupported,
           SignatureVersion: "3",
         };
+
         const outcome = yield* webhook
           .handle(stringifyJson(unsupportedEnvelope))
           .pipe(Effect.exit);
@@ -841,6 +881,7 @@ describe("SesEmailFeedbackWebhook", () => {
       () =>
         Effect.gen(function* () {
           const webhook = yield* SesEmailFeedbackWebhook;
+
           const outcome = yield* webhook
             .handle(
               snsSubscriptionConfirmation("http://evil.example.com/confirm")

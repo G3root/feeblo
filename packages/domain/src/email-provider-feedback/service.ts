@@ -115,6 +115,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
         recipientEmail: schema.emailDeliveryTable.recipientEmail,
         state: schema.emailDeliveryTable.state,
       } as const;
+
       const fromDelivery = () =>
         db
           .select(select)
@@ -127,15 +128,19 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
       const [byMessageId] = yield* fromDelivery()
         .where(eq(schema.emailDeliveryTable.messageId, event.messageId))
         .limit(1);
+
       if (byMessageId !== undefined) {
         return yield* decodeDelivery(byMessageId);
       }
+
       if (event.deliveryId === undefined) {
         return undefined;
       }
+
       const [byDeliveryId] = yield* fromDelivery()
         .where(eq(schema.emailDeliveryTable.id, event.deliveryId))
         .limit(1);
+
       return byDeliveryId === undefined
         ? undefined
         : yield* decodeDelivery(byDeliveryId);
@@ -232,8 +237,10 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                   false,
                   false
                 );
+
                 return { _tag: "UnknownDelivery" as const, suppressed: false };
               }
+
               yield* suppress({
                 event,
                 organizationId: null,
@@ -252,11 +259,13 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                   providerEventId: event.eventId,
                 })
               );
+
               return {
                 _tag: "UnknownDelivery" as const,
                 suppressed: event.recipients.length > 0,
               };
             }
+
             // A complaint is deliberately not suppressed here: a complaint is
             // about one sender's mail, and without a delivery there is no
             // sender to scope the row to. Writing a platform row would silence
@@ -266,6 +275,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
             if (event.type === "complained") {
               yield* recordEmailProviderComplaint(false);
             }
+
             return { _tag: "UnknownDelivery" as const, suppressed: false };
           }
 
@@ -351,17 +361,21 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
               if (delivery.attemptCount >= maximumDeliveryAttempts) {
                 const failed = yield* transitionDelivery("failed");
                 yield* recordEmailDeliveryTransition("failed", failed ? 1 : 0);
+
                 return failed;
               }
+
               const nextAttemptAt = DateTime.toDateUtc(
                 DateTime.addDuration(
                   DateTime.makeUnsafe(event.occurredAt),
                   softBounceRetryDelay
                 )
               );
+
               const deferred = yield* transitionDelivery("deferred", {
                 nextAttemptAt,
               });
+
               yield* recordEmailDeliveryTransition(
                 "deferred",
                 deferred ? 1 : 0
@@ -375,6 +389,7 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                   providerEventId: event.eventId,
                 })
               );
+
               return deferred;
             });
 
@@ -385,35 +400,42 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                 "delivered",
                 deliveryUpdated ? 1 : 0
               );
+
               return {
                 _tag: "Processed" as const,
                 deliveryUpdated,
                 suppressed: false,
               };
             }
+
             case "deferred": {
               // Provider deferral is observable only. Feeblo must not queue a
               // second send while the provider may still be attempting
               // delivery.
               yield* recordEmailDeliveryTransition("deferred");
+
               return {
                 _tag: "Processed" as const,
                 deliveryUpdated: false,
                 suppressed: false,
               };
             }
+
             case "bounced": {
               if (event.bounceType !== "hard") {
                 const deliveryUpdated = yield* retryAfterSoftBounce(
                   event.bounceType
                 );
+
                 yield* recordEmailProviderBounce(event.bounceType, false, true);
+
                 return {
                   _tag: "Processed" as const,
                   deliveryUpdated,
                   suppressed: false,
                 };
               }
+
               const deliveryUpdated = yield* transitionDelivery("bounced");
               yield* recordEmailDeliveryTransition(
                 "bounced",
@@ -437,24 +459,28 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                   providerEventId: event.eventId,
                 })
               );
+
               return {
                 _tag: "Processed" as const,
                 deliveryUpdated,
                 suppressed: event.recipients.length > 0,
               };
             }
+
             case "failed": {
               const deliveryUpdated = yield* transitionDelivery("failed");
               yield* recordEmailDeliveryTransition(
                 "failed",
                 deliveryUpdated ? 1 : 0
               );
+
               return {
                 _tag: "Processed" as const,
                 deliveryUpdated,
                 suppressed: false,
               };
             }
+
             case "complained": {
               const deliveryUpdated = yield* transitionDelivery("failed");
               yield* recordEmailDeliveryTransition(
@@ -475,12 +501,14 @@ const makeEmailProviderFeedbackService = Effect.gen(function* () {
                   providerEventId: event.eventId,
                 })
               );
+
               return {
                 _tag: "Processed" as const,
                 deliveryUpdated,
                 suppressed: event.recipients.length > 0,
               };
             }
+
             default:
               return event satisfies never;
           }

@@ -54,12 +54,14 @@ function PostVoterDialogRoot({
 }) {
   const site = useSite();
   const organizationId = site.organizationId;
+
   // The surrounding surface's collection: post detail pages override this
   // with the slug-scoped `publicPostUpvoteCollection`, so the dialog lists
   // only the viewed post's voters instead of syncing every org vote.
   const {
     collections: { upvoteCollection },
   } = usePostCollections();
+
   const { data: upvotes } = usePostUpvotes({
     organizationId,
     postId,
@@ -73,6 +75,8 @@ function PostVoterDialogRoot({
 
     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
     const voters = upvotes as PostVoter[];
+    // Four faces, then the count — the same number the dashboard's voter panel
+    // shows, so the two post-detail surfaces cannot drift apart.
     const visibleVoters = voters.slice(0, 4);
 
     return {

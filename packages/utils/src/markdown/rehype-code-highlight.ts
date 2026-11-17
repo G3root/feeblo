@@ -23,11 +23,13 @@ const normalizeCodeBlockLanguage = (language: string): string =>
 /** Concatenate the readable text of a `code` element's children. */
 const codeText = (code: Element): string => {
   let text = "";
+
   for (const child of code.children) {
     if (child.type === "text") {
       text += child.value;
     }
   }
+
   return text;
 };
 
@@ -54,19 +56,24 @@ export function rehypeCodeHighlight(): (tree: Root) => void {
       }
 
       const className = code.properties?.className;
+
       const classNameList: unknown[] = Array.isArray(className)
         ? className
         : [];
+
       let languageClass: string | null = null;
+
       for (const value of classNameList) {
         // hast className values can be primitives; only strings carry a
         // `language-` prefix, so coerce then check.
         const name = String(value);
+
         if (name.startsWith("language-")) {
           languageClass = name;
           break;
         }
       }
+
       if (languageClass === null) {
         return;
       }
@@ -74,6 +81,7 @@ export function rehypeCodeHighlight(): (tree: Root) => void {
       const language = normalizeCodeBlockLanguage(
         languageClass.slice("language-".length)
       );
+
       const tokens = tokenize(codeText(code), { lang: language });
       code.children = tokensToNodes(tokens);
     });

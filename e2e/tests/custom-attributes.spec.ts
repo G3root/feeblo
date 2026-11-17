@@ -33,9 +33,11 @@ test.describe("custom attributes", () => {
       .getByLabel("Contacts")
       .getByRole("button", { name: "Create attribute" })
       .click();
+
     const createDialog = page.getByRole("dialog", {
       name: "Create contact attribute",
     });
+
     await createDialog.getByRole("textbox", { name: "Name" }).fill(initialName);
     await createDialog.getByRole("switch", { name: "Required" }).click();
     await createDialog
@@ -54,9 +56,11 @@ test.describe("custom attributes", () => {
       .getByRole("button", { name: `Open actions for ${initialName}` })
       .click();
     await page.getByRole("menuitem", { name: "Edit" }).click();
+
     const editDialog = page.getByRole("dialog", {
       name: "Edit contact attribute",
     });
+
     await editDialog.getByRole("textbox", { name: "Name" }).fill(updatedName);
     await editDialog.getByRole("switch", { name: "Required" }).click();
     await editDialog.getByRole("button", { name: "Save changes" }).click();
@@ -72,9 +76,11 @@ test.describe("custom attributes", () => {
       .getByRole("button", { name: `Open actions for ${updatedName}` })
       .click();
     await page.getByRole("menuitem", { name: "Delete" }).click();
+
     const deleteDialog = page.getByRole("alertdialog", {
       name: "Delete Attribute",
     });
+
     await deleteDialog.getByRole("button", { name: "Continue" }).click();
 
     await expect(
@@ -97,9 +103,11 @@ test.describe("custom attributes", () => {
       .getByLabel("Companies")
       .getByRole("button", { name: "Create attribute" })
       .click();
+
     const createDialog = page.getByRole("dialog", {
       name: "Create company attribute",
     });
+
     await createDialog.getByRole("textbox", { name: "Name" }).fill(initialName);
     await createDialog.getByRole("switch", { name: "Required" }).click();
     await createDialog
@@ -117,9 +125,11 @@ test.describe("custom attributes", () => {
       .getByRole("button", { name: `Open actions for ${initialName}` })
       .click();
     await page.getByRole("menuitem", { name: "Edit" }).click();
+
     const editDialog = page.getByRole("dialog", {
       name: "Edit company attribute",
     });
+
     await editDialog.getByRole("textbox", { name: "Name" }).fill(updatedName);
     await editDialog.getByRole("switch", { name: "Required" }).click();
     await editDialog.getByRole("button", { name: "Save changes" }).click();
@@ -159,9 +169,11 @@ test.describe("custom attributes", () => {
       .getByLabel("Contacts")
       .getByRole("button", { name: "Create attribute" })
       .click();
+
     const attributeDialog = page.getByRole("dialog", {
       name: "Create contact attribute",
     });
+
     await attributeDialog
       .getByRole("textbox", { name: "Name" })
       .fill(attributeName);
@@ -207,9 +219,11 @@ test.describe("custom attributes", () => {
       .getByLabel("Companies")
       .getByRole("button", { name: "Create attribute" })
       .click();
+
     const attributeDialog = page.getByRole("dialog", {
       name: "Create company attribute",
     });
+
     await attributeDialog
       .getByRole("textbox", { name: "Name" })
       .fill(attributeName);

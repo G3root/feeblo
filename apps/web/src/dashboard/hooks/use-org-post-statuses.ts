@@ -11,6 +11,7 @@ import { useDashboardCollections } from "~/providers/dashboard-collections-provi
  */
 export function useOrgPostStatuses(organizationId: string) {
   const { postStatusCollection } = useDashboardCollections();
+
   return useLiveQuery({
     queryKey: ["org-post-statuses", postStatusCollection.id, organizationId],
     query: (q) =>

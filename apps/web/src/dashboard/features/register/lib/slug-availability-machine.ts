@@ -202,6 +202,7 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
         if (event.enabled === context.enabled && event.slug === context.slug) {
           return undefined;
         }
+
         return {
           context: inputContext(event),
           target:
@@ -289,15 +290,19 @@ export const toSlugAvailability = (
       reason: snapshot.context.reason,
     };
   }
+
   if (snapshot.matches("checking")) {
     return { status: "checking", suggestion: null, reason: null };
   }
+
   if (snapshot.matches("available")) {
     return { status: "available", suggestion: null, reason: null };
   }
+
   if (snapshot.matches("error")) {
     return { status: "error", suggestion: null, reason: null };
   }
+
   // `idle` and `debouncing`: nothing has settled, so nothing is claimed.
   return { status: "idle", suggestion: null, reason: null };
 };

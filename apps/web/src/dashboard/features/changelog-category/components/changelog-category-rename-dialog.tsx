@@ -49,6 +49,7 @@ function ChangelogCategoryRenameForm() {
   const organizationId = useOrganizationId();
   const { changelogCategoryCollection } = useDashboardCollections();
   const store = useChangelogCategoryEditDialogContext();
+
   const categoryId = useSelector(
     store,
     (state) => state.context.data.categoryId
@@ -89,6 +90,7 @@ function ChangelogCategoryRenameFormFields({
 }) {
   const { changelogCategoryCollection } = useDashboardCollections();
   const store = useChangelogCategoryEditDialogContext();
+
   const categoryId = useSelector(
     store,
     (state) => state.context.data.categoryId

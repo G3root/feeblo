@@ -106,6 +106,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
     Policy.policy((session) =>
       Effect.gen(function* () {
         const actor = Policy.getMembership(session, args.organizationId);
+
         if (!actor) {
           return false;
         }
@@ -114,6 +115,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
           memberId: args.memberId,
           organizationId: args.organizationId,
         });
+
         if (Option.isNone(target)) {
           return false;
         }
@@ -134,6 +136,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
     Policy.policy((session) =>
       Effect.gen(function* () {
         const actor = Policy.getMembership(session, args.organizationId);
+
         if (!actor) {
           return false;
         }
@@ -142,6 +145,7 @@ const makeMembershipPolicy = Effect.gen(function* () {
           memberId: args.memberId,
           organizationId: args.organizationId,
         });
+
         if (Option.isNone(target)) {
           return false;
         }

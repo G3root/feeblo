@@ -254,22 +254,15 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     "EntitlementPolicy.mayCreatePublicEmailSubscriptions"
   )(function* (organizationId: string) {
     const { entitlements } = yield* findEntitlements(organizationId);
+
     return entitlements.capabilities.subscriberEmails;
   });
-
-  /**
-   * Whether the workspace plan includes delivery to end-user subscribers.
-   *
-   * Member notifications are not gated: every plan emails members. This
-   * capability only decides whether the subscriber audience is allowed in
-   * addition to them.
-   */
-  const mayEmailSubscribers = mayCreatePublicEmailSubscriptions;
 
   /** Whether the workspace plan permits hiding the Feeblo branding. */
   const mayRemoveBranding = Effect.fn("EntitlementPolicy.mayRemoveBranding")(
     function* (organizationId: string) {
       const { entitlements } = yield* findEntitlements(organizationId);
+
       return entitlements.capabilities.removeBranding;
     }
   );
@@ -278,6 +271,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
   const mayUseIntegrations = Effect.fn("EntitlementPolicy.mayUseIntegrations")(
     function* (organizationId: string) {
       const { entitlements } = yield* findEntitlements(organizationId);
+
       return entitlements.capabilities.integrations;
     }
   );
@@ -311,7 +305,14 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateChangelogCategory,
     canCreateCrmEntry,
     mayCreatePublicEmailSubscriptions,
-    mayEmailSubscribers,
+    /**
+     * Whether the workspace plan includes delivery to end-user subscribers.
+     *
+     * Member notifications are not gated: every plan emails members. This
+     * capability only decides whether the subscriber audience is allowed in
+     * addition to them.
+     */
+    mayEmailSubscribers: mayCreatePublicEmailSubscriptions,
     mayUseIntegrations,
     canUseIntegrations,
     mayRemoveBranding,

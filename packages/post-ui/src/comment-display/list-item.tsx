@@ -30,6 +30,7 @@ export function CommentDisplayItem({
     collections: { commentCollection, postCollection, postStatusCollection },
     getPostHref,
   } = usePostCollections();
+
   const { isMerged, post: viewedPost } = usePostCollectionData();
   const createComment = useCreateCommentAction();
 
@@ -38,23 +39,27 @@ export function CommentDisplayItem({
   // stays undefined there and the label renders without a link instead of
   // pointing at a redirect loop.
   const mergedFromPostId = data.mergedFromPostId;
+
   const { data: mergedFromPost } = useLiveQuery({
     queryKey: ["merged-from-post", postCollection.id, mergedFromPostId ?? null],
     query: (q) => {
       if (!mergedFromPostId) {
         return undefined;
       }
+
       return q
         .from({ post: postCollection })
         .where(({ post }) => eq(post.id, mergedFromPostId))
         .findOne();
     },
   });
+
   // The label marks a comment that was carried in from another post, so it
   // belongs on the survivor only. On the merged post's own page these are
   // simply its comments, not merged ones.
   const showMergedLabel =
     mergedFromPostId != null && mergedFromPostId !== viewedPost.id;
+
   const mergedFromHref =
     showMergedLabel && mergedFromPost && getPostHref
       ? getPostHref(mergedFromPost)
@@ -75,6 +80,7 @@ export function CommentDisplayItem({
           eq(postStatus.id, data.statusUpdateId ?? "")
         ),
   });
+
   const statusUpdate = statusUpdateRows?.[0];
   const statusUpdateType = statusUpdate?.type ?? null;
   const statusUpdateLabel = statusUpdate?.label ?? null;
@@ -129,6 +135,7 @@ export function CommentDisplayItem({
           })
         );
       }
+
       await commentCollection.utils.refetch();
     },
   });

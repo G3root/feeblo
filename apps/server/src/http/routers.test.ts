@@ -25,6 +25,7 @@ const pathsSeen: string[] = [];
 const FakeAuth: Layer.Layer<Auth> = Layer.succeed(Auth, {
   handler: (request) => {
     pathsSeen.push(new URL(request.url).pathname);
+
     return new Response("reached");
   },
   api: {

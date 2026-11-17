@@ -20,6 +20,7 @@ vi.mock("@feeblo/web-shared/auth-client", () => ({
     parse: <T,>(value: T) => value,
   },
 }));
+
 // eslint-disable-next-line anti-slop/no-module-mocking
 vi.mock("@feeblo/web-shared/runtime", () => ({
   fetchRpc: vi.fn(),
@@ -90,6 +91,7 @@ const probeTargets = [
 ] as const;
 
 type StyleKey = (typeof styleKeys)[number];
+
 type StyleValues = {
   backgroundColor: string;
   borderBlockStartColor: string;
@@ -109,7 +111,9 @@ type StyleValues = {
   textDecorationColor: string;
   whiteSpace: string;
 };
+
 type ProbeTarget = (typeof probeTargets)[number][0];
+
 type Difference = {
   editor: string;
   field: StyleKey;
@@ -175,6 +179,7 @@ function collectDifferences(editor: Element, rendered: Element): Difference[] {
       if (field === "whiteSpace" && key !== "pre") {
         continue;
       }
+
       // ProseMirror's scroll wrapper owns the table's flow margin.
       if (field === "marginBlockStart" && key === "table") {
         continue;
@@ -242,6 +247,7 @@ describe("typeset parity", () => {
     const emptyParagraphs = Array.from(editorRoot.querySelectorAll("p")).filter(
       (paragraph) => (paragraph.textContent ?? "").trim() === ""
     );
+
     expect(emptyParagraphs.length).toBe(0);
     expect(
       editorRoot.querySelector("div[data-node-view-root]:has(img)")

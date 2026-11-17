@@ -21,7 +21,7 @@ import type {
 /** Failure parsing a verified Slack inbound request body into its typed payload. */
 export class SlackInboundPayloadError extends Schema.TaggedError<SlackInboundPayloadError>()(
   "SlackInboundPayloadError",
-  { reason: Schema.String }
+  { reason: Schema.String, cause: Schema.optionalKey(Schema.Defect()) }
 ) {}
 
 /** Typed Slack API failure algebra re-exported at the provider boundary. */

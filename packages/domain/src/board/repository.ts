@@ -107,6 +107,7 @@ const makeBoardRepository = Effect.gen(function* () {
     create: (args: TBoardCreate) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
+
         return yield* db
           .insert(schema.boardTable)
           .values({
@@ -120,6 +121,7 @@ const makeBoardRepository = Effect.gen(function* () {
     findMany: ({ organizationId, visibility }: TBoardFindMany) =>
       Effect.gen(function* () {
         const where: SQL[] = [];
+
         if (visibility) {
           where.push(eq(schema.boardTable.visibility, visibility));
         }

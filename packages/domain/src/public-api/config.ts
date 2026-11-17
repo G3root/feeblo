@@ -21,6 +21,7 @@ export class PublicApiConfig extends Context.Service<PublicApiConfig>()(
       // request URL Effect exposes into the absolute URL a token verifier
       // expects (DPoP binds a proof to `htu`, which must be absolute).
       const apiUrl = yield* Config.schema(Schema.URLFromString, "API_URL");
+
       return {
         appUrl: appUrl.href.replace(trailingSlashPattern, ""),
         apiUrl: apiUrl.href.replace(trailingSlashPattern, ""),

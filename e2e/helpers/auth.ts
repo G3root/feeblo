@@ -31,6 +31,7 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
   ).toBeTruthy();
 
   const email = await waitForVerificationEmail(page.request, user.email);
+
   const verificationResponse = await page
     .context()
     .request.post(`${apiUrl()}/api/auth/email-otp/verify-email`, {
@@ -39,6 +40,7 @@ export async function signUpProgrammatically(page: Page, user: TestUser) {
         otp: verificationCodeFromEmail(email),
       },
     });
+
   expect(verificationResponse.ok()).toBeTruthy();
 }
 
@@ -118,7 +120,7 @@ export async function logOut(page: Page, userEmail: string) {
   // Dashboard redirects preserve the return path in a query parameter.
   await page.waitForURL(/\/sign-in(?:\?|$)/);
   await expect(
-    page.getByRole("button", { name: "Login", exact: true })
+    page.getByRole("button", { name: "Sign in", exact: true })
   ).toBeVisible();
 }
 

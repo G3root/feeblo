@@ -32,12 +32,14 @@ async function pickReaction(page: Page, scope?: Locator) {
   const trigger = (scope ?? page)
     .getByRole("button", { name: "Add reaction" })
     .first();
+
   const dialog = page.locator('[role="dialog"]:visible');
 
   await expect(async () => {
     if ((await dialog.count()) === 0) {
       await trigger.click();
     }
+
     await dialog
       .getByRole("button", { name: "👍️", exact: true })
       .click({ timeout: 2_000 });
@@ -76,11 +78,14 @@ async function inviteMember(
   const form = page.locator("form").filter({
     has: page.getByRole("textbox", { name: "Invite email" }),
   });
+
   await form.getByRole("textbox", { name: "Invite email" }).fill(email);
+
   if (role !== "manager") {
     await form.getByRole("combobox").click();
     await page.getByRole("option", { name: role }).click();
   }
+
   await form.getByRole("button", { name: "Invite" }).click();
   await expect(
     page.getByText("Invitation sent", { exact: true })
@@ -107,6 +112,7 @@ async function signInAsContributor(
   await inviteMember(ownerPage, invitee.email, "contributor");
   const email = await waitForTestEmail(ownerPage.request, invitee.email);
   const invitationId = invitationIdFromEmail(email);
+
   const accepted = await inviteeContext.request.post(
     `${apiUrl()}/api/auth/organization/accept-invitation`,
     {
@@ -114,6 +120,7 @@ async function signInAsContributor(
       headers: { Origin: webUrl() },
     }
   );
+
   expect(accepted.ok()).toBeTruthy();
 
   const contributorPage = await inviteeContext.newPage();
@@ -122,6 +129,7 @@ async function signInAsContributor(
   await expect(
     contributorPage.getByRole("button", { name: invitee.email })
   ).toBeVisible();
+
   return { contributorPage, inviteeContext };
 }
 
@@ -179,6 +187,7 @@ test.describe("feedback workflow", () => {
       const commentCard = page
         .locator('[data-slot="comment"]')
         .filter({ hasText: comment });
+
       await pickReaction(page, commentCard);
       await expect(
         commentCard
@@ -860,15 +869,18 @@ test.describe("feedback workflow", () => {
       name: "Unsubscribe",
       exact: true,
     });
+
     await expect(unsubscribeButton).toBeVisible();
 
     // Unsubscribe, then re-subscribe.
     const deleteRpc = waitForRpc(page, "DeletePostSubscription");
     await unsubscribeButton.click();
+
     const subscribeButton = page.getByRole("button", {
       name: "Subscribe",
       exact: true,
     });
+
     await expect(subscribeButton).toBeVisible();
     // Wait for the RPC to settle so the reload cannot race it.
     await deleteRpc;
@@ -925,6 +937,7 @@ test.describe("feedback workflow", () => {
   }) => {
     const owner = await createWorkspace(page);
     const invitee = createTestUser();
+
     const { contributorPage, inviteeContext } = await signInAsContributor(
       browser,
       page,
@@ -945,9 +958,11 @@ test.describe("feedback workflow", () => {
       await contributorPage
         .getByRole("button", { name: "Delete post" })
         .click();
+
       const deleteDialog = contributorPage.getByRole("alertdialog", {
         name: "Delete Post",
       });
+
       const deleted = waitForRpc(contributorPage, "DeletePost");
       await deleteDialog.getByRole("button", { name: "Continue" }).click();
       await deleted;

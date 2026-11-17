@@ -253,6 +253,7 @@ describe("CommentRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .ListComments({
@@ -451,6 +452,7 @@ describe("CommentRpcHandlers", () => {
               slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(publicComments).toHaveLength(0);
 
           const memberComments = yield* handlers
@@ -459,6 +461,7 @@ describe("CommentRpcHandlers", () => {
               slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(memberComments).toHaveLength(1);
         })
       );
@@ -547,6 +550,7 @@ describe("CommentRpcHandlers", () => {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
           const commentId = yield* CommentId.generate;
+
           const error = yield* Effect.flip(
             handlers
               .CreateComment(
@@ -571,6 +575,7 @@ describe("CommentRpcHandlers", () => {
             const handlers = yield* CommentRpcHandlersEffect;
             const fixture = yield* makeFixture("PUBLIC");
             const commentId = yield* CommentId.generate;
+
             const error = yield* Effect.flip(
               handlers
                 .CreateComment(
@@ -640,6 +645,7 @@ describe("CommentRpcHandlers", () => {
             );
 
           const db = yield* currentDb;
+
           const rows = yield* db
             .select()
             .from(schema.auditLogTable)
@@ -673,6 +679,7 @@ describe("CommentRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const lockedPostId = yield* addPost(fixture, fixture.boardId, true);
           const commentId = yield* CommentId.generate;
+
           const error = yield* Effect.flip(
             handlers
               .CreateComment({
@@ -709,6 +716,7 @@ describe("CommentRpcHandlers", () => {
             .where(eq(schema.postTable.id, mergedPostId));
 
           const commentId = yield* CommentId.generate;
+
           const error = yield* Effect.flip(
             handlers
               .CreateComment({
@@ -787,6 +795,7 @@ describe("CommentRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(error._tag).toBe("PolicyDenied");
 
           // An INTERNAL reply to the same parent is allowed.
@@ -800,6 +809,7 @@ describe("CommentRpcHandlers", () => {
               parentCommentId: internalCommentId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           expect(result.message).toBe("Comment created successfully");
         })
       );
@@ -1019,6 +1029,7 @@ describe("CommentRpcHandlers", () => {
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, fixture.postId));
+
           // The post status is untouched by the rejected request.
           expect(post?.statusId).toBe(fixture.statusId);
         })
@@ -1059,6 +1070,7 @@ describe("CommentRpcHandlers", () => {
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, fixture.postId));
+
           // The post status is untouched by the rejected request.
           expect(post?.statusId).toBe(fixture.statusId);
         })
@@ -1100,6 +1112,7 @@ describe("CommentRpcHandlers", () => {
           // An authenticated caller who is not the commenter sees the
           // commenter's identifiers redacted, same as an anonymous caller.
           const otherUserId = `other_${fixture.organizationId}`;
+
           const otherSession: Session = {
             user: {
               id: otherUserId,
@@ -1111,6 +1124,7 @@ describe("CommentRpcHandlers", () => {
             organizations: [{ id: fixture.organizationId }],
             memberships: [],
           };
+
           const asOther = yield* handlers
             .ListCommentsPublic({
               organizationId: fixture.organizationId,
@@ -1221,6 +1235,7 @@ describe("CommentRpcHandlers", () => {
           const handlers = yield* CommentRpcHandlersEffect;
           const fixture = yield* makeFixture("PRIVATE");
           const commentId = yield* CommentId.generate;
+
           const error = yield* Effect.flip(
             handlers
               .CreateCommentPublic(
@@ -1244,6 +1259,7 @@ describe("CommentRpcHandlers", () => {
           const fixture = yield* makeFixture("PUBLIC");
           const lockedPostId = yield* addPost(fixture, fixture.boardId, true);
           const commentId = yield* CommentId.generate;
+
           const error = yield* Effect.flip(
             handlers
               .CreateCommentPublic({
@@ -1325,6 +1341,7 @@ describe("CommentRpcHandlers", () => {
               email: `${guestUserId}@example.com`,
               name: "Guest User",
             });
+
             const guestSession: Session = {
               user: {
                 id: guestUserId,
@@ -1372,6 +1389,7 @@ describe("CommentRpcHandlers", () => {
                   eq(schema.notificationTable.resourceId, replyId)
                 )
               );
+
             expect(rows).toEqual([]);
           })
       );
@@ -1398,6 +1416,7 @@ describe("CommentRpcHandlers", () => {
             role: "manager",
             createdAt: yield* DateTime.nowAsDate,
           });
+
           const otherMemberSession: Session = {
             user: {
               id: otherUserId,
@@ -1449,6 +1468,7 @@ describe("CommentRpcHandlers", () => {
                 eq(schema.notificationTable.resourceId, replyId)
               )
             );
+
           expect(rows).toHaveLength(1);
           expect(rows[0]?.recipientUserId).toBe(otherUserId);
         })
@@ -1731,6 +1751,7 @@ describe("CommentRpcHandlers", () => {
               slug: fixture.postSlug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(comments).toHaveLength(0);
         })
       );
@@ -2034,6 +2055,7 @@ describe("CommentRpcHandlers", () => {
             commentCreateInput(fixture, commentId, "A comment without opt-in")
           )
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
         expect(result.message).toBe("Comment created successfully");
 
         const isSubscribed = yield* subscriptions.isSubscribed({
@@ -2041,6 +2063,7 @@ describe("CommentRpcHandlers", () => {
           postId: fixture.postId,
           userId: fixture.userId,
         });
+
         expect(isSubscribed).toBe(false);
       })
     );
@@ -2066,6 +2089,7 @@ describe("CommentRpcHandlers", () => {
             orderIndex,
             organizationId: fixture.organizationId,
           });
+
           return id;
         });
 
@@ -2076,6 +2100,7 @@ describe("CommentRpcHandlers", () => {
             const handlers = yield* CommentRpcHandlersEffect;
             const fixture = yield* makeFixture();
             const commentId = yield* CommentId.generate;
+
             const completedStatusId = yield* makeStatus(
               fixture,
               "COMPLETED",
@@ -2092,10 +2117,12 @@ describe("CommentRpcHandlers", () => {
               );
 
             const db = yield* currentDb;
+
             const [post] = yield* db
               .select({ statusId: schema.postTable.statusId })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, fixture.postId));
+
             expect(post?.statusId).toBe(completedStatusId);
 
             const [comment] = yield* db
@@ -2104,6 +2131,7 @@ describe("CommentRpcHandlers", () => {
               })
               .from(schema.commentTable)
               .where(eq(schema.commentTable.id, commentId));
+
             expect(comment?.statusUpdateId).toBe(completedStatusId);
 
             const statusActivity = yield* db
@@ -2118,6 +2146,7 @@ describe("CommentRpcHandlers", () => {
                   eq(schema.postActivityTable.kind, "STATUS_CHANGED")
                 )
               );
+
             expect(statusActivity).toEqual([
               {
                 previousValue: fixture.statusId,
@@ -2134,6 +2163,7 @@ describe("CommentRpcHandlers", () => {
             const handlers = yield* CommentRpcHandlersEffect;
             const fixture = yield* makeFixture();
             const commentId = yield* CommentId.generate;
+
             const completedStatusId = yield* makeStatus(
               fixture,
               "COMPLETED",
@@ -2156,6 +2186,7 @@ describe("CommentRpcHandlers", () => {
                 // SAFETY: The recorded envelope exposes `type` for the event.
                 (candidate as { type?: string }).type === "post.status_changed"
             );
+
             expect(event).toBeDefined();
           })
       );
@@ -2179,12 +2210,14 @@ describe("CommentRpcHandlers", () => {
               );
 
             const db = yield* currentDb;
+
             const [comment] = yield* db
               .select({
                 statusUpdateId: schema.commentTable.statusUpdateId,
               })
               .from(schema.commentTable)
               .where(eq(schema.commentTable.id, commentId));
+
             expect(comment?.statusUpdateId).toBeNull();
           })
       );
@@ -2211,15 +2244,19 @@ describe("CommentRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const db = yield* currentDb;
+
           const [post] = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, fixture.postId));
+
           expect(post?.statusId).toBe(fixture.statusId);
+
           const [comment] = yield* db
             .select({ statusUpdateId: schema.commentTable.statusUpdateId })
             .from(schema.commentTable)
             .where(eq(schema.commentTable.id, replyId));
+
           expect(comment?.statusUpdateId).toBeNull();
         })
       );
@@ -2231,6 +2268,7 @@ describe("CommentRpcHandlers", () => {
             const handlers = yield* CommentRpcHandlersEffect;
             const fixture = yield* makeFixture("PUBLIC");
             const commentId = yield* CommentId.generate;
+
             const completedStatusId = yield* makeStatus(
               fixture,
               "COMPLETED",
@@ -2250,16 +2288,19 @@ describe("CommentRpcHandlers", () => {
               );
 
             const db = yield* currentDb;
+
             const [post] = yield* db
               .select({ statusId: schema.postTable.statusId })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, fixture.postId));
+
             expect(post?.statusId).toBe(completedStatusId);
 
             const [comment] = yield* db
               .select({ statusUpdateId: schema.commentTable.statusUpdateId })
               .from(schema.commentTable)
               .where(eq(schema.commentTable.id, commentId));
+
             expect(comment?.statusUpdateId).toBe(completedStatusId);
           })
       );
@@ -2290,10 +2331,12 @@ describe("CommentRpcHandlers", () => {
           expect(error._tag).toBe("PolicyDenied");
 
           const db = yield* currentDb;
+
           const [post] = yield* db
             .select({ statusId: schema.postTable.statusId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, fixture.postId));
+
           // The post status is untouched by the rejected request.
           expect(post?.statusId).toBe(fixture.statusId);
         })

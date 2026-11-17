@@ -98,9 +98,11 @@ describe("role permissions", () => {
     const resources = new Set(
       PERMISSIONS.map((permission) => permission.split(".")[0])
     );
+
     for (const resource of resources) {
       expect(PERMISSIONS).toContain(`${resource}.*`);
     }
+
     expect(
       PERMISSIONS.every((permission) => permission.split(".").length === 2)
     ).toBe(true);
@@ -130,14 +132,17 @@ describe("role permissions", () => {
       expect(roleGrants(role, "contacts.create")).toBe(true);
       expect(roleGrants(role, "companies.update")).toBe(true);
     }
+
     expect(roleGrants("owner", "boards.*")).toBe(true);
     expect(roleGrants("admin", "boards.*")).toBe(true);
+
     for (const action of ["create", "update", "delete"] as const) {
       expect(roleGrants("owner", `boards.${action}`)).toBe(true);
       expect(roleGrants("admin", `boards.${action}`)).toBe(true);
       expect(roleGrants("manager", `boards.${action}`)).toBe(false);
       expect(roleGrants("contributor", `boards.${action}`)).toBe(false);
     }
+
     expect(roleGrants("contributor", "changelog.create")).toBe(false);
     expect(roleGrants("contributor", "tags.create")).toBe(false);
     expect(roleGrants("contributor", "contacts.create")).toBe(false);
@@ -182,6 +187,7 @@ describe("can()", () => {
       ["org_a", "manager"],
       ["org_b", "admin"],
     ]);
+
     expect(can(session, "org_a", "posts.lock")).toBe(true);
     expect(can(session, "org_a", "boards.create")).toBe(false);
     expect(can(session, "org_b", "posts.lock")).toBe(true);
@@ -190,6 +196,7 @@ describe("can()", () => {
 
   it("denies can() for a contributor on content-management and privileged permissions", () => {
     const session = ctx([[org, "contributor"]]);
+
     for (const permission of [
       "workspace.update",
       "boards.create",
@@ -225,6 +232,7 @@ describe("can()", () => {
 
   it("allows managers to run content operations contributors cannot", () => {
     const session = ctx([[org, "manager"]]);
+
     for (const permission of [
       "members.remove",
       "posts.*",
@@ -242,6 +250,7 @@ describe("can()", () => {
     ] as const) {
       expect(can(session, org, permission)).toBe(true);
     }
+
     expect(can(session, org, "boards.create")).toBe(false);
     expect(can(session, org, "boards.*")).toBe(false);
   });
@@ -258,6 +267,7 @@ describe("can()", () => {
       [org, "admin"],
       ["org_other", "manager"],
     ]);
+
     expect(roleIn(session, org)).toBe("admin");
     expect(isMember(session, org)).toBe(true);
     expect(isOwnerOrAdmin(session, org)).toBe(true);

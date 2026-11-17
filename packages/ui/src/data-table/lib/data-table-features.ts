@@ -113,6 +113,7 @@ const dataTableFilteringFeature: TableFeature = {
     const options: TableOptions_DataTableFiltering = {
       onJoinOperatorChange: makeStateUpdater("joinOperator", table),
     };
+
     return options;
   },
   assignColumnPrototype: (prototype, table) => {
@@ -210,6 +211,7 @@ function getPlainFilter(columnId: string, filters: ColumnFilterItem[]) {
   const index = filters.findIndex(
     (filter) => filter.id === columnId && getIsPlainFilter(filter)
   );
+
   const filter = filters[index];
   const value = filter ? getPlainFilterValue(filter) : undefined;
 
@@ -227,12 +229,15 @@ function setPlainFilter(
       filter: previous,
       value: previousValue,
     } = getPlainFilter(columnId, asFilterItems(old));
+
     const value = functionalUpdate(updater, previousValue);
+
     const next: ColumnFilter = previous?.filterId
       ? { id: columnId, value, filterId: previous.filterId }
       : { id: columnId, value };
 
     if (index === -1) return [...old, next];
+
     return old.map((filter, filterIndex) =>
       filterIndex === index ? next : filter
     );
@@ -246,15 +251,19 @@ function getShouldRemoveFilter(
   instance: DataTableInstance
 ) {
   if (filter.value === undefined) return true;
+
   if (filter.operator) return false;
 
   const column = instance.getColumn(filter.id);
+
   if (!column) return false;
 
   const filterFn = column.getFilterFn();
+
   if (filterFn?.autoRemove) {
     return filterFn.autoRemove(filter.value, column);
   }
+
   return isString(filter.value) && !filter.value;
 }
 

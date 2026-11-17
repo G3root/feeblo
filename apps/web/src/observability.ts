@@ -15,6 +15,7 @@ import { hasWindow } from "@feeblo/utils/runtime-kind";
  */
 // oxlint-disable typescript/no-unnecessary-type-parameters -- A captured failure is any value a browser handler can throw. A generic parameter accepts it without naming `unknown` (banned by anti-slop), and the SDK accepts the value unchanged.
 import {
+  isBrowserTelemetryStarted,
   recordBrowserNavigation,
   startBrowserTelemetry,
 } from "@feeblo/web-shared/browser-telemetry";
@@ -28,6 +29,7 @@ import type { AnyRouter } from "@tanstack/react-router";
 
 const environment = (): string => {
   const env = getRuntimePublicEnv();
+
   return (
     env.sentryEnvironment ??
     env.appEnv ??
@@ -39,15 +41,12 @@ const environment = (): string => {
 const telemetryUrl = (signal: "traces" | "logs"): string =>
   new URL(`/telemetry/${signal}`, window.location.origin).href;
 
-let telemetryStarted = false;
-
 /**
  * Start the Effect OTLP exporters once per document. The public board is a
  * first-class surface: its page loads and navigation spans are traced too.
  */
 export const startWebTelemetry = (): void => {
-  if (telemetryStarted || !hasWindow()) return;
-  telemetryStarted = true;
+  if (isBrowserTelemetryStarted() || !hasWindow()) return;
   const env = getRuntimePublicEnv();
   startBrowserTelemetry({
     service: "feeblo-web",
@@ -64,6 +63,7 @@ export const startWebTelemetry = (): void => {
 export const startWebErrorReporting = (): void => {
   if (!hasWindow()) return;
   const env = getRuntimePublicEnv();
+
   if (env.sentryDsn === undefined || env.sentryDsn.length === 0) return;
   startErrorReporting({
     dsn: env.sentryDsn,
@@ -91,15 +91,18 @@ export const reportRouteError = <T>(error: T): void => {
  */
 export const startNavigationTelemetry = (router: AnyRouter): (() => void) => {
   if (!hasWindow()) return () => {};
+
   const start = router.subscribe("onBeforeNavigate", (event) => {
     recordBrowserNavigation({
       type: "start",
       path: event.toLocation.pathname,
     });
   });
+
   const end = router.subscribe("onResolved", () => {
     recordBrowserNavigation({ type: "end" });
   });
+
   return () => {
     start();
     end();

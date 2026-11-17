@@ -32,6 +32,7 @@ const StoredRouteSelection = Schema.Struct({
 /** Records matched event deliveries in the caller's database transaction only. */
 const makeIntegrationEventRecorder = Effect.gen(function* () {
   const db = yield* currentDb;
+
   const recordIntegrationEvent = Effect.fn(
     "IntegrationEventRecorder.recordIntegrationEvent"
   )(function* ({ event }: { readonly event: IntegrationEventEnvelopeV1 }) {
@@ -62,16 +63,19 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
           )
         )
       );
+
     const routes = yield* Effect.forEach(selections, (selection) =>
       Schema.decodeEffect(StoredRouteSelection)(selection).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new IntegrationEventRecordingError({
               message: "Stored integration route selection is invalid",
+              cause,
             })
         )
       )
     );
+
     const matched = routes.filter((route) =>
       doesIntegrationRouteMatchEvent({
         connectionLifecycleStatus: route.connectionLifecycle,
@@ -79,14 +83,18 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
         route,
       })
     );
+
     if (matched.length === 0) {
       return { deliveryCount: 0, eventRecorded: false };
     }
+
     const now = yield* DateTime.now;
     const occurredAt = DateTime.toDate(event.occurredAt);
+
     const retentionExpiresAt = DateTime.toDate(
       DateTime.addDuration(now, Duration.days(30))
     );
+
     yield* db.insert(schema.integrationEventTable).values({
       causalHopCount: event.causalHopCount,
       causationId: event.causationId ?? null,
@@ -100,6 +108,7 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
       type: event.type,
       version: event.version,
     });
+
     // One event fans out to every matched route, and the delivery rows are
     // written as batched inserts in the caller's transaction rather than one
     // round trip per route.
@@ -118,11 +127,13 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
         }))
       )
     );
+
     // Each `VALUES` row binds one parameter per column, and Postgres rejects a
     // statement past 65,535 parameters. Route fan-out has no bound, so the
     // rows go in fixed-size chunks inside the same transaction: a fan-out past
     // the chunk size costs one extra statement, not one per route.
     const DELIVERY_INSERT_CHUNK = 500;
+
     for (
       let offset = 0;
       offset < deliveries.length;
@@ -132,8 +143,10 @@ const makeIntegrationEventRecorder = Effect.gen(function* () {
         .insert(schema.integrationDeliveryTable)
         .values(deliveries.slice(offset, offset + DELIVERY_INSERT_CHUNK));
     }
+
     return { deliveryCount: matched.length, eventRecorded: true };
   });
+
   return {
     recordIntegrationEvent: (input) =>
       recordIntegrationEvent(input).pipe(

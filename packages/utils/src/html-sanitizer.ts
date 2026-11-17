@@ -22,14 +22,17 @@ export const secureBlankTarget = (node: {
   readonly setAttribute: (name: string, value: string) => void;
 }): void => {
   const target = node.getAttribute("target")?.trim().toLowerCase();
+
   if (node.tagName !== "A" || target !== "_blank") {
     return;
   }
 
   const existingRel = node.getAttribute("rel") ?? "";
+
   const relTokens = new Set(
     existingRel.split(REL_TOKEN_SEPARATOR).filter(Boolean)
   );
+
   relTokens.add("noopener");
   relTokens.add("noreferrer");
   node.setAttribute("rel", [...relTokens].join(" "));
@@ -168,18 +171,14 @@ const SANITIZE_SCHEMA = {
 };
 
 const relTokens = (value: Properties[string]): Set<string> => {
-  const tokens = new Set<string>();
   const values = Array.isArray(value) ? value : [value];
-  for (const entry of values) {
-    if (isString(entry)) {
-      for (const token of entry.split(REL_TOKEN_SEPARATOR)) {
-        if (token) {
-          tokens.add(token);
-        }
-      }
-    }
-  }
-  return tokens;
+
+  return new Set(
+    values
+      .filter(isString)
+      .flatMap((entry) => entry.split(REL_TOKEN_SEPARATOR))
+      .filter((token) => token !== "")
+  );
 };
 
 /**
@@ -200,14 +199,19 @@ const rehypeSecureLinkTargets = () => (tree: Root) => {
     if (node.tagName !== "a") {
       return;
     }
+
     const target = node.properties?.target;
+
     if (!isString(target)) {
       return;
     }
+
     const normalizedTarget = target.trim().toLowerCase();
+
     if (normalizedTarget === "" || SAME_CONTEXT_TARGETS.has(normalizedTarget)) {
       return;
     }
+
     const tokens = relTokens(node.properties.rel);
     tokens.add("noopener");
     tokens.add("noreferrer");
@@ -237,6 +241,7 @@ export class HtmlSanitizer {
     if (!result) {
       return result;
     }
+
     return result.endsWith("\n") ? result : `${result}\n`;
   }
 }

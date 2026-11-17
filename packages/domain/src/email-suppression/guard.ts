@@ -83,12 +83,14 @@ export const sendUnlessSuppressed = <E, R>(args: {
 > =>
   Effect.gen(function* () {
     const suppressions = yield* EmailSuppressionRepository;
+
     const suppressed = yield* suppressions
       .isSuppressed({
         email: args.email,
         organizationId: args.organizationId,
       })
       .pipe(Effect.mapError(toSuppressionDataError));
+
     if (suppressed) {
       yield* Effect.logWarning(
         "Email skipped because the address is suppressed"
@@ -97,8 +99,10 @@ export const sendUnlessSuppressed = <E, R>(args: {
           organizationId: args.organizationId ?? "platform",
         })
       );
+
       return;
     }
+
     yield* args.send.pipe(
       Effect.catchIf(
         (error) =>

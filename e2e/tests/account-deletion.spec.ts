@@ -28,6 +28,7 @@ async function submitDeleteAccount(
   const dialog = page.getByRole("alertdialog");
   await dialog.getByLabel("Password", { exact: true }).fill(password);
   await dialog.getByRole("button", { name: "Delete account" }).click();
+
   return dialog;
 }
 
@@ -41,12 +42,14 @@ test.describe("account deletion", () => {
 
     // The account is gone, so the dashboard has no session to return to.
     await page.waitForURL(/\/sign-up/);
+
     const signIn = await page
       .context()
       .request.post(`${apiUrl()}/api/auth/sign-in/email`, {
         data: { email: owner.email, password: owner.password },
         headers: { Origin: webUrl() },
       });
+
     expect(signIn.ok()).toBeFalsy();
   });
 
@@ -65,9 +68,11 @@ test.describe("account deletion", () => {
       // Invite the teammate and accept for them: this test is about deletion,
       // and the invitation UI has its own spec.
       await page.goto(settingsPath(owner.organizationUrl, "/settings/members"));
+
       const form = page.locator("form").filter({
         has: page.getByRole("textbox", { name: "Invite email" }),
       });
+
       await form
         .getByRole("textbox", { name: "Invite email" })
         .fill(teammate.email);
@@ -75,10 +80,12 @@ test.describe("account deletion", () => {
       await expect(
         page.getByText("Invitation sent", { exact: true })
       ).toBeVisible();
+
       const email = await waitForTestEmail(
         page.context().request,
         teammate.email
       );
+
       const accepted = await teammateContext.request.post(
         `${apiUrl()}/api/auth/organization/accept-invitation`,
         {
@@ -86,6 +93,7 @@ test.describe("account deletion", () => {
           headers: { Origin: webUrl() },
         }
       );
+
       expect(accepted.ok()).toBeTruthy();
 
       const dialog = await submitDeleteAccount(

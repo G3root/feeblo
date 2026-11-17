@@ -8,10 +8,13 @@ import {
 import { z } from "zod";
 
 const themeModeSchema = z.enum(["light", "dark", "auto"]);
+
 const resolvedThemeSchema = z.enum(["light", "dark"]);
+
 const themeKey = "theme";
 
 type ThemeMode = z.infer<typeof themeModeSchema>;
+
 type ResolvedTheme = z.infer<typeof resolvedThemeSchema>;
 
 const getResolvedThemeFromDOM = () => {
@@ -21,6 +24,7 @@ const getResolvedThemeFromDOM = () => {
 const getStoredThemeMode = () => {
   try {
     const storedTheme = localStorage.getItem(themeKey);
+
     return themeModeSchema.parse(storedTheme);
   } catch {
     return "auto";
@@ -68,6 +72,7 @@ const getNextTheme = (current: ThemeMode): ThemeMode => {
     getSystemTheme() === "dark"
       ? ["auto", "light", "dark"]
       : ["auto", "dark", "light"];
+
   return themes[(themes.indexOf(current) + 1) % themes.length] ?? "auto";
 };
 
@@ -75,6 +80,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() =>
     getStoredThemeMode()
   );
+
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     getResolvedThemeFromDOM()
   );
@@ -84,12 +90,16 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     if (themeMode !== "auto") {
       return;
     }
+
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
     const handler = () => {
       updateThemeClass("auto");
       setResolvedTheme(getSystemTheme());
     };
+
     mediaQuery.addEventListener("change", handler);
+
     return () => mediaQuery.removeEventListener("change", handler);
   }, [themeMode]);
 
@@ -115,8 +125,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);
+
   if (!context) {
     throw new Error("useTheme must be used within a ThemeProvider");
   }
+
   return context;
 };

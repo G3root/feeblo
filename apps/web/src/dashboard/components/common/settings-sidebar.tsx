@@ -183,6 +183,7 @@ export function SettingsSidebar({
 }: React.ComponentProps<typeof Sidebar>) {
   const organizationId = useOrganizationId();
   const { data: session } = useAuthState();
+
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -217,8 +218,10 @@ export function SettingsSidebar({
                 {group.subItems.map((item) => {
                   const permission =
                     "permission" in item ? item.permission : undefined;
+
                   const permissions =
                     "permissions" in item ? item.permissions : undefined;
+
                   const canAccess =
                     permission === undefined && permissions === undefined
                       ? true
@@ -228,6 +231,7 @@ export function SettingsSidebar({
                               hasPermission(organizationId, candidate)(session)
                             )
                           : hasPermission(organizationId, permission)(session));
+
                   const itemPath = `/${organizationId}/settings/${item.to
                     .split("/")
                     .slice(3)

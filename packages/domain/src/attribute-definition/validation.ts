@@ -19,6 +19,121 @@ export type AttributeValue =
   | null
   | undefined;
 
+type ConfigValidationResult =
+  | { readonly valid: true }
+  | { readonly valid: false; readonly error: string };
+
+type AttributeConfigValue = S.Schema.Type<typeof AttributeConfig>;
+
+/** One attribute type's value check and its own config checks. */
+type AttributeTypeRules = {
+  /** Whether a non-null value has this type's runtime shape. */
+  readonly accepts: (value: AttributeValue) => boolean;
+  /** The type's configured-rule check; absent when the type has none. */
+  readonly checkConfig?: AttributeConfigCheck;
+};
+
+type AttributeConfigCheck = (input: {
+  readonly config: AttributeConfigValue;
+  readonly definition: AttributeDefinition;
+  readonly value: AttributeValue;
+}) => ConfigValidationResult;
+
+/** TEXT: an optional pattern, compiled only after the safety check. */
+const checkTextConfig: AttributeConfigCheck = ({
+  config,
+  definition,
+  value,
+}) => {
+  if (!isString(value)) {
+    return {
+      valid: false,
+      error: `Expected text value for "${definition.name}"`,
+    };
+  }
+
+  if (config.pattern === undefined) {
+    return { valid: true };
+  }
+
+  if (isPotentiallyUnsafeRegex(config.pattern)) {
+    // Never execute a pattern that can backtrack catastrophically;
+    // fail loudly so the misconfiguration surfaces instead.
+    return {
+      valid: false,
+      error: `Configured validation pattern for "${definition.name}" is unsafe and was not applied`,
+    };
+  }
+
+  try {
+    return new RegExp(config.pattern).test(value)
+      ? { valid: true }
+      : {
+          valid: false,
+          error: `Value for "${definition.name}" does not match configured rules`,
+        };
+  } catch {
+    return {
+      valid: false,
+      error: `Configured validation pattern for "${definition.name}" is invalid`,
+    };
+  }
+};
+
+/** INTEGER and DECIMAL share one optional range. */
+const checkNumericConfig: AttributeConfigCheck = ({
+  config,
+  definition,
+  value,
+}) => {
+  if (!isNumber(value)) {
+    return {
+      valid: false,
+      error: `Expected numeric value for "${definition.name}"`,
+    };
+  }
+
+  if (config.min !== undefined && value < config.min) {
+    return {
+      valid: false,
+      error: `Value for "${definition.name}" is below the configured minimum`,
+    };
+  }
+
+  if (config.max !== undefined && value > config.max) {
+    return {
+      valid: false,
+      error: `Value for "${definition.name}" exceeds the configured maximum`,
+    };
+  }
+
+  return { valid: true };
+};
+
+/**
+ * One entry per attribute type: how a value is type-checked and which
+ * configured rules apply. A new type is one entry here rather than a new case
+ * in the two switches that used to answer these questions separately.
+ */
+const attributeTypeRules: Record<
+  AttributeDefinition["type"],
+  AttributeTypeRules
+> = {
+  BOOLEAN: { accepts: isBoolean },
+  DATE: {
+    accepts: (value) => value instanceof Date && !Number.isNaN(value.getTime()),
+  },
+  DECIMAL: {
+    accepts: (value) => isNumber(value) && !Number.isNaN(value),
+    checkConfig: checkNumericConfig,
+  },
+  INTEGER: {
+    accepts: (value) => isNumber(value) && Number.isInteger(value),
+    checkConfig: checkNumericConfig,
+  },
+  TEXT: { accepts: isString, checkConfig: checkTextConfig },
+};
+
 const validateType = (
   definition: AttributeDefinition,
   value: AttributeValue
@@ -27,25 +142,14 @@ const validateType = (
     return !definition.isRequired;
   }
 
-  switch (definition.type) {
-    case "TEXT":
-      return isString(value);
-    case "INTEGER":
-      return isNumber(value) && Number.isInteger(value);
-    case "DECIMAL":
-      return isNumber(value) && !Number.isNaN(value);
-    case "BOOLEAN":
-      return isBoolean(value);
-    case "DATE":
-      return value instanceof Date && !Number.isNaN(value.getTime());
-    default:
-      return false;
-  }
-};
+  // The `type` columns are plain text rather than a Postgres enum, so a row can
+  // carry a type this build does not know — written by a newer deployment, or
+  // one since removed. That is a validation failure, not a crash: a defect here
+  // would leave the `BadRequestError` channel this module promises.
+  const rules = attributeTypeRules[definition.type];
 
-type ConfigValidationResult =
-  | { readonly valid: true }
-  | { readonly valid: false; readonly error: string };
+  return rules !== undefined && rules.accepts(value);
+};
 
 const validateConfig = (
   definition: AttributeDefinition,
@@ -65,72 +169,21 @@ const validateConfig = (
     definition.config ?? {},
     { onExcessProperty: "ignore" }
   );
+
   if (Option.isNone(decodedConfig)) {
     return {
       valid: false,
       error: `Configured validation rules for "${definition.name}" are invalid`,
     };
   }
-  const config = decodedConfig.value;
 
-  switch (definition.type) {
-    case "TEXT": {
-      if (!isString(value)) {
-        return {
-          valid: false,
-          error: `Expected text value for "${definition.name}"`,
-        };
-      }
-      if (config.pattern === undefined) {
-        return { valid: true };
-      }
-      if (isPotentiallyUnsafeRegex(config.pattern)) {
-        // Never execute a pattern that can backtrack catastrophically;
-        // fail loudly so the misconfiguration surfaces instead.
-        return {
-          valid: false,
-          error: `Configured validation pattern for "${definition.name}" is unsafe and was not applied`,
-        };
-      }
-      try {
-        return new RegExp(config.pattern).test(value)
-          ? { valid: true }
-          : {
-              valid: false,
-              error: `Value for "${definition.name}" does not match configured rules`,
-            };
-      } catch {
-        return {
-          valid: false,
-          error: `Configured validation pattern for "${definition.name}" is invalid`,
-        };
-      }
+  const { checkConfig } = attributeTypeRules[definition.type];
+
+  return (
+    checkConfig?.({ config: decodedConfig.value, definition, value }) ?? {
+      valid: true,
     }
-    case "INTEGER":
-    case "DECIMAL": {
-      if (!isNumber(value)) {
-        return {
-          valid: false,
-          error: `Expected numeric value for "${definition.name}"`,
-        };
-      }
-      if (config.min !== undefined && value < config.min) {
-        return {
-          valid: false,
-          error: `Value for "${definition.name}" is below the configured minimum`,
-        };
-      }
-      if (config.max !== undefined && value > config.max) {
-        return {
-          valid: false,
-          error: `Value for "${definition.name}" exceeds the configured maximum`,
-        };
-      }
-      return { valid: true };
-    }
-    default:
-      return { valid: true };
-  }
+  );
 };
 
 export type AttributeValidationResult = {
@@ -150,6 +203,7 @@ export const validateAttributeValue = (
   }
 
   const configResult = validateConfig(definition, value);
+
   if (!configResult.valid) {
     return {
       valid: false,
@@ -171,10 +225,12 @@ export const validateAttributeValueEffect = (
 ): Effect.Effect<void, BadRequestError> =>
   Effect.gen(function* () {
     const result = validateAttributeValue(definition, value);
+
     if (!result.valid) {
       return yield* new BadRequestError({ message: result.error });
     }
   });
+
 /**
  * Maximum length of an attribute validation pattern. Long patterns are never
  * needed for field validation and keep the compiled-regex surface small.
@@ -185,6 +241,7 @@ const MAX_ATTRIBUTE_PATTERN_REPETITION = 100;
 
 /** A single decimal digit, the only backreference number a pattern may carry. */
 const singleDigitPattern = /^[0-9]$/;
+
 /** A repetition bound, which must be a plain decimal integer. */
 const decimalIntegerPattern = /^\d+$/;
 
@@ -207,33 +264,41 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
 
   let inCharClass = false;
   let i = 0;
+
   while (i < pattern.length) {
     const ch = pattern[i];
+
     if (ch === "\\") {
       // Backreferences make matching non-regular and can introduce expensive
       // retry paths. Escaped literals and character classes remain safe.
       if (singleDigitPattern.test(pattern[i + 1] ?? "")) {
         return true;
       }
+
       i += 2;
       continue;
     }
+
     if (inCharClass) {
       if (ch === "]") {
         inCharClass = false;
       }
+
       i += 1;
       continue;
     }
+
     if (ch === "[") {
       inCharClass = true;
       i += 1;
       continue;
     }
+
     if (ch === "{") {
       const end = pattern.indexOf("}", i + 1);
       const repetition = pattern.slice(i + 1, end);
       const repetitionParts = repetition.split(",");
+
       if (
         end === -1 ||
         repetitionParts.length > 2 ||
@@ -244,9 +309,11 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
       ) {
         return true;
       }
+
       i = end + 1;
       continue;
     }
+
     if (
       ch === "(" ||
       ch === ")" ||
@@ -257,8 +324,10 @@ export const isPotentiallyUnsafeRegex = (pattern: string): boolean => {
     ) {
       return true;
     }
+
     i += 1;
   }
+
   return false;
 };
 
@@ -271,6 +340,7 @@ export const noDuplicateAttributeIds = S.makeFilter<
     if (attributeIds.has(attributeId)) {
       return "attributeValues must not contain duplicate attributeId values";
     }
+
     attributeIds.add(attributeId);
   }
 

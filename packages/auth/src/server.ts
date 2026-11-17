@@ -146,6 +146,7 @@ export const initAuthHandler = (
       emailVerificationRequired,
       autoSignInAfterSignUp,
     } = yield* AuthConfig;
+
     const polarService = yield* PolarService;
 
     // A half-configured Polar is the one failure mode that takes money without
@@ -169,6 +170,7 @@ export const initAuthHandler = (
     // misconfiguration before a customer does. See docs/adr/0015.
     if (polarService.client) {
       const settings = yield* polarService.getOrganizationSettings();
+
       if (
         Option.isSome(settings) &&
         !settings.value.allowMultipleSubscriptions
@@ -186,9 +188,11 @@ export const initAuthHandler = (
     const workflowEngine = yield* WorkflowEngine;
 
     const dbLayer = Layer.succeed(Database.Database, db);
+
     const entitlementPolicyLayer = EntitlementPolicy.layer.pipe(
       Layer.provide(WorkspaceRepository.layer)
     );
+
     const membershipPolicyLayer = MembershipPolicy.layer.pipe(
       Layer.provide(entitlementPolicyLayer),
       Layer.provide(MembershipRepository.layer)
@@ -272,6 +276,7 @@ export const initAuthHandler = (
       if (!(timeZone && isValidTimeZone(timeZone))) {
         return Promise.resolve();
       }
+
       return callbackRuntime.runPromise(
         Effect.gen(function* () {
           const now = yield* DateTime.nowAsDate;
@@ -295,6 +300,7 @@ export const initAuthHandler = (
           const session = await callbackRuntime.runPromise(
             createSsoSession({ clientIp, organizationId, token })
           );
+
           // A portal sign-in proves the workspace's own view of the person.
           // Deferred subscriptions that were waiting for this access activate
           // here; the call is best-effort and must never fail the sign-in.
@@ -315,6 +321,7 @@ export const initAuthHandler = (
               )
             )
           );
+
           return session;
         } catch (error) {
           // The plugin may hand back an error that crossed a request
@@ -322,6 +329,7 @@ export const initAuthHandler = (
           if (Schema.is(SsoError)(error)) {
             return { code: error.code, message: error.message };
           }
+
           return { code: "FAILED_TO_CREATE_SSO_USER" };
         }
       },
@@ -364,6 +372,7 @@ export const initAuthHandler = (
       readonly activeOrganizationId?: unknown;
     }): string | null => {
       const value = session.activeOrganizationId;
+
       return isString(value) && value.length > 0 ? value : null;
     };
 
@@ -468,11 +477,13 @@ export const initAuthHandler = (
             // the same pair of workspaces; without a fixed order each could hold
             // the first one the other is waiting for.
             .orderBy(asc(schema.organizationTable.id));
+
           return memberships.filter((membership) =>
             membership.role.split(",").includes("owner")
           );
         })
       );
+
       if (ownedWorkspaces.length === 0) {
         return;
       }
@@ -485,9 +496,11 @@ export const initAuthHandler = (
       const ownedWorkspaceIds = ownedWorkspaces.map(
         (workspace) => workspace.id
       );
+
       const blockingWorkspaceNames = await callbackRuntime.runPromise(
         Effect.gen(function* () {
           const memberCounts = new Map<string, number>();
+
           for (
             let start = 0;
             start < ownedWorkspaceIds.length;
@@ -509,6 +522,7 @@ export const initAuthHandler = (
                 )
               )
               .groupBy(schema.memberTable.organizationId);
+
             for (const row of counts) {
               memberCounts.set(row.organizationId, row.total);
             }
@@ -519,6 +533,7 @@ export const initAuthHandler = (
             .map((workspace) => workspace.name);
         })
       );
+
       if (blockingWorkspaceNames.length > 0) {
         throw ownershipRequiredError(blockingWorkspaceNames);
       }
@@ -550,24 +565,29 @@ export const initAuthHandler = (
           Effect.gen(function* () {
             const nowBlocking: string[] = [];
             const deletable: string[] = [];
+
             for (const workspace of ownedWorkspaces) {
               const [locked] = yield* db
                 .select({ id: schema.organizationTable.id })
                 .from(schema.organizationTable)
                 .where(eq(schema.organizationTable.id, workspace.id))
                 .for("update");
+
               if (locked === undefined) {
                 continue;
               }
+
               if ((yield* countMembers(workspace.id)) > 1) {
                 nowBlocking.push(workspace.name);
               } else {
                 deletable.push(workspace.id);
               }
             }
+
             if (nowBlocking.length > 0) {
               return yield* Effect.fail(ownershipRequiredError(nowBlocking));
             }
+
             for (const workspaceId of deletable) {
               yield* BillingRepository.use((billingRepository) =>
                 billingRepository.enqueueSubscriptionRevocationsForOrganization(
@@ -580,6 +600,7 @@ export const initAuthHandler = (
                 .delete(schema.organizationTable)
                 .where(eq(schema.organizationTable.id, workspaceId));
             }
+
             return deletable;
           })
         )
@@ -647,6 +668,7 @@ export const initAuthHandler = (
             disableImplicitSignUp: !signUpEnabled,
             mapProfileToUser: (profile: GitHubEmulatorProfile) => {
               const name = profile.name ?? profile.login;
+
               return {
                 name: name ?? "",
                 ...(profile.avatar_url && { image: profile.avatar_url }),
@@ -694,6 +716,7 @@ export const initAuthHandler = (
       | "email-verification"
       | "password-reset"
       | "sign-in";
+
     const verificationOtpRateLimitedPaths = new Set([
       "/email-otp/request-password-reset",
       "/forget-password/email-otp",
@@ -701,18 +724,77 @@ export const initAuthHandler = (
       "/email-otp/send-verification-otp",
     ]);
 
+    /**
+     * The flow an OTP request belongs to, or null when its path is not one of
+     * the OTP endpoints this hook rate limits.
+     */
+    const verificationOtpFlowFor = (ctx: {
+      path: string;
+      body?: Record<string, string | number | boolean | null | undefined>;
+    }): VerificationOtpFlow | null => {
+      if (
+        ctx.path === "/email-otp/request-password-reset" ||
+        ctx.path === "/forget-password/email-otp"
+      ) {
+        return "password-reset";
+      }
+
+      if (ctx.path === "/email-otp/request-email-change") {
+        return "email-verification";
+      }
+
+      if (ctx.path !== "/email-otp/send-verification-otp") {
+        return null;
+      }
+
+      if (ctx.body?.type === "sign-in") {
+        return "sign-in";
+      }
+
+      if (ctx.body?.type === "forget-password") {
+        return "password-reset";
+      }
+
+      return "email-verification";
+    };
+
+    /** What one OTP type charges and what the email calls it. */
+    type VerificationOtpMeta = {
+      readonly flow: VerificationOtpFlow;
+      readonly label: string;
+    };
+
+    /**
+     * One table, so a new type cannot be added to the flow and not to the
+     * label.
+     */
+    const verificationOtpMeta = (type: string): VerificationOtpMeta => {
+      switch (type) {
+        case "forget-password":
+          return { flow: "password-reset", label: "password reset" };
+        case "sign-in":
+          return { flow: "sign-in", label: "sign-in" };
+        default:
+          return { flow: "email-verification", label: "email verification" };
+      }
+    };
+
     const consumeVerificationOtpRateLimitForFlow = async (
       flow: VerificationOtpFlow,
       email: string
     ) => {
       await callbackRuntime.runPromise(
-        RateLimitService.use((rateLimiter) =>
-          flow === "password-reset"
-            ? rateLimiter.consumePasswordResetOtp(email)
-            : flow === "sign-in"
-              ? rateLimiter.consumeSignInOtp(email)
-              : rateLimiter.consumeEmailVerificationOtp(email)
-        ).pipe(
+        RateLimitService.use((rateLimiter) => {
+          if (flow === "password-reset") {
+            return rateLimiter.consumePasswordResetOtp(email);
+          }
+
+          if (flow === "sign-in") {
+            return rateLimiter.consumeSignInOtp(email);
+          }
+
+          return rateLimiter.consumeEmailVerificationOtp(email);
+        }).pipe(
           Effect.catchTag("RateLimiterError", (error) =>
             Effect.fail(
               new APIError(
@@ -752,21 +834,9 @@ export const initAuthHandler = (
       path: string;
       body?: Record<string, string | number | boolean | null | undefined>;
     }) => {
-      const flow =
-        ctx.path === "/email-otp/request-password-reset" ||
-        ctx.path === "/forget-password/email-otp"
-          ? ("password-reset" as const)
-          : ctx.path === "/email-otp/request-email-change"
-            ? ("email-verification" as const)
-            : ctx.path === "/email-otp/send-verification-otp"
-              ? ctx.body?.type === "sign-in"
-                ? ("sign-in" as const)
-                : ctx.body?.type === "forget-password"
-                  ? ("password-reset" as const)
-                  : ("email-verification" as const)
-              : null;
+      const flow = verificationOtpFlowFor(ctx);
 
-      if (!flow) {
+      if (flow === null) {
         return;
       }
 
@@ -947,15 +1017,18 @@ export const initAuthHandler = (
             shouldRedirect: async ({ user, session, isContinuation }) => {
               const activeOrganizationId = activeOrganizationIdOf(session);
               const memberships = await listMemberships(user.id);
+
               // No workspace at all: let consent refuse with a clear message
               // rather than sending the member to a chooser with no options.
               if (memberships.length === 0) {
                 return false;
               }
+
               const active = memberships.find(
                 (membership) =>
                   membership.organizationId === activeOrganizationId
               );
+
               // An active workspace the member may not authorize is treated
               // like no selection at all: the chooser explains the role
               // requirement instead of the provider answering a bare error.
@@ -965,6 +1038,7 @@ export const initAuthHandler = (
               ) {
                 return true;
               }
+
               // Ask once per authorization; a continuation proves the page ran.
               return (
                 !isContinuation &&
@@ -979,6 +1053,7 @@ export const initAuthHandler = (
             consentReferenceId: async ({ user, session }) => {
               const activeOrganizationId = activeOrganizationIdOf(session);
               const memberships = await listMemberships(user.id);
+
               const active =
                 activeOrganizationId === null
                   ? undefined
@@ -986,6 +1061,7 @@ export const initAuthHandler = (
                       (membership) =>
                         membership.organizationId === activeOrganizationId
                     );
+
               if (active === undefined) {
                 throw new APIError("BAD_REQUEST", {
                   error: "set_organization",
@@ -993,6 +1069,7 @@ export const initAuthHandler = (
                     "Choose a workspace before authorizing this application.",
                 });
               }
+
               // A grant is a workspace-wide machine credential. Anyone could
               // otherwise consent to scopes their own role does not hold —
               // `companies.delete`, for a contributor — and then call the
@@ -1004,6 +1081,7 @@ export const initAuthHandler = (
                     "Only workspace admins can authorize applications for this workspace.",
                 });
               }
+
               return active.organizationId;
             },
           },
@@ -1088,6 +1166,7 @@ export const initAuthHandler = (
                             .then(() => undefined);
                           break;
                         }
+
                         default: {
                           return;
                         }
@@ -1137,6 +1216,16 @@ export const initAuthHandler = (
 
         lastLoginMethod({
           storeInDatabase: true,
+          // The plugin's default resolver maps `/sign-up/email` and
+          // `/sign-in/email`, but this app verifies the address before a new
+          // account is given a session: the response that actually signs the
+          // person in after an email sign-up is `/email-otp/verify-email`.
+          // Without this, the sign-in page's "Last used" hint would be missing
+          // on the first visit after signing up — the visit it exists for — and
+          // would only appear from the second sign-in onward. Returning `null`
+          // for everything else falls back to the default resolver.
+          customResolveMethod: (ctx) =>
+            ctx.path === "/email-otp/verify-email" ? "email" : null,
         }),
         organization({
           allowUserToCreateOrganization: false,
@@ -1178,8 +1267,10 @@ export const initAuthHandler = (
           },
           async sendInvitationEmail(data) {
             const inviteLink = `${appUrl}/invitation/${data.id}`;
+
             const { createOrganizationInvitationEmail } =
               await loadOrganizationInvitationEmail();
+
             await callbackRuntime.runPromise(
               sendUnlessSuppressed({
                 email: data.email,
@@ -1231,22 +1322,12 @@ export const initAuthHandler = (
             // dispatching the email-OTP endpoint, so hooks.before does not run.
             // Keep those sends rate limited, while avoiding a second consume
             // for paths already handled by the request hook.
+            const { flow, label: flowLabel } = verificationOtpMeta(type);
+
             if (!(ctx && verificationOtpRateLimitedPaths.has(ctx.path))) {
-              await consumeVerificationOtpRateLimitForFlow(
-                type === "forget-password"
-                  ? "password-reset"
-                  : type === "sign-in"
-                    ? "sign-in"
-                    : "email-verification",
-                email
-              );
+              await consumeVerificationOtpRateLimitForFlow(flow, email);
             }
-            const flowLabel =
-              type === "forget-password"
-                ? "password reset"
-                : type === "sign-in"
-                  ? "sign-in"
-                  : "email verification";
+
             const { createVerificationOtpEmail } =
               await loadVerificationOtpEmail();
 
@@ -1305,6 +1386,7 @@ export const initAuthHandler = (
                   "This email address is not allowed. Please use a different email or contact support.",
               });
             }
+
             if (isTemporaryEmail(ctx.body.email)) {
               throw new APIError("BAD_REQUEST", {
                 code: "TEMPORARY_EMAIL_NOT_ALLOWED",
@@ -1365,6 +1447,7 @@ export const initAuthHandler = (
         },
       },
     } satisfies BetterAuthOptions;
+
     return betterAuth(config);
   }).pipe(
     // initAuthHandler runs once at server composition to build the auth
@@ -1397,6 +1480,7 @@ export type AuthClientOrganization = {
 };
 
 export type Auth = Effect.Success<ReturnType<typeof initAuthHandler>>;
+
 export type Session = Auth["$Infer"]["Session"] & {
   memberships: AuthClientMembership[];
   organizations: AuthClientOrganization[];

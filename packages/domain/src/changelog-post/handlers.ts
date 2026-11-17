@@ -53,12 +53,14 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
         const session = yield* CurrentSession;
         const audit = yield* AuditLogRecorder;
         const eligible = yield* repository.findEligible(args);
+
         if (eligible.length === 0) {
           return yield* new Policy.PolicyDeniedError({
             reason:
               "Post is not an unannounced completed post in this organization",
           });
         }
+
         // changelogPolicy.canUpdate additionally requires the changelog to
         // belong to this organization, so a manager cannot link this
         // organization's post to another organization's changelog.
@@ -94,7 +96,15 @@ export const ChangelogPostRpcHandlersEffect = Effect.gen(function* () {
         const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
-            yield* repository.delete(args);
+            const { deleted } = yield* repository.delete(args);
+
+            // A link that was not there — already removed, or a post that was
+            // never linked — changed nothing, and an `unlinked` entry for it
+            // would describe an edit the entry never had.
+            if (!deleted) {
+              return;
+            }
+
             yield* audit.record({
               organizationId: args.organizationId,
               actor: actorFromSession(session, args.organizationId),

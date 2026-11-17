@@ -63,6 +63,7 @@ const dateAt = (instant: string | number | Date): Date =>
 
 describe("PostRpcHandlers", () => {
   const recordedIntegrationEvents: unknown[] = [];
+
   type Fixture = {
     boardId: LegidOf<"BoardId">;
     creatorEmail: string;
@@ -341,6 +342,7 @@ describe("PostRpcHandlers", () => {
     Effect.gen(function* () {
       const gate = yield* MergeRaceGate;
       const realPolicy = yield* PostPolicy;
+
       return PostPolicy.of({
         ...realPolicy,
         canUpdate: (args) =>
@@ -372,6 +374,7 @@ describe("PostRpcHandlers", () => {
         Effect.gen(function* () {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture();
+
           const error = yield* Effect.flip(
             handlers
               .ListPosts({
@@ -437,6 +440,7 @@ describe("PostRpcHandlers", () => {
             // List rows carry the excerpt, not the full body; the body
             // resolves through the detail RPC.
             expect(posts[0]?.excerpt).not.toHaveLength(0);
+
             const detail = yield* handlers
               .GetPostPublic({
                 organizationId: fixture.organizationId,
@@ -446,6 +450,7 @@ describe("PostRpcHandlers", () => {
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
               );
+
             expect(detail.content).toContain("A public idea");
           })
       );
@@ -455,6 +460,7 @@ describe("PostRpcHandlers", () => {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PRIVATE");
           const postId = yield* PostId.generate;
+
           const error = yield* Effect.flip(
             handlers
               .CreatePostPublic(
@@ -550,6 +556,7 @@ describe("PostRpcHandlers", () => {
               organizationId: fixture.organizationId,
               topic: { topicId: postId, topicType: "post" },
             });
+
             expect(Option.getOrUndefined(subscription)).toMatchObject({
               source: "post_creator",
               state: "active",
@@ -607,6 +614,7 @@ describe("PostRpcHandlers", () => {
             .select({ id: schema.postTable.id })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(posts).toEqual([]);
         })
       );
@@ -634,6 +642,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.emailOutboxTable)
               .where(eq(schema.emailOutboxTable.aggregateId, postId));
+
             expect(intents).toEqual([
               {
                 aggregateId: postId,
@@ -668,6 +677,7 @@ describe("PostRpcHandlers", () => {
           const handlers = yield* PostRpcHandlersEffect;
           const fixture = yield* makeFixture("PUBLIC");
           const postId = yield* PostId.generate;
+
           const error = yield* Effect.flip(
             handlers
               .CreatePost(
@@ -704,6 +714,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const db = yield* currentDb;
+
           const rows = yield* db
             .select({ id: schema.postTable.id, slug: schema.postTable.slug })
             .from(schema.postTable)
@@ -751,6 +762,7 @@ describe("PostRpcHandlers", () => {
               );
 
             const db = yield* currentDb;
+
             const rows = yield* db
               .select({ id: schema.postTable.id, slug: schema.postTable.slug })
               .from(schema.postTable)
@@ -850,12 +862,17 @@ describe("PostRpcHandlers", () => {
             organizationId: fixture.organizationId,
           });
 
-          expect(result).toEqual({ deleted: false, restoredChildren: [] });
+          expect(result).toEqual({
+            deleted: false,
+            deletedIds: [],
+            restoredChildren: [],
+          });
 
           const [post] = yield* db
             .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, sourcePostId));
+
           expect(post).toMatchObject({ mergedIntoPostId: targetPostId });
         })
       );
@@ -929,6 +946,7 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           const session = Option.some(makeSession(fixture));
+
           const check = () =>
             handlers
               .ListPostDeleteEligibilityPublic({
@@ -969,6 +987,7 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const createdPost = created.find((post) => post.id === postId);
 
           expect(createdPost).toBeDefined();
@@ -1006,6 +1025,7 @@ describe("PostRpcHandlers", () => {
               boardId: privateBoardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const privatePost = created.find((post) => post.id === privatePostId);
 
           expect(privatePost).toBeDefined();
@@ -1072,6 +1092,7 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const source = posts.find((post) => post.id === sourcePostId);
           const target = posts.find((post) => post.id === targetPostId);
 
@@ -1111,6 +1132,7 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const post = posts.find((row) => row.id === postId);
 
           const resolved = yield* handlers
@@ -1145,6 +1167,7 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const createdPost = created.find((post) => post.id === postId);
 
           expect(createdPost).toBeDefined();
@@ -1425,6 +1448,7 @@ describe("PostRpcHandlers", () => {
                   eq(schema.emailOutboxTable.kind, "post.status_changed")
                 )
               );
+
             expect(intents).toHaveLength(1);
             expect(intents[0]?.payload).toMatchObject({
               statusId: plannedStatusId,
@@ -1482,6 +1506,7 @@ describe("PostRpcHandlers", () => {
                   ])
                 )
               );
+
             expect(intents).toEqual([{ kind: "post.closed" }]);
           })
       );
@@ -1593,10 +1618,12 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(post).toMatchObject({
             id: postId,
             title: "Updated feedback",
           });
+
           // Content updates are visible through the detail RPC; list rows
           // only carry the excerpt.
           const detail = yield* handlers
@@ -1606,6 +1633,7 @@ describe("PostRpcHandlers", () => {
               slug: post!.slug,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(detail.content).toContain("Updated content");
         })
       );
@@ -1632,6 +1660,7 @@ describe("PostRpcHandlers", () => {
             .select({ updatedAt: schema.postTable.updatedAt })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           // SAFETY: CreatePost above guarantees the row exists.
           const staleUpdatedAt = dateAt(row!.updatedAt.getTime() - 1000);
 
@@ -1652,12 +1681,14 @@ describe("PostRpcHandlers", () => {
                 )
               )
           );
+
           expect(error._tag).toBe("PostVersionConflictError");
 
           const [unchanged] = yield* db
             .select({ content: schema.postTable.content })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(unchanged?.content).toContain("Original content");
 
           yield* handlers
@@ -1681,6 +1712,7 @@ describe("PostRpcHandlers", () => {
             .select({ content: schema.postTable.content })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, postId));
+
           expect(updated?.content).toContain("Updated content");
         })
       );
@@ -1879,6 +1911,7 @@ describe("PostRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, session))
           );
+
           expect(memberOnlyError._tag).toBe("PolicyDenied");
 
           yield* handlers
@@ -1929,6 +1962,7 @@ describe("PostRpcHandlers", () => {
               .select({ updatedAt: schema.postTable.updatedAt })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, postId));
+
             // SAFETY: CreatePostPublic above guarantees the row exists.
             const staleUpdatedAt = dateAt(row!.updatedAt.getTime() - 1000);
 
@@ -1944,12 +1978,14 @@ describe("PostRpcHandlers", () => {
                 })
                 .pipe(Effect.provideService(CurrentSession, session))
             );
+
             expect(error._tag).toBe("PostVersionConflictError");
 
             const [unchanged] = yield* db
               .select({ content: schema.postTable.content })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, postId));
+
             expect(unchanged?.content).toContain("Original content");
           })
       );
@@ -2038,6 +2074,7 @@ describe("PostRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, session))
           );
+
           expect(memberOnlyError._tag).toBe("PolicyDenied");
 
           yield* handlers
@@ -2082,6 +2119,7 @@ describe("PostRpcHandlers", () => {
               user: { ...session.user, id: otherUserId, email: otherEmail },
               session: { userId: otherUserId, token: "other-token" },
             };
+
             yield* handlers
               .CreatePostPublic(
                 postCreateInput(fixture, postId, "Someone else's post")
@@ -2116,6 +2154,7 @@ describe("PostRpcHandlers", () => {
               .pipe(
                 Effect.provideService(OptionalCurrentSession, Option.none())
               );
+
             expect(posts.map((post) => post.id)).toContain(postId);
           })
       );
@@ -2271,6 +2310,7 @@ describe("PostRpcHandlers", () => {
             );
 
           const db = yield* currentDb;
+
           const rows = yield* db
             .select()
             .from(schema.auditLogTable)
@@ -2286,6 +2326,7 @@ describe("PostRpcHandlers", () => {
             "post.archived",
             "post.locked",
           ]);
+
           for (const row of rows) {
             expect(row).toMatchObject({
               actorType: "user",
@@ -2296,6 +2337,7 @@ describe("PostRpcHandlers", () => {
               source: "dashboard",
             });
           }
+
           expect(
             rows.find((row) => row.action === "post.locked")?.changes
           ).toEqual({
@@ -2312,6 +2354,52 @@ describe("PostRpcHandlers", () => {
           });
         })
       );
+
+      it.effect("records a title save only when the title changed", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .CreatePost(postCreateInput(fixture, postId, "Original title"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const saveTitle = (title: string) =>
+            handlers
+              .UpdatePostTitle({
+                boardId: fixture.boardId,
+                id: postId,
+                organizationId: fixture.organizationId,
+                title,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(AuditLogEnabled, true)
+              );
+
+          // Re-saving the stored title is a no-op the write path already skips;
+          // it must not leave an entry claiming an edit.
+          yield* saveTitle("Original title");
+          yield* saveTitle("Revised title");
+
+          const db = yield* currentDb;
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.resourceId, postId),
+                eq(schema.auditLogTable.action, "post.updated")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.metadata).toMatchObject({ title: "Revised title" });
+        })
+      );
     });
 
     describe("GetPostSuggestions", () => {
@@ -2319,6 +2407,7 @@ describe("PostRpcHandlers", () => {
         Effect.gen(function* () {
           let embedCalls = 0;
           const releaseEmbedding = yield* Deferred.make<void>();
+
           const embedder: PostEmbeddingService["Service"] = {
             embed: () =>
               Effect.sync(() => {
@@ -2328,6 +2417,7 @@ describe("PostRpcHandlers", () => {
                 Effect.as(Option.none())
               ),
           };
+
           const handlers = yield* PostRpcHandlersEffect;
           const db = yield* currentDb;
           const fixture = yield* makeFixture();
@@ -2367,6 +2457,7 @@ describe("PostRpcHandlers", () => {
           const db = yield* currentDb;
           const fixture = yield* makeFixture();
           const postId = yield* PostId.generate;
+
           const vector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
             (_, index) => (index === 0 ? 1 : 0)
@@ -2404,6 +2495,7 @@ describe("PostRpcHandlers", () => {
             const db = yield* currentDb;
             const fixture = yield* makeFixture();
             const postId = yield* PostId.generate;
+
             const vector = Array.from(
               { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
               (_, index) => (index === 0 ? 1 : 0)
@@ -2426,6 +2518,7 @@ describe("PostRpcHandlers", () => {
               .select({ updatedAt: schema.postTable.updatedAt })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, postId));
+
             yield* generatePostEmbedding({
               content: sanitizeMarkdown("Original body").sanitizedMarkdown,
               organizationId: fixture.organizationId,
@@ -2445,6 +2538,7 @@ describe("PostRpcHandlers", () => {
               .select({ updatedAt: schema.postTable.updatedAt })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, postId));
+
             // SAFETY: CreatePost above guarantees the row exists.
             expect(after?.updatedAt.getTime()).toBe(
               // SAFETY: CreatePost above guarantees the row exists.
@@ -2470,6 +2564,7 @@ describe("PostRpcHandlers", () => {
               .select({ content: schema.postTable.content })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, postId));
+
             expect(updated?.content).toContain("Updated body");
           })
       );
@@ -2481,10 +2576,12 @@ describe("PostRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const nearPostId = yield* PostId.generate;
           const farPostId = yield* PostId.generate;
+
           const queryVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
             (_, index) => (index === 0 ? 1 : 0)
           );
+
           const farVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
             (_, index) => (index < 2 ? 0.5 : 0)
@@ -2500,6 +2597,7 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
+
           yield* repository.updateEmbedding({
             embedding: queryVector,
             expectedContent: sanitizeMarkdown("Near vector").sanitizedMarkdown,
@@ -2526,6 +2624,7 @@ describe("PostRpcHandlers", () => {
                 }),
             })
           );
+
           const suggestions = yield* semanticHandlers
             .GetPostSuggestions({
               organizationId: fixture.organizationId,
@@ -2550,10 +2649,12 @@ describe("PostRpcHandlers", () => {
           const fixture = yield* makeFixture();
           const nearPostId = yield* PostId.generate;
           const unrelatedPostId = yield* PostId.generate;
+
           const queryVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
             (_, index) => (index === 0 ? 1 : 0)
           );
+
           const unrelatedVector = Array.from(
             { length: DEFAULT_POST_EMBEDDING_DIMENSIONS },
             (_, index) => (index === 1 ? 1 : 0)
@@ -2569,6 +2670,7 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
+
           yield* repository.updateEmbedding({
             embedding: queryVector,
             expectedContent: sanitizeMarkdown("Near vector").sanitizedMarkdown,
@@ -2596,6 +2698,7 @@ describe("PostRpcHandlers", () => {
                 }),
             })
           );
+
           const suggestions = yield* semanticHandlers
             .GetPostSuggestions({
               organizationId: fixture.organizationId,
@@ -2711,6 +2814,7 @@ describe("PostRpcHandlers", () => {
           yield* activateStarterPlan(fixture.organizationId);
           const sourcePostId = yield* PostId.generate;
           const targetPostId = yield* PostId.generate;
+
           for (const [id, title] of [
             [sourcePostId, "Source"],
             [targetPostId, "Target"],
@@ -2721,6 +2825,7 @@ describe("PostRpcHandlers", () => {
                 Effect.provideService(CurrentSession, makeSession(fixture))
               );
           }
+
           yield* handlers
             .MergePost({
               organizationId: fixture.organizationId,
@@ -2738,6 +2843,7 @@ describe("PostRpcHandlers", () => {
                 eq(schema.emailOutboxTable.kind, "post.merged")
               )
             );
+
           expect(intents).toHaveLength(1);
           expect(intents[0]?.payload).toMatchObject({
             postId: sourcePostId,
@@ -2752,6 +2858,7 @@ describe("PostRpcHandlers", () => {
             const handlers = yield* PostRpcHandlersEffect;
             const fixture = yield* makeFixture();
             const postId = yield* PostId.generate;
+
             const error = yield* Effect.flip(
               handlers
                 .MergePost({
@@ -2837,6 +2944,7 @@ describe("PostRpcHandlers", () => {
             })
             .from(schema.postTable)
             .where(eq(schema.postTable.organizationId, fixture.organizationId));
+
           expect(
             posts.find((post) => post.id === firstPostId)?.mergedIntoPostId
           ).toBe(secondPostId);
@@ -2883,6 +2991,7 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
           const sourcePost = posts.find((post) => post.id === sourcePostId);
 
           expect(sourcePost).toMatchObject({ mergedIntoPostId: targetPostId });
@@ -2912,6 +3021,7 @@ describe("PostRpcHandlers", () => {
 
           const sharedVoterId = `user_shared_${fixture.organizationId}`;
           const sourceOnlyVoterId = `user_source_only_${fixture.organizationId}`;
+
           for (const [id, email] of [
             [sharedVoterId, `shared_${fixture.organizationId}@example.com`],
             [
@@ -3029,6 +3139,7 @@ describe("PostRpcHandlers", () => {
             })
             .from(schema.upvoteTable)
             .where(eq(schema.upvoteTable.postId, targetPostId));
+
           expect(targetUpvotes.map((upvote) => upvote.userId).sort()).toEqual(
             [sharedVoterId, sourceOnlyVoterId].sort()
           );
@@ -3050,6 +3161,7 @@ describe("PostRpcHandlers", () => {
             })
             .from(schema.postReactionTable)
             .where(eq(schema.postReactionTable.postId, targetPostId));
+
           expect(targetReactions).toHaveLength(2);
           expect(targetReactions).toContainEqual({
             userId: sharedVoterId,
@@ -3064,6 +3176,7 @@ describe("PostRpcHandlers", () => {
             .select({ tagId: schema.postTagTable.tagId })
             .from(schema.postTagTable)
             .where(eq(schema.postTagTable.postId, targetPostId));
+
           expect(targetTags.map((postTag) => postTag.tagId).sort()).toEqual(
             [
               `tag_shared_${fixture.organizationId}`,
@@ -3075,6 +3188,7 @@ describe("PostRpcHandlers", () => {
             .select({ id: schema.commentTable.id })
             .from(schema.commentTable)
             .where(eq(schema.commentTable.postId, targetPostId));
+
           expect(targetComments.map((comment) => comment.id)).toEqual([
             commentId,
           ]);
@@ -3083,6 +3197,7 @@ describe("PostRpcHandlers", () => {
             .select({ mergedFromPostId: schema.commentTable.mergedFromPostId })
             .from(schema.commentTable)
             .where(eq(schema.commentTable.id, commentId));
+
           expect(movedComment?.mergedFromPostId).toBe(sourcePostId);
 
           // Engagement whose restoration needs no provenance moved off the
@@ -3096,6 +3211,7 @@ describe("PostRpcHandlers", () => {
             .select({ id: schema.commentTable.id })
             .from(schema.commentTable)
             .where(eq(schema.commentTable.postId, sourcePostId));
+
           expect(leftoverComments).toEqual([]);
 
           const sourceReactions = yield* db
@@ -3105,6 +3221,7 @@ describe("PostRpcHandlers", () => {
             })
             .from(schema.postReactionTable)
             .where(eq(schema.postReactionTable.postId, sourcePostId));
+
           expect(sourceReactions).toEqual([
             { userId: sharedVoterId, emoji: "👍" },
           ]);
@@ -3113,6 +3230,7 @@ describe("PostRpcHandlers", () => {
             .select({ tagId: schema.postTagTable.tagId })
             .from(schema.postTagTable)
             .where(eq(schema.postTagTable.postId, sourcePostId));
+
           expect(sourceTags.map((row) => row.tagId)).toEqual([
             `tag_shared_${fixture.organizationId}`,
           ]);
@@ -3128,6 +3246,7 @@ describe("PostRpcHandlers", () => {
             })
             .from(schema.upvoteTable)
             .where(eq(schema.upvoteTable.postId, sourcePostId));
+
           expect(sourceUpvotes).toEqual([
             {
               id: `upvote_shared_source_${fixture.organizationId}`,
@@ -3280,6 +3399,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.commentTable)
               .where(eq(schema.commentTable.id, commentId));
+
             expect(comment).toMatchObject({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3292,6 +3412,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.upvoteTable)
               .where(eq(schema.upvoteTable.id, upvoteId));
+
             expect(upvote).toMatchObject({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3301,11 +3422,14 @@ describe("PostRpcHandlers", () => {
               .select({ id: schema.commentTable.id })
               .from(schema.commentTable)
               .where(eq(schema.commentTable.postId, targetPostId));
+
             expect(targetComments).toEqual([]);
+
             const targetUpvotes = yield* db
               .select({ id: schema.upvoteTable.id })
               .from(schema.upvoteTable)
               .where(eq(schema.upvoteTable.postId, targetPostId));
+
             expect(targetUpvotes).toEqual([]);
           })
       );
@@ -3439,6 +3563,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.postTagTable)
               .where(eq(schema.postTagTable.id, postTagId));
+
             expect(postTag).toEqual({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3451,6 +3576,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.postReactionTable)
               .where(eq(schema.postReactionTable.id, reactionId));
+
             expect(reaction).toEqual({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3463,6 +3589,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.postSubscriptionTable)
               .where(eq(schema.postSubscriptionTable.id, subscriptionId));
+
             expect(subscription).toEqual({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3476,6 +3603,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.emailSubscriptionTable)
               .where(eq(schema.emailSubscriptionTable.id, emailSubscriptionId));
+
             expect(emailSubscription).toEqual({
               topicId: sourcePostId,
               mergedFromPostId: null,
@@ -3488,6 +3616,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.changelogPostTable)
               .where(eq(schema.changelogPostTable.postId, sourcePostId));
+
             expect(changelogLink).toEqual({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3498,6 +3627,7 @@ describe("PostRpcHandlers", () => {
               .select({ id: schema.postTagTable.id })
               .from(schema.postTagTable)
               .where(eq(schema.postTagTable.postId, targetPostId));
+
             expect(leftovers).toEqual([]);
           })
       );
@@ -3562,6 +3692,7 @@ describe("PostRpcHandlers", () => {
               .select({ id: schema.upvoteTable.id })
               .from(schema.upvoteTable)
               .where(eq(schema.upvoteTable.postId, sourcePostId));
+
             expect(mergedSourceUpvotes).toEqual([{ id: sourceUpvoteId }]);
 
             yield* handlers
@@ -3580,9 +3711,11 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.upvoteTable)
               .where(eq(schema.upvoteTable.postId, sourcePostId));
+
             expect(sourceUpvotes).toEqual([
               { id: sourceUpvoteId, mergedFromPostId: null },
             ]);
+
             const remainingTargetUpvotes = yield* db
               .select({
                 id: schema.upvoteTable.id,
@@ -3590,6 +3723,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.upvoteTable)
               .where(eq(schema.upvoteTable.postId, targetPostId));
+
             expect(remainingTargetUpvotes).toEqual([
               { id: targetUpvoteId, mergedFromPostId: null },
             ]);
@@ -3672,6 +3806,7 @@ describe("PostRpcHandlers", () => {
               .select({ updatedAt: schema.postTable.updatedAt })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, sourcePostId));
+
             // Move the (test) clock so the revert is provably a fresh write.
             yield* TestClock.adjust("1 seconds");
 
@@ -3697,6 +3832,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, sourcePostId));
+
             expect(sourcePost).toMatchObject({
               archivedAt: null,
               mergedAt: null,
@@ -3715,6 +3851,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.postTagTable)
               .where(eq(schema.postTagTable.id, postTagId));
+
             expect(restoredTag).toEqual({
               mergedFromPostId: null,
               postId: sourcePostId,
@@ -3727,6 +3864,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.commentTable)
               .where(eq(schema.commentTable.id, commentId));
+
             expect(comment).toMatchObject({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3739,6 +3877,7 @@ describe("PostRpcHandlers", () => {
               })
               .from(schema.upvoteTable)
               .where(eq(schema.upvoteTable.id, upvoteId));
+
             expect(upvote).toMatchObject({
               postId: sourcePostId,
               mergedFromPostId: null,
@@ -3748,6 +3887,7 @@ describe("PostRpcHandlers", () => {
               .select({ id: schema.postTable.id })
               .from(schema.postTable)
               .where(eq(schema.postTable.id, targetPostId));
+
             expect(remainingTargets).toEqual([]);
 
             const [activity] = yield* db
@@ -3763,6 +3903,7 @@ describe("PostRpcHandlers", () => {
                   eq(schema.postActivityTable.kind, "POST_UNMERGED")
                 )
               );
+
             expect(activity).toMatchObject({
               kind: "POST_UNMERGED",
               nextValue: targetPostId,
@@ -3807,6 +3948,7 @@ describe("PostRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(titleError).toBeInstanceOf(Policy.PolicyDeniedError);
 
           const etaError = yield* Effect.flip(
@@ -3818,6 +3960,7 @@ describe("PostRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(etaError).toBeInstanceOf(Policy.PolicyDeniedError);
 
           const adminError = yield* Effect.flip(
@@ -3829,6 +3972,7 @@ describe("PostRpcHandlers", () => {
               })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
+
           expect(adminError).toBeInstanceOf(Policy.PolicyDeniedError);
         })
       );
@@ -3854,6 +3998,7 @@ describe("PostRpcHandlers", () => {
 
           const sharedUserId = `user_shared_sub_${fixture.organizationId}`;
           const sourceOnlyUserId = `user_source_only_sub_${fixture.organizationId}`;
+
           for (const [id, email] of [
             [sharedUserId, `shared_sub_${fixture.organizationId}@example.com`],
             [
@@ -3959,9 +4104,11 @@ describe("PostRpcHandlers", () => {
             .select({ userId: schema.postSubscriptionTable.userId })
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, targetPostId));
+
           const targetSubscriberIds = targetSubscriptions.map(
             (row) => row.userId
           );
+
           // The shared subscriber is deduped to a single target row; the
           // source-only subscriber is carried over. (The fixture creator is
           // auto-subscribed on create and is intentionally ignored here.)
@@ -3974,9 +4121,11 @@ describe("PostRpcHandlers", () => {
             .select({ contactId: schema.emailSubscriptionTable.contactId })
             .from(schema.emailSubscriptionTable)
             .where(eq(schema.emailSubscriptionTable.topicId, targetPostId));
+
           const targetEmailContactIds = targetEmailSubscriptions.map(
             (row) => row.contactId
           );
+
           expect(
             targetEmailContactIds.filter((id) => id === sharedContactId)
           ).toHaveLength(1);
@@ -3990,6 +4139,7 @@ describe("PostRpcHandlers", () => {
             .select({ userId: schema.postSubscriptionTable.userId })
             .from(schema.postSubscriptionTable)
             .where(eq(schema.postSubscriptionTable.postId, sourcePostId));
+
           expect(
             leftoverPostSubscriptions.map((row) => row.userId).sort()
           ).toEqual([sharedUserId, fixture.userId].sort());
@@ -4005,6 +4155,7 @@ describe("PostRpcHandlers", () => {
               )
             )
             .where(eq(schema.emailSubscriptionTable.topicId, sourcePostId));
+
           // Emails are stored normalized, so compare case-insensitively.
           expect(
             leftoverEmailSubscriptions
@@ -4397,6 +4548,7 @@ describe("PostRpcHandlers", () => {
 
             const subscriberUserId = `subscriber_${sourcePostId}`;
             const upvoterUserId = `upvoter_${sourcePostId}`;
+
             for (const userId of [subscriberUserId, upvoterUserId]) {
               yield* db.insert(schema.userTable).values({
                 id: userId,
@@ -4404,6 +4556,7 @@ describe("PostRpcHandlers", () => {
                 name: "Recipient",
               });
             }
+
             // In-app inboxes are member-only, so both recipients are members.
             for (const userId of [subscriberUserId, upvoterUserId]) {
               yield* db.insert(schema.memberTable).values({
@@ -4414,6 +4567,7 @@ describe("PostRpcHandlers", () => {
                 createdAt: yield* DateTime.nowAsDate,
               });
             }
+
             // Both rows start on the source and are carried to the target
             // by the merge before the notification fan-out runs.
             yield* db.insert(schema.postSubscriptionTable).values({
@@ -4482,6 +4636,7 @@ describe("PostRpcHandlers", () => {
                   notification.recipientUserId === fixture.userId
               )
             ).toBe(false);
+
             for (const notification of notifications) {
               expect(notification.resourceId).toBe(sourcePostId);
               expect(notification.href).toBe(
@@ -4516,6 +4671,7 @@ describe("PostRpcHandlers", () => {
             // A public-board voter without membership: their vote moves back
             // too, but their inbox is unreachable, so they are skipped.
             const guestVoterId = `guest_${sourcePostId}`;
+
             for (const userId of [followerUserId, guestVoterId]) {
               yield* db.insert(schema.userTable).values({
                 id: userId,
@@ -4523,6 +4679,7 @@ describe("PostRpcHandlers", () => {
                 name: "Recipient",
               });
             }
+
             yield* db.insert(schema.memberTable).values({
               id: `member_${followerUserId}`,
               organizationId: fixture.organizationId,
@@ -4639,6 +4796,7 @@ describe("PostRpcHandlers", () => {
               Effect.provideService(CurrentSession, makeSession(fixture)),
               Effect.forkChild
             );
+
           yield* Deferred.await(gate.policyEvaluated);
 
           // A concurrent merge commits while the update waits, so the policy
@@ -4663,6 +4821,7 @@ describe("PostRpcHandlers", () => {
             })
             .from(schema.postTable)
             .where(eq(schema.postTable.id, sourcePostId));
+
           expect(post).toMatchObject({
             mergedIntoPostId: targetPostId,
             title: "Source feedback",
@@ -4706,6 +4865,7 @@ describe("PostRpcHandlers", () => {
               ),
               Effect.forkChild
             );
+
           yield* Deferred.await(gate.policyEvaluated);
 
           yield* handlers
@@ -4737,6 +4897,7 @@ describe("PostRpcHandlers", () => {
             .pipe(
               Effect.provideService(CurrentSession, makeSession(fixture, null))
             );
+
           return postId;
         });
 
@@ -4787,6 +4948,7 @@ describe("PostRpcHandlers", () => {
               boardId: fixture.boardId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
           expect(posts).toHaveLength(0);
         })
       );

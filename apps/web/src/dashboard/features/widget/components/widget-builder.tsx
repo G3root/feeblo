@@ -57,6 +57,7 @@ export function WidgetBuilder() {
 
 function WidgetModulesCard() {
   const store = useWidgetStore();
+
   const modules = useSelector(
     store,
     (snapshot) => snapshot.context.draft.modules
@@ -88,10 +89,12 @@ function WidgetModulesCard() {
 
 function WidgetLauncherCard() {
   const store = useWidgetStore();
+
   const launcher = useSelector(
     store,
     (snapshot) => snapshot.context.draft.launcher
   );
+
   const theme = useSelector(store, (snapshot) => snapshot.context.draft.theme);
 
   return (
@@ -109,6 +112,7 @@ function WidgetLauncherCard() {
             multiple={false}
             onValueChange={(value) => {
               const next = value[0];
+
               if (next !== undefined && isWidgetLauncher(next)) {
                 store.send({ type: "setLauncher", launcher: next });
               }
@@ -137,6 +141,7 @@ function WidgetLauncherCard() {
             multiple={false}
             onValueChange={(value) => {
               const next = value[0];
+
               if (next !== undefined && isWidgetTheme(next)) {
                 store.send({ type: "setTheme", theme: next });
               }

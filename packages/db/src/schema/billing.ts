@@ -39,6 +39,7 @@ export const organizationHasEntitledPaidSubscription = (
   now: Date
 ): SQL<boolean> => {
   const queryBuilder = new QueryBuilder();
+
   return sql<boolean>`exists ${queryBuilder
     .select({ one: sql`1` })
     .from(subscriptionTable)

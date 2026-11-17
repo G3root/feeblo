@@ -23,12 +23,14 @@ describe("EmailSuppressionRepository", () => {
       slug: organizationId,
       createdAt: now,
     });
+
     return organizationId;
   });
 
   const rowsFor = (email: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
+
       return yield* db
         .select()
         .from(schema.emailSuppressionTable)
@@ -211,6 +213,7 @@ describe("EmailSuppressionRepository", () => {
           emails: ["BATCH@example.com", "clear@example.com", "not an email"],
           organizationId,
         });
+
         expect([...suppressed]).toEqual(["batch@example.com"]);
         expect(
           yield* repository.isSuppressed({
@@ -237,6 +240,7 @@ describe("EmailSuppressionRepository", () => {
             reason: "hard_bounce",
           });
         }
+
         yield* repository.upsert({
           email: "blocked@example.com",
           note: "Abuse report",
@@ -265,6 +269,7 @@ describe("EmailSuppressionRepository", () => {
           offset: 0,
           organizationId,
         });
+
         expect(all.total).toBe(3);
         expect(all.items.map((item) => item.email).sort()).toEqual([
           "blocked@example.com",
@@ -278,6 +283,7 @@ describe("EmailSuppressionRepository", () => {
           organizationId,
           search: "BLOCK",
         });
+
         expect(search.items.map((item) => item.email)).toEqual([
           "blocked@example.com",
         ]);
@@ -288,6 +294,7 @@ describe("EmailSuppressionRepository", () => {
           organizationId,
           reason: "hard_bounce",
         });
+
         expect(byReason.total).toBe(2);
 
         const stats = yield* repository.stats(organizationId);
@@ -327,13 +334,13 @@ describe("EmailSuppressionRepository", () => {
             email: "foreign@example.com",
             organizationId,
           })
-        ).toEqual({ removed: false });
+        ).toEqual({ reason: null, removed: false });
         expect(
           yield* repository.remove({
             email: "removable@example.com",
             organizationId,
           })
-        ).toEqual({ removed: true });
+        ).toEqual({ reason: "complaint", removed: true });
         expect(yield* rowsFor("foreign@example.com")).toHaveLength(1);
         expect(yield* rowsFor("removable@example.com")).toHaveLength(0);
       })
@@ -366,6 +373,7 @@ describe("EmailSuppressionRepository", () => {
               eq(schema.emailSuppressionTable.organizationId, organizationId)
             )
           );
+
         expect(remaining).toHaveLength(0);
       })
     );

@@ -22,6 +22,7 @@ export const testMailboxRouter = (mailbox: Ref.Ref<TestMailerState>) =>
       "/__e2e/emails",
       Effect.gen(function* () {
         const state = yield* Ref.get(mailbox);
+
         return yield* HttpServerResponse.json({
           emails: state.renderedMessages,
         });
@@ -59,12 +60,14 @@ export const e2eRoadmapSeedRouter = HttpRouter.use((router) =>
     return yield* router.add("POST", "/__e2e/seed-roadmap", (request) =>
       Effect.gen(function* () {
         const body = yield* request.json;
+
         const payload =
           yield* Schema.decodeUnknownEffect(SeedRoadmapPayload)(body);
 
         const statuses = yield* postStatuses.findMany({
           organizationId: payload.organizationId,
         });
+
         const statusIdByType = new Map(
           statuses.map((status) => [status.type, status.id])
         );
@@ -72,6 +75,7 @@ export const e2eRoadmapSeedRouter = HttpRouter.use((router) =>
         const unknownStatuses = payload.columns.flatMap((column) =>
           statusIdByType.has(column.status) ? [] : [column.status]
         );
+
         if (unknownStatuses.length > 0) {
           return HttpServerResponse.jsonUnsafe(
             {
@@ -96,6 +100,7 @@ export const e2eRoadmapSeedRouter = HttpRouter.use((router) =>
 
         for (const [position, column] of payload.columns.entries()) {
           const statusId = statusIdByType.get(column.status);
+
           if (!statusId) {
             continue;
           }

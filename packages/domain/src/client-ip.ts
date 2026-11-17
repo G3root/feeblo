@@ -73,44 +73,58 @@ export type InvalidClientIpProxyTrustConfiguration = {
 
 const parseIpAddress = (input: string): ParsedIpAddress | undefined => {
   const text = input.trim();
+
   if (!ipaddr.isValid(text)) {
     return undefined;
   }
+
   const parsed = ipaddr.parse(text);
+
   const address =
     parsed instanceof ipaddr.IPv6 && parsed.isIPv4MappedAddress()
       ? parsed.toIPv4Address()
       : parsed;
+
   return { address, text: address.toString() };
 };
 
 const parseIpCidr = (input: string): ParsedIpCidr | undefined => {
   const trimmed = input.trim();
   const cidrParts = trimmed.split("/");
+
   if (cidrParts.length > 2) {
     return undefined;
   }
+
   const [addressInput, prefixInput] = cidrParts;
+
   if (!(addressInput && ipaddr.isValid(addressInput))) {
     return undefined;
   }
+
   const originalAddress = ipaddr.parse(addressInput);
   const maximumPrefixLength = originalAddress.kind() === "ipv4" ? 32 : 128;
   let originalPrefixLength = maximumPrefixLength;
+
   if (prefixInput !== undefined) {
     if (!CIDR_PREFIX_PATTERN.test(prefixInput)) {
       return undefined;
     }
+
     originalPrefixLength = Number(prefixInput);
   }
+
   if (originalPrefixLength > maximumPrefixLength) {
     return undefined;
   }
+
   const addressText = originalAddress.toString();
   const parsedAddress = parseIpAddress(addressText);
+
   if (!parsedAddress) {
     return undefined;
   }
+
   if (
     originalAddress instanceof ipaddr.IPv6 &&
     originalAddress.isIPv4MappedAddress() &&
@@ -118,6 +132,7 @@ const parseIpCidr = (input: string): ParsedIpCidr | undefined => {
   ) {
     return undefined;
   }
+
   return {
     address: parsedAddress,
     prefixLength:
@@ -136,16 +151,20 @@ export const parseClientIpProxyTrust = (
   InvalidClientIpProxyTrustConfiguration
 > => {
   const trustedProxyCidrs: ParsedIpCidr[] = [];
+
   for (const entry of input.trustedProxyCidrs) {
     const parsed = parseIpCidr(entry);
+
     if (!parsed) {
       return Result.fail({
         _tag: "InvalidClientIpProxyTrustConfiguration",
         entry,
       });
     }
+
     trustedProxyCidrs.push(parsed);
   }
+
   return Result.succeed({
     _tag: "ClientIpProxyTrust",
     trustAllHeaders: input.trustAllHeaders,
@@ -202,6 +221,7 @@ const CLOUDFLARE_IP_RANGES = [
   "2c0f:f248::/32",
 ].flatMap((entry) => {
   const parsed = parseIpCidr(entry);
+
   return parsed ? [parsed] : [];
 });
 
@@ -216,7 +236,9 @@ export const isTrustedProxy = (
   if (proxyTrust.trustAllHeaders) {
     return true;
   }
+
   const peer = parseIpAddress(peerIp);
+
   return Boolean(
     peer &&
     proxyTrust.trustedProxyCidrs.some((cidr) => ipAddressInCidr(peer, cidr))
@@ -227,10 +249,13 @@ const forwardedForAddresses = (
   headers: Headers.Headers
 ): readonly ParsedIpAddress[] | undefined => {
   const raw = Option.getOrUndefined(Headers.get(headers, "x-forwarded-for"));
+
   if (!raw) {
     return undefined;
   }
+
   const parsed = raw.split(",").map(parseIpAddress);
+
   return parsed.length > 0 && parsed.every((address) => address !== undefined)
     ? parsed
     : undefined;
@@ -244,9 +269,11 @@ const resolveForwardedClientIp = (
   const cfConnectingIp = Option.getOrUndefined(
     Headers.get(headers, "cf-connecting-ip")
   );
+
   const parsedCloudflareClientIp = cfConnectingIp
     ? parseIpAddress(cfConnectingIp)
     : undefined;
+
   if (parsedCloudflareClientIp && isCloudflarePeer(peer)) {
     return {
       _tag: "ClientIpAddress",
@@ -259,20 +286,26 @@ const resolveForwardedClientIp = (
   }
 
   const forwardedFor = forwardedForAddresses(headers);
+
   if (forwardedFor) {
     if (proxyTrust.trustAllHeaders) {
       const originatingAddress = forwardedFor[0];
+
       return originatingAddress
         ? { _tag: "ClientIpAddress", address: originatingAddress.text }
         : undefined;
     }
+
     for (let index = forwardedFor.length - 1; index >= 0; index -= 1) {
       const address = forwardedFor[index];
+
       if (address && !isTrustedProxy(address.text, proxyTrust)) {
         return { _tag: "ClientIpAddress", address: address.text };
       }
     }
+
     const furthestAddress = forwardedFor[0];
+
     if (furthestAddress) {
       return { _tag: "ClientIpAddress", address: furthestAddress.text };
     }
@@ -280,6 +313,7 @@ const resolveForwardedClientIp = (
 
   const realIp = Option.getOrUndefined(Headers.get(headers, "x-real-ip"));
   const parsedRealIp = realIp ? parseIpAddress(realIp) : undefined;
+
   return parsedRealIp
     ? { _tag: "ClientIpAddress", address: parsedRealIp.text }
     : undefined;
@@ -294,9 +328,11 @@ export const getClientIpFromHeaders = (
   } = {}
 ): ClientIpValue => {
   const peer = options.peer ? parseIpAddress(options.peer) : undefined;
+
   if (!peer) {
     return ClientIpUnavailable;
   }
+
   return (
     resolveForwardedClientIp(
       headers,
@@ -313,9 +349,11 @@ export const getClientIpFromRequest = (
 ): ClientIpValue => {
   const remoteAddress = Option.getOrUndefined(request.remoteAddress);
   const peer = remoteAddress ? parseIpAddress(remoteAddress) : undefined;
+
   if (!peer) {
     return ClientIpUnavailable;
   }
+
   return (
     resolveForwardedClientIp(request.headers, peer, proxyTrust) ?? {
       _tag: "ClientIpAddress",

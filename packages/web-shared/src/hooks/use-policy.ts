@@ -22,6 +22,7 @@ export function usePolicy(policy: ClientPolicy): PolicyEvaluation {
     if (!session) {
       return false;
     }
+
     return policy(session);
   }, [session, policy]);
 
@@ -111,9 +112,11 @@ export function PolicyGuard({
     const renderChildren = children as (result: {
       allowed: boolean;
     }) => ReactNode;
+
     if (isPending) {
       return renderChildren({ allowed: false });
     }
+
     return renderChildren({ allowed });
   }
 

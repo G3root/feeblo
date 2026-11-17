@@ -58,6 +58,7 @@ export const withProviderAudit = <A, E, R>(
 ): Effect.Effect<A, E, R | CurrentSession> =>
   Effect.gen(function* () {
     const session = yield* CurrentSession;
+
     return yield* effect.pipe(
       Effect.provideService(
         IntegrationAuditActor,
@@ -103,9 +104,11 @@ export const recordProviderChange = (
 ) =>
   Effect.gen(function* () {
     const actor = yield* IntegrationAuditActor;
+
     if (actor === null) {
       return;
     }
+
     yield* audit.record({
       organizationId,
       actor,
