@@ -14,6 +14,9 @@ import { ContactRpcs } from "./contact/rpcs";
 import { DataTransferRpcs } from "./data-transfer/rpcs";
 import { EmailSubscriptionRpcs } from "./email-subscription/rpcs";
 import { EmailSuppressionRpcs } from "./email-suppression/rpcs";
+import { HelpCenterArticleFeedbackRpcs } from "./help-center-article-feedback/rpcs";
+import { HelpCenterArticleRpcs } from "./help-center-article/rpcs";
+import { HelpCenterTopicRpcs } from "./help-center-topic/rpcs";
 import { InsightsRpcs } from "./insights/rpcs";
 import { DiscordManagementRpcs } from "./integration/discord/rpcs";
 import { ExternalResourceRpcs } from "./integration/external-resource/rpcs";
@@ -70,6 +73,9 @@ export const RpcGroups = [
   ["Changelog", ChangelogRpcs],
   ["ChangelogPost", ChangelogPostRpcs],
   ["ChangelogCategory", ChangelogCategoryRpcs],
+  ["HelpCenterTopic", HelpCenterTopicRpcs],
+  ["HelpCenterArticle", HelpCenterArticleRpcs],
+  ["HelpCenterArticleFeedback", HelpCenterArticleFeedbackRpcs],
   ["ChangelogSubscription", ChangelogSubscriptionRpcs],
   ["Insights", InsightsRpcs],
   ["JwtSecret", JwtSecretRpcs],

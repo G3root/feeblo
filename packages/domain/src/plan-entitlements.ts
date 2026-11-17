@@ -22,6 +22,7 @@ export type LimitFeatureKey =
   | "feedbackBoards"
   | "members"
   | "changelogCategories"
+  | "helpCenterArticles"
   | "crmEntries"
   | "workspaces";
 
@@ -81,6 +82,11 @@ export const PLAN_FEATURE_CATALOG = {
     singularLabel: "Changelog Category",
     pluralLabel: "Changelog Categories",
   },
+  helpCenterArticles: {
+    kind: "limit",
+    singularLabel: "Help Center Article",
+    pluralLabel: "Help Center Articles",
+  },
   crmEntries: {
     kind: "limit",
     singularLabel: "CRM Entry",
@@ -134,6 +140,7 @@ const LIMIT_FEATURE_ORDER = defineFeatureOrder<LimitFeatureKey>()([
   "feedbackBoards",
   "members",
   "changelogCategories",
+  "helpCenterArticles",
   "crmEntries",
   "workspaces",
 ] as const);
@@ -159,6 +166,10 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 2,
       members: 2,
       changelogCategories: 3,
+      // The help center is available on every plan; the free plan gets a
+      // working documentation site rather than a trial of one, and the paid
+      // plans remove the ceiling instead of unlocking the feature.
+      helpCenterArticles: 25,
       crmEntries: 10,
       workspaces: 3,
     },
@@ -182,6 +193,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: 5,
       members: 5,
       changelogCategories: null,
+      helpCenterArticles: null,
       crmEntries: null,
       workspaces: null,
     },
@@ -205,6 +217,7 @@ export const PLAN_ENTITLEMENTS = {
       feedbackBoards: null,
       members: null,
       changelogCategories: null,
+      helpCenterArticles: null,
       crmEntries: null,
       workspaces: null,
     },

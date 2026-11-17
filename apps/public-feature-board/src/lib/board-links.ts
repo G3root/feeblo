@@ -11,6 +11,8 @@ export const boardPaths = {
   board: (boardSlug: string) => `/s/b/${boardSlug}`,
   changelog: "/s/changelog",
   changelogEntry: (changelogSlug: string) => `/s/changelog/${changelogSlug}`,
+  help: "/s/help",
+  helpArticle: (articleSlug: string) => `/s/help/articles/${articleSlug}`,
   home: "/s",
   post: (slug: string) => `/s/p/${slug}`,
   roadmap: "/s/roadmap",

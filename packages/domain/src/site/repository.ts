@@ -18,6 +18,7 @@ interface findManyArgs {
 
 interface updateArgs {
   changelogVisibility: "PUBLIC" | "HIDDEN";
+  helpCenterVisibility?: "PUBLIC" | "HIDDEN" | undefined;
   id: string;
   name: string;
   noIndex: boolean;
@@ -45,6 +46,7 @@ const makeSiteRepository = Effect.gen(function* () {
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
           roadmapVisibility: schema.siteTable.roadmapVisibility,
+          helpCenterVisibility: schema.siteTable.helpCenterVisibility,
           noIndex: schema.siteTable.noIndex,
           createdAt: schema.siteTable.createdAt,
           updatedAt: schema.siteTable.updatedAt,
@@ -84,6 +86,7 @@ const makeSiteRepository = Effect.gen(function* () {
           customDomain: schema.siteTable.customDomain,
           changelogVisibility: schema.siteTable.changelogVisibility,
           roadmapVisibility: schema.siteTable.roadmapVisibility,
+          helpCenterVisibility: schema.siteTable.helpCenterVisibility,
           noIndex: schema.siteTable.noIndex,
           createdAt: schema.siteTable.createdAt,
           updatedAt: schema.siteTable.updatedAt,
@@ -100,6 +103,7 @@ const makeSiteRepository = Effect.gen(function* () {
     },
     update: ({
       changelogVisibility,
+      helpCenterVisibility,
       id,
       name,
       noIndex,
@@ -113,6 +117,11 @@ const makeSiteRepository = Effect.gen(function* () {
           .update(schema.siteTable)
           .set({
             changelogVisibility,
+            // Only when the caller named it: an absent field means "leave it",
+            // not "set it to what this client happened to read".
+            ...(helpCenterVisibility === undefined
+              ? {}
+              : { helpCenterVisibility }),
             updatedAt: now,
             roadmapVisibility,
             noIndex,

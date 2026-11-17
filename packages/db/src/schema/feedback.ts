@@ -5,7 +5,6 @@ import {
   type AnyPgColumn,
   boolean,
   check,
-  customType,
   foreignKey,
   index,
   integer,
@@ -19,7 +18,6 @@ import {
   unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import * as Schema from "effect/Schema";
 
 import type { TPostActivityKind } from "../validation-schema/activity-kind";
 import type { TAttributeType } from "../validation-schema/attribute-type";
@@ -51,29 +49,17 @@ import {
 } from "../validation-schema/post-status-type";
 import type { TRoadmapMode } from "../validation-schema/roadmap-mode";
 import { memberTable, organizationTable, userTable } from "./auth";
+import { DEFAULT_EMBEDDING_DIMENSIONS, embeddingVector } from "./embedding";
+import { helpCenterVisibilityEnum } from "./help-center";
 
-const VectorValues = Schema.Array(Schema.Finite);
-
-export const DEFAULT_POST_EMBEDDING_DIMENSIONS = 1536;
-
-const embeddingVector = (dimensions: number) =>
-  customType<{
-    data: number[];
-    driverData: string;
-  }>({
-    dataType: () => `vector(${dimensions})`,
-    fromDriver: (value) =>
-      Array.from(
-        // Drizzle's customType callbacks are synchronous by API contract, so
-        // this decode cannot be composed through Effect; a malformed stored
-        // vector throwing here surfaces as a query failure.
-        // eslint-disable-next-line effecttsgo/schema-sync -- Drizzle customType is sync
-        Schema.decodeUnknownSync(VectorValues)(JSON.parse(value))
-      ),
-    toDriver: (value) =>
-      // eslint-disable-next-line effecttsgo/schema-sync -- Drizzle customType is sync
-      JSON.stringify(Schema.decodeSync(VectorValues)(value)),
-  });
+/**
+ * The post embedding width.
+ *
+ * Kept as its own name — the embedding service and its tests import it — while
+ * the width itself is shared with every other embedded row, because two tables
+ * reading two defaults would produce vectors a single model cannot compare.
+ */
+export const DEFAULT_POST_EMBEDDING_DIMENSIONS = DEFAULT_EMBEDDING_DIMENSIONS;
 
 export const boardVisibilityEnum = pgEnum("board_visibility", [
   "PUBLIC",
@@ -970,6 +956,15 @@ export const siteTable = pgTable(
       .default("PUBLIC")
       .notNull(),
     roadmapVisibility: roadmapVisibilityEnum("roadmap_visibility")
+      .default("PUBLIC")
+      .notNull(),
+    /**
+     * Whether the help center is a readable portal surface, like the changelog
+     * and the roadmap above. The enum and the tables it gates live in
+     * `help-center.ts`; only the switch belongs on the site row, because that
+     * is the row the portal's host resolution already loads.
+     */
+    helpCenterVisibility: helpCenterVisibilityEnum("help_center_visibility")
       .default("PUBLIC")
       .notNull(),
     noIndex: boolean("no_index").default(false).notNull(),

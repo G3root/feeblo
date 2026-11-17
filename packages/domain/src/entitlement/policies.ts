@@ -33,6 +33,10 @@ type TCanCreateChangelogCategory = {
   organizationId: string;
 };
 
+type TCanCreateHelpCenterArticle = {
+  organizationId: string;
+};
+
 type TCanUpdateRoadmapVisibility = {
   organizationId: string;
 };
@@ -228,6 +232,29 @@ const makeEntitlementPolicy = Effect.gen(function* () {
       }
     });
 
+  const canCreateHelpCenterArticle = <E, R>(
+    args: TCanCreateHelpCenterArticle & {
+      articleCount: Effect.Effect<number, E, R>;
+    }
+  ) =>
+    Effect.gen(function* () {
+      const { entitlements, plan } = yield* findEntitlements(
+        args.organizationId
+      );
+
+      if (entitlements.limits.helpCenterArticles === null) {
+        return;
+      }
+
+      if (
+        (yield* args.articleCount) >= entitlements.limits.helpCenterArticles
+      ) {
+        return yield* new Policy.PolicyDeniedError({
+          reason: `The ${plan} plan allows up to ${entitlements.limits.helpCenterArticles} help center articles.`,
+        });
+      }
+    });
+
   const canCreateCrmEntry = <E, R>(
     args: TCanCreateCrmEntry & {
       crmEntryCount: Effect.Effect<number, E, R>;
@@ -303,6 +330,7 @@ const makeEntitlementPolicy = Effect.gen(function* () {
     canCreateRoadmap,
     canUpdateRoadmapVisibility,
     canCreateChangelogCategory,
+    canCreateHelpCenterArticle,
     canCreateCrmEntry,
     mayCreatePublicEmailSubscriptions,
     /**

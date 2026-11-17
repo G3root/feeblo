@@ -32,6 +32,8 @@ export const ROLE_PERMISSIONS = {
     "posts.*",
     "changelog.*",
     "changelog-categories.*",
+    "helpCenterTopics.*",
+    "helpCenterArticles.*",
     "tags.*",
     "roadmap.*",
     "statuses.*",

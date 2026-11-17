@@ -5,6 +5,9 @@ export const changelogVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
 
 export const roadmapVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
 
+/** The help center's portal switch. Same vocabulary as the two above. */
+export const helpCenterVisibilitySchema = S.Literals(["PUBLIC", "HIDDEN"]);
+
 export const Site = S.Struct({
   id: S.String,
   name: S.String,
@@ -13,6 +16,7 @@ export const Site = S.Struct({
   customDomain: S.Union([S.String, S.Null]),
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
+  helpCenterVisibility: helpCenterVisibilitySchema,
   noIndex: S.Boolean,
   hidePoweredBy: S.Boolean,
   createdAt: S.DateFromString,
@@ -33,6 +37,14 @@ export const SiteUpdate = S.Struct({
   organizationId: WorkspaceId.schema,
   changelogVisibility: changelogVisibilitySchema,
   roadmapVisibility: roadmapVisibilitySchema,
+  /**
+   * Optional, and only sent when the form actually changed it.
+   *
+   * The site row is written as one payload, so a required field means a rename
+   * carries whatever visibility the client last read — silently reverting a
+   * toggle another member flipped in between.
+   */
+  helpCenterVisibility: S.optional(helpCenterVisibilitySchema),
   noIndex: S.Boolean,
   name: S.String,
 });

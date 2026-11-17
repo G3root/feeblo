@@ -18,6 +18,9 @@ import { ContactRpcHandlers } from "./contact/handlers";
 import { DataTransferRpcHandlers } from "./data-transfer/handlers";
 import { EmailSubscriptionRpcHandlers } from "./email-subscription/handlers";
 import { EmailSuppressionRpcHandlers } from "./email-suppression/handlers";
+import { HelpCenterArticleFeedbackRpcHandlers } from "./help-center-article-feedback/handlers";
+import { HelpCenterArticleRpcHandlers } from "./help-center-article/handlers";
+import { HelpCenterTopicRpcHandlers } from "./help-center-topic/handlers";
 import { InsightsRpcHandlers } from "./insights/handlers";
 import { ExternalResourceRpcHandlers } from "./integration/external-resource/handlers";
 import { JwtSecretRpcHandlers } from "./jwt-secret/handlers";
@@ -75,6 +78,9 @@ export const RpcHandlerRegistrations = {
   Changelog: ChangelogRpcHandlers,
   ChangelogPost: ChangelogPostRpcHandlers,
   ChangelogCategory: ChangelogCategoryRpcHandlers,
+  HelpCenterTopic: HelpCenterTopicRpcHandlers,
+  HelpCenterArticle: HelpCenterArticleRpcHandlers,
+  HelpCenterArticleFeedback: HelpCenterArticleFeedbackRpcHandlers,
   ChangelogSubscription: ChangelogSubscriptionRpcHandlers,
   Insights: InsightsRpcHandlers,
   JwtSecret: JwtSecretRpcHandlers,

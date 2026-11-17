@@ -162,6 +162,22 @@ export async function preloadChangelogEditor(): Promise<void> {
   ]);
 }
 
+/** The help center index: topics and their articles. */
+export async function preloadHelpCenter(): Promise<void> {
+  await Promise.all([
+    dashboardCollections.helpCenterTopicCollection.preload(),
+    dashboardCollections.helpCenterArticleCollection.preload(),
+  ]);
+}
+
+/** The help center editor: the article plus the topic it can be moved into. */
+export async function preloadHelpCenterEditor(): Promise<void> {
+  await Promise.all([
+    dashboardCollections.helpCenterArticleCollection.preload(),
+    dashboardCollections.helpCenterTopicCollection.preload(),
+  ]);
+}
+
 /** Contacts and companies share this: the CRM lists render both sides. */
 export async function preloadContacts(): Promise<void> {
   await Promise.all([

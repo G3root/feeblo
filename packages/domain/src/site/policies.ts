@@ -54,11 +54,32 @@ const makeSitePolicy = Effect.gen(function* () {
       }
     });
 
+  /**
+   * The help center's portal gate.
+   *
+   * Same shape as the changelog and roadmap gates, and deliberately not
+   * "is there a site row": a workspace with no site has no portal at all, so
+   * `None` must read as hidden rather than as an unrestricted default.
+   */
+  const canViewHelpCenter = (organizationId: string) =>
+    Effect.gen(function* () {
+      const site = yield* siteRepository.findByOrganizationId({
+        organizationId,
+      });
+
+      if (Option.isNone(site) || site.value.helpCenterVisibility !== "PUBLIC") {
+        return yield* new Policy.PolicyDeniedError({
+          reason: "Help center is not publicly visible.",
+        });
+      }
+    });
+
   return {
     canManageSite,
     canHidePoweredByBranding,
     canViewChangelog,
     canViewRoadmap,
+    canViewHelpCenter,
   };
 });
 

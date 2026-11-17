@@ -16,6 +16,8 @@ import { BillingRepository } from "@feeblo/domain/billing/repository";
 import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revocation";
 import { PolarService } from "@feeblo/domain/billing/service";
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
+import { HelpCenterArticleRepository } from "@feeblo/domain/help-center-article/repository";
+import { helpCenterArticleViewRetention } from "@feeblo/domain/help-center-article/retention";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
@@ -233,6 +235,23 @@ export const program = Effect.gen(function* () {
     Effect.provide(trafficRuntime),
     Effect.forkScoped
   );
+
+  // The help center's read events age out on the same terms, for the same
+  // reason: the counter beside them is the number a customer reads and is never
+  // pruned, so the events only need to answer the recent window.
+  //
+  // Off means nothing writes a read event, so the sweep is not scheduled at
+  // all — the same rule the audit-log sweep below applies.
+  if (isFeatureEnabled("HELP_CENTER")) {
+    const helpCenterTrafficRuntime = yield* Layer.build(
+      HelpCenterArticleRepository.layer
+    );
+
+    yield* helpCenterArticleViewRetention.pipe(
+      Effect.provide(helpCenterTrafficRuntime),
+      Effect.forkScoped
+    );
+  }
 
   // The audit log owns the one writer allowed to delete from an append-only
   // table; the sweep says so on its own transaction. It is not scheduled while

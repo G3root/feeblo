@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { AuthButton } from "@feeblo/post-ui/auth-dialog";
 import { NotificationsMenu } from "@feeblo/post-ui/notifications-menu";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
@@ -43,6 +44,10 @@ export function Navbar() {
                   label={m.strong_loved_flamingo()}
                 />
               ) : null}
+              {isFeatureEnabled("HELP_CENTER") &&
+              site.helpCenterVisibility === "PUBLIC" ? (
+                <NavTab href={boardPaths.help} label={m.arable_plane_felix()} />
+              ) : null}
             </nav>
           </div>
 
@@ -64,6 +69,10 @@ export function Navbar() {
               href={boardPaths.changelog}
               label={m.strong_loved_flamingo()}
             />
+          ) : null}
+          {isFeatureEnabled("HELP_CENTER") &&
+          site.helpCenterVisibility === "PUBLIC" ? (
+            <NavTab href={boardPaths.help} label={m.arable_plane_felix()} />
           ) : null}
         </nav>
       </div>

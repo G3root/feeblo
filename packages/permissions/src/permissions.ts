@@ -60,6 +60,11 @@ const PERMISSION_ACTIONS = {
   votes: ["onBehalf"],
   changelog: ["create", "update", "publish", "delete"],
   "changelog-categories": ["create", "update", "delete"],
+  // The help center is documentation, not feedback: topics are its ordering
+  // structure and articles are the pages. Both are manager-owned content,
+  // like the changelog they sit beside on the portal.
+  helpCenterTopics: ["create", "update", "delete"],
+  helpCenterArticles: ["create", "update", "publish", "delete"],
   roadmap: ["create", "update", "delete"],
   statuses: ["create", "update", "delete"],
   tags: ["create", "update", "delete"],
@@ -99,6 +104,11 @@ export const PERMISSIONS = [
   ...createPermissions(
     "changelog-categories",
     PERMISSION_ACTIONS["changelog-categories"]
+  ),
+  ...createPermissions("helpCenterTopics", PERMISSION_ACTIONS.helpCenterTopics),
+  ...createPermissions(
+    "helpCenterArticles",
+    PERMISSION_ACTIONS.helpCenterArticles
   ),
   ...createPermissions("roadmap", PERMISSION_ACTIONS.roadmap),
   ...createPermissions("statuses", PERMISSION_ACTIONS.statuses),

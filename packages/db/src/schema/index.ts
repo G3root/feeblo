@@ -6,7 +6,11 @@ export * from "./billing";
 
 export * from "./data-transfer";
 
+export * from "./embedding";
+
 export * from "./feedback";
+
+export * from "./help-center";
 
 export * from "./integration";
 

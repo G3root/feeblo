@@ -28,6 +28,20 @@ Customer feedback platform: feature requests collected on boards, with roadmaps,
 
 **Untouched post**: An active post with no assignee, no status change, and no comment. The word is about decisions, not edits: a changed title or body does not make a post touched. _Avoid_: stale post, idle post, neglected post
 
+### Help center
+
+**Topic**: The section an article belongs to — a name, a slug, an optional description and icon — and the article's only container. Every article has exactly one. Topics are not plan-limited; the article allowance is. _Avoid_: category, collection, folder, space
+
+**Article**: One documentation page in the help center, as opposed to a **Post**, which is feedback. It has a sanitized Markdown body, a title, a slug unique within the workspace, and a lifecycle state. _Avoid_: doc, page, page content, knowledge base entry
+
+**Section list**: the ordering a topic's articles are read in. Not to be confused with **View**, which is what the board is showing.
+
+**Article view**: One read of an article — a count with a timestamp, never a person. There is no visitor identifier behind it, and the all-time number is a counter that outlives the events. _Avoid_: pageview, hit, impression, traffic
+
+**Verdict**: A reader's "was this helpful?" answer on one article — helpful or not helpful, with an optional reason explaining an unhelpful one. One verdict per reader per article, flipped in place rather than added. _Avoid_: feedback, rating, vote, reaction, like
+
+**Reader**: A person reading the help center. A reader may be a member, an end user with an account, or nobody signed in at all; the last is the common case, which is why a verdict records either an account or a browser-generated id. _Avoid_: visitor, viewer, user
+
 ### Data transfer
 
 **Export**: a workspace's posts — every board's, or one board's — rendered as a CSV file the workspace downloads. _Avoid_: download, dump, backup
