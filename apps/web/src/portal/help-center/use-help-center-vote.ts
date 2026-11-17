@@ -1,9 +1,14 @@
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
-import { fetchRpc } from "@feeblo/web-shared/runtime";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { useMachine } from "@xstate/react";
-import { useEffect, useRef } from "react";
+import * as Result from "effect/reactivity/AsyncResult";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  helpCenterArticleFeedbackAtom,
+  helpCenterPublicReactivityKeys,
+  setHelpCenterArticleFeedbackAtom,
+  type HelpCenterFeedbackAtomArgs,
+} from "./atoms";
 import {
   helpCenterVoteMachine,
   toHelpCenterVoteView,
@@ -28,64 +33,59 @@ export type HelpCenterVote = HelpCenterVoteView & {
 /**
  * The reader's verdict lifecycle, wired to the tally and the write.
  *
- * The graph lives in `vote-machine.ts`. This hook is the adapter: it loads the
- * tally, adopts it once per article, and sends the settle event the mutation
- * resolved to. The mutation is not an `invoke` inside the machine because its
- * failure belongs to React Query's `isError` and the caller's toast, not to a
- * fifth state — the machine tracks the reader's intent, and a reload re-derives
- * that intent from the server.
+ * The graph lives in `vote-machine.ts`. This hook is the adapter: it reads the
+ * tally from an atom, adopts it once per article, and sends the settle event
+ * the write resolved to.
+ *
+ * The write carries the tally's reactivity keys, which is what replaced React
+ * Query's `setQueryData`: the atom refreshes itself, so the widget never writes
+ * a cache it does not own. The machine holds the reader's intent, so the button
+ * state does not wait for a cache mutation to look right.
  */
 export function useHelpCenterVote({
   articleId,
   organizationId,
   visitorId,
 }: {
-  articleId: string | undefined;
+  /** Both are known before the widget renders; see the page's gate. */
+  articleId: string;
   organizationId: string;
-  visitorId: string | undefined;
+  visitorId: string;
 }): HelpCenterVote {
-  const queryClient = useQueryClient();
   const [snapshot, send] = useMachine(helpCenterVoteMachine);
 
-  const queryKey = [
-    "portal-help-center-feedback",
-    organizationId,
-    articleId,
-    visitorId,
-  ] as const;
+  /**
+   * Memoized because `Atom.family` keys on identity, and the key includes the
+   * visitor id: `mine` is part of the answer, so two readers must not share an
+   * entry.
+   */
+  const tallyArgs = useMemo<HelpCenterFeedbackAtomArgs>(
+    () => ({ articleId, organizationId, visitorId }),
+    [articleId, organizationId, visitorId]
+  );
 
-  const feedbackQuery = useQuery({
-    // `visitorId` is part of the key, so a request sent before it resolves
-    // would be thrown away and re-sent — one wasted round trip per article
-    // view, and an answer that cannot say whether *this* reader voted.
-    enabled:
-      isFeatureEnabled("HELP_CENTER") &&
-      articleId !== undefined &&
-      visitorId !== undefined,
-    queryKey,
-    queryFn: () =>
-      fetchRpc((rpc) =>
-        rpc.GetHelpCenterArticleFeedbackPublic({
-          organizationId,
-          articleId: articleId ?? "",
-          visitorId,
-        })
-      ),
-  });
+  const feedbackResult = useAtomValue(helpCenterArticleFeedbackAtom(tallyArgs));
 
-  const tally = feedbackQuery.data;
+  const tally = Result.getOrElse(
+    feedbackResult,
+    (): {
+      helpfulCount: number;
+      mine: boolean | null;
+      notHelpfulCount: number;
+    } | null => null
+  );
 
   /**
    * Adopt the server's verdict once per article.
    *
    * The tally arrives after mount, so `loading` has to be left by an event
    * rather than by the initial state. The guard is the article id, not the
-   * tally object: a refetch returns the same verdict, and re-sending it would
-   * yank a reader out of the reason box they are typing in.
+   * tally: a refetch returns the same verdict, and re-sending it would yank a
+   * reader out of the reason box they are typing in.
    */
   const adoptedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (tally === undefined || articleId === undefined) {
+    if (tally === null) {
       return;
     }
 
@@ -97,24 +97,44 @@ export function useHelpCenterVote({
     send({ type: toVoteLoadedEvent(tally.mine) });
   }, [articleId, send, tally]);
 
-  const vote = useMutation({
-    mutationFn: (helpful: boolean) =>
-      fetchRpc((rpc) =>
-        rpc.SetHelpCenterArticleFeedback({
-          organizationId,
-          articleId: articleId ?? "",
-          helpful,
-          reason: helpful ? null : snapshot.context.reason.trim() || null,
-          visitorId,
-        })
-      ),
-    onSuccess: (next) => {
-      queryClient.setQueryData(queryKey, next);
-      send({
-        type: next.mine === true ? "SETTLED_HELPFUL" : "SETTLED_UNHELPFUL",
-      });
-    },
+  const setFeedback = useAtomSet(setHelpCenterArticleFeedbackAtom, {
+    mode: "promise",
   });
+
+  /**
+   * Whether a write is in flight.
+   *
+   * The machine tracks the reader's intent, not the transport, so this is the
+   * one thing it deliberately does not model: it exists to disable the buttons
+   * while a press is on its way, not to describe a state the reader can see.
+   */
+  const [isPending, setIsPending] = useState(false);
+
+  const cast = (helpful: boolean) => {
+    setIsPending(true);
+
+    void setFeedback({
+      payload: {
+        organizationId,
+        articleId,
+        helpful,
+        reason: helpful ? null : snapshot.context.reason.trim() || null,
+        visitorId,
+      },
+      reactivityKeys: helpCenterPublicReactivityKeys(organizationId),
+    })
+      .then(() =>
+        send({
+          type: helpful ? "SETTLED_HELPFUL" : "SETTLED_UNHELPFUL",
+        })
+      )
+      .catch(() => {
+        // The verdict is a count, not a document: a refused write leaves the
+        // machine where it is and the reader can press again. A toast for this
+        // would outlive the press that caused it.
+      })
+      .finally(() => setIsPending(false));
+  };
 
   const view = toHelpCenterVoteView(snapshot);
 
@@ -124,15 +144,14 @@ export function useHelpCenterVote({
       helpful: tally?.helpfulCount ?? 0,
       notHelpful: tally?.notHelpfulCount ?? 0,
     },
-    isPending: vote.isPending,
-    reason: snapshot.context.reason,
-    markHelpful: () => vote.mutate(true),
-    // One mutation per press. The machine decides what the settle means: from
+    isPending,
+    markHelpful: () => cast(true),
+    // One write per press. The machine decides what the settle means: from
     // anywhere but the prompt it opens the box, and from the prompt it closes
-    // it. Sending an open beforehand would give the box two ways to appear and
-    // let the two disagree about whether a verdict had been recorded yet.
-    markUnhelpful: () => vote.mutate(false),
-    sendReason: () => vote.mutate(false),
+    // it. Opening it beforehand would give the box two ways to appear and let
+    // the two disagree about whether a verdict had been recorded yet.
+    markUnhelpful: () => cast(false),
+    sendReason: () => cast(false),
     closeReason: () => send({ type: "CLOSE_REASON" }),
     setReason: (value: string) => send({ type: "SET_REASON", value }),
   };

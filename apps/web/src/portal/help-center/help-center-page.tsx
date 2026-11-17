@@ -1,3 +1,4 @@
+import { useAtomValue } from "@effect/atom-react";
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Badge } from "@feeblo/ui/badge";
@@ -8,9 +9,13 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Skeleton } from "@feeblo/ui/skeleton";
-import { fetchRpc } from "@feeblo/web-shared/runtime";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import * as Result from "effect/reactivity/AsyncResult";
+
+import {
+  helpCenterArticlesPublicAtom,
+  helpCenterTopicsPublicAtom,
+} from "./atoms";
 
 /**
  * The portal's help center index.
@@ -26,22 +31,14 @@ export function HelpCenterPage() {
   const organizationId = site.organizationId;
   const enabled = isFeatureEnabled("HELP_CENTER");
 
-  const topicsQuery = useQuery({
-    enabled,
-    queryKey: ["portal-help-center-topics", organizationId],
-    queryFn: () =>
-      fetchRpc((rpc) => rpc.ListHelpCenterTopicsPublic({ organizationId })),
-  });
+  const topicsResult = useAtomValue(helpCenterTopicsPublicAtom(organizationId));
 
-  const articlesQuery = useQuery({
-    enabled,
-    queryKey: ["portal-help-center-articles", organizationId],
-    queryFn: () =>
-      fetchRpc((rpc) => rpc.ListHelpCenterArticlesPublic({ organizationId })),
-  });
+  const articlesResult = useAtomValue(
+    helpCenterArticlesPublicAtom(organizationId)
+  );
 
-  const topics = topicsQuery.data ?? [];
-  const articles = articlesQuery.data ?? [];
+  const topics = Result.getOrElse(topicsResult, () => []);
+  const articles = Result.getOrElse(articlesResult, () => []);
 
   const articlesByTopic = groupArticlesByTopic(articles);
 
@@ -56,7 +53,7 @@ export function HelpCenterPage() {
     );
   }
 
-  if (topicsQuery.isPending || articlesQuery.isPending) {
+  if (Result.isInitial(topicsResult) || Result.isInitial(articlesResult)) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-4 py-8">
         <Skeleton className="h-7 w-48" />

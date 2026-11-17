@@ -1,3 +1,4 @@
+import { useAtomSet } from "@effect/atom-react";
 import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-center-article";
 import { targetStatesFor } from "@feeblo/domain/help-center-article/machine";
 import { HelpCenterArticleId } from "@feeblo/id";
@@ -8,19 +9,24 @@ import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import { cn } from "@feeblo/ui/utils";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
-import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { ArrowLeft02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
+  createHelpCenterArticleAtom,
+  deleteHelpCenterArticleAtom,
+  helpCenterArticleReactivityKeys,
+  updateHelpCenterArticleAtom,
+} from "../atoms";
+import {
   helpCenterArticleFormOptions,
   helpCenterArticleFormValues,
+  type HelpCenterArticleFormValues,
 } from "../help-center-forms";
 import { HelpCenterTopicIcon } from "./help-center-topic-icons";
 
@@ -77,7 +83,6 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     useDashboardCollections();
 
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   const topicsQuery = useLiveQuery({
     queryKey: [
@@ -110,6 +115,18 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
   const offeredStatuses = [currentStatus, ...targetStatesFor(currentStatus)];
 
   /**
+   * The status the editor opened on, kept for the write's conflict check.
+   *
+   * A `useState` initialiser rather than a read of `article.status` at submit
+   * time: the atom's stale-while-revalidate refreshes the article underneath the
+   * form, so by the time an editor saves, `article.status` may be a colleague's
+   * newer value — and using it would make the constraint compare the row to
+   * itself and always pass. This is what the form was seeded with, and it does
+   * not move.
+   */
+  const [openedStatus] = useState(() => article?.status);
+
+  /**
    * The last refused save or delete.
    *
    * A local string rather than the form's `errorMap`: `onSubmit` on a zod-
@@ -119,6 +136,18 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
    * like this can have.
    */
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const createArticle = useAtomSet(createHelpCenterArticleAtom, {
+    mode: "promise",
+  });
+
+  const updateArticle = useAtomSet(updateHelpCenterArticleAtom, {
+    mode: "promise",
+  });
+
+  const deleteArticle = useAtomSet(deleteHelpCenterArticleAtom, {
+    mode: "promise",
+  });
 
   const form = useAppForm({
     ...helpCenterArticleFormOptions,
@@ -144,40 +173,16 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     },
   });
 
-  async function submit(value: {
-    content: string;
-    slug: string;
-    status: "draft" | "published" | "archived";
-    title: string;
-    topicId: string;
-  }) {
+  async function submit(value: HelpCenterArticleFormValues) {
     const topicId = value.topicId;
     const title = value.title.trim();
     const slug = value.slug.trim();
 
-    /**
-     * Drop the route's cached single-article read.
-     *
-     * The editor page holds the body under `["help-center-article", org, id]`.
-     * After this form replaces or removes that article, invalidating would
-     * leave the entry *readable*, so reopening would paint the old body
-     * until a refetch landed; removing it makes the next open a load.
-     */
-    const forgetArticle = () => {
-      if (article === undefined) {
-        return;
-      }
-
-      queryClient.removeQueries({
-        queryKey: ["help-center-article", organizationId, article.id],
-      });
-    };
-
     if (article === undefined) {
       const id = await HelpCenterArticleId.unsafeGenerate();
 
-      await fetchRpc((rpc) =>
-        rpc.CreateHelpCenterArticle({
+      await createArticle({
+        payload: {
           id,
           organizationId,
           topicId,
@@ -190,11 +195,12 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
           status: value.status,
           publishedAt: value.status === "draft" ? null : new Date(),
           position: null,
-        })
-      );
+        },
+        reactivityKeys: helpCenterArticleReactivityKeys(organizationId),
+      });
     } else {
-      await fetchRpc((rpc) =>
-        rpc.UpdateHelpCenterArticle({
+      await updateArticle({
+        payload: {
           id: article.id,
           organizationId,
           topicId,
@@ -202,20 +208,24 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
           slug: slug.length === 0 ? article.slug : slug,
           content: value.content,
           status: value.status,
-          // The status this editor opened: a row that moved since is refused
-          // as a conflict rather than silently reverted.
-          expectedStatus: article.status,
+          // What this editor opened on, not what a background refresh has
+          // since put there: a row that moved is refused as a conflict rather
+          // than silently reverted.
+          expectedStatus: openedStatus ?? article.status,
           // A flip back to draft clears the date; the server applies the same
           // rule, and sending the previous date for a non-draft status is what
           // keeps a typo fix from looking like a new release.
           publishedAt: value.status === "draft" ? null : article.publishedAt,
           position: article.position,
-        })
-      );
+        },
+        reactivityKeys: helpCenterArticleReactivityKeys(organizationId),
+      });
     }
 
+    // The list's rows are summaries the collection owns; the write above
+    // refreshed the single-article atom through its reactivity keys, so there
+    // is no cache entry here to forget.
     await helpCenterArticleCollection.utils.refetch();
-    forgetArticle();
     await navigate({
       params: { organizationId },
       to: "/$organizationId/help-center",
@@ -228,16 +238,14 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     }
 
     try {
-      const tx = helpCenterArticleCollection.delete(article.id);
-
-      // The collection removes the row optimistically and applies the server's
-      // answer through the transaction; awaiting it is what lets a refusal keep
-      // the editor open instead of navigating away from a live article.
-      await tx.when("settled");
-
-      queryClient.removeQueries({
-        queryKey: ["help-center-article", organizationId, article.id],
+      await deleteArticle({
+        payload: { id: article.id, organizationId },
+        // Carries the same keys as the read, so a back-navigation to a deleted
+        // article finds no cached success to paint.
+        reactivityKeys: helpCenterArticleReactivityKeys(organizationId),
       });
+
+      await helpCenterArticleCollection.utils.refetch();
       await navigate({
         params: { organizationId },
         to: "/$organizationId/help-center",

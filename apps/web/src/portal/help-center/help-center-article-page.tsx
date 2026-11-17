@@ -1,3 +1,4 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Badge } from "@feeblo/ui/badge";
@@ -13,7 +14,6 @@ import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { Textarea } from "@feeblo/ui/textarea";
 import { cn } from "@feeblo/ui/utils";
-import { fetchRpc } from "@feeblo/web-shared/runtime";
 import {
   ArrowLeft02Icon,
   Copy01Icon,
@@ -21,10 +21,15 @@ import {
   ThumbsUpIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import * as Result from "effect/reactivity/AsyncResult";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  addHelpCenterArticleViewAtom,
+  helpCenterArticlePublicAtom,
+  type HelpCenterArticlePublicAtomArgs,
+} from "./atoms";
 import { useHelpCenterVote } from "./use-help-center-vote";
 
 const VISITOR_KEY = "feeblo_help_visitor_id";
@@ -63,19 +68,23 @@ export function HelpCenterArticlePage({
   const organizationId = site.organizationId;
   const enabled = isFeatureEnabled("HELP_CENTER");
 
-  const articleQuery = useQuery({
-    enabled,
-    queryKey: ["portal-help-center-article", organizationId, articleSlug],
-    queryFn: () =>
-      fetchRpc((rpc) =>
-        rpc.GetHelpCenterArticlePublic({ organizationId, slug: articleSlug })
-      ),
-  });
+  // Memoized because `Atom.family` keys on identity: a fresh literal per render
+  // would be a fresh atom — and a fetch — per render.
+  const articleArgs = useMemo<HelpCenterArticlePublicAtomArgs>(
+    () => ({ organizationId, slug: articleSlug }),
+    [organizationId, articleSlug]
+  );
+
+  const articleResult = useAtomValue(helpCenterArticlePublicAtom(articleArgs));
 
   const visitorId = useVisitorId();
-  const articleId = articleQuery.data?.id;
 
-  useViewBeacon({ articleId, organizationId });
+  useViewBeacon({
+    articleId: Result.isSuccess(articleResult)
+      ? articleResult.value.id
+      : undefined,
+    organizationId,
+  });
 
   if (!enabled) {
     return (
@@ -88,8 +97,15 @@ export function HelpCenterArticlePage({
     );
   }
 
-  if (articleQuery.isError) {
-    return (
+  return Result.builder(articleResult)
+    .onInitial(() => (
+      <div className="mx-auto w-full max-w-3xl space-y-4 py-8">
+        <Skeleton className="h-9 w-2/3" />
+        <Skeleton className="h-4 w-1/3" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    ))
+    .onFailure(() => (
       <Empty className="py-16">
         <EmptyHeader>
           <EmptyTitle>Article not found</EmptyTitle>
@@ -98,87 +114,80 @@ export function HelpCenterArticlePage({
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
-    );
-  }
-
-  if (articleQuery.isPending) {
-    return (
-      <div className="mx-auto w-full max-w-3xl space-y-4 py-8">
-        <Skeleton className="h-9 w-2/3" />
-        <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
-
-  const article = articleQuery.data;
-
-  return (
-    <article className="mx-auto w-full max-w-3xl py-8">
-      <Button
-        render={<Link to="/s/help" />}
-        size="sm"
-        type="button"
-        variant="ghost"
-      >
-        <HugeiconsIcon icon={ArrowLeft02Icon} />
-        Help center
-      </Button>
-
-      <header className="mt-4 space-y-2">
-        <p className="text-muted-foreground text-xs">
-          <Link className="hover:text-foreground" to="/s/help">
-            {article.topicName}
-          </Link>
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {article.title}
-        </h1>
-        <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          {article.authorName === null ? null : (
-            <span>Written by {article.authorName}</span>
-          )}
-          <span>Updated {DATE_FORMAT.format(article.updatedAt)}</span>
-          <span className="tabular-nums">
-            {article.viewCount.toLocaleString()} views
-          </span>
-        </div>
-        {article.isArchived ? (
-          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-            This article describes behaviour that is no longer current.
-          </p>
-        ) : null}
-      </header>
-
-      <div className="mt-4 flex justify-end">
-        <CopyButton
-          onCopy={() => article.content}
-          successMessage="Markdown copied"
+    ))
+    .onSuccess((article) => (
+      <article className="mx-auto w-full max-w-3xl py-8">
+        <Button
+          render={<Link to="/s/help" />}
+          size="sm"
           type="button"
           variant="ghost"
         >
-          <HugeiconsIcon icon={Copy01Icon} />
-          Copy as Markdown
-        </CopyButton>
-      </div>
+          <HugeiconsIcon icon={ArrowLeft02Icon} />
+          Help center
+        </Button>
 
-      <div className="mt-2 border-t pt-6">
-        <MarkdownContent content={article.content} />
-      </div>
+        <header className="mt-4 space-y-2">
+          <p className="text-muted-foreground text-xs">
+            <Link className="hover:text-foreground" to="/s/help">
+              {article.topicName}
+            </Link>
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {article.title}
+          </h1>
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            {article.authorName === null ? null : (
+              <span>Written by {article.authorName}</span>
+            )}
+            <span>Updated {DATE_FORMAT.format(article.updatedAt)}</span>
+            <span className="tabular-nums">
+              {article.viewCount.toLocaleString()} views
+            </span>
+          </div>
+          {article.isArchived ? (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              This article describes behaviour that is no longer current.
+            </p>
+          ) : null}
+        </header>
 
-      {/*
-       * Keyed by the article: the verdict machine adopts one tally per article,
-       * and navigating from `/articles/a` to `/articles/b` keeps this route
-       * mounted. Without the key the widget would show A's verdict on B.
-       */}
-      <VerdictSection
-        key={article.id}
-        articleId={article.id}
-        organizationId={organizationId}
-        visitorId={visitorId}
-      />
-    </article>
-  );
+        <div className="mt-4 flex justify-end">
+          <CopyButton
+            onCopy={() => article.content}
+            successMessage="Markdown copied"
+            type="button"
+            variant="ghost"
+          >
+            <HugeiconsIcon icon={Copy01Icon} />
+            Copy as Markdown
+          </CopyButton>
+        </div>
+
+        <div className="mt-2 border-t pt-6">
+          <MarkdownContent content={article.content} />
+        </div>
+
+        {/*
+         * Rendered once the reader can be identified: the tally's key includes the
+         * visitor id, and an atom read before it resolves would be a request for a
+         * tally it cannot attribute.
+         *
+         * Keyed by the article: the verdict machine adopts one tally per article,
+         * and navigating from `/articles/a` to `/articles/b` keeps this route
+         * mounted. Without the key the widget would show A's verdict on B.
+         */}
+        {visitorId === undefined ? null : (
+          <VerdictSection
+            key={article.id}
+            articleId={article.id}
+            organizationId={organizationId}
+            visitorId={visitorId}
+          />
+        )}
+      </article>
+    ))
+    .exhaustive();
 }
 
 function VerdictSection({
@@ -188,7 +197,7 @@ function VerdictSection({
 }: {
   articleId: string;
   organizationId: string;
-  visitorId: string | undefined;
+  visitorId: string;
 }) {
   const vote = useHelpCenterVote({ articleId, organizationId, visitorId });
   const total = vote.counts.helpful + vote.counts.notHelpful;
@@ -371,19 +380,23 @@ function useViewBeacon({
   articleId: string | undefined;
   organizationId: string;
 }) {
+  const recordView = useAtomSet(addHelpCenterArticleViewAtom, {
+    mode: "promise",
+  });
+
   const beacon = useCallback(
     (id: string) =>
-      fetchRpc((rpc) =>
-        rpc.AddHelpCenterArticleView({
+      recordView({
+        payload: {
           organizationId,
           articleId: id,
           id: crypto.randomUUID(),
-        })
-      ).catch(() => {
+        },
+      }).catch(() => {
         // A read count is not worth an error surface; the server answers
         // `accepted: false` for anything it will not count.
       }),
-    [organizationId]
+    [organizationId, recordView]
   );
 
   useEffect(() => {

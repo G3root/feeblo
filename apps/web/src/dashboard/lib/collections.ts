@@ -688,21 +688,10 @@ export function helpCenterArticleCollection(scope: DashboardCollectionScope) {
         return [...data];
       },
       getKey: (item) => item.id,
-      // No `onInsert`/`onUpdate`: a row is a *summary*, and the body lives only
-      // on the single-article read. The editor therefore writes through
-      // `CreateHelpCenterArticle`/`UpdateHelpCenterArticle` and refetches,
-      // rather than asking a collection to round-trip a field it never held.
-      onDelete: async ({ collection, transaction }) => {
-        const { original } = transaction.mutations[0];
-
-        await fetchRpc((rpc) =>
-          rpc.DeleteHelpCenterArticle({
-            id: original.id,
-            organizationId: original.organizationId,
-          })
-        );
-        await collection.utils.refetch({ throwOnError: true });
-      },
+      // Read-only: a row is a *summary*, and the body lives only on the
+      // single-article read. The editor writes through the help center's atom
+      // mutations and refetches this list, so no collection callback has to
+      // round-trip a field these rows never held.
     })
   );
 }
