@@ -54,28 +54,29 @@ export function Calendar({
       "size-(--cell-size) p-0 text-xs font-medium text-muted-foreground/72",
   };
 
+  // react-day-picker types `classNames` by its enum-keyed `ClassNames` record,
+  // while `defaultClassNames` is a plain object literal. The map keeps the
+  // override lookup on the string names both use, so no key has to be asserted
+  // into an enum type.
+  const userClassNames = new Map<string, string | undefined>(
+    Object.entries(classNames ?? {})
+  );
+
   const mergedClassNames: typeof defaultClassNames = Object.keys(
     defaultClassNames
   ).reduce(
-    (acc, key) => {
-      // SAFETY: The key is a member of the source object's key set in this usage.
-      const userClass = classNames?.[key as keyof typeof classNames];
+    (merged, key) => {
+      // SAFETY: `key` comes from `defaultClassNames`, so it is one of its keys.
+      const mergedKey = key as keyof typeof defaultClassNames;
+      const userClass = userClassNames.get(key);
 
-      const baseClass =
-        // SAFETY: The key is a member of the source object's key set in this usage.
-        defaultClassNames[key as keyof typeof defaultClassNames];
+      if (userClass) {
+        merged[mergedKey] = cn(merged[mergedKey], userClass);
+      }
 
-      // SAFETY: The key is a member of the source object's key set in this usage.
-      acc[key as keyof typeof defaultClassNames] = userClass
-        ? cn(baseClass, userClass)
-        : baseClass;
-
-      return acc;
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      // SAFETY: The upstream contract guarantees this value here.
+      return merged;
     },
-    // SAFETY: The upstream contract guarantees this value here.
-    { ...defaultClassNames } as typeof defaultClassNames
+    { ...defaultClassNames }
   );
 
   const defaultComponents = {
