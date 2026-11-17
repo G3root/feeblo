@@ -1,4 +1,6 @@
 import { HELP_CENTER_ARTICLE_WRITE_STATES } from "@feeblo/domain-contracts/help-center-article";
+import type { THelpCenterArticle } from "@feeblo/domain/help-center-article/schema";
+import type { THelpCenterTopic } from "@feeblo/domain/help-center-topic/schema";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
@@ -38,12 +40,14 @@ export type HelpCenterTopicFormValues = z.infer<
  * while it is open, so this runs once per open and the form resets itself by
  * being a new component.
  */
+/** The row fields a topic dialog seeds from, taken from the read schema. */
+export type HelpCenterTopicFormSeed = Pick<
+  THelpCenterTopic,
+  "description" | "icon" | "name"
+>;
+
 export const helpCenterTopicFormValues = (
-  topic?: {
-    readonly description: string | null;
-    readonly icon: string | null;
-    readonly name: string;
-  },
+  topic?: HelpCenterTopicFormSeed,
   fallbackIcon: THelpCenterTopicIcon = DEFAULT_HELP_CENTER_TOPIC_ICON
 ): HelpCenterTopicFormValues => ({
   description: topic?.description ?? "",
@@ -100,13 +104,15 @@ export type HelpCenterArticleFormValues = z.infer<
  * the schema has nothing to say about. It is a form value all the same, held
  * under `content` so the preview subscribes to it like any other.
  */
-export const helpCenterArticleFormValues = (article?: {
-  readonly content: string;
-  readonly slug: string;
-  readonly status: HelpCenterArticleFormValues["status"];
-  readonly title: string;
-  readonly topicId: string;
-}): HelpCenterArticleFormValues => ({
+/** The row fields the editor seeds from, taken from the read schema. */
+export type HelpCenterArticleFormSeed = Pick<
+  THelpCenterArticle,
+  "content" | "slug" | "status" | "title" | "topicId"
+>;
+
+export const helpCenterArticleFormValues = (
+  article?: HelpCenterArticleFormSeed
+): HelpCenterArticleFormValues => ({
   content: article?.content ?? "",
   slug: article?.slug ?? "",
   status: article?.status ?? "draft",

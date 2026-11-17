@@ -7,12 +7,14 @@ import { useAppForm } from "@feeblo/ui/hooks/form";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
 import { cn } from "@feeblo/ui/utils";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { fetchRpc } from "@feeblo/web-shared/runtime";
 import { ArrowLeft02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -107,78 +109,118 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
   const currentStatus: THelpCenterArticleState = article?.status ?? "draft";
   const offeredStatuses = [currentStatus, ...targetStatesFor(currentStatus)];
 
+  /**
+   * The last refused save or delete.
+   *
+   * A local string rather than the form's `errorMap`: `onSubmit` on a zod-
+   * validated form is a structured `{ form, fields }` payload, and writing into
+   * it meant narrowing a union at the render site to print one sentence. This
+   * clears at the start of every attempt, which is the only drift a message
+   * like this can have.
+   */
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const form = useAppForm({
     ...helpCenterArticleFormOptions,
     defaultValues: helpCenterArticleFormValues(article),
     onSubmit: async ({ value }) => {
-      const topicId = value.topicId;
-      const title = value.title.trim();
-      const slug = value.slug.trim();
-
       /**
-       * Drop the route's cached single-article read.
+       * A refused write is shown, not thrown.
        *
-       * The editor page holds the body under `["help-center-article", org, id]`.
-       * After this form replaces or removes that article, invalidating would
-       * leave the entry *readable*, so reopening would paint the old body
-       * until a refetch landed; removing it makes the next open a load.
+       * `handleSubmit` rethrows a rejected `onSubmit`, so leaving the failure to
+       * propagate would both skip the form's error slot — nothing writes
+       * `errorMap.onSubmit` on that path — and leave `void form.handleSubmit()`
+       * in the submit handler with an unhandled rejection. Catching here puts
+       * the server's own message where the block below renders it, and the next
+       * submission replaces it.
        */
-      const forgetArticle = () => {
-        if (article === undefined) {
-          return;
-        }
+      setSubmitError(null);
 
-        queryClient.removeQueries({
-          queryKey: ["help-center-article", organizationId, article.id],
-        });
-      };
-
-      if (article === undefined) {
-        const id = await HelpCenterArticleId.unsafeGenerate();
-
-        await fetchRpc((rpc) =>
-          rpc.CreateHelpCenterArticle({
-            id,
-            organizationId,
-            topicId,
-            title,
-            // Omitted rather than sent as "": the server derives the slug from
-            // the title, and an empty string is refused rather than treated as
-            // "no preference".
-            slug: slug.length === 0 ? undefined : slug,
-            content: value.content,
-            status: value.status,
-            publishedAt: value.status === "draft" ? null : new Date(),
-            position: null,
-          })
-        );
-      } else {
-        await fetchRpc((rpc) =>
-          rpc.UpdateHelpCenterArticle({
-            id: article.id,
-            organizationId,
-            topicId,
-            title,
-            slug: slug.length === 0 ? article.slug : slug,
-            content: value.content,
-            status: value.status,
-            // A flip back to draft clears the date; the server applies the same
-            // rule, and sending the previous date for a non-draft status is what
-            // keeps a typo fix from looking like a new release.
-            publishedAt: value.status === "draft" ? null : article.publishedAt,
-            position: article.position,
-          })
-        );
+      try {
+        await submit(value);
+      } catch (cause) {
+        setSubmitError(parseRpcError(cause).message);
       }
-
-      await helpCenterArticleCollection.utils.refetch();
-      forgetArticle();
-      await navigate({
-        params: { organizationId },
-        to: "/$organizationId/help-center",
-      });
     },
   });
+
+  async function submit(value: {
+    content: string;
+    slug: string;
+    status: "draft" | "published" | "archived";
+    title: string;
+    topicId: string;
+  }) {
+    const topicId = value.topicId;
+    const title = value.title.trim();
+    const slug = value.slug.trim();
+
+    /**
+     * Drop the route's cached single-article read.
+     *
+     * The editor page holds the body under `["help-center-article", org, id]`.
+     * After this form replaces or removes that article, invalidating would
+     * leave the entry *readable*, so reopening would paint the old body
+     * until a refetch landed; removing it makes the next open a load.
+     */
+    const forgetArticle = () => {
+      if (article === undefined) {
+        return;
+      }
+
+      queryClient.removeQueries({
+        queryKey: ["help-center-article", organizationId, article.id],
+      });
+    };
+
+    if (article === undefined) {
+      const id = await HelpCenterArticleId.unsafeGenerate();
+
+      await fetchRpc((rpc) =>
+        rpc.CreateHelpCenterArticle({
+          id,
+          organizationId,
+          topicId,
+          title,
+          // Omitted rather than sent as "": the server derives the slug from
+          // the title, and an empty string is refused rather than treated as
+          // "no preference".
+          slug: slug.length === 0 ? undefined : slug,
+          content: value.content,
+          status: value.status,
+          publishedAt: value.status === "draft" ? null : new Date(),
+          position: null,
+        })
+      );
+    } else {
+      await fetchRpc((rpc) =>
+        rpc.UpdateHelpCenterArticle({
+          id: article.id,
+          organizationId,
+          topicId,
+          title,
+          slug: slug.length === 0 ? article.slug : slug,
+          content: value.content,
+          status: value.status,
+          // The status this editor opened: a row that moved since is refused
+          // as a conflict rather than silently reverted.
+          expectedStatus: article.status,
+          // A flip back to draft clears the date; the server applies the same
+          // rule, and sending the previous date for a non-draft status is what
+          // keeps a typo fix from looking like a new release.
+          publishedAt: value.status === "draft" ? null : article.publishedAt,
+          position: article.position,
+        })
+      );
+    }
+
+    await helpCenterArticleCollection.utils.refetch();
+    forgetArticle();
+    await navigate({
+      params: { organizationId },
+      to: "/$organizationId/help-center",
+    });
+  }
 
   const remove = async () => {
     if (article === undefined) {
@@ -201,14 +243,10 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
         to: "/$organizationId/help-center",
       });
     } catch (cause) {
-      // Rethrown into the form so one place shows every failure, whether it
-      // came from the save or the delete.
-      throw new Error(
-        cause instanceof Error
-          ? cause.message
-          : "Could not delete the article.",
-        { cause }
-      );
+      // The same message area the save uses: `remove` is not part of a submit,
+      // so throwing would surface as an unhandled rejection from the button's
+      // `void remove()` rather than as a message.
+      setSubmitError(parseRpcError(cause).message);
     }
   };
 
@@ -388,13 +426,9 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
           </TabsPanel>
         </Tabs>
 
-        <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
-          {(error) =>
-            error === undefined || error === null ? null : (
-              <p className="text-destructive mt-4 text-sm">{String(error)}</p>
-            )
-          }
-        </form.Subscribe>
+        {submitError === null ? null : (
+          <p className="text-destructive mt-4 text-sm">{submitError}</p>
+        )}
       </form>
     </div>
   );

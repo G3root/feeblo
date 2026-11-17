@@ -171,9 +171,11 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
           topicId: args.topicId,
           position: args.position,
-          // The status read a moment ago. A row that has moved since is a
-          // conflict, not an overwrite.
-          expectedStatus: previous.status,
+          // What the editor had on screen, not what this request just read: a
+          // colleague's save in between is a conflict, not an overwrite. An
+          // API caller that does not track it falls back to the row as read,
+          // which is the weaker guarantee but the only one it can offer.
+          expectedStatus: args.expectedStatus ?? previous.status,
           now,
           write,
         });

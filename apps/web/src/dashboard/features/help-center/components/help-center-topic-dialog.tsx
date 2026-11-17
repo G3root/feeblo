@@ -12,6 +12,8 @@ import {
 } from "@feeblo/ui/dialog";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { cn } from "@feeblo/ui/utils";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { useState } from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
@@ -165,23 +167,26 @@ function TopicFields({
   onSubmit: (value: HelpCenterTopicFormValues) => Promise<void>;
   submitLabel: string;
 }) {
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const form = useAppForm({
     ...helpCenterTopicFormOptions,
     ...(initial === undefined ? {} : { defaultValues: initial }),
     onSubmit: async ({ value }) => {
+      /**
+       * A refused write keeps the dialog open with the reason.
+       *
+       * Not a rethrow: `handleSubmit` propagates a rejected `onSubmit` to its
+       * caller, and the caller is a `void form.handleSubmit()` in the submit
+       * handler — so a throw is an unhandled rejection, not a message. The
+       * dialog stays mounted because nothing navigates on this path.
+       */
+      setSubmitError(null);
+
       try {
         await onSubmit(value);
       } catch (cause) {
-        // Rethrowing is what puts the message under the form: TanStack Form
-        // stores a thrown submit error in `errorMap.onSubmit`, so the dialog
-        // stays open with the reason instead of closing on a write the server
-        // refused.
-        throw new Error(
-          cause instanceof Error
-            ? cause.message
-            : "Could not save the section.",
-          { cause }
-        );
+        setSubmitError(parseRpcError(cause).message);
       }
     },
   });
@@ -245,13 +250,9 @@ function TopicFields({
           )}
         </form.AppField>
 
-        <form.Subscribe selector={(state) => state.errorMap.onSubmit}>
-          {(error) =>
-            error === undefined || error === null ? null : (
-              <p className="text-destructive text-sm">{String(error)}</p>
-            )
-          }
-        </form.Subscribe>
+        {submitError === null ? null : (
+          <p className="text-destructive text-sm">{submitError}</p>
+        )}
       </DialogPanel>
 
       <DialogFooter>

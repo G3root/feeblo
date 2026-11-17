@@ -199,6 +199,15 @@ export const HelpCenterArticleUpdate = S.Struct({
   slug: ArticleSlug,
   content: ArticleContent,
   status: HelpCenterArticleWriteState,
+  /**
+   * The status the editor had on screen when it loaded the article.
+   *
+   * Optional so an API caller need not track it, but the dashboard always sends
+   * it: the write is constrained to rows still in this status, which is what
+   * stops an editor who opened a draft from saving over a publication that
+   * happened in between.
+   */
+  expectedStatus: S.optional(HelpCenterArticleState),
   publishedAt: publishedAtWithDefault,
   position: positionWithDefault,
 });
