@@ -1,8 +1,17 @@
 import { hasWindow } from "@feeblo/utils/runtime-kind";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// Client-side singleton to ensure the same instance is used across the app
-let clientQueryClient: QueryClient | null = null;
+// Client-side singleton to ensure the same instance is used across the app.
+// Held in a closure so the instance is built once and never reassigned.
+const getClientQueryClient = (() => {
+  let client: QueryClient | null = null;
+
+  return (): QueryClient => {
+    client ??= makeQueryClient();
+
+    return client;
+  };
+})();
 
 function makeQueryClient() {
   return new QueryClient({
@@ -31,13 +40,9 @@ export function getContext() {
     };
   }
 
-  // Client: use singleton to preserve cache across navigations
-  if (!clientQueryClient) {
-    clientQueryClient = makeQueryClient();
-  }
-
+  // Client: the singleton preserves the cache across navigations
   return {
-    queryClient: clientQueryClient,
+    queryClient: getClientQueryClient(),
   };
 }
 

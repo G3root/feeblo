@@ -171,20 +171,14 @@ const SANITIZE_SCHEMA = {
 };
 
 const relTokens = (value: Properties[string]): Set<string> => {
-  const tokens = new Set<string>();
   const values = Array.isArray(value) ? value : [value];
 
-  for (const entry of values) {
-    if (isString(entry)) {
-      for (const token of entry.split(REL_TOKEN_SEPARATOR)) {
-        if (token) {
-          tokens.add(token);
-        }
-      }
-    }
-  }
-
-  return tokens;
+  return new Set(
+    values
+      .filter(isString)
+      .flatMap((entry) => entry.split(REL_TOKEN_SEPARATOR))
+      .filter((token) => token !== "")
+  );
 };
 
 /**

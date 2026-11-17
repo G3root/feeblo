@@ -78,23 +78,28 @@ export function bindTriggers(target: TriggerTarget, logger?: Logger): void {
   }
 }
 
-let triggerScanInterval: ReturnType<typeof setInterval> | null = null;
+/** The scan timer while one is running; only the two functions below touch it. */
+type TriggerScanSession = { interval: ReturnType<typeof setInterval> | null };
+
+const scanning: TriggerScanSession = {
+  interval: null,
+};
 
 export function startTriggerScanning(
   target: TriggerTarget,
   logger?: Logger
 ): void {
-  if (triggerScanInterval) {
+  if (scanning.interval !== null) {
     return;
   }
 
-  triggerScanInterval = setInterval(() => bindTriggers(target, logger), 1000);
+  scanning.interval = setInterval(() => bindTriggers(target, logger), 1000);
   bindTriggers(target, logger);
 }
 
 export function stopTriggerScanning(): void {
-  if (triggerScanInterval) {
-    clearInterval(triggerScanInterval);
-    triggerScanInterval = null;
+  if (scanning.interval !== null) {
+    clearInterval(scanning.interval);
+    scanning.interval = null;
   }
 }

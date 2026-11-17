@@ -18,7 +18,12 @@ export interface PostUiI18nRuntime {
   setLocale: SetLocaleFn;
 }
 
-let initialized = false;
+/** The host runtime once installed; `undefined` until `initPostUiI18n` runs. */
+type InstalledI18nRuntime = { runtime: PostUiI18nRuntime | undefined };
+
+const hostI18n: InstalledI18nRuntime = {
+  runtime: undefined,
+};
 
 /**
  * Overrides the package's Paraglide runtime with the host app's locale
@@ -28,9 +33,9 @@ let initialized = false;
 export function initPostUiI18n(runtime: PostUiI18nRuntime) {
   overwriteGetLocale(runtime.getLocale);
   overwriteSetLocale(runtime.setLocale);
-  initialized = true;
+  hostI18n.runtime = runtime;
 }
 
 export function isPostUiI18nInitialized() {
-  return initialized;
+  return hostI18n.runtime !== undefined;
 }

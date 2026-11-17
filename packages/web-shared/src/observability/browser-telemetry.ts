@@ -242,7 +242,19 @@ interface BrowserTelemetryHandle {
   ) => Effect.Effect<void, never, BrowserTelemetry>;
 }
 
-let handle: BrowserTelemetryHandle | undefined;
+/**
+ * The installed session. The slot is the module's own: `start` fills it and
+ * every reader asks for it here rather than keeping a second flag.
+ */
+type TelemetrySession = { handle: BrowserTelemetryHandle | undefined };
+
+const telemetry: TelemetrySession = {
+  handle: undefined,
+};
+
+/** Whether this page has installed its telemetry yet. */
+export const isBrowserTelemetryStarted = (): boolean =>
+  telemetry.handle !== undefined;
 
 /**
  * Install the page's telemetry once. A build without relay URLs (local,
@@ -251,9 +263,9 @@ let handle: BrowserTelemetryHandle | undefined;
 export const startBrowserTelemetry = (
   settings: BrowserTelemetrySettings
 ): void => {
-  if (handle !== undefined || !hasWindow()) return;
+  if (telemetry.handle !== undefined || !hasWindow()) return;
   const runtime = ManagedRuntime.make(browserTelemetryLayer(settings));
-  handle = {
+  telemetry.handle = {
     runtime,
     flush: Effect.flatMap(BrowserTelemetry, (telemetry) => telemetry.flush),
     navigation: (event) =>
@@ -269,6 +281,8 @@ export const recordBrowserNavigation = (
     | { readonly type: "load" | "start"; readonly path: string }
     | { readonly type: "end" }
 ): void => {
+  const { handle } = telemetry;
+
   if (handle !== undefined)
     void handle.runtime.runFork(handle.navigation(event));
 };

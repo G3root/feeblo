@@ -44,25 +44,29 @@ const defaultSessionGetter: AuthSessionGetter = () => authClient.getSession();
 
 // `Atom.make` only accepts effects requiring `Scope.Scope | AtomRegistry`, so
 // the getter cannot be provided through Effect's Context without migrating the
-// atom to `AtomRuntime`. A single module-level slot keeps the override local;
-// tests must reset it in teardown so state does not leak between cases.
-let currentSessionGetter: AuthSessionGetter = defaultSessionGetter;
+// atom to `AtomRuntime`. One slot keeps the override local; tests must reset it
+// in teardown so state does not leak between cases.
+type SessionTransportSlot = { current: AuthSessionGetter };
+
+const sessionTransport: SessionTransportSlot = {
+  current: defaultSessionGetter,
+};
 
 /** Test seam: replace the session transport without constructing auth interceptors. */
 export const overrideSessionGetterForTests = (
   getter: AuthSessionGetter
 ): void => {
-  currentSessionGetter = getter;
+  sessionTransport.current = getter;
 };
 
 /** Restore the real authClient transport; call this in test teardown. */
 export const resetSessionGetterForTests = (): void => {
-  currentSessionGetter = defaultSessionGetter;
+  sessionTransport.current = defaultSessionGetter;
 };
 
 export const meAtom = Atom.make(
   Effect.gen(function* () {
-    const result = yield* Effect.promise(() => currentSessionGetter());
+    const result = yield* Effect.promise(() => sessionTransport.current());
 
     if (result.error) {
       return yield* new AuthSessionRequestError({ cause: result.error });

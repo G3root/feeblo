@@ -18,7 +18,12 @@ export interface PublicBoardI18nRuntime {
   setLocale: SetLocaleFn;
 }
 
-let initialized = false;
+/** The host runtime once installed; `undefined` until `initPublicBoardI18n` runs. */
+type InstalledBoardI18n = { runtime: PublicBoardI18nRuntime | undefined };
+
+const hostI18n: InstalledBoardI18n = {
+  runtime: undefined,
+};
 
 /**
  * Overrides the board's Paraglide runtime with the host app's locale
@@ -28,9 +33,9 @@ let initialized = false;
 export function initPublicBoardI18n(runtime: PublicBoardI18nRuntime) {
   overwriteGetLocale(runtime.getLocale);
   overwriteSetLocale(runtime.setLocale);
-  initialized = true;
+  hostI18n.runtime = runtime;
 }
 
 export function isPublicBoardI18nInitialized() {
-  return initialized;
+  return hostI18n.runtime !== undefined;
 }

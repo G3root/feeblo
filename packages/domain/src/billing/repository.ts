@@ -159,12 +159,17 @@ const decodeProductMetadata = Schema.decodeUnknownSync(
   ProductMetadataFromPolar
 );
 
+/** The row identity and event facts a subscription payload cannot supply. */
+type SubscriptionRowContext = {
+  readonly eventTimestamp: Date;
+  readonly id: string;
+  readonly organizationId: string;
+  readonly polarServer: string;
+};
+
 const toSubscriptionValues = (
   payload: SubscriptionPayload,
-  id: string,
-  organizationId: string,
-  eventTimestamp: Date,
-  polarServer: string
+  { eventTimestamp, id, organizationId, polarServer }: SubscriptionRowContext
 ): SubscriptionInsert => ({
   id,
   externalId: payload.id,
@@ -320,13 +325,12 @@ const makeBillingRepository = Effect.gen(function* () {
         const id = yield* SubscriptionId.generate;
         const now = yield* DateTime.nowAsDate;
 
-        const values = toSubscriptionValues(
-          payload,
-          id,
-          organizationId.value,
+        const values = toSubscriptionValues(payload, {
           eventTimestamp,
-          polarService.target
-        );
+          id,
+          organizationId: organizationId.value,
+          polarServer: polarService.target,
+        });
 
         const { id: _id, ...updateValues } = values;
         yield* db

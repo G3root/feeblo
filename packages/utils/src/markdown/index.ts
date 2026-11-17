@@ -60,15 +60,20 @@ function createHtmlProcessor() {
 
 type HtmlProcessor = ReturnType<typeof createHtmlProcessor>;
 
-let htmlProcessor: HtmlProcessor | null = null;
+/**
+ * The processor is built at most once per isolate and kept inside this
+ * closure: no other module can read or replace it, and a module that never
+ * renders Markdown never pays for the pipeline.
+ */
+const getHtmlProcessor = (() => {
+  let processor: HtmlProcessor | null = null;
 
-function getHtmlProcessor(): HtmlProcessor {
-  if (!htmlProcessor) {
-    htmlProcessor = createHtmlProcessor();
-  }
+  return (): HtmlProcessor => {
+    processor ??= createHtmlProcessor();
 
-  return htmlProcessor;
-}
+    return processor;
+  };
+})();
 
 // Isolate-local memo for rendered Markdown HTML (RSS feeds, SEO snapshots).
 // Callers key by a content version (e.g. `${id}:${updatedAt}`) so edits

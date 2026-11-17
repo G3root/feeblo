@@ -119,7 +119,19 @@ const productFeedbackButton =
 
 const copyUrlButton = requiredElement<HTMLButtonElement>("#copy-url");
 
-let widget: FeebloWidget;
+/** The preview page's embed; every `initializePreview` replaces it. */
+type PreviewWidgetSlot = { widget: FeebloWidget | undefined };
+
+const preview: PreviewWidgetSlot = { widget: undefined };
+
+/** The embed the buttons act on. Initialization runs before they can be clicked. */
+const currentWidget = (): FeebloWidget => {
+  if (preview.widget === undefined) {
+    throw new Error("[Preview] the widget has not been initialized");
+  }
+
+  return preview.widget;
+};
 
 const inputTimers = new WeakMap<HTMLInputElement, number>();
 
@@ -204,7 +216,7 @@ function initializePreview(): void {
   statusOutput.value = "initializing";
   statusOutput.textContent = "initializing";
 
-  widget = Feeblo.init(config.organizationId, {
+  preview.widget = Feeblo.init(config.organizationId, {
     baseUrl: config.baseUrl,
     mode: config.mode,
     ...(config.mode === "hub" && { modules: config.modules }),
@@ -278,27 +290,27 @@ for (const input of [
 requiredElement<HTMLButtonElement>("#open-widget").addEventListener(
   "click",
   () => {
-    widget.open();
+    currentWidget().open();
   }
 );
 
 requiredElement<HTMLButtonElement>("#close-widget").addEventListener(
   "click",
   () => {
-    widget.close();
+    currentWidget().close();
   }
 );
 
 openFeedbackButton.addEventListener("click", () => {
-  widget.openModule("feedback");
+  currentWidget().openModule("feedback");
 });
 
 openUpdatesButton.addEventListener("click", () => {
-  widget.openModule("updates");
+  currentWidget().openModule("updates");
 });
 
 productFeedbackButton.addEventListener("click", () => {
-  widget.open(productFeedbackButton);
+  currentWidget().open(productFeedbackButton);
 });
 
 copyUrlButton.addEventListener("click", async () => {
