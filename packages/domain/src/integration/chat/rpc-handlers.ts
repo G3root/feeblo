@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import { EntitlementPolicy } from "../../entitlement/policies";
 import * as Policy from "../../policy";
 import { withRemapDbErrors } from "../../rpc-errors";
+import { withProviderAudit } from "../audit";
 import type {
   ChatManagementSchemas,
   ChatManagementServiceContract,
@@ -17,6 +18,12 @@ import type {
  * differs between providers. `connectStart` additionally requires the plan's
  * integrations capability — existing connections stay manageable, so a
  * downgraded workspace can still disconnect.
+ *
+ * `connectStart`, `channelNotificationsUpdate` and `connectionDisconnect` are
+ * configuration writes and run with the operator in context, so the provider
+ * writes the entry inside the transaction that changes the connection. The
+ * reads — channel list, connection list, status — are not audited: reading a
+ * connection is not a change to it.
  */
 export const makeChatManagementRpcHandlers = <S extends ChatManagementSchemas>(
   service: ChatManagementServiceContract<S>
@@ -35,20 +42,26 @@ export const makeChatManagementRpcHandlers = <S extends ChatManagementSchemas>(
       channelNotificationsUpdate: (
         input: Parameters<typeof service.setChannelNotifications>[0]
       ) =>
-        service
-          .setChannelNotifications(input)
-          .pipe(authorize(input.organizationId)),
+        withProviderAudit(
+          input.organizationId,
+          service.setChannelNotifications(input)
+        ).pipe(authorize(input.organizationId)),
       connectStart: (input: Parameters<typeof service.connectStart>[0]) =>
         Effect.gen(function* () {
           yield* entitlementPolicy.canUseIntegrations(input.organizationId);
 
-          return yield* service.connectStart(input);
+          return yield* withProviderAudit(
+            input.organizationId,
+            service.connectStart(input)
+          );
         }).pipe(
           authorize(input.organizationId),
           withRemapDbErrors("Integration", "select")
         ),
       connectionDisconnect: (input: Parameters<typeof service.disconnect>[0]) =>
-        service.disconnect(input).pipe(authorize(input.organizationId)),
+        withProviderAudit(input.organizationId, service.disconnect(input)).pipe(
+          authorize(input.organizationId)
+        ),
       connectionList: (input: Parameters<typeof service.listConnections>[0]) =>
         service.listConnections(input).pipe(authorize(input.organizationId)),
       integrationStatus: () => service.status,

@@ -22,6 +22,8 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { TestClock } from "effect/testing";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
@@ -264,6 +266,7 @@ describe("PostRpcHandlers", () => {
     });
 
   const RepositoriesTest = Layer.mergeAll(
+    AuditLogRecorder.layer,
     BoardRepository.layer,
     PostRepository.layer,
     PostActivityRepository.layer,
@@ -859,7 +862,11 @@ describe("PostRpcHandlers", () => {
             organizationId: fixture.organizationId,
           });
 
-          expect(result).toEqual({ deleted: false, restoredChildren: [] });
+          expect(result).toEqual({
+            deleted: false,
+            deletedIds: [],
+            restoredChildren: [],
+          });
 
           const [post] = yield* db
             .select({ mergedIntoPostId: schema.postTable.mergedIntoPostId })
@@ -2277,6 +2284,120 @@ describe("PostRpcHandlers", () => {
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
           expect(post?.lockedAt).toBeInstanceOf(Date);
+        })
+      );
+
+      it.effect("records the lock and the archive it actually changed", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .CreatePost(postCreateInput(fixture, postId, "Moderated feedback"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          yield* handlers
+            .AdminUpdatePost({
+              archived: true,
+              id: postId,
+              locked: true,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(AuditLogEnabled, true)
+            );
+
+          const db = yield* currentDb;
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.resourceId, postId)
+              )
+            )
+            .orderBy(schema.auditLogTable.action);
+
+          expect(rows.map((row) => row.action)).toEqual([
+            "post.archived",
+            "post.locked",
+          ]);
+
+          for (const row of rows) {
+            expect(row).toMatchObject({
+              actorType: "user",
+              actorUserId: fixture.userId,
+              outcome: "allowed",
+              resourceId: postId,
+              resourceType: "post",
+              source: "dashboard",
+            });
+          }
+
+          expect(
+            rows.find((row) => row.action === "post.locked")?.changes
+          ).toEqual({
+            fields: ["locked"],
+            before: { locked: false },
+            after: { locked: true },
+          });
+          expect(
+            rows.find((row) => row.action === "post.archived")?.changes
+          ).toEqual({
+            fields: ["archived"],
+            before: { archived: false },
+            after: { archived: true },
+          });
+        })
+      );
+
+      it.effect("records a title save only when the title changed", () =>
+        Effect.gen(function* () {
+          const handlers = yield* PostRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const postId = yield* PostId.generate;
+
+          yield* handlers
+            .CreatePost(postCreateInput(fixture, postId, "Original title"))
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const saveTitle = (title: string) =>
+            handlers
+              .UpdatePostTitle({
+                boardId: fixture.boardId,
+                id: postId,
+                organizationId: fixture.organizationId,
+                title,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, makeSession(fixture)),
+                Effect.provideService(AuditLogEnabled, true)
+              );
+
+          // Re-saving the stored title is a no-op the write path already skips;
+          // it must not leave an entry claiming an edit.
+          yield* saveTitle("Original title");
+          yield* saveTitle("Revised title");
+
+          const db = yield* currentDb;
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.resourceId, postId),
+                eq(schema.auditLogTable.action, "post.updated")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.metadata).toMatchObject({ title: "Revised title" });
         })
       );
     });

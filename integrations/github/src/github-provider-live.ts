@@ -5,6 +5,8 @@ import {
   gitHubIssueSafeMetadataConditions,
   schema,
 } from "@feeblo/db";
+import { AuditLogRecorder } from "@feeblo/domain/audit-log/recorder";
+import { recordProviderChange } from "@feeblo/domain/integration/audit";
 import { GitHubIntegrationConfig } from "@feeblo/domain/integration/github/config";
 import {
   BadRequestError,
@@ -61,6 +63,7 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
     GitHubProvider,
     Effect.gen(function* () {
       const db = yield* currentDb;
+      const audit = yield* AuditLogRecorder;
       const domainConfig = yield* GitHubIntegrationConfig;
       const secureRandom = yield* SecureRandom.SecureRandom;
       const api = makeGitHubApiClient();
@@ -188,17 +191,40 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
             );
 
             yield* db
-              .insert(schema.integrationConnectionTable)
-              .values({
-                id,
-                organizationId,
-                provider: githubProviderKey,
-                name: "GitHub",
-                lifecycle: "connecting",
-                credentialGeneration: 1,
-                credentialsCiphertext: ciphertext,
-                safeDisplayMetadata: {},
-              })
+              .transaction(() =>
+                Effect.gen(function* () {
+                  yield* db
+                    .insert(schema.integrationConnectionTable)
+                    .values({
+                      id,
+                      organizationId,
+                      provider: githubProviderKey,
+                      name: "GitHub",
+                      lifecycle: "connecting",
+                      credentialGeneration: 1,
+                      credentialsCiphertext: ciphertext,
+                      safeDisplayMetadata: {},
+                    })
+                    .pipe(
+                      Effect.mapError(() =>
+                        providerFailure("connection creation")
+                      )
+                    );
+                  // The round trip starts here and the setup callback completes
+                  // it, so this records the *started* connect against the
+                  // connecting row the same transaction just created. The
+                  // installation nonce is never named: it is the credential
+                  // material the state carries.
+                  yield* recordProviderChange(audit, {
+                    organizationId,
+                    action: "integration.connected",
+                    connectionId: id,
+                    metadata: { flow: "started", provider: "github" },
+                  }).pipe(
+                    Effect.mapError(() => providerFailure("audit entry"))
+                  );
+                })
+              )
               .pipe(
                 Effect.mapError(() => providerFailure("connection creation"))
               );
@@ -748,4 +774,4 @@ export const makeGitHubProviderLive = (config: GitHubProviderLiveInput) =>
 
       return provider;
     })
-  );
+  ).pipe(Layer.provide(AuditLogRecorder.layer));

@@ -126,21 +126,45 @@ Do not record end-user actions (the portal and widget are `post_activity`), deli
 
 The audited-read list is the sizing decision, not a detail: it is the difference between a table that needs no partitioning for years and one that does.
 
-### Shipped call sites
+### What is recorded
+
+Sixty-seven actions, every one of them declared in the catalog and every declared action written by at least one call site:
 
 | Module | Actions |
 | --- | --- |
-| `board` | created, updated, deleted |
+| `board` | created, updated, deleted, exported |
+| `post` | created, updated, status_changed, moved, locked, archived, merged, unmerged, deleted |
+| `comments` | created, updated, deleted, pinned |
 | `tag` | created, updated, deleted, and `post.updated` from `SetPostTags` |
 | `post-status` | created, updated (update, set-default, reorder), deleted |
 | `roadmap` | created, updated, deleted |
-| `membership` | role_changed, removed |
+| `changelog` | created, updated, published, deleted |
+| `changelog-category` | created, updated, deleted |
+| `attribute-definition` | created, updated, deleted, value_updated |
+| `membership` | role_changed, removed, invite_cancelled |
+| `site` | `workspace.updated` |
+| `jwt-secret` | `jwt_secret.revoked` |
 | `api-key` | created, revoked |
-| `public-api` | `api.request`, a refusal at the scope gate |
+| `contact` | created, updated, deleted, read |
+| `company` | created, updated, deleted |
+| `user-ban` | created, removed |
+| `data-transfer` | imported, exported |
+| `email-suppression` | added, removed |
+| `webhook` | created, updated, deleted, paused, resumed, secret_rotated |
+| `integration` (Slack, Discord, GitHub) | connected, updated, disconnected |
+| `public-api` | `api.request` |
 
-Every one writes `record` inside the handler's `transaction()`, except the two that cannot: the API key lifecycle (the credential call is the plugin's own) and the scope refusal (the request is already being refused). Both use `recordBestEffort` and say why inline.
+Two rules govern the catalog, and only one of them is absolute.
 
-Adding one is three lines: declare the verb if it is new, call `record` inside the transaction, and provide `AuditLogRecorder.layer` where the handler layer is built (`PublicApiInternals` already does, for the surface's own gate).
+**A writer may only record an action the catalog declares.** `AUDIT_ACTIONS` and a grep for `action: "…"` across `packages/domain/src` and `integrations/*/src` must agree in that direction at all times — otherwise an entry lands with a verb no reader can label or filter on.
+
+**A declared action may have no writer.** Entries outlive the code that writes them, so deleting a verb that already has rows would orphan them outside every filter. Adding a writer is what adds a verb; removing a writer leaves its verbs in place.
+
+The two sets are therefore identical only at the rollout that introduced them. From then on the catalog is append-only, and the direction that matters is the first one.
+
+Deliberately not recorded: portal and widget writes (the `*Public` twins are end-user actions, which `post_activity` covers), votes and reactions, saved views, webhook delivery attempts and retries, the billing portal, and workspace creation (there is no workspace yet to scope the entry to).
+
+Most writers record inside the transaction that performs the write. Three do not, and each says why at the call site: the API key lifecycle (the credential call is the plugin's own), the Public API scope refusal (the request is already being refused), and the bulk export (the bytes are streamed after the effect returns, so failing a completed download would be worse than a missing row). The post create/edit paths record best effort for a different reason: they fork a fiber that would inherit the outer transaction's connection, and holding a pooled connection across an embedding call is how one request's write lands on another's transaction.
 
 ## Retention
 
@@ -155,13 +179,13 @@ Adding one is three lines: declare the verb if it is new, call `record` inside t
 
 ## Not built yet
 
-- The dashboard page and its filters; the RPC has no client.
-- The Public API surface (`audit_log.read` scope, hand-written DTO per ADR 0004).
-- The remaining call sites: post, comments, contact, company, user-ban, data-transfer, changelog, attribute definitions, webhooks and the chat integrations. The catalog declares them; the next PR wires them and drops the verbs that turn out not to be needed.
-- The audited reads (`board.exported`, `data_transfer.exported`, `contact.read`) are declared and nothing records them yet.
-- **Plan-based retention.** Flat at a year today; a shorter window for a lower tier is a product decision with a data-loss consequence, and the sweep takes the window as a constant so it is one edit.
-- Partitioning. Revisit at roughly 20M live rows or when a retention sweep takes minutes; the primary key would have to include `occurred_at`, so the decision is a rewrite, made with numbers rather than a hunch.
+- **The dashboard page and its filters.** The only product surface left: the RPC has no client, so the feature is unreachable from the app. It is also what makes the flag flippable, so it belongs to the same release as the pricing plan.
+- **The Public API read surface** (`GET /api/v1/audit-log`, `audit_log.read`, hand-written DTO per ADR 0004). It is the next PR of this stack.
+- **Plan-based retention.** Flat at a year today; a shorter window for a lower tier is a product decision with a data-loss consequence.
+- **Partitioning.** Revisit at roughly 20M live rows or when a retention sweep takes minutes; the primary key would have to include `occurred_at`, so the decision is a rewrite, made with numbers rather than a hunch.
 
 ## Tests
 
 `packages/domain/src/audit-log/` covers the catalog's shape, the repository's paging and filters, the check constraints, the append-only trigger and the workspace-deletion contract (an entry outlives its workspace), the recorder's flag, derivation and redaction, the read RPC's role gate, and the retention pass — including a run that drains two batches and leaves the fresh row behind.
+
+Every wired module also has one test that drives the audited mutation with `AuditLogEnabled` provided as true and reads the entry back from `audit_log` scoped to its own organization — board, tag, post-status, roadmap, membership, post, comments, contact, company, user-ban, data-transfer, changelog, changelog-category, changelog-post, attribute-definition, site, jwt-secret, email-suppression, api-key — plus the provider suites under `integrations/`. The flag is off by default, so a test that forgets to turn it on still passes; that is why each assertion provides it explicitly.

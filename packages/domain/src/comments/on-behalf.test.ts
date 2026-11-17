@@ -16,6 +16,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EmailOutboxConfig } from "../email-outbox/config";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -190,6 +191,7 @@ describe("CommentRpcHandlers on-behalf", () => {
     });
 
   const RepositoriesTest = Layer.mergeAll(
+    AuditLogRecorder.layer,
     PostRepository.layer,
     CommentRepository.layer,
     PostActivityRepository.layer,

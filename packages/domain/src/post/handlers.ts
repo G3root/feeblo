@@ -3,6 +3,8 @@ import * as Permissions from "@feeblo/permissions";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EmailOutboxRepository } from "../email-outbox/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
@@ -29,6 +31,7 @@ import {
   PostNotFoundError,
 } from "./errors";
 import {
+  LOCKED_POST_ENGAGEMENT,
   engagementForLock,
   engagementOf,
   isArchivedPostPresence,
@@ -123,6 +126,14 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     embeddings: embeddingService,
   });
 
+  /**
+   * The ids in a delete request that exist on the board it names.
+   *
+   * The shared write path reports one verdict for the whole request, and a
+   * privileged bulk delete tolerates an id that matches nothing, so the audit
+   * entries are written for the rows the delete could have removed rather than
+   * for whatever the client sent.
+   */
   /**
    * Re-attributes a post to a resolved on-behalf subject.
    *
@@ -249,39 +260,156 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     public: { rateLimit: "expensive", policy: canUpdatePublicAs },
   });
 
-  const removePost = deleteWrite.handlers((_surface, args) =>
-    Effect.flatMap(CurrentSession, (session) =>
-      writes.remove(
-        {
-          ...args,
-          mayDeleteEngaged: Permissions.can(
-            session,
-            args.organizationId,
-            "posts.*"
-          ),
-        },
-        memberActor(session, args.organizationId)
-      )
-    )
+  // Every dashboard write below records an audit entry; the portal halves are
+  // end-user actions — the public board is `post_activity`'s timeline, not the
+  // workspace's accountability record — and write none. Where the shared write
+  // path leaves nothing running after its transaction, the entry goes inside
+  // that transaction (the path's own transaction nests as a savepoint in the
+  // one opened here) so the entry and the change commit together. `create`,
+  // `updatePostContent` and `updatePostTitle` are the exceptions, and each says
+  // why where it records.
+  const removePost = deleteWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const audit = yield* AuditLogRecorder;
+
+      const write = {
+        ...args,
+        mayDeleteEngaged: Permissions.can(
+          session,
+          args.organizationId,
+          "posts.*"
+        ),
+      };
+
+      // The asset sweep runs once the delete has committed, never inside the
+      // transaction: it touches storage and the asset table, and a rollback
+      // would otherwise leave the post alive with its assets already collected.
+      // The delete and its entries stay in the transaction, where they commit
+      // together.
+      const cleanup = writes.cleanupAfterRemove(args.organizationId);
+
+      if (surface === "public") {
+        yield* writes.remove(write, memberActor(session, args.organizationId));
+        yield* cleanup;
+
+        return;
+      }
+
+      yield* transaction(
+        Effect.gen(function* () {
+          const removed = yield* writes.remove(
+            write,
+            memberActor(session, args.organizationId)
+          );
+
+          const actor = actorFromSession(session, args.organizationId);
+          // The ids the delete removed, not the ids the request asked for:
+          // the pre-read and the delete are two statements, and a post that
+          // vanished between them must not leave an entry claiming it was
+          // deleted.
+          yield* Effect.forEach(
+            removed.deletedIds,
+            (id) =>
+              audit.record({
+                organizationId: args.organizationId,
+                actor,
+                source: "dashboard",
+                action: "post.deleted",
+                resourceId: id,
+              }),
+            { discard: true }
+          );
+        })
+      );
+
+      yield* cleanup;
+    })
   );
 
-  const updatePost = updateWrite.handlers((_surface, args) =>
-    Effect.flatMap(CurrentSession, (session) =>
-      writes.update(
-        {
-          boardId: args.boardId,
-          id: args.id,
-          organizationId: args.organizationId,
-          statusId: args.statusId,
-        },
-        memberActor(session, args.organizationId)
-      )
-    )
+  const updatePost = updateWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const audit = yield* AuditLogRecorder;
+
+      return yield* transaction(
+        Effect.gen(function* () {
+          // Read first, in this transaction, and under the row lock the
+          // activity-state read takes: the board and status the post carried
+          // are the half of the diff the update no longer knows, and two
+          // concurrent saves would otherwise diff from the same stale row.
+          let previous:
+            | { readonly boardId: string; readonly statusId: string }
+            | undefined;
+
+          if (surface === "dashboard") {
+            const state = yield* repository.findActivityState({
+              id: args.id,
+              organizationId: args.organizationId,
+            });
+
+            previous =
+              state === undefined
+                ? undefined
+                : { boardId: state.boardId, statusId: state.statusId };
+          }
+
+          yield* writes.update(
+            {
+              boardId: args.boardId,
+              id: args.id,
+              organizationId: args.organizationId,
+              statusId: args.statusId,
+            },
+            memberActor(session, args.organizationId)
+          );
+
+          if (previous === undefined) {
+            return;
+          }
+
+          const actor = actorFromSession(session, args.organizationId);
+
+          if (previous.boardId !== args.boardId) {
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor,
+              source: "dashboard",
+              action: "post.moved",
+              resourceId: args.id,
+              changes: {
+                fields: ["boardId"],
+                before: { boardId: previous.boardId },
+                after: { boardId: args.boardId },
+              },
+            });
+          }
+
+          if (previous.statusId !== args.statusId) {
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor,
+              source: "dashboard",
+              action: "post.status_changed",
+              resourceId: args.id,
+              changes: {
+                fields: ["statusId"],
+                before: { statusId: previous.statusId },
+                after: { statusId: args.statusId },
+              },
+            });
+          }
+        })
+      );
+    })
   );
 
-  const updatePostContent = updateContentWrite.handlers((_surface, args) =>
-    Effect.flatMap(CurrentSession, (session) =>
-      writes.update(
+  const updatePostContent = updateContentWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const audit = yield* AuditLogRecorder;
+
+      const { contentChanged } = yield* writes.update(
         {
           assetIds: args.assetIds,
           content: args.content,
@@ -290,21 +418,66 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
           organizationId: args.organizationId,
         },
         memberActor(session, args.organizationId)
-      )
-    )
+      );
+
+      // `contentChanged` is the shared write path's comparison of the stored
+      // body against the prepared one — sanitising can make two different
+      // submissions the same post — so a save that changed nothing writes no
+      // entry.
+      if (surface !== "dashboard" || !contentChanged) {
+        return;
+      }
+
+      // Best effort for the same reason `create` is: a body edit schedules an
+      // embedding on a detached fiber, so the entry is written once the edit
+      // is durable rather than from inside a transaction that fiber would
+      // inherit. The update returns the row it wrote, not the one it replaced,
+      // and a post body is far too much data to keep a copy of in the log, so
+      // the new body is described rather than diffed.
+      yield* audit.recordBestEffort({
+        organizationId: args.organizationId,
+        actor: actorFromSession(session, args.organizationId),
+        source: "dashboard",
+        action: "post.updated",
+        resourceId: args.id,
+        metadata: {
+          assetIds: args.assetIds,
+          contentLength: args.content.length,
+          field: "content",
+        },
+      });
+    })
   );
 
-  const updatePostTitle = updateTitleWrite.handlers((_surface, args) =>
-    Effect.flatMap(CurrentSession, (session) =>
-      writes.update(
+  const updatePostTitle = updateTitleWrite.handlers((surface, args) =>
+    Effect.gen(function* () {
+      const session = yield* CurrentSession;
+      const audit = yield* AuditLogRecorder;
+
+      const { titleChanged } = yield* writes.update(
         {
           id: args.id,
           organizationId: args.organizationId,
           title: args.title,
         },
         memberActor(session, args.organizationId)
-      )
-    )
+      );
+
+      if (surface !== "dashboard" || !titleChanged) {
+        return;
+      }
+
+      // Best effort, for the reason given on `create` and `updatePostContent`:
+      // a title change re-schedules the embedding the same way.
+      yield* audit.recordBestEffort({
+        organizationId: args.organizationId,
+        actor: actorFromSession(session, args.organizationId),
+        source: "dashboard",
+        action: "post.updated",
+        resourceId: args.id,
+        metadata: { field: "title", title: args.title },
+      });
+    })
   );
 
   // On-behalf attribution is a dashboard capability: the public `canCreate`
@@ -350,12 +523,37 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       }
 
       const session = yield* CurrentSession;
+      const audit = yield* AuditLogRecorder;
 
-      return yield* writes.create(
+      const slug = yield* writes.create(
         args,
         memberActor(session, args.organizationId),
         surface === "public" ? { source: "PUBLIC_BOARD" } : undefined
       );
+
+      if (surface === "dashboard") {
+        // Best effort, and one of the three in this module that are: `create`
+        // ends by scheduling the post's embedding on a detached fiber, and a
+        // fiber forked inside an outer transaction inherits that transaction's
+        // connection. Holding a pooled connection past its transaction for an
+        // HTTP call is how one request's write lands on another's connection,
+        // so the entry is written once the creation is durable and a failure
+        // to write it is logged instead of failing the caller twice.
+        yield* audit.recordBestEffort({
+          organizationId: args.organizationId,
+          actor: actorFromSession(session, args.organizationId),
+          source: "dashboard",
+          action: "post.created",
+          resourceId: args.id,
+          metadata: {
+            boardId: args.boardId,
+            statusId: args.statusId,
+            title: args.title,
+          },
+        });
+      }
+
+      return slug;
     })
   );
 
@@ -546,16 +744,38 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     CreatePostPublic: createPost.public,
 
     UpdatePostEta: (args: TPostUpdateEta) =>
-      Effect.flatMap(CurrentSession, (session) =>
-        writes.update(
-          {
-            etaQuarter: args.etaQuarter,
-            id: args.id,
-            organizationId: args.organizationId,
-          },
-          memberActor(session, args.organizationId)
-        )
-      ).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+
+        yield* transaction(
+          Effect.gen(function* () {
+            const { etaChanged } = yield* writes.update(
+              {
+                etaQuarter: args.etaQuarter,
+                id: args.id,
+                organizationId: args.organizationId,
+              },
+              memberActor(session, args.organizationId)
+            );
+
+            // Re-saving the same quarter changes nothing, and the entry would
+            // claim an edit the row never had.
+            if (!etaChanged) {
+              return;
+            }
+
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post.updated",
+              resourceId: args.id,
+              metadata: { etaQuarter: args.etaQuarter, field: "etaQuarter" },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(
           postPolicy.canUpdateEta({
             organizationId: args.organizationId,
@@ -566,7 +786,24 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     UpdatePostAuthor: (args: TPostUpdateAuthor) =>
-      updatePostAuthorEffect(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* updatePostAuthorEffect(args);
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post.updated",
+              resourceId: args.id,
+              metadata: { author: args.author, field: "author" },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(
           postPolicy.canUpdateAuthor({
             organizationId: args.organizationId,
@@ -577,16 +814,39 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     UpdatePostAssignee: (args: TPostUpdateAssignee) =>
-      Effect.flatMap(CurrentSession, (session) =>
-        writes.update(
-          {
-            assigneeMemberId: args.assigneeMemberId,
-            id: args.id,
-            organizationId: args.organizationId,
-          },
-          memberActor(session, args.organizationId)
-        )
-      ).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+
+        yield* transaction(
+          Effect.gen(function* () {
+            const { assigneeChanged } = yield* writes.update(
+              {
+                assigneeMemberId: args.assigneeMemberId,
+                id: args.id,
+                organizationId: args.organizationId,
+              },
+              memberActor(session, args.organizationId)
+            );
+
+            if (!assigneeChanged) {
+              return;
+            }
+
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post.updated",
+              resourceId: args.id,
+              metadata: {
+                assigneeMemberId: args.assigneeMemberId,
+                field: "assignee",
+              },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(
           postPolicy.canUpdateAssignee({
             organizationId: args.organizationId,
@@ -600,6 +860,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
+        const audit = yield* AuditLogRecorder;
         yield* transaction(
           Effect.gen(function* () {
             const previous = yield* requireNotMergedActivityState(args);
@@ -611,27 +872,34 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               postId: args.id,
             };
 
-            const activities: PostActivityInput[] = [];
-
             // The activity is emitted on a real move, which is a question for
             // the engagement and presence graphs rather than for the two
             // timestamp columns: `adminUpdate` is an idempotent set, so asking
             // the machine is what keeps "archived twice" from announcing
-            // itself twice.
-            if (
-              args.locked !== undefined &&
-              engagementOf(previous) !== engagementForLock(args.locked)
-            ) {
+            // itself twice. The audit entry answers the same question from the
+            // same answer, so a no-op admin update writes neither.
+            const nextLocked = args.locked;
+
+            const lockedChanged =
+              nextLocked !== undefined &&
+              engagementOf(previous) !== engagementForLock(nextLocked);
+
+            const nextArchived = args.archived;
+
+            const archivedChanged =
+              nextArchived !== undefined &&
+              isArchivedPostPresence(presenceOf(previous)) !== nextArchived;
+
+            const activities: PostActivityInput[] = [];
+
+            if (lockedChanged) {
               activities.push({
                 ...actor,
                 kind: args.locked ? "POST_LOCKED" : "POST_UNLOCKED",
               });
             }
 
-            if (
-              args.archived !== undefined &&
-              isArchivedPostPresence(presenceOf(previous)) !== args.archived
-            ) {
+            if (archivedChanged) {
               activities.push({
                 ...actor,
                 kind: args.archived ? "POST_ARCHIVED" : "POST_UNARCHIVED",
@@ -640,6 +908,42 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
 
             yield* repository.adminUpdate(args);
             yield* activityRepository.createMany(activities);
+
+            const auditActor = actorFromSession(session, args.organizationId);
+
+            if (lockedChanged) {
+              yield* audit.record({
+                organizationId: args.organizationId,
+                actor: auditActor,
+                source: "dashboard",
+                action: "post.locked",
+                resourceId: args.id,
+                changes: {
+                  fields: ["locked"],
+                  before: {
+                    locked: engagementOf(previous) === LOCKED_POST_ENGAGEMENT,
+                  },
+                  after: { locked: nextLocked },
+                },
+              });
+            }
+
+            if (archivedChanged) {
+              yield* audit.record({
+                organizationId: args.organizationId,
+                actor: auditActor,
+                source: "dashboard",
+                action: "post.archived",
+                resourceId: args.id,
+                changes: {
+                  fields: ["archived"],
+                  before: {
+                    archived: isArchivedPostPresence(presenceOf(previous)),
+                  },
+                  after: { archived: nextArchived },
+                },
+              });
+            }
           })
         );
       }).pipe(
@@ -656,6 +960,7 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const session = yield* CurrentSession;
         const membership = Policy.getMembership(session, args.organizationId);
+        const audit = yield* AuditLogRecorder;
         // An official update is a timeline event only. It used to also email
         // post subscribers; that notification is gone with the three-email
         // model, so the write stands alone.
@@ -673,6 +978,20 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
               body: args.body,
               organizationId: args.organizationId,
               postId: args.postId,
+            });
+            // The catalog has no verb for a published official update, so the
+            // post-level change is recorded under the closest declared verb
+            // and the timeline entry it wrote is named in `metadata`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post.updated",
+              resourceId: args.postId,
+              metadata: {
+                field: "officialUpdate",
+                updateId: args.updateId,
+              },
             });
           })
         );
@@ -695,14 +1014,28 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
         }
 
         const session = yield* CurrentSession;
-
+        const audit = yield* AuditLogRecorder;
         // The move, the two timeline entries, the notification, and the email
         // intent are the shared write path (`post/write.ts`), so a merge
         // performed from the dashboard and one performed with an API key
         // cannot drift; only the actor differs.
-        return yield* writes.merge(
-          args,
-          memberActor(session, args.organizationId)
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* writes.merge(
+              args,
+              memberActor(session, args.organizationId)
+            );
+            // The archived post is the one that stopped being its own page, so
+            // it is the resource; the survivor it was folded into is context.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post.merged",
+              resourceId: args.sourcePostId,
+              metadata: { targetPostId: args.targetPostId },
+            });
+          })
         );
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
@@ -712,7 +1045,22 @@ export const PostRpcHandlersEffect = Effect.gen(function* () {
     UnmergePost: (args: TPostUnmerge) =>
       Effect.gen(function* () {
         const session = yield* CurrentSession;
-        yield* writes.unmerge(args, memberActor(session, args.organizationId));
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* writes.unmerge(
+              args,
+              memberActor(session, args.organizationId)
+            );
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "post.unmerged",
+              resourceId: args.sourcePostId,
+            });
+          })
+        );
       }).pipe(
         Policy.withPolicy(postPolicy.canMerge(args.organizationId)),
         withRemapDbErrors("Post", "update")
@@ -730,5 +1078,6 @@ export const PostRpcHandlers = PostRpcs.toLayer(PostRpcHandlersEffect).pipe(
     EntitlementPolicy.layer.pipe(Layer.provide(WorkspaceRepository.layer))
   ),
   Layer.provide(PostEmbeddingService.layer),
-  Layer.provide(ParticipationPolicy.layer)
+  Layer.provide(ParticipationPolicy.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );

@@ -1146,9 +1146,22 @@ const makePostWriteService = Effect.gen(function* () {
         }
 
         embeddingNeeded = titleChanged || contentChanged;
+
+        // The flags travel so a caller that records a change can record only
+        // what changed. `contentChanged` compares the stored body with the
+        // prepared one, not with the bytes the caller sent: sanitising can make
+        // two different bodies the same post, and the opposite.
+        return {
+          assigneeChanged,
+          boardChanged,
+          contentChanged,
+          etaChanged,
+          statusChanged,
+          titleChanged,
+        };
       });
 
-      yield* transaction(write).pipe(
+      const changes = yield* transaction(write).pipe(
         prepared === undefined
           ? (effect) => effect
           : (effect) =>
@@ -1172,6 +1185,8 @@ const makePostWriteService = Effect.gen(function* () {
           title: finalTitle,
         });
       }
+
+      return changes;
     });
 
   /**
@@ -1229,19 +1244,27 @@ const makePostWriteService = Effect.gen(function* () {
         });
       }
 
-      return undefined;
-    }).pipe(
-      Effect.tap(() =>
-        cleanupOrphanedEditorAssets({
-          organizationId: args.organizationId,
-        }).pipe(
-          Effect.catch((cause) =>
-            Effect.logWarning(
-              "Failed to clean up orphaned editor assets",
-              cause
-            ).pipe(Effect.annotateLogs({ organizationId: args.organizationId }))
-          )
-        )
+      // The outcome travels: `removePost` audits the ids this delete removed,
+      // not the ids the request asked for.
+      return result;
+    });
+
+  /**
+   * Sweeps the editor assets a delete orphaned.
+   *
+   * Called by the delete's caller *after* its transaction commits, never from
+   * inside one: the sweep touches storage and the asset table, and running it
+   * before the commit would collect the assets of a post whose delete then
+   * rolled back. Best effort — the delete it follows has already happened, so
+   * a failed sweep logs rather than failing the caller.
+   */
+  const cleanupAfterRemove = (organizationId: string) =>
+    cleanupOrphanedEditorAssets({ organizationId }).pipe(
+      Effect.catch((cause) =>
+        Effect.logWarning(
+          "Failed to clean up orphaned editor assets",
+          cause
+        ).pipe(Effect.annotateLogs({ organizationId }))
       )
     );
 
@@ -1432,6 +1455,13 @@ const makePostWriteService = Effect.gen(function* () {
     ) {
       return yield* remove(args, actor).pipe(provideWriteEnvironment);
     }),
+    cleanupAfterRemove: Effect.fn("PostWriteService.cleanupAfterRemove")(
+      function* (organizationId: string) {
+        return yield* cleanupAfterRemove(organizationId).pipe(
+          provideWriteEnvironment
+        );
+      }
+    ),
     unmerge: Effect.fn("PostWriteService.unmerge")(function* (
       args: PostUnmergeWrite,
       actor: PostWriteActor

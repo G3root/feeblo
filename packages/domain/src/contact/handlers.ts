@@ -6,6 +6,8 @@ import * as Option from "effect/Option";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
 import { validateAttributeValueEffect } from "../attribute-definition/validation";
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { CompanyRepository } from "../company/repository";
 import { createCrmEntry } from "../crm-entry/intake";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
@@ -70,14 +72,39 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
         }
 
         const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
         // Dashboard read-level rate limit for the picker (see
         // plan-on-behalf.md); keyed by the searching member.
         yield* consumeDashboardRateLimit({
           key: `contact-search:${args.organizationId}:${session.session.userId}`,
           name: "contact-search",
         });
+        const results = yield* repository.search(searchArgs);
 
-        return yield* repository.search(searchArgs);
+        // This is the audited contact read: it searches the whole CRM and
+        // returns the full records it finds, while `ListContacts` serves a
+        // page of one table. The search is already done when the entry is
+        // written and there is no transaction to join, so a failed insert is
+        // logged and given up rather than turning a completed read into an
+        // error the client cannot act on. A search that found nothing moved no
+        // data and is not recorded.
+        if (results.length > 0) {
+          yield* audit.recordBestEffort({
+            organizationId: args.organizationId,
+            actor: actorFromSession(session, args.organizationId),
+            source: "dashboard",
+            action: "contact.read",
+            metadata: {
+              query: searchArgs.query,
+              resultCount: results.length,
+              ...(searchArgs.postId !== undefined && {
+                postId: searchArgs.postId,
+              }),
+            },
+          });
+        }
+
+        return results;
       }).pipe(
         Policy.withPolicy(Policy.hasMembership(args.organizationId)),
         withRemapDbErrors("Contact", "select")
@@ -127,67 +154,84 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
       ),
 
     CreateContact: (args: TContactCreate) =>
-      createCrmEntry({
-        organizationId: args.organizationId,
-        insert: Effect.gen(function* () {
-          const attributeValues = args.attributeValues ?? [];
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
 
-          // Share-locked for this transaction, like the company create: the
-          // required-value check, the per-value validation and the upserts
-          // below all read one snapshot, so a definition that becomes required
-          // while the create runs cannot let a supplied `null` through.
-          const definitions =
-            yield* attributeDefinitionRepository.findContactAttributeDefinitionsForShare(
-              args.organizationId
+        return yield* createCrmEntry({
+          organizationId: args.organizationId,
+          insert: Effect.gen(function* () {
+            const attributeValues = args.attributeValues ?? [];
+
+            // Share-locked for this transaction, like the company create: the
+            // required-value check, the per-value validation and the upserts
+            // below all read one snapshot, so a definition that becomes required
+            // while the create runs cannot let a supplied `null` through.
+            const definitions =
+              yield* attributeDefinitionRepository.findContactAttributeDefinitionsForShare(
+                args.organizationId
+              );
+
+            const definitionsById = new Map(
+              definitions.map((definition) => [definition.id, definition])
             );
 
-          const definitionsById = new Map(
-            definitions.map((definition) => [definition.id, definition])
-          );
-
-          yield* Effect.forEach(
-            definitions.filter(
-              (definition) =>
-                definition.isRequired &&
-                !attributeValues.some(
-                  (attributeValue) =>
-                    attributeValue.attributeId === definition.id
-                )
-            ),
-            (definition) => validateAttributeValueEffect(definition, null)
-          );
-
-          const contact = yield* repository.create(args);
-          yield* Effect.forEach(args.attributeValues ?? [], (attributeValue) =>
-            Effect.gen(function* () {
-              const definition = definitionsById.get(
-                attributeValue.attributeId
-              );
-
-              if (definition === undefined) {
-                return yield* new Policy.PolicyDeniedError();
-              }
-
-              yield* validateAttributeValueEffect(
-                definition,
-                attributeValue.value
-              );
-              yield* attributeDefinitionRepository
-                .upsertContactAttributeValue({
-                  ...attributeValue,
-                  contactId: contact.id,
-                  organizationId: args.organizationId,
-                })
-                .pipe(
-                  Effect.catchTag("FailedToUpsertAttributeValueError", () =>
-                    Effect.fail(new FailedToCreateContactError())
+            yield* Effect.forEach(
+              definitions.filter(
+                (definition) =>
+                  definition.isRequired &&
+                  !attributeValues.some(
+                    (attributeValue) =>
+                      attributeValue.attributeId === definition.id
                   )
-                );
-            })
-          );
+              ),
+              (definition) => validateAttributeValueEffect(definition, null)
+            );
 
-          return contact;
-        }),
+            const contact = yield* repository.create(args);
+            yield* Effect.forEach(
+              args.attributeValues ?? [],
+              (attributeValue) =>
+                Effect.gen(function* () {
+                  const definition = definitionsById.get(
+                    attributeValue.attributeId
+                  );
+
+                  if (definition === undefined) {
+                    return yield* new Policy.PolicyDeniedError();
+                  }
+
+                  yield* validateAttributeValueEffect(
+                    definition,
+                    attributeValue.value
+                  );
+                  yield* attributeDefinitionRepository
+                    .upsertContactAttributeValue({
+                      ...attributeValue,
+                      contactId: contact.id,
+                      organizationId: args.organizationId,
+                    })
+                    .pipe(
+                      Effect.catchTag("FailedToUpsertAttributeValueError", () =>
+                        Effect.fail(new FailedToCreateContactError())
+                      )
+                    );
+                })
+            );
+            // Inside `createCrmEntry`'s transaction, so the contact, its
+            // attribute values and the entry commit together.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "contact.created",
+              resourceId: contact.id,
+              metadata: { email: contact.email, name: contact.name },
+            });
+
+            return contact;
+          }),
+        });
       }).pipe(
         Policy.withPolicy(contactPolicy.canCreate(args)),
         withRemapDbErrors("Contact", "create")
@@ -195,7 +239,35 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
 
     UpdateContact: (args: TContactUpdate) =>
       Effect.gen(function* () {
-        const contact = yield* repository.update(args);
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+
+        const contact = yield* transaction(
+          Effect.gen(function* () {
+            const updated = yield* repository.update(args);
+
+            if (Option.isNone(updated)) {
+              return updated;
+            }
+
+            // The update returns the row it wrote, not the one it replaced, so
+            // the new values go in `metadata` rather than posing as a diff
+            // with an empty `before`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "contact.updated",
+              resourceId: args.id,
+              metadata: {
+                email: updated.value.email,
+                name: updated.value.name,
+              },
+            });
+
+            return updated;
+          })
+        );
 
         if (Option.isNone(contact)) {
           return yield* new ContactNotFoundError({
@@ -235,6 +307,9 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
 
     DeleteContact: (args: TContactDelete) =>
       Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+
         const deleted = yield* transaction(
           Effect.gen(function* () {
             const contact = yield* repository.delete(args);
@@ -250,6 +325,15 @@ export const ContactRpcHandlersEffect = Effect.gen(function* () {
                 contact.value.userId
               );
             }
+
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "contact.deleted",
+              resourceId: args.id,
+              metadata: { userId: contact.value.userId },
+            });
 
             return contact;
           })
@@ -277,5 +361,6 @@ export const ContactRpcHandlers = ContactRpcs.toLayer(
   Layer.provide(AttributeDefinitionRepository.layer),
   Layer.provide(CompanyRepository.layer),
   Layer.provide(EmailSubscriptionRepository.layer),
-  Layer.provide(UserRepository.layer)
+  Layer.provide(UserRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );

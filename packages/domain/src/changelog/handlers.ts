@@ -12,6 +12,8 @@ import {
   rollbackPreparedEditorAssets,
   syncChangelogAssetReferences,
 } from "../asset/service";
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { ChangelogPostRepository } from "../changelog-post/repository";
 import { wakeEmailOutboxBestEffort } from "../email-outbox/queue";
 import { EmailOutboxRepository } from "../email-outbox/repository";
@@ -115,6 +117,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         }
 
         const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
 
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
@@ -128,13 +131,33 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
 
         const outboxId = yield* transaction(
           Effect.gen(function* () {
-            yield* repository.create({
+            const created = yield* repository.create({
               ...args,
               content: prepared.content,
               coverImage: prepared.coverImage,
               creatorId: session.session.userId,
               ...(isMember && { creatorMemberId: isMember.membershipId }),
               excerpt: htmlToExcerpt(sanitizedHtml),
+            });
+
+            // In the same transaction as the entry it describes, so a create
+            // that fails anywhere below leaves no audit row claiming it
+            // happened. `metadata` rather than `changes`: there is no previous
+            // row to diff against.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "changelog.created",
+              resourceId: args.id,
+              // The stored slug, not the submitted one: the repository derives
+              // it from the title when the caller left it empty, and the entry
+              // should name the entry as it exists.
+              metadata: {
+                title: args.title,
+                slug: created?.slug ?? args.slug,
+                status: args.status,
+              },
             });
 
             const createdOutboxId = isPublishedChangelogStatus(args.status)
@@ -182,8 +205,32 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
     },
 
     DeleteChangelog: (args: TChangelogDelete) =>
-      repository.delete(args).pipe(
-        Effect.asVoid,
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            const deleted = yield* repository.delete(args);
+
+            // `canDelete` proved the caller may delete, not that there was
+            // anything to delete. A row that is already gone (or never was in
+            // this workspace) is a 404, and nothing is recorded for it.
+            if (!deleted) {
+              return yield* new ChangelogNotFoundError({
+                message: "Changelog entry not found",
+              });
+            }
+
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "changelog.deleted",
+              resourceId: args.id,
+            });
+          })
+        );
+      }).pipe(
         Effect.tap(() =>
           cleanupOrphanedEditorAssets({
             organizationId: args.organizationId,
@@ -220,6 +267,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
         }
 
         const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
         const membership = Policy.getMembership(session, args.organizationId);
 
         const prepared = yield* prepareEditorAssetContent({
@@ -262,10 +310,40 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
               });
             }
 
+            // The update returns the row it wrote, not the one it replaced,
+            // so the new values go in `metadata` rather than posing as a diff
+            // with an empty `before`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "changelog.updated",
+              resourceId: args.id,
+              metadata: {
+                title: args.title,
+                slug: updated.slug,
+                status: args.status,
+              },
+            });
             // The publication intent and the subscriber fan-out belong to the
             // transition, not to the value: a save that leaves a live entry
             // live changes nothing and must not announce itself twice.
             const publishedNow = publishesNow(previousStatus, args.status);
+
+            // A publish is its own audited event, recorded beside the update
+            // that carried it; a save that leaves a live entry live is only an
+            // update. `resourceId` is the same entry, so the reader can follow
+            // the two rows as one history.
+            if (publishedNow) {
+              yield* audit.record({
+                organizationId: args.organizationId,
+                actor: actorFromSession(session, args.organizationId),
+                source: "dashboard",
+                action: "changelog.published",
+                resourceId: args.id,
+                metadata: { title: args.title, slug: updated.slug },
+              });
+            }
 
             const createdOutboxId = publishedNow
               ? yield* publication.recordPublishedIntent({
@@ -327,5 +405,6 @@ export const ChangelogRpcHandlers = ChangelogRpcs.toLayer(
   Layer.provide(SiteRepository.layer),
   Layer.provide(ChangelogRepository.layer),
   Layer.provide(ChangelogPostRepository.layer),
-  Layer.provide(EmailOutboxRepository.layer)
+  Layer.provide(EmailOutboxRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );

@@ -108,7 +108,8 @@ const makeSiteRepository = Effect.gen(function* () {
     }: updateArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+
+        return yield* db
           .update(schema.siteTable)
           .set({
             changelogVisibility,
@@ -123,7 +124,8 @@ const makeSiteRepository = Effect.gen(function* () {
               eq(schema.siteTable.organizationId, organizationId)
             )
           )
-          .pipe(Effect.asVoid);
+          .returning({ id: schema.siteTable.id })
+          .pipe(Effect.map((rows) => ({ updated: rows.length > 0 })));
       }),
     updateHidePoweredByBranding: ({
       hidePoweredBy,
@@ -132,7 +134,8 @@ const makeSiteRepository = Effect.gen(function* () {
     }: updateHidePoweredByBrandingArgs) =>
       Effect.gen(function* () {
         const now = yield* DateTime.nowAsDate;
-        yield* db
+
+        return yield* db
           .update(schema.siteTable)
           .set({
             hidePoweredBy,
@@ -144,7 +147,8 @@ const makeSiteRepository = Effect.gen(function* () {
               eq(schema.siteTable.organizationId, organizationId)
             )
           )
-          .pipe(Effect.asVoid);
+          .returning({ id: schema.siteTable.id })
+          .pipe(Effect.map((rows) => ({ updated: rows.length > 0 })));
       }),
   };
 });

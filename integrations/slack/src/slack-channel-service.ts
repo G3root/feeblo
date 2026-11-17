@@ -1,4 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { AuditLogRecorder } from "@feeblo/domain/audit-log/recorder";
+import { recordProviderChange } from "@feeblo/domain/integration/audit";
 import { SlackIntegrationConfig } from "@feeblo/domain/integration/slack/config";
 import type { SlackChannelServiceContract } from "@feeblo/domain/integration/slack/management-service";
 import type * as S from "@feeblo/domain/integration/slack/schema";
@@ -61,6 +63,7 @@ export const makeSlackChannelServiceLive = (
     SlackChannelService,
     Effect.gen(function* () {
       const db = yield* currentDb;
+      const audit = yield* AuditLogRecorder;
       const config = yield* SlackIntegrationConfig;
 
       const listChannels = Effect.fn("SlackChannel.listChannels")(
@@ -267,6 +270,23 @@ export const makeSlackChannelServiceLive = (
                     )
                   );
               }
+
+              // Inside the same transaction as the route change: the entry
+              // and the channel's notification setting commit together. The
+              // setting name is in `metadata` because this is a route upsert,
+              // not a field-by-field diff of a row the caller holds.
+              yield* recordProviderChange(audit, {
+                organizationId: input.organizationId,
+                action: "integration.updated",
+                connectionId: input.connectionId,
+                metadata: {
+                  channelId: input.channelId,
+                  channelName,
+                  enabled: input.enabled,
+                  provider: "slack",
+                  setting: "channel_notifications",
+                },
+              });
             })
           )
           .pipe(mapManagementError("channel notifications update"));
@@ -277,4 +297,4 @@ export const makeSlackChannelServiceLive = (
         setChannelNotifications,
       });
     })
-  );
+  ).pipe(Layer.provide(AuditLogRecorder.layer));

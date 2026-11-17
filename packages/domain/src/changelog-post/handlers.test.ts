@@ -7,10 +7,13 @@ import {
   PostStatusId,
   WorkspaceId,
 } from "@feeblo/id";
+import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { ChangelogPolicy } from "../changelog/policies";
 import { ChangelogRepository } from "../changelog/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
@@ -141,6 +144,7 @@ describe("ChangelogPostRpcHandlers", () => {
     ChangelogRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     SiteRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     WorkspaceRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive
   );
 
@@ -246,6 +250,88 @@ describe("ChangelogPostRpcHandlers", () => {
 
           expect(posts).toHaveLength(0);
         })
+    );
+    it.effect("records linking and unlinking as changes to the entry", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogPostRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        const args = {
+          changelogId: fixture.changelogId,
+          postId: fixture.postId,
+          organizationId: fixture.organizationId,
+        };
+
+        const provideSession = Effect.provideService(
+          CurrentSession,
+          makeSession(fixture)
+        );
+
+        const auditOn = Effect.provideService(AuditLogEnabled, true);
+
+        yield* handlers.CreateChangelogPost(args).pipe(provideSession, auditOn);
+        yield* handlers.DeleteChangelogPost(args).pipe(provideSession, auditOn);
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(2);
+        expect(rows.find((row) => row.metadata?.linked === true)).toMatchObject(
+          {
+            action: "changelog.updated",
+            actorType: "user",
+            actorUserId: fixture.userId,
+            outcome: "allowed",
+            resourceId: fixture.changelogId,
+            resourceType: "changelog",
+            source: "dashboard",
+          }
+        );
+        expect(
+          rows.find((row) => row.metadata?.linked === false)
+        ).toMatchObject({
+          action: "changelog.updated",
+          resourceId: fixture.changelogId,
+          resourceType: "changelog",
+        });
+      })
+    );
+
+    it.effect("records nothing when the link was already absent", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogPostRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+
+        const args = {
+          changelogId: fixture.changelogId,
+          postId: fixture.postId,
+          organizationId: fixture.organizationId,
+        };
+
+        // Unlinking a post that was never linked changes nothing, so there is
+        // no `linked: false` entry to write.
+        yield* handlers
+          .DeleteChangelogPost(args)
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture)),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(0);
+      })
     );
   });
 });

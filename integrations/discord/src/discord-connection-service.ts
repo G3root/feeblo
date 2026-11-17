@@ -1,4 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { AuditLogRecorder } from "@feeblo/domain/audit-log/recorder";
+import { recordProviderChange } from "@feeblo/domain/integration/audit";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import type { DiscordConnectionServiceContract } from "@feeblo/domain/integration/discord/management-service";
 import type * as S from "@feeblo/domain/integration/discord/schema";
@@ -83,6 +85,7 @@ export const makeDiscordConnectionServiceLive = (
     DiscordConnectionService,
     Effect.gen(function* () {
       const db = yield* currentDb;
+      const audit = yield* AuditLogRecorder;
       const config = yield* DiscordIntegrationConfig;
       const secureRandom = yield* SecureRandom.SecureRandom;
 
@@ -144,6 +147,16 @@ export const makeDiscordConnectionServiceLive = (
                 organizationId,
                 provider: discordProviderKey,
                 safeDisplayMetadata: {},
+              });
+              // The round trip starts here and the callback completes it, so
+              // this records the *started* connect against the connecting row
+              // the same transaction just created. The OAuth nonce is never
+              // named: it is credential material the state carries.
+              yield* recordProviderChange(audit, {
+                organizationId,
+                action: "integration.connected",
+                connectionId,
+                metadata: { flow: "started", provider: "discord" },
               });
             })
           );
@@ -546,6 +559,16 @@ export const makeDiscordConnectionServiceLive = (
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
+              // Inside the transaction that moves the connection out of use:
+              // the disconnect entry and the routes it disabled commit
+              // together. The archived early return above records nothing,
+              // because a disconnect on a tombstone changes no configuration.
+              yield* recordProviderChange(audit, {
+                organizationId,
+                action: "integration.disconnected",
+                connectionId,
+                metadata: { name: connection.name, provider: "discord" },
+              });
 
               return {
                 credentialsCiphertext:
@@ -655,4 +678,4 @@ export const makeDiscordConnectionServiceLive = (
         listConnections,
       });
     })
-  );
+  ).pipe(Layer.provide(AuditLogRecorder.layer));

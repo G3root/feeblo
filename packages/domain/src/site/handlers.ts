@@ -1,10 +1,14 @@
+import { transaction } from "@feeblo/db";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
-import { withRemapDbErrors } from "../rpc-errors";
+import { NotFoundError, withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
 import { SitePolicy } from "./policies";
 import { SiteRepository } from "./repository";
@@ -80,14 +84,66 @@ export const SiteRpcHandlersEffect = Effect.gen(function* () {
         withRemapDbErrors("Site", "select")
       ),
     UpdateSite: (args: TSiteUpdate) =>
-      repository
-        .update(args)
-        .pipe(
-          Policy.withPolicy(sitePolicy.canManageSite(args.organizationId)),
-          withRemapDbErrors("Site", "update")
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            const { updated } = yield* repository.update(args);
+
+            if (!updated) {
+              return yield* new NotFoundError({ message: "Site not found" });
+            }
+
+            // The site row is the workspace's settings, which the catalog
+            // models as a singleton: no `resourceId`, and the site id rides in
+            // `metadata`. The update returns nothing, so the new values go in
+            // `metadata` rather than posing as a diff with an empty `before`.
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "workspace.updated",
+              metadata: {
+                siteId: args.id,
+                name: args.name,
+                changelogVisibility: args.changelogVisibility,
+                roadmapVisibility: args.roadmapVisibility,
+                noIndex: args.noIndex,
+              },
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(sitePolicy.canManageSite(args.organizationId)),
+        withRemapDbErrors("Site", "update")
+      ),
     HideSitePoweredByBranding: (args: TSiteHidePoweredByBranding) =>
-      repository.updateHidePoweredByBranding(args).pipe(
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            const { updated } =
+              yield* repository.updateHidePoweredByBranding(args);
+
+            if (!updated) {
+              return yield* new NotFoundError({ message: "Site not found" });
+            }
+
+            yield* audit.record({
+              organizationId: args.organizationId,
+              actor: actorFromSession(session, args.organizationId),
+              source: "dashboard",
+              action: "workspace.updated",
+              metadata: {
+                siteId: args.id,
+                hidePoweredBy: args.hidePoweredBy,
+              },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(
           sitePolicy.canHidePoweredByBranding({
             organizationId: args.organizationId,
@@ -103,5 +159,6 @@ export const SiteRpcHandlers = SiteRpcs.toLayer(SiteRpcHandlersEffect).pipe(
   Layer.provide(SitePolicy.layer),
   Layer.provide(EntitlementPolicy.layer),
   Layer.provide(WorkspaceRepository.layer),
-  Layer.provide(SiteRepository.layer)
+  Layer.provide(SiteRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
 );

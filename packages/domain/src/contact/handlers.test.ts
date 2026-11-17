@@ -15,6 +15,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { AttributeDefinitionRepository } from "../attribute-definition/repository";
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { CompanyRepository } from "../company/repository";
 import { EmailSubscriptionRepository } from "../email-subscription/repository";
 import { EmailSubscriptionTokenService } from "../email-subscription/tokens";
@@ -116,6 +118,7 @@ describe("ContactRpcHandlers", () => {
     ),
     Repositories,
     Entitlements,
+    AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
     Database.PgliteDatabaseLive,
     NodeCrypto.layer
   );
@@ -1088,6 +1091,51 @@ describe("ContactRpcHandlers", () => {
         expect(created).toMatchObject({
           name: "Ada",
           userId: fixture.userId,
+        });
+      })
+    );
+
+    it.effect("records the contact search as an access entry", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const handlers = yield* ContactRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const now = yield* DateTime.nowAsDate;
+        yield* db.insert(schema.contactTable).values({
+          id: `contact_${fixture.organizationId}`,
+          organizationId: fixture.organizationId,
+          name: "Ada Lovelace",
+          email: "ada@example.com",
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        yield* handlers
+          .SearchContacts({
+            organizationId: fixture.organizationId,
+            query: "lovelace",
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture)),
+            Effect.provideService(AuditLogEnabled, true)
+          );
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          action: "contact.read",
+          actorType: "user",
+          actorUserId: fixture.userId,
+          metadata: { query: "lovelace", resultCount: 1 },
+          outcome: "allowed",
+          resourceType: "contact",
+          source: "dashboard",
         });
       })
     );

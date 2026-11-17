@@ -132,7 +132,8 @@ const makeChangelogPostRepository = Effect.gen(function* () {
             eq(schema.changelogPostTable.organizationId, organizationId)
           )
         )
-        .pipe(Effect.asVoid),
+        .returning({ postId: schema.changelogPostTable.postId })
+        .pipe(Effect.map((rows) => ({ deleted: rows.length > 0 }))),
   };
 });
 

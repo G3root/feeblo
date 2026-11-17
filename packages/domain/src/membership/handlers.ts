@@ -171,14 +171,43 @@ export const MembershipRpcHandlersEffect = Effect.gen(function* () {
       organizationId,
       invitationId,
     }: TCancelInvitation) =>
-      repository
-        .cancelInvitation({ organizationId, invitationId })
-        .pipe(
-          Policy.withPolicy(
-            membershipPolicy.canCancelInvitation({ organizationId })
-          ),
-          withRemapDbErrors("Invitation", "update")
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            const { cancelled } = yield* repository.cancelInvitation({
+              organizationId,
+              invitationId,
+            });
+
+            // An id that matched nothing — a typo, or another workspace's
+            // invitation — changed nothing, and the RPC answers success either
+            // way. Recording it would put a withdrawal in the log that never
+            // happened.
+            if (!cancelled) {
+              return;
+            }
+
+            // Cancelling an invitation withdraws an authority the workspace
+            // already granted, so it is an entry even though nobody was ever a
+            // member: the invitation id is the resource, and the invitee never
+            // had a user id to name.
+            yield* audit.record({
+              organizationId,
+              actor: actorFromSession(session, organizationId),
+              source: "dashboard",
+              action: "member.invite_cancelled",
+              resourceId: invitationId,
+            });
+          })
+        );
+      }).pipe(
+        Policy.withPolicy(
+          membershipPolicy.canCancelInvitation({ organizationId })
         ),
+        withRemapDbErrors("Invitation", "update")
+      ),
   };
 });
 

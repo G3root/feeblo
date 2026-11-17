@@ -1,13 +1,17 @@
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { BoardRepository } from "../board/repository";
 import * as Policy from "../policy";
 import { statusDisplayName } from "../post-status/display-name";
 import { PublicApiConfig } from "../public-api/config";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import {
   BOARD_POST_CSV_HEADER,
   type BoardPostCsvRow,
@@ -132,6 +136,58 @@ export const streamPostCsv = (input: {
       });
     }
 
+    const session = yield* CurrentSession;
+    const audit = yield* AuditLogRecorder;
+    const actor = actorFromSession(session, input.organizationId);
+    // The entry describes what was sent, so it is written when the stream
+    // ends rather than when it starts: the count above decides the cap, but
+    // rows can change between that count and the pages, and a page is what a
+    // caller actually receives. Counting the pages is also what makes an
+    // empty export record nothing — no rows left, no access to log.
+    const sentRows = yield* Ref.make(0);
+
+    const recordExport = Effect.gen(function* () {
+      const rowCount = yield* Ref.get(sentRows);
+
+      if (rowCount === 0) {
+        return;
+      }
+
+      // This is a read with no transaction behind it, and the bytes are
+      // streamed to the client after this effect returns. Failing a completed
+      // read because its log entry could not be written would deny a download
+      // that already happened, so a recorder failure is logged and given up.
+      // One entry per export, not two. `board.exported` names the board it
+      // read; an export of every board has no single board to name, so it is a
+      // `data_transfer.exported` instead of a board entry without a board.
+      // Two rows for one download would double every export in the access view
+      // and report a board scope the caller never asked for.
+      const metadata = {
+        allBoards: input.boardId === null,
+        includeArchived: input.includeArchived,
+        rowCount,
+      };
+
+      if (input.boardId === null) {
+        yield* audit.recordBestEffort({
+          organizationId: input.organizationId,
+          actor,
+          source: "dashboard",
+          action: "data_transfer.exported",
+          metadata,
+        });
+      } else {
+        yield* audit.recordBestEffort({
+          organizationId: input.organizationId,
+          actor,
+          source: "dashboard",
+          action: "board.exported",
+          resourceId: input.boardId,
+          metadata,
+        });
+      }
+    });
+
     const mapRow = toCsvRow({
       appUrl: config.appUrl,
       organizationId: input.organizationId,
@@ -173,8 +229,18 @@ export const streamPostCsv = (input: {
         Stream.make(encodeText(BOARD_POST_CSV_HEADER)),
         pages.pipe(
           Stream.grouped(EXPORT_PAGE_SIZE),
+          // Counted per batch, on the rows that are about to be serialized, so
+          // the number in the entry is the number of records the caller gets
+          // rather than the number of pages the source produced.
+          Stream.tap((rows) =>
+            Ref.update(sentRows, (count) => count + rows.length)
+          ),
           Stream.map((rows) => encodeText(serializeBoardPostCsvRows(rows)))
         )
+      ).pipe(
+        // Runs however the stream ends, interruption included: a download the
+        // client cut short still moved the rows it received.
+        Stream.ensuring(recordExport)
       ),
     };
   }).pipe(Policy.withPolicy(canExportData(input.organizationId)));

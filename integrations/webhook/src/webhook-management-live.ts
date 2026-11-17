@@ -3,6 +3,8 @@ import {
   IntegrationRouteEventSelection,
   SUBSCRIBABLE_INTEGRATION_EVENT_TYPES,
 } from "@feeblo/db/validation-schema/integration";
+import { AuditLogRecorder } from "@feeblo/domain/audit-log/recorder";
+import { recordProviderChange } from "@feeblo/domain/integration/audit";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { WebhookManagementErrors } from "@feeblo/domain/integration/errors";
 import { WebhookDeliveryHistoryPage } from "@feeblo/domain/integration/schema";
@@ -153,6 +155,7 @@ export const WebhookManagementServiceLive = Layer.effect(
   WebhookManagementService,
   Effect.gen(function* () {
     const db = yield* currentDb;
+    const audit = yield* AuditLogRecorder;
 
     const { encryptionKey, endpointSecurityPolicy } =
       yield* WebhookIntegrationConfig;
@@ -311,6 +314,20 @@ export const WebhookManagementServiceLive = Layer.effect(
               routeKey: "",
               safeDisplayMetadata: {},
             });
+            // Inside the transaction that creates the endpoint, so the entry
+            // and the endpoint commit together. The signing secret generated
+            // above is not part of it: the operator receives it once, and an
+            // audit row is not a second place it lives.
+            yield* recordProviderChange(audit, {
+              organizationId: input.organizationId,
+              action: "webhook.created",
+              connectionId,
+              metadata: {
+                eventTypes: [...input.eventTypes],
+                hostname: validated.hostname,
+                name: input.name,
+              },
+            });
           })
         );
 
@@ -376,6 +393,36 @@ export const WebhookManagementServiceLive = Layer.effect(
               existing.safeDisplayMetadata ?? {}
             );
 
+            const previousHostname = hostname;
+            // Set below, when the submitted URL is decrypted beside the stored
+            // one. The hostname cannot stand in for it: a webhook moved from
+            // `/a` to `/b` on the same host sends to a different place.
+            let destinationChanged = false;
+
+            // Read before the writes below: the diff needs what the endpoint
+            // carried before this save, and the read after the update returns
+            // the row it wrote.
+            const [routeBefore] = yield* db
+              .select({ eventTypes: schema.integrationRouteTable.eventTypes })
+              .from(schema.integrationRouteTable)
+              .where(
+                and(
+                  eq(
+                    schema.integrationRouteTable.connectionId,
+                    input.connectionId
+                  ),
+                  eq(
+                    schema.integrationRouteTable.organizationId,
+                    input.organizationId
+                  )
+                )
+              )
+              .limit(1);
+
+            const previousEventTypes = yield* decodeWebhookRouteEventSelection(
+              routeBefore?.eventTypes ?? []
+            );
+
             let credentialsCiphertext = existing.credentialsCiphertext;
 
             if (input.endpointUrl !== undefined && validated !== undefined) {
@@ -397,6 +444,13 @@ export const WebhookManagementServiceLive = Layer.effect(
                     })
                 )
               );
+
+              // Storage keeps the submitted string verbatim, so a difference
+              // is a real change even when only the path moved. Neither URL
+              // reaches the entry: the hostname already names the endpoint, and
+              // a path can carry a per-endpoint token.
+              destinationChanged =
+                Redacted.value(credentials.endpointUrl) !== input.endpointUrl;
 
               credentialsCiphertext = yield* encryptWebhookCredentialMaterial(
                 encryptionKey,
@@ -488,17 +542,51 @@ export const WebhookManagementServiceLive = Layer.effect(
               route?.eventTypes ?? []
             );
 
+            const eventTypes = subscribableEventTypes.filter((type) =>
+              selectedEventTypes.includes(type)
+            );
+
+            const name = input.name ?? existing.name;
+
+            // The endpoint row and its route were both read inside this
+            // transaction, so the diff is decided from the same snapshot the
+            // write replaced. A save that changed nothing is not an event.
+            const fields = [
+              ...(existing.name === name ? [] : ["name"]),
+              ...(previousHostname === hostname ? [] : ["hostname"]),
+              ...(destinationChanged ? ["destination"] : []),
+              ...(previousEventTypes.length === eventTypes.length &&
+              previousEventTypes.every((type) => eventTypes.includes(type))
+                ? []
+                : ["eventTypes"]),
+            ];
+
+            if (fields.length > 0) {
+              yield* recordProviderChange(audit, {
+                organizationId: input.organizationId,
+                action: "webhook.updated",
+                connectionId: input.connectionId,
+                changes: {
+                  fields,
+                  before: {
+                    eventTypes: [...previousEventTypes],
+                    hostname: previousHostname,
+                    name: existing.name,
+                  },
+                  after: { eventTypes, hostname, name },
+                },
+              });
+            }
+
             return {
-              eventTypes: subscribableEventTypes.filter((type) =>
-                selectedEventTypes.includes(type)
-              ),
+              eventTypes,
               health: endpointHealth(existing),
               hostname,
               id: asLegid(IntegrationConnectionId)(existing.id),
               lastFailedAt: existing.lastFailedAt,
               lastSucceededAt: existing.lastSucceededAt,
               lifecycle: existing.lifecycle,
-              name: input.name ?? existing.name,
+              name,
             };
           })
         );
@@ -577,6 +665,12 @@ export const WebhookManagementServiceLive = Layer.effect(
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
+              yield* recordProviderChange(audit, {
+                organizationId: input.organizationId,
+                action: "webhook.paused",
+                connectionId: input.connectionId,
+                metadata: { name: connection.name },
+              });
             })
           )
           .pipe(mapManagementError("pause"));
@@ -642,6 +736,12 @@ export const WebhookManagementServiceLive = Layer.effect(
                     )
                   )
                 );
+              yield* recordProviderChange(audit, {
+                organizationId: input.organizationId,
+                action: "webhook.resumed",
+                connectionId: input.connectionId,
+                metadata: { name: connection.name },
+              });
             })
           )
           .pipe(mapManagementError("resume"));
@@ -730,6 +830,12 @@ export const WebhookManagementServiceLive = Layer.effect(
                     eq(schema.integrationDeliveryTable.state, "pending")
                   )
                 );
+              yield* recordProviderChange(audit, {
+                organizationId: input.organizationId,
+                action: "webhook.deleted",
+                connectionId: input.connectionId,
+                metadata: { name: connection.name },
+              });
             })
           )
           .pipe(mapManagementError("remove"));
@@ -821,6 +927,19 @@ export const WebhookManagementServiceLive = Layer.effect(
                     )
                   )
                 );
+              // The rotated secret is generated above and returned to the
+              // caller once; it is never named here. The generation number is
+              // the auditable fact, and it identifies which keyring rotation
+              // the entry describes without repeating any key material.
+              yield* recordProviderChange(audit, {
+                organizationId: input.organizationId,
+                action: "webhook.secret_rotated",
+                connectionId: input.connectionId,
+                metadata: {
+                  credentialGeneration: connection.credentialGeneration + 1,
+                  name: connection.name,
+                },
+              });
 
               return { signingSecret: Redacted.value(keyring.current) };
             })
@@ -1187,4 +1306,4 @@ export const WebhookManagementServiceLive = Layer.effect(
       updateEndpoint,
     };
   })
-);
+).pipe(Layer.provide(AuditLogRecorder.layer));

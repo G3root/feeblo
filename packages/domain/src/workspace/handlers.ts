@@ -25,6 +25,14 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   return {
     CreateWorkspace: (args: TCreateWorkspaceInput) => {
       return Effect.gen(function* () {
+        // Deliberately not audited. An audit entry is scoped to the workspace
+        // it describes, and there is no organization to write the row under
+        // until this transaction commits — the caller is not a member yet, and
+        // a row filed under any other workspace would be both misplaced and
+        // outside this session's authority. The catalog agrees: `workspace`
+        // declares `updated` and `deleted` only, because creation is the
+        // moment the scope comes into existence. The owner membership row this
+        // transaction writes is the durable record of who created it.
         const session = yield* CurrentSession;
         const workspaceName = args.workspaceName.trim();
 

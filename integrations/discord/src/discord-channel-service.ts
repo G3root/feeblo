@@ -1,4 +1,6 @@
 import { currentDb, type Database, schema } from "@feeblo/db";
+import { AuditLogRecorder } from "@feeblo/domain/audit-log/recorder";
+import { recordProviderChange } from "@feeblo/domain/integration/audit";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import type { DiscordChannelServiceContract } from "@feeblo/domain/integration/discord/management-service";
 import type * as S from "@feeblo/domain/integration/discord/schema";
@@ -57,6 +59,7 @@ export const makeDiscordChannelServiceLive = (
     DiscordChannelService,
     Effect.gen(function* () {
       const db = yield* currentDb;
+      const audit = yield* AuditLogRecorder;
       const config = yield* DiscordIntegrationConfig;
 
       const listChannels = Effect.fn("DiscordChannel.listChannels")(
@@ -276,6 +279,23 @@ export const makeDiscordChannelServiceLive = (
                       )
                     );
                 }
+
+                // Inside the same transaction as the route change: the entry
+                // and the channel's notification setting commit together. The
+                // setting name is in `metadata` because this is a route
+                // upsert, not a field-by-field diff of a row the caller holds.
+                yield* recordProviderChange(audit, {
+                  organizationId: input.organizationId,
+                  action: "integration.updated",
+                  connectionId: input.connectionId,
+                  metadata: {
+                    channelId: input.channelId,
+                    channelName,
+                    enabled: input.enabled,
+                    provider: "discord",
+                    setting: "channel_notifications",
+                  },
+                });
               })
             )
             .pipe(mapManagementError("channel notifications update"));
@@ -289,7 +309,7 @@ export const makeDiscordChannelServiceLive = (
         setChannelNotifications,
       });
     })
-  );
+  ).pipe(Layer.provide(AuditLogRecorder.layer));
 
 /** Live layer with the default fetch-backed Discord API client. */
 export const DiscordChannelServiceLive = makeDiscordChannelServiceLive();

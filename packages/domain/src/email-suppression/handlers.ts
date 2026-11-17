@@ -1,9 +1,12 @@
+import { transaction } from "@feeblo/db";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
+import { actorFromSession } from "../audit-log/attribution";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import * as Policy from "../policy";
 import {
   BadRequestError,
@@ -11,6 +14,7 @@ import {
   NotFoundError,
   withRemapDbErrors,
 } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { EmailSuppressionRepository } from "./repository";
 import { EmailSuppressionRpcs } from "./rpcs";
 import { EmailSuppressionDataError } from "./schema";
@@ -110,22 +114,43 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
       organizationId,
     }: EmailSuppressionAddRequest) =>
       Effect.gen(function* () {
-        const now = yield* DateTime.nowAsDate;
-        yield* repository.upsert({
-          email,
-          note: note ?? null,
-          now,
-          organizationId,
-          providerEventId: null,
-          reason: "administrative_block",
-        });
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+
+        const added = yield* transaction(
+          Effect.gen(function* () {
+            const now = yield* DateTime.nowAsDate;
+            yield* repository.upsert({
+              email,
+              note: note ?? null,
+              now,
+              organizationId,
+              providerEventId: null,
+              reason: "administrative_block",
+            });
+            // The address is deliberately absent: `audit_log` is append-only
+            // (a trigger refuses UPDATE and DELETE), so an address written
+            // here could never be forgotten when the block is lifted — which
+            // is exactly what the suppression table exists to do. The reason
+            // is the context the entry needs; the address stays in the
+            // mutable table.
+            yield* audit.record({
+              organizationId,
+              actor: actorFromSession(session, organizationId),
+              source: "dashboard",
+              action: "email_suppression.added",
+              metadata: { reason: "administrative_block" },
+            });
+
+            return yield* repository
+              .find({ email, organizationId })
+              .pipe(Effect.flatMap(failIfMissing));
+          })
+        );
+
         yield* recordEmailSuppression("administrative_block", "manual");
 
-        const record = yield* repository
-          .find({ email, organizationId })
-          .pipe(Effect.flatMap(failIfMissing));
-
-        return toSummary(record);
+        return toSummary(added);
       }).pipe(
         Effect.catchTags({
           EmailSuppressionDataError: (error) =>
@@ -150,15 +175,40 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
       email,
       organizationId,
     }: EmailSuppressionRemoveRequest) =>
-      repository.remove({ email, organizationId }).pipe(
-        remapDataError,
-        Effect.flatMap((result) =>
-          result.removed
-            ? Effect.void
-            : Effect.fail(
-                new NotFoundError({ message: "Suppression not found" })
-              )
-        ),
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const audit = yield* AuditLogRecorder;
+        yield* transaction(
+          Effect.gen(function* () {
+            // The read is the not-found check: a row that does not exist, and
+            // one owned by another workspace, answer the same way.
+            yield* repository
+              .find({ email, organizationId })
+              .pipe(remapDataError, Effect.flatMap(failIfMissing));
+
+            const result = yield* repository
+              .remove({ email, organizationId })
+              .pipe(remapDataError);
+
+            if (!result.removed) {
+              return yield* new NotFoundError({
+                message: "Suppression not found",
+              });
+            }
+
+            // The reason comes from the row the delete removed, not the row
+            // read before it: a concurrent write between the two would
+            // otherwise put the old reason on the entry.
+            yield* audit.record({
+              organizationId,
+              actor: actorFromSession(session, organizationId),
+              source: "dashboard",
+              action: "email_suppression.removed",
+              metadata: { reason: result.reason },
+            });
+          })
+        );
+      }).pipe(
         Policy.withPolicy(canManage(organizationId)),
         withRemapDbErrors("EmailSuppression", "delete")
       ),
@@ -178,4 +228,7 @@ export const EmailSuppressionRpcHandlersEffect = Effect.gen(function* () {
 
 export const EmailSuppressionRpcHandlers = EmailSuppressionRpcs.toLayer(
   EmailSuppressionRpcHandlersEffect
-).pipe(Layer.provide(EmailSuppressionRepository.layer));
+).pipe(
+  Layer.provide(EmailSuppressionRepository.layer),
+  Layer.provide(AuditLogRecorder.layer)
+);

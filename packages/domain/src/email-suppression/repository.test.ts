@@ -334,13 +334,13 @@ describe("EmailSuppressionRepository", () => {
             email: "foreign@example.com",
             organizationId,
           })
-        ).toEqual({ removed: false });
+        ).toEqual({ reason: null, removed: false });
         expect(
           yield* repository.remove({
             email: "removable@example.com",
             organizationId,
           })
-        ).toEqual({ removed: true });
+        ).toEqual({ reason: "complaint", removed: true });
         expect(yield* rowsFor("foreign@example.com")).toHaveLength(1);
         expect(yield* rowsFor("removable@example.com")).toHaveLength(0);
       })

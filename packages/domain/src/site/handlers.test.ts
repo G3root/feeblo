@@ -8,6 +8,8 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -166,7 +168,8 @@ describe("SiteRpcHandlers", () => {
 
   const RepositoriesTest = Layer.mergeAll(
     WorkspaceRepository.layer,
-    SiteRepository.layer
+    SiteRepository.layer,
+    AuditLogRecorder.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   // Exposed as well as provided: the Subdomain projection consults the
@@ -572,6 +575,47 @@ describe("SiteRpcHandlers", () => {
             .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
           expect(results[0]?.hidePoweredBy).toBe(false);
+        })
+      );
+
+      it.effect("records a settings change as a workspace update", () =>
+        Effect.gen(function* () {
+          const handlers = yield* SiteRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+
+          yield* handlers
+            .UpdateSite({
+              id: fixture.siteId,
+              organizationId: fixture.organizationId,
+              name: "Renamed workspace",
+              changelogVisibility: "HIDDEN",
+              roadmapVisibility: "PUBLIC",
+              noIndex: true,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(fixture)),
+              Effect.provideService(AuditLogEnabled, true)
+            );
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              eq(schema.auditLogTable.organizationId, fixture.organizationId)
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            action: "workspace.updated",
+            actorType: "user",
+            actorUserId: fixture.userId,
+            outcome: "allowed",
+            resourceId: null,
+            resourceType: "workspace",
+            source: "dashboard",
+            metadata: { siteId: fixture.siteId, name: "Renamed workspace" },
+          });
         })
       );
     });

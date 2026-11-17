@@ -1,7 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { MemberId, WorkspaceId } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -607,6 +607,122 @@ describe("MembershipRpcHandlers", () => {
             resourceId: targetMemberId,
             resourceType: "member",
           });
+        }).pipe(Effect.provideService(AuditLogEnabled, true))
+    );
+
+    it.effect(
+      "records a cancelled invitation against the admin who withdrew it",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* MembershipRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const db = yield* currentDb;
+          const invitationId = `inv_${fixture.organizationId}`;
+          const now = yield* DateTime.now;
+
+          yield* db.insert(schema.invitationTable).values({
+            id: invitationId,
+            organizationId: fixture.organizationId,
+            email: "invitee@example.com",
+            role: "manager",
+            expiresAt: DateTime.toDate(DateTime.add({ days: 7 })(now)),
+            inviterId: fixture.userId,
+          });
+
+          yield* handlers
+            .CancelOrganizationInvitation({
+              organizationId: fixture.organizationId,
+              invitationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.action, "member.invite_cancelled")
+              )
+            );
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]).toMatchObject({
+            actorType: "user",
+            actorUserId: fixture.userId,
+            outcome: "allowed",
+            resourceId: invitationId,
+            resourceType: "member",
+            source: "dashboard",
+          });
+
+          // Cancelling the same invitation again matches no pending row, so it
+          // reports success and adds nothing to the log.
+          yield* handlers
+            .CancelOrganizationInvitation({
+              organizationId: fixture.organizationId,
+              invitationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+          const afterRetry = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              and(
+                eq(schema.auditLogTable.organizationId, fixture.organizationId),
+                eq(schema.auditLogTable.action, "member.invite_cancelled")
+              )
+            );
+
+          expect(afterRetry).toHaveLength(1);
+        }).pipe(Effect.provideService(AuditLogEnabled, true))
+    );
+
+    it.effect(
+      "leaves another workspace's invitation alone, and records nothing",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* MembershipRpcHandlersEffect;
+          const db = yield* currentDb;
+          const mine = yield* makeFixture();
+          const theirs = yield* makeFixture();
+          const invitationId = `inv_${theirs.organizationId}`;
+          const now = yield* DateTime.now;
+
+          yield* db.insert(schema.invitationTable).values({
+            id: invitationId,
+            organizationId: theirs.organizationId,
+            email: "invitee@example.com",
+            role: "manager",
+            expiresAt: DateTime.toDate(DateTime.add({ days: 7 })(now)),
+            inviterId: theirs.userId,
+          });
+
+          yield* handlers
+            .CancelOrganizationInvitation({
+              organizationId: mine.organizationId,
+              invitationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(mine)));
+
+          // The update matched nothing, so the invitation is still pending and
+          // no withdrawal was recorded for the workspace that asked.
+          const [invitation] = yield* db
+            .select()
+            .from(schema.invitationTable)
+            .where(eq(schema.invitationTable.id, invitationId));
+
+          expect(invitation?.status).toBe("pending");
+
+          const rows = yield* db
+            .select()
+            .from(schema.auditLogTable)
+            .where(
+              eq(schema.auditLogTable.organizationId, mine.organizationId)
+            );
+
+          expect(rows).toHaveLength(0);
         }).pipe(Effect.provideService(AuditLogEnabled, true))
     );
   });

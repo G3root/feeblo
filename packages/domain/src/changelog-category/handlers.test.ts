@@ -12,6 +12,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import { AuditLogEnabled } from "../audit-log/flag";
+import { AuditLogRecorder } from "../audit-log/recorder";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
@@ -165,7 +167,8 @@ describe("ChangelogCategoryRpcHandlers", () => {
   const Repositories = Layer.mergeAll(
     ChangelogCategoryRepository.layer,
     SiteRepository.layer,
-    WorkspaceRepository.layer
+    WorkspaceRepository.layer,
+    AuditLogRecorder.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
 
   const Entitlements = EntitlementPolicy.layer.pipe(
@@ -261,6 +264,43 @@ describe("ChangelogCategoryRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
 
         expect(categories).toEqual([]);
+      })
+    );
+
+    it.effect("refuses another workspace's category and records nothing", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const mine = yield* makeFixture();
+        const theirs = yield* makeFixture();
+        const id = yield* insertCategory(theirs);
+
+        const failure = yield* Effect.flip(
+          handlers
+            .UpdateChangelogCategory({
+              icon: "#3b82f6",
+              iconType: "color",
+              id,
+              name: "Improved",
+              organizationId: mine.organizationId,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, makeSession(mine)),
+              Effect.provideService(AuditLogEnabled, true)
+            )
+        );
+
+        expect(failure._tag).toBe("ChangelogCategoryNotFoundError");
+
+        // The category was not touched, and an update that matched nothing
+        // must not leave an entry behind.
+        const db = yield* currentDb;
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(eq(schema.auditLogTable.organizationId, mine.organizationId));
+
+        expect(rows).toHaveLength(0);
       })
     );
 
@@ -621,6 +661,77 @@ describe("ChangelogCategoryRpcHandlers", () => {
         expect(links.map((link) => link.changelogId)).toEqual([
           publishedChangelogId,
         ]);
+      })
+    );
+    it.effect("records category writes and the entry they are filed on", () =>
+      Effect.gen(function* () {
+        const handlers = yield* ChangelogCategoryRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const db = yield* currentDb;
+        const id = yield* ChangelogCategoryId.generate;
+        const changelogId = yield* insertChangelog(fixture);
+        const auditOn = Effect.provideService(AuditLogEnabled, true);
+        const provideSession = Effect.provideService(CurrentSession, session);
+
+        yield* handlers
+          .CreateChangelogCategory({
+            id,
+            name: "Feature",
+            iconType: "color",
+            icon: "#22c55e",
+            organizationId: fixture.organizationId,
+          })
+          .pipe(provideSession, auditOn);
+        yield* handlers
+          .UpdateChangelogCategory({
+            id,
+            name: "Update",
+            iconType: "color",
+            icon: "#f97316",
+            organizationId: fixture.organizationId,
+          })
+          .pipe(provideSession, auditOn);
+        yield* handlers
+          .SetChangelogCategories({
+            changelogId,
+            organizationId: fixture.organizationId,
+            categoryIds: [id],
+          })
+          .pipe(provideSession, auditOn);
+        yield* handlers
+          .DeleteChangelogCategory({
+            id,
+            organizationId: fixture.organizationId,
+          })
+          .pipe(provideSession, auditOn);
+
+        const rows = yield* db
+          .select()
+          .from(schema.auditLogTable)
+          .where(
+            eq(schema.auditLogTable.organizationId, fixture.organizationId)
+          );
+
+        expect(rows.map((row) => row.action).sort()).toEqual([
+          "changelog.updated",
+          "changelog_category.created",
+          "changelog_category.deleted",
+          "changelog_category.updated",
+        ]);
+        expect(
+          rows.find((row) => row.action === "changelog.updated")
+        ).toMatchObject({
+          actorType: "user",
+          actorUserId: fixture.userId,
+          outcome: "allowed",
+          resourceId: changelogId,
+          resourceType: "changelog",
+          source: "dashboard",
+        });
+        expect(
+          rows.find((row) => row.action === "changelog_category.deleted")
+        ).toMatchObject({ resourceId: id, resourceType: "changelog_category" });
       })
     );
   });
