@@ -92,6 +92,87 @@ export function formatPlanPrice(
   return `${formatMoney(monthlyAmount, price.currency)} / month`;
 }
 
+/** The price block a plan card renders: billed amount, period, and a note. */
+export type PlanPriceDescription = {
+  /** Null for the free plan and for a paid plan with no published price. */
+  readonly amount: string | null;
+  readonly suffix: string | null;
+  readonly note: string;
+};
+
+/**
+ * The billed amount for one interval, not a monthly equivalent: a yearly plan
+ * shows the amount charged once a year, which is what the checkout charges.
+ */
+export function describePlanPrice(
+  plan: PlanCard,
+  interval: BillingInterval
+): PlanPriceDescription {
+  if (plan.planType === "free") {
+    return { amount: null, suffix: null, note: "No card required" };
+  }
+
+  const price = interval === "year" ? plan.year : plan.month;
+
+  if (!price) {
+    return { amount: null, suffix: null, note: "Pricing unavailable" };
+  }
+
+  const amount = formatMoney(price.amount, price.currency);
+  const suffix = interval === "year" ? "/ year" : "/ month";
+  let note = interval === "year" ? "Billed yearly" : "Billed monthly";
+
+  if (interval === "year" && plan.month) {
+    const savings = plan.month.amount * 12 - price.amount;
+
+    if (savings > 0) {
+      note = `Billed yearly · save ${formatMoney(savings, price.currency)} a year`;
+    }
+  }
+
+  return { amount, suffix, note };
+}
+
+export type PlanCardAction = {
+  readonly label: string;
+  readonly disabled: boolean;
+};
+
+/**
+ * What a plan card's button does, given what the workspace already pays for.
+ *
+ * A paid workspace changes plans in the billing portal; a free workspace can
+ * only check out into a plan that has a published price for the chosen
+ * interval. The current plan is never actionable.
+ */
+export function describePlanAction({
+  currentPlanType,
+  hasPaidPlan,
+  interval,
+  plan,
+}: {
+  readonly currentPlanType: PlanType;
+  readonly hasPaidPlan: boolean;
+  readonly interval: BillingInterval;
+  readonly plan: PlanCard;
+}): PlanCardAction {
+  if (hasPaidPlan) {
+    return { label: "Manage billing", disabled: false };
+  }
+
+  if (plan.planType === currentPlanType) {
+    return { label: "Current plan", disabled: true };
+  }
+
+  const price = interval === "year" ? plan.year : plan.month;
+
+  if (!price) {
+    return { label: "Unavailable", disabled: true };
+  }
+
+  return { label: `Upgrade to ${plan.name}`, disabled: false };
+}
+
 export const isPaidPlan = (plan?: PlanType): boolean => {
   if (!plan || plan === "free") {
     return false;
