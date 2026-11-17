@@ -8,9 +8,6 @@ import {
   CardPanel,
   CardTitle,
 } from "@feeblo/ui/card";
-import { Separator } from "@feeblo/ui/separator";
-import { Tick02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 
 import {
   type BillingInterval,
@@ -20,7 +17,15 @@ import {
   type PlanType,
 } from "../lib/plans";
 
+/**
+ * One plan's price and action.
+ *
+ * Deliberately compact: the dialog it lives in follows the cards with the full
+ * comparison table, so repeating a feature list here would state the same
+ * allowances twice and push the table out of reach.
+ */
 export function PlanCard({
+  canManageBilling,
   currentPlanType,
   hasPaidPlan,
   interval,
@@ -29,6 +34,7 @@ export function PlanCard({
   onAction,
   plan,
 }: {
+  readonly canManageBilling: boolean;
   readonly currentPlanType: PlanType;
   readonly hasPaidPlan: boolean;
   readonly interval: BillingInterval;
@@ -45,7 +51,11 @@ export function PlanCard({
     plan,
   });
 
+  const price = describePlanPrice(plan, interval);
   const isCurrent = plan.planType === currentPlanType;
+
+  const displayAmount =
+    plan.planType === "free" ? "Free" : (price.amount ?? "—");
 
   return (
     <Card className={isCurrent ? "border-primary/40" : undefined} size="sm">
@@ -63,15 +73,23 @@ export function PlanCard({
           </div>
         </div>
       </CardHeader>
-      <CardPanel className="space-y-5">
-        <PlanPrice interval={interval} plan={plan} />
-        <Separator />
-        <PlanFeatures plan={plan} />
+      <CardPanel>
+        <p className="flex items-baseline gap-1.5">
+          <span className="text-3xl leading-none font-semibold tracking-tight tabular-nums">
+            {displayAmount}
+          </span>
+          {price.suffix === null ? null : (
+            <span className="text-muted-foreground text-sm">
+              {price.suffix}
+            </span>
+          )}
+        </p>
+        <p className="text-muted-foreground mt-2 text-xs">{price.note}</p>
       </CardPanel>
       <CardFooter>
         <Button
           className="w-full"
-          disabled={action.disabled || isBusy}
+          disabled={!canManageBilling || action.disabled || isBusy}
           loading={isLoading}
           onClick={onAction}
           type="button"
@@ -81,55 +99,5 @@ export function PlanCard({
         </Button>
       </CardFooter>
     </Card>
-  );
-}
-
-function PlanPrice({
-  interval,
-  plan,
-}: {
-  readonly interval: BillingInterval;
-  readonly plan: PlanCardData;
-}) {
-  const price = describePlanPrice(plan, interval);
-
-  const displayAmount =
-    plan.planType === "free" ? "Free" : (price.amount ?? "—");
-
-  return (
-    <div>
-      <p className="flex items-baseline gap-1.5">
-        <span className="text-3xl leading-none font-semibold tracking-tight tabular-nums">
-          {displayAmount}
-        </span>
-        {price.suffix === null ? null : (
-          <span className="text-muted-foreground text-sm">{price.suffix}</span>
-        )}
-      </p>
-      <p className="text-muted-foreground mt-2 text-xs">{price.note}</p>
-    </div>
-  );
-}
-
-function PlanFeatures({ plan }: { readonly plan: PlanCardData }) {
-  return (
-    <div className="space-y-2.5">
-      {plan.includesLabel ? (
-        <p className="text-sm font-medium">{plan.includesLabel}</p>
-      ) : null}
-      <ul className="space-y-2">
-        {plan.features.map((feature) => (
-          <li className="flex items-start gap-2 text-sm" key={feature.key}>
-            <HugeiconsIcon
-              aria-hidden="true"
-              className="text-primary mt-0.5 size-3.5 shrink-0"
-              icon={Tick02Icon}
-              strokeWidth={2.2}
-            />
-            <span className="text-muted-foreground">{feature.label}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }

@@ -11,11 +11,6 @@ export type PlanPrice = {
   currency: string;
 };
 
-export type WorkspacePlan = {
-  organizationId: string;
-  plan: PlanType;
-};
-
 export type PlanCard = {
   planType: PlanType;
   name: string;
@@ -77,19 +72,6 @@ export function formatMoney(priceAmount: number, currency: string) {
     currency,
     maximumFractionDigits: 0,
   }).format(priceAmount / 100);
-}
-
-export function formatPlanPrice(
-  price: PlanPrice | undefined,
-  interval: BillingInterval
-) {
-  if (!price) {
-    return "$0 / month";
-  }
-
-  const monthlyAmount = interval === "year" ? price.amount / 12 : price.amount;
-
-  return `${formatMoney(monthlyAmount, price.currency)} / month`;
 }
 
 /** The price block a plan card renders: billed amount, period, and a note. */

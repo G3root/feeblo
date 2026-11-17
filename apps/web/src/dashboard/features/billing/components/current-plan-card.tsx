@@ -11,6 +11,7 @@ import { CrownIcon, GiftIcon, StarIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import { useState } from "react";
 
+import { useUpgradePlanDialogContext } from "../dialog-stores";
 import { startBillingPortal } from "../lib/checkout";
 import { PLAN_COPY, type PlanType } from "../lib/plans";
 
@@ -23,10 +24,11 @@ const PLAN_ICONS = {
 /**
  * The workspace's active plan, with the one action that changes it.
  *
- * A paid workspace changes or cancels through the billing portal; a free one
- * upgrades from the plans section below, which the button links to. Neither
- * path invents subscription details the workspace read does not carry (an
- * interval or a renewal date), so the card states the plan and stops there.
+ * A paid workspace changes or cancels through the billing portal; both paths
+ * are reachable from the plan dialog this card opens, which shows the pricing
+ * and the comparison. Neither path invents subscription details the workspace
+ * read does not carry (an interval or a renewal date), so the card states the
+ * plan and stops there.
  */
 export function CurrentPlanCard({
   organizationId,
@@ -36,6 +38,7 @@ export function CurrentPlanCard({
   readonly plan: PlanType;
 }) {
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const upgradePlanStore = useUpgradePlanDialogContext();
   const copy = PLAN_COPY[plan];
   const hasPaidPlan = plan !== "free";
 
@@ -86,7 +89,13 @@ export function CurrentPlanCard({
               Manage billing
             </Button>
           ) : null}
-          <Button render={<a href="#plans" />} variant="outline">
+          <Button
+            onClick={() => {
+              upgradePlanStore.send({ type: "setOpen", open: true });
+            }}
+            type="button"
+            variant="outline"
+          >
             View plans
           </Button>
         </div>

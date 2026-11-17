@@ -5,7 +5,6 @@ import { z } from "zod";
 
 import { CheckoutConfirmationAlert } from "~/features/billing/components/checkout-confirmation-alert";
 import { CurrentPlanCard } from "~/features/billing/components/current-plan-card";
-import { PlansSection } from "~/features/billing/components/plans-section";
 import { WorkspaceUsageCard } from "~/features/billing/components/usage-card";
 import { SettingsAccessDenied } from "~/features/settings/components/settings-access-denied";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
@@ -90,10 +89,6 @@ function BillingSettingsContent({
           plan={currentPlanType}
         />
         <WorkspaceUsageCard />
-        <PlansSection
-          currentPlanType={currentPlanType}
-          organizationId={organizationId}
-        />
       </SettingsLayout.Content>
     </SettingsLayout.Root>
   );
