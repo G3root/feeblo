@@ -1,7 +1,8 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import { slugify } from "@feeblo/utils/url";
+import { and, eq } from "drizzle-orm";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -13,6 +14,9 @@ import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspacePolicy } from "./policies";
 import { WorkspaceRepository } from "./repository";
+
+/** The two boards a create writes when the reader keeps the defaults. */
+const DEFAULT_BOARDS = ["Bugs 🐞", "Features 💡"] as const;
 
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
@@ -160,7 +164,11 @@ describe("WorkspaceRpcHandlers", () => {
             };
 
             const result = yield* handlers
-              .CreateWorkspace({ workspaceName: "My Awesome Workspace" })
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "my-awesome-workspace",
+                workspaceName: "My Awesome Workspace",
+              })
               .pipe(Effect.provideService(CurrentSession, session));
 
             expect(result.organizationId).toBeDefined();
@@ -210,15 +218,16 @@ describe("WorkspaceRpcHandlers", () => {
 
             expect(statuses).toHaveLength(6);
 
-            // Verify default post tags were created
+            // Verify default post tags were created, plus the guide tag the
+            // sample posts wear
             const tags = yield* db
               .select()
               .from(schema.tagTable)
               .where(eq(schema.tagTable.organizationId, result.organizationId));
 
-            expect(tags).toHaveLength(2);
+            expect(tags).toHaveLength(3);
             expect(tags.map((tag) => tag.name)).toEqual(
-              expect.arrayContaining(["High Priority", "Low Priority"])
+              expect.arrayContaining(["High Priority", "Low Priority", "Guide"])
             );
 
             // Verify the primary status roadmap and its ordered columns were created
@@ -275,24 +284,24 @@ describe("WorkspaceRpcHandlers", () => {
           })
       );
 
-      it.effect(
-        "rejects workspace names that produce subdomain shorter than 4 characters",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* WorkspaceRpcHandlersEffect;
-            const fixture = yield* makeFixture();
+      it.effect("rejects a subdomain shorter than 4 characters", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const fixture = yield* makeFixture();
 
-            const error = yield* Effect.flip(
-              handlers
-                .CreateWorkspace({ workspaceName: "a" })
-                .pipe(
-                  Effect.provideService(CurrentSession, makeSession(fixture))
-                )
-            );
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "ab",
+                workspaceName: "Fine Name",
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
 
-            expect(error._tag).toBe("BadRequestError");
-            expect(error.message).toContain("at least 4 characters");
-          })
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toContain("at least 4 characters");
+        })
       );
 
       it.effect("rejects reserved subdomains", () =>
@@ -303,34 +312,16 @@ describe("WorkspaceRpcHandlers", () => {
           // "feeblo" is a reserved subdomain and is at least 4 characters
           const error = yield* Effect.flip(
             handlers
-              .CreateWorkspace({ workspaceName: "feeblo" })
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "feeblo",
+                workspaceName: "Feeblo Feedback",
+              })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
           expect(error._tag).toBe("ReservedSubdomainError");
           expect(error.message).toContain("reserved");
-        })
-      );
-
-      it.effect("rejects when the subdomain is already taken", () =>
-        Effect.gen(function* () {
-          const handlers = yield* WorkspaceRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-
-          // Create a site that claims the subdomain first
-          yield* createSiteForSubdomain(
-            "existing-workspace",
-            fixture.organizationId
-          );
-
-          const error = yield* Effect.flip(
-            handlers
-              .CreateWorkspace({ workspaceName: "Existing Workspace" })
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
-          );
-
-          expect(error._tag).toBe("BadRequestError");
-          expect(error.message).toBe("This workspace name is already taken");
         })
       );
     });
@@ -681,8 +672,405 @@ describe("WorkspaceRpcHandlers", () => {
 
             expect(result.available).toBe(false);
             expect(result.suggestion).toBe("taken-slug-2");
-            expect(result.reason).toBe("This workspace name is already taken");
+            expect(result.reason).toBe("This address is already taken");
           })
+      );
+    });
+
+    describe("workspace onboarding", () => {
+      /** A session that has just signed up: no memberships, no organizations. */
+      const newUserSession = (userId: string): Session => ({
+        user: {
+          id: userId,
+          email: `${userId}@example.com`,
+          name: "New User",
+          restrictedToOrganizationId: null,
+        },
+        session: { userId, token: "test-token" },
+        organizations: [],
+        memberships: [],
+      });
+
+      const seedUser = (userId: string) =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          yield* db.insert(schema.userTable).values({
+            id: userId,
+            email: `${userId}@example.com`,
+            name: "New User",
+          });
+        });
+
+      const createWorkspace = (
+        userId: string,
+        workspaceName: string,
+        boardNames: readonly string[] = DEFAULT_BOARDS
+      ) =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+
+          return yield* handlers
+            .CreateWorkspace({
+              boardNames,
+              subdomain: slugify(workspaceName),
+              workspaceName,
+            })
+            .pipe(
+              Effect.provideService(CurrentSession, newUserSession(userId))
+            );
+        });
+
+      it.effect("seeds three sample posts across the default boards", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const userId = "user_onboarding_seed";
+          yield* seedUser(userId);
+
+          const result = yield* createWorkspace(userId, "Seed Workspace");
+
+          const posts = yield* db
+            .select()
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, result.organizationId));
+
+          expect(posts).toHaveLength(3);
+          expect(
+            posts
+              .map((post) => post.metadata.onboarding ?? "missing")
+              .sort((left, right) => left.localeCompare(right))
+          ).toStrictEqual(["bugs", "ideas", "welcome"]);
+
+          // Every sample post is a real post: a board, the workspace's
+          // default status, an author, and an excerpt the list can render.
+          const boards = yield* db
+            .select({
+              id: schema.boardTable.id,
+              slug: schema.boardTable.slug,
+            })
+            .from(schema.boardTable)
+            .where(eq(schema.boardTable.organizationId, result.organizationId));
+
+          const boardSlugById = new Map(
+            boards.map((board) => [board.id, board.slug] as const)
+          );
+
+          const [defaultStatus] = yield* db
+            .select({ id: schema.postStatusTable.id })
+            .from(schema.postStatusTable)
+            .where(
+              and(
+                eq(
+                  schema.postStatusTable.organizationId,
+                  result.organizationId
+                ),
+                eq(schema.postStatusTable.isDefault, true)
+              )
+            );
+
+          for (const post of posts) {
+            expect(post.statusId).toBe(defaultStatus?.id);
+            expect(post.creatorId).toBe(userId);
+            expect(post.excerpt.length).toBeGreaterThan(0);
+            expect(post.slug.length).toBeGreaterThan(0);
+          }
+
+          const boardSlugs = posts
+            .map((post) => boardSlugById.get(post.boardId) ?? "missing")
+            .sort((left, right) => left.localeCompare(right));
+
+          expect(boardSlugs).toStrictEqual(["bugs", "features", "features"]);
+
+          // The samples carry the guide tag, and the tag exists once even
+          // though three posts wear it.
+          const tagLinks = yield* db
+            .select({
+              postId: schema.postTagTable.postId,
+              tagId: schema.postTagTable.tagId,
+            })
+            .from(schema.postTagTable)
+            .where(
+              eq(schema.postTagTable.organizationId, result.organizationId)
+            );
+
+          expect(tagLinks).toHaveLength(3);
+          expect(new Set(tagLinks.map((link) => link.tagId)).size).toBe(1);
+        })
+      );
+
+      it.effect("keeps the boards the reader named, in their order", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const userId = "user_custom_boards";
+          yield* seedUser(userId);
+
+          const { organizationId } = yield* createWorkspace(
+            userId,
+            "Custom Boards",
+            ["Ideas", "Complaints"]
+          );
+
+          const boards = yield* db
+            .select({ id: schema.boardTable.id, name: schema.boardTable.name })
+            .from(schema.boardTable)
+            .where(eq(schema.boardTable.organizationId, organizationId));
+
+          expect(boards.map((board) => board.name)).toStrictEqual([
+            "Ideas",
+            "Complaints",
+          ]);
+
+          // The templates name their own boards by slug, and neither of these
+          // is one of them, so every sample lands on the first board the reader
+          // picked instead of being dropped.
+          const posts = yield* db
+            .select({ boardId: schema.postTable.boardId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, organizationId));
+
+          expect(posts).toHaveLength(3);
+          expect(new Set(posts.map((post) => post.boardId))).toStrictEqual(
+            new Set([boards[0]?.id])
+          );
+        })
+      );
+
+      it.effect("collapses board names that share a slug", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const userId = "user_duplicate_boards";
+          yield* seedUser(userId);
+
+          const { organizationId } = yield* createWorkspace(
+            userId,
+            "Duplicate Boards",
+            ["Bugs", " bugs ", "Ideas"]
+          );
+
+          const boards = yield* db
+            .select({ name: schema.boardTable.name })
+            .from(schema.boardTable)
+            .where(eq(schema.boardTable.organizationId, organizationId));
+
+          // A board slug is unique per workspace, so the second "bugs" would
+          // violate the index. The first spelling wins.
+          expect(boards.map((board) => board.name)).toStrictEqual([
+            "Bugs",
+            "Ideas",
+          ]);
+        })
+      );
+
+      it.effect(
+        "returns the committed workspace when the same owner retries",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const userId = "user_replayed_create";
+            yield* seedUser(userId);
+
+            const first = yield* createWorkspace(userId, "Replayed Create");
+            const second = yield* createWorkspace(userId, "Replayed Create");
+
+            // A create can commit and lose its reply. The retry has to resolve to
+            // the workspace it created, not to a conflict it cannot escape.
+            expect(second.organizationId).toBe(first.organizationId);
+            // The first attempt said so, so the retry says so too: otherwise
+            // the retry denies the welcome tour the first attempt promised.
+            expect(second.isFirstWorkspace).toBe(true);
+
+            // Counting the user's whole set, not the one id: a second insert
+            // under a different id would pass a filter on the first id and
+            // leave the duplicate undetected.
+            const owned = yield* db
+              .select({ id: schema.organizationTable.id })
+              .from(schema.memberTable)
+              .innerJoin(
+                schema.organizationTable,
+                eq(
+                  schema.memberTable.organizationId,
+                  schema.organizationTable.id
+                )
+              )
+              .where(
+                and(
+                  eq(schema.memberTable.userId, userId),
+                  eq(schema.memberTable.role, "owner")
+                )
+              );
+
+            expect(owned).toStrictEqual([{ id: first.organizationId }]);
+          })
+      );
+
+      it.effect("still refuses an address owned by someone else", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const owner = yield* makeFixture();
+          const other = yield* makeFixture();
+
+          yield* createSiteForSubdomain(
+            "claimed-address",
+            owner.organizationId
+          );
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "claimed-address",
+                workspaceName: "Other Workspace",
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(other)))
+          );
+
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toBe("This address is already taken");
+        })
+      );
+
+      it.effect("refuses more boards than a new workspace's plan allows", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const userId = "user_too_many_boards";
+          yield* seedUser(userId);
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: ["One", "Two", "Three"],
+                subdomain: "too-many-boards",
+                workspaceName: "Too Many Boards",
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, newUserSession(userId))
+              )
+          );
+
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toContain("at most 2 boards");
+        })
+      );
+
+      it.effect("refuses a board name that is too long", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const userId = "user_long_board_name";
+          yield* seedUser(userId);
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: ["A".repeat(61)],
+                subdomain: "long-board-name",
+                workspaceName: "Long Board Name",
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, newUserSession(userId))
+              )
+          );
+
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toContain("60 characters");
+        })
+      );
+
+      it.effect(
+        "reports whether the created workspace is the user's first",
+        () =>
+          Effect.gen(function* () {
+            const userId = "user_first_workspace";
+            yield* seedUser(userId);
+
+            const first = yield* createWorkspace(userId, "First Workspace");
+            expect(first.isFirstWorkspace).toBe(true);
+
+            const second = yield* createWorkspace(userId, "Second Workspace");
+            expect(second.isFirstWorkspace).toBe(false);
+          })
+      );
+
+      it.effect("counts the sample posts a workspace has left", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const userId = "user_onboarding_summary";
+          yield* seedUser(userId);
+
+          const { organizationId } = yield* createWorkspace(
+            userId,
+            "Summary Workspace"
+          );
+
+          const members = yield* db
+            .select({ id: schema.memberTable.id })
+            .from(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
+
+          const session: Session = {
+            user: {
+              id: userId,
+              email: `${userId}@example.com`,
+              name: "New User",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId, token: "test-token" },
+            organizations: [{ id: organizationId }],
+            memberships: [
+              {
+                membershipId: members[0]?.id ?? "",
+                organizationId,
+                role: "owner",
+              },
+            ],
+          };
+
+          const summary = yield* handlers
+            .GetWorkspaceOnboardingSummary({ organizationId })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          expect(summary).toStrictEqual({ samplePostCount: 3 });
+
+          // Deleting one sample is what the dashboard's post delete does;
+          // the summary has to follow it down rather than report the seed.
+          const [post] = yield* db
+            .select({ id: schema.postTable.id })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, organizationId))
+            .limit(1);
+
+          yield* db
+            .delete(schema.postTable)
+            .where(eq(schema.postTable.id, post?.id ?? ""));
+
+          const after = yield* handlers
+            .GetWorkspaceOnboardingSummary({ organizationId })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          expect(after).toStrictEqual({ samplePostCount: 2 });
+        })
+      );
+
+      it.effect("refuses the summary to a non-member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+
+          const error = yield* Effect.flip(
+            handlers
+              .GetWorkspaceOnboardingSummary({
+                organizationId: fixture.organizationId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, {
+                  ...makeSession(fixture),
+                  memberships: [],
+                  organizations: [],
+                })
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
       );
     });
   });

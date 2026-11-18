@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -16,6 +17,34 @@ import type {
   TWorkspaceInput,
   TWorkspaceSlugCheckInput,
 } from "./schema";
+
+/** The longest board name the create accepts, matching the name fields. */
+const MAX_BOARD_NAME_LENGTH = 60;
+
+/**
+ * The board names a create will write.
+ *
+ * Trimmed, with blanks and repeats dropped. `board.slug` is unique per
+ * workspace, and two names that slugify to the same string would collide on
+ * insert, so the first one wins and the second is dropped rather than failing
+ * a create the reader cannot fix from the form.
+ */
+const normalizeBoardNames = (names: readonly string[]): string[] => {
+  const bySlug = new Map<string, string>();
+
+  for (const name of names) {
+    const trimmed = name.trim();
+    const slug = slugify(trimmed);
+
+    if (slug.length === 0 || bySlug.has(slug)) {
+      continue;
+    }
+
+    bySlug.set(slug, trimmed);
+  }
+
+  return [...bySlug.values()];
+};
 
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;
@@ -35,47 +64,116 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
         // transaction writes is the durable record of who created it.
         const session = yield* CurrentSession;
         const workspaceName = args.workspaceName.trim();
+        const subdomain = args.subdomain.trim().toLowerCase();
 
-        const subdomain = slugify(workspaceName);
-
+        // The schema already refuses a short subdomain, but the handlers are
+        // also called directly (tests, and any future internal caller that
+        // skips decoding), and a two-character address would pass every other
+        // check in this function.
         if (subdomain.length < 4) {
           return yield* new BadRequestError({
-            message:
-              "Workspace name must produce a subdomain of at least 4 characters",
+            message: "Subdomain must be at least 4 characters",
           });
         }
 
         yield* validateSubdomain(subdomain);
 
-        const organizationId = yield* transaction(
+        const boardNames = normalizeBoardNames(args.boardNames);
+        const boardLimit = PLAN_ENTITLEMENTS.free.limits.feedbackBoards;
+
+        if (boardNames.length === 0) {
+          return yield* new BadRequestError({
+            message: "A workspace needs at least one board",
+          });
+        }
+
+        // A workspace is created on the free plan, so that allowance is the
+        // ceiling here. Letting the request through would land the reader on a
+        // workspace that is over its plan before they have seen it.
+        if (boardLimit !== null && boardNames.length > boardLimit) {
+          return yield* new BadRequestError({
+            message: `A new workspace starts with at most ${boardLimit} boards`,
+          });
+        }
+
+        const longName = boardNames.find(
+          (name) => name.length > MAX_BOARD_NAME_LENGTH
+        );
+
+        if (longName !== undefined) {
+          return yield* new BadRequestError({
+            message: `Board names are ${MAX_BOARD_NAME_LENGTH} characters or fewer`,
+          });
+        }
+
+        return yield* transaction(
           Effect.gen(function* () {
             // Lock first, then count: the per-user workspace cap spans
             // workspaces, so the count is only authoritative while this row
             // is held. Locking before the first child insert avoids
             // deadlocking two concurrent creates against each other.
             yield* repository.lockUser(session.session.userId);
-            yield* workspacePolicy.canCreateWorkspace({
-              userId: session.session.userId,
-            });
 
             const isSubdomainTaken =
               yield* repository.isSubdomainTaken(subdomain);
 
             if (isSubdomainTaken) {
+              // The reply to a create can be lost after it committed, and the
+              // retry then finds its own address taken. Returning that
+              // workspace is what lets the retry finish; a subdomain owned by
+              // anyone else still fails, because no membership row matches.
+              //
+              // Checked before the cap, because a replay creates nothing. A
+              // reader who lost the reply to the workspace that filled their
+              // last slot would otherwise be refused the workspace they
+              // already have.
+              const ownedByCaller =
+                yield* repository.findOwnedWorkspaceBySubdomain({
+                  subdomain,
+                  userId: session.session.userId,
+                });
+
+              if (Option.isSome(ownedByCaller)) {
+                // The same answer the first attempt gave: the replayed
+                // workspace was the reader's first if it is the only one they
+                // own. A retry that reported `false` would deny the welcome
+                // tour to the very workspace the tour describes.
+                const owned = yield* repository.findOwnedWorkspaces(
+                  session.session.userId
+                );
+
+                return {
+                  isFirstWorkspace: owned.length === 1,
+                  organizationId: ownedByCaller.value,
+                };
+              }
+
               return yield* new BadRequestError({
-                message: "This workspace name is already taken",
+                message: "This address is already taken",
               });
             }
 
-            return yield* repository.createWorkspace({
+            yield* workspacePolicy.canCreateWorkspace({
+              userId: session.session.userId,
+            });
+
+            // Read under the same lock, and before the insert: "first" is a
+            // property of the world before this workspace, and a count taken
+            // after the commit would race a concurrent create.
+            const owned = yield* repository.findOwnedWorkspaces(
+              session.session.userId
+            );
+
+            const organizationId = yield* repository.createWorkspace({
+              boardNames,
+              subdomain,
               userId: session.session.userId,
               workspaceName,
-              subdomain,
             });
+
+            return { isFirstWorkspace: owned.length === 0, organizationId };
           })
         );
-
-        return { organizationId };
       }).pipe(withRemapDbErrors("Workspace", "create"));
     },
     GetWorkspaceCreationState: () =>
@@ -86,6 +184,17 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
           userId: session.session.userId,
         });
       }).pipe(withRemapDbErrors("Workspace", "select")),
+    GetWorkspaceOnboardingSummary: (args: TWorkspaceInput) =>
+      Effect.gen(function* () {
+        const samplePostCount = yield* repository.countOnboardingPosts(
+          args.organizationId
+        );
+
+        return { samplePostCount };
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Workspace", "select")
+      ),
     ListWorkspaceProducts: () =>
       repository.findProducts().pipe(withRemapDbErrors("Workspace", "select")),
     GetWorkspacePlan: (args: TWorkspaceInput) =>
@@ -125,7 +234,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
               return {
                 available: false,
                 suggestion: Option.getOrNull(suggestion),
-                reason: "This workspace name is already taken",
+                reason: "This address is already taken",
               };
             }),
         }),

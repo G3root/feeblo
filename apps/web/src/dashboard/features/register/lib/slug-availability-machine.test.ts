@@ -240,6 +240,36 @@ describe("slug availability machine", () => {
     expect(availabilityOf(actor).status).toBe("available");
   });
 
+  it("asks again about the same slug when told the answer is stale", async () => {
+    const actor = start();
+
+    actor.send({ type: "INPUT", enabled: true, slug: "acme-corp" });
+    await vi.advanceTimersByTimeAsync(400);
+    checks[0]?.settle(answered(true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(availabilityOf(actor).status).toBe("available");
+
+    // A create refused this address after the field called it free. The string
+    // has not changed, so `INPUT` would be ignored by the unchanged-input
+    // shortcut; `RECHECK` is the way to ask the same question again.
+    actor.send({ type: "RECHECK" });
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(checks.map((entry) => entry.slug)).toStrictEqual([
+      "acme-corp",
+      "acme-corp",
+    ]);
+  });
+
+  it("ignores a recheck with nothing typed", async () => {
+    const actor = start();
+
+    actor.send({ type: "RECHECK" });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(checks).toHaveLength(0);
+  });
+
   it("drops a settled answer as soon as the slug changes again", async () => {
     const actor = start();
 

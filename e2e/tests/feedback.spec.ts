@@ -659,11 +659,15 @@ test.describe("feedback workflow", () => {
     await page.keyboard.press("Escape");
 
     // The survivor is not offered as a source either: with the duplicate
-    // already merged and the survivor ineligible, no candidate remains.
+    // already merged and the survivor ineligible, searching for it finds
+    // nothing. A workspace now opens with sample posts, so "no candidate
+    // remains" is no longer true of an unfiltered list; the query is what
+    // makes the assertion about the survivor.
     await page.goto(workspace.organizationUrl);
     await openPost(page, thirdTitle);
     await page.getByRole("button", { name: "Merge post" }).click();
     await page.getByRole("menuitem", { name: "Merge others to this" }).click();
+    await page.getByPlaceholder("Search posts to merge...").fill(targetTitle);
     await expect(page.getByText("No matching posts.")).toBeVisible();
     await page.keyboard.press("Escape");
 

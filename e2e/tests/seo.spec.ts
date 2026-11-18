@@ -79,12 +79,15 @@ test.describe("public board SEO", () => {
       `<loc>${boardUrl}/changelog/${changelogSlug}</loc>`
     );
 
-    // The workspace has exactly one post, so its detail URL is the only
-    // /p/ entry in the sitemap.
-    const postUrl =
-      /<loc>([^<]+\/p\/[^<]+)<\/loc>\s*<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/.exec(
-        sitemapBody
-      )?.[1];
+    // The workspace opens with sample posts, so the sitemap holds several /p/
+    // entries. This post's own entry is the one whose slug matches its title,
+    // which is what makes the assertion below about this post and not about
+    // whichever entry the sitemap happened to list first.
+    const postPath = `/p/${title.toLowerCase().replaceAll(" ", "-")}`;
+
+    const postUrl = [...sitemapBody.matchAll(/<loc>([^<]+)<\/loc>/g)]
+      .map((match) => match[1])
+      .find((loc) => loc?.endsWith(postPath));
 
     expect(postUrl).toBeTruthy();
 

@@ -24,8 +24,11 @@ import * as Option from "effect/Option";
 import type { OrganizationPlan } from "../plan-entitlements";
 import { lockUserRow } from "../row-locks";
 import { FailedToCreateWorkspaceError } from "./errors";
+import { seedWorkspaceOnboarding } from "./onboarding";
 
 interface CreateWorkspaceArgs {
+  /** Trimmed, de-duplicated board names, in the order the reader picked them. */
+  boardNames: readonly string[];
   subdomain: string;
   userId: string;
   workspaceName: string;
@@ -33,6 +36,11 @@ interface CreateWorkspaceArgs {
 
 interface FindPlanByOrganizationIdArgs {
   organizationId: string;
+}
+
+interface FindOwnedWorkspaceBySubdomainArgs {
+  subdomain: string;
+  userId: string;
 }
 
 /**
@@ -86,6 +94,72 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         return memberships
           .filter(({ role }) => role.split(",").includes("owner"))
           .map(({ id, name }) => ({ id, name }));
+      }),
+
+    /**
+     * How many posts still carry the sample marker.
+     *
+     * The marker is a key in `post.metadata`, which is the column the seed
+     * wrote it into, so the count is one predicate rather than a join against
+     * a table of its own. A workspace that deleted every sample reads zero;
+     * one that edited a sample without removing the marker still counts it,
+     * which is deliberate — the row is still the seeded one.
+     */
+    countOnboardingPosts: (organizationId: string) =>
+      Effect.gen(function* () {
+        const [row] = yield* db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.organizationId, organizationId),
+              sql`${schema.postTable.metadata}->>'onboarding' is not null`
+            )
+          );
+
+        return row?.count ?? 0;
+      }),
+
+    /**
+     * The workspace with this address, if the caller owns it.
+     *
+     * A create can commit and still lose its reply, and a retry then finds the
+     * address taken by the workspace it created a moment ago. Looking the
+     * address up under the caller's ownership is what lets that retry finish
+     * instead of dead-ending on "already taken": anyone else's address is still
+     * refused, because no membership row matches.
+     *
+     * Ownership is read the way `findOwnedWorkspaces` reads it, from the
+     * comma-joined role list, so the two cannot disagree about who owns what.
+     */
+    findOwnedWorkspaceBySubdomain: ({
+      subdomain,
+      userId,
+    }: FindOwnedWorkspaceBySubdomainArgs) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({
+            id: schema.siteTable.organizationId,
+            role: schema.memberTable.role,
+          })
+          .from(schema.siteTable)
+          .innerJoin(
+            schema.memberTable,
+            eq(
+              schema.memberTable.organizationId,
+              schema.siteTable.organizationId
+            )
+          )
+          .where(
+            and(
+              eq(schema.siteTable.subdomain, subdomain),
+              eq(schema.memberTable.userId, userId)
+            )
+          );
+
+        const owned = rows.find((row) => row.role.split(",").includes("owner"));
+
+        return Option.fromNullishOr(owned?.id);
       }),
 
     isSubdomainTaken: (subdomain: string) =>
@@ -243,9 +317,12 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             });
           }
 
-          const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
+          // The order is the reader's, and the seed below uses the first board
+          // as the fallback home for a sample post whose own board the reader
+          // did not pick.
+          const boardIds: string[] = [];
 
-          for (const boardName of defaultBoards) {
+          for (const boardName of args.boardNames) {
             const boardId = yield* BoardId.generate;
             yield* tx.insert(schema.boardTable).values({
               id: boardId,
@@ -256,6 +333,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               createdAt: now,
               updatedAt: now,
             });
+            boardIds.push(boardId);
           }
 
           const siteId = yield* SiteId.generate;
@@ -268,6 +346,29 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             subdomain: args.subdomain,
             hidePoweredBy: false,
           });
+
+          // Sample posts are a courtesy, not a precondition. The nested
+          // transaction is a savepoint, so an insert that fails is rolled back
+          // on its own and the workspace the caller asked for still commits;
+          // seeding inside the enclosing transaction without one would turn a
+          // bad template into a registration that cannot complete.
+          yield* db
+            .transaction(() =>
+              seedWorkspaceOnboarding({
+                boardIds,
+                memberId,
+                organizationId,
+                userId: args.userId,
+              })
+            )
+            .pipe(
+              Effect.catch((cause) =>
+                Effect.logWarning(
+                  "Failed to seed workspace onboarding posts",
+                  cause
+                ).pipe(Effect.annotateLogs({ organizationId }))
+              )
+            );
 
           return organizationId;
         })

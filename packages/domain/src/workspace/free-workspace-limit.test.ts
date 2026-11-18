@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { slugify } from "@feeblo/utils/url";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -22,6 +23,13 @@ import { WorkspaceRepository } from "./repository";
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
   DateTime.toDateUtc(DateTime.makeUnsafe(instant));
+
+/** The payload a create needs now that the address and boards are chosen. */
+const createInput = (workspaceName: string) => ({
+  boardNames: ["Bugs 🐞", "Features 💡"],
+  subdomain: slugify(workspaceName),
+  workspaceName,
+});
 
 describe("free workspace limit", () => {
   /** A user row for the given id, with no memberships. */
@@ -153,7 +161,7 @@ describe("free workspace limit", () => {
           yield* createOwnedWorkspace(userId);
 
           const result = yield* handlers
-            .CreateWorkspace({ workspaceName: "Third Workspace" })
+            .CreateWorkspace(createInput("Third Workspace"))
             .pipe(
               Effect.provideService(CurrentSession, makeBareSession(userId))
             );
@@ -175,7 +183,7 @@ describe("free workspace limit", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CreateWorkspace({ workspaceName: "Fourth Workspace" })
+              .CreateWorkspace(createInput("Fourth Workspace"))
               .pipe(
                 Effect.provideService(CurrentSession, makeBareSession(userId))
               )
@@ -214,7 +222,7 @@ describe("free workspace limit", () => {
         );
 
         const result = yield* handlers
-          .CreateWorkspace({ workspaceName: "Member Workspace" })
+          .CreateWorkspace(createInput("Member Workspace"))
           .pipe(
             Effect.provideService(CurrentSession, makeBareSession(memberId))
           );
@@ -235,7 +243,11 @@ describe("free workspace limit", () => {
           yield* createOwnedWorkspace(userId, { paid: true });
 
           const result = yield* handlers
-            .CreateWorkspace({ workspaceName: "Third Free Workspace" })
+            .CreateWorkspace({
+              boardNames: ["Bugs 🐞", "Features 💡"],
+              subdomain: "third-free-workspace",
+              workspaceName: "Third Free Workspace",
+            })
             .pipe(
               Effect.provideService(CurrentSession, makeBareSession(userId))
             );
@@ -258,7 +270,11 @@ describe("free workspace limit", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CreateWorkspace({ workspaceName: "Fourth Free Workspace" })
+              .CreateWorkspace({
+                boardNames: ["Bugs 🐞", "Features 💡"],
+                subdomain: "fourth-free-workspace",
+                workspaceName: "Fourth Free Workspace",
+              })
               .pipe(
                 Effect.provideService(CurrentSession, makeBareSession(userId))
               )

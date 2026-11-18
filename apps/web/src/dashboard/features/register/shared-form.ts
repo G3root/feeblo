@@ -1,28 +1,15 @@
-import { z } from "zod";
+import { initialDraft, registerDraftSchema } from "./lib/register-draft";
 
-import { toWorkspaceSlug } from "./utils";
-
-export const registerFormSchema = z
-  .object({
-    workspaceName: z.string().trim().min(2, "Workspace name is required"),
-  })
-  .superRefine((value, ctx) => {
-    const slug = toWorkspaceSlug(value.workspaceName);
-
-    if (slug.length < 4) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["workspaceName"],
-        message: "Workspace name must produce a slug of at least 4 characters",
-      });
-    }
-  });
-
+/**
+ * The form's options, shared so `withForm` can type a step against the same
+ * draft the page holds.
+ *
+ * `defaultValues` here is a seed for that type, not the instance: the page
+ * creates the form it renders, and `withForm` uses the one it is handed.
+ */
 export const registerFormOpts = {
-  defaultValues: {
-    workspaceName: "",
-  },
+  defaultValues: initialDraft(),
   validators: {
-    onChange: registerFormSchema,
+    onChange: registerDraftSchema,
   },
 };

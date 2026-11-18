@@ -20,6 +20,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { useCreateBoardDialogContext } from "~/features/board/dialog-stores";
 import { RecentPostsSection } from "~/features/dashboard-home/components/recent-posts-section";
+import { OnboardingSampleBanner } from "~/features/onboarding/components/onboarding-sample-banner";
 import { usePostCreateDialogContext } from "~/features/post/dialog-stores";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { dashboardCollections } from "~/lib/collections";
@@ -124,6 +125,8 @@ function RouteComponent() {
           </SpeedDialItem>
         </SpeedDialContent>
       </SpeedDial>
+
+      <OnboardingSampleBanner organizationId={organizationId} />
 
       {/* Recent posts */}
       <RecentPostsSection

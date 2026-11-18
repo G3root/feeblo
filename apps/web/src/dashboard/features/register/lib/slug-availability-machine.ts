@@ -94,6 +94,19 @@ const AvailabilityContextSchema = Schema.toStandardSchemaV1(
   })
 );
 
+/**
+ * A request to ask the same question again.
+ *
+ * The unchanged-input shortcut above exists so a settled answer is not thrown
+ * away for the same string. This is the opposite case: the answer is known to
+ * be stale, because a create refused the address the field had reported free,
+ * and the reader is looking at a verdict nobody can trust. The string has not
+ * changed, so `INPUT` would be ignored.
+ */
+const recheckSchema = Schema.toStandardSchemaV1(
+  Schema.Struct({ type: Schema.Literal("RECHECK") })
+);
+
 const InputEventSchema = Schema.toStandardSchemaV1(
   Schema.Struct({
     enabled: Schema.Boolean,
@@ -173,7 +186,7 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
     },
     schemas: {
       context: AvailabilityContextSchema,
-      events: { INPUT: InputEventSchema },
+      events: { INPUT: InputEventSchema, RECHECK: recheckSchema },
       input: SlugInputSchema,
     },
   }).createMachine({
@@ -209,6 +222,10 @@ export const createSlugAvailabilityMachine = (check: SlugAvailabilityCheck) =>
             event.enabled && event.slug.length > 0 ? ".debouncing" : ".idle",
         };
       },
+      // Re-entering the debounce restarts the timer, and leaving `checking`
+      // aborts whatever was in flight, which is exactly a fresh check.
+      RECHECK: ({ context }: { context: SlugAvailabilityContext }) =>
+        hasQuery(context) ? { target: ".debouncing" } : undefined,
     },
     states: {
       idle: {

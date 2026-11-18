@@ -9,6 +9,7 @@ import {
   CreateWorkspaceOutput,
   WorkspaceCreationState,
   WorkspaceInput,
+  WorkspaceOnboardingSummary,
   WorkspacePlan,
   WorkspaceProduct,
   WorkspaceSlugCheckInput,
@@ -23,6 +24,11 @@ export class WorkspaceRpcs extends RpcGroup.make(
   }).middleware(AuthMiddleware),
   Rpc.make("GetWorkspaceCreationState", {
     success: WorkspaceCreationState,
+    error: WorkspaceServiceErrors,
+  }).middleware(AuthMiddleware),
+  Rpc.make("GetWorkspaceOnboardingSummary", {
+    payload: WorkspaceInput,
+    success: WorkspaceOnboardingSummary,
     error: WorkspaceServiceErrors,
   }).middleware(AuthMiddleware),
   Rpc.make("ListWorkspaceProducts", {
