@@ -15,7 +15,7 @@ import {
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 import { useStore } from "@tanstack/react-store";
 
-import { useWorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
+import { useSlugAvailability } from "../lib/slug-availability-context";
 import { registerFormOpts } from "../shared-form";
 import { MIN_SLUG_LENGTH, toWorkspaceSlug } from "../utils";
 
@@ -103,8 +103,9 @@ export const RegisterWorkspaceStep = withForm({
 
     const slug = toWorkspaceSlug(workspaceName);
 
-    const { availability, reportWorkspaceName } =
-      useWorkspaceSlugAvailability(workspaceName);
+    // The check belongs to the page: the preview beside the form renders the
+    // same subdomain, so both read one machine rather than two.
+    const { availability, reportWorkspaceName } = useSlugAvailability();
 
     const { status: slugStatus, suggestion, reason } = availability;
 

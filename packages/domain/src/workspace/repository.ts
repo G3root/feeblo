@@ -24,6 +24,7 @@ import * as Option from "effect/Option";
 import type { OrganizationPlan } from "../plan-entitlements";
 import { lockUserRow } from "../row-locks";
 import { FailedToCreateWorkspaceError } from "./errors";
+import { seedWorkspaceOnboarding } from "./onboarding";
 
 interface CreateWorkspaceArgs {
   subdomain: string;
@@ -86,6 +87,30 @@ const makeWorkspaceRepository = Effect.gen(function* () {
         return memberships
           .filter(({ role }) => role.split(",").includes("owner"))
           .map(({ id, name }) => ({ id, name }));
+      }),
+
+    /**
+     * How many posts still carry the sample marker.
+     *
+     * The marker is a key in `post.metadata`, which is the column the seed
+     * wrote it into, so the count is one predicate rather than a join against
+     * a table of its own. A workspace that deleted every sample reads zero;
+     * one that edited a sample without removing the marker still counts it,
+     * which is deliberate — the row is still the seeded one.
+     */
+    countOnboardingPosts: (organizationId: string) =>
+      Effect.gen(function* () {
+        const [row] = yield* db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.organizationId, organizationId),
+              sql`${schema.postTable.metadata}->>'onboarding' is not null`
+            )
+          );
+
+        return row?.count ?? 0;
       }),
 
     isSubdomainTaken: (subdomain: string) =>
@@ -268,6 +293,28 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             subdomain: args.subdomain,
             hidePoweredBy: false,
           });
+
+          // Sample posts are a courtesy, not a precondition. The nested
+          // transaction is a savepoint, so an insert that fails is rolled back
+          // on its own and the workspace the caller asked for still commits;
+          // seeding inside the enclosing transaction without one would turn a
+          // bad template into a registration that cannot complete.
+          yield* db
+            .transaction(() =>
+              seedWorkspaceOnboarding({
+                memberId,
+                organizationId,
+                userId: args.userId,
+              })
+            )
+            .pipe(
+              Effect.catch((cause) =>
+                Effect.logWarning(
+                  "Failed to seed workspace onboarding posts",
+                  cause
+                ).pipe(Effect.annotateLogs({ organizationId }))
+              )
+            );
 
           return organizationId;
         })

@@ -15,7 +15,27 @@ export const CreateWorkspaceInput = S.Struct({
 
 export const CreateWorkspaceOutput = S.Struct({
   organizationId: S.String,
+  /**
+   * True when this was the user's first owned workspace, so the caller knows
+   * to open the welcome tour the workspace is created with sample data for.
+   * Decided inside the create transaction, under the same user-row lock that
+   * makes the workspace cap authoritative, rather than by a second count a
+   * concurrent create could invalidate.
+   */
+  isFirstWorkspace: S.Boolean,
 });
+
+export const WorkspaceOnboardingSummary = S.Struct({
+  /**
+   * How many posts in the workspace still carry the sample marker. Zero means
+   * the reader has deleted or rewritten every seeded post.
+   */
+  samplePostCount: S.Finite,
+});
+
+export type TWorkspaceOnboardingSummary = S.Schema.Type<
+  typeof WorkspaceOnboardingSummary
+>;
 
 export const WorkspaceCreationState = S.Struct({
   canCreate: S.Boolean,

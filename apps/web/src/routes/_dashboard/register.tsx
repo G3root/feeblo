@@ -18,11 +18,16 @@ import { useAuthState } from "@feeblo/web-shared/use-auth-state";
 import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useStore } from "@tanstack/react-store";
 import * as Result from "effect/reactivity/AsyncResult";
 import { z } from "zod";
 
+import { markPendingWelcomeTour } from "~/features/onboarding/lib/tour-storage";
 import { RegisterShell } from "~/features/register/components/register-shell";
 import { RegisterWorkspaceStep } from "~/features/register/components/register-workspace-step";
+import { WorkspacePreview } from "~/features/register/components/workspace-preview";
+import { useWorkspaceSlugAvailability } from "~/features/register/hooks/use-workspace-slug-availability";
+import { SlugAvailabilityProvider } from "~/features/register/lib/slug-availability-context";
 import { registerFormOpts } from "~/features/register/shared-form";
 import { DeleteWorkspaceDialog } from "~/features/settings/components/delete-workspace-dialog";
 import { workspaceCreationStateAtom } from "~/features/workspace/atoms";
@@ -60,6 +65,15 @@ function RegisterRoute() {
             title: "Workspace created successfully",
             type: "success",
           });
+
+          // Queued before the navigation, and only for a first workspace: the
+          // tour talks about sample posts and a board URL that every workspace
+          // now has, but only the first is worth interrupting someone for. The
+          // gate consumes the flag and drops it.
+          if (result.isFirstWorkspace) {
+            markPendingWelcomeTour();
+          }
+
           // The atom still caches the pre-create count; refresh it for a later
           // return to this page through the switcher.
           refreshCreationState();
@@ -95,69 +109,103 @@ function RegisterRoute() {
     },
   });
 
-  return (
-    <RegisterShell>
-      {Result.builder(creationState)
-        .onInitial(() => <RegisterLoadingCard />)
-        .onFailure(() => <RegisterErrorCard onRetry={refreshCreationState} />)
-        .onSuccess((state) =>
-          state.canCreate ? (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Create a new Workspace</CardTitle>
-                  <CardDescription>
-                    create a new workspace to get started
-                  </CardDescription>
-                </CardHeader>
-
-                <CardPanel>
-                  <form
-                    className="flex flex-col gap-5"
-                    id="register-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void form.handleSubmit();
-                    }}
-                  >
-                    <RegisterShell.Body>
-                      <RegisterWorkspaceStep form={form} />
-                    </RegisterShell.Body>
-                  </form>
-                </CardPanel>
-              </Card>
-
-              <form.Subscribe
-                selector={(state) =>
-                  [state.isSubmitting, !state.canSubmit] as const
-                }
-              >
-                {([isSubmitting, isInvalid]) => (
-                  <Button
-                    className="w-full"
-                    disabled={isInvalid}
-                    form="register-form"
-                    loading={isSubmitting}
-                    size="lg"
-                    type="submit"
-                  >
-                    Create Workspace
-                  </Button>
-                )}
-              </form.Subscribe>
-            </>
-          ) : (
-            <WorkspaceLimitCard
-              freeWorkspaces={state.freeWorkspaces}
-              onDeleted={refreshCreationState}
-              reason={state.reason}
-            />
-          )
-        )
-        .exhaustive()}
-    </RegisterShell>
+  /** The subdomain the preview shows, and the check the form field shows. */
+  const workspaceName = useStore(
+    form.store,
+    // SAFETY: The upstream contract guarantees a string here.
+    (state) => (state.values.workspaceName as string) || ""
   );
+
+  const slugAvailability = useWorkspaceSlugAvailability(workspaceName);
+  const slugTaken = slugAvailability.availability.status === "taken";
+
+  return Result.builder(creationState)
+    .onInitial(() => (
+      <RegisterShell>
+        <RegisterLoadingCard />
+      </RegisterShell>
+    ))
+    .onFailure(() => (
+      <RegisterShell>
+        <RegisterErrorCard onRetry={refreshCreationState} />
+      </RegisterShell>
+    ))
+    .onSuccess((state) =>
+      state.canCreate ? (
+        <SlugAvailabilityProvider value={slugAvailability}>
+          <RegisterShell
+            preview={<WorkspacePreview workspaceName={workspaceName} />}
+          >
+            {/* Plain on this page: the split already gives the form a column
+                of its own, and a bordered card inside it would read as the
+                centred card this layout replaced. */}
+            <Card className="border-0 bg-transparent shadow-none before:hidden">
+              <CardHeader>
+                <CardTitle>Create a new Workspace</CardTitle>
+                <CardDescription>
+                  create a new workspace to get started
+                </CardDescription>
+              </CardHeader>
+
+              <CardPanel>
+                <form
+                  className="flex flex-col gap-5"
+                  id="register-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void form.handleSubmit();
+                  }}
+                >
+                  <RegisterShell.Body>
+                    <RegisterWorkspaceStep form={form} />
+                  </RegisterShell.Body>
+                </form>
+              </CardPanel>
+            </Card>
+
+            <form.Subscribe
+              selector={(formState) =>
+                [
+                  formState.isSubmitting,
+                  !formState.canSubmit,
+                  // In the selector, not captured from the parent render: the
+                  // subscription only re-renders when its selected tuple
+                  // changes, so a captured value would leave the button
+                  // enabled after the check settled on "taken".
+                  slugTaken,
+                ] as const
+              }
+            >
+              {([isSubmitting, isInvalid, isSlugTaken]) => (
+                <Button
+                  className="w-full"
+                  // A taken subdomain is refused by the server too, but the
+                  // field already knows: blocking the submit is what keeps the
+                  // reader from discovering it as a toast after a round trip.
+                  disabled={isInvalid || isSlugTaken}
+                  form="register-form"
+                  loading={isSubmitting}
+                  size="lg"
+                  type="submit"
+                >
+                  Create Workspace
+                </Button>
+              )}
+            </form.Subscribe>
+          </RegisterShell>
+        </SlugAvailabilityProvider>
+      ) : (
+        <RegisterShell>
+          <WorkspaceLimitCard
+            freeWorkspaces={state.freeWorkspaces}
+            onDeleted={refreshCreationState}
+            reason={state.reason}
+          />
+        </RegisterShell>
+      )
+    )
+    .exhaustive();
 }
 
 /**

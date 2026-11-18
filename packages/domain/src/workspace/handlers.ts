@@ -47,7 +47,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
 
         yield* validateSubdomain(subdomain);
 
-        const organizationId = yield* transaction(
+        return yield* transaction(
           Effect.gen(function* () {
             // Lock first, then count: the per-user workspace cap spans
             // workspaces, so the count is only authoritative while this row
@@ -67,15 +67,22 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
               });
             }
 
-            return yield* repository.createWorkspace({
+            // Read under the same lock, and before the insert: "first" is a
+            // property of the world before this workspace, and a count taken
+            // after the commit would race a concurrent create.
+            const owned = yield* repository.findOwnedWorkspaces(
+              session.session.userId
+            );
+
+            const organizationId = yield* repository.createWorkspace({
               userId: session.session.userId,
               workspaceName,
               subdomain,
             });
+
+            return { isFirstWorkspace: owned.length === 0, organizationId };
           })
         );
-
-        return { organizationId };
       }).pipe(withRemapDbErrors("Workspace", "create"));
     },
     GetWorkspaceCreationState: () =>
@@ -86,6 +93,17 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
           userId: session.session.userId,
         });
       }).pipe(withRemapDbErrors("Workspace", "select")),
+    GetWorkspaceOnboardingSummary: (args: TWorkspaceInput) =>
+      Effect.gen(function* () {
+        const samplePostCount = yield* repository.countOnboardingPosts(
+          args.organizationId
+        );
+
+        return { samplePostCount };
+      }).pipe(
+        Policy.withPolicy(Policy.hasMembership(args.organizationId)),
+        withRemapDbErrors("Workspace", "select")
+      ),
     ListWorkspaceProducts: () =>
       repository.findProducts().pipe(withRemapDbErrors("Workspace", "select")),
     GetWorkspacePlan: (args: TWorkspaceInput) =>

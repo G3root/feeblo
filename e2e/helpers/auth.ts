@@ -75,6 +75,10 @@ export async function signUpAndCreateWorkspace(
     page.waitForURL(/\/org_/),
     registerPage.createWorkspace(user.workspaceName),
   ]);
+
+  // The first workspace opens the welcome tour over the dashboard.
+  await registerPage.dismissWelcomeTour();
+
   const organizationUrl = page.url();
 
   return { ...user, organizationUrl };
@@ -93,6 +97,9 @@ export async function createAuthenticatedWorkspace(
     page.waitForURL(/\/org_/),
     registerPage.createWorkspace(user.workspaceName),
   ]);
+
+  // The first workspace opens the welcome tour over the dashboard.
+  await registerPage.dismissWelcomeTour();
 
   return { ...user, organizationUrl: page.url() };
 }

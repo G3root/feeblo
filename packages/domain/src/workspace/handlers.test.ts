@@ -1,7 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -210,15 +210,16 @@ describe("WorkspaceRpcHandlers", () => {
 
             expect(statuses).toHaveLength(6);
 
-            // Verify default post tags were created
+            // Verify default post tags were created, plus the guide tag the
+            // sample posts wear
             const tags = yield* db
               .select()
               .from(schema.tagTable)
               .where(eq(schema.tagTable.organizationId, result.organizationId));
 
-            expect(tags).toHaveLength(2);
+            expect(tags).toHaveLength(3);
             expect(tags.map((tag) => tag.name)).toEqual(
-              expect.arrayContaining(["High Priority", "Low Priority"])
+              expect.arrayContaining(["High Priority", "Low Priority", "Guide"])
             );
 
             // Verify the primary status roadmap and its ordered columns were created
@@ -683,6 +684,218 @@ describe("WorkspaceRpcHandlers", () => {
             expect(result.suggestion).toBe("taken-slug-2");
             expect(result.reason).toBe("This workspace name is already taken");
           })
+      );
+    });
+
+    describe("workspace onboarding", () => {
+      /** A session that has just signed up: no memberships, no organizations. */
+      const newUserSession = (userId: string): Session => ({
+        user: {
+          id: userId,
+          email: `${userId}@example.com`,
+          name: "New User",
+          restrictedToOrganizationId: null,
+        },
+        session: { userId, token: "test-token" },
+        organizations: [],
+        memberships: [],
+      });
+
+      const seedUser = (userId: string) =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          yield* db.insert(schema.userTable).values({
+            id: userId,
+            email: `${userId}@example.com`,
+            name: "New User",
+          });
+        });
+
+      const createWorkspace = (userId: string, workspaceName: string) =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+
+          return yield* handlers
+            .CreateWorkspace({ workspaceName })
+            .pipe(
+              Effect.provideService(CurrentSession, newUserSession(userId))
+            );
+        });
+
+      it.effect("seeds three sample posts across the default boards", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const userId = "user_onboarding_seed";
+          yield* seedUser(userId);
+
+          const result = yield* createWorkspace(userId, "Seed Workspace");
+
+          const posts = yield* db
+            .select()
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, result.organizationId));
+
+          expect(posts).toHaveLength(3);
+          expect(
+            posts
+              .map((post) => post.metadata.onboarding ?? "missing")
+              .sort((left, right) => left.localeCompare(right))
+          ).toStrictEqual(["bugs", "ideas", "welcome"]);
+
+          // Every sample post is a real post: a board, the workspace's
+          // default status, an author, and an excerpt the list can render.
+          const boards = yield* db
+            .select({
+              id: schema.boardTable.id,
+              slug: schema.boardTable.slug,
+            })
+            .from(schema.boardTable)
+            .where(eq(schema.boardTable.organizationId, result.organizationId));
+
+          const boardSlugById = new Map(
+            boards.map((board) => [board.id, board.slug] as const)
+          );
+
+          const [defaultStatus] = yield* db
+            .select({ id: schema.postStatusTable.id })
+            .from(schema.postStatusTable)
+            .where(
+              and(
+                eq(
+                  schema.postStatusTable.organizationId,
+                  result.organizationId
+                ),
+                eq(schema.postStatusTable.isDefault, true)
+              )
+            );
+
+          for (const post of posts) {
+            expect(post.statusId).toBe(defaultStatus?.id);
+            expect(post.creatorId).toBe(userId);
+            expect(post.excerpt.length).toBeGreaterThan(0);
+            expect(post.slug.length).toBeGreaterThan(0);
+          }
+
+          const boardSlugs = posts
+            .map((post) => boardSlugById.get(post.boardId) ?? "missing")
+            .sort((left, right) => left.localeCompare(right));
+
+          expect(boardSlugs).toStrictEqual(["bugs", "features", "features"]);
+
+          // The samples carry the guide tag, and the tag exists once even
+          // though three posts wear it.
+          const tagLinks = yield* db
+            .select({
+              postId: schema.postTagTable.postId,
+              tagId: schema.postTagTable.tagId,
+            })
+            .from(schema.postTagTable)
+            .where(
+              eq(schema.postTagTable.organizationId, result.organizationId)
+            );
+
+          expect(tagLinks).toHaveLength(3);
+          expect(new Set(tagLinks.map((link) => link.tagId)).size).toBe(1);
+        })
+      );
+
+      it.effect(
+        "reports whether the created workspace is the user's first",
+        () =>
+          Effect.gen(function* () {
+            const userId = "user_first_workspace";
+            yield* seedUser(userId);
+
+            const first = yield* createWorkspace(userId, "First Workspace");
+            expect(first.isFirstWorkspace).toBe(true);
+
+            const second = yield* createWorkspace(userId, "Second Workspace");
+            expect(second.isFirstWorkspace).toBe(false);
+          })
+      );
+
+      it.effect("counts the sample posts a workspace has left", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const userId = "user_onboarding_summary";
+          yield* seedUser(userId);
+
+          const { organizationId } = yield* createWorkspace(
+            userId,
+            "Summary Workspace"
+          );
+
+          const members = yield* db
+            .select({ id: schema.memberTable.id })
+            .from(schema.memberTable)
+            .where(eq(schema.memberTable.organizationId, organizationId));
+
+          const session: Session = {
+            user: {
+              id: userId,
+              email: `${userId}@example.com`,
+              name: "New User",
+              restrictedToOrganizationId: null,
+            },
+            session: { userId, token: "test-token" },
+            organizations: [{ id: organizationId }],
+            memberships: [
+              {
+                membershipId: members[0]?.id ?? "",
+                organizationId,
+                role: "owner",
+              },
+            ],
+          };
+
+          const summary = yield* handlers
+            .GetWorkspaceOnboardingSummary({ organizationId })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          expect(summary).toStrictEqual({ samplePostCount: 3 });
+
+          // Deleting one sample is what the dashboard's post delete does;
+          // the summary has to follow it down rather than report the seed.
+          const [post] = yield* db
+            .select({ id: schema.postTable.id })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, organizationId))
+            .limit(1);
+
+          yield* db
+            .delete(schema.postTable)
+            .where(eq(schema.postTable.id, post?.id ?? ""));
+
+          const after = yield* handlers
+            .GetWorkspaceOnboardingSummary({ organizationId })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          expect(after).toStrictEqual({ samplePostCount: 2 });
+        })
+      );
+
+      it.effect("refuses the summary to a non-member", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+
+          const error = yield* Effect.flip(
+            handlers
+              .GetWorkspaceOnboardingSummary({
+                organizationId: fixture.organizationId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, {
+                  ...makeSession(fixture),
+                  memberships: [],
+                  organizations: [],
+                })
+              )
+          );
+
+          expect(error._tag).toBe("PolicyDenied");
+        })
       );
     });
   });

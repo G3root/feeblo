@@ -73,6 +73,13 @@ export interface AnalyticsEvents {
   org_member_removed: { success: boolean };
   org_member_role_changed: { role: string; success: boolean };
 
+  // ── Onboarding ───────────────────────────────────────────────────────────
+  welcome_tour_finished: {
+    action: "completed" | "skipped";
+    steps_viewed: number;
+  };
+  welcome_tour_step_viewed: { step_id: string; step_index: number };
+
   // ── Organization ─────────────────────────────────────────────────────────
   org_renamed: { success: boolean };
   org_switched: { success: boolean };

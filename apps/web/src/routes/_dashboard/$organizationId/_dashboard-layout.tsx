@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { DashboardPendingShell } from "~/components/dashboard-pending-shell";
+import { WelcomeTourGate } from "~/features/onboarding/components/welcome-tour-gate";
 import { DashboardLayout } from "~/layouts/dashboard-layout";
 import { preloadDashboardShell } from "~/lib/preloads";
 
@@ -26,6 +27,9 @@ function DashboardLayoutComponent() {
   return (
     <DashboardLayout>
       <Outlet />
+      {/* Outside the layout's scroll container and outside `Outlet`: the tour
+          is chrome over the dashboard, not a page in it. */}
+      <WelcomeTourGate />
     </DashboardLayout>
   );
 }
