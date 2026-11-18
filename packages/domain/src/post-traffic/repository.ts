@@ -114,24 +114,26 @@ const makePostTrafficRepository = Effect.gen(function* () {
         return yield* db
           .transaction(() =>
             Effect.gen(function* () {
-              const visible = yield* db
-                .select({ id: schema.postTable.id })
-                .from(schema.postTable)
-                .innerJoin(
-                  schema.boardTable,
-                  eq(schema.boardTable.id, schema.postTable.boardId)
-                )
-                // The post lifecycle's own predicate: an archived or merged
-                // post has no public page, and a private board's post is not
-                // reachable. Reusing the derived fragment is what keeps this
-                // ingest from becoming a second copy of the machine.
-                .where(
-                  and(
-                    eq(schema.postTable.id, input.postId),
-                    publicPostVisibility
+              const visible = yield* (
+                db
+                  .select({ id: schema.postTable.id })
+                  .from(schema.postTable)
+                  .innerJoin(
+                    schema.boardTable,
+                    eq(schema.boardTable.id, schema.postTable.boardId)
                   )
-                )
-                .limit(1);
+                  // The post lifecycle's own predicate: an archived or merged
+                  // post has no public page, and a private board's post is not
+                  // reachable. Reusing the derived fragment is what keeps this
+                  // ingest from becoming a second copy of the machine.
+                  .where(
+                    and(
+                      eq(schema.postTable.id, input.postId),
+                      publicPostVisibility
+                    )
+                  )
+                  .limit(1)
+              );
 
               if (visible.length === 0) {
                 return false;

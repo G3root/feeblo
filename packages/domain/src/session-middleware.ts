@@ -168,15 +168,16 @@ export const OptionalAuthMiddlewareLive = Layer.effect(
 
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
-      return getValidatedSessionFromToken(auth, token ?? "").pipe(
-        Effect.map((session) =>
-          session.user.restrictedToOrganizationId
-            ? Option.none()
-            : Option.some(session)
-        ),
-        Effect.orElseSucceed(() => Option.none()),
-        Effect.flatMap((session) =>
-          effect.pipe(Effect.provideService(OptionalCurrentSession, session))
+      return Effect.provideServiceEffect(
+        effect,
+        OptionalCurrentSession,
+        getValidatedSessionFromToken(auth, token ?? "").pipe(
+          Effect.map((session) =>
+            session.user.restrictedToOrganizationId
+              ? Option.none()
+              : Option.some(session)
+          ),
+          Effect.orElseSucceed(() => Option.none())
         )
       );
     });
@@ -195,10 +196,10 @@ export const PublicAuthMiddlewareLive = Layer.effect(
 
       const token = getSessionTokenFromCookieHeader(cookieHeader);
 
-      return getValidatedSessionFromToken(auth, token ?? "").pipe(
-        Effect.flatMap((session) =>
-          effect.pipe(Effect.provideService(CurrentSession, session))
-        )
+      return Effect.provideServiceEffect(
+        effect,
+        CurrentSession,
+        getValidatedSessionFromToken(auth, token ?? "")
       );
     });
   })

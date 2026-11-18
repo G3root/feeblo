@@ -419,29 +419,31 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
 
-            return yield* db
-              .insert(schema.contactAttributeValueTable)
-              .values({
-                id,
-                organizationId: args.organizationId,
-                contactId: args.contactId,
-                attributeId: args.attributeId,
-                ...valueMap,
-                createdAt: now,
-                updatedAt: now,
-              })
-              // The (contact, attribute) pair is unique: a row that already
-              // exists for this pair — raced or pre-existing — is updated in
-              // place rather than surfacing a unique violation.
-              .onConflictDoUpdate({
-                target: [
-                  schema.contactAttributeValueTable.contactId,
-                  schema.contactAttributeValueTable.attributeId,
-                ],
-                set: { ...valueMap, updatedAt: now },
-              })
-              .returning()
-              .pipe(Effect.map(([created]) => created));
+            return yield* (
+              db
+                .insert(schema.contactAttributeValueTable)
+                .values({
+                  id,
+                  organizationId: args.organizationId,
+                  contactId: args.contactId,
+                  attributeId: args.attributeId,
+                  ...valueMap,
+                  createdAt: now,
+                  updatedAt: now,
+                })
+                // The (contact, attribute) pair is unique: a row that already
+                // exists for this pair — raced or pre-existing — is updated in
+                // place rather than surfacing a unique violation.
+                .onConflictDoUpdate({
+                  target: [
+                    schema.contactAttributeValueTable.contactId,
+                    schema.contactAttributeValueTable.attributeId,
+                  ],
+                  set: { ...valueMap, updatedAt: now },
+                })
+                .returning()
+                .pipe(Effect.map(([created]) => created))
+            );
           }),
         generateId: ContactAttributeValueId.generate,
       }).pipe(Effect.asVoid),
@@ -566,29 +568,31 @@ const makeAttributeDefinitionRepository = Effect.gen(function* () {
           Effect.gen(function* () {
             const now = yield* DateTime.nowAsDate;
 
-            return yield* db
-              .insert(schema.companyAttributeValueTable)
-              .values({
-                id,
-                organizationId: args.organizationId,
-                companyId: args.companyId,
-                attributeId: args.attributeId,
-                ...valueMap,
-                createdAt: now,
-                updatedAt: now,
-              })
-              // The (company, attribute) pair is unique: a row that already
-              // exists for this pair — raced or pre-existing — is updated in
-              // place rather than surfacing a unique violation.
-              .onConflictDoUpdate({
-                target: [
-                  schema.companyAttributeValueTable.companyId,
-                  schema.companyAttributeValueTable.attributeId,
-                ],
-                set: { ...valueMap, updatedAt: now },
-              })
-              .returning()
-              .pipe(Effect.map(([created]) => created));
+            return yield* (
+              db
+                .insert(schema.companyAttributeValueTable)
+                .values({
+                  id,
+                  organizationId: args.organizationId,
+                  companyId: args.companyId,
+                  attributeId: args.attributeId,
+                  ...valueMap,
+                  createdAt: now,
+                  updatedAt: now,
+                })
+                // The (company, attribute) pair is unique: a row that already
+                // exists for this pair — raced or pre-existing — is updated in
+                // place rather than surfacing a unique violation.
+                .onConflictDoUpdate({
+                  target: [
+                    schema.companyAttributeValueTable.companyId,
+                    schema.companyAttributeValueTable.attributeId,
+                  ],
+                  set: { ...valueMap, updatedAt: now },
+                })
+                .returning()
+                .pipe(Effect.map(([created]) => created))
+            );
           }),
         generateId: CompanyAttributeValueId.generate,
       }).pipe(Effect.asVoid),

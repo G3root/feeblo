@@ -195,23 +195,25 @@ const makeCommentService = Effect.gen(function* () {
    */
   const assertPostAcceptsComments = (draft: CommentDraft) =>
     Effect.gen(function* () {
-      const rows = yield* database
-        .select({
-          lockedAt: schema.postTable.lockedAt,
-          mergedIntoPostId: schema.postTable.mergedIntoPostId,
-        })
-        .from(schema.postTable)
-        .where(
-          and(
-            eq(schema.postTable.id, draft.postId),
-            eq(schema.postTable.organizationId, draft.organizationId)
+      const rows = yield* (
+        database
+          .select({
+            lockedAt: schema.postTable.lockedAt,
+            mergedIntoPostId: schema.postTable.mergedIntoPostId,
+          })
+          .from(schema.postTable)
+          .where(
+            and(
+              eq(schema.postTable.id, draft.postId),
+              eq(schema.postTable.organizationId, draft.organizationId)
+            )
           )
-        )
-        .limit(1)
-        // `no key update` rather than `update`: the post row is pointed at by
-        // foreign keys across the workspace, and the stronger lock would block
-        // unrelated inserts that merely reference this post.
-        .for("no key update");
+          .limit(1)
+          // `no key update` rather than `update`: the post row is pointed at by
+          // foreign keys across the workspace, and the stronger lock would block
+          // unrelated inserts that merely reference this post.
+          .for("no key update")
+      );
 
       const post = rows.at(0);
 

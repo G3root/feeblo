@@ -529,75 +529,77 @@ export const setPostTagsOperation = defineOperation(
 
       const wanted = [...new Set(tagIds)];
 
-      return yield* db
-        .transaction(() =>
-          Effect.gen(function* () {
-            if (wanted.length > 0) {
-              // `key share` is the lock the foreign-key check itself takes: a
-              // tag deleted concurrently either loses the race and is missing
-              // from this read, or waits here until these rows exist and then
-              // cascades them away with it.
-              const known = yield* tags.countExistingTags({
-                lock: "key share",
-                organizationId: caller.organizationId,
-                tagIds: wanted,
-              });
+      return yield* (
+        db
+          .transaction(() =>
+            Effect.gen(function* () {
+              if (wanted.length > 0) {
+                // `key share` is the lock the foreign-key check itself takes: a
+                // tag deleted concurrently either loses the race and is missing
+                // from this read, or waits here until these rows exist and then
+                // cascades them away with it.
+                const known = yield* tags.countExistingTags({
+                  lock: "key share",
+                  organizationId: caller.organizationId,
+                  tagIds: wanted,
+                });
 
-              if (known !== wanted.length) {
-                return yield* invalidRequestError(
-                  "One or more tagIds do not exist in this workspace."
-                );
+                if (known !== wanted.length) {
+                  return yield* invalidRequestError(
+                    "One or more tagIds do not exist in this workspace."
+                  );
+                }
               }
-            }
 
-            // The replacement locks the post row and returns what it carried
-            // before, so the write and the timeline entry are decided from the
-            // same snapshot. A post outside this workspace is reported on the
-            // dashboard's policy vocabulary; the published answer is the
-            // missing resource. A merged post is readable, so it is answered
-            // as the merged refusal the PATCH publishes rather than 404.
-            const replaced = yield* tags
-              .setPostTags({
-                organizationId: caller.organizationId,
-                postId,
-                tagIds: wanted,
-              })
-              .pipe(
-                Effect.catchTags({
-                  PolicyDenied: () =>
-                    Effect.fail(notFoundError("Post not found.")),
-                  PostIsMergedError: () =>
-                    Effect.fail(
-                      invalidRequestError(
-                        "This post has been merged into another post and cannot be changed."
-                      )
-                    ),
+              // The replacement locks the post row and returns what it carried
+              // before, so the write and the timeline entry are decided from the
+              // same snapshot. A post outside this workspace is reported on the
+              // dashboard's policy vocabulary; the published answer is the
+              // missing resource. A merged post is readable, so it is answered
+              // as the merged refusal the PATCH publishes rather than 404.
+              const replaced = yield* tags
+                .setPostTags({
+                  organizationId: caller.organizationId,
+                  postId,
+                  tagIds: wanted,
+                })
+                .pipe(
+                  Effect.catchTags({
+                    PolicyDenied: () =>
+                      Effect.fail(notFoundError("Post not found.")),
+                    PostIsMergedError: () =>
+                      Effect.fail(
+                        invalidRequestError(
+                          "This post has been merged into another post and cannot be changed."
+                        )
+                      ),
+                  })
+                );
+
+              yield* activities.createMany(
+                postTagChangeActivities({
+                  previousTagIds: replaced.previousTagIds,
+                  nextTagIds: wanted,
+                  actor: {
+                    actorId: null,
+                    actorMemberId: null,
+                    organizationId: caller.organizationId,
+                    postId,
+                  },
                 })
               );
 
-            yield* activities.createMany(
-              postTagChangeActivities({
-                previousTagIds: replaced.previousTagIds,
-                nextTagIds: wanted,
-                actor: {
-                  actorId: null,
-                  actorMemberId: null,
-                  organizationId: caller.organizationId,
-                  postId,
-                },
-              })
-            );
-
-            return { data: replaced.tags.map(toPublicApiTag) };
-          })
-        )
-        // One remap for the whole transaction: the repository's id generation,
-        // the tag read, and the timeline write all surface driver failures the
-        // same way, and a failure anywhere rolls the transaction back.
-        .pipe(
-          withRemapDbErrors("PublicApiTag", "update"),
-          Effect.catchTag("InternalServerError", () => onInternalError)
-        );
+              return { data: replaced.tags.map(toPublicApiTag) };
+            })
+          )
+          // One remap for the whole transaction: the repository's id generation,
+          // the tag read, and the timeline write all surface driver failures the
+          // same way, and a failure anywhere rolls the transaction back.
+          .pipe(
+            withRemapDbErrors("PublicApiTag", "update"),
+            Effect.catchTag("InternalServerError", () => onInternalError)
+          )
+      );
     })
 );
 

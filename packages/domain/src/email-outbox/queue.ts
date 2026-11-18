@@ -1192,21 +1192,23 @@ const sendDeliveryAttempt = (
         const boardRows =
           namedPostIds.length === 0
             ? []
-            : yield* db
-                .select({ visibility: schema.boardTable.visibility })
-                .from(schema.postTable)
-                // LEFT JOIN so a post whose board row is gone still counts as
-                // unproven instead of vanishing from the proof.
-                .leftJoin(
-                  schema.boardTable,
-                  eq(schema.boardTable.id, schema.postTable.boardId)
-                )
-                .where(
-                  and(
-                    inArray(schema.postTable.id, [...namedPostIds]),
-                    eq(schema.postTable.organizationId, intent.organizationId)
+            : yield* (
+                db
+                  .select({ visibility: schema.boardTable.visibility })
+                  .from(schema.postTable)
+                  // LEFT JOIN so a post whose board row is gone still counts as
+                  // unproven instead of vanishing from the proof.
+                  .leftJoin(
+                    schema.boardTable,
+                    eq(schema.boardTable.id, schema.postTable.boardId)
                   )
-                );
+                  .where(
+                    and(
+                      inArray(schema.postTable.id, [...namedPostIds]),
+                      eq(schema.postTable.organizationId, intent.organizationId)
+                    )
+                  )
+              );
 
         const currentBoardVisibility =
           boardRows.length === 0 || boardRows.length < namedPostIds.length

@@ -504,43 +504,45 @@ export const makeIntegrationDeliveryWorkerRepository = (
             Effect.gen(function* () {
               const now = yield* DateTime.nowAsDate;
 
-              const [row] = yield* db
-                .select({ id: schema.integrationDeliveryTable.id })
-                .from(schema.integrationDeliveryTable)
-                .innerJoin(
-                  schema.integrationConnectionTable,
-                  eq(
-                    schema.integrationDeliveryTable.connectionId,
-                    schema.integrationConnectionTable.id
-                  )
-                )
-                .innerJoin(
-                  schema.integrationRouteTable,
-                  eq(
-                    schema.integrationDeliveryTable.routeId,
-                    schema.integrationRouteTable.id
-                  )
-                )
-                .where(
-                  and(
+              const [row] = yield* (
+                db
+                  .select({ id: schema.integrationDeliveryTable.id })
+                  .from(schema.integrationDeliveryTable)
+                  .innerJoin(
+                    schema.integrationConnectionTable,
                     eq(
-                      schema.integrationDeliveryTable.id,
-                      claimed.input.delivery.id
-                    ),
-                    eq(schema.integrationDeliveryTable.state, "leased"),
-                    eq(
-                      schema.integrationDeliveryTable.leaseOwner,
-                      claimed.leaseOwner
-                    ),
-                    gt(schema.integrationDeliveryTable.leaseExpiresAt, now),
-                    eq(schema.integrationConnectionTable.lifecycle, "active"),
-                    eq(schema.integrationRouteTable.enabled, true)
+                      schema.integrationDeliveryTable.connectionId,
+                      schema.integrationConnectionTable.id
+                    )
                   )
-                )
-                // Lifecycle operations lock the same connection row. Whichever
-                // transaction commits first defines whether this request started.
-                .for("update", { of: schema.integrationConnectionTable })
-                .limit(1);
+                  .innerJoin(
+                    schema.integrationRouteTable,
+                    eq(
+                      schema.integrationDeliveryTable.routeId,
+                      schema.integrationRouteTable.id
+                    )
+                  )
+                  .where(
+                    and(
+                      eq(
+                        schema.integrationDeliveryTable.id,
+                        claimed.input.delivery.id
+                      ),
+                      eq(schema.integrationDeliveryTable.state, "leased"),
+                      eq(
+                        schema.integrationDeliveryTable.leaseOwner,
+                        claimed.leaseOwner
+                      ),
+                      gt(schema.integrationDeliveryTable.leaseExpiresAt, now),
+                      eq(schema.integrationConnectionTable.lifecycle, "active"),
+                      eq(schema.integrationRouteTable.enabled, true)
+                    )
+                  )
+                  // Lifecycle operations lock the same connection row. Whichever
+                  // transaction commits first defines whether this request started.
+                  .for("update", { of: schema.integrationConnectionTable })
+                  .limit(1)
+              );
 
               return row !== undefined;
             })

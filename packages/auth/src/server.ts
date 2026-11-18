@@ -460,23 +460,28 @@ export const initAuthHandler = (
 
       const ownedWorkspaces = await callbackRuntime.runPromise(
         Effect.gen(function* () {
-          const memberships = yield* db
-            .select({
-              id: schema.organizationTable.id,
-              name: schema.organizationTable.name,
-              role: schema.memberTable.role,
-            })
-            .from(schema.memberTable)
-            .innerJoin(
-              schema.organizationTable,
-              eq(schema.organizationTable.id, schema.memberTable.organizationId)
-            )
-            .where(eq(schema.memberTable.userId, userId))
-            // Ordered so the locks below are taken in one order. A workspace can
-            // have several owners, so two owners deleting their accounts can own
-            // the same pair of workspaces; without a fixed order each could hold
-            // the first one the other is waiting for.
-            .orderBy(asc(schema.organizationTable.id));
+          const memberships = yield* (
+            db
+              .select({
+                id: schema.organizationTable.id,
+                name: schema.organizationTable.name,
+                role: schema.memberTable.role,
+              })
+              .from(schema.memberTable)
+              .innerJoin(
+                schema.organizationTable,
+                eq(
+                  schema.organizationTable.id,
+                  schema.memberTable.organizationId
+                )
+              )
+              .where(eq(schema.memberTable.userId, userId))
+              // Ordered so the locks below are taken in one order. A workspace can
+              // have several owners, so two owners deleting their accounts can own
+              // the same pair of workspaces; without a fixed order each could hold
+              // the first one the other is waiting for.
+              .orderBy(asc(schema.organizationTable.id))
+          );
 
           return memberships.filter((membership) =>
             membership.role.split(",").includes("owner")
