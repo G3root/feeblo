@@ -136,6 +136,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
 
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const targetStatusId =
+        dragPreview?.targetStatusId ??
         dragState?.targetStatusId ??
         (target?.data?.statusId as string | undefined);
 
@@ -148,6 +149,15 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
         return;
         // SAFETY: The upstream contract guarantees a string here.
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      }
+
+      // The lane can disappear while the pointer is over it (a live-query
+      // refresh). Reject the drop rather than writing a status the roadmap no
+      // longer has a column for.
+      if (!lanes.some((lane) => lane.statusId === targetStatusId)) {
+        setDragPreview(null);
+
+        return;
       }
 
       // SAFETY: The upstream contract guarantees a string here.
@@ -168,7 +178,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
         }
       );
     },
-    [postCollection]
+    [dragPreview, lanes, postCollection]
   );
 
   return (

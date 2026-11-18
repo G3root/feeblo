@@ -7,6 +7,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import type { TBoardUpdate as TBoardUpdatePayload } from "./schema";
+
 interface TBoardCreate {
   /** Null when the board is created by an import whose uploader is gone. */
   creatorId: string | null;
@@ -18,13 +20,13 @@ interface TBoardCreate {
   visibility: "PUBLIC" | "PRIVATE";
 }
 
-interface TBoardUpdate {
-  icon?: string | null | undefined;
+type TBoardUpdate = Pick<
+  TBoardUpdatePayload,
+  "icon" | "name" | "visibility"
+> & {
   id: string;
-  name?: string | undefined;
   organizationId: string;
-  visibility?: "PUBLIC" | "PRIVATE" | undefined;
-}
+};
 
 interface TBoardFindById {
   id: string;

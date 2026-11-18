@@ -1,4 +1,5 @@
 import { isFunction, isString } from "@feeblo/utils/runtime-kind";
+import { isTablerFilledIconName } from "@feeblo/web-shared/icons/defaults";
 import { useSelector } from "@xstate/store-react";
 import {
   type ComponentProps,
@@ -1559,7 +1560,9 @@ function IconPickerField({
 
   const trimmedValue = isString(value) ? value.trim() : "";
 
-  const selected = trimmedValue.length > 0 ? trimmedValue : fallbackIcon;
+  const selected = isTablerFilledIconName(trimmedValue)
+    ? trimmedValue
+    : fallbackIcon;
 
   return (
     <Popover onOpenChange={setOpen} open={open}>

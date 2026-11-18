@@ -118,31 +118,32 @@ export function StatusField({
       >
         <ComboboxValue placeholder={placeholder}>
           {(value) => {
-            const current = value
-              ? statuses.find((status) => status.id === value.value)
-              : undefined;
+            if (!value) {
+              return null;
+            }
 
-            const icon = current === undefined ? value?.icon : current.icon;
+            const current = statuses.find(
+              (status) => status.id === value.value
+            );
+
+            // One row decides every part of the trigger: an icon change and a
+            // section change that keep the id must not disagree.
+            // SAFETY: The items are built from TPostStatus rows, so both
+            // branches are a status type.
+            const type = (current?.type ?? value.type) as BoardPostStatus;
+            const icon = current === undefined ? value.icon : current.icon;
+
+            const label =
+              current === undefined
+                ? value.label
+                : current.label || formatPostStatus(current.type);
 
             return (
               <span className="flex items-center gap-2">
-                {value ? (
-                  <>
-                    <span
-                      className={cn(
-                        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                        BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
-                      )}
-                    >
-                      <PostStatusIcon
-                        icon={icon}
-                        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                        type={value.type as BoardPostStatus}
-                      />
-                    </span>
-                    {value.label}
-                  </>
-                ) : null}
+                <span className={cn(BOARD_LANE_COLOR_MAP[type])}>
+                  <PostStatusIcon icon={icon} type={type} />
+                </span>
+                {label}
               </span>
             );
           }}

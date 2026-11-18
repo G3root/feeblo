@@ -27,6 +27,7 @@ import { toastManager } from "@feeblo/ui/toast";
 import { DEFAULT_POST_STATUS_ICONS } from "@feeblo/web-shared/icons/defaults";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
+import { useRef } from "react";
 import { z } from "zod";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -84,6 +85,9 @@ type EditableStatus = Pick<TPostStatus, "icon" | "id" | "label" | "type"> & {
 function PostStatusEditForm({ status }: { status: EditableStatus }) {
   const { postStatusCollection } = useDashboardCollections();
   const store = usePostStatusEditDialogContext();
+  // The value the form opened with; a save that only renamed the status must
+  // not repoint its icon at a concurrent change.
+  const initialIcon = useRef(status.icon);
 
   const form = useAppForm({
     defaultValues: {
@@ -122,11 +126,16 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
             ) + 1
           : undefined;
 
+        const iconChanged = data.value.icon !== initialIcon.current;
+
         const tx = postStatusCollection.update(status.id, (draft) => {
           draft.color = data.value.color;
-          draft.icon = data.value.icon;
           draft.label = data.value.label;
           draft.type = data.value.type;
+
+          if (iconChanged) {
+            draft.icon = data.value.icon;
+          }
 
           if (orderIndex !== undefined) {
             draft.orderIndex = orderIndex;

@@ -1,10 +1,6 @@
 import { HELP_CENTER_ARTICLE_WRITE_STATES } from "@feeblo/domain-contracts/help-center-article";
 import type { THelpCenterArticle } from "@feeblo/domain/help-center-article/schema";
 import type { THelpCenterTopic } from "@feeblo/domain/help-center-topic/schema";
-import {
-  DEFAULT_HELP_CENTER_TOPIC_ICON,
-  helpCenterTopicIconName,
-} from "@feeblo/web-shared/icons/defaults";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
@@ -24,7 +20,7 @@ export const helpCenterTopicFormSchema = z.object({
     .min(1, "A section needs a name.")
     .max(100, "Use 100 characters or fewer."),
   description: z.string().trim().max(500, "Use 500 characters or fewer."),
-  icon: z.string().trim().min(1).max(64),
+  icon: z.string().trim().max(64).nullable(),
 });
 
 export type HelpCenterTopicFormValues = z.infer<
@@ -46,13 +42,12 @@ export type HelpCenterTopicFormSeed = Pick<
 >;
 
 export const helpCenterTopicFormValues = (
-  topic?: HelpCenterTopicFormSeed,
-  fallbackIcon: string = DEFAULT_HELP_CENTER_TOPIC_ICON
+  topic?: HelpCenterTopicFormSeed
 ): HelpCenterTopicFormValues => ({
   description: topic?.description ?? "",
-  // Resolved here rather than on submit: the picker renders the value it is
-  // given, so a legacy key has to become a Tabler name before the form opens.
-  icon: helpCenterTopicIconName(topic?.icon ?? fallbackIcon),
+  // Null means "no override": the picker shows the client default, and a
+  // "Use default" reset stays null instead of persisting that default.
+  icon: topic?.icon ?? null,
   name: topic?.name ?? "",
 });
 

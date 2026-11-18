@@ -1,13 +1,16 @@
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { isString } from "@feeblo/utils/runtime-kind";
 
+import { TABLER_FILLED_ICON_NAMES } from "./generated/tabler-filled-names";
+
 /**
  * The icon a board, status or help-center topic renders when it has none.
  *
  * The default lives on the client rather than in the database so an existing
- * row can stay null and still draw something. The resolver only fills in a
- * null or empty value; it does not validate a name against the catalogue,
- * because the catalogue is code-split and not available synchronously.
+ * row can stay null and still draw something. A stored name the build does not
+ * know is treated like null: the sprite renders nothing for an unknown symbol,
+ * so an unknown value would otherwise leave an empty tile. The name set is
+ * generated beside the sprite; the search metadata stays code-split.
  */
 export const DEFAULT_BOARD_ICON = "layout-grid";
 
@@ -29,6 +32,9 @@ export const DEFAULT_POST_STATUS_ICONS = {
   CLOSED: "circle-x",
 } satisfies Record<TPostStatusType, string>;
 
+export const isTablerFilledIconName = (name: string): boolean =>
+  TABLER_FILLED_ICON_NAMES.has(name);
+
 const resolveIconName = (
   icon: string | null | undefined,
   fallback: string
@@ -39,7 +45,9 @@ const resolveIconName = (
 
   const trimmed = icon.trim();
 
-  return trimmed.length > 0 ? trimmed : fallback;
+  return trimmed.length > 0 && isTablerFilledIconName(trimmed)
+    ? trimmed
+    : fallback;
 };
 
 export const boardIconName = (icon: string | null | undefined): string =>

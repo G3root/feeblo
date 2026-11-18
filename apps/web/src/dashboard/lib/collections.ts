@@ -347,7 +347,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
-        const { modified: updatedStatus } = mutation;
+        const { modified: updatedStatus, original: previousStatus } = mutation;
         const organizationId = scope.organizationId;
 
         if (!organizationId) {
@@ -361,7 +361,9 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
             type: updatedStatus.type,
             label: updatedStatus.label,
             color: updatedStatus.color ?? null,
-            icon: updatedStatus.icon ?? null,
+            ...(updatedStatus.icon === previousStatus.icon
+              ? {}
+              : { icon: updatedStatus.icon }),
           })
         );
         await collection.utils.refetch({ throwOnError: true });

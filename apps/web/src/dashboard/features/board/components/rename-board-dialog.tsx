@@ -18,6 +18,7 @@ import { DEFAULT_BOARD_ICON } from "@feeblo/web-shared/icons/defaults";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
+import { useRef } from "react";
 
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -82,6 +83,9 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
   const store = useRenameBoardDialogContext();
   const boardId = useSelector(store, (state) => state.context.data.boardId);
   const navigate = useNavigate();
+  // Captured when the sheet opened: a refetch can change the row under the
+  // form, and a save must compare against the value the editor started with.
+  const initialIcon = useRef(board.icon);
 
   const form = useAppForm({
     ...boardFormOpts,
@@ -93,21 +97,35 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
     onSubmit: async ({ formApi, value }) => {
       try {
         const boardSlug = slugify(value.name);
-        // A save that only renamed the board must not repoint the icon at the
-        // value this form opened with; a concurrent icon change would lose.
-        const iconIsDirty = formApi.getFieldMeta("icon")?.isDirty ?? false;
+        const nameIsDirty = formApi.getFieldMeta("name")?.isDirty ?? false;
+
+        const visibilityIsDirty =
+          formApi.getFieldMeta("visibility")?.isDirty ?? false;
+
+        // Compare with the value the sheet opened with, not `isDirty`: the
+        // form's defaults can be replaced by a refetch, and a save that only
+        // changed one field must not repoint the others.
+        const iconChanged = value.icon !== initialIcon.current;
 
         const tx = boardCollection.update(boardId, (draft) => {
-          draft.name = value.name;
-          draft.visibility = value.visibility;
-          draft.slug = boardSlug;
+          if (nameIsDirty) {
+            draft.name = value.name;
+            draft.slug = boardSlug;
+          }
 
-          if (iconIsDirty) {
+          if (visibilityIsDirty) {
+            draft.visibility = value.visibility;
+          }
+
+          if (iconChanged) {
             draft.icon = value.icon;
           }
         });
 
         await tx.when("settled");
+        // The server derives the slug from the saved name, and a concurrent
+        // rename may have moved it. Navigate to the row the save returned.
+        const savedSlug = boardCollection.get(boardId)?.slug ?? boardSlug;
         toastManager.add({
           title: "Board renamed successfully",
           type: "success",
@@ -118,7 +136,7 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
           to: "/$organizationId/board/$boardSlug",
           params: {
             organizationId,
-            boardSlug,
+            boardSlug: savedSlug,
           },
         });
       } catch {

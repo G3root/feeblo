@@ -4,7 +4,10 @@ import { z } from "zod";
 
 export const boardFormSchema = z.object({
   name: z.string().trim().min(1, "Board name is required"),
-  icon: z.string().trim().max(64).nullable(),
+  // No length rule: an existing stored icon must not block a rename. New
+  // selections come from the picker, whose generated names are all shorter
+  // than the column's bound.
+  icon: z.string().trim().nullable(),
   visibility: z.enum(["PUBLIC", "PRIVATE"]),
 });
 
