@@ -1,8 +1,6 @@
 import { cn } from "@feeblo/ui/utils";
 import type React from "react";
 
-import { Heading, Body, Actions } from "./register-shell-parts";
-
 type RootProps = {
   children: React.ReactNode;
   className?: string;
@@ -63,8 +61,4 @@ function Root({ children, className, preview }: RootProps) {
   );
 }
 
-export const RegisterShell = Object.assign(Root, {
-  Heading,
-  Body,
-  Actions,
-});
+export { Root as RegisterShell };

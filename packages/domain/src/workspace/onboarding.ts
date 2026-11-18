@@ -62,7 +62,7 @@ const onboardingPosts: readonly OnboardingPostTemplate[] = [
     kind: "welcome",
     title: "Welcome to your workspace",
     content: [
-      "Your workspace is ready. It has two boards, a public roadmap, a changelog and a help center. We added three sample posts so you can see how they fit together.",
+      "Your workspace is ready. It has boards, a public roadmap, a changelog and a help center. We added three sample posts so you can see how they fit together.",
       "## What you can do here",
       "- Collect posts on the Bugs and Features boards\n- Vote and comment so the most wanted work stays visible\n- Move a post's status to put it on the roadmap\n- Publish what shipped in the changelog",
       "## Suggested next steps",
@@ -111,6 +111,15 @@ const toExcerpt = (content: string): string => {
 };
 
 export type SeedWorkspaceOnboardingArgs = {
+  /**
+   * The boards the workspace was created with, in the reader's order.
+   *
+   * A template names the board it belongs on by slug, and a workspace whose
+   * boards the reader named themselves has none of those slugs. Rather than
+   * dropping the samples, the first board the reader picked takes them, which
+   * is the one they are most likely to open.
+   */
+  readonly boardIds: readonly string[];
   /** The owner membership the sample posts are attributed to. */
   readonly memberId: string;
   readonly organizationId: string;
@@ -223,10 +232,10 @@ const insertSamplePosts = Effect.fn(
  * fails to be created because a template did not insert would be a worse bug
  * than a workspace with no samples.
  *
- * Templates whose board is missing are dropped rather than inserted into a
- * wrong board. The two default boards are written by `createWorkspace` itself,
- * so this only matters if that list changes under this module's feet, which is
- * exactly when dropping them is the honest outcome.
+ * A template names its board by slug and falls back to the first board the
+ * reader picked, so the samples land on a board that exists whatever the
+ * workspace's boards are called. With no boards at all the seed writes
+ * nothing, which is the one case where there is nowhere to put a post.
  */
 export const seedWorkspaceOnboarding = (args: SeedWorkspaceOnboardingArgs) =>
   Effect.gen(function* () {
@@ -246,7 +255,7 @@ export const seedWorkspaceOnboarding = (args: SeedWorkspaceOnboardingArgs) =>
     // miss: a template whose board is absent is dropped here, not filed under
     // an empty id and rolled back by the savepoint.
     const templates = onboardingPosts.flatMap((template) => {
-      const boardId = boardIdBySlug.get(template.boardSlug);
+      const boardId = boardIdBySlug.get(template.boardSlug) ?? args.boardIds[0];
 
       return boardId === undefined ? [] : [{ boardId, template }];
     });

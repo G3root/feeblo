@@ -7,7 +7,7 @@ import {
   verificationCodeFromEmail,
   waitForVerificationEmail,
 } from "./test-mailbox";
-import { createTestUser, type TestUser } from "./test-users";
+import { createTestUser, subdomainFor, type TestUser } from "./test-users";
 import { apiUrl } from "./urls";
 
 export type AuthenticatedUser = TestUser & {
@@ -73,7 +73,10 @@ export async function signUpAndCreateWorkspace(
   // Submit the workspace form and wait for the org dashboard to load.
   await Promise.all([
     page.waitForURL(/\/org_/),
-    registerPage.createWorkspace(user.workspaceName),
+    registerPage.createWorkspace(
+      user.workspaceName,
+      subdomainFor(user.workspaceName)
+    ),
   ]);
 
   // The first workspace opens the welcome tour over the dashboard.
@@ -95,7 +98,10 @@ export async function createAuthenticatedWorkspace(
 
   await Promise.all([
     page.waitForURL(/\/org_/),
-    registerPage.createWorkspace(user.workspaceName),
+    registerPage.createWorkspace(
+      user.workspaceName,
+      subdomainFor(user.workspaceName)
+    ),
   ]);
 
   // The first workspace opens the welcome tour over the dashboard.

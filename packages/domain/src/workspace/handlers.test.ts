@@ -1,6 +1,7 @@
 import { describe, expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
 import { WorkspaceId } from "@feeblo/id";
+import { slugify } from "@feeblo/utils/url";
 import { and, eq } from "drizzle-orm";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
@@ -13,6 +14,9 @@ import { SubdomainValidationService } from "../site/subdomain/service";
 import { WorkspaceRpcHandlersEffect } from "./handlers";
 import { WorkspacePolicy } from "./policies";
 import { WorkspaceRepository } from "./repository";
+
+/** The two boards a create writes when the reader keeps the defaults. */
+const DEFAULT_BOARDS = ["Bugs 🐞", "Features 💡"] as const;
 
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
@@ -160,7 +164,11 @@ describe("WorkspaceRpcHandlers", () => {
             };
 
             const result = yield* handlers
-              .CreateWorkspace({ workspaceName: "My Awesome Workspace" })
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "my-awesome-workspace",
+                workspaceName: "My Awesome Workspace",
+              })
               .pipe(Effect.provideService(CurrentSession, session));
 
             expect(result.organizationId).toBeDefined();
@@ -276,24 +284,24 @@ describe("WorkspaceRpcHandlers", () => {
           })
       );
 
-      it.effect(
-        "rejects workspace names that produce subdomain shorter than 4 characters",
-        () =>
-          Effect.gen(function* () {
-            const handlers = yield* WorkspaceRpcHandlersEffect;
-            const fixture = yield* makeFixture();
+      it.effect("rejects a subdomain shorter than 4 characters", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const fixture = yield* makeFixture();
 
-            const error = yield* Effect.flip(
-              handlers
-                .CreateWorkspace({ workspaceName: "a" })
-                .pipe(
-                  Effect.provideService(CurrentSession, makeSession(fixture))
-                )
-            );
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "ab",
+                workspaceName: "Fine Name",
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+          );
 
-            expect(error._tag).toBe("BadRequestError");
-            expect(error.message).toContain("at least 4 characters");
-          })
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toContain("at least 4 characters");
+        })
       );
 
       it.effect("rejects reserved subdomains", () =>
@@ -304,7 +312,11 @@ describe("WorkspaceRpcHandlers", () => {
           // "feeblo" is a reserved subdomain and is at least 4 characters
           const error = yield* Effect.flip(
             handlers
-              .CreateWorkspace({ workspaceName: "feeblo" })
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "feeblo",
+                workspaceName: "Feeblo Feedback",
+              })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
@@ -326,7 +338,11 @@ describe("WorkspaceRpcHandlers", () => {
 
           const error = yield* Effect.flip(
             handlers
-              .CreateWorkspace({ workspaceName: "Existing Workspace" })
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "existing-workspace",
+                workspaceName: "Existing Workspace",
+              })
               .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
           );
 
@@ -711,12 +727,20 @@ describe("WorkspaceRpcHandlers", () => {
           });
         });
 
-      const createWorkspace = (userId: string, workspaceName: string) =>
+      const createWorkspace = (
+        userId: string,
+        workspaceName: string,
+        boardNames: readonly string[] = DEFAULT_BOARDS
+      ) =>
         Effect.gen(function* () {
           const handlers = yield* WorkspaceRpcHandlersEffect;
 
           return yield* handlers
-            .CreateWorkspace({ workspaceName })
+            .CreateWorkspace({
+              boardNames,
+              subdomain: slugify(workspaceName),
+              workspaceName,
+            })
             .pipe(
               Effect.provideService(CurrentSession, newUserSession(userId))
             );
@@ -796,6 +820,69 @@ describe("WorkspaceRpcHandlers", () => {
 
           expect(tagLinks).toHaveLength(3);
           expect(new Set(tagLinks.map((link) => link.tagId)).size).toBe(1);
+        })
+      );
+
+      it.effect("keeps the boards the reader named, in their order", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const userId = "user_custom_boards";
+          yield* seedUser(userId);
+
+          const { organizationId } = yield* createWorkspace(
+            userId,
+            "Custom Boards",
+            ["Ideas", "Complaints"]
+          );
+
+          const boards = yield* db
+            .select({ id: schema.boardTable.id, name: schema.boardTable.name })
+            .from(schema.boardTable)
+            .where(eq(schema.boardTable.organizationId, organizationId));
+
+          expect(boards.map((board) => board.name)).toStrictEqual([
+            "Ideas",
+            "Complaints",
+          ]);
+
+          // The templates name their own boards by slug, and neither of these
+          // is one of them, so every sample lands on the first board the reader
+          // picked instead of being dropped.
+          const posts = yield* db
+            .select({ boardId: schema.postTable.boardId })
+            .from(schema.postTable)
+            .where(eq(schema.postTable.organizationId, organizationId));
+
+          expect(posts).toHaveLength(3);
+          expect(new Set(posts.map((post) => post.boardId))).toStrictEqual(
+            new Set([boards[0]?.id])
+          );
+        })
+      );
+
+      it.effect("collapses board names that share a slug", () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const userId = "user_duplicate_boards";
+          yield* seedUser(userId);
+
+          const { organizationId } = yield* createWorkspace(
+            userId,
+            "Duplicate Boards",
+            ["Bugs", " bugs ", "Ideas"]
+          );
+
+          const boards = yield* db
+            .select({ name: schema.boardTable.name })
+            .from(schema.boardTable)
+            .where(eq(schema.boardTable.organizationId, organizationId));
+
+          // A board slug is unique per workspace, so the second "bugs" would
+          // violate the index. The first spelling wins.
+          expect(boards.map((board) => board.name)).toStrictEqual([
+            "Bugs",
+            "Ideas",
+          ]);
         })
       );
 

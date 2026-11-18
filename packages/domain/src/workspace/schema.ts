@@ -10,7 +10,22 @@ export const WorkspacePlan = S.Struct({
 });
 
 export const CreateWorkspaceInput = S.Struct({
-  workspaceName: S.String.pipe(S.check(S.isMinLength(3))),
+  workspaceName: S.String.pipe(S.check(S.isMinLength(2))),
+  /**
+   * The subdomain the reader chose, not one derived from the name.
+   *
+   * Two names can want the same address, and a name that reads well in the
+   * sidebar can make an address nobody wants to type. The check the field
+   * shows (`CheckWorkspaceSlug`) and this field are the same string, so the
+   * server validates rather than computes it.
+   */
+  subdomain: S.String.pipe(S.check(S.isMinLength(4))),
+  /**
+   * The boards the workspace starts with, in the order the reader picked them.
+   * At least one, because the sample posts need somewhere to land and an
+   * empty board list is a state the empty dashboard already covers.
+   */
+  boardNames: S.Array(S.String).pipe(S.check(S.isMinLength(1))),
 });
 
 export const CreateWorkspaceOutput = S.Struct({

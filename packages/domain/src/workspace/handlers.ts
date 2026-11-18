@@ -17,6 +17,31 @@ import type {
   TWorkspaceSlugCheckInput,
 } from "./schema";
 
+/**
+ * The board names a create will write.
+ *
+ * Trimmed, with blanks and repeats dropped. `board.slug` is unique per
+ * workspace, and two names that slugify to the same string would collide on
+ * insert, so the first one wins and the second is dropped rather than failing
+ * a create the reader cannot fix from the form.
+ */
+const normalizeBoardNames = (names: readonly string[]): string[] => {
+  const bySlug = new Map<string, string>();
+
+  for (const name of names) {
+    const trimmed = name.trim();
+    const slug = slugify(trimmed);
+
+    if (slug.length === 0 || bySlug.has(slug)) {
+      continue;
+    }
+
+    bySlug.set(slug, trimmed);
+  }
+
+  return [...bySlug.values()];
+};
+
 export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* WorkspaceRepository;
   const workspacePolicy = yield* WorkspacePolicy;
@@ -35,17 +60,27 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
         // transaction writes is the durable record of who created it.
         const session = yield* CurrentSession;
         const workspaceName = args.workspaceName.trim();
+        const subdomain = args.subdomain.trim().toLowerCase();
 
-        const subdomain = slugify(workspaceName);
-
+        // The schema already refuses a short subdomain, but the handlers are
+        // also called directly (tests, and any future internal caller that
+        // skips decoding), and a two-character address would pass every other
+        // check in this function.
         if (subdomain.length < 4) {
           return yield* new BadRequestError({
-            message:
-              "Workspace name must produce a subdomain of at least 4 characters",
+            message: "Subdomain must be at least 4 characters",
           });
         }
 
         yield* validateSubdomain(subdomain);
+
+        const boardNames = normalizeBoardNames(args.boardNames);
+
+        if (boardNames.length === 0) {
+          return yield* new BadRequestError({
+            message: "A workspace needs at least one board",
+          });
+        }
 
         return yield* transaction(
           Effect.gen(function* () {
@@ -75,9 +110,10 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
             );
 
             const organizationId = yield* repository.createWorkspace({
+              boardNames,
+              subdomain,
               userId: session.session.userId,
               workspaceName,
-              subdomain,
             });
 
             return { isFirstWorkspace: owned.length === 0, organizationId };

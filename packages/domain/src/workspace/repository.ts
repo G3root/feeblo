@@ -27,6 +27,8 @@ import { FailedToCreateWorkspaceError } from "./errors";
 import { seedWorkspaceOnboarding } from "./onboarding";
 
 interface CreateWorkspaceArgs {
+  /** Trimmed, de-duplicated board names, in the order the reader picked them. */
+  boardNames: readonly string[];
   subdomain: string;
   userId: string;
   workspaceName: string;
@@ -268,9 +270,12 @@ const makeWorkspaceRepository = Effect.gen(function* () {
             });
           }
 
-          const defaultBoards = ["Bugs 🐞", "Features 💡"] as const;
+          // The order is the reader's, and the seed below uses the first board
+          // as the fallback home for a sample post whose own board the reader
+          // did not pick.
+          const boardIds: string[] = [];
 
-          for (const boardName of defaultBoards) {
+          for (const boardName of args.boardNames) {
             const boardId = yield* BoardId.generate;
             yield* tx.insert(schema.boardTable).values({
               id: boardId,
@@ -281,6 +286,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
               createdAt: now,
               updatedAt: now,
             });
+            boardIds.push(boardId);
           }
 
           const siteId = yield* SiteId.generate;
@@ -302,6 +308,7 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           yield* db
             .transaction(() =>
               seedWorkspaceOnboarding({
+                boardIds,
                 memberId,
                 organizationId,
                 userId: args.userId,

@@ -1,16 +1,14 @@
 import { createContext, type ReactNode, useContext } from "react";
 
-import type { WorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
+import type { WorkspaceSlugAvailability } from "../hooks/use-slug-availability";
 
 /**
- * The page's one slash-availability machine, for the two places that read it.
+ * The page's one slug-availability machine, for the two places that read it.
  *
- * The register page owns the check because two subtrees render its answer: the
- * form field's footer ("Name is available", the suggestion button) and the
- * preview's address bar. Passing it down through `withForm`'s `props` would
- * have meant inventing a default value for a prop the page always supplies — a
- * no-op `reportWorkspaceName` that silently drops input if the wiring ever
- * slipped — so the value travels through context instead, where "not provided"
+ * The url step renders the verdict in the field's footer, and the preview
+ * renders it in the address bar. Passing it down through `withForm`'s `props`
+ * would have meant inventing a default value for an object the page always
+ * supplies, so the value travels through context instead, where "not provided"
  * is an error rather than a plausible-looking lie.
  */
 const SlugAvailabilityContext = createContext<WorkspaceSlugAvailability | null>(
@@ -29,12 +27,12 @@ export function SlugAvailabilityProvider({
   );
 }
 
-export function useSlugAvailability(): WorkspaceSlugAvailability {
+export function useSlugAvailabilityContext(): WorkspaceSlugAvailability {
   const value = useContext(SlugAvailabilityContext);
 
   if (value === null) {
     throw new Error(
-      "useSlugAvailability must be used inside SlugAvailabilityProvider"
+      "useSlugAvailabilityContext must be used inside SlugAvailabilityProvider"
     );
   }
 

@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures";
 import { signUpProgrammatically } from "../helpers/auth";
-import { createTestUser } from "../helpers/test-users";
+import { createTestUser, subdomainFor } from "../helpers/test-users";
 import { RegisterPage } from "../page-objects/RegisterPage";
 
 /**
@@ -21,7 +21,10 @@ test.describe("welcome tour", () => {
     await registerPage.goto();
     await Promise.all([
       page.waitForURL(/\/org_/),
-      registerPage.createWorkspace(user.workspaceName),
+      registerPage.createWorkspace(
+        user.workspaceName,
+        subdomainFor(user.workspaceName)
+      ),
     ]);
 
     const tour = page.getByRole("dialog");

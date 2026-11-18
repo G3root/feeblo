@@ -15,7 +15,7 @@ import type React from "react";
  * own board, so the step they read is recognisable on the screen behind it. An
  * illustration of a feature teaches nothing; the row teaches the shape.
  *
- * Every step names something this workspace actually has: the two boards and
+ * Every step names something this workspace actually has: the boards and
  * six statuses `createWorkspace` writes, the roadmap columns, the changelog
  * categories, the widget, the Public API. The three posts the rows name are
  * the ones the seed puts on the board, so a reader who follows the tour sees
@@ -128,9 +128,9 @@ export function buildWelcomeTourSteps({
       title: `Welcome to ${workspaceName}`,
       description: (
         <>
-          Your workspace has two boards, a roadmap, a changelog and a help
-          center. We added three posts so you can see how they fit together.
-          Edit or delete them whenever you like.
+          Your workspace has boards, a roadmap, a changelog and a help center.
+          We added three posts so you can see how they fit together. Edit or
+          delete them whenever you like.
         </>
       ),
       detail: (

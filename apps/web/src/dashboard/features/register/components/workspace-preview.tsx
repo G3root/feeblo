@@ -10,9 +10,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-import type { WorkspaceSlugAvailability } from "../hooks/use-workspace-slug-availability";
-import { useSlugAvailability } from "../lib/slug-availability-context";
-import { toWorkspaceSlug } from "../utils";
+import type { WorkspaceSlugAvailability } from "../hooks/use-slug-availability";
+import type { RegisterBoardDraft } from "../lib/register-draft";
 
 /**
  * The workspace the reader is about to create, rendered as the public board it
@@ -172,27 +171,35 @@ function PreviewRow({
 }
 
 export function WorkspacePreview({
+  boards,
+  logoUrl,
+  status,
+  subdomain,
+  suggestion,
   workspaceName,
 }: {
+  readonly boards: readonly RegisterBoardDraft[];
+  readonly logoUrl: string | null;
+  readonly status: WorkspaceSlugAvailability["availability"]["status"];
+  readonly subdomain: string;
+  readonly suggestion: string | null;
   readonly workspaceName: string;
 }) {
-  const { availability } = useSlugAvailability();
   const name = workspaceName.trim() || placeholderName;
-  const slug = toWorkspaceSlug(workspaceName);
+
+  const visibleBoards = boards.filter(
+    (board) => board.enabled && board.name.trim().length > 0
+  );
 
   return (
     <div className="border-border/60 bg-card flex h-full min-h-0 flex-col overflow-hidden rounded-xl border shadow-xl shadow-black/5">
-      <AddressBar
-        slug={slug}
-        status={availability.status}
-        suggestion={availability.suggestion}
-      />
+      <AddressBar slug={subdomain} status={status} suggestion={suggestion} />
 
       {/* The public board's header, which is what the subdomain serves. */}
       <header className="border-border/60 bg-background/80 shrink-0 border-b px-5">
         <div className="flex h-14 items-center gap-4">
           <div className="flex min-w-0 items-center gap-2">
-            <UserAvatar image={null} name={name} />
+            <UserAvatar image={logoUrl} name={name} />
             <span className="truncate text-sm font-semibold tracking-tight">
               {name}
             </span>
@@ -204,6 +211,22 @@ export function WorkspacePreview({
           </nav>
         </div>
       </header>
+
+      {/* The boards the reader kept, as the board list will show them. */}
+      <div className="border-border/60 flex shrink-0 items-center gap-2 overflow-x-auto border-b px-5 py-2">
+        {visibleBoards.length === 0 ? (
+          <span className="text-muted-foreground text-xs">No boards yet</span>
+        ) : (
+          visibleBoards.map((board) => (
+            <span
+              className="bg-muted text-muted-foreground rounded-md px-2 py-1 text-xs"
+              key={board.id}
+            >
+              {board.name}
+            </span>
+          ))
+        )}
+      </div>
 
       {/* The board's own scroller: the page never scrolls, the list does, the
           way it will once this board exists. */}
