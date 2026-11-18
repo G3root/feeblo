@@ -225,7 +225,9 @@ function TopicFields({
             <IconPickerField
               fallbackIcon={DEFAULT_HELP_CENTER_TOPIC_ICON}
               label="Choose icon"
-              onChange={(icon) => field.handleChange(icon)}
+              onChange={(icon) =>
+                field.handleChange(icon ?? DEFAULT_HELP_CENTER_TOPIC_ICON)
+              }
               value={field.state.value}
             />
           )}

@@ -60,13 +60,14 @@ function PostStatusCreateForm({ type }: { type: TPostStatusType }) {
   const form = useAppForm({
     defaultValues: {
       color: DEFAULT_POST_STATUS_COLORS[type],
-      icon: DEFAULT_POST_STATUS_ICONS[type],
+      // SAFETY: The form's icon is nullable; null means "use the type default".
+      icon: null as string | null,
       label: "",
     },
     validators: {
       onSubmit: z.object({
         color: z.string(),
-        icon: z.string().trim().min(1).max(64),
+        icon: z.string().trim().max(64).nullable(),
         label: z.string().min(1).max(60),
       }),
     },

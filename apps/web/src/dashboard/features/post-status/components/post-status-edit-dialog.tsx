@@ -1,4 +1,7 @@
-import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
+import type {
+  TPostStatus,
+  TPostStatusType,
+} from "@feeblo/domain/post-status/schema";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -73,12 +76,9 @@ export function PostStatusEditDialog() {
   );
 }
 
-type EditableStatus = {
-  color: string | null;
-  icon: string | null;
-  id: string;
-  label: string;
-  type: TPostStatusType;
+type EditableStatus = Pick<TPostStatus, "icon" | "id" | "label" | "type"> & {
+  /** The projection normalizes the optional column to an explicit null. */
+  color: Exclude<TPostStatus["color"], undefined>;
 };
 
 function PostStatusEditForm({ status }: { status: EditableStatus }) {
@@ -88,14 +88,16 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
   const form = useAppForm({
     defaultValues: {
       color: status.color,
-      icon: status.icon ?? DEFAULT_POST_STATUS_ICONS[status.type],
+      icon: status.icon,
       label: status.label,
       type: status.type,
     },
     validators: {
       onSubmit: z.object({
         color: z.string().nullable(),
-        icon: z.string().trim().min(1).max(64),
+        // No length rule here: an untouched stored icon must not block an
+        // unrelated edit. The picker can only emit catalogue names.
+        icon: z.string().trim().nullable(),
         label: z.string().min(1).max(60),
         type: z.enum([
           "PENDING",
@@ -171,19 +173,23 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
             </Field>
           )}
         </form.AppField>
-        <form.AppField name="icon">
-          {(field) => (
-            <Field>
-              <FieldLabel>Icon</FieldLabel>
-              <IconPickerField
-                fallbackIcon={DEFAULT_POST_STATUS_ICONS[status.type]}
-                label="Choose icon"
-                onChange={(icon) => field.handleChange(icon)}
-                value={field.state.value}
-              />
-            </Field>
+        <form.Subscribe selector={(state) => state.values.type}>
+          {(type) => (
+            <form.AppField name="icon">
+              {(field) => (
+                <Field>
+                  <FieldLabel>Icon</FieldLabel>
+                  <IconPickerField
+                    fallbackIcon={DEFAULT_POST_STATUS_ICONS[type]}
+                    label="Choose icon"
+                    onChange={(icon) => field.handleChange(icon)}
+                    value={field.state.value}
+                  />
+                </Field>
+              )}
+            </form.AppField>
           )}
-        </form.AppField>
+        </form.Subscribe>
         <form.AppField name="type">
           {(field) => (
             <Field>

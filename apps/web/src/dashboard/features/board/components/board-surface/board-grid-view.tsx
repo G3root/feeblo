@@ -75,6 +75,7 @@ function movePostToColumn(
           {
             ...movedPost,
             status: targetStatus,
+            statusIcon: lane.statusIcon,
             statusId: targetLaneStatusId,
           },
           ...lane.posts,

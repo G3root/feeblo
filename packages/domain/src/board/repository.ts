@@ -21,9 +21,9 @@ interface TBoardCreate {
 interface TBoardUpdate {
   icon?: string | null | undefined;
   id: string;
-  name?: string;
+  name?: string | undefined;
   organizationId: string;
-  visibility?: "PUBLIC" | "PRIVATE";
+  visibility?: "PUBLIC" | "PRIVATE" | undefined;
 }
 
 interface TBoardFindById {

@@ -43,13 +43,12 @@ type PostRowLike = Pick<
 type PostStatusRowLike = Pick<
   TPostStatus,
   "id" | "label" | "organizationId" | "type"
-> & {
+> &
   /**
    * Optional so a collection fixture that predates the picker still satisfies
    * the constraint; the production collection always carries it.
    */
-  icon?: string | null;
-};
+  Partial<Pick<TPostStatus, "icon">>;
 
 type RoadmapRowLike = Pick<
   TRoadmap,

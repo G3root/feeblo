@@ -36,9 +36,9 @@ export type TBoardCreate = S.Schema.Type<typeof BoardCreate>;
 
 export const BoardUpdate = S.Struct({
   id: BoardId.schema,
-  name: S.String,
+  name: S.optional(S.String),
   icon: S.optional(S.NullOr(S.String)),
-  visibility: S.Literals(["PUBLIC", "PRIVATE"]),
+  visibility: S.optional(S.Literals(["PUBLIC", "PRIVATE"])),
   organizationId: WorkspaceId.schema,
 });
 

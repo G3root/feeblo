@@ -1557,8 +1557,9 @@ function IconPickerField({
 }: IconPickerFieldProps): ReactElement {
   const [open, setOpen] = useState(false);
 
-  const selected =
-    isString(value) && value.trim().length > 0 ? value : fallbackIcon;
+  const trimmedValue = isString(value) ? value.trim() : "";
+
+  const selected = trimmedValue.length > 0 ? trimmedValue : fallbackIcon;
 
   return (
     <Popover onOpenChange={setOpen} open={open}>
@@ -1589,7 +1590,7 @@ function IconPickerField({
         <div className="mt-1 flex justify-end">
           <Button
             onClick={() => {
-              onChange(fallbackIcon);
+              onChange(null);
               setOpen(false);
             }}
             size="xs"

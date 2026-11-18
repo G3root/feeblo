@@ -1,3 +1,4 @@
+import type { TBoard } from "@feeblo/domain/board/schema";
 import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { IconPickerField } from "@feeblo/ui/icon-picker";
@@ -22,7 +23,7 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useRenameBoardDialogContext } from "../dialog-stores";
-import { type BoardFormValues, boardFormOpts } from "../shared-form";
+import { boardFormOpts } from "../shared-form";
 import { BoardVisibilityField } from "./board-visibility-field";
 
 export function RenameBoardDialog() {
@@ -72,18 +73,8 @@ function RenameBoardForm() {
   return <RenameBoardFormFields board={board} />;
 }
 
-/**
- * The row the edit sheet seeds from.
- *
- * `icon` is the stored nullable value, not the form's string: the form defaults
- * it to the client's default, and the row itself is allowed to have never
- * picked one.
- */
-type RenameBoardRow = {
-  icon: string | null;
-  name: string;
-  visibility: BoardFormValues["visibility"];
-};
+/** The row the edit sheet seeds from. */
+type RenameBoardRow = Pick<TBoard, "icon" | "name" | "visibility">;
 
 function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
   const organizationId = useOrganizationId();
@@ -96,18 +87,24 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
     ...boardFormOpts,
     defaultValues: {
       name: board.name,
-      icon: board.icon ?? DEFAULT_BOARD_ICON,
+      icon: board.icon,
       visibility: board.visibility,
     },
-    onSubmit: async (data) => {
+    onSubmit: async ({ formApi, value }) => {
       try {
-        const boardSlug = slugify(data.value.name);
+        const boardSlug = slugify(value.name);
+        // A save that only renamed the board must not repoint the icon at the
+        // value this form opened with; a concurrent icon change would lose.
+        const iconIsDirty = formApi.getFieldMeta("icon")?.isDirty ?? false;
 
         const tx = boardCollection.update(boardId, (draft) => {
-          draft.name = data.value.name;
-          draft.icon = data.value.icon;
-          draft.visibility = data.value.visibility;
+          draft.name = value.name;
+          draft.visibility = value.visibility;
           draft.slug = boardSlug;
+
+          if (iconIsDirty) {
+            draft.icon = value.icon;
+          }
         });
 
         await tx.when("settled");

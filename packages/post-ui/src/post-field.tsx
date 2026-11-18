@@ -39,13 +39,12 @@ export function FieldRow({
   );
 }
 
-type PostStatusChoice = Pick<TPostStatus, "id" | "label" | "type"> & {
+type PostStatusChoice = Pick<TPostStatus, "id" | "label" | "type"> &
   /**
    * Optional because a caller that builds its own option list may not carry
    * the icon; the status then renders its type's default.
    */
-  icon?: string | null;
-};
+  Partial<Pick<TPostStatus, "icon">>;
 
 export function StatusField({
   currentStatusId,
@@ -118,27 +117,35 @@ export function StatusField({
         }
       >
         <ComboboxValue placeholder={placeholder}>
-          {(value) => (
-            <span className="flex items-center gap-2">
-              {value ? (
-                <>
-                  <span
-                    className={cn(
-                      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                      BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
-                    )}
-                  >
-                    <PostStatusIcon
-                      icon={value.icon}
-                      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                      type={value.type as BoardPostStatus}
-                    />
-                  </span>
-                  {value.label}
-                </>
-              ) : null}
-            </span>
-          )}
+          {(value) => {
+            const current = value
+              ? statuses.find((status) => status.id === value.value)
+              : undefined;
+
+            const icon = current === undefined ? value?.icon : current.icon;
+
+            return (
+              <span className="flex items-center gap-2">
+                {value ? (
+                  <>
+                    <span
+                      className={cn(
+                        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+                        BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
+                      )}
+                    >
+                      <PostStatusIcon
+                        icon={icon}
+                        // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+                        type={value.type as BoardPostStatus}
+                      />
+                    </span>
+                    {value.label}
+                  </>
+                ) : null}
+              </span>
+            );
+          }}
         </ComboboxValue>
       </ComboboxTrigger>
       <ComboboxPopup aria-label={m.safe_jolly_shell()} className="w-full">

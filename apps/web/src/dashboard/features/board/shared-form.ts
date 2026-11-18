@@ -4,16 +4,15 @@ import { z } from "zod";
 
 export const boardFormSchema = z.object({
   name: z.string().trim().min(1, "Board name is required"),
-  icon: z.string().trim().min(1).max(64),
+  icon: z.string().trim().max(64).nullable(),
   visibility: z.enum(["PUBLIC", "PRIVATE"]),
 });
-
-export type BoardFormValues = z.infer<typeof boardFormSchema>;
 
 export const boardFormOpts = formOptions({
   defaultValues: {
     name: "",
-    icon: DEFAULT_BOARD_ICON,
+    // SAFETY: The form's icon is nullable; null means "use the client default".
+    icon: null as string | null,
     // SAFETY: The upstream source guarantees one of these values; the cast bridges an untyped API.
     visibility: "PUBLIC" as "PUBLIC" | "PRIVATE",
   },

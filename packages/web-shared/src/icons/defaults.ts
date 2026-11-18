@@ -32,7 +32,15 @@ export const DEFAULT_POST_STATUS_ICONS = {
 const resolveIconName = (
   icon: string | null | undefined,
   fallback: string
-): string => (isString(icon) && icon.trim().length > 0 ? icon : fallback);
+): string => {
+  if (!isString(icon)) {
+    return fallback;
+  }
+
+  const trimmed = icon.trim();
+
+  return trimmed.length > 0 ? trimmed : fallback;
+};
 
 export const boardIconName = (icon: string | null | undefined): string =>
   resolveIconName(icon, DEFAULT_BOARD_ICON);

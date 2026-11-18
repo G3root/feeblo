@@ -47,11 +47,23 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
     hasPermission(organizationId, "posts.status")
   );
 
-  const [dragPreview, setDragPreview] = useState<
-    RoadmapLane<RoadmapBoardPost>[] | null
-  >(null);
+  /**
+   * The active drag, as the post and the lane it is hovering over.
+   *
+   * The preview is derived from `lanes` on every render rather than stored as
+   * a lane snapshot: a live-query refetch during a drag must refresh every
+   * field of the lanes the preview shows, while the hovered target stays where
+   * the pointer is.
+   */
+  const [dragPreview, setDragPreview] = useState<{
+    postId: string;
+    targetStatusId: string;
+  } | null>(null);
 
-  const items = dragPreview ?? lanes;
+  const items =
+    dragPreview === null
+      ? lanes
+      : movePostToStatus(lanes, dragPreview.postId, dragPreview.targetStatusId);
 
   const activeDrag = useRef<{
     sourceId: string;
@@ -99,18 +111,10 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
         activeDrag.current.targetStatusId = targetStatusId;
       }
 
-      setDragPreview((currentItems) =>
-        movePostToStatus(
-          // SAFETY: The upstream contract guarantees a string here.
-          // SAFETY: The upstream contract guarantees a string here.
-          currentItems ?? lanes,
-          // SAFETY: The upstream contract guarantees a string here.
-          source.id as string,
-          targetStatusId
-        )
-      );
+      // SAFETY: The upstream contract guarantees a string here.
+      setDragPreview({ postId: source.id as string, targetStatusId });
     },
-    [lanes]
+    []
   );
 
   const handleDragEnd = useCallback<DragDropEventHandlers["onDragEnd"]>(

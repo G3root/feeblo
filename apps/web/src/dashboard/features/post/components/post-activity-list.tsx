@@ -158,12 +158,18 @@ function getActivityDescription({
   return descriptions[activity.kind];
 }
 
-type ActivityIcon = {
-  color: string;
-  icon?: typeof FileAddIcon;
-  statusIcon?: string | null;
-  statusType?: BoardPostStatus;
-};
+type ActivityIcon =
+  | {
+      color: string;
+      kind: "status";
+      statusIcon: string | null;
+      statusType: BoardPostStatus;
+    }
+  | {
+      color: string;
+      icon: typeof FileAddIcon;
+      kind: "generic";
+    };
 
 function getActivityIcon(
   activity: TPostActivity,
@@ -175,6 +181,7 @@ function getActivityIcon(
     if (status) {
       return {
         color: BOARD_LANE_COLOR_MAP[status.type] ?? "text-muted-foreground",
+        kind: "status",
         statusIcon: status.icon,
         statusType: status.type,
       };
@@ -183,7 +190,8 @@ function getActivityIcon(
 
   return {
     color: "text-muted-foreground",
-    icon: activityIconMap[activity.kind],
+    icon: activityIconMap[activity.kind] ?? FileAddIcon,
+    kind: "generic",
   };
 }
 
@@ -339,7 +347,7 @@ export function PostActivityList({
         return (
           <ActivityTimelineItem
             icon={
-              activityIcon.statusType ? (
+              activityIcon.kind === "status" ? (
                 <span className={cn("inline-flex", color)}>
                   <PostStatusIcon
                     className="size-3.5"
@@ -351,7 +359,7 @@ export function PostActivityList({
                 <HugeiconsIcon
                   aria-hidden="true"
                   className={cn("size-3.5", color)}
-                  icon={activityIcon.icon ?? FileAddIcon}
+                  icon={activityIcon.icon}
                   strokeWidth={2}
                 />
               )

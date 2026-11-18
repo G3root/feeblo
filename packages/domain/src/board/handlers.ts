@@ -153,12 +153,13 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
             const nextIcon =
               args.icon === undefined ? previous.icon : args.icon;
 
+            const nextName = args.name ?? previous.name;
+            const nextVisibility = args.visibility ?? previous.visibility;
+
             const fields = [
-              ...(previous.name === args.name ? [] : ["name"]),
+              ...(previous.name === nextName ? [] : ["name"]),
               ...(previous.icon === nextIcon ? [] : ["icon"]),
-              ...(previous.visibility === args.visibility
-                ? []
-                : ["visibility"]),
+              ...(previous.visibility === nextVisibility ? [] : ["visibility"]),
             ];
 
             yield* repository.update(args);
@@ -182,8 +183,8 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
                 },
                 after: {
                   icon: nextIcon,
-                  name: args.name,
-                  visibility: args.visibility,
+                  name: nextName,
+                  visibility: nextVisibility,
                 },
               },
             });

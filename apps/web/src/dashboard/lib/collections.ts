@@ -815,16 +815,25 @@ export function boardCollection(scope: DashboardCollectionScope) {
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
-        const { modified: updatedBoard } = mutation;
+        const { modified: updatedBoard, original: previousBoard } = mutation;
 
+        // Only the fields this edit actually changed. `UpdateBoard` treats an
+        // omitted field as "leave it alone", so a concurrent change to another
+        // field is not overwritten by this row's cached copy.
         await fetchRpc(
           (rpc) =>
             rpc.UpdateBoard({
               id: updatedBoard.id,
-              name: updatedBoard.name,
-              icon: updatedBoard.icon ?? null,
-              visibility: updatedBoard.visibility,
               organizationId: updatedBoard.organizationId,
+              ...(updatedBoard.name === previousBoard.name
+                ? {}
+                : { name: updatedBoard.name }),
+              ...(updatedBoard.icon === previousBoard.icon
+                ? {}
+                : { icon: updatedBoard.icon }),
+              ...(updatedBoard.visibility === previousBoard.visibility
+                ? {}
+                : { visibility: updatedBoard.visibility }),
             }),
           {}
         );
