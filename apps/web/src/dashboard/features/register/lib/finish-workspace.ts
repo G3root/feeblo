@@ -9,6 +9,59 @@ import type {
 } from "./register-wizard-machine";
 
 /**
+ * The two calls the post-create work makes.
+ *
+ * Injected rather than reached for, so the behaviour below can be tested
+ * without standing up an auth client or an object store: the interesting part
+ * is what happens when one of them fails, and a fake is the only way to make
+ * that happen on purpose.
+ */
+export type FinishWorkspaceDeps = {
+  /** Sends one invitation. A non-null `error` means the server refused it. */
+  readonly invite: (input: {
+    readonly email: string;
+    readonly organizationId: string;
+  }) => Promise<{ readonly error: unknown }>;
+  /** Applies the logo. `false` means it did not land. */
+  readonly uploadLogo: (input: {
+    readonly file: File;
+    readonly organizationId: string;
+  }) => Promise<boolean>;
+};
+
+const liveDeps: FinishWorkspaceDeps = {
+  invite: async ({ email, organizationId }) => {
+    const result = await authClient.organization.inviteMember({
+      email,
+      organizationId,
+      // The least privilege an invitation can carry. Onboarding is the wrong
+      // moment to hand someone management rights, and the owner can raise the
+      // role from settings once they know what the person should do.
+      role: "contributor",
+    });
+
+    return { error: result.error };
+  },
+  uploadLogo: async ({ file, organizationId }) => {
+    const body = new FormData();
+    body.set("file", file);
+    body.set("organizationId", organizationId);
+
+    try {
+      const response = await fetch(organizationLogoUploadEndpoint, {
+        body,
+        credentials: "include",
+        method: "POST",
+      });
+
+      return response.ok;
+    } catch {
+      return false;
+    }
+  },
+};
+
+/**
  * The work that happens after the workspace exists: the logo, then the
  * invitations.
  *
@@ -21,16 +74,17 @@ import type {
  * things the reader can retry from settings, and the wizard reports them in its
  * summary rather than failing a create that has already happened.
  */
-export async function finishWorkspace({
-  invites,
-  logo,
-  organizationId,
-}: FinishWorkspacePayload): Promise<FinishWorkspaceResult> {
+export async function finishWorkspace(
+  { invites, logo, organizationId }: FinishWorkspacePayload,
+  deps: FinishWorkspaceDeps = liveDeps
+): Promise<FinishWorkspaceResult> {
   // Independent of each other, so they go together: the reader is waiting on
   // both, and one has no bearing on the other's request.
   const [invitations, logoUploaded] = await Promise.all([
-    sendInvites({ invites, organizationId }),
-    uploadLogo({ logo, organizationId }),
+    sendInvites({ deps, invites, organizationId }),
+    logo === null
+      ? Promise.resolve(false)
+      : deps.uploadLogo({ file: logo, organizationId }),
   ]);
 
   return {
@@ -38,34 +92,6 @@ export async function finishWorkspace({
     invited: invitations.invited,
     logoUploaded,
   };
-}
-
-async function uploadLogo({
-  logo,
-  organizationId,
-}: {
-  readonly logo: File | null;
-  readonly organizationId: string;
-}): Promise<boolean> {
-  if (logo === null) {
-    return false;
-  }
-
-  const body = new FormData();
-  body.set("file", logo);
-  body.set("organizationId", organizationId);
-
-  try {
-    const response = await fetch(organizationLogoUploadEndpoint, {
-      body,
-      credentials: "include",
-      method: "POST",
-    });
-
-    return response.ok;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -76,9 +102,11 @@ async function uploadLogo({
  * failure on invitations that could have succeeded.
  */
 async function sendInvites({
+  deps,
   invites,
   organizationId,
 }: {
+  readonly deps: FinishWorkspaceDeps;
   readonly invites: readonly string[];
   readonly organizationId: string;
 }): Promise<{ failed: string[]; invited: string[] }> {
@@ -87,16 +115,9 @@ async function sendInvites({
 
   for (const email of invites) {
     try {
-      const result = await authClient.organization.inviteMember({
-        email,
-        organizationId,
-        // The least privilege an invitation can carry. Onboarding is the wrong
-        // moment to hand someone management rights, and the owner can raise the
-        // role from settings once they know what the person should do.
-        role: "contributor",
-      });
+      const { error } = await deps.invite({ email, organizationId });
 
-      if (result.error) {
+      if (error !== null && error !== undefined) {
         failed.push(email);
 
         continue;
@@ -105,8 +126,8 @@ async function sendInvites({
       invited.push(email);
     } catch {
       // A throw here is one invitation, not the batch. Without this the actor
-      // rejected, the machine moved to `done` through its error transition,
-      // and every invitation made before this one was reported as none.
+      // rejected, the machine moved to `done` through its error transition, and
+      // every invitation made before this one was reported as none.
       failed.push(email);
     }
   }

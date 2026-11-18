@@ -238,8 +238,11 @@ test.describe("dashboard auth redirects", () => {
       await page.goto("/");
 
       await expect(page).toHaveURL(/\/register/);
+      // The register page opens on the first wizard step. Its name field is
+      // the stable thing to assert: the buttons below it change label as the
+      // reader moves through the steps.
       await expect(
-        page.getByRole("button", { name: "Create Workspace" })
+        page.getByRole("textbox", { name: "Workspace name" })
       ).toBeVisible();
     }
   );

@@ -27,7 +27,9 @@ test.describe("welcome tour", () => {
       ),
     ]);
 
-    const tour = page.getByRole("dialog");
+    // Named, because the "Workspace created" toast is a dialog too and an
+    // unnamed role query matches both.
+    const tour = page.getByRole("dialog", { name: /Welcome to/ });
     await expect(tour).toBeVisible();
     await expect(
       tour.getByRole("heading", { name: `Welcome to ${user.workspaceName}` })
@@ -49,6 +51,6 @@ test.describe("welcome tour", () => {
     // The completion is remembered per workspace, so a reload does not greet
     // the same reader twice.
     await page.reload();
-    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(page.getByRole("dialog", { name: /Welcome to/ })).toBeHidden();
   });
 });

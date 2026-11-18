@@ -337,9 +337,11 @@ test(
           .click();
         await expect(visitorPage.getByText(feedbackContent)).toBeVisible();
 
-        const upvoteButton = visitorPage.getByRole("button", {
-          name: "Upvote",
-        });
+        // The board now opens with sample posts, so the open post is not the
+        // only upvote button on the page.
+        const upvoteButton = visitorPage
+          .getByRole("button", { name: "Upvote" })
+          .first();
 
         await expect(upvoteButton).toContainText("0");
         await upvoteButton.click();
