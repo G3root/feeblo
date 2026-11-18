@@ -1,54 +1,46 @@
 import type { TPlanPricing } from "@feeblo/domain/pricing/schema";
-import { Badge } from "@feeblo/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
+import { Card, CardFooter, CardHeader, CardPanel } from "@feeblo/ui/card";
 import {
   Dialog,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogPanel,
   DialogPopup,
   DialogTitle,
 } from "@feeblo/ui/dialog";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-  FieldTitle,
-} from "@feeblo/ui/field";
-import { Radio, RadioGroup } from "@feeblo/ui/radio-group";
-import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
-import { SparklesIcon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Skeleton } from "@feeblo/ui/skeleton";
+import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
+import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { useState } from "react";
 
 import { BillingIntervalTabs } from "~/features/billing/components/billing-interval-tabs";
 import { useOrganizationId } from "~/hooks/use-organization-id";
+import { usePlan } from "~/hooks/use-plan";
 import { usePlanCatalog } from "~/hooks/use-plan-catalog";
-import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { useUpgradePlanDialogContext } from "../dialog-stores";
 import { startBillingCheckout, startBillingPortal } from "../lib/checkout";
 import {
   type BillingInterval,
-  type PlanCard,
   buildPlanCards,
-  formatPlanPrice,
-  PLAN_COPY,
+  type PlanCard as PlanCardData,
   type PlanType,
-  type WorkspacePlan,
 } from "../lib/plans";
+import { PlanCard } from "./plan-card";
+import { PlanComparison } from "./plan-comparison";
 
-type PlanView = PlanCard & {
-  productId: {
-    month: string;
-    year: string;
-  };
-};
-
+/**
+ * The plan picker, as one scrolling column: pricing cards, then the full
+ * comparison, then the caveats that decide what a viewer can do.
+ *
+ * It is opened from the dashboard's upgrade prompts and from billing settings,
+ * so it carries no route state and reads the workspace plan itself. A paid
+ * workspace changes plans through the portal; a free one checks out here.
+ */
 export function UpgradePlanDialog() {
   const store = useUpgradePlanDialogContext();
   const isOpen = useSelector(store, (state) => state.context.open);
@@ -68,372 +60,223 @@ export function UpgradePlanDialog() {
 
 function UpgradePlanDialogPopup() {
   const organizationId = useOrganizationId();
-  const { workspacePlanCollection } = useDashboardCollections();
 
   const catalog = usePlanCatalog();
-
-  const { data: workspacePlans, isLoading: plansLoading } = useLiveQuery({
-    queryKey: [
-      "upgrade-workspace-plans",
-      workspacePlanCollection.id,
-      organizationId,
-    ],
-    query: (q) =>
-      q
-        .from({ plan: workspacePlanCollection })
-        .where(({ plan }) => eq(plan.organizationId, organizationId)),
-  });
-
-  if (catalog.isPending || plansLoading) {
-    return <UpgradePlanDialogSkeleton />;
-  }
+  const workspacePlan = usePlan();
+  const currentPlanType = workspacePlan.data?.plan ?? "free";
 
   if (catalog.isError) {
     return (
-      <DialogPopup className="max-w-5xl">
-        <DialogPanel scrollFade={false}>
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle>Upgrade Plan</DialogTitle>
-            <DialogDescription className="mt-1">
-              Plans are unavailable right now. Please try again later.
-            </DialogDescription>
-          </DialogHeader>
-        </DialogPanel>
-      </DialogPopup>
+      <UpgradePlanDialogError
+        onRetry={() => {
+          void catalog.refetch();
+        }}
+      />
     );
+  }
+
+  if (catalog.data === undefined || workspacePlan.isLoading) {
+    return <UpgradePlanDialogSkeleton />;
   }
 
   return (
     <UpgradePlanDialogContent
+      catalog={catalog.data}
+      currentPlanType={currentPlanType}
       organizationId={organizationId}
-      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-      catalog={catalog.data ?? []}
-      workspacePlans={workspacePlans ?? []}
     />
   );
 }
 
-function UpgradePlanDialogHeader() {
-  return (
-    <DialogHeader className="gap-4 px-6 pt-6 pb-5">
-      <div className="flex items-center gap-3">
-        <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl">
-          <HugeiconsIcon className="h-4 w-4" icon={SparklesIcon} />
-        </div>
-        <div>
-          <DialogTitle>Upgrade Plan</DialogTitle>
-          <DialogDescription className="mt-1">
-            Select the plan that fits this workspace.
-          </DialogDescription>
-        </div>
-      </div>
-    </DialogHeader>
-  );
-}
-
 function UpgradePlanDialogContent({
-  organizationId,
   catalog,
-  workspacePlans,
+  currentPlanType,
+  organizationId,
 }: {
-  organizationId: string;
-  catalog: readonly TPlanPricing[];
-  workspacePlans: WorkspacePlan[];
+  readonly catalog: readonly TPlanPricing[];
+  readonly currentPlanType: PlanType;
+  readonly organizationId: string;
 }) {
-  const currentPlanType = workspacePlans[0]?.plan ?? "free";
-  const { plans: rawPlans } = buildPlanCards(catalog, currentPlanType);
+  const [interval, setInterval] = useState<BillingInterval>("year");
+  const [loadingPlanType, setLoadingPlanType] = useState<PlanType | null>(null);
 
-  const plans: PlanView[] = rawPlans.map((plan) => ({
-    ...plan,
-    productId: {
-      month: plan.month?.productId ?? "free",
-      year: plan.year?.productId ?? "free",
-    },
-  }));
-
-  const [selectedInterval, setSelectedInterval] =
-    useState<BillingInterval>("year");
-
-  const [selectedPlanType, setSelectedPlanType] =
-    useState<PlanType>(currentPlanType);
+  const { allowed: canManageBilling } = usePolicy(
+    hasPermission(organizationId, "billing.update")
+  );
 
   const hasPaidPlan = currentPlanType !== "free";
+  const { plans } = buildPlanCards(catalog, currentPlanType);
 
-  const selectedPlan =
-    plans.find((p) => p.planType === selectedPlanType) ?? plans[0];
+  const handlePlanAction = async (plan: PlanCardData) => {
+    if (hasPaidPlan) {
+      setLoadingPlanType(plan.planType);
 
-  const isCurrentPlan = selectedPlanType === currentPlanType;
-  const [showAllFeatures, setShowAllFeatures] = useState(false);
+      const didStart = await startBillingPortal({ organizationId });
 
-  // Reset expanded state when switching plans so the list stays compact.
-  const handlePlanTypeChange = (value: PlanType) => {
-    setSelectedPlanType(value);
-    setShowAllFeatures(false);
+      if (!didStart) {
+        setLoadingPlanType(null);
+      }
+
+      return;
+    }
+
+    const price = interval === "year" ? plan.year : plan.month;
+
+    if (!price) {
+      return;
+    }
+
+    setLoadingPlanType(plan.planType);
+
+    const didStart = await startBillingCheckout({
+      organizationId,
+      productId: price.productId,
+    });
+
+    if (!didStart) {
+      setLoadingPlanType(null);
+    }
   };
-
-  const visibleFeatures = showAllFeatures
-    ? selectedPlan.features
-    : selectedPlan.features.slice(0, 6);
-
-  const hiddenCount = selectedPlan.features.length - visibleFeatures.length;
 
   return (
     <DialogPopup className="max-w-5xl">
-      <DialogPanel scrollFade={false}>
-        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-          <div className="border-border flex flex-col lg:border-r">
-            <UpgradePlanDialogHeader />
-
-            <div className="flex flex-1 flex-col px-6 pb-6">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div className="text-sm font-medium">Select plan:</div>
-                <BillingIntervalTabs
-                  onValueChange={setSelectedInterval}
-                  value={selectedInterval}
-                />
-              </div>
-
-              <RadioGroup
-                className="gap-3"
-                onValueChange={(value) =>
-                  // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                  handlePlanTypeChange(value as PlanType)
-                }
-                value={selectedPlanType}
-              >
-                {plans?.map((plan) => {
-                  const isCurrent = plan.planType === currentPlanType;
-
-                  const selectedProduct =
-                    selectedInterval === "year" ? plan.year : plan.month;
-
-                  return (
-                    <Field key={plan.planType} orientation="horizontal">
-                      <FieldLabel
-                        className="flex flex-1 cursor-pointer items-center gap-3"
-                        htmlFor={plan.planType}
-                      >
-                        <Radio id={plan.planType} value={plan.planType} />
-                        <FieldContent>
-                          <FieldTitle>
-                            {plan.name}{" "}
-                            {isCurrent ? (
-                              <Badge variant="default">Current</Badge>
-                            ) : null}
-                          </FieldTitle>
-                          <FieldDescription>
-                            {plan.description}
-                          </FieldDescription>
-                        </FieldContent>
-                        <div className="flex items-center">
-                          <div className="text-muted-foreground">
-                            {formatPlanPrice(selectedProduct, selectedInterval)}
-                          </div>
-                        </div>
-                      </FieldLabel>
-                    </Field>
-                  );
-                })}
-              </RadioGroup>
-
-              <DialogFooter className="pt-6" variant="bare">
-                <UpgradePlanButton
-                  hasPaidPlan={hasPaidPlan}
-                  isCurrentPlan={isCurrentPlan}
-                  organizationId={organizationId}
-                  selectedInterval={selectedInterval}
-                  selectedPlan={selectedPlan}
-                />
-              </DialogFooter>
-            </div>
+      <DialogPanel className="space-y-6 pt-6">
+        <DialogHeader className="gap-4 p-0 pr-10">
+          <DialogIntro />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium">Billing interval</p>
+            <BillingIntervalTabs onValueChange={setInterval} value={interval} />
           </div>
+        </DialogHeader>
 
-          <aside className="bg-muted/20 flex flex-col px-6 py-6">
-            <div className="max-w-sm">
-              <div className="text-2xl font-semibold tracking-tight">
-                {selectedPlan.name}
-              </div>
-              <p className="text-muted-foreground mt-2 text-base">
-                {selectedPlan.description}
-              </p>
-            </div>
-
-            {selectedPlan.includesLabel ? (
-              <div className="text-muted-foreground mt-5 text-sm font-medium">
-                {selectedPlan.includesLabel}
-              </div>
-            ) : null}
-
-            <ul className="mt-3 space-y-2">
-              {visibleFeatures.map((feature) => (
-                <li
-                  className="flex items-start gap-2.5 text-sm leading-5"
-                  key={feature.key}
-                >
-                  <span className="bg-primary/10 text-primary mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full">
-                    <HugeiconsIcon
-                      className="size-3"
-                      icon={Tick02Icon}
-                      strokeWidth={2.2}
-                    />
-                  </span>
-                  <span className="text-foreground/80">{feature.label}</span>
-                </li>
-              ))}
-            </ul>
-            {hiddenCount > 0 ? (
-              <button
-                className="text-muted-foreground hover:text-foreground mt-3 text-left text-sm font-medium underline-offset-4 hover:underline"
-                onClick={() => setShowAllFeatures(true)}
-                type="button"
-              >
-                + {hiddenCount} more feature{hiddenCount > 1 ? "s" : ""}
-              </button>
-            ) : selectedPlan.features.length > 6 ? (
-              <button
-                className="text-muted-foreground hover:text-foreground mt-3 text-left text-sm font-medium underline-offset-4 hover:underline"
-                onClick={() => setShowAllFeatures(false)}
-                type="button"
-              >
-                Show less
-              </button>
-            ) : null}
-          </aside>
+        <div className="grid gap-3 md:grid-cols-3">
+          {plans.map((plan) => (
+            <PlanCard
+              canManageBilling={canManageBilling}
+              currentPlanType={currentPlanType}
+              hasPaidPlan={hasPaidPlan}
+              interval={interval}
+              isBusy={loadingPlanType !== null}
+              isLoading={loadingPlanType === plan.planType}
+              key={plan.planType}
+              onAction={() => {
+                void handlePlanAction(plan);
+              }}
+              plan={plan}
+            />
+          ))}
         </div>
+
+        <PlanComparison catalog={catalog} currentPlanType={currentPlanType} />
+
+        <UpgradePlanDialogNotes
+          canManageBilling={canManageBilling}
+          hasPaidPlan={hasPaidPlan}
+        />
       </DialogPanel>
     </DialogPopup>
+  );
+}
+
+function DialogIntro() {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="bg-primary/15 text-primary flex size-9 shrink-0 items-center justify-center rounded-xl">
+        <HugeiconsIcon
+          aria-hidden="true"
+          className="size-4"
+          icon={SparklesIcon}
+        />
+      </div>
+      <div className="min-w-0">
+        <DialogTitle>Plans</DialogTitle>
+        <DialogDescription className="mt-1">
+          Pick the plan that fits this workspace. You can change plans or cancel
+          at any time.
+        </DialogDescription>
+      </div>
+    </div>
+  );
+}
+
+function UpgradePlanDialogNotes({
+  canManageBilling,
+  hasPaidPlan,
+}: {
+  readonly canManageBilling: boolean;
+  readonly hasPaidPlan: boolean;
+}) {
+  if (canManageBilling && !hasPaidPlan) {
+    return null;
+  }
+
+  return (
+    <div className="text-muted-foreground space-y-1.5 text-xs">
+      {canManageBilling ? null : (
+        <p>Only workspace admins can change the subscription.</p>
+      )}
+      {hasPaidPlan ? (
+        <p>To move to Free, cancel your subscription in Manage billing.</p>
+      ) : null}
+    </div>
   );
 }
 
 function UpgradePlanDialogSkeleton() {
   return (
     <DialogPopup className="max-w-5xl">
-      <DialogPanel scrollFade={false}>
-        <div className="grid lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-          <div className="border-border flex flex-col lg:border-r">
-            <UpgradePlanDialogHeader />
-            <div className="flex flex-1 flex-col px-6 pb-6">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div className="text-sm font-medium">Select plan:</div>
-              </div>
-              <SkeletonLoader isLoading>
-                <SkeletonWrapper>
-                  <RadioGroup className="gap-3" value="free">
-                    {Object.entries(PLAN_COPY).map(([planType, copy]) => (
-                      <Field key={planType} orientation="horizontal">
-                        <FieldLabel
-                          className="flex flex-1 cursor-pointer items-center gap-3"
-                          htmlFor={planType}
-                        >
-                          <Radio id={planType} value={planType} />
-                          <FieldContent>
-                            <FieldTitle>{copy.name}</FieldTitle>
-                            <FieldDescription>
-                              {copy.description}
-                            </FieldDescription>
-                          </FieldContent>
-                        </FieldLabel>
-                      </Field>
-                    ))}
-                  </RadioGroup>
-                </SkeletonWrapper>
-              </SkeletonLoader>
-            </div>
-          </div>
-          <aside className="bg-muted/20 flex flex-col px-6 py-6">
-            <SkeletonLoader isLoading>
-              <SkeletonWrapper>
-                <div className="max-w-sm space-y-5">
-                  <div className="text-2xl font-semibold tracking-tight">
-                    Loading
-                  </div>
-                  <p className="text-muted-foreground text-base">Loading</p>
-                </div>
-              </SkeletonWrapper>
-            </SkeletonLoader>
-          </aside>
+      <DialogPanel className="space-y-6 pt-6">
+        <DialogHeader className="p-0 pr-10">
+          <DialogIntro />
+        </DialogHeader>
+        <div className="grid gap-3 md:grid-cols-3">
+          {["free", "starter", "professional"].map((planType) => (
+            <Card key={planType} size="sm">
+              <CardHeader>
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-4 w-36" />
+              </CardHeader>
+              <CardPanel className="space-y-4">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-px w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-10/12" />
+              </CardPanel>
+              <CardFooter>
+                <Skeleton className="h-8 w-full" />
+              </CardFooter>
+            </Card>
+          ))}
         </div>
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </DialogPanel>
     </DialogPopup>
   );
 }
 
-function UpgradePlanButton({
-  hasPaidPlan,
-  isCurrentPlan,
-  organizationId,
-  selectedPlan,
-  selectedInterval,
-}: {
-  hasPaidPlan: boolean;
-  isCurrentPlan: boolean;
-  organizationId: string;
-  selectedPlan: PlanView;
-  selectedInterval: BillingInterval;
-}) {
-  const [loading, setLoading] = useState(false);
-
-  let label = `Upgrade to ${selectedPlan.name}`;
-
-  if (loading) {
-    label = "Redirecting...";
-  } else if (hasPaidPlan) {
-    label = "Manage Billing";
-  } else if (isCurrentPlan) {
-    label = "Current Plan";
-  } else if (selectedPlan.planType === "free") {
-    label = "Unavailable";
-  }
-
+function UpgradePlanDialogError({ onRetry }: { readonly onRetry: () => void }) {
   return (
-    <Button
-      className="w-full"
-      disabled={
-        loading ||
-        (!hasPaidPlan &&
-          ((selectedPlan.planType === "free" && !isCurrentPlan) ||
-            isCurrentPlan))
-      }
-      onClick={async () => {
-        try {
-          if (hasPaidPlan) {
-            setLoading(true);
-
-            const didStart = await startBillingPortal({
-              organizationId,
-            });
-
-            if (!didStart) {
-              setLoading(false);
-            }
-
-            return;
-          }
-
-          const productId = selectedPlan.productId[selectedInterval];
-
-          if (!productId || productId === "free") {
-            throw new Error("Missing product id");
-          }
-
-          setLoading(true);
-
-          const didStart = await startBillingCheckout({
-            organizationId,
-            productId,
-          });
-
-          if (!didStart) {
-            setLoading(false);
-          }
-        } catch {
-          setLoading(false);
-        }
-      }}
-      size="lg"
-      type="button"
-    >
-      {label}
-    </Button>
+    <DialogPopup className="max-w-5xl">
+      <DialogPanel className="space-y-6 pt-6">
+        <DialogHeader className="p-0 pr-10">
+          <DialogIntro />
+        </DialogHeader>
+        <Alert variant="error">
+          <AlertTitle>Plans are unavailable right now</AlertTitle>
+          <AlertDescription>
+            The pricing catalog could not be loaded. Try again in a moment.
+          </AlertDescription>
+          <Button
+            className="mt-3"
+            onClick={onRetry}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Retry
+          </Button>
+        </Alert>
+      </DialogPanel>
+    </DialogPopup>
   );
 }

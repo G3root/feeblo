@@ -19,6 +19,11 @@ test.describe("billing", () => {
         exact: true,
       })
     ).toBeVisible();
-    await expect(page.getByText("Free", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Free plan", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("How this workspace measures against its plan limits.", {
+        exact: true,
+      })
+    ).toBeVisible();
   });
 });
