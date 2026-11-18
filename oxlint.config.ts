@@ -56,6 +56,11 @@ export default defineConfig({
     "apps/web/worker-configuration.d.ts",
     "packages/feedback-widget/src/icons/types.ts",
     "packages/feedback-widget/src/icons/sprite.svg",
+    // The icon picker's sprite, metadata and licence are generated from
+    // `@tabler/icons` by `packages/ui/scripts/generate-tabler-filled-sprite.ts`.
+    // Reformatting them would make every regeneration a whole-file diff, and
+    // the generator owns their layout. See `docs/adr/0030`.
+    "packages/ui/src/icon-picker/generated/**",
 
     // Drizzle migrations (generated SQL + metadata)
     "packages/db/src/migrations/**",

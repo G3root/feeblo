@@ -15,9 +15,11 @@
     "./hooks/use-lazy-ref": "./src/hooks/use-lazy-ref.ts",
     "./hooks/use-media-query": "./src/hooks/use-media-query.ts",
     "./hooks/*": "./src/hooks/*.tsx",
+    "./icon-picker": "./src/icon-picker/index.tsx",
     "./*": "./src/*.tsx"
   },
   "scripts": {
+    "icons:generate": "node scripts/generate-tabler-filled-sprite.ts",
     "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
@@ -32,6 +34,8 @@
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-store": "^0.11.0",
     "@tanstack/react-table": "catalog:",
+    "@xstate/store": "catalog:",
+    "@xstate/store-react": "catalog:",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
     "prosekit": "^0.23.0",
@@ -42,8 +46,10 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@tabler/icons": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "svgo": "catalog:",
     "tsrs": "catalog:"
   }
 }
