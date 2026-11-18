@@ -111,9 +111,9 @@ function updateViewportState(
 
   if (
     data.rows.length === 0 ||
-    !categoryHeaderHeight ||
-    !rowHeight ||
-    !viewportHeight
+    categoryHeaderHeight === null ||
+    rowHeight === null ||
+    viewportHeight === null
   ) {
     return {
       ...context,
@@ -308,14 +308,22 @@ export function createIconPickerStore(config: IconPickerStoreConfig) {
 
 /**
  * Replaces the result set and starts it at its first row: keeping the old
- * active cell would point at an icon the new search no longer contains.
+ * active cell would point at an icon the new search no longer contains, and
+ * keeping the old scroll offset would leave the window over rows that moved.
+ * The viewport scrolls its element to the top when `data` changes; this resets
+ * the value the window is computed from in the same commit.
  */
 function withData(
   context: IconPickerStoreContext,
   data: IconPickerData
 ): IconPickerStoreContext {
   return updateViewportState(
-    { ...context, activeColumnIndex: 0, activeRowIndex: 0 },
+    {
+      ...context,
+      activeColumnIndex: 0,
+      activeRowIndex: 0,
+      viewportScrollY: 0,
+    },
     { data }
   );
 }

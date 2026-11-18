@@ -136,18 +136,69 @@ function useStableCallback<Args extends unknown[], Result>(
   );
 }
 
-function setRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+function isCleanup(value: void | (() => void)): value is () => void {
+  return isFunction(value);
+}
+
+/**
+ * Sets a ref and returns the cleanup a React 19 callback ref handed back.
+ *
+ * A callback ref may return a cleanup instead of being called with `null` on
+ * unmount; the composed wrappers below return it so React can run it, and they
+ * clear their internal ref in the same cleanup.
+ */
+function setRef<T>(
+  ref: Ref<T> | undefined,
+  value: T | null
+): (() => void) | undefined {
   if (!ref) {
-    return;
+    return undefined;
   }
 
   if ("current" in ref) {
     ref.current = value;
 
-    return;
+    return undefined;
   }
 
-  ref(value);
+  const cleanup = ref(value);
+
+  return isCleanup(cleanup) ? cleanup : undefined;
+}
+
+/**
+ * Composes the picker's internal ref with the caller's `ref`.
+ *
+ * The returned cleanup clears the internal ref and then either runs the
+ * caller's cleanup (a callback ref that returned one) or calls the caller's
+ * ref with `null` (an object ref, or a callback that returned nothing). The
+ * `null` path only runs for callers that do not use cleanup semantics, since
+ * React does not invoke the callback with `null` when it receives a cleanup.
+ */
+function composeRef<T>(
+  internalRef: RefObject<T | null>,
+  ref: Ref<T> | undefined,
+  value: T | null
+): (() => void) | undefined {
+  internalRef.current = value;
+
+  if (value === null) {
+    setRef(ref, null);
+
+    return undefined;
+  }
+
+  const cleanup = setRef(ref, value);
+
+  return () => {
+    internalRef.current = null;
+
+    if (cleanup) {
+      cleanup();
+    } else {
+      setRef(ref, null);
+    }
+  };
 }
 
 function isRenderFunction(
@@ -498,10 +549,7 @@ function IconPickerRoot({
     useIconPickerFocus(store, rootRef, onFocusCapture, onBlurCapture);
 
   const setRootElement = useCallback(
-    (element: HTMLDivElement | null) => {
-      rootRef.current = element;
-      setRef(ref, element);
-    },
+    (element: HTMLDivElement | null) => composeRef(rootRef, ref, element),
     [ref]
   );
 
@@ -532,6 +580,12 @@ function IconPickerRoot({
       cancelled = true;
     };
   }, [store]);
+
+  // The default icon and the sizer render `TablerIcon`, which starts the sprite
+  // fetch, but a custom `Icon` renderer need not. Starting it here keeps a
+  // custom picker from sitting in the loading state forever; the module-level
+  // promise makes the duplicate call free.
+  useIconPickerSprite();
 
   useIconPickerKeyboard(store, elements, isFocusedWithin);
 
@@ -592,11 +646,13 @@ function IconPickerSearch({
     (event: IconPickerSearchChangeEvent) => {
       onChange?.(event);
 
-      if (!event.defaultPrevented) {
+      // A controlled search mirrors `value` through the effect below; reading
+      // the DOM here would filter on text the owner refused to accept.
+      if (!event.defaultPrevented && !isControlled) {
         store.send({ type: "searchChanged", search: event.target.value });
       }
     },
-    [onChange, store]
+    [isControlled, onChange, store]
   );
 
   return (
@@ -650,12 +706,18 @@ function IconPickerViewport({
   const categoriesCount = useSelector(store, selectCategoriesCount);
 
   const setViewportElement = useCallback(
-    (element: HTMLDivElement | null) => {
-      viewportRef.current = element;
-      setRef(ref, element);
-    },
+    (element: HTMLDivElement | null) => composeRef(viewportRef, ref, element),
     [ref, viewportRef]
   );
+
+  const data = useSelector(store, (state) => state.context.data);
+
+  // A new result set starts at the top in the store (see `withData`); this is
+  // the DOM half of that reset, and it is keyed on the data object so a
+  // `value` or `sticky` change leaves the scroll position alone.
+  useLayoutEffect(() => {
+    viewportRef.current?.scrollTo({ behavior: "instant", top: 0 });
+  }, [data, viewportRef]);
 
   const handleScroll = useCallback(
     (event: ReactUIEvent<HTMLDivElement>) => {
@@ -743,9 +805,9 @@ function scrollRowIntoView(
   if (
     !list ||
     !viewport ||
-    !rowHeight ||
-    !categoryHeaderHeight ||
-    !viewportHeight
+    rowHeight === null ||
+    categoryHeaderHeight === null ||
+    viewportHeight === null
   ) {
     return;
   }
@@ -754,7 +816,7 @@ function scrollRowIntoView(
     viewport.scrollTo({ behavior: "instant", top: 0 });
   }
 
-  const row = list.querySelector(`[aria-rowindex="${rowIndex}"]`);
+  const row = list.querySelector(`[aria-rowindex="${rowIndex + 1}"]`);
   const renderedRow = row instanceof HTMLElement ? row : null;
 
   // The row may be one the virtual window has not rendered yet, which happens
@@ -824,7 +886,7 @@ function listIconProps(
   isSelected: boolean
 ): IconPickerListIconProps {
   return {
-    "aria-colindex": columnIndex,
+    "aria-colindex": columnIndex + 1,
     "aria-label": icon.label,
     "aria-selected": isActive || undefined,
     "data-active": isActive ? "" : undefined,
@@ -838,7 +900,7 @@ function listIconProps(
 
 function listRowProps(rowIndex: number, sizer = false): IconPickerListRowProps {
   return {
-    "aria-rowindex": sizer ? undefined : rowIndex,
+    "aria-rowindex": sizer ? undefined : rowIndex + 1,
     "data-slot": "icon-picker-row",
     role: sizer ? undefined : "row",
     style: {
@@ -1279,10 +1341,7 @@ function IconPickerList({
   );
 
   const setListElement = useCallback(
-    (element: HTMLDivElement | null) => {
-      listRef.current = element;
-      setRef(ref, element);
-    },
+    (element: HTMLDivElement | null) => composeRef(listRef, ref, element),
     [listRef, ref]
   );
 
