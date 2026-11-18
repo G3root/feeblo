@@ -75,6 +75,11 @@ catalog:
   "@sentry/react": 11.11.0
   "@sentry/vite-plugin": 11.11.0
   "@solidjs/router": ^1.0.1
+  # The icons the icon picker searches are generated from this exact version, so
+  # a bump is a regeneration of `packages/ui/src/icon-picker/generated` and a
+  # visible diff in the sprite, not an automatic range move. See
+  # `docs/adr/0030`.
+  "@tabler/icons": 3.52.0
   "@tailwindcss/vite": ^4.3.4
   # The TanStack DB track is pinned to exact versions, not carets: `1.0.0-rc.1`
   # is a release candidate, and a caret would let `1.0.0` and later RCs in
@@ -100,6 +105,8 @@ catalog:
   # change what the lockfile resolves.
   "@xstate/effect": 1.0.0-alpha.12
   "@xstate/react": 7.0.0-alpha.7
+  "@xstate/store": ^4.3.0
+  "@xstate/store-react": ^2.1.0
   better-auth: 1.7.18
   class-variance-authority: ^0.7.1
   cn: ^0.5.2
@@ -128,6 +135,7 @@ catalog:
   rolldown: ^1.3.0
   shadcn: ^4.23.0
   solid-js: ^1.9.18
+  svgo: ^4.1.0
   tailwindcss: ^4.3.4
   tsrs: 0.22.0-ts7.1.0-beta
   tsx: ^4.20.6
