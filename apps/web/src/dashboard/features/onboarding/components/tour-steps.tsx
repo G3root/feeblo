@@ -1,7 +1,10 @@
+import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
 import {
-  ArrowUp02Icon,
-  DashboardSquare01Icon,
+  ArrowUp01Icon,
+  Comment01Icon,
+  LockIcon,
   Megaphone01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -10,16 +13,21 @@ import type React from "react";
 /**
  * The tour's copy, one entry per surface a new workspace has.
  *
- * The `detail` of a step is the point of the whole design. It is one row from
- * the product, drawn with the same parts the reader is about to see on their
- * own board, so the step they read is recognisable on the screen behind it. An
- * illustration of a feature teaches nothing; the row teaches the shape.
+ * The `detail` of a step is the point of the whole design: one object from the
+ * product, drawn at the size the product draws it — a post, a board list, a
+ * roadmap lane, a changelog entry, the board's own address. A step the reader
+ * reads is then recognisable on the screen behind the dialog, because it is
+ * the same row, lane or card rather than an illustration of one.
  *
- * Every step names something this workspace actually has: the boards and
- * six statuses `createWorkspace` writes, the roadmap columns, the changelog
- * categories, the widget, the Public API. The three posts the rows name are
- * the ones the seed puts on the board, so a reader who follows the tour sees
- * the same titles when they open it.
+ * One object, not a shrunken page: the plate is 176px tall and the dialog is
+ * 28rem wide, and a whole window at that size is a thumbnail where nothing is
+ * legible. A single object at full size can be read from across the room.
+ *
+ * Every step names something this workspace actually has: the boards the
+ * reader kept, the statuses `createWorkspace` writes, the changelog
+ * categories, the Public API, the board address. The sample post titles are
+ * the ones the seed writes, so a reader who follows the tour meets the same
+ * rows when they close it.
  *
  * Rows are static. They are a picture of the shape of the product, not a
  * preview of this workspace's data, and a live query behind a five-step dialog
@@ -33,75 +41,246 @@ export type WelcomeTourStep = {
   readonly title: string;
 };
 
-/** The vote pill every post row carries on the board. */
-function VotePill({ votes }: { readonly votes: number }) {
-  return (
-    <span className="text-muted-foreground flex w-9 shrink-0 flex-col items-center rounded-md border py-1 text-[11px] font-medium tabular-nums">
-      <HugeiconsIcon className="size-3.5" icon={ArrowUp02Icon} />
-      {votes}
-    </span>
-  );
-}
-
-/** The row every step's plate shows, in the board's own proportions. */
-function PreviewRow({
+/** The card every detail sits in: one product object, lifted off the plate. */
+function PlateCard({
   children,
-  icon,
-  iconClassName,
-  subtitle,
-  title,
-  votes,
+  className,
 }: {
-  readonly children?: React.ReactNode;
-  readonly icon?: React.ReactNode;
-  readonly iconClassName?: string;
-  readonly subtitle: React.ReactNode;
-  readonly title: string;
-  readonly votes?: number;
+  readonly children: React.ReactNode;
+  readonly className?: string;
 }) {
   return (
-    <div className="bg-background flex w-[min(100%,20rem)] items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm shadow-[0_1px_2px_rgba(0,0,0,0.08),0_12px_24px_-16px_rgba(0,0,0,0.4)]">
-      {votes === undefined ? (
-        <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-md",
-            iconClassName
-          )}
-        >
-          {icon}
-        </span>
-      ) : (
-        <VotePill votes={votes} />
+    <div
+      className={cn(
+        "bg-background border-border/70 w-[min(100%,21rem)] rounded-xl border px-3.5 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_16px_32px_-24px_rgba(0,0,0,0.45)]",
+        className
       )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{title}</span>
-        <span className="text-muted-foreground mt-0.5 block truncate text-xs">
-          {subtitle}
-        </span>
-      </span>
+    >
       {children}
     </div>
   );
 }
 
+/** The vote pill every post row carries on the board, at its real size. */
+function VotePill({
+  count,
+  voted = false,
+}: {
+  readonly count: number;
+  readonly voted?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex h-11 w-10 shrink-0 flex-col items-center justify-center rounded-lg border text-[11px] leading-none font-medium tabular-nums",
+        voted
+          ? "border-brand/40 bg-brand/12 text-brand"
+          : "border-border bg-muted/50 text-muted-foreground"
+      )}
+    >
+      <HugeiconsIcon
+        className="size-4 shrink-0"
+        icon={ArrowUp01Icon}
+        strokeWidth={2.5}
+      />
+      {count}
+    </span>
+  );
+}
+
 /**
- * A status dot in the colour the status actually has.
+ * A status in the colour the status actually has.
  *
  * The six defaults come from `DEFAULT_POST_STATUS_COLORS`, and a dot in the
  * wrong hue is a small lie about a colour the reader will see within seconds.
  */
-function StatusDot({
-  className,
-  children,
+function StatusMark({
+  label,
+  type,
 }: {
-  readonly children: React.ReactNode;
-  readonly className: string;
+  readonly label: string;
+  readonly type: keyof typeof DEFAULT_POST_STATUS_COLORS;
 }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span aria-hidden className={cn("size-1.5 rounded-full", className)} />
+      <span
+        aria-hidden
+        className="size-2 shrink-0 rounded-full"
+        style={{ backgroundColor: DEFAULT_POST_STATUS_COLORS[type] }}
+      />
+      {label}
+    </span>
+  );
+}
+
+function BoardBadge({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
       {children}
     </span>
+  );
+}
+
+/** One board's row, as the board list shows it: a post and what it carries. */
+function SamplePost({
+  board,
+  status,
+  title,
+  votes,
+}: {
+  readonly board: string;
+  readonly status: {
+    label: string;
+    type: keyof typeof DEFAULT_POST_STATUS_COLORS;
+  };
+  readonly title: string;
+  readonly votes: number;
+}) {
+  return (
+    <PlateCard>
+      <div className="flex items-center gap-3">
+        <VotePill count={votes} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{title}</p>
+          <div className="text-muted-foreground mt-1.5 flex items-center gap-2 text-xs">
+            <StatusMark label={status.label} type={status.type} />
+            <BoardBadge>{board}</BoardBadge>
+          </div>
+        </div>
+      </div>
+    </PlateCard>
+  );
+}
+
+/** The board list, as the public board's sidebar draws it. */
+function BoardList({ boards }: { readonly boards: readonly string[] }) {
+  return (
+    <PlateCard className="w-[min(100%,15rem)]">
+      <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+        Boards
+      </span>
+      <div className="mt-2 flex flex-col gap-0.5">
+        <span className="text-muted-foreground flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
+          <span className="bg-muted-foreground/40 size-1.5 shrink-0 rounded-full" />
+          All feedback
+        </span>
+        {boards.map((board, index) => (
+          <span
+            className={cn(
+              "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm",
+              index === 0
+                ? "bg-muted text-foreground font-medium"
+                : "text-muted-foreground"
+            )}
+            key={board}
+          >
+            <span
+              className={cn(
+                "size-1.5 shrink-0 rounded-full",
+                index === 0 ? "bg-primary" : "bg-muted-foreground/40"
+              )}
+            />
+            <span className="truncate">{board}</span>
+          </span>
+        ))}
+      </div>
+    </PlateCard>
+  );
+}
+
+/** A roadmap lane with one card in it, the way a status puts it there. */
+function RoadmapLane({
+  status,
+  title,
+}: {
+  readonly status: {
+    label: string;
+    type: keyof typeof DEFAULT_POST_STATUS_COLORS;
+  };
+  readonly title: string;
+}) {
+  return (
+    <div className="bg-muted/40 w-[min(100%,15rem)] rounded-xl p-2.5">
+      <div className="flex items-center justify-between gap-2 px-1 pb-2">
+        <span className="flex items-center gap-2 text-xs font-medium">
+          <span
+            aria-hidden
+            className="size-2 shrink-0 rounded-full"
+            style={{ backgroundColor: DEFAULT_POST_STATUS_COLORS[status.type] }}
+          />
+          {status.label}
+        </span>
+        <span className="text-muted-foreground text-[11px] tabular-nums">
+          1
+        </span>
+      </div>
+      <div className="bg-background flex flex-col gap-2 rounded-lg border p-2.5">
+        <p className="line-clamp-2 text-xs leading-snug font-medium">{title}</p>
+        <div className="text-muted-foreground flex items-center justify-between gap-2 text-[11px]">
+          <BoardBadge>Features</BoardBadge>
+          <span className="flex items-center gap-1 tabular-nums">
+            <HugeiconsIcon
+              className="size-3 shrink-0"
+              icon={ArrowUp01Icon}
+              strokeWidth={2.5}
+            />
+            12
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** A changelog entry as the changelog lists it: category, title, when. */
+function ChangelogEntry({ title }: { readonly title: string }) {
+  return (
+    <PlateCard>
+      <div className="flex items-center gap-2">
+        <HugeiconsIcon
+          className="size-3.5 shrink-0 text-emerald-600"
+          icon={Megaphone01Icon}
+          strokeWidth={2}
+        />
+        <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+          Update
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-snug font-medium">{title}</p>
+      <p className="text-muted-foreground mt-1.5 text-[11px]">
+        Published 2 days ago · subscribers were emailed
+      </p>
+    </PlateCard>
+  );
+}
+
+/** The board's own address, which is the one thing a visitor needs. */
+function BoardAddress({
+  host,
+  name,
+}: {
+  readonly host: string | null;
+  readonly name: string;
+}) {
+  return (
+    <PlateCard className="w-[min(100%,18rem)]">
+      <div className="flex items-center gap-2.5">
+        <UserAvatar name={name} size="sm" />
+        <span className="min-w-0 truncate text-sm font-medium">{name}</span>
+        <span className="border-border text-muted-foreground ml-auto shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium">
+          Public
+        </span>
+      </div>
+      <div className="border-border/70 bg-muted/40 text-muted-foreground mt-2.5 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px]">
+        <HugeiconsIcon
+          aria-hidden
+          className="size-2.5 shrink-0 opacity-70"
+          icon={LockIcon}
+          strokeWidth={2}
+        />
+        <span className="truncate">{host ?? "Setting up…"}</span>
+      </div>
+    </PlateCard>
   );
 }
 
@@ -111,16 +290,24 @@ function StatusDot({
  * `boardUrl` is null until the workspace's site row resolves, and the last
  * step says that the board is public without printing a half-built address:
  * a preview of the wrong URL is worse than a sentence that waits for the right
- * one.
+ * one. The plate says "Setting up…" for the same reason, in the same place the
+ * address will appear.
+ *
+ * `boardNames` is the two boards `createWorkspace` writes, renamed by the
+ * reader on the register page. The tour names them because the reader named
+ * them.
  */
 export function buildWelcomeTourSteps({
-  workspaceName,
+  boardNames,
   boardUrl,
+  workspaceName,
 }: {
+  readonly boardNames: readonly string[];
   readonly boardUrl: string | null;
   readonly workspaceName: string;
 }): WelcomeTourStep[] {
   const boardHost = boardUrl?.replace(/^https?:\/\//, "") ?? null;
+  const firstBoard = boardNames[0] ?? "Features";
 
   return [
     {
@@ -134,10 +321,9 @@ export function buildWelcomeTourSteps({
         </>
       ),
       detail: (
-        <PreviewRow
-          subtitle={
-            <StatusDot className="bg-muted-foreground/60">Pending</StatusDot>
-          }
+        <SamplePost
+          board={firstBoard}
+          status={{ label: "Pending", type: "PENDING" }}
           title="Welcome to your workspace"
           votes={0}
         />
@@ -154,15 +340,7 @@ export function buildWelcomeTourSteps({
           assign whoever is doing the work.
         </>
       ),
-      detail: (
-        <PreviewRow
-          subtitle={
-            <StatusDot className="bg-muted-foreground/60">Pending</StatusDot>
-          }
-          title="What makes a bug report useful"
-          votes={0}
-        />
-      ),
+      detail: <BoardList boards={boardNames} />,
     },
     {
       id: "roadmap",
@@ -175,17 +353,8 @@ export function buildWelcomeTourSteps({
         </>
       ),
       detail: (
-        <PreviewRow
-          icon={
-            <HugeiconsIcon
-              className="text-muted-foreground size-4"
-              icon={DashboardSquare01Icon}
-            />
-          }
-          iconClassName="border"
-          subtitle={
-            <StatusDot className="bg-indigo-500">Planned · Features</StatusDot>
-          }
+        <RoadmapLane
+          status={{ label: "Planned", type: "PLANNED" }}
           title="How ideas become roadmap items"
         />
       ),
@@ -199,19 +368,7 @@ export function buildWelcomeTourSteps({
           to the changelog get an email, and the entry is public.
         </>
       ),
-      detail: (
-        <PreviewRow
-          icon={
-            <HugeiconsIcon
-              className="size-4 text-emerald-600"
-              icon={Megaphone01Icon}
-            />
-          }
-          iconClassName="bg-emerald-500/10"
-          subtitle="New · Draft"
-          title="Sample posts are ready to edit"
-        />
-      ),
+      detail: <ChangelogEntry title="Sample posts are ready to edit" />,
     },
     {
       id: "board",
@@ -230,27 +387,7 @@ export function buildWelcomeTourSteps({
           API serves them to anything else.
         </>
       ),
-      detail: (
-        <PreviewRow
-          icon={
-            <HugeiconsIcon
-              className="size-4 text-emerald-600"
-              icon={Megaphone01Icon}
-            />
-          }
-          iconClassName="bg-emerald-500/10"
-          subtitle={boardHost ? "Live" : "Setting up"}
-          title={boardHost ?? "Your public board"}
-        >
-          <span className="relative flex size-2 shrink-0">
-            <span
-              aria-hidden
-              className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60"
-            />
-            <span className="relative size-2 rounded-full bg-emerald-500" />
-          </span>
-        </PreviewRow>
-      ),
+      detail: <BoardAddress host={boardHost} name={workspaceName} />,
     },
   ];
 }
