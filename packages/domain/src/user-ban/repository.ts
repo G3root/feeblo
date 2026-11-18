@@ -433,23 +433,25 @@ const makeUserBanRepository = Effect.gen(function* () {
         // contact with no linked account never adopts a same-address global
         // account — the ban stays address-scoped and does not reach an
         // account the workspace has no relationship with.
-        const [contact] = yield* db
-          .select({
-            name: schema.contactTable.name,
-            userId: schema.contactTable.userId,
-          })
-          .from(schema.contactTable)
-          .where(
-            and(
-              eq(schema.contactTable.organizationId, input.organizationId),
-              sql`lower(${schema.contactTable.email}) = ${email}`
+        const [contact] = yield* (
+          db
+            .select({
+              name: schema.contactTable.name,
+              userId: schema.contactTable.userId,
+            })
+            .from(schema.contactTable)
+            .where(
+              and(
+                eq(schema.contactTable.organizationId, input.organizationId),
+                sql`lower(${schema.contactTable.email}) = ${email}`
+              )
             )
-          )
-          // Both rows can exist because the contact unique index is
-          // case-sensitive while the lookup is not. A linked row is the
-          // stronger relationship, so it wins the arbitrary-order tie.
-          .orderBy(asc(sql`${schema.contactTable.userId} is null`))
-          .limit(1);
+            // Both rows can exist because the contact unique index is
+            // case-sensitive while the lookup is not. A linked row is the
+            // stronger relationship, so it wins the arbitrary-order tie.
+            .orderBy(asc(sql`${schema.contactTable.userId} is null`))
+            .limit(1)
+        );
 
         if (contact !== undefined) {
           if (contact.userId === null) {

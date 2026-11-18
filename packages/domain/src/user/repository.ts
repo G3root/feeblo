@@ -107,36 +107,38 @@ const makeUserRepository = Effect.gen(function* () {
         const emailHash = yield* hashEmail(args.email);
         const normalisedEmail = args.email.toLowerCase().trim();
 
-        const rows = yield* db
-          .select()
-          .from(schema.userTable)
-          .where(
-            and(
-              sql`(
+        const rows = yield* (
+          db
+            .select()
+            .from(schema.userTable)
+            .where(
+              and(
+                sql`(
                 (
                   ${schema.userTable.restrictedToOrganizationId} IS NULL
                   AND lower(${schema.userTable.email}) = ${normalisedEmail}
                 )
                 OR ${schema.userTable.emailHash} = ${emailHash}
               )`,
-              sql`(${schema.userTable.restrictedToOrganizationId} IS NULL OR ${schema.userTable.restrictedToOrganizationId} = ${args.organizationId})`
+                sql`(${schema.userTable.restrictedToOrganizationId} IS NULL OR ${schema.userTable.restrictedToOrganizationId} = ${args.organizationId})`
+              )
             )
-          )
-          // Precedence: a verified portal identity bound to this workspace,
-          // then a real unrestricted account, then an attribution-only shadow.
-          // A shadow must never outrank a verified account: deleting a contact
-          // leaves its shadow behind while attributed content still refers to
-          // it, and adopting that orphan would strand the human's real
-          // identity on content history they can never sign in to.
-          .orderBy(
-            sql`CASE
+            // Precedence: a verified portal identity bound to this workspace,
+            // then a real unrestricted account, then an attribution-only shadow.
+            // A shadow must never outrank a verified account: deleting a contact
+            // leaves its shadow behind while attributed content still refers to
+            // it, and adopting that orphan would strand the human's real
+            // identity on content history they can never sign in to.
+            .orderBy(
+              sql`CASE
               WHEN ${schema.userTable.restrictedToOrganizationId} IS NULL THEN 1
               WHEN ${schema.userTable.emailVerified} IS TRUE THEN 0
               ELSE 2
             END`,
-            schema.userTable.id
-          )
-          .limit(1);
+              schema.userTable.id
+            )
+            .limit(1)
+        );
 
         return rows[0] ? Option.some(rows[0]) : Option.none();
       }),

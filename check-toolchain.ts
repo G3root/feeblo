@@ -13,9 +13,11 @@
  *    is versioned separately. The workspace `overrides` are checked too, because
  *    `@effect/platform-node-shared` is pinned there rather than in a manifest.
  * 2. The compiler train is declared exactly once. `tsrs` lives in the
- *    catalog; `@effect/tsgo`, `oxlint`, `oxlint-tsgolint` and `@oxlint/plugins`
- *    live in the root `package.json`, `oxlint` and `@oxlint/plugins` share a
- *    release, and no package pins any of them to something else.
+ *    catalog; `@effect/tsgo`, `oxlint` and `@oxlint/plugins` live in the root
+ *    `package.json`, `oxlint` and `@oxlint/plugins` share a release, and no
+ *    package pins any of them to something else. `oxlint-tsgolint` must appear
+ *    nowhere: `pnpm lint` runs the type-aware pass on `tsrs`, so an installed
+ *    `tsgolint` is a second program builder nothing would use.
  * 3. Every `patchedDependencies` selector names a version that is installed. A
  *    selector that names no installed version is a no-op, and the package then
  *    runs unpatched with the install still succeeding. The block itself may be
@@ -35,6 +37,14 @@ const root = import.meta.dirname;
 
 /** The Effect release train. `@effect/tsgo` versions itself. */
 const effectPackage = /^@effect\/(?!tsgo$)/;
+
+/**
+ * Tools the gate must not depend on any more. `oxlint-tsgolint` built the
+ * type-aware program until `@effect/tsgo@0.70.0`, whose `--tsrs-lint` runs that
+ * pass on `tsrs` instead; a declaration left behind would install a second
+ * program builder that nothing invokes.
+ */
+const retired = ["oxlint-tsgolint"] as const;
 
 /** A dependency map: `{ "@effect/sql-pg": "catalog:" }`. */
 type Dependencies = Readonly<Record<string, string>>;
@@ -228,12 +238,7 @@ const checkToolchain = (
 
   const dev = dependencies(rootManifest, "devDependencies");
 
-  const tools = [
-    "@effect/tsgo",
-    "oxlint",
-    "oxlint-tsgolint",
-    "@oxlint/plugins",
-  ] as const;
+  const tools = ["@effect/tsgo", "oxlint", "@oxlint/plugins"] as const;
 
   const compiler = catalog.get("tsrs");
   const failures: Array<string> = [];
@@ -335,6 +340,65 @@ const checkToolchain = (
   return group("The compiler train disagrees with itself", failures);
 };
 
+/**
+ * A package may not declare a tool the gate has retired, because a dependency
+ * nothing invokes is indistinguishable from one that still does. The
+ * declaration can hide behind an `npm:` alias — `"lint-engine":
+ * "npm:oxlint-tsgolint@7.0.2007"` installs the retired package under another
+ * name — so the spec is read as well as the key. Aliases of anything else are
+ * ordinary, and a value that names no package (a range, a tag, a workspace or
+ * catalog reference) is not an alias at all.
+ */
+const aliasTarget = (spec: string): string | undefined => {
+  if (!spec.startsWith("npm:")) return undefined;
+
+  const target = spec.slice("npm:".length);
+  // A scoped name opens with `@`, so its own `@` is not the version separator.
+  const separator = target.indexOf("@", 1);
+
+  return separator === -1 ? target : target.slice(0, separator);
+};
+
+/**
+ * Where a retired tool may still be declared: every dependency field of every
+ * manifest, the manifests' `npm:` aliases, and the workspace `overrides` block,
+ * which can re-add a package no manifest names.
+ */
+const checkRetired = (
+  manifests: ReadonlyArray<Manifest>,
+  overrides: Mapping
+): ReadonlyArray<string> => {
+  const failures: Array<string> = [];
+
+  for (const manifest of manifests) {
+    for (const field of dependencyFields) {
+      for (const [name, spec] of Object.entries(
+        dependencies(manifest, field)
+      )) {
+        const target = aliasTarget(spec);
+
+        for (const tool of retired) {
+          if (name !== tool && target !== tool) continue;
+
+          failures.push(
+            `  ${manifest.file} ${field}.${name} is declared; the type-aware pass runs on tsrs, so nothing invokes it.`
+          );
+        }
+      }
+    }
+  }
+
+  for (const tool of retired) {
+    if (overrides.has(tool)) {
+      failures.push(
+        `  pnpm-workspace.yaml overrides.${tool} is declared; the type-aware pass runs on tsrs, so nothing invokes it.`
+      );
+    }
+  }
+
+  return group("A retired tool is still declared", failures);
+};
+
 const checkPatches = (patches: Mapping): ReadonlyArray<string> => {
   const failures: Array<string> = [];
 
@@ -395,7 +459,6 @@ const selfTest = () => {
       devDependencies: {
         "@effect/tsgo": "0.47.2",
         oxlint: "1.82.0",
-        "oxlint-tsgolint": "7.0.2001",
         "@oxlint/plugins": "1.82.0",
         tsrs: "catalog:",
       },
@@ -434,7 +497,6 @@ const selfTest = () => {
       devDependencies: {
         "@effect/tsgo": "0.47.2",
         oxlint: "1.82.0",
-        "oxlint-tsgolint": "7.0.2001",
         "@oxlint/plugins": "1.82.0",
         tsrs: "0.20.0-ts7.1.0-beta",
       },
@@ -466,6 +528,42 @@ const selfTest = () => {
     checkToolchain(driftedCatalogTool, [rootFixture, clean]),
     []
   );
+
+  // The retired-tool check has to fail on a declaration and pass on its
+  // absence, or removing `oxlint-tsgolint` from the gate would be unguarded.
+  const retiredFixture: Manifest = {
+    file: "e/package.json",
+    json: { devDependencies: { "oxlint-tsgolint": "7.0.2001" } },
+  };
+
+  const aliasedRetired: Manifest = {
+    file: "f/package.json",
+    json: {
+      devDependencies: { "lint-engine": "npm:oxlint-tsgolint@7.0.2001" },
+    },
+  };
+
+  // An alias of anything else is ordinary, and so is an alias with no version.
+  const aliasedOther: Manifest = {
+    file: "g/package.json",
+    json: {
+      devDependencies: {
+        engine: "npm:oxlint@1.82.0",
+        types: "npm:@types/node",
+      },
+    },
+  };
+
+  assert.deepEqual(
+    checkRetired([clean, rootFixture, aliasedOther], new Map()),
+    []
+  );
+  assert.notDeepEqual(checkRetired([retiredFixture], new Map()), []);
+  assert.notDeepEqual(checkRetired([aliasedRetired], new Map()), []);
+  assert.notDeepEqual(
+    checkRetired([clean], new Map([["oxlint-tsgolint", "7.0.2001"]])),
+    []
+  );
 };
 
 selfTest();
@@ -483,6 +581,7 @@ const manifests = readManifests();
 const failures = [
   ...checkEffectTrain(catalog, overrides, manifests),
   ...checkToolchain(catalog, manifests),
+  ...checkRetired(manifests, overrides),
   ...checkPatches(patches),
 ];
 
@@ -505,6 +604,5 @@ const dev =
 
 console.log(
   `Toolchain: effect ${catalog.get("effect")}, tsrs ${catalog.get("tsrs")}, ` +
-    `oxlint ${dev["oxlint"]}, tsgolint ${dev["oxlint-tsgolint"]}, ` +
-    `tsgo ${dev["@effect/tsgo"]}.`
+    `oxlint ${dev["oxlint"]}, tsgo ${dev["@effect/tsgo"]}.`
 );

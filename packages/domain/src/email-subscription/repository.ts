@@ -380,40 +380,42 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
           verificationToken,
         }
       : yield* Effect.gen(function* () {
-          const [created] = yield* db
-            .insert(schema.emailSubscriptionTable)
-            .values({
-              id: subscriptionId,
-              organizationId: input.organizationId,
-              contactId: persistedContact.id,
-              topicType: input.topic.topicType,
-              topicId: input.topic.topicId,
-              source: input.source,
-              state,
-              verificationTokenHash,
-              verificationExpiresAt:
-                state === "pending_verification"
-                  ? input.verificationExpiresAt
-                  : null,
-              unsubscribeTokenHash,
-              verifiedAt: state === "active" ? input.now : null,
-              unsubscribedAt: null,
-              createdAt: input.now,
-              updatedAt: input.now,
-            })
-            // Two concurrent requests for the same (contact, topic) can both
-            // see no prior row above; the unique index decides the winner and
-            // the loser re-reads it and applies the same state write, so the
-            // duplicate stays idempotent instead of aborting the caller's
-            // transaction with a unique violation.
-            .onConflictDoNothing({
-              target: [
-                schema.emailSubscriptionTable.contactId,
-                schema.emailSubscriptionTable.topicType,
-                schema.emailSubscriptionTable.topicId,
-              ],
-            })
-            .returning();
+          const [created] = yield* (
+            db
+              .insert(schema.emailSubscriptionTable)
+              .values({
+                id: subscriptionId,
+                organizationId: input.organizationId,
+                contactId: persistedContact.id,
+                topicType: input.topic.topicType,
+                topicId: input.topic.topicId,
+                source: input.source,
+                state,
+                verificationTokenHash,
+                verificationExpiresAt:
+                  state === "pending_verification"
+                    ? input.verificationExpiresAt
+                    : null,
+                unsubscribeTokenHash,
+                verifiedAt: state === "active" ? input.now : null,
+                unsubscribedAt: null,
+                createdAt: input.now,
+                updatedAt: input.now,
+              })
+              // Two concurrent requests for the same (contact, topic) can both
+              // see no prior row above; the unique index decides the winner and
+              // the loser re-reads it and applies the same state write, so the
+              // duplicate stays idempotent instead of aborting the caller's
+              // transaction with a unique violation.
+              .onConflictDoNothing({
+                target: [
+                  schema.emailSubscriptionTable.contactId,
+                  schema.emailSubscriptionTable.topicType,
+                  schema.emailSubscriptionTable.topicId,
+                ],
+              })
+              .returning()
+          );
 
           if (created !== undefined) {
             return {
@@ -627,12 +629,13 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
 
       // A full-row read with its decoder, not the column projection the
       // neighbouring reads got: this method is the one seam where projecting
-      // the columns collapses inference across the handler layer with
-      // tsrs 0.22.0-ts7.1.0-beta — the guarded write below and its outcome
-      // union resolve to `unknown` at three call sites, and no local shape of
-      // the projection stops it. The cost is one row's extra columns on a
-      // single-row lookup by unique index, so the projection buys nothing
-      // here anyway. Revisit with the next compiler-train bump.
+      // the columns collapses inference across the handler layer — the guarded
+      // write below and its outcome union resolve to `unknown` at three call
+      // sites, and no local shape of the projection stops it. Re-tested on the
+      // tsrs 0.25.0-ts7.1.0-beta that replaced 0.22.0, where it still resolves
+      // to `unknown`, so the full row stays. The cost is one row's extra columns
+      // on a single-row lookup by unique index, so the projection buys nothing
+      // here anyway.
       const [row] = yield* db
         .select()
         .from(schema.emailSubscriptionTable)
@@ -651,25 +654,27 @@ const makeEmailSubscriptionRepository = Effect.gen(function* () {
         return { _tag: "AlreadyUnsubscribed" as const };
       }
 
-      const [updated] = yield* db
-        .update(schema.emailSubscriptionTable)
-        .set({
-          state: "unsubscribed",
-          unsubscribedAt: input.now,
-          updatedAt: input.now,
-        })
-        // The machine reads the sources, same as the authenticated path: no
-        // state the graph forbids subscribing out of can be written past this
-        // `WHERE` if one ever appears.
-        .where(
-          and(
-            eq(schema.emailSubscriptionTable.id, subscription.id),
-            inArray(schema.emailSubscriptionTable.state, [
-              ...sourceStatesFor("unsubscribe"),
-            ])
+      const [updated] = yield* (
+        db
+          .update(schema.emailSubscriptionTable)
+          .set({
+            state: "unsubscribed",
+            unsubscribedAt: input.now,
+            updatedAt: input.now,
+          })
+          // The machine reads the sources, same as the authenticated path: no
+          // state the graph forbids subscribing out of can be written past this
+          // `WHERE` if one ever appears.
+          .where(
+            and(
+              eq(schema.emailSubscriptionTable.id, subscription.id),
+              inArray(schema.emailSubscriptionTable.state, [
+                ...sourceStatesFor("unsubscribe"),
+              ])
+            )
           )
-        )
-        .returning();
+          .returning()
+      );
 
       if (updated === undefined) {
         // The pre-write read above lost a race: the row reached `unsubscribed`,

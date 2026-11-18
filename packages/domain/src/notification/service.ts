@@ -695,50 +695,52 @@ const makeNotificationService = Effect.gen(function* () {
           });
         }
 
-        return yield* db
-          .select({
-            id: schema.notificationTable.id,
-            organizationId: schema.notificationTable.organizationId,
-            recipientUserId: schema.notificationTable.recipientUserId,
-            actorUserId: schema.notificationTable.actorUserId,
-            // Left-joined so a row with no actor still lists. The user table's
-            // `name` is not-null, but a left join makes every selected column
-            // nullable, which is exactly the `null` the schema and the inbox
-            // fallback icon expect.
-            actorName: schema.userTable.name,
-            actorImage: schema.userTable.image,
-            kind: schema.notificationTable.kind,
-            resourceType: schema.notificationTable.resourceType,
-            resourceId: schema.notificationTable.resourceId,
-            title: schema.notificationTable.title,
-            body: schema.notificationTable.body,
-            href: schema.notificationTable.href,
-            readAt: schema.notificationTable.readAt,
-            createdAt: schema.notificationTable.createdAt,
-          })
-          .from(schema.notificationTable)
-          .leftJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.notificationTable.actorUserId)
-          )
-          .where(
-            and(
-              eq(schema.notificationTable.organizationId, organizationId),
-              eq(schema.notificationTable.recipientUserId, recipientUserId),
-              ...(after._tag === "Decoded"
-                ? [
-                    sql`(${schema.notificationTable.createdAt}, ${schema.notificationTable.id}) < (${after.createdAt}, ${after.id})`,
-                  ]
-                : [])
+        return yield* (
+          db
+            .select({
+              id: schema.notificationTable.id,
+              organizationId: schema.notificationTable.organizationId,
+              recipientUserId: schema.notificationTable.recipientUserId,
+              actorUserId: schema.notificationTable.actorUserId,
+              // Left-joined so a row with no actor still lists. The user table's
+              // `name` is not-null, but a left join makes every selected column
+              // nullable, which is exactly the `null` the schema and the inbox
+              // fallback icon expect.
+              actorName: schema.userTable.name,
+              actorImage: schema.userTable.image,
+              kind: schema.notificationTable.kind,
+              resourceType: schema.notificationTable.resourceType,
+              resourceId: schema.notificationTable.resourceId,
+              title: schema.notificationTable.title,
+              body: schema.notificationTable.body,
+              href: schema.notificationTable.href,
+              readAt: schema.notificationTable.readAt,
+              createdAt: schema.notificationTable.createdAt,
+            })
+            .from(schema.notificationTable)
+            .leftJoin(
+              schema.userTable,
+              eq(schema.userTable.id, schema.notificationTable.actorUserId)
             )
-          )
-          // The id joins the sort key so rows inside one fan-out batch keep
-          // one order across refetches instead of shuffling every poll.
-          .orderBy(
-            desc(schema.notificationTable.createdAt),
-            desc(schema.notificationTable.id)
-          )
-          .limit(Math.min(Math.max(limit, 1), 50));
+            .where(
+              and(
+                eq(schema.notificationTable.organizationId, organizationId),
+                eq(schema.notificationTable.recipientUserId, recipientUserId),
+                ...(after._tag === "Decoded"
+                  ? [
+                      sql`(${schema.notificationTable.createdAt}, ${schema.notificationTable.id}) < (${after.createdAt}, ${after.id})`,
+                    ]
+                  : [])
+              )
+            )
+            // The id joins the sort key so rows inside one fan-out batch keep
+            // one order across refetches instead of shuffling every poll.
+            .orderBy(
+              desc(schema.notificationTable.createdAt),
+              desc(schema.notificationTable.id)
+            )
+            .limit(Math.min(Math.max(limit, 1), 50))
+        );
       }),
 
     unreadCount: ({

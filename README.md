@@ -61,7 +61,7 @@ docs/                   Topic docs and docs/adr/ decision records
 - **Widget:** SolidJS, Vite-built, Floating UI positioning
 - **State:** XState 6
 - **Observability:** OpenTelemetry over OTLP, Sentry for errors, Databuddy for product analytics
-- **Tooling:** pnpm 11, Turborepo, tsrs (a Rust port of TypeScript 7), Oxlint + Oxfmt (type-aware via `@effect/tsgo`), Knip, Vitest, Playwright
+- **Tooling:** pnpm 11, Turborepo, tsrs (a Rust port of TypeScript 7), Oxlint + Oxfmt (type-aware through `effect-tsgo --tsrs-lint`), Knip, Vitest, Playwright
 - **Infra/Deploy:** Docker, Cloudflare via Wrangler
 
 ## Prerequisites
@@ -78,7 +78,7 @@ docs/                   Topic docs and docs/adr/ decision records
    pnpm install
    ```
 
-   `prepare` runs `effect-tsgo patch` here, which wires the Effect language service into the `tsrs` compiler and Oxlint. If Effect diagnostics never appear later, that step did not run.
+   `prepare` runs `effect-tsgo patch --tsrs` here, which wires the Effect language service into the `tsrs` compiler; `pnpm lint` then loads the patched Oxlint binding itself, so Effect diagnostics need both. If they never appear later, one of those did not happen.
 
 2. Copy the environment file and fill in values:
 

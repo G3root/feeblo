@@ -365,23 +365,25 @@ const makePublicApiVoteRepository = Effect.gen(function* () {
     readonly limit: number;
   }) =>
     Effect.gen(function* () {
-      const rows = yield* db
-        .select(VOTE_COLUMNS)
-        .from(schema.upvoteTable)
-        // The voter is joined rather than left-joined: `upvote.userId` is not
-        // null, so a vote always has an account behind it. The end-user record
-        // is read by `VOTE_COLUMNS`' own subquery, not a join, so a voter with
-        // two contacts cannot duplicate the vote.
-        .innerJoin(
-          schema.userTable,
-          eq(schema.userTable.id, schema.upvoteTable.userId)
-        )
-        .where(and(...args.conditions))
-        .orderBy(
-          desc(schema.upvoteTable.createdAt),
-          desc(schema.upvoteTable.id)
-        )
-        .limit(args.limit + 1);
+      const rows = yield* (
+        db
+          .select(VOTE_COLUMNS)
+          .from(schema.upvoteTable)
+          // The voter is joined rather than left-joined: `upvote.userId` is not
+          // null, so a vote always has an account behind it. The end-user record
+          // is read by `VOTE_COLUMNS`' own subquery, not a join, so a voter with
+          // two contacts cannot duplicate the vote.
+          .innerJoin(
+            schema.userTable,
+            eq(schema.userTable.id, schema.upvoteTable.userId)
+          )
+          .where(and(...args.conditions))
+          .orderBy(
+            desc(schema.upvoteTable.createdAt),
+            desc(schema.upvoteTable.id)
+          )
+          .limit(args.limit + 1)
+      );
 
       const hasMore = rows.length > args.limit;
       const pageRows = hasMore ? rows.slice(0, args.limit) : rows;

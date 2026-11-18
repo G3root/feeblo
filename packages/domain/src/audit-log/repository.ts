@@ -133,67 +133,69 @@ const makeAuditLogRepository = Effect.gen(function* () {
     const after = query.after;
     const changedField = query.changedField;
 
-    const rows = yield* db
-      .select({
-        id: table.id,
-        occurredAt: table.occurredAt,
-        recordedAt: table.recordedAt,
-        actorType: table.actorType,
-        actorUserId: table.actorUserId,
-        actorTokenId: table.actorTokenId,
-        actorLabel: table.actorLabel,
-        actorRole: table.actorRole,
-        affectedUserId: table.affectedUserId,
-        source: table.source,
-        action: table.action,
-        outcome: table.outcome,
-        denialReason: table.denialReason,
-        resourceType: table.resourceType,
-        resourceId: table.resourceId,
-        changes: table.changes,
-        metadata: table.metadata,
-        requestId: table.requestId,
-        originIp: table.originIp,
-        originCountry: table.originCountry,
-        userAgent: table.userAgent,
-      })
-      .from(table)
-      .where(
-        and(
-          eq(table.organizationId, query.organizationId),
-          after === undefined
-            ? undefined
-            : sql`(${table.occurredAt}, ${table.id}) < (${after.occurredAt}, ${after.id})`,
-          query.action === undefined
-            ? undefined
-            : eq(table.action, query.action),
-          query.resourceType === undefined
-            ? undefined
-            : eq(table.resourceType, query.resourceType),
-          query.resourceId === undefined
-            ? undefined
-            : eq(table.resourceId, query.resourceId),
-          query.actorUserId === undefined
-            ? undefined
-            : eq(table.actorUserId, query.actorUserId),
-          query.outcome === undefined
-            ? undefined
-            : eq(table.outcome, query.outcome),
-          changedField === undefined
-            ? undefined
-            : sql`(${table.changes} -> 'fields') @> jsonb_build_array(${changedField}::text)`,
-          query.since === undefined
-            ? undefined
-            : gte(table.occurredAt, query.since),
-          query.until === undefined
-            ? undefined
-            : lte(table.occurredAt, query.until),
-          kindCondition(query.kind)
+    const rows = yield* (
+      db
+        .select({
+          id: table.id,
+          occurredAt: table.occurredAt,
+          recordedAt: table.recordedAt,
+          actorType: table.actorType,
+          actorUserId: table.actorUserId,
+          actorTokenId: table.actorTokenId,
+          actorLabel: table.actorLabel,
+          actorRole: table.actorRole,
+          affectedUserId: table.affectedUserId,
+          source: table.source,
+          action: table.action,
+          outcome: table.outcome,
+          denialReason: table.denialReason,
+          resourceType: table.resourceType,
+          resourceId: table.resourceId,
+          changes: table.changes,
+          metadata: table.metadata,
+          requestId: table.requestId,
+          originIp: table.originIp,
+          originCountry: table.originCountry,
+          userAgent: table.userAgent,
+        })
+        .from(table)
+        .where(
+          and(
+            eq(table.organizationId, query.organizationId),
+            after === undefined
+              ? undefined
+              : sql`(${table.occurredAt}, ${table.id}) < (${after.occurredAt}, ${after.id})`,
+            query.action === undefined
+              ? undefined
+              : eq(table.action, query.action),
+            query.resourceType === undefined
+              ? undefined
+              : eq(table.resourceType, query.resourceType),
+            query.resourceId === undefined
+              ? undefined
+              : eq(table.resourceId, query.resourceId),
+            query.actorUserId === undefined
+              ? undefined
+              : eq(table.actorUserId, query.actorUserId),
+            query.outcome === undefined
+              ? undefined
+              : eq(table.outcome, query.outcome),
+            changedField === undefined
+              ? undefined
+              : sql`(${table.changes} -> 'fields') @> jsonb_build_array(${changedField}::text)`,
+            query.since === undefined
+              ? undefined
+              : gte(table.occurredAt, query.since),
+            query.until === undefined
+              ? undefined
+              : lte(table.occurredAt, query.until),
+            kindCondition(query.kind)
+          )
         )
-      )
-      .orderBy(desc(table.occurredAt), desc(table.id))
-      // One row past the page answers `has more` without a second count.
-      .limit(query.limit + 1);
+        .orderBy(desc(table.occurredAt), desc(table.id))
+        // One row past the page answers `has more` without a second count.
+        .limit(query.limit + 1)
+    );
 
     const hasMore = rows.length > query.limit;
     const page = hasMore ? rows.slice(0, query.limit) : rows;

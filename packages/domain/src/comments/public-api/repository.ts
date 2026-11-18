@@ -162,21 +162,23 @@ const makePublicApiCommentRepository = Effect.gen(function* () {
           );
         }
 
-        const rows = yield* db
-          .select(COMMENT_COLUMNS)
-          .from(schema.commentTable)
-          // The author is joined rather than left-joined: `comment.userId` is
-          // not null, so a comment always has an account behind it.
-          .innerJoin(
-            schema.userTable,
-            eq(schema.userTable.id, schema.commentTable.userId)
-          )
-          .where(and(...conditions))
-          .orderBy(
-            desc(schema.commentTable.createdAt),
-            desc(schema.commentTable.id)
-          )
-          .limit(limit + 1);
+        const rows = yield* (
+          db
+            .select(COMMENT_COLUMNS)
+            .from(schema.commentTable)
+            // The author is joined rather than left-joined: `comment.userId` is
+            // not null, so a comment always has an account behind it.
+            .innerJoin(
+              schema.userTable,
+              eq(schema.userTable.id, schema.commentTable.userId)
+            )
+            .where(and(...conditions))
+            .orderBy(
+              desc(schema.commentTable.createdAt),
+              desc(schema.commentTable.id)
+            )
+            .limit(limit + 1)
+        );
 
         const hasMore = rows.length > limit;
         const pageRows = hasMore ? rows.slice(0, limit) : rows;

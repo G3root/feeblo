@@ -325,19 +325,21 @@ const makeResolvePrincipalService = Effect.gen(function* () {
         const id = yield* ContactId.generate;
         const now = yield* DateTime.nowAsDate;
 
-        const [created = null] = yield* db
-          .insert(schema.contactTable)
-          // The resolver creates as a side effect of attributing something,
-          // never through the contact dialog, so the row says so.
-          .values({
-            ...values,
-            source: "ON_BEHALF",
-            id,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .onConflictDoNothing()
-          .returning();
+        const [created = null] = yield* (
+          db
+            .insert(schema.contactTable)
+            // The resolver creates as a side effect of attributing something,
+            // never through the contact dialog, so the row says so.
+            .values({
+              ...values,
+              source: "ON_BEHALF",
+              id,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .onConflictDoNothing()
+            .returning()
+        );
 
         return Option.fromNullishOr(created);
       }),

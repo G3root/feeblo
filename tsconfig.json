@@ -9,7 +9,8 @@
   // so this becomes a whole-repo program: 9,035 files (every package's sources
   // plus their dependency `.d.ts` graph) rather than 318. Type-aware Oxlint
   // builds one program per discovered tsconfig, so a single root file dragged a
-  // whole-repo program into `tsgolint` and cost 1.2 GB instead of 79 MB. Module
+  // whole-repo program into the type-aware lint pass and cost 1.2 GB instead of
+  // 79 MB. Module
   // resolution still pulls in imports; `include` only seeds root files.
   //
   // `tools/**` is deliberately absent: those are Oxlint JS plugins, ignored by
