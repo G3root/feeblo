@@ -24,7 +24,8 @@ import {
 
 import { Input } from "../input";
 import { cn } from "../utils";
-import { TABLER_FILLED_SYMBOL_PREFIX } from "./generated/tabler-filled-icons";
+import { loadIconPickerCatalogue, preloadIconPickerCatalogue } from "./data";
+import { TABLER_FILLED_SYMBOL_PREFIX } from "./generated/tabler-filled-symbol-prefix";
 import { useIconPickerSprite, useIconPickerSpriteStatus } from "./sprite";
 import {
   createIconPickerStore,
@@ -33,6 +34,7 @@ import {
   sameIconPickerIcon,
   sameIconPickerRow,
   selectActiveIcon,
+  selectCatalogueStatus,
   selectCategoriesCount,
   selectCategoriesStartRowIndices,
   selectIsEmpty,
@@ -506,6 +508,30 @@ function IconPickerRoot({
   useLayoutEffect(() => {
     store.send({ type: "configChanged", columns, sticky, value });
   }, [columns, store, sticky, value]);
+
+  // The catalogue is its own chunk. It starts here, in parallel with the
+  // sprite the list's sizer fetches, rather than at module scope: a page that
+  // only renders a trigger should never download the search metadata.
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadIconPickerCatalogue()
+      .then((catalogue) => {
+        if (!cancelled) {
+          store.send({ type: "catalogueSettled", catalogue });
+        }
+      })
+      .catch((error: Error) => {
+        if (!cancelled) {
+          console.error("Failed to load the icon picker catalogue.", error);
+          store.send({ type: "catalogueSettled", catalogue: null });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
 
   useIconPickerKeyboard(store, elements, isFocusedWithin);
 
@@ -1181,13 +1207,13 @@ const IconPickerListRows = memo(function IconPickerListRows({
 
           return (
             <Fragment key={rowIndex}>
-              {categoryIndex >= 0 && (
+              {categoryIndex >= 0 ? (
                 <div
                   style={{
                     height: "var(--icon-picker-category-header-height)",
                   }}
                 />
-              )}
+              ) : null}
               <IconPickerListRow Icon={Icon} Row={Row} rowIndex={rowIndex} />
             </Fragment>
           );
@@ -1302,9 +1328,16 @@ function IconPickerLoading({
   className,
   ...props
 }: IconPickerLoadingProps): ReactElement | null {
-  const status = useIconPickerSpriteStatus();
+  const store = useIconPickerStore();
+  const catalogueStatus = useSelector(store, selectCatalogueStatus);
+  const spriteStatus = useIconPickerSpriteStatus();
 
-  if (status === "ready" || status === "error") {
+  const isCatalogueLoading =
+    catalogueStatus === "idle" || catalogueStatus === "loading";
+
+  const isSpriteLoading = spriteStatus === "idle" || spriteStatus === "loading";
+
+  if (!isCatalogueLoading && !isSpriteLoading) {
     return null;
   }
 
@@ -1390,6 +1423,15 @@ function IconPickerActiveIcon({
  *   />
  * </PopoverPopup>
  * ```
+ *
+ * The catalogue is its own chunk. Start it on hover so opening does not wait
+ * for it:
+ *
+ * ```tsx
+ * <PopoverTrigger onPointerEnter={IconPicker.preload} render={<Button />}>
+ *   <TablerIcon name={icon} />
+ * </PopoverTrigger>
+ * ```
  */
 function IconPickerContent({
   className,
@@ -1453,6 +1495,11 @@ const IconPicker = {
   Root: IconPickerRoot,
   Search: IconPickerSearch,
   Viewport: IconPickerViewport,
+  /**
+   * Starts the catalogue chunk early. Call it from a trigger's
+   * `onPointerEnter`/`onFocus` so opening the picker does not wait for it.
+   */
+  preload: preloadIconPickerCatalogue,
 };
 
 export {
@@ -1467,6 +1514,8 @@ export {
   IconPickerViewport,
   TablerIcon,
 };
+
+export { preloadIconPickerCatalogue } from "./data";
 
 export { loadIconPickerSprite } from "./sprite";
 

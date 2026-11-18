@@ -1,7 +1,3 @@
-import {
-  TABLER_FILLED_CATEGORIES,
-  TABLER_FILLED_ICONS,
-} from "./generated/tabler-filled-icons";
 import type {
   IconPickerData,
   IconPickerDataCategory,
@@ -10,24 +6,78 @@ import type {
   TablerFilledIconRecord,
 } from "./types";
 
-const ICON_PICKER_CATEGORIES = TABLER_FILLED_CATEGORIES;
-
 type SearchableIcon = {
   icon: TablerFilledIconRecord;
   label: string;
   tags: string[];
 };
 
+export type IconPickerCatalogue = {
+  categories: readonly string[];
+  searchableIcons: readonly SearchableIcon[];
+};
+
 /**
- * Normalising 1,054 labels and ~10,000 tags per keystroke is the one part of
- * the search that does not have to be lazy: the catalogue is fixed, so the
- * lowercase, hyphen-free form is built once and reused for every query.
+ * The empty result set a picker renders before its catalogue arrives. It is
+ * frozen because every store starts on this same object and the store only
+ * replaces `data`, never mutates it.
  */
-const searchableIcons: SearchableIcon[] = TABLER_FILLED_ICONS.map((icon) => ({
-  icon,
-  label: normalize(icon.label),
-  tags: icon.tags.map((tag) => normalize(tag)),
-}));
+export const EMPTY_ICON_PICKER_DATA: IconPickerData = {
+  categories: [],
+  categoriesStartRowIndices: [],
+  count: 0,
+  rows: [],
+};
+
+// Hoisted so a keystroke does not allocate a RegExp per normalised label or
+// tag. `replace` resets a global regex's lastIndex, so reuse is safe.
+const WHITESPACE_PATTERN = /\s+/g;
+
+type CatalogueState = {
+  promise: Promise<IconPickerCatalogue> | null;
+};
+
+const catalogueState: CatalogueState = { promise: null };
+
+/**
+ * Loads the generated catalogue in its own chunk.
+ *
+ * The sprite is what an icon needs to draw, so it is fetched by the first
+ * `TablerIcon` — a trigger can show the selected icon without opening the
+ * picker. The catalogue is only needed once the picker itself mounts, which is
+ * why this is a dynamic import with a literal path: the bundler splits it, and
+ * a page that never opens a picker never downloads it.
+ */
+export function loadIconPickerCatalogue(): Promise<IconPickerCatalogue> {
+  if (!catalogueState.promise) {
+    catalogueState.promise = import("./generated/tabler-filled-icons")
+      .then(({ TABLER_FILLED_CATEGORIES, TABLER_FILLED_ICONS }) => ({
+        categories: TABLER_FILLED_CATEGORIES,
+        searchableIcons: TABLER_FILLED_ICONS.map((icon) => ({
+          icon,
+          label: normalize(icon.label),
+          tags: icon.tags.map((tag) => normalize(tag)),
+        })),
+      }))
+      .catch((error: Error) => {
+        // The next picker that opens should be able to retry, rather than
+        // sharing a failure that may have been transient.
+        catalogueState.promise = null;
+        throw error;
+      });
+  }
+
+  return catalogueState.promise;
+}
+
+/**
+ * Starts the catalogue chunk early, for a trigger's `onPointerEnter`
+ * or `onFocus`. Errors are swallowed here — the picker reports them when it
+ * mounts, and a preload must not surface an unhandled rejection.
+ */
+export function preloadIconPickerCatalogue(): void {
+  void loadIconPickerCatalogue().catch(noop);
+}
 
 /**
  * Filters and ranks the catalogue. A label hit is worth ten tag hits, so
@@ -35,22 +85,24 @@ const searchableIcons: SearchableIcon[] = TABLER_FILLED_ICONS.map((icon) => ({
  * in its tags — Frimousse's scoring, kept because it behaves well on a list
  * this size.
  */
-function searchIcons(search: string): TablerFilledIconRecord[] {
+function searchIcons(
+  catalogue: IconPickerCatalogue,
+  search: string
+): TablerFilledIconRecord[] {
   const searchText = normalize(search);
 
   if (!searchText) {
-    return [...TABLER_FILLED_ICONS];
+    return catalogue.searchableIcons.map((searchable) => searchable.icon);
   }
 
-  const matches = searchableIcons
+  return catalogue.searchableIcons
     .flatMap((searchable) => {
       const score = scoreIcon(searchable, searchText);
 
       return score > 0 ? [{ icon: searchable.icon, score }] : [];
     })
-    .sort((a, b) => b.score - a.score);
-
-  return matches.map((match) => match.icon);
+    .toSorted((a, b) => b.score - a.score)
+    .map((match) => match.icon);
 }
 
 /**
@@ -70,11 +122,12 @@ function scoreIcon(searchable: SearchableIcon, searchText: string): number {
 }
 
 export function getIconPickerData(
+  catalogue: IconPickerCatalogue,
   columns: number,
   search: string
 ): IconPickerData {
   const columnCount = Math.max(1, Math.floor(columns));
-  const matches = searchIcons(search);
+  const matches = searchIcons(catalogue, search);
   const iconsByCategory = Map.groupBy(matches, (icon) => icon.category);
 
   const rows: IconPickerDataRow[] = [];
@@ -82,7 +135,7 @@ export function getIconPickerData(
   const categoriesStartRowIndices: number[] = [];
   let startRowIndex = 0;
 
-  for (const [categoryIndex, label] of ICON_PICKER_CATEGORIES.entries()) {
+  for (const [categoryIndex, label] of catalogue.categories.entries()) {
     const categoryIcons = iconsByCategory.get(categoryIndex);
 
     if (!categoryIcons || categoryIcons.length === 0) {
@@ -116,11 +169,19 @@ export function getIconPickerData(
 }
 
 function normalize(value: string): string {
-  return value.toLowerCase().replaceAll("-", " ").replace(/\s+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replaceAll("-", " ")
+    .replace(WHITESPACE_PATTERN, " ")
+    .trim();
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
   return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
     items.slice(index * size, index * size + size)
   );
+}
+
+function noop(): void {
+  // A preload that fails is reported by the picker when it mounts.
 }

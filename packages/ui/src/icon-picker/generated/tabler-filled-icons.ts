@@ -2,8 +2,6 @@
 // Source: @tabler/icons 3.52.0 (MIT). See LICENSE-tabler-icons.txt.
 import type { TablerFilledIconRecord } from "../types";
 
-export const TABLER_FILLED_SYMBOL_PREFIX = "tabler-filled-";
-
 export const TABLER_FILLED_CATEGORIES: readonly string[] = [
   "Animals",
   "Arrows",

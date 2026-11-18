@@ -1,6 +1,10 @@
 import { createStore } from "@xstate/store";
 
-import { getIconPickerData } from "./data";
+import {
+  EMPTY_ICON_PICKER_DATA,
+  getIconPickerData,
+  type IconPickerCatalogue,
+} from "./data";
 import type {
   IconPickerData,
   IconPickerDataRow,
@@ -21,7 +25,11 @@ export type IconPickerStoreConfig = {
   onIconSelect: (icon: IconPickerIcon) => void;
 };
 
+export type IconPickerCatalogueStatus = "idle" | "loading" | "ready" | "error";
+
 export type IconPickerStoreContext = IconPickerStoreConfig & {
+  catalogue: IconPickerCatalogue | null;
+  catalogueStatus: IconPickerCatalogueStatus;
   data: IconPickerData;
   search: string;
   interaction: IconPickerInteraction;
@@ -55,6 +63,7 @@ type IconPickerStoreEvents = {
     value: string | undefined;
   };
   searchChanged: { search: string };
+  catalogueSettled: { catalogue: IconPickerCatalogue | null };
   iconActivated: {
     interaction: Exclude<IconPickerInteraction, "none">;
     columnIndex: number;
@@ -195,7 +204,9 @@ export function createIconPickerStore(config: IconPickerStoreConfig) {
   return createStore<IconPickerStoreContext, IconPickerStoreEvents>({
     context: {
       ...config,
-      data: getIconPickerData(config.columns, ""),
+      catalogue: null,
+      catalogueStatus: "idle",
+      data: EMPTY_ICON_PICKER_DATA,
       search: "",
       interaction: "none",
       activeColumnIndex: 0,
@@ -218,11 +229,19 @@ export function createIconPickerStore(config: IconPickerStoreConfig) {
           value: event.value,
         };
 
-        // Only a column count changes the row layout; a new `value` or `sticky`
-        // must not reset the scroll window.
-        return event.columns === context.columns
+        // Only a column count changes the row layout, and only a loaded
+        // catalogue can be re-flowed; a new `value` or `sticky` must not reset
+        // the scroll window.
+        return event.columns === context.columns || !context.catalogue
           ? next
-          : withData(next, getIconPickerData(event.columns, context.search));
+          : withData(
+              next,
+              getIconPickerData(
+                context.catalogue,
+                event.columns,
+                context.search
+              )
+            );
       },
       searchChanged: (context, event) => {
         const next: IconPickerStoreContext = {
@@ -231,7 +250,34 @@ export function createIconPickerStore(config: IconPickerStoreConfig) {
           interaction: event.search ? "keyboard" : "none",
         };
 
-        return withData(next, getIconPickerData(context.columns, event.search));
+        // Typing before the catalogue arrives only records the query; the
+        // settled handler below derives the grid from it.
+        return context.catalogue
+          ? withData(
+              next,
+              getIconPickerData(
+                context.catalogue,
+                context.columns,
+                event.search
+              )
+            )
+          : next;
+      },
+      catalogueSettled: (context, event) => {
+        if (!event.catalogue) {
+          return { ...context, catalogueStatus: "error" };
+        }
+
+        const next: IconPickerStoreContext = {
+          ...context,
+          catalogue: event.catalogue,
+          catalogueStatus: "ready",
+        };
+
+        return withData(
+          next,
+          getIconPickerData(event.catalogue, context.columns, context.search)
+        );
       },
       iconActivated: (context, event) => ({
         ...context,
@@ -315,8 +361,22 @@ export function selectActiveIcon(
   ];
 }
 
+export function selectCatalogueStatus(
+  state: IconPickerStoreSnapshot
+): IconPickerCatalogueStatus {
+  return state.context.catalogueStatus;
+}
+
+/**
+ * `error` counts as empty so the picker shows its empty state instead of a
+ * spinner that never resolves; the failure itself is logged where it happened.
+ */
 export function selectIsEmpty(state: IconPickerStoreSnapshot): boolean {
-  return state.context.data.count === 0;
+  return (
+    state.context.catalogueStatus === "error" ||
+    (state.context.catalogueStatus === "ready" &&
+      state.context.data.count === 0)
+  );
 }
 
 export function sameIconPickerIcon(
