@@ -1,4 +1,5 @@
 import { Button } from "@feeblo/ui/button";
+import { FieldError } from "@feeblo/ui/field";
 import { withForm } from "@feeblo/ui/hooks/form";
 import { Input } from "@feeblo/ui/input";
 import { Cancel01Icon, Plus } from "@hugeicons/core-free-icons";
@@ -22,6 +23,14 @@ export const TeamStep = withForm({
   ...registerFormOpts,
   render: function TeamStepRender({ form }) {
     const invites = useStore(form.store, (state) => state.values.invites);
+
+    // The step's answer decides whether Continue is usable, but the message
+    // belongs under the rows it is about. Without it, pressing Enter with a bad
+    // address left the reader with a disabled button and no reason for it.
+    const inviteErrors = useStore(
+      form.store,
+      (state) => state.fieldMeta.invites?.errors ?? []
+    );
 
     const update = (index: number, value: string) => {
       form.setFieldValue(
@@ -75,6 +84,8 @@ export const TeamStep = withForm({
             </div>
           ))}
         </div>
+
+        {inviteErrors.length > 0 ? <FieldError errors={inviteErrors} /> : null}
 
         <Button
           className="self-start"

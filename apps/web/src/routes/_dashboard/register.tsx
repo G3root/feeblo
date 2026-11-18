@@ -47,7 +47,7 @@ function RegisterRoute() {
    * from by the time this runs.
    */
   const onCreated = useCallback(
-    (outcome: RegisterOutcome) => {
+    async (outcome: RegisterOutcome) => {
       trackEvent("org_created", { success: true });
 
       if (outcome.failedInvites.length > 0) {
@@ -77,7 +77,12 @@ function RegisterRoute() {
       // The atom still caches the pre-create count; refresh it for a later
       // return to this page through the switcher.
       refreshCreationState();
-      void refetch();
+      // Awaited, not fired and forgotten. The dashboard's guard reads the
+      // session, which does not name the workspace until this resolves, so
+      // navigating first sends the reader back here with a `redirectTo` for the
+      // workspace they just made. That is what the e2e suite caught: every
+      // create landed on `/register?redirectTo=/org_...` instead of the board.
+      await refetch();
 
       if (search.redirectTo !== undefined) {
         // The guard sends an org-less visitor here with the path it bounced,

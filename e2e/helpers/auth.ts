@@ -10,6 +10,15 @@ import {
 import { createTestUser, subdomainFor, type TestUser } from "./test-users";
 import { apiUrl } from "./urls";
 
+/**
+ * A URL that is the dashboard for a workspace.
+ *
+ * Matched on the pathname, not on the string: `/register?redirectTo=/org_...`
+ * contains `/org_` and is exactly the redirect a create lands on when the
+ * session has not caught up, so a substring match called that success.
+ */
+const isWorkspaceUrl = (url: URL) => url.pathname.startsWith("/org_");
+
 export type AuthenticatedUser = TestUser & {
   organizationUrl: string;
 };
@@ -72,7 +81,7 @@ export async function signUpAndCreateWorkspace(
 
   // Submit the workspace form and wait for the org dashboard to load.
   await Promise.all([
-    page.waitForURL(/\/org_/),
+    page.waitForURL(isWorkspaceUrl),
     registerPage.createWorkspace(
       user.workspaceName,
       subdomainFor(user.workspaceName)
@@ -97,7 +106,7 @@ export async function createAuthenticatedWorkspace(
   await registerPage.goto();
 
   await Promise.all([
-    page.waitForURL(/\/org_/),
+    page.waitForURL(isWorkspaceUrl),
     registerPage.createWorkspace(
       user.workspaceName,
       subdomainFor(user.workspaceName)
@@ -141,7 +150,7 @@ export async function logIn(page: Page, user: TestUser) {
   const loginPage = new LoginPage(page);
   await expect(loginPage.submitButton).toBeVisible();
   await Promise.all([
-    page.waitForURL(/\/org_/),
+    page.waitForURL(isWorkspaceUrl),
     loginPage.login(user.email, user.password),
   ]);
 }

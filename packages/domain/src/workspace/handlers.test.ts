@@ -874,14 +874,31 @@ describe("WorkspaceRpcHandlers", () => {
             // A create can commit and lose its reply. The retry has to resolve to
             // the workspace it created, not to a conflict it cannot escape.
             expect(second.organizationId).toBe(first.organizationId);
-            expect(second.isFirstWorkspace).toBe(false);
+            // The first attempt said so, so the retry says so too: otherwise
+            // the retry denies the welcome tour the first attempt promised.
+            expect(second.isFirstWorkspace).toBe(true);
 
-            const organizations = yield* db
+            // Counting the user's whole set, not the one id: a second insert
+            // under a different id would pass a filter on the first id and
+            // leave the duplicate undetected.
+            const owned = yield* db
               .select({ id: schema.organizationTable.id })
-              .from(schema.organizationTable)
-              .where(eq(schema.organizationTable.id, first.organizationId));
+              .from(schema.memberTable)
+              .innerJoin(
+                schema.organizationTable,
+                eq(
+                  schema.memberTable.organizationId,
+                  schema.organizationTable.id
+                )
+              )
+              .where(
+                and(
+                  eq(schema.memberTable.userId, userId),
+                  eq(schema.memberTable.role, "owner")
+                )
+              );
 
-            expect(organizations).toHaveLength(1);
+            expect(owned).toStrictEqual([{ id: first.organizationId }]);
           })
       );
 

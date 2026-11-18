@@ -13,6 +13,13 @@ export type WorkspaceSlugAvailability = {
   readonly availability: SlugAvailability;
   /** Called by whoever changes the subdomain; the lifecycle's only input event. */
   readonly reportSlug: (subdomain: string) => void;
+  /**
+   * Asks again about the subdomain already in the field.
+   *
+   * For the case where the answer is known to be wrong rather than merely old:
+   * a create refused an address the check had called free.
+   */
+  readonly recheck: () => void;
 };
 
 /**
@@ -54,8 +61,11 @@ export function useSlugAvailability(
     [send]
   );
 
+  const recheck = useCallback(() => send({ type: "RECHECK" }), [send]);
+
   return {
     availability: toSlugAvailability(snapshot),
+    recheck,
     reportSlug,
   };
 }

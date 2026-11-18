@@ -127,7 +127,7 @@ test.describe("register wizard", () => {
     await register.submit();
 
     expect((await logoUpload).ok()).toBe(true);
-    await expect(page).toHaveURL(/\/org_/);
+    await expect(page).toHaveURL((url) => url.pathname.startsWith("/org_"));
 
     // The workspace exists at this point, so the tour is over the dashboard.
     await register.dismissWelcomeTour();

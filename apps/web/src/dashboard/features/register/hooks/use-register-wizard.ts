@@ -36,7 +36,11 @@ const registerWizardMachine = createRegisterWizardMachine({
 export function useRegisterWizard({
   onCreated,
 }: {
-  readonly onCreated: (outcome: RegisterOutcome) => void;
+  /**
+   * Called once the machine is done. It may be async: leaving the page before
+   * the session names the new workspace lands the reader back on this route.
+   */
+  readonly onCreated: (outcome: RegisterOutcome) => Promise<void> | void;
 }) {
   const [snapshot, send] = useMachine(registerWizardMachine, {
     input: { stepIds: registerStepIds },
@@ -55,7 +59,16 @@ export function useRegisterWizard({
   });
 
   const values = useStore(form.store, (state) => state.values);
-  const slug = useSlugAvailability(values.subdomain);
+
+  // The same rule `CreateWorkspace` applies before it uses the address. The
+  // check has to judge the string the server will, or a stray capital or a
+  // trailing space makes the field claim an address the create then refuses.
+  const subdomain = useMemo(
+    () => values.subdomain.trim().toLowerCase(),
+    [values.subdomain]
+  );
+
+  const slug = useSlugAvailability(subdomain);
 
   const canContinue = useMemo(() => {
     if (view.stepId === null) {
@@ -88,7 +101,7 @@ export function useRegisterWizard({
     }
 
     reportedRef.current = view.outcome.organizationId;
-    onCreated(view.outcome);
+    void onCreated(view.outcome);
   }, [onCreated, view.isDone, view.outcome]);
 
   const next = useCallback(
@@ -96,7 +109,17 @@ export function useRegisterWizard({
     [canContinue, send]
   );
 
-  const back = useCallback(() => send({ type: "BACK" }), [send]);
+  const back = useCallback(() => {
+    // A create refused with an address conflict means the address the field
+    // called free is not. Back is the only way the reader leaves that state, so
+    // it is also the moment to ask again: the string is unchanged, and the
+    // check's own input event would ignore it.
+    if (view.isFailed) {
+      slug.recheck();
+    }
+
+    send({ type: "BACK" });
+  }, [send, slug, view.isFailed]);
 
   const goTo = useCallback(
     (index: number) => send({ type: "GO_TO", index }),

@@ -86,22 +86,29 @@ async function sendInvites({
   const invited: string[] = [];
 
   for (const email of invites) {
-    const result = await authClient.organization.inviteMember({
-      email,
-      organizationId,
-      // The least privilege an invitation can carry. Onboarding is the wrong
-      // moment to hand someone management rights, and the owner can raise the
-      // role from settings once they know what the person should do.
-      role: "contributor",
-    });
+    try {
+      const result = await authClient.organization.inviteMember({
+        email,
+        organizationId,
+        // The least privilege an invitation can carry. Onboarding is the wrong
+        // moment to hand someone management rights, and the owner can raise the
+        // role from settings once they know what the person should do.
+        role: "contributor",
+      });
 
-    if (result.error) {
+      if (result.error) {
+        failed.push(email);
+
+        continue;
+      }
+
+      invited.push(email);
+    } catch {
+      // A throw here is one invitation, not the batch. Without this the actor
+      // rejected, the machine moved to `done` through its error transition,
+      // and every invitation made before this one was reported as none.
       failed.push(email);
-
-      continue;
     }
-
-    invited.push(email);
   }
 
   return { failed, invited };

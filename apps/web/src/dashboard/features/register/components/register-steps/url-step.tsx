@@ -101,7 +101,7 @@ export const UrlStep = withForm({
                   id={field.name}
                   onBlur={field.handleBlur}
                   onChange={(event) => {
-                    const next = event.target.value.toLowerCase();
+                    const next = event.target.value.trim().toLowerCase();
 
                     field.handleChange(next);
                     reportSlug(next);

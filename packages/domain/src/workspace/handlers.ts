@@ -134,8 +134,16 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
                 });
 
               if (Option.isSome(ownedByCaller)) {
+                // The same answer the first attempt gave: the replayed
+                // workspace was the reader's first if it is the only one they
+                // own. A retry that reported `false` would deny the welcome
+                // tour to the very workspace the tour describes.
+                const owned = yield* repository.findOwnedWorkspaces(
+                  session.session.userId
+                );
+
                 return {
-                  isFirstWorkspace: false,
+                  isFirstWorkspace: owned.length === 1,
                   organizationId: ownedByCaller.value,
                 };
               }
