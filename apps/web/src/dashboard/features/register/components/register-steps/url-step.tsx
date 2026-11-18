@@ -138,7 +138,11 @@ export const UrlStep = withForm({
 
                 {status === "taken" ? (
                   <div className="flex flex-col gap-2">
-                    <FieldError id={`${field.name}-status`}>
+                    {/* `match` draws the message without the enclosing field
+                        reporting a validation error. Base UI's Field.Error
+                        otherwise renders only when its own field is invalid,
+                        and this answer is the check's, not the form's. */}
+                    <FieldError id={`${field.name}-status`} match>
                       {reason ?? "Someone already has this address."}
                     </FieldError>
                     {suggestion === null ? null : (
@@ -160,7 +164,7 @@ export const UrlStep = withForm({
                 ) : null}
 
                 {status === "error" ? (
-                  <FieldError id={`${field.name}-status`}>
+                  <FieldError id={`${field.name}-status`} match>
                     Could not check this address. Keep typing to try again.
                   </FieldError>
                 ) : null}

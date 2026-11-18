@@ -85,7 +85,9 @@ export const TeamStep = withForm({
           ))}
         </div>
 
-        {inviteErrors.length > 0 ? <FieldError errors={inviteErrors} /> : null}
+        {inviteErrors.length > 0 ? (
+          <FieldError errors={inviteErrors} match />
+        ) : null}
 
         <Button
           className="self-start"

@@ -27,9 +27,11 @@ test.describe("welcome tour", () => {
       ),
     ]);
 
-    // Named, because the "Workspace created" toast is a dialog too and an
-    // unnamed role query matches both.
-    const tour = page.getByRole("dialog", { name: /Welcome to/ });
+    // Located by its popup, not by its accessible name: the name is the step
+    // title, so it changes as the reader moves and a name-scoped locator would
+    // stop matching after the first Continue. An unnamed role query is no good
+    // either, because the "Workspace created" toast is a dialog too.
+    const tour = page.locator('[data-slot="dialog-popup"]');
     await expect(tour).toBeVisible();
     await expect(
       tour.getByRole("heading", { name: `Welcome to ${user.workspaceName}` })
@@ -51,6 +53,6 @@ test.describe("welcome tour", () => {
     // The completion is remembered per workspace, so a reload does not greet
     // the same reader twice.
     await page.reload();
-    await expect(page.getByRole("dialog", { name: /Welcome to/ })).toBeHidden();
+    await expect(tour).toBeHidden();
   });
 });
