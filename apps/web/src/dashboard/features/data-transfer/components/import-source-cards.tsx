@@ -210,6 +210,7 @@ export function ImportSourcesSection({
 
       {csvOpen ? (
         <CsvImportDialog
+          key={organizationId}
           onOpenChange={setCsvOpen}
           onStaged={onStaged}
           onStartingChange={setIsStarting}
@@ -219,6 +220,7 @@ export function ImportSourcesSection({
       ) : null}
       {openProvider === null ? null : (
         <ProviderImportDialog
+          key={organizationId}
           onOpenChange={(open) => {
             if (!open) {
               setOpenProvider(null);

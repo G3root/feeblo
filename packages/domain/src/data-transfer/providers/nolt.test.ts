@@ -30,6 +30,52 @@ const textResponse = (
 const CSV_HEADER =
   "id,title,description,board,status,upvotes,author name,author email,created at,tags,url";
 
+type ChunkedBody = {
+  readonly canceled: () => boolean;
+  readonly pulls: () => number;
+  readonly response: Response;
+};
+
+/**
+ * A body that only produces a chunk when the consumer asks for one, so a test
+ * can tell whether an oversized read stopped before the next chunk.
+ */
+const chunkedResponse = (chunks: readonly Uint8Array[]): ChunkedBody => {
+  let index = 0;
+  let pulled = 0;
+  let canceled = false;
+
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      cancel() {
+        canceled = true;
+      },
+      pull(controller) {
+        const chunk = chunks[index];
+
+        if (chunk === undefined) {
+          controller.close();
+
+          return;
+        }
+
+        index += 1;
+        pulled += 1;
+        controller.enqueue(chunk);
+      },
+    },
+    { highWaterMark: 0 }
+  );
+
+  return {
+    canceled: () => canceled,
+    pulls: () => pulled,
+    response: new Response(stream, {
+      headers: { "content-type": "text/csv" },
+    }),
+  };
+};
+
 const csvResponse = (rows: readonly string[]) =>
   HttpClient.make((request) =>
     Effect.succeed(textResponse(request, 200, [CSV_HEADER, ...rows].join("\n")))
@@ -178,12 +224,63 @@ describe("Nolt import adapter", () => {
     })
   );
 
-  it.effect("refuses an export past the byte cap", () =>
+  it.effect("reads a multi-chunk export split inside a character", () =>
     Effect.gen(function* () {
-      const oversized = `"${"x".repeat(DATA_IMPORT_MAX_BYTES)}"`;
+      const encoder = new TextEncoder();
+
+      const body = encoder.encode(
+        [CSV_HEADER, "n-1,Café,Body,,,0,,,,"].join("\n")
+      );
+
+      // Split between the two UTF-8 bytes of `é`: decoding must happen after
+      // the chunks are joined, not per chunk.
+      const split = body.indexOf(0xc3);
+
+      const chunks = [
+        body.slice(0, split),
+        body.slice(split, split + 1),
+        body.slice(split + 1),
+      ];
+
+      const response = chunkedResponse(chunks);
 
       const adapter = makeNoltImportProvider({
-        httpClient: csvResponse([oversized]),
+        httpClient: HttpClient.make((request) =>
+          Effect.succeed(HttpClientResponse.fromWeb(request, response.response))
+        ),
+      });
+
+      const result = yield* adapter.fetchPosts({
+        credentials: { apiKey: "a-key", boardUrl: "acme.nolt.io" },
+      });
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]?.title).toBe("Café");
+    })
+  );
+
+  it.effect("stops at the byte cap on a multi-chunk non-ASCII export", () =>
+    Effect.gen(function* () {
+      const encoder = new TextEncoder();
+      // The string is under the cap, but its UTF-8 encoding is over it.
+      const title = "é".repeat(Math.floor(DATA_IMPORT_MAX_BYTES / 2) + 2);
+      const body = encoder.encode([CSV_HEADER, `"${title}"`].join("\n"));
+      const first = Math.floor(body.byteLength / 3);
+      const second = Math.floor((body.byteLength * 2) / 3);
+
+      const chunks = [
+        body.slice(0, first),
+        body.slice(first, second),
+        body.slice(second),
+        encoder.encode("this chunk must never be pulled"),
+      ];
+
+      const response = chunkedResponse(chunks);
+
+      const adapter = makeNoltImportProvider({
+        httpClient: HttpClient.make((request) =>
+          Effect.succeed(HttpClientResponse.fromWeb(request, response.response))
+        ),
       });
 
       const error = yield* Effect.flip(
@@ -193,6 +290,9 @@ describe("Nolt import adapter", () => {
       );
 
       expect(error).toBeInstanceOf(DataImportProviderResponseError);
+      expect(error.message).toContain("larger than 10 MB");
+      expect(response.pulls()).toBe(3);
+      expect(response.canceled()).toBe(true);
     })
   );
 
