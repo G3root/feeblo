@@ -5,16 +5,20 @@ import * as Stream from "effect/Stream";
 
 import { actorFromSession } from "../audit-log/attribution";
 import { AuditLogRecorder } from "../audit-log/recorder";
+import * as Policy from "../policy";
 import { withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { DataImportService } from "./import-service";
 import { toDataImportJobDetail, toDataImportJobSummary } from "./mappers";
+import { ImportProviderRegistryLive } from "./providers";
 import { DataTransferRpcs } from "./rpcs";
 import type {
   TDataImportCancel,
   TDataImportConfirm,
   TDataImportGet,
   TDataImportList,
+  TDataImportProviderList,
+  TDataImportProviderStart,
 } from "./schema";
 
 /**
@@ -79,6 +83,23 @@ export const DataTransferRpcHandlersEffect = Effect.gen(function* () {
       service
         .listImports({ organizationId: args.organizationId })
         .pipe(Effect.map((jobs) => jobs.map(toDataImportJobSummary))),
+    ListDataImportProviders: (args: TDataImportProviderList) =>
+      service.listProviders({ organizationId: args.organizationId }),
+    StartProviderDataImport: (args: TDataImportProviderStart) =>
+      Effect.gen(function* () {
+        const session = yield* CurrentSession;
+        const membership = Policy.getMembership(session, args.organizationId);
+
+        const job = yield* service.stageProviderImport({
+          credentials: args.credentials,
+          memberId: membership?.membershipId ?? null,
+          organizationId: args.organizationId,
+          provider: args.provider,
+          userId: session.user.id,
+        });
+
+        return toDataImportJobSummary(job);
+      }),
     WatchDataImports: (args: TDataImportList) =>
       service
         .watchImportList({ organizationId: args.organizationId })
@@ -94,5 +115,6 @@ export const DataTransferRpcHandlers = DataTransferRpcs.toLayer(
   DataTransferRpcHandlersEffect
 ).pipe(
   Layer.provide(DataImportService.layer),
+  Layer.provide(ImportProviderRegistryLive),
   Layer.provide(AuditLogRecorder.layer)
 );

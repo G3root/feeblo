@@ -510,6 +510,65 @@ const splitTagCell = (cell: string): readonly string[] =>
       .filter((name) => name.length > 0)
   );
 
+/** One record of a CSV read as raw cells, before any column contract applies. */
+export type ParsedCsvGrid = {
+  readonly header: readonly string[];
+  readonly rows: readonly {
+    readonly cells: readonly string[];
+    readonly lineNumber: number;
+  }[];
+};
+
+/**
+ * Reads any comma-delimited export as a header and its data rows.
+ *
+ * The board importer's own parser refuses a file without its fixed columns;
+ * a provider export has its own header. This is the same reader without the
+ * contract, so a provider adapter maps names to values instead of carrying a
+ * second, subtly different CSV parser.
+ */
+export const parseCsvGrid = (
+  source: string
+): Effect.Effect<ParsedCsvGrid, InvalidBoardPostCsvError> => {
+  const parsed = parseRecords(source);
+
+  if ("unterminated" in parsed) {
+    return Effect.fail(
+      new InvalidBoardPostCsvError({
+        message:
+          "The export has an unterminated quoted value. Check for a missing closing quote.",
+      })
+    );
+  }
+
+  const records = parsed.records.filter(
+    (record) =>
+      !(
+        record.cells.length === 1 &&
+        record.cells[0] === "" &&
+        !record.firstFieldQuoted
+      )
+  );
+
+  const [header, ...dataRecords] = records;
+
+  if (header === undefined) {
+    return Effect.fail(
+      new InvalidBoardPostCsvError({
+        message: "The export is empty. Expected a header row and data rows.",
+      })
+    );
+  }
+
+  return Effect.succeed({
+    header: header.cells,
+    rows: dataRecords.map((record) => ({
+      cells: record.cells,
+      lineNumber: record.lineNumber,
+    })),
+  });
+};
+
 /**
  * Parses an uploaded board CSV.
  *

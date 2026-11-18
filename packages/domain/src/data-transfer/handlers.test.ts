@@ -19,6 +19,7 @@ import { PostStatusRepository } from "../post-status/repository";
 import { CurrentSession, type Session } from "../session-middleware";
 import { DataTransferRpcHandlersEffect } from "./handlers";
 import { DataImportService } from "./import-service";
+import { ImportProviderRegistryLive } from "./providers";
 import { DataTransferRepository } from "./repository";
 
 type Fixture = {
@@ -115,11 +116,34 @@ const TestLayer = Layer.mergeAll(
   PostStatusRepository.layer,
   AuditLogRecorder.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
 ).pipe(
+  Layer.provide(ImportProviderRegistryLive),
   Layer.provideMerge(Database.PgliteDatabaseLive),
   Layer.provideMerge(NodeCrypto.layer)
 );
 
 layer(TestLayer)("DataTransferRpcHandlers", (it) => {
+  it.effect("lists the providers this deployment offers", () =>
+    Effect.gen(function* () {
+      const handlers = yield* DataTransferRpcHandlersEffect;
+      const fixture = yield* makeFixture();
+
+      const providers = yield* handlers
+        .ListDataImportProviders({ organizationId: fixture.organizationId })
+        .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+      expect(providers.map((provider) => provider.name)).toEqual([
+        "Canny",
+        "Nolt",
+        "Productboard",
+      ]);
+      // Every descriptor names the fields its form renders, so the dashboard
+      // never learns a provider's request shape.
+      expect(
+        providers.every((provider) => provider.credentialFields.length > 0)
+      ).toBe(true);
+    })
+  );
+
   it.effect(
     "records a confirmed import against the person who released it",
     () =>

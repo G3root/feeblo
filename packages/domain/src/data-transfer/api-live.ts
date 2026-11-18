@@ -27,6 +27,7 @@ import { DataImportService } from "./import-service";
 import { DATA_IMPORT_MAX_BYTES } from "./limits";
 import { toDataImportJobSummary } from "./mappers";
 import { canImportPosts } from "./policies";
+import { ImportProviderRegistryLive } from "./providers";
 import { DataTransferRepository } from "./repository";
 
 /**
@@ -57,7 +58,7 @@ const HandlerDependencies = Layer.mergeAll(
   BoardRepository.layer,
   PublicApiConfig.layer,
   AuditLogRecorder.layer
-).pipe(Layer.orDie);
+).pipe(Layer.provideMerge(ImportProviderRegistryLive), Layer.orDie);
 
 /** Control characters and separators that must not reach the header. */
 const UNSAFE_FILENAME_CHARACTERS = /["\\/\r\n]/gu;

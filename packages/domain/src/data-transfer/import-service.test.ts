@@ -21,9 +21,15 @@ import { TestClock } from "effect/testing";
 import { BoardRepository } from "../board/repository";
 import { PostStatusRepository } from "../post-status/repository";
 import { CurrentSession, type Session } from "../session-middleware";
+import type { ParsedBoardPostRow } from "./csv";
+import { DataImportProviderCredentialError } from "./errors";
 import { streamImportProblemsCsv } from "./import-problems-csv";
 import { DataImportService, type DataImportJobDetail } from "./import-service";
 import { DATA_IMPORT_WATCH_MS } from "./limits";
+import {
+  type ImportProviderAdapter,
+  makeImportProviderRegistryLayer,
+} from "./provider";
 import {
   DataTransferRepository,
   type DataImportJobRecord,
@@ -147,12 +153,78 @@ const stage = (
       );
   });
 
+let cannyFetchCount = 0;
+
+const providerRow: ParsedBoardPostRow = {
+  authorEmail: "",
+  authorName: "",
+  board: "Test board",
+  content: "The body",
+  createdAt: "",
+  eta: "",
+  rowNumber: 1,
+  status: "Pending",
+  tags: [],
+  title: "From Canny",
+  updatedAt: "",
+  url: "",
+  voteCount: "",
+};
+
+const cannyFake: ImportProviderAdapter = {
+  descriptor: {
+    carries: ["Posts"],
+    credentialFields: [],
+    helpText: "Help",
+    helpUrl: "https://example.com",
+    id: "canny",
+    name: "Canny",
+    omissions: [],
+    tagline: "Canny posts",
+  },
+  fetchPosts: () => {
+    cannyFetchCount += 1;
+
+    return Effect.succeed({
+      fingerprint: "canny-fingerprint",
+      notices: ["Canny returned 1 post."],
+      rows: [providerRow],
+    });
+  },
+};
+
+const failingFake: ImportProviderAdapter = {
+  descriptor: {
+    carries: [],
+    credentialFields: [],
+    helpText: "Help",
+    helpUrl: "https://example.com",
+    id: "nolt",
+    name: "Nolt",
+    omissions: [],
+    tagline: "Nolt posts",
+  },
+  fetchPosts: () =>
+    Effect.fail(
+      new DataImportProviderCredentialError({
+        message: "Nolt rejected the key.",
+        provider: "nolt",
+      })
+    ),
+};
+
+const TestProviderRegistry = makeImportProviderRegistryLayer([
+  cannyFake,
+  failingFake,
+]);
+
 const TestLayer = Layer.mergeAll(
   DataImportService.layer,
   DataTransferRepository.layer,
   BoardRepository.layer,
   PostStatusRepository.layer
 ).pipe(
+  Layer.provide(TestProviderRegistry),
   Layer.provideMerge(Database.PgliteDatabaseLive),
   Layer.provideMerge(NodeCrypto.layer)
 );
@@ -749,6 +821,83 @@ layer(TestLayer)("DataImportService", (it) => {
       // The terminal snapshot is the last one: the stream ends on its own.
       yield* Fiber.join(watcher);
       expect(yield* Queue.size(emissions)).toBe(0);
+    })
+  );
+
+  it.effect("stages a provider pull through the same planner", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const service = yield* DataImportService;
+      const session = makeSession(fixture, "manager");
+      cannyFetchCount = 0;
+
+      const job = yield* service
+        .stageProviderImport({
+          credentials: { apiKey: "a-key" },
+          memberId: fixture.membershipId,
+          organizationId: fixture.organizationId,
+          provider: "canny",
+          userId: fixture.userId,
+        })
+        .pipe(Effect.provideService(CurrentSession, session));
+
+      expect(cannyFetchCount).toBe(1);
+      expect(job.fileName).toBe("Canny import");
+      expect(job.status).toBe("awaiting_confirmation");
+      expect(job.rowCount).toBe(1);
+      expect(job.notices).toContain("Canny returned 1 post.");
+      // The provider's fingerprint is what the duplicate warning hashes, so a
+      // job staged from it is indistinguishable from one staged from a file.
+      expect(job.fileHash).toHaveLength(64);
+    })
+  );
+
+  it.effect(
+    "checks the workspace's import slot before calling a provider",
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const service = yield* DataImportService;
+        const session = makeSession(fixture, "manager");
+        yield* stage(fixture, encoder.encode("title\nFirst\n"));
+        cannyFetchCount = 0;
+
+        const error = yield* Effect.flip(
+          service
+            .stageProviderImport({
+              credentials: { apiKey: "a-key" },
+              memberId: fixture.membershipId,
+              organizationId: fixture.organizationId,
+              provider: "canny",
+              userId: fixture.userId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session))
+        );
+
+        expect(error._tag).toBe("DataImportAlreadyActiveError");
+        expect(cannyFetchCount).toBe(0);
+      })
+  );
+
+  it.effect("keeps a provider's own failure", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture();
+      const service = yield* DataImportService;
+      const session = makeSession(fixture, "manager");
+
+      const error = yield* Effect.flip(
+        service
+          .stageProviderImport({
+            credentials: { apiKey: "wrong" },
+            memberId: fixture.membershipId,
+            organizationId: fixture.organizationId,
+            provider: "nolt",
+            userId: fixture.userId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session))
+      );
+
+      expect(error._tag).toBe("DataImportProviderCredentialError");
     })
   );
 

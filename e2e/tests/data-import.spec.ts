@@ -10,23 +10,58 @@ const importCsv = (rows: readonly string[]): string =>
 const dataSettingsUrl = (organizationUrl: string): string =>
   `${organizationUrl}/settings/data`;
 
-async function uploadCsv(page: Page, name: string, contents: string) {
-  await page.getByLabel("CSV file").setInputFiles({
+/** Stages a CSV through the source card's dialog, then closes the preview. */
+async function stageCsv(page: Page, name: string, contents: string) {
+  await page.getByRole("button", { name: "Upload CSV" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[type="file"]').setInputFiles({
     buffer: Buffer.from(contents),
     mimeType: "text/csv",
     name,
   });
-  await page.getByRole("button", { name: "Upload file" }).click();
+  await dialog.getByRole("button", { name: "Stage import" }).click();
+
+  await expect(dialog.getByText("Ready to review")).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
 }
 
 test.describe("data import", () => {
+  test("offers a file and the provider catalog as sources", async ({
+    page,
+  }) => {
+    const owner = await createAuthenticatedWorkspace(page);
+    await page.goto(dataSettingsUrl(owner.organizationUrl));
+
+    await expect(page.getByText("CSV file")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Import from Canny" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Import from Nolt" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Import from Productboard" })
+    ).toBeVisible();
+
+    // The provider card is the RPC catalog rendered: no credential is sent
+    // until every field its descriptor declares holds one.
+    await page.getByRole("button", { name: "Import from Canny" }).click();
+    const dialog = page.getByRole("dialog");
+    const submit = dialog.getByRole("button", { name: "Connect Canny" });
+    await expect(submit).toBeDisabled();
+
+    await dialog.getByLabel("Canny API key").fill("a-canny-key");
+    await expect(submit).toBeEnabled();
+  });
+
   test("reviews a staged import and confirms it into a post", async ({
     page,
   }) => {
     const owner = await createAuthenticatedWorkspace(page);
     await page.goto(dataSettingsUrl(owner.organizationUrl));
 
-    await uploadCsv(
+    await stageCsv(
       page,
       "posts.csv",
       importCsv(["Imported post,Body,,,,,,,,", ",No title,,,,,,,,"])
@@ -85,25 +120,27 @@ test.describe("data import", () => {
     const owner = await createAuthenticatedWorkspace(page);
     await page.goto(dataSettingsUrl(owner.organizationUrl));
 
-    await page.getByLabel("CSV file").setInputFiles({
+    await page.getByRole("button", { name: "Upload CSV" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.locator('input[type="file"]').setInputFiles({
       buffer: Buffer.from("not a csv"),
       mimeType: "text/plain",
       name: "notes.txt",
     });
 
-    await expect(page.getByText("Choose a CSV file.")).toBeVisible();
+    await expect(page.getByText("Choose a .csv file")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Upload file" })
+      dialog.getByRole("button", { name: "Stage import" })
     ).toBeDisabled();
   });
 
-  test("cancels a staged import so the next file can be uploaded", async ({
+  test("cancels a staged import so the next import can start", async ({
     page,
   }) => {
     const owner = await createAuthenticatedWorkspace(page);
     await page.goto(dataSettingsUrl(owner.organizationUrl));
 
-    await uploadCsv(page, "posts.csv", importCsv(["First post,Body,,,,,,,,"]));
+    await stageCsv(page, "posts.csv", importCsv(["First post,Body,,,,,,,,"]));
     await expect(
       page.getByRole("button", { name: "Cancel import" }).first()
     ).toBeVisible();
@@ -114,6 +151,11 @@ test.describe("data import", () => {
     await dialog.getByRole("button", { name: "Discard rows" }).click();
 
     await expect(page.getByText("Canceled", { exact: true })).toBeVisible();
-    await expect(page.getByLabel("CSV file")).toBeEnabled();
+
+    // The workspace's one import slot is free again.
+    await page.getByRole("button", { name: "Upload CSV" }).click();
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: "Stage import" })
+    ).toBeDisabled();
   });
 });

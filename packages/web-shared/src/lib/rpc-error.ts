@@ -65,6 +65,18 @@ const ALLOWED_USER_FACING_TAGS = new Set<string>([
   "SubjectNotFoundError",
   "InvalidSubjectError",
   "CrmEntryLimitReachedError",
+  // A provider import fails for reasons the person who pasted the credential
+  // can act on: a rejected key, a rate limit with a wait, an account with no
+  // posts, or a provider response this build cannot read. The service authors
+  // every one of these messages and never includes the credential, so showing
+  // them is both safe and the only way the form can say what to fix.
+  "UnknownDataImportProviderError",
+  "DataImportProviderCredentialError",
+  "DataImportProviderRateLimitedError",
+  "DataImportProviderUnavailableError",
+  "DataImportProviderResponseError",
+  "DataImportProviderEmptyError",
+  "DataImportAlreadyActiveError",
 ]);
 
 function extractUserMessage(cause: unknown): string | undefined {
