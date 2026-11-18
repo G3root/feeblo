@@ -145,17 +145,17 @@ function RegisterFlow({
   const wizard = useRegisterWizard({ onCreated });
   const logo = useStore(wizard.form.store, (state) => state.values.logo);
   const logoUrl = useObjectUrl(logo);
+  const auth = useAuthState();
 
   return (
     <SlugAvailabilityProvider value={wizard.slug}>
       <RegisterShell
         preview={
           <WorkspacePreview
+            authorName={auth.data?.user.name ?? wizard.values.workspaceName}
             boards={wizard.values.boards}
             logoUrl={logoUrl}
-            status={wizard.slug.availability.status}
             subdomain={wizard.values.subdomain}
-            suggestion={wizard.slug.availability.suggestion}
             workspaceName={wizard.values.workspaceName}
           />
         }

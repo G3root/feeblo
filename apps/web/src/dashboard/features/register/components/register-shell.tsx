@@ -22,8 +22,9 @@ type RootProps = {
  * the workspace it is describing are two views of one thing, and giving each
  * half the viewport is what makes the preview read as the product the reader
  * is about to get instead of an illustration of it. The preview half is
- * height-locked to the viewport so it never scrolls the page. The board
- * scrolls inside its own panel, the way it will once it exists.
+ * height-locked to the viewport so it never scrolls the page. The preview owns
+ * its own insets — it draws a page that runs off the right and bottom edges, so
+ * a gutter here would cut it twice.
  *
  * Without a preview the page falls back to a centred column: the loading and
  * limit states have nothing to show on the right, and a half-empty split would
@@ -54,9 +55,7 @@ function Root({ children, className, preview }: RootProps) {
         <div className="flex w-full max-w-sm flex-col gap-5">{children}</div>
       </div>
 
-      <div className="bg-muted/40 hidden min-h-0 border-l p-6 lg:block">
-        {preview}
-      </div>
+      <div className="bg-muted/40 hidden min-h-0 lg:block">{preview}</div>
     </div>
   );
 }

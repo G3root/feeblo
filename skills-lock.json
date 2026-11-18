@@ -109,6 +109,13 @@
       "skillPath": "playwright-best-practices/SKILL.md",
       "computedHash": "d4beb67ed0ecd6e9f61d9715e038a33beb15322662ed9a6acb9a3787da2dc915"
     },
+    "prototype": {
+      "source": "mattpocock/skills",
+      "commit": "5863806dd4e15c63174bee4e7515a4256792ecfa",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/prototype/SKILL.md",
+      "computedHash": "1e3ba2202a5b77b8aa50bc4447432331d6e42590e53ec0935689662cfed199ca"
+    },
     "quality-code": {
       "source": "RhysSullivan/skills",
       "sourceType": "github",

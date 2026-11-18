@@ -1,34 +1,34 @@
-import { UserAvatar } from "@feeblo/ui/user-avatar";
-import { cn } from "@feeblo/ui/utils";
+import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
 import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
-import {
-  AlertCircleIcon,
-  ArrowUp02Icon,
-  CheckmarkCircle02Icon,
-  Loading03Icon,
-  LockIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 
-import type { WorkspaceSlugAvailability } from "../hooks/use-slug-availability";
+import {
+  ProductPostShot,
+  type ProductShotPost,
+} from "~/components/product-shot/product-post-shot";
+
 import type { RegisterBoardDraft } from "../lib/register-draft";
 
 /**
- * The workspace the reader is about to create, rendered as the public board it
- * will be.
+ * The workspace the reader is about to create, shown as the one screen the
+ * product is for: a request, open.
  *
- * A preview is worth showing only if it is the truth about the fields above
- * it: the name in the header is the name being typed, the address in the bar
- * is the subdomain the server is checking, and the board it shows is laid out
- * the way `{subdomain}.{rootDomain}` lays it out. The rows inside are static because they
- * are the sample posts the new workspace opens with, and inventing
- * live data for a workspace that does not exist yet would be a fiction with a
- * loading state.
+ * A preview is worth showing only if it is the truth about the fields beside
+ * it. The address at the top is the subdomain the server is checking, the name
+ * is the name being typed, the logo is the logo just uploaded, the board is the
+ * first board they kept, and the post is the real sample post every workspace
+ * opens with — body and all, from `packages/domain/src/workspace/onboarding.ts`.
  *
- * Rendered at its natural size inside a fluid column rather than as a scaled
- * down desktop window: the register form is a narrow column on a wide screen,
- * so the board only has to look right at one width, and type that stays at its
- * real size reads as a product instead of a screenshot.
+ * A whole board page would have to invent more than this one does: three posts
+ * cannot fill a full-height panel, so a board view either floats in the middle
+ * of it or pads the empty half with something the reader will never see. A post
+ * with no comments is the honest state of a workspace created ten seconds from
+ * now, and it leaves room for the composer, which is the half of the product a
+ * new owner uses first.
+ *
+ * Rendered at its natural size rather than scaled down: the register form is a
+ * narrow column on a wide screen, so the panel only has to look right at one
+ * width, and type that stays at its real size reads as a product instead of a
+ * screenshot.
  */
 
 /** Where the address bar's subdomain ends and the shared root begins. */
@@ -39,212 +39,86 @@ const placeholderName = "Your workspace";
 const placeholderSlug = "your-workspace";
 
 /**
- * The three sample posts every workspace opens with, as the board will show
- * them. Kept in step with `packages/domain/src/workspace/onboarding.ts` by
- * naming the same three posts, not by importing the templates: the server's
- * copy is the one that ships, and this is a picture of it.
+ * The welcome post `createWorkspace` seeds, as the board will show it.
  *
- * All three are Pending because that is the status the seed writes. A preview
- * that showed one of them Planned would be describing a workspace the reader
- * is not about to get.
+ * Kept in step with `onboarding.ts` by naming the same words, not by importing
+ * the templates: the server's copy is the one that ships, and this is a picture
+ * of it. All three sample posts arrive Pending, which is why the status is not
+ * a variable here.
  */
-const previewPosts = [
-  {
-    status: "Pending",
-    statusClassName: "bg-muted-foreground/60",
-    title: "Welcome to your workspace",
-    votes: 0,
+const welcomePost: Omit<ProductShotPost, "board" | "author"> = {
+  intro:
+    "Your workspace is ready. It has boards, a public roadmap, a changelog and a help center. We added three sample posts so you can see how they fit together.",
+  sections: [
+    {
+      heading: "What you can do here",
+      points: [
+        "Collect posts on the Bugs and Features boards",
+        "Vote and comment so the most wanted work stays visible",
+        "Move a post's status to put it on the roadmap",
+        "Publish what shipped in the changelog",
+      ],
+    },
+    {
+      heading: "Suggested next steps",
+      points: [
+        "Open a sample post and change its status",
+        "Write your own with New post",
+        "Add your logo and colours in Settings",
+      ],
+    },
+  ],
+  status: {
+    color: DEFAULT_POST_STATUS_COLORS.PENDING,
+    label: "Pending",
   },
-  {
-    status: "Pending",
-    statusClassName: "bg-muted-foreground/60",
-    title: "How ideas become roadmap items",
-    votes: 0,
-  },
-  {
-    status: "Pending",
-    statusClassName: "bg-muted-foreground/60",
-    title: "What makes a bug report useful",
-    votes: 0,
-  },
-] as const;
-
-function AvailabilityBadge({
-  status,
-  suggestion,
-}: Pick<WorkspaceSlugAvailability["availability"], "status" | "suggestion">) {
-  if (status === "checking") {
-    return (
-      <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
-        <HugeiconsIcon className="size-3 animate-spin" icon={Loading03Icon} />
-        Checking
-      </span>
-    );
-  }
-
-  if (status === "available") {
-    return (
-      <span className="flex items-center gap-1 text-[11px] text-emerald-600">
-        <HugeiconsIcon className="size-3" icon={CheckmarkCircle02Icon} />
-        Available
-      </span>
-    );
-  }
-
-  if (status === "taken") {
-    return (
-      <span className="text-destructive flex items-center gap-1 text-[11px]">
-        <HugeiconsIcon className="size-3" icon={AlertCircleIcon} />
-        {suggestion ?? "Taken"}
-      </span>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
-        <HugeiconsIcon className="size-3" icon={AlertCircleIcon} />
-        Unchecked
-      </span>
-    );
-  }
-
-  return null;
-}
-
-function AddressBar({
-  slug,
-  status,
-  suggestion,
-}: {
-  readonly slug: string;
-  readonly status: WorkspaceSlugAvailability["availability"]["status"];
-  readonly suggestion: string | null;
-}) {
-  const root = appRootDomain();
-  const subdomain = slug.trim() || placeholderSlug;
-
-  return (
-    <div className="border-border/60 bg-muted/50 flex items-center gap-3 border-b px-3 py-2">
-      <span aria-hidden className="flex gap-1.5">
-        <span className="bg-border size-2.5 rounded-full" />
-        <span className="bg-border size-2.5 rounded-full" />
-        <span className="bg-border size-2.5 rounded-full" />
-      </span>
-      <span className="bg-background text-muted-foreground flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2.5 py-1 text-[11px]">
-        <HugeiconsIcon className="size-2.5 shrink-0" icon={LockIcon} />
-        <span className="truncate">
-          {subdomain}
-          {root ? `.${root}` : ""}
-        </span>
-      </span>
-      <span className="flex shrink-0 justify-end">
-        <AvailabilityBadge status={status} suggestion={suggestion} />
-      </span>
-    </div>
-  );
-}
-
-function PreviewRow({
-  post,
-}: {
-  readonly post: (typeof previewPosts)[number];
-}) {
-  return (
-    <div className="border-border/60 bg-background flex items-center gap-3 rounded-xl border px-3 py-2.5">
-      <span className="text-muted-foreground flex w-9 shrink-0 flex-col items-center rounded-md border py-1 text-[11px] font-medium tabular-nums">
-        <HugeiconsIcon className="size-3.5" icon={ArrowUp02Icon} />
-        {post.votes}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{post.title}</span>
-        <span className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
-          <span
-            aria-hidden
-            className={cn("size-1.5 rounded-full", post.statusClassName)}
-          />
-          {post.status}
-        </span>
-      </span>
-    </div>
-  );
-}
+  title: "Welcome to your workspace",
+  votes: 0,
+};
 
 export function WorkspacePreview({
+  authorName,
   boards,
   logoUrl,
-  status,
   subdomain,
-  suggestion,
   workspaceName,
 }: {
+  /**
+   * Who the sample posts are attributed to: the person creating the
+   * workspace, because `createWorkspace` writes them as its author. Falling
+   * back to the workspace's own name would turn an org into a person.
+   */
+  readonly authorName: string;
   readonly boards: readonly RegisterBoardDraft[];
   readonly logoUrl: string | null;
-  readonly status: WorkspaceSlugAvailability["availability"]["status"];
   readonly subdomain: string;
-  readonly suggestion: string | null;
   readonly workspaceName: string;
 }) {
   const name = workspaceName.trim() || placeholderName;
+  const root = appRootDomain();
+  const host = `${subdomain.trim() || placeholderSlug}${root ? `.${root}` : ""}`;
 
-  const visibleBoards = boards.filter(
-    (board) => board.enabled && board.name.trim().length > 0
+  // A post belongs to one board, and the samples land on the first board the
+  // reader kept, so that is the board the picture has to name.
+  const board = boards.find(
+    (draft) => draft.enabled && draft.name.trim().length > 0
   );
 
   return (
-    <div className="border-border/60 bg-card flex h-full min-h-0 flex-col overflow-hidden rounded-xl border shadow-xl shadow-black/5">
-      <AddressBar slug={subdomain} status={status} suggestion={suggestion} />
-
-      {/* The public board's header, which is what the subdomain serves. */}
-      <header className="border-border/60 bg-background/80 shrink-0 border-b px-5">
-        <div className="flex h-14 items-center gap-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <UserAvatar image={logoUrl} name={name} />
-            <span className="truncate text-sm font-semibold tracking-tight">
-              {name}
-            </span>
-          </div>
-          <nav className="text-muted-foreground hidden items-center gap-3 text-xs sm:flex">
-            <span className="text-foreground">Feedback</span>
-            <span>Roadmap</span>
-            <span>Changelog</span>
-          </nav>
-        </div>
-      </header>
-
-      {/* The boards the reader kept, as the board list will show them. */}
-      <div className="border-border/60 flex shrink-0 items-center gap-2 overflow-x-auto border-b px-5 py-2">
-        {visibleBoards.length === 0 ? (
-          <span className="text-muted-foreground text-xs">No boards yet</span>
-        ) : (
-          visibleBoards.map((board) => (
-            <span
-              className="bg-muted text-muted-foreground rounded-md px-2 py-1 text-xs"
-              key={board.id}
-            >
-              {board.name}
-            </span>
-          ))
-        )}
+    <div className="bg-muted/40 relative h-full overflow-hidden dark:bg-black/30">
+      <div className="bg-background border-border absolute top-8 right-0 bottom-0 left-8 flex flex-col overflow-hidden rounded-tl-2xl border-r-0 border-b-0 shadow-lg shadow-black/5">
+        <ProductPostShot
+          comments={[]}
+          host={host}
+          logoUrl={logoUrl}
+          name={name}
+          post={{
+            ...welcomePost,
+            author: authorName,
+            board: board?.name.trim(),
+          }}
+        />
       </div>
-
-      {/* The board's own scroller: the page never scrolls, the list does, the
-          way it will once this board exists. */}
-      <div className="bg-muted/30 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-5">
-        <div className="text-muted-foreground flex items-center justify-between px-1 text-xs">
-          <span className="text-foreground font-medium">All feedback</span>
-          <span>Newest</span>
-        </div>
-
-        {previewPosts.map((post) => (
-          <PreviewRow key={post.title} post={post} />
-        ))}
-      </div>
-
-      <p className="border-border/60 text-muted-foreground shrink-0 border-t px-5 py-3 text-[11px] leading-relaxed">
-        Three sample posts are added to every new workspace, and you can delete
-        them whenever you like.
-      </p>
     </div>
   );
 }

@@ -78,8 +78,11 @@ export function WelcomeTourDialog({
         className="max-w-md overflow-hidden p-0"
         showCloseButton={false}
       >
-        {/* The plate: one real product row, on the surface colour. */}
-        <div className="bg-muted/60 flex h-40 shrink-0 items-center justify-center overflow-hidden border-b px-6">
+        {/* The plate: one product object, on the surface colour. Tall enough
+            for a lane or a post row at the size the product draws them, so the
+            detail is the shape the reader meets on their own board rather than
+            a diagram of it. */}
+        <div className="bg-muted/60 flex h-44 shrink-0 items-center justify-center overflow-hidden border-b px-6 dark:bg-black/30">
           <div
             className="ease-out-strong flex w-full justify-center transition-[opacity,translate] duration-200 motion-reduce:transition-opacity starting:translate-y-1 starting:opacity-0"
             key={step.id}

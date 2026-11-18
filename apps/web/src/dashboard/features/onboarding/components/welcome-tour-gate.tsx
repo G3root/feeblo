@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePublicSiteUrl, useSite } from "~/hooks/use-site";
 
@@ -37,6 +38,12 @@ export function WelcomeTourGate() {
   const organizationId = useOrganizationId();
   const site = useSite();
   const boardUrl = usePublicSiteUrl();
+  const boardQuery = useOrgBoards(organizationId);
+
+  const boardNames = useMemo(
+    () => (boardQuery.data ?? []).map((board) => board.name),
+    [boardQuery.data]
+  );
 
   // Read once. Re-reading on every render would let the dialog reopen after the
   // flag it just cleared, which is the bug `sessionStorage` is here to avoid.
@@ -47,10 +54,11 @@ export function WelcomeTourGate() {
   const steps = useMemo<WelcomeTourStep[]>(
     () =>
       buildWelcomeTourSteps({
+        boardNames,
         boardUrl: boardUrl ?? null,
         workspaceName: site?.name ?? "your workspace",
       }),
-    [boardUrl, site?.name]
+    [boardNames, boardUrl, site?.name]
   );
 
   const stepIds = useMemo(() => steps.map((step) => step.id), [steps]);

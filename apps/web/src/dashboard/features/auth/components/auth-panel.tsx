@@ -1,65 +1,337 @@
 import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
+import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
-import { ArrowUp01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUp01Icon, Comment01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMachine } from "@xstate/react";
+import type { ReactNode } from "react";
 
 import { authPanelSampleVoteMachine } from "../lib/auth-panel-sample-vote-machine";
 
 /**
- * The panel beside the auth form: a slice of the product, rendered in the DOM
- * rather than shipped as an image.
+ * The panel beside the auth form: the product in five tiles.
  *
  * An auth page has one job, so the column beside it is not free real estate for
- * decoration. It shows the thing the visitor is signing in *to* — a board of
- * requests with the vote counts that decide what gets built — at a scale where
- * the vote is legible. That also lets the page preview the vote control the
- * product uses, which is the one affordance a new visitor will meet first.
+ * decoration. It shows what the visitor is signing in *to* — a customer's
+ * request and the votes that decide what gets built, the roadmap that answers
+ * it, the boards it lands on, and the changelog that closes the loop.
  *
- * `aria-hidden`: every word in here is illustrative (a fictional board, sample
- * posts, invented counts), and a screen reader announcing "128 votes, Dark mode
- * for the embeddable widget" would be describing a page that does not exist.
+ * Five tiles rather than one screenshot because the column is tall and a
+ * request page is short: a single window leaves half the panel empty, and
+ * filling it with a longer feed invents posts the product does not have. A
+ * bento is honest about being a set of surfaces — each tile is one component
+ * cropped to what identifies it, at the size the product draws it, and the
+ * varied sizes do the work a page's own sections would do.
  *
- * Motion: one orchestrated entrance — the frame settles, the rows arrive 90ms
- * apart, and a vote lands on the first row. It then stays still. Nothing here
+ * The composition follows the app's own bento rules: one hero (the request,
+ * with its vote), neighbours of different kinds (a number beside a lane, a
+ * list beside an entry), one accent on the one thing the panel is about, and
+ * no string, avatar or status repeated from tile to tile.
+ *
+ * `aria-hidden`: every word in here is illustrative (a fictional workspace,
+ * sample posts, invented counts and commenters), and a screen reader
+ * announcing "128 votes, Dark mode for the embeddable widget" would be
+ * describing a page that does not exist.
+ *
+ * Motion: one vote lands on the hero — the affordance a new visitor meets
+ * first, previewed doing the thing it does. It then stays still. Nothing
  * loops, because a looping decoration next to a form competes with typing. The
  * sample vote is a machine (`../lib/auth-panel-sample-vote-machine`), not a
- * timer in an effect; `prefers-reduced-motion` is handled where the movement
- * is, by `motion-safe:`/`motion-reduce:` on the two elements that animate.
+ * timer in an effect, so the first client render matches the server's.
  */
 
-const samplePosts = [
-  {
-    author: "Maya",
-    statusLabel: "Planned",
-    statusType: "PLANNED",
-    title: "Dark mode for the embeddable widget",
-    votes: 128,
-  },
-  {
-    author: "Jonas",
-    statusLabel: "In Progress",
-    statusType: "IN_PROGRESS",
-    title: "Keyboard shortcuts on the board",
-    votes: 64,
-  },
-  {
-    author: "Priya",
-    statusLabel: "Pending",
-    statusType: "PENDING",
-    title: "Export a board to CSV",
-    votes: 12,
-  },
-  {
-    author: "Tom",
-    statusLabel: "Completed",
-    statusType: "COMPLETED",
-    title: "Slack notifications for new posts",
-    votes: 9,
-  },
-] as const;
+/** One tile. Shared radius, gap, padding and surface, as a set must. */
+function Tile({
+  children,
+  className,
+}: {
+  readonly children: ReactNode;
+  readonly className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "bg-background border-border/60 flex min-h-0 flex-col overflow-hidden rounded-2xl border p-4",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
-export function AuthPanel({ className }: { className?: string }) {
+/** The label every supporting tile carries, in the product's own casing. */
+function TileLabel({ children }: { readonly children: ReactNode }) {
+  return (
+    <span className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+      {children}
+    </span>
+  );
+}
+
+function StatusMark({
+  type,
+  label,
+}: {
+  readonly label: string;
+  readonly type: keyof typeof DEFAULT_POST_STATUS_COLORS;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium">
+      <span
+        aria-hidden
+        className="size-2 shrink-0 rounded-full"
+        style={{ backgroundColor: DEFAULT_POST_STATUS_COLORS[type] }}
+      />
+      {label}
+    </span>
+  );
+}
+
+function BoardBadge({ children }: { readonly children: ReactNode }) {
+  return (
+    <span className="bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">
+      {children}
+    </span>
+  );
+}
+
+/**
+ * The vote control, drawn to the compact trigger's geometry.
+ *
+ * Deliberately not the real `UpvoteButton`: that one reads a session, a live
+ * query and a TanStack DB collection, none of which exist on a signed-out page.
+ * The size, radius and voted palette are the real ones so the panel previews
+ * the control honestly instead of approximating it.
+ */
+function VoteChip({
+  count,
+  voted,
+}: {
+  readonly count: number;
+  readonly voted: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] leading-none font-medium tabular-nums",
+        voted
+          ? "border-brand/40 bg-brand/12 text-brand"
+          : "border-border text-muted-foreground"
+      )}
+    >
+      <span className="relative flex items-center justify-center">
+        {voted ? (
+          <span
+            aria-hidden
+            className="animate-vote-burst border-brand/60 absolute size-4 rounded-full border motion-reduce:hidden"
+          />
+        ) : null}
+        <HugeiconsIcon
+          className="size-4 shrink-0"
+          icon={ArrowUp01Icon}
+          strokeWidth={2.5}
+        />
+      </span>
+      {/* Keyed on the count so the arriving number replays the rise rather
+          than swapping in place. */}
+      <span className="motion-safe:animate-rise-in leading-none" key={count}>
+        {count}
+      </span>
+    </span>
+  );
+}
+
+/** The hero: one request, with the vote that decides whether it gets built. */
+function RequestTile({ voted }: { readonly voted: boolean }) {
+  return (
+    <Tile className="border-border/70 flex-[0.95] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_24px_48px_-32px_rgba(0,0,0,0.35)]">
+      <div className="flex items-center gap-2">
+        <StatusMark label="Planned" type="PLANNED" />
+        <BoardBadge>Features</BoardBadge>
+      </div>
+
+      <p className="mt-2.5 text-base leading-snug font-semibold tracking-tight text-balance">
+        Dark mode for the embeddable widget
+      </p>
+      <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs leading-relaxed">
+        The board is white at 1am. A dark theme would make the widget match the
+        sites it sits on.
+      </p>
+
+      <div className="mt-3 flex items-center gap-2.5">
+        <VoteChip count={voted ? 129 : 128} voted={voted} />
+        <span className="bg-border h-4 w-px shrink-0" />
+        <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[11px]">
+          <UserAvatar name="Maya" size="sm" />
+          <span className="truncate">Maya</span>
+        </span>
+        <span className="text-muted-foreground ml-auto flex shrink-0 items-center gap-1 text-[11px] tabular-nums">
+          <HugeiconsIcon
+            className="size-3.5"
+            icon={Comment01Icon}
+            strokeWidth={2}
+          />
+          7
+        </span>
+      </div>
+
+      {/* The thread under the request: the panel is about what customers want
+          and who is answering, and a request with no replies is a wish. */}
+      <div className="border-border/50 mt-3 flex flex-col gap-2.5 border-t pt-3">
+        <div className="flex items-start gap-2.5">
+          <UserAvatar isMember name="Jonas" size="sm" />
+          <p className="text-muted-foreground min-w-0 text-[11px] leading-relaxed">
+            <span className="text-foreground font-medium">Jonas</span> Moved
+            this to Planned — the column updates on its own.
+          </p>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <UserAvatar name="Priya" size="sm" />
+          <p className="text-muted-foreground min-w-0 text-[11px] leading-relaxed">
+            <span className="text-foreground font-medium">Priya</span> Could the
+            status change send an email? Half our customers never come back.
+          </p>
+        </div>
+        <div className="flex items-start gap-2.5">
+          <UserAvatar name="Dana" size="sm" />
+          <p className="text-muted-foreground min-w-0 text-[11px] leading-relaxed">
+            <span className="text-foreground font-medium">Dana</span> Same
+            request from us — we embed on a black site.
+          </p>
+        </div>
+      </div>
+    </Tile>
+  );
+}
+
+/** A number, its label, and the week it measures. */
+function VotesTile() {
+  return (
+    <Tile>
+      <TileLabel>Votes</TileLabel>
+      <p className="mt-1.5 text-3xl leading-none font-semibold tracking-tight tabular-nums">
+        269
+      </p>
+      <p className="text-muted-foreground mt-1.5 text-[11px]">
+        on the top five requests
+      </p>
+      {/* The bars fill the rest of the tile: a number at the top of a tall
+          tile with a chart pinned under it leaves a void in the middle that
+          reads as missing content. */}
+      <div className="mt-3 flex min-h-0 flex-1 items-end gap-1">
+        {[38, 52, 30, 64, 44, 58, 72].map((height, index) => (
+          <span
+            className={cn(
+              "flex-1 rounded-sm",
+              index === 6 ? "bg-brand/60" : "bg-brand/20"
+            )}
+            key={height}
+            style={{ height: `${height}%` }}
+          />
+        ))}
+      </div>
+    </Tile>
+  );
+}
+
+/** A roadmap lane, which is a status and the posts it holds. */
+function LaneTile() {
+  return (
+    <Tile className="bg-muted/40">
+      <div className="flex items-center justify-between gap-2">
+        <StatusMark label="In progress" type="IN_PROGRESS" />
+        <span className="text-muted-foreground text-[11px] tabular-nums">
+          4
+        </span>
+      </div>
+
+      <div className="mt-2.5 flex flex-col gap-2">
+        <div className="bg-background flex flex-col gap-1.5 rounded-lg border p-2.5">
+          <p className="line-clamp-2 text-[11px] leading-snug font-medium">
+            Keyboard shortcuts on the board
+          </p>
+          <span className="text-muted-foreground flex items-center gap-1 text-[10px] tabular-nums">
+            <HugeiconsIcon
+              className="size-3 shrink-0"
+              icon={ArrowUp01Icon}
+              strokeWidth={2.5}
+            />
+            64
+          </span>
+        </div>
+        <div className="bg-background flex flex-col gap-1.5 rounded-lg border p-2.5">
+          <p className="line-clamp-2 text-[11px] leading-snug font-medium">
+            Widget launcher overlaps the home bar
+          </p>
+          <span className="text-muted-foreground flex items-center gap-1 text-[10px] tabular-nums">
+            <HugeiconsIcon
+              className="size-3 shrink-0"
+              icon={ArrowUp01Icon}
+              strokeWidth={2.5}
+            />
+            7
+          </span>
+        </div>
+        <div className="bg-background flex flex-col gap-1.5 rounded-lg border p-2.5">
+          <p className="line-clamp-2 text-[11px] leading-snug font-medium">
+            Export a board to CSV
+          </p>
+          <span className="text-muted-foreground flex items-center gap-1 text-[10px] tabular-nums">
+            <HugeiconsIcon
+              className="size-3 shrink-0"
+              icon={ArrowUp01Icon}
+              strokeWidth={2.5}
+            />
+            12
+          </span>
+        </div>
+        <div className="bg-background flex flex-col gap-1.5 rounded-lg border p-2.5">
+          <p className="line-clamp-2 text-[11px] leading-snug font-medium">
+            Custom tags on posts
+          </p>
+          <span className="text-muted-foreground flex items-center gap-1 text-[10px] tabular-nums">
+            <HugeiconsIcon
+              className="size-3 shrink-0"
+              icon={ArrowUp01Icon}
+              strokeWidth={2.5}
+            />
+            5
+          </span>
+        </div>
+      </div>
+    </Tile>
+  );
+}
+
+/**
+ * The changelog entry, as the changelog lists it: what shipped, when, and who
+ * was told. A wide strip rather than a square: the set ends on something calm
+ * after two dense rows, and a strip lets the meta sit on the row instead of in
+ * a column under it.
+ */
+function ChangelogTile() {
+  return (
+    <Tile className="justify-center">
+      <div className="flex items-center gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <StatusMark label="Completed" type="COMPLETED" />
+            <span className="text-muted-foreground text-[10px]">2d</span>
+          </div>
+          <p className="truncate text-xs font-medium">
+            Custom tags, and a faster board
+          </p>
+        </div>
+        <p className="text-muted-foreground ml-auto hidden shrink-0 text-[10px] leading-relaxed sm:block">
+          Published to the changelog. 340 people were emailed.
+        </p>
+      </div>
+    </Tile>
+  );
+}
+
+export function AuthPanel({ className }: { readonly className?: string }) {
   // `settling` on the server and on the first client render — the actor starts
   // in an effect — so hydration compares two identical documents and the vote
   // lands one state later.
@@ -71,110 +343,29 @@ export function AuthPanel({ className }: { className?: string }) {
     <aside
       aria-hidden
       className={cn(
-        "bg-muted/40 border-border relative hidden overflow-hidden border-l lg:block",
+        // A recessed ground in both themes: on dark, `bg-muted` is *lighter*
+        // than the tiles it frames, which would sink the product into the page.
+        // Depth on dark comes from a darker ground, not a shadow.
+        "bg-muted/40 relative hidden overflow-hidden lg:block dark:bg-black/30",
         className
       )}
       data-slot="auth-panel"
     >
-      {/* One soft light source behind the board. Not a gradient wash: the
-          panel needs a direction for the card's shadow to read against. */}
-      <div className="bg-brand/6 pointer-events-none absolute -top-24 -right-20 size-[26rem] rounded-full blur-3xl" />
+      {/* One even gutter round the set: the tiles are the picture, and a grid
+          pressed against its frame reads as a screenshot rather than a
+          composition. The gap equals the tiles' own padding. */}
+      <div className="absolute inset-8 flex flex-col gap-4">
+        <RequestTile voted={hasVoted} />
 
-      <div className="relative flex h-full items-center justify-center px-12 py-16 xl:px-20">
-        <div className="w-full max-w-[30rem]">
-          <div className="motion-safe:animate-board-in border-border bg-card overflow-hidden rounded-2xl border shadow-sm">
-            <div className="border-border flex items-center justify-between gap-3 border-b px-5 py-3.5">
-              <span className="text-foreground inline-flex items-center gap-2 text-sm font-medium">
-                <span className="bg-brand size-1.5 rounded-full" />
-                Product feedback
-              </span>
-            </div>
+        <div className="flex min-h-0 flex-[1.05] gap-4">
+          <VotesTile />
+          <LaneTile />
+        </div>
 
-            <ul className="divide-border divide-y">
-              {samplePosts.map((post, index) => (
-                <li
-                  className="motion-safe:animate-board-in flex items-start gap-3.5 px-5 py-4"
-                  key={post.title}
-                  style={{
-                    animationDelay: `${140 + index * 90}ms`,
-                  }}
-                >
-                  <PanelVote
-                    count={
-                      index === 0 && hasVoted ? post.votes + 1 : post.votes
-                    }
-                    isVoted={index === 0 && hasVoted}
-                  />
-                  <div className="min-w-0 flex-1 pt-1">
-                    <p className="text-foreground truncate text-sm leading-snug font-medium">
-                      {post.title}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
-                        <span
-                          className="size-1.5 shrink-0 rounded-full"
-                          style={{
-                            backgroundColor:
-                              DEFAULT_POST_STATUS_COLORS[post.statusType],
-                          }}
-                        />
-                        {post.statusLabel}
-                      </span>
-                      <span className="text-muted-foreground truncate text-xs">
-                        {post.author}
-                      </span>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <p className="text-muted-foreground mt-8 max-w-[26rem] text-sm leading-relaxed">
-            What your customers want, and how many of them want it.
-          </p>
+        <div className="flex min-h-0 flex-[0.4] gap-4">
+          <ChangelogTile />
         </div>
       </div>
     </aside>
-  );
-}
-
-/**
- * A still copy of the compact vote control from `@feeblo/post-ui/upvote-toggle`.
- *
- * Deliberately not the real component: that one reads a session, a live query
- * and a TanStack DB collection, none of which exist on a signed-out page. The
- * dimensions and the voted palette are kept identical so the panel previews
- * the control honestly instead of approximating it.
- */
-function PanelVote({ count, isVoted }: { count: number; isVoted: boolean }) {
-  return (
-    <span
-      className={cn(
-        "pointer-events-none relative flex h-11 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors duration-300 ease-out",
-        isVoted
-          ? "border-brand/40 bg-brand/12 text-brand"
-          : "border-border bg-muted/50 text-muted-foreground"
-      )}
-    >
-      {isVoted ? (
-        <span className="animate-vote-burst border-brand/60 absolute top-2 left-1/2 size-4 -translate-x-1/2 rounded-full border motion-reduce:hidden" />
-      ) : null}
-      <HugeiconsIcon
-        className="size-3.5"
-        icon={ArrowUp01Icon}
-        strokeWidth={2.5}
-      />
-      {/* Keyed on the count so the arriving number replays the rise rather
-          than swapping in place. `@number-flow/react` would be the better
-          tool, but it is a `post-ui` dependency and adding it here for one
-          decorative figure is not worth the install. */}
-      <span
-        className="motion-safe:animate-rise-in text-[11px] leading-none font-medium tabular-nums"
-        key={count}
-      >
-        {count}
-      </span>
-    </span>
   );
 }
