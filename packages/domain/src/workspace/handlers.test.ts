@@ -886,6 +886,52 @@ describe("WorkspaceRpcHandlers", () => {
         })
       );
 
+      it.effect("refuses more boards than a new workspace's plan allows", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const userId = "user_too_many_boards";
+          yield* seedUser(userId);
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: ["One", "Two", "Three"],
+                subdomain: "too-many-boards",
+                workspaceName: "Too Many Boards",
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, newUserSession(userId))
+              )
+          );
+
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toContain("at most 2 boards");
+        })
+      );
+
+      it.effect("refuses a board name that is too long", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const userId = "user_long_board_name";
+          yield* seedUser(userId);
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: ["A".repeat(61)],
+                subdomain: "long-board-name",
+                workspaceName: "Long Board Name",
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, newUserSession(userId))
+              )
+          );
+
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toContain("60 characters");
+        })
+      );
+
       it.effect(
         "reports whether the created workspace is the user's first",
         () =>

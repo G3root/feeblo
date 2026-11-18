@@ -25,7 +25,13 @@ export const CreateWorkspaceInput = S.Struct({
    * At least one, because the sample posts need somewhere to land and an
    * empty board list is a state the empty dashboard already covers.
    */
-  boardNames: S.Array(S.String).pipe(S.check(S.isMinLength(1))),
+  boardNames: S.Array(S.String).pipe(
+    S.check(S.isMinLength(1)),
+    // A guard, not the policy: the handler enforces the plan's own allowance
+    // and names the plan in the error. This only stops a hostile request from
+    // reaching that check with ten thousand rows.
+    S.check(S.isMaxLength(10))
+  ),
 });
 
 export const CreateWorkspaceOutput = S.Struct({

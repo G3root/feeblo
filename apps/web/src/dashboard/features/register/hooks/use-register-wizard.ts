@@ -64,6 +64,9 @@ export function useRegisterWizard({
       : answerIsComplete;
   }, [slug.availability.status, values, view.stepId]);
 
+  // The verdict is per step, so the machine never needs to be told again when
+  // the reader walks back to an answered one. This effect only reports a change
+  // in the current answer, and its dependency is a boolean.
   useEffect(() => {
     send({ type: "SYNC", canContinue });
   }, [canContinue, send]);

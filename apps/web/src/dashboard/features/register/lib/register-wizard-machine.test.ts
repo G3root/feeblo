@@ -110,13 +110,41 @@ describe("register wizard machine", () => {
     expect(viewOf(actor).stepIndex).toBe(0);
   });
 
-  it("drops the verdict when the step changes", () => {
+  it("asks the new step for its own answer", () => {
     const { actor } = started();
     answerStep(actor);
     actor.send({ type: "NEXT" });
 
     // The next step has not been answered yet, whatever the last one said.
     expect(viewOf(actor)).toMatchObject({ canContinue: false, stepIndex: 1 });
+  });
+
+  it("remembers the answer of a step the reader walks back to", () => {
+    const { actor } = started();
+
+    answerStep(actor);
+    actor.send({ type: "NEXT" });
+
+    answerStep(actor);
+    actor.send({ type: "BACK" });
+
+    // The regression this covers: a single verdict for the whole wizard had to
+    // be cleared on every move, so coming back to an answered step left
+    // Continue disabled until something unrelated changed a field.
+    expect(viewOf(actor)).toMatchObject({
+      canContinue: true,
+      stepId: "identity",
+      stepIndex: 0,
+    });
+  });
+
+  it("forgets a step's answer when it changes", () => {
+    const { actor } = started();
+
+    answerStep(actor);
+    actor.send({ type: "SYNC", canContinue: false });
+
+    expect(viewOf(actor).canContinue).toBe(false);
   });
 
   it("walks forward and back, keeping the index in range", () => {

@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { PLAN_ENTITLEMENTS } from "../plan-entitlements";
 import * as Policy from "../policy";
 import { BadRequestError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
@@ -16,6 +17,9 @@ import type {
   TWorkspaceInput,
   TWorkspaceSlugCheckInput,
 } from "./schema";
+
+/** The longest board name the create accepts, matching the name fields. */
+const MAX_BOARD_NAME_LENGTH = 60;
 
 /**
  * The board names a create will write.
@@ -75,10 +79,30 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
         yield* validateSubdomain(subdomain);
 
         const boardNames = normalizeBoardNames(args.boardNames);
+        const boardLimit = PLAN_ENTITLEMENTS.free.limits.feedbackBoards;
 
         if (boardNames.length === 0) {
           return yield* new BadRequestError({
             message: "A workspace needs at least one board",
+          });
+        }
+
+        // A workspace is created on the free plan, so that allowance is the
+        // ceiling here. Letting the request through would land the reader on a
+        // workspace that is over its plan before they have seen it.
+        if (boardLimit !== null && boardNames.length > boardLimit) {
+          return yield* new BadRequestError({
+            message: `A new workspace starts with at most ${boardLimit} boards`,
+          });
+        }
+
+        const longName = boardNames.find(
+          (name) => name.length > MAX_BOARD_NAME_LENGTH
+        );
+
+        if (longName !== undefined) {
+          return yield* new BadRequestError({
+            message: `Board names are ${MAX_BOARD_NAME_LENGTH} characters or fewer`,
           });
         }
 

@@ -7,7 +7,11 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useStore } from "@tanstack/react-store";
 import { useRef } from "react";
 
-import type { RegisterBoardDraft } from "../../lib/register-draft";
+import {
+  maxBoardNameLength,
+  maxBoards,
+  type RegisterBoardDraft,
+} from "../../lib/register-draft";
 import { registerFormOpts } from "../../shared-form";
 
 /**
@@ -25,6 +29,7 @@ export const BoardsStep = withForm({
   render: function BoardsStepRender({ form }) {
     const boards = useStore(form.store, (state) => state.values.boards);
     const nextId = useRef(boards.length);
+    const atLimit = boards.length >= maxBoards;
 
     const update = (index: number, patch: Partial<RegisterBoardDraft>) => {
       form.setFieldValue(
@@ -74,6 +79,7 @@ export const BoardsStep = withForm({
               />
               <Input
                 aria-label="Board name"
+                maxLength={maxBoardNameLength}
                 onChange={(event) =>
                   update(index, { name: event.target.value })
                 }
@@ -95,16 +101,25 @@ export const BoardsStep = withForm({
           ))}
         </div>
 
-        <Button
-          className="self-start"
-          onClick={addBoard}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <HugeiconsIcon icon={Plus} />
-          Add a board
-        </Button>
+        <div className="flex flex-col gap-1.5">
+          <Button
+            className="self-start"
+            disabled={atLimit}
+            onClick={addBoard}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <HugeiconsIcon icon={Plus} />
+            Add a board
+          </Button>
+          {atLimit ? (
+            <p className="text-muted-foreground text-xs">
+              {maxBoards} is the free plan&apos;s limit. Remove one to add
+              another, or add more after upgrading.
+            </p>
+          ) : null}
+        </div>
       </div>
     );
   },

@@ -26,8 +26,12 @@ export async function finishWorkspace({
   logo,
   organizationId,
 }: FinishWorkspacePayload): Promise<FinishWorkspaceResult> {
-  const invitations = await sendInvites({ invites, organizationId });
-  const logoUploaded = await uploadLogo({ logo, organizationId });
+  // Independent of each other, so they go together: the reader is waiting on
+  // both, and one has no bearing on the other's request.
+  const [invitations, logoUploaded] = await Promise.all([
+    sendInvites({ invites, organizationId }),
+    uploadLogo({ logo, organizationId }),
+  ]);
 
   return {
     failedInvites: invitations.failed,

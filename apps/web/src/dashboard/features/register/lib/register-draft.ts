@@ -1,3 +1,4 @@
+import { PLAN_ENTITLEMENTS } from "@feeblo/domain/plan-entitlements";
 import { isValidSubdomainLabel } from "@feeblo/utils/url";
 import { z } from "zod";
 
@@ -16,6 +17,20 @@ import { z } from "zod";
 
 /** The shortest subdomain the server accepts. */
 export const minSubdomainLength = 4;
+
+/**
+ * How many boards a workspace may start with.
+ *
+ * Every new workspace begins on the free plan, so its allowance is the ceiling
+ * here. The wizard could let a reader pick more and let the over-plan gate catch
+ * it, but a workspace that is over its plan before it has a name is a bad first
+ * minute, and the server refuses the same number.
+ */
+export const maxBoards =
+  PLAN_ENTITLEMENTS.free.limits.feedbackBoards ?? Number.MAX_SAFE_INTEGER;
+
+/** The longest board name, matching the column and the server's check. */
+export const maxBoardNameLength = 60;
 
 const workspaceNameSchema = z
   .string()
@@ -43,6 +58,7 @@ const boardSchema = z.object({
 
 const boardsSchema = z
   .array(boardSchema)
+  .max(maxBoards, `A new workspace starts with at most ${maxBoards} boards`)
   .refine(
     (boards) => boards.some((board) => board.enabled),
     "Keep at least one board"
@@ -51,6 +67,11 @@ const boardsSchema = z
     (boards) =>
       boards.every((board) => !board.enabled || board.name.trim().length >= 2),
     "Give every selected board a name"
+  )
+  .refine(
+    (boards) =>
+      boards.every((board) => board.name.trim().length <= maxBoardNameLength),
+    `Board names are ${maxBoardNameLength} characters or fewer`
   );
 
 const invitesSchema = z
