@@ -79,9 +79,10 @@ test.describe("register wizard", () => {
 
     await register.fillAddress(taken);
 
-    await expect(
-      page.getByText("Someone already has this address.")
-    ).toBeVisible();
+    // The server's reason, not the field's fallback: this is the sentence the
+    // check returns, and asserting it is what proves the failure reached the
+    // screen rather than being swallowed.
+    await expect(page.getByText("This address is already taken")).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
 
     const suggestion = page.getByRole("button", { name: `Use ${taken}-2` });

@@ -210,6 +210,30 @@ describe("register wizard machine", () => {
     await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(2));
   });
 
+  it("lets Back leave a failed create, one step back", async () => {
+    const create = vi.fn(async (): Promise<CreateWorkspaceResult> => ({
+      message: "This address is already taken",
+      ok: false,
+    }));
+
+    const { actor } = started({ create });
+
+    reachTeam(actor);
+    actor.send({ type: "SUBMIT", draft: draft() });
+    await vi.waitFor(() => expect(viewOf(actor).isFailed).toBe(true));
+
+    actor.send({ type: "BACK" });
+
+    // The address is the thing that was refused, and it is one step back. The
+    // answers are still in the form; the machine only moves.
+    expect(viewOf(actor)).toMatchObject({
+      error: null,
+      isFailed: false,
+      stepId: "boards",
+      stepIndex: 2,
+    });
+  });
+
   it("treats a failed logo or invitation as a warning, not an error", async () => {
     const finish = vi.fn(async (): Promise<FinishWorkspaceResult> => ({
       failedInvites: ["taken@example.com"],

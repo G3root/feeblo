@@ -121,8 +121,25 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
               yield* repository.isSubdomainTaken(subdomain);
 
             if (isSubdomainTaken) {
+              // The reply to a create can be lost after it committed, and the
+              // retry then finds its own address taken. Returning that
+              // workspace is what lets the retry finish; a subdomain owned by
+              // anyone else still fails, because no membership row matches.
+              const ownedByCaller =
+                yield* repository.findOwnedWorkspaceBySubdomain({
+                  subdomain,
+                  userId: session.session.userId,
+                });
+
+              if (Option.isSome(ownedByCaller)) {
+                return {
+                  isFirstWorkspace: false,
+                  organizationId: ownedByCaller.value,
+                };
+              }
+
               return yield* new BadRequestError({
-                message: "This workspace name is already taken",
+                message: "This address is already taken",
               });
             }
 
@@ -203,7 +220,7 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
               return {
                 available: false,
                 suggestion: Option.getOrNull(suggestion),
-                reason: "This workspace name is already taken",
+                reason: "This address is already taken",
               };
             }),
         }),

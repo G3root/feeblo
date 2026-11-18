@@ -38,6 +38,11 @@ interface FindPlanByOrganizationIdArgs {
   organizationId: string;
 }
 
+interface FindOwnedWorkspaceBySubdomainArgs {
+  subdomain: string;
+  userId: string;
+}
+
 /**
  * The plan a subscription's product declares, or `free` when its Polar
  * metadata names none.
@@ -113,6 +118,48 @@ const makeWorkspaceRepository = Effect.gen(function* () {
           );
 
         return row?.count ?? 0;
+      }),
+
+    /**
+     * The workspace with this address, if the caller owns it.
+     *
+     * A create can commit and still lose its reply, and a retry then finds the
+     * address taken by the workspace it created a moment ago. Looking the
+     * address up under the caller's ownership is what lets that retry finish
+     * instead of dead-ending on "already taken": anyone else's address is still
+     * refused, because no membership row matches.
+     *
+     * Ownership is read the way `findOwnedWorkspaces` reads it, from the
+     * comma-joined role list, so the two cannot disagree about who owns what.
+     */
+    findOwnedWorkspaceBySubdomain: ({
+      subdomain,
+      userId,
+    }: FindOwnedWorkspaceBySubdomainArgs) =>
+      Effect.gen(function* () {
+        const rows = yield* db
+          .select({
+            id: schema.siteTable.organizationId,
+            role: schema.memberTable.role,
+          })
+          .from(schema.siteTable)
+          .innerJoin(
+            schema.memberTable,
+            eq(
+              schema.memberTable.organizationId,
+              schema.siteTable.organizationId
+            )
+          )
+          .where(
+            and(
+              eq(schema.siteTable.subdomain, subdomain),
+              eq(schema.memberTable.userId, userId)
+            )
+          );
+
+        const owned = rows.find((row) => row.role.split(",").includes("owner"));
+
+        return Option.fromNullishOr(owned?.id);
       }),
 
     isSubdomainTaken: (subdomain: string) =>

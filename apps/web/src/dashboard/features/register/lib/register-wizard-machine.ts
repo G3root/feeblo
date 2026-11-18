@@ -25,8 +25,8 @@ import {
  *   nothing behind and must go back to the form. A failed logo or invitation
  *   leaves a real workspace behind, so it is a warning, not an error.
  * - `done`: terminal. The page navigates from here.
- * - `failed`: the create refused. The reader keeps every answer, and `EDIT`
- *   returns them to the form rather than making them start over.
+ * - `failed`: the create refused. The reader keeps every answer, `BACK`
+ *   returns them to the form, and `SUBMIT` retries the same draft.
  *
  * Whether the current step is answered is not the machine's to store. The form
  * owns the answers, so the page derives that during render and sends it with
@@ -223,7 +223,6 @@ export const createRegisterWizardMachine = ({
       context: contextSchema,
       events: {
         BACK: eventSchema("BACK"),
-        EDIT: eventSchema("EDIT"),
         GO_TO: goToSchema,
         NEXT: nextSchema,
         SUBMIT: submitSchema,
@@ -390,7 +389,16 @@ export const createRegisterWizardMachine = ({
       done: { type: "final" },
       failed: {
         on: {
-          EDIT: { target: "editing" },
+          // The reader is not stuck on the answer that was refused. Back
+          // returns to the form one step earlier and keeps every answer, and
+          // SUBMIT retries the same draft for a failure that was transient.
+          BACK: ({ context }: { context: RegisterWizardContext }) => ({
+            context: {
+              error: null,
+              stepIndex: Math.max(context.stepIndex - 1, 0),
+            },
+            target: "editing",
+          }),
           SUBMIT: ({ event }: { event: SubmitEvent }) => ({
             context: { draft: event.draft, error: null },
             target: "submitting",

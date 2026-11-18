@@ -324,32 +324,6 @@ describe("WorkspaceRpcHandlers", () => {
           expect(error.message).toContain("reserved");
         })
       );
-
-      it.effect("rejects when the subdomain is already taken", () =>
-        Effect.gen(function* () {
-          const handlers = yield* WorkspaceRpcHandlersEffect;
-          const fixture = yield* makeFixture();
-
-          // Create a site that claims the subdomain first
-          yield* createSiteForSubdomain(
-            "existing-workspace",
-            fixture.organizationId
-          );
-
-          const error = yield* Effect.flip(
-            handlers
-              .CreateWorkspace({
-                boardNames: DEFAULT_BOARDS,
-                subdomain: "existing-workspace",
-                workspaceName: "Existing Workspace",
-              })
-              .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
-          );
-
-          expect(error._tag).toBe("BadRequestError");
-          expect(error.message).toBe("This workspace name is already taken");
-        })
-      );
     });
 
     describe("ListWorkspaceProducts", () => {
@@ -698,7 +672,7 @@ describe("WorkspaceRpcHandlers", () => {
 
             expect(result.available).toBe(false);
             expect(result.suggestion).toBe("taken-slug-2");
-            expect(result.reason).toBe("This workspace name is already taken");
+            expect(result.reason).toBe("This address is already taken");
           })
       );
     });
@@ -883,6 +857,57 @@ describe("WorkspaceRpcHandlers", () => {
             "Bugs",
             "Ideas",
           ]);
+        })
+      );
+
+      it.effect(
+        "returns the committed workspace when the same owner retries",
+        () =>
+          Effect.gen(function* () {
+            const db = yield* currentDb;
+            const userId = "user_replayed_create";
+            yield* seedUser(userId);
+
+            const first = yield* createWorkspace(userId, "Replayed Create");
+            const second = yield* createWorkspace(userId, "Replayed Create");
+
+            // A create can commit and lose its reply. The retry has to resolve to
+            // the workspace it created, not to a conflict it cannot escape.
+            expect(second.organizationId).toBe(first.organizationId);
+            expect(second.isFirstWorkspace).toBe(false);
+
+            const organizations = yield* db
+              .select({ id: schema.organizationTable.id })
+              .from(schema.organizationTable)
+              .where(eq(schema.organizationTable.id, first.organizationId));
+
+            expect(organizations).toHaveLength(1);
+          })
+      );
+
+      it.effect("still refuses an address owned by someone else", () =>
+        Effect.gen(function* () {
+          const handlers = yield* WorkspaceRpcHandlersEffect;
+          const owner = yield* makeFixture();
+          const other = yield* makeFixture();
+
+          yield* createSiteForSubdomain(
+            "claimed-address",
+            owner.organizationId
+          );
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateWorkspace({
+                boardNames: DEFAULT_BOARDS,
+                subdomain: "claimed-address",
+                workspaceName: "Other Workspace",
+              })
+              .pipe(Effect.provideService(CurrentSession, makeSession(other)))
+          );
+
+          expect(error._tag).toBe("BadRequestError");
+          expect(error.message).toBe("This address is already taken");
         })
       );
 

@@ -44,7 +44,16 @@ export function useRegisterWizard({
 
   const view = useMemo(() => toRegisterWizardView(snapshot), [snapshot]);
 
-  const form = useAppForm(registerFormOpts);
+  const form = useAppForm({
+    ...registerFormOpts,
+    // The one place the form and the machine meet on the way in. Without it
+    // `handleSubmit` validates and returns: the button would look like it
+    // worked and no create request would ever leave the page.
+    onSubmit: ({ value }) => {
+      send({ type: "SUBMIT", draft: value });
+    },
+  });
+
   const values = useStore(form.store, (state) => state.values);
   const slug = useSlugAvailability(values.subdomain);
 
@@ -94,8 +103,6 @@ export function useRegisterWizard({
     [send]
   );
 
-  const retry = useCallback(() => send({ type: "EDIT" }), [send]);
-
   const submit = useCallback(() => {
     void form.handleSubmit();
   }, [form]);
@@ -106,7 +113,6 @@ export function useRegisterWizard({
     form,
     goTo,
     next,
-    retry,
     slug,
     submit,
     values,
