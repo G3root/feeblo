@@ -113,9 +113,6 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
             // is held. Locking before the first child insert avoids
             // deadlocking two concurrent creates against each other.
             yield* repository.lockUser(session.session.userId);
-            yield* workspacePolicy.canCreateWorkspace({
-              userId: session.session.userId,
-            });
 
             const isSubdomainTaken =
               yield* repository.isSubdomainTaken(subdomain);
@@ -125,6 +122,11 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
               // retry then finds its own address taken. Returning that
               // workspace is what lets the retry finish; a subdomain owned by
               // anyone else still fails, because no membership row matches.
+              //
+              // Checked before the cap, because a replay creates nothing. A
+              // reader who lost the reply to the workspace that filled their
+              // last slot would otherwise be refused the workspace they
+              // already have.
               const ownedByCaller =
                 yield* repository.findOwnedWorkspaceBySubdomain({
                   subdomain,
@@ -142,6 +144,10 @@ export const WorkspaceRpcHandlersEffect = Effect.gen(function* () {
                 message: "This address is already taken",
               });
             }
+
+            yield* workspacePolicy.canCreateWorkspace({
+              userId: session.session.userId,
+            });
 
             // Read under the same lock, and before the insert: "first" is a
             // property of the world before this workspace, and a count taken
