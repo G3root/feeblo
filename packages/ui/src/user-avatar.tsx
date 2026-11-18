@@ -88,8 +88,13 @@ export function UserAvatar({
 
   // The tick has to sit outside the avatar: `Avatar` clips its content with
   // `overflow-hidden`, so a badge inside it would be cut off at the corner.
+  //
+  // `h-fit` is what keeps the wrapper the avatar's own height. Left to stretch
+  // (the default `align-items` of a plain flex row) the wrapper grows to the
+  // row's tallest text, and the tick — sized as a percentage of the wrapper —
+  // stretches into an oval that hangs off the avatar's bottom edge.
   return (
-    <span className="relative inline-flex shrink-0">
+    <span className="relative inline-flex h-fit shrink-0">
       {avatar}
       <MemberTick label={memberLabel} />
     </span>
