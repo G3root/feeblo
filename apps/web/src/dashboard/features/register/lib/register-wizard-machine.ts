@@ -28,12 +28,12 @@ import {
  * - `failed`: the create refused. The reader keeps every answer, and `EDIT`
  *   returns them to the form rather than making them start over.
  *
- * The verdict on each step is an event (`SYNC`), not a guard that reaches into
- * the form: the form owns the answers and the machine owns which question is
- * current, so the page reports whether the current step is answered and the
- * machine files that under the step it belongs to. `canContinue` is derived
- * from that record when the view is built, which is why returning to an
- * answered step needs no second report to become usable again.
+ * Whether the current step is answered is not the machine's to store. The form
+ * owns the answers, so the page derives that during render and sends it with
+ * the event it belongs to (`NEXT`). A copy in the machine made a second owner,
+ * needed an effect to keep the two in step, and could not describe a step that
+ * arrived already answered: nothing about it ever changed, so nothing reported
+ * it, and Continue stayed disabled on a step the reader could plainly leave.
  */
 
 export type RegisterWizardStepId = RegisterStepId;
@@ -73,20 +73,11 @@ export type RegisterWizardContext = {
   readonly outcome: RegisterOutcome | null;
   readonly stepIds: readonly RegisterWizardStepId[];
   readonly stepIndex: number;
-  /**
-   * Whether each step's own answers are good enough to leave it.
-   *
-   * One verdict per step rather than one for the wizard, because the answer
-   * belongs to the question. A single flag had to be cleared on every move, and
-   * clearing it on the way back to a step that was already answered left
-   * Continue disabled until something unrelated changed.
-   */
-  readonly verdicts: Readonly<Record<string, boolean>>;
 };
 
-type SyncEvent = {
+type NextEvent = {
   readonly canContinue: boolean;
-  readonly type: "SYNC";
+  readonly type: "NEXT";
 };
 
 type SubmitEvent = {
@@ -128,7 +119,6 @@ const contextSchema = Schema.toStandardSchemaV1(
     ),
     stepIds: Schema.Array(Schema.Literals(registerStepIds)),
     stepIndex: Schema.Finite,
-    verdicts: Schema.Record(Schema.String, Schema.Boolean),
   })
 );
 
@@ -139,8 +129,8 @@ const inputSchema = Schema.toStandardSchemaV1(
 const eventSchema = (type: string) =>
   Schema.toStandardSchemaV1(Schema.Struct({ type: Schema.Literal(type) }));
 
-const syncSchema = Schema.toStandardSchemaV1(
-  Schema.Struct({ canContinue: Schema.Boolean, type: Schema.Literal("SYNC") })
+const nextSchema = Schema.toStandardSchemaV1(
+  Schema.Struct({ canContinue: Schema.Boolean, type: Schema.Literal("NEXT") })
 );
 
 const goToSchema = Schema.toStandardSchemaV1(
@@ -195,18 +185,6 @@ export type FinishWorkspace = (
 const isLastStep = (context: RegisterWizardContext): boolean =>
   context.stepIndex >= context.stepIds.length - 1;
 
-/** The id of the step the reader is on, or null when there is none. */
-const currentStepId = (
-  context: RegisterWizardContext
-): RegisterWizardStepId | null => context.stepIds[context.stepIndex] ?? null;
-
-/** Whether the current step's answers are good enough to leave it. */
-const mayLeaveCurrentStep = (context: RegisterWizardContext): boolean => {
-  const stepId = currentStepId(context);
-
-  return stepId === null ? false : (context.verdicts[stepId] ?? false);
-};
-
 /** Whether anything has to happen after the workspace exists. */
 const needsFinishing = (draft: RegisterDraft | null): boolean =>
   draft !== null && (draft.logo !== null || selectedInvites(draft).length > 0);
@@ -247,9 +225,8 @@ export const createRegisterWizardMachine = ({
         BACK: eventSchema("BACK"),
         EDIT: eventSchema("EDIT"),
         GO_TO: goToSchema,
-        NEXT: eventSchema("NEXT"),
+        NEXT: nextSchema,
         SUBMIT: submitSchema,
-        SYNC: syncSchema,
       },
       input: inputSchema,
     },
@@ -264,39 +241,23 @@ export const createRegisterWizardMachine = ({
       outcome: null,
       stepIds: input.stepIds,
       stepIndex: 0,
-      verdicts: {},
     }),
     id: "registerWizard",
     initial: "editing",
     states: {
       editing: {
         on: {
-          // The verdict is filed under the step it belongs to, so moving away
-          // and back finds the same answer again.
-          SYNC: ({
+          // The answer arrives with the move. A step that cannot be left does
+          // not transition, and the same value decides the button's disabled
+          // state, so the two cannot disagree.
+          NEXT: ({
             context,
             event,
           }: {
             context: RegisterWizardContext;
-            event: SyncEvent;
+            event: NextEvent;
           }) => {
-            const stepId = currentStepId(context);
-
-            if (
-              stepId === null ||
-              context.verdicts[stepId] === event.canContinue
-            ) {
-              return undefined;
-            }
-
-            return {
-              context: {
-                verdicts: { ...context.verdicts, [stepId]: event.canContinue },
-              },
-            };
-          },
-          NEXT: ({ context }: { context: RegisterWizardContext }) => {
-            if (!mayLeaveCurrentStep(context)) {
+            if (!event.canContinue) {
               return undefined;
             }
 
@@ -441,7 +402,6 @@ export const createRegisterWizardMachine = ({
 
 /** What the page renders. */
 export type RegisterWizardView = {
-  readonly canContinue: boolean;
   readonly error: string | null;
   readonly isBusy: boolean;
   readonly isDone: boolean;
@@ -465,7 +425,6 @@ export const toRegisterWizardView = (
   const busy = snapshot.matches("submitting") || snapshot.matches("finishing");
 
   return {
-    canContinue: mayLeaveCurrentStep(context),
     error: context.error,
     isBusy: busy,
     isDone: snapshot.matches("done"),

@@ -80,22 +80,24 @@ const viewOf = (actor: ReturnType<typeof started>["actor"]) =>
     actor.getSnapshot() as Parameters<typeof toRegisterWizardView>[0]
   );
 
-const answerStep = (actor: ReturnType<typeof started>["actor"]) =>
-  actor.send({ type: "SYNC", canContinue: true });
+const next = (
+  actor: ReturnType<typeof started>["actor"],
+  canContinue = true
+) => {
+  actor.send({ type: "NEXT", canContinue });
+};
 
 const reachTeam = (actor: ReturnType<typeof started>["actor"]) => {
   for (let step = 0; step < 3; step += 1) {
-    answerStep(actor);
-    actor.send({ type: "NEXT" });
+    next(actor);
   }
 };
 
 describe("register wizard machine", () => {
-  it("starts on the first step with nothing to continue to", () => {
+  it("starts on the first step", () => {
     const { actor } = started();
 
     expect(viewOf(actor)).toMatchObject({
-      canContinue: false,
       isBusy: false,
       stepId: "identity",
       stepIndex: 0,
@@ -103,48 +105,23 @@ describe("register wizard machine", () => {
     });
   });
 
-  it("refuses to advance until the step is answered", () => {
+  it("refuses to advance when the event says the step is not answered", () => {
     const { actor } = started();
-    actor.send({ type: "NEXT" });
+    next(actor, false);
 
     expect(viewOf(actor).stepIndex).toBe(0);
   });
 
-  it("asks the new step for its own answer", () => {
-    const { actor } = started();
-    answerStep(actor);
-    actor.send({ type: "NEXT" });
-
-    // The next step has not been answered yet, whatever the last one said.
-    expect(viewOf(actor)).toMatchObject({ canContinue: false, stepIndex: 1 });
-  });
-
-  it("remembers the answer of a step the reader walks back to", () => {
+  it("walks back to a step without being told again", () => {
     const { actor } = started();
 
-    answerStep(actor);
-    actor.send({ type: "NEXT" });
-
-    answerStep(actor);
+    next(actor);
+    next(actor);
     actor.send({ type: "BACK" });
 
-    // The regression this covers: a single verdict for the whole wizard had to
-    // be cleared on every move, so coming back to an answered step left
-    // Continue disabled until something unrelated changed a field.
-    expect(viewOf(actor)).toMatchObject({
-      canContinue: true,
-      stepId: "identity",
-      stepIndex: 0,
-    });
-  });
-
-  it("forgets a step's answer when it changes", () => {
-    const { actor } = started();
-
-    answerStep(actor);
-    actor.send({ type: "SYNC", canContinue: false });
-
-    expect(viewOf(actor).canContinue).toBe(false);
+    // The machine holds no answer of its own, so there is nothing to forget:
+    // the page derives the answer for whichever step is showing.
+    expect(viewOf(actor)).toMatchObject({ stepId: "url", stepIndex: 1 });
   });
 
   it("walks forward and back, keeping the index in range", () => {

@@ -113,7 +113,7 @@ export function RegisterWizard({ wizard }: { wizard: RegisterWizardState }) {
         )}
 
         <Button
-          disabled={view.isBusy || (!view.isLastStep && !view.canContinue)}
+          disabled={view.isBusy || (!view.isLastStep && !wizard.canContinue)}
           loading={view.isBusy}
           type="submit"
         >

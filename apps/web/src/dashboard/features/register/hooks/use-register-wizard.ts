@@ -27,15 +27,11 @@ const registerWizardMachine = createRegisterWizardMachine({
  * The register wizard: one form, one machine, one slug check.
  *
  * The form owns the answers and the machine owns where the reader is and
- * whether a request is in flight. The two are bridged by a single derived
- * boolean: `isStepComplete` for the current step, plus the check's verdict on
- * the url step. That verdict is reported to the machine as an event, so `NEXT`
- * never has to read the form and the machine can be tested without one.
- *
- * The bridge is an effect on purpose. The form store changes outside React's
- * render cycle, and the machine needs the newest answer before the next click,
- * not after the next paint; the dependency is a boolean, so the effect runs
- * when the answer changes and not on every keystroke.
+ * whether a request is in flight. `canContinue` is derived from the form during
+ * render and sent with `NEXT`, so the button's state and the machine's decision
+ * are the same value read once. Nothing is stored twice and no effect keeps two
+ * copies in step: a step that arrives already answered (the boards step, whose
+ * two defaults are complete on sight) needs no notification to become usable.
  */
 export function useRegisterWizard({
   onCreated,
@@ -64,13 +60,13 @@ export function useRegisterWizard({
       : answerIsComplete;
   }, [slug.availability.status, values, view.stepId]);
 
-  // The verdict is per step, so the machine never needs to be told again when
-  // the reader walks back to an answered one. This effect only reports a change
-  // in the current answer, and its dependency is a boolean.
-  useEffect(() => {
-    send({ type: "SYNC", canContinue });
-  }, [canContinue, send]);
-
+  /**
+   * The one effect left in the wizard, and it is a notification rather than a
+   * derivation: the machine reaching `done` is the only signal that the route
+   * should leave, and a route change is not an interaction any handler of ours
+   * could sit on. The ref makes it fire once per workspace instead of once per
+   * render of the terminal state.
+   */
   const reportedRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -86,7 +82,11 @@ export function useRegisterWizard({
     onCreated(view.outcome);
   }, [onCreated, view.isDone, view.outcome]);
 
-  const next = useCallback(() => send({ type: "NEXT" }), [send]);
+  const next = useCallback(
+    () => send({ type: "NEXT", canContinue }),
+    [canContinue, send]
+  );
+
   const back = useCallback(() => send({ type: "BACK" }), [send]);
 
   const goTo = useCallback(
@@ -100,7 +100,18 @@ export function useRegisterWizard({
     void form.handleSubmit();
   }, [form]);
 
-  return { back, form, goTo, next, retry, slug, submit, values, view };
+  return {
+    back,
+    canContinue,
+    form,
+    goTo,
+    next,
+    retry,
+    slug,
+    submit,
+    values,
+    view,
+  };
 }
 
 export type RegisterWizardState = ReturnType<typeof useRegisterWizard>;
