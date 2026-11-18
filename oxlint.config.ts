@@ -679,9 +679,11 @@ export default defineConfig({
   ],
 
   options: {
-    // Type-aware rules run through `oxlint-tsgolint`, which `@effect/tsgo`
-    // patches so the `effecttsgo/*` rules resolve. `tsrs` still owns plain type
-    // checking; `typeCheck` stays off so diagnostics are not reported twice.
+    // Type-aware rules run on `tsrs`: `pnpm lint` is
+    // `effect-tsgo --tsrs-lint oxlint`, which preloads the patched Oxlint
+    // binding (where the `effecttsgo/*` rules live) and hands the type-aware
+    // pass to the patched `tsrs` instead of `oxlint-tsgolint`. `typeCheck` stays
+    // off so compiler diagnostics are reported once, by `tsrs --noEmit`.
     typeAware: true,
     typeCheck: false,
   },
