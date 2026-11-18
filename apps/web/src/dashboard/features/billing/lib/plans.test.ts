@@ -48,6 +48,17 @@ describe("describePlanPrice", () => {
       note: "Pricing unavailable",
     });
   });
+
+  it("omits savings when the two prices are quoted in different currencies", () => {
+    expect(
+      describePlanPrice(
+        plan({
+          year: { productId: "prod_year", amount: 18_000, currency: "eur" },
+        }),
+        "year"
+      )
+    ).toEqual({ amount: "€180", suffix: "/ year", note: "Billed yearly" });
+  });
 });
 
 describe("describePlanAction", () => {

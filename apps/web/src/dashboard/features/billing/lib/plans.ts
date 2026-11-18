@@ -103,9 +103,16 @@ export function describePlanPrice(
   const amount = formatMoney(price.amount, price.currency);
   const suffix = interval === "year" ? "/ year" : "/ month";
   let note = interval === "year" ? "Billed yearly" : "Billed monthly";
+  const monthly = plan.month;
 
-  if (interval === "year" && plan.month) {
-    const savings = plan.month.amount * 12 - price.amount;
+  // Savings compare two amounts, which is only meaningful when both prices are
+  // quoted in one currency; a mixed pair would subtract unlike units.
+  if (
+    interval === "year" &&
+    monthly !== undefined &&
+    monthly.currency === price.currency
+  ) {
+    const savings = monthly.amount * 12 - price.amount;
 
     if (savings > 0) {
       note = `Billed yearly · save ${formatMoney(savings, price.currency)} a year`;
