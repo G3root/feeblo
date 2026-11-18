@@ -34,12 +34,14 @@ const LANE_ICON_BY_GROUPING: Record<TBoardGroupBy, typeof GroupItemsIcon> = {
 export function BoardLaneIcon({
   groupBy,
   status,
+  statusIcon,
 }: {
   groupBy: TBoardGroupBy;
   status?: BoardPostStatus;
+  statusIcon?: string | null;
 }) {
   if (groupBy === "status" && status) {
-    return <StatusIcon status={status} />;
+    return <StatusIcon icon={statusIcon} status={status} />;
   }
 
   const icon = LANE_ICON_BY_GROUPING[groupBy];

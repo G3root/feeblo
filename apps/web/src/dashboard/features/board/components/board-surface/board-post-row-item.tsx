@@ -69,7 +69,7 @@ export function BoardPostRowItem({
             />
             {post.upvoteCount}
           </Badge>
-          <StatusIcon status={post.status} />
+          <StatusIcon icon={post.statusIcon} status={post.status} />
           <p className="truncate text-sm font-medium no-underline!">
             {post.title}
           </p>

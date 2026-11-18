@@ -13,6 +13,7 @@ export type BoardPostRow = {
   slug: string;
   statusId: string;
   status: BoardPostStatus;
+  statusIcon?: string | null;
   title: string;
   summary: string;
   updatedAt: Date | string;
@@ -31,6 +32,7 @@ export type BoardPostLane = {
    * status to write.
    */
   status?: BoardPostStatus;
+  statusIcon?: string | null;
   statusId?: string;
 };
 

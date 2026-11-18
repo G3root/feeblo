@@ -1,5 +1,6 @@
 import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { IconPickerField } from "@feeblo/ui/icon-picker";
 import {
   Sheet,
   SheetClose,
@@ -12,6 +13,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
+import { DEFAULT_BOARD_ICON } from "@feeblo/web-shared/icons/defaults";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { useNavigate } from "@tanstack/react-router";
 import { useSelector } from "@xstate/store-react";
@@ -70,7 +72,20 @@ function RenameBoardForm() {
   return <RenameBoardFormFields board={board} />;
 }
 
-function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
+/**
+ * The row the edit sheet seeds from.
+ *
+ * `icon` is the stored nullable value, not the form's string: the form defaults
+ * it to the client's default, and the row itself is allowed to have never
+ * picked one.
+ */
+type RenameBoardRow = {
+  icon: string | null;
+  name: string;
+  visibility: BoardFormValues["visibility"];
+};
+
+function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
   const organizationId = useOrganizationId();
   const { boardCollection } = useDashboardCollections();
   const store = useRenameBoardDialogContext();
@@ -81,6 +96,7 @@ function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
     ...boardFormOpts,
     defaultValues: {
       name: board.name,
+      icon: board.icon ?? DEFAULT_BOARD_ICON,
       visibility: board.visibility,
     },
     onSubmit: async (data) => {
@@ -89,6 +105,7 @@ function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
 
         const tx = boardCollection.update(boardId, (draft) => {
           draft.name = data.value.name;
+          draft.icon = data.value.icon;
           draft.visibility = data.value.visibility;
           draft.slug = boardSlug;
         });
@@ -128,6 +145,16 @@ function RenameBoardFormFields({ board }: { board: BoardFormValues }) {
       <SheetPanel className="grid gap-4">
         <form.AppField name="name">
           {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="icon">
+          {(field) => (
+            <IconPickerField
+              fallbackIcon={DEFAULT_BOARD_ICON}
+              label="Choose icon"
+              onChange={(icon) => field.handleChange(icon)}
+              value={field.state.value}
+            />
+          )}
         </form.AppField>
         <BoardVisibilityField form={form} />
       </SheetPanel>

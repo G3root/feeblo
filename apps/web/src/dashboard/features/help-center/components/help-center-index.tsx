@@ -42,7 +42,7 @@ import {
   CreateHelpCenterTopicDialog,
   EditHelpCenterTopicDialog,
 } from "./help-center-topic-dialog";
-import { HelpCenterTopicIcon } from "./help-center-topic-icons";
+import { HelpCenterTopicIcon } from "./help-center-topic-icon";
 
 /** The collection's own row: `description` and `icon` are nullable columns. */
 type THelpCenterTopicRow = {

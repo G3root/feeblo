@@ -9,6 +9,8 @@ import type {
 } from "./types";
 
 type BoardGroupingStatus = {
+  /** Optional so a test fixture or a partial status row still groups. */
+  icon?: string | null;
   id: string;
   label: string;
   type: BoardPostStatus;
@@ -81,6 +83,7 @@ function groupByStatus(
       label: string;
       posts: BoardPostRow[];
       status: BoardPostStatus;
+      statusIcon?: string | null;
       statusId: string;
     }
   >(
@@ -90,6 +93,7 @@ function groupByStatus(
         label: status.label,
         posts: [],
         status: status.type,
+        statusIcon: status.icon,
         statusId: status.id,
       },
     ])
@@ -107,6 +111,7 @@ function groupByStatus(
       label: "",
       posts: [post],
       status: post.status,
+      statusIcon: post.statusIcon,
       statusId: post.statusId,
     });
   }
@@ -123,6 +128,7 @@ function groupByStatus(
       label: lane.label,
       posts: lane.posts,
       status: lane.status,
+      statusIcon: lane.statusIcon,
       statusId: lane.statusId,
     });
   }

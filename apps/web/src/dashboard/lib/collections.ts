@@ -339,6 +339,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
             type: newStatus.type,
             label: newStatus.label,
             color: newStatus.color ?? null,
+            icon: newStatus.icon ?? null,
             orderIndex: newStatus.orderIndex,
           })
         );
@@ -360,6 +361,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
             type: updatedStatus.type,
             label: updatedStatus.label,
             color: updatedStatus.color ?? null,
+            icon: updatedStatus.icon ?? null,
           })
         );
         await collection.utils.refetch({ throwOnError: true });
@@ -788,6 +790,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
             rpc.CreateBoard({
               id: newBoard.id,
               name: newBoard.name,
+              icon: newBoard.icon ?? null,
               visibility: newBoard.visibility,
               organizationId: newBoard.organizationId,
             }),
@@ -819,6 +822,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
             rpc.UpdateBoard({
               id: updatedBoard.id,
               name: updatedBoard.name,
+              icon: updatedBoard.icon ?? null,
               visibility: updatedBoard.visibility,
               organizationId: updatedBoard.organizationId,
             }),

@@ -1,4 +1,6 @@
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import { cn } from "@feeblo/ui/utils";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useLocation } from "@tanstack/react-router";
 
@@ -33,6 +35,7 @@ export function BoardListCard() {
         {data?.map((board) => (
           <BoardNavLink
             href={boardPaths.board(board.slug)}
+            icon={board.icon}
             key={board.id}
             label={board.name}
           />
@@ -44,10 +47,12 @@ export function BoardListCard() {
 
 export function BoardNavLink({
   href,
+  icon,
   label,
   showActiveIndicator = false,
 }: {
   href: string;
+  icon?: string | null;
   label: string;
   showActiveIndicator?: boolean;
 }) {
@@ -64,13 +69,23 @@ export function BoardNavLink({
       )}
       to={href}
     >
-      <span
-        className={cn(
-          "size-1.5 shrink-0 rounded-full",
-          isActive ? "bg-primary" : "bg-muted-foreground/40",
-          showActiveIndicator ? "bg-primary" : ""
-        )}
-      />
+      {icon === undefined ? (
+        <span
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            isActive ? "bg-primary" : "bg-muted-foreground/40",
+            showActiveIndicator ? "bg-primary" : ""
+          )}
+        />
+      ) : (
+        <TablerIcon
+          className={cn(
+            "size-4",
+            isActive ? "text-foreground" : "text-muted-foreground"
+          )}
+          name={boardIconName(icon)}
+        />
+      )}
       <span className="truncate">{label}</span>
     </Link>
   );

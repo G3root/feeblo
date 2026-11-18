@@ -310,6 +310,7 @@ export function BoardGridView({
                   key={lane.id}
                   label={lane.label}
                   status={lane.status}
+                  statusIcon={lane.statusIcon}
                   statusId={lane.statusId}
                   totalPosts={rows.length}
                 >

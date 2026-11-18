@@ -9,7 +9,7 @@
 - **The picker's behaviour is a port of [Frimousse](https://github.com/liveblocks/frimousse), not a reimplementation.** The virtualization, the keyboard grid, the sticky category headers and the measurement of the caller's own `Icon` and `CategoryHeader` components are kept as they are. The emoji-specific parts are removed: skin tones, locales, the locale-aware Emojibase resolver, and the emoji font.
 - **The store is an `@xstate/store` event map, and `interaction` is its one declared lifecycle.** There is no statechart, because the state the virtualizer needs is not a lifecycle: it is measured DOM geometry (`rowHeight`, `viewportHeight`, `viewportScrollY`) that a machine would only mirror.
 
-The picker is a design-system component exported as `@feeblo/ui/icon-picker`; no product surface selects an icon yet. Wiring it into the changelog category's `iconType: "icon"` is a product change with its own schema work, not part of this one.
+The picker is a design-system component exported as `@feeblo/ui/icon-picker`. `IconPickerField` is its popover-backed trigger, and the board, post-status and help-center-topic settings dialogs use it. Each stores a Tabler name in a nullable text column and resolves a null or unknown name to a client default in `@feeblo/web-shared/icons/defaults`: the default lives on the client so the artwork can change without a migration, and a row that predates the picker still renders a mark. Wiring the changelog category's `iconType: "icon"` is still a product change with its own schema work, not part of this one.
 
 ### The generated artefacts
 

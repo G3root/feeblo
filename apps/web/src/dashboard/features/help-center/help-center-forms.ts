@@ -1,22 +1,21 @@
 import { HELP_CENTER_ARTICLE_WRITE_STATES } from "@feeblo/domain-contracts/help-center-article";
 import type { THelpCenterArticle } from "@feeblo/domain/help-center-article/schema";
 import type { THelpCenterTopic } from "@feeblo/domain/help-center-topic/schema";
-import { formOptions } from "@tanstack/react-form";
-import { z } from "zod";
-
 import {
   DEFAULT_HELP_CENTER_TOPIC_ICON,
-  HELP_CENTER_TOPIC_ICON_KEYS,
-  type THelpCenterTopicIcon,
-} from "./components/help-center-topic-icons";
+  helpCenterTopicIconName,
+} from "@feeblo/web-shared/icons/defaults";
+import { formOptions } from "@tanstack/react-form";
+import { z } from "zod";
 
 /**
  * The topic form's shape, and the labels its controls render.
  *
  * The schema mirrors the server's bounds rather than defining them: a courtesy
  * check that turns a round trip into an inline message, with the RPC as the
- * enforcement point. `icon` is an enum over the catalogue, so a stored value
- * the picker cannot render is a validation failure instead of an empty tile.
+ * enforcement point. `icon` is a Tabler name from the picker; an unknown name
+ * renders the client's default rather than an empty tile, so the form only
+ * enforces the column's length.
  */
 export const helpCenterTopicFormSchema = z.object({
   name: z
@@ -25,7 +24,7 @@ export const helpCenterTopicFormSchema = z.object({
     .min(1, "A section needs a name.")
     .max(100, "Use 100 characters or fewer."),
   description: z.string().trim().max(500, "Use 500 characters or fewer."),
-  icon: z.enum(HELP_CENTER_TOPIC_ICON_KEYS),
+  icon: z.string().trim().min(1).max(64),
 });
 
 export type HelpCenterTopicFormValues = z.infer<
@@ -48,14 +47,12 @@ export type HelpCenterTopicFormSeed = Pick<
 
 export const helpCenterTopicFormValues = (
   topic?: HelpCenterTopicFormSeed,
-  fallbackIcon: THelpCenterTopicIcon = DEFAULT_HELP_CENTER_TOPIC_ICON
+  fallbackIcon: string = DEFAULT_HELP_CENTER_TOPIC_ICON
 ): HelpCenterTopicFormValues => ({
   description: topic?.description ?? "",
-  // `find` over the tuple already narrows to the icon union, so the fallback is
-  // the only `undefined` it can return.
-  icon:
-    HELP_CENTER_TOPIC_ICON_KEYS.find((key) => key === topic?.icon) ??
-    fallbackIcon,
+  // Resolved here rather than on submit: the picker renders the value it is
+  // given, so a legacy key has to become a Tabler name before the form opens.
+  icon: helpCenterTopicIconName(topic?.icon ?? fallbackIcon),
   name: topic?.name ?? "",
 });
 

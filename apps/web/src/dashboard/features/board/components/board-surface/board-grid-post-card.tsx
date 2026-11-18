@@ -52,6 +52,7 @@ export const BoardGridPostCard = memo(function BoardGridPostCard({
       }
       rootRef={ref}
       status={post.status}
+      statusIcon={post.statusIcon}
       title={post.title}
       updatedAt={post.updatedAt}
     />

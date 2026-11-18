@@ -97,6 +97,7 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
           Effect.gen(function* () {
             yield* repository.create({
               ...args,
+              icon: args.icon ?? null,
               creatorId: session.session.userId,
               creatorMemberId: isMember.membershipId,
             });
@@ -147,8 +148,14 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
             // A save that changed nothing is not an event; `fields` is what
             // the reader filters on, so an empty diff is left unrecorded
             // rather than written as an update with no change.
+            // `undefined` is "leave it alone"; `null` is "clear the custom
+            // icon". A nullish coalesce would make the second impossible.
+            const nextIcon =
+              args.icon === undefined ? previous.icon : args.icon;
+
             const fields = [
               ...(previous.name === args.name ? [] : ["name"]),
+              ...(previous.icon === nextIcon ? [] : ["icon"]),
               ...(previous.visibility === args.visibility
                 ? []
                 : ["visibility"]),
@@ -169,10 +176,15 @@ export const BoardRpcHandlersEffect = Effect.gen(function* () {
               changes: {
                 fields,
                 before: {
+                  icon: previous.icon,
                   name: previous.name,
                   visibility: previous.visibility,
                 },
-                after: { name: args.name, visibility: args.visibility },
+                after: {
+                  icon: nextIcon,
+                  name: args.name,
+                  visibility: args.visibility,
+                },
               },
             });
           })

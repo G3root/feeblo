@@ -2,6 +2,7 @@ import type { TContact } from "@feeblo/domain/contact/schema";
 import type { TPostActivityKind } from "@feeblo/domain/post-activity/schema";
 import type { TPostActivity } from "@feeblo/domain/post-activity/schema";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
+import { PostStatusIcon } from "@feeblo/post-ui/post-status-icon";
 import {
   ActivityTimeline,
   ActivityTimelineItem,
@@ -10,7 +11,6 @@ import { cn } from "@feeblo/ui/utils";
 import * as dayjs from "@feeblo/utils/dayjs";
 import {
   BOARD_LANE_COLOR_MAP,
-  BoardIconMap,
   type BoardPostStatus,
 } from "@feeblo/web-shared/board/constants";
 import {
@@ -158,26 +158,32 @@ function getActivityDescription({
   return descriptions[activity.kind];
 }
 
-type ActivityIcon = { icon: typeof FileAddIcon; color: string };
+type ActivityIcon = {
+  color: string;
+  icon?: typeof FileAddIcon;
+  statusIcon?: string | null;
+  statusType?: BoardPostStatus;
+};
 
 function getActivityIcon(
   activity: TPostActivity,
-  statusTypes: ReadonlyMap<string, BoardPostStatus>
+  statuses: ReadonlyMap<string, { icon: string | null; type: BoardPostStatus }>
 ): ActivityIcon {
   if (activity.kind === "STATUS_CHANGED" && activity.nextValue) {
-    const statusType = statusTypes.get(activity.nextValue);
+    const status = statuses.get(activity.nextValue);
 
-    if (statusType) {
+    if (status) {
       return {
-        icon: BoardIconMap[statusType] ?? StatusIcon,
-        color: BOARD_LANE_COLOR_MAP[statusType] ?? "text-muted-foreground",
+        color: BOARD_LANE_COLOR_MAP[status.type] ?? "text-muted-foreground",
+        statusIcon: status.icon,
+        statusType: status.type,
       };
     }
   }
 
   return {
-    icon: activityIconMap[activity.kind],
     color: "text-muted-foreground",
+    icon: activityIconMap[activity.kind],
   };
 }
 
@@ -240,8 +246,14 @@ export function PostActivityList({
     [statuses]
   );
 
-  const statusTypes = useMemo(
-    () => new Map(statuses.map((status) => [status.id, status.type])),
+  const statusMarks = useMemo(
+    () =>
+      new Map(
+        statuses.map((status) => [
+          status.id,
+          { icon: status.icon, type: status.type },
+        ])
+      ),
     [statuses]
   );
 
@@ -311,7 +323,8 @@ export function PostActivityList({
     <ActivityTimeline className="w-full">
       {activities.map((activity) => {
         const actorName = activity.actor.name ?? "Someone";
-        const { icon, color } = getActivityIcon(activity, statusTypes);
+        const activityIcon = getActivityIcon(activity, statusMarks);
+        const { color } = activityIcon;
         const onBehalfMetadata = getOnBehalfMetadata(activity);
 
         const onBehalfSubject = onBehalfMetadata
@@ -326,12 +339,22 @@ export function PostActivityList({
         return (
           <ActivityTimelineItem
             icon={
-              <HugeiconsIcon
-                aria-hidden="true"
-                className={cn("size-3.5", color)}
-                icon={icon}
-                strokeWidth={2}
-              />
+              activityIcon.statusType ? (
+                <span className={cn("inline-flex", color)}>
+                  <PostStatusIcon
+                    className="size-3.5"
+                    icon={activityIcon.statusIcon}
+                    type={activityIcon.statusType}
+                  />
+                </span>
+              ) : (
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className={cn("size-3.5", color)}
+                  icon={activityIcon.icon ?? FileAddIcon}
+                  strokeWidth={2}
+                />
+              )
             }
             key={activity.id}
           >

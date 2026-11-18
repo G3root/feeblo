@@ -48,7 +48,7 @@ export const helpCenterTopicTable = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     /**
-     * An icon *name* from the dashboard's icon set, not a colour triple.
+     * A Tabler icon *name* from the dashboard's picker, not a colour triple.
      * `changelog_category` carries `icon_type` beside `icon` because it
      * predates a decision about icon families; a new table picks one
      * representation rather than encoding a union as two columns.

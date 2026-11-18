@@ -11,6 +11,7 @@ interface TBoardCreate {
   /** Null when the board is created by an import whose uploader is gone. */
   creatorId: string | null;
   creatorMemberId: string | null;
+  icon: string | null;
   id: string;
   name: string;
   organizationId: string;
@@ -18,6 +19,7 @@ interface TBoardCreate {
 }
 
 interface TBoardUpdate {
+  icon?: string | null | undefined;
   id: string;
   name?: string;
   organizationId: string;
@@ -62,6 +64,7 @@ const BOARD_FIELDS = {
   id: schema.boardTable.id,
   name: schema.boardTable.name,
   slug: schema.boardTable.slug,
+  icon: schema.boardTable.icon,
   visibility: schema.boardTable.visibility,
   organizationId: schema.boardTable.organizationId,
   createdAt: schema.boardTable.createdAt,

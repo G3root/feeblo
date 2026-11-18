@@ -30,6 +30,7 @@ const board = (overrides: Partial<TBoard> = {}): TBoard => ({
   id: "brd_1",
   name: "Feature requests",
   slug: "feature-requests",
+  icon: null,
   visibility: "PUBLIC",
   createdAt: date("2026-01-01T00:00:00.000Z"),
   updatedAt: date("2026-01-01T00:00:00.000Z"),

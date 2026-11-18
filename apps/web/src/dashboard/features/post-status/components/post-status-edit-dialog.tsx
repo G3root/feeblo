@@ -12,6 +12,7 @@ import {
 } from "@feeblo/ui/dialog";
 import { Field, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { IconPickerField } from "@feeblo/ui/icon-picker";
 import {
   Select,
   SelectItem,
@@ -20,6 +21,7 @@ import {
   SelectValue,
 } from "@feeblo/ui/select";
 import { toastManager } from "@feeblo/ui/toast";
+import { DEFAULT_POST_STATUS_ICONS } from "@feeblo/web-shared/icons/defaults";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
@@ -59,6 +61,7 @@ export function PostStatusEditDialog() {
             key={status.id}
             status={{
               color: status.color ?? null,
+              icon: status.icon ?? null,
               id: status.id,
               label: status.label,
               type: status.type,
@@ -72,6 +75,7 @@ export function PostStatusEditDialog() {
 
 type EditableStatus = {
   color: string | null;
+  icon: string | null;
   id: string;
   label: string;
   type: TPostStatusType;
@@ -84,12 +88,14 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
   const form = useAppForm({
     defaultValues: {
       color: status.color,
+      icon: status.icon ?? DEFAULT_POST_STATUS_ICONS[status.type],
       label: status.label,
       type: status.type,
     },
     validators: {
       onSubmit: z.object({
         color: z.string().nullable(),
+        icon: z.string().trim().min(1).max(64),
         label: z.string().min(1).max(60),
         type: z.enum([
           "PENDING",
@@ -116,6 +122,7 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
 
         const tx = postStatusCollection.update(status.id, (draft) => {
           draft.color = data.value.color;
+          draft.icon = data.value.icon;
           draft.label = data.value.label;
           draft.type = data.value.type;
 
@@ -159,6 +166,19 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
               <FieldLabel>Colour</FieldLabel>
               <PostStatusColorField
                 onChange={(color) => field.handleChange(color)}
+                value={field.state.value}
+              />
+            </Field>
+          )}
+        </form.AppField>
+        <form.AppField name="icon">
+          {(field) => (
+            <Field>
+              <FieldLabel>Icon</FieldLabel>
+              <IconPickerField
+                fallbackIcon={DEFAULT_POST_STATUS_ICONS[status.type]}
+                label="Choose icon"
+                onChange={(icon) => field.handleChange(icon)}
                 value={field.state.value}
               />
             </Field>

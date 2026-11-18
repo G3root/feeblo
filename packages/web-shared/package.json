@@ -102,6 +102,10 @@
       "types": "./src/board/constants.ts",
       "default": "./src/board/constants.ts"
     },
+    "./icons/defaults": {
+      "types": "./src/icons/defaults.ts",
+      "default": "./src/icons/defaults.ts"
+    },
     "./analytics-provider": {
       "types": "./src/lib/analytics-provider.tsx",
       "default": "./src/lib/analytics-provider.tsx"

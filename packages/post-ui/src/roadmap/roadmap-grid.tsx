@@ -29,6 +29,7 @@ export function RoadmapGrid<TPost extends RoadmapPost>({
             label={lane.label}
             name={lane.name}
             status={lane.status}
+            statusIcon={lane.statusIcon}
             totalPosts={lane.posts.length}
           >
             {lane.posts.length > 0 ? (

@@ -11,7 +11,8 @@ import {
   DialogTitle,
 } from "@feeblo/ui/dialog";
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import { cn } from "@feeblo/ui/utils";
+import { IconPickerField } from "@feeblo/ui/icon-picker";
+import { DEFAULT_HELP_CENTER_TOPIC_ICON } from "@feeblo/web-shared/icons/defaults";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { useState } from "react";
 
@@ -22,10 +23,6 @@ import {
   helpCenterTopicFormValues,
   type HelpCenterTopicFormValues,
 } from "../help-center-forms";
-import {
-  HELP_CENTER_TOPIC_ICON_KEYS,
-  HelpCenterTopicIcon,
-} from "./help-center-topic-icons";
 
 /**
  * The section dialog, as two variants rather than one component with a mode.
@@ -225,28 +222,12 @@ function TopicFields({
 
         <form.AppField name="icon">
           {(field) => (
-            <fieldset className="flex flex-col gap-2">
-              <legend className="text-sm font-medium">Icon</legend>
-              <div className="flex flex-wrap gap-2">
-                {HELP_CENTER_TOPIC_ICON_KEYS.map((key) => (
-                  <button
-                    aria-label={key}
-                    aria-pressed={field.state.value === key}
-                    className={cn(
-                      "flex size-9 items-center justify-center rounded-md border transition-colors",
-                      field.state.value === key
-                        ? "border-primary/50 bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                    key={key}
-                    onClick={() => field.handleChange(key)}
-                    type="button"
-                  >
-                    <HelpCenterTopicIcon className="size-4" icon={key} />
-                  </button>
-                ))}
-              </div>
-            </fieldset>
+            <IconPickerField
+              fallbackIcon={DEFAULT_HELP_CENTER_TOPIC_ICON}
+              label="Choose icon"
+              onChange={(icon) => field.handleChange(icon)}
+              value={field.state.value}
+            />
           )}
         </form.AppField>
 

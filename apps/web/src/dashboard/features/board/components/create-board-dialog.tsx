@@ -9,6 +9,7 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { IconPickerField } from "@feeblo/ui/icon-picker";
 import {
   Sheet,
   SheetClose,
@@ -21,6 +22,7 @@ import {
 } from "@feeblo/ui/sheet";
 import { toastManager } from "@feeblo/ui/toast";
 import { slugify } from "@feeblo/utils/url";
+import { DEFAULT_BOARD_ICON } from "@feeblo/web-shared/icons/defaults";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@xstate/store-react";
@@ -77,6 +79,7 @@ function CreateBoardForm() {
           createdAt: new Date(),
           updatedAt: new Date(),
           name: data.value.name,
+          icon: data.value.icon,
           visibility: data.value.visibility,
           slug: slugify(data.value.name),
           organizationId,
@@ -139,6 +142,16 @@ function CreateBoardForm() {
       <SheetPanel className="grid gap-4">
         <form.AppField name="name">
           {(field) => <field.TextField label="Name" />}
+        </form.AppField>
+        <form.AppField name="icon">
+          {(field) => (
+            <IconPickerField
+              fallbackIcon={DEFAULT_BOARD_ICON}
+              label="Choose icon"
+              onChange={(icon) => field.handleChange(icon)}
+              value={field.state.value}
+            />
+          )}
         </form.AppField>
         <BoardVisibilityField form={form} />
       </SheetPanel>

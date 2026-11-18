@@ -13,7 +13,6 @@ import { SelectButton } from "@feeblo/ui/select";
 import { cn } from "@feeblo/ui/utils";
 import {
   BOARD_LANE_COLOR_MAP,
-  BoardIconMap,
   type BoardPostStatus,
 } from "@feeblo/web-shared/board/constants";
 import { DashedLine02Icon, Search01Icon } from "@hugeicons/core-free-icons";
@@ -21,6 +20,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 
 import { m } from "./paraglide/messages.js";
 import { formatPostStatus } from "./post-status";
+import { PostStatusIcon } from "./post-status-icon";
 
 export function FieldRow({
   label,
@@ -39,6 +39,14 @@ export function FieldRow({
   );
 }
 
+type PostStatusChoice = Pick<TPostStatus, "id" | "label" | "type"> & {
+  /**
+   * Optional because a caller that builds its own option list may not carry
+   * the icon; the status then renders its type's default.
+   */
+  icon?: string | null;
+};
+
 export function StatusField({
   currentStatusId,
   statuses,
@@ -50,10 +58,8 @@ export function StatusField({
 }: {
   /** Null renders the placeholder: the field supports "nothing selected". */
   currentStatusId: string | null;
-  statuses: readonly Pick<TPostStatus, "id" | "label" | "type">[];
-  onValueChange: (
-    status: Pick<TPostStatus, "id" | "label" | "type"> | null
-  ) => void;
+  statuses: readonly PostStatusChoice[];
+  onValueChange: (status: PostStatusChoice | null) => void;
   disabled?: boolean;
   placeholder?: string;
   /** Hide the chevron for a row that renders the control as plain text. */
@@ -62,6 +68,7 @@ export function StatusField({
   triggerClassName?: string;
 }) {
   const items = statuses.map((postStatus) => ({
+    icon: postStatus.icon,
     label: postStatus.label || formatPostStatus(postStatus.type),
     type: postStatus.type,
     value: postStatus.id,
@@ -75,6 +82,7 @@ export function StatusField({
   const defaultValue = currentStatus
     ? {
         value: currentStatus.id,
+        icon: currentStatus.icon,
         label: currentStatus.label || formatPostStatus(currentStatus.type),
         type: currentStatus.type,
       }
@@ -91,6 +99,7 @@ export function StatusField({
           value
             ? {
                 id: value.value,
+                icon: value.icon,
                 label: value.label,
                 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                 type: value.type as BoardPostStatus,
@@ -113,16 +122,18 @@ export function StatusField({
             <span className="flex items-center gap-2">
               {value ? (
                 <>
-                  <HugeiconsIcon
+                  <span
                     className={cn(
-                      "size-4",
                       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                       BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
                     )}
-                    // SAFETY: The upstream contract guarantees this value here.
-                    icon={BoardIconMap[value.type as BoardPostStatus]}
-                    strokeWidth={2}
-                  />
+                  >
+                    <PostStatusIcon
+                      icon={value.icon}
+                      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+                      type={value.type as BoardPostStatus}
+                    />
+                  </span>
                   {value.label}
                 </>
               ) : null}
@@ -144,18 +155,18 @@ export function StatusField({
           {(item) => (
             <ComboboxItem key={item.value} value={item}>
               <span className="flex items-center gap-2 whitespace-nowrap">
-                <HugeiconsIcon
+                <span
                   className={cn(
                     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                    // SAFETY: The upstream contract guarantees this value here.
-                    "size-4",
-                    // SAFETY: The upstream contract guarantees this value here.
                     BOARD_LANE_COLOR_MAP[item.type as BoardPostStatus]
                   )}
-                  // SAFETY: The upstream contract guarantees this value here.
-                  icon={BoardIconMap[item.type as BoardPostStatus]}
-                  strokeWidth={2}
-                />
+                >
+                  <PostStatusIcon
+                    icon={item.icon}
+                    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+                    type={item.type as BoardPostStatus}
+                  />
+                </span>
                 {item.label}
               </span>
             </ComboboxItem>

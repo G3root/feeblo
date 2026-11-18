@@ -9,6 +9,7 @@ type RoadmapIssueCardContentProps = {
   boardName?: string;
   footer?: ReactNode;
   status: RoadmapStatus;
+  statusIcon?: string | null;
   title: string;
   updatedAt: Date | string;
 };
@@ -17,6 +18,7 @@ function RoadmapIssueCardContent({
   boardName,
   footer,
   status,
+  statusIcon,
   title,
   updatedAt,
 }: RoadmapIssueCardContentProps) {
@@ -27,7 +29,7 @@ function RoadmapIssueCardContent({
           {title}
         </span>
         <div className="flex items-start">
-          <RoadmapStatusIcon status={status} />
+          <RoadmapStatusIcon icon={statusIcon} status={status} />
         </div>
       </div>
 

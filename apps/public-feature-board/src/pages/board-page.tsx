@@ -6,10 +6,12 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import {
   isLiveQueryFailed,
   isLiveQueryPending,
 } from "@feeblo/web-shared/collections";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
 import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import type { ReactNode } from "react";
 
@@ -41,10 +43,21 @@ function MainContent({ children }: { children: ReactNode }) {
   );
 }
 
-function ListHeader({ count, title }: { count?: number; title: string }) {
+function ListHeader({
+  count,
+  icon,
+  title,
+}: {
+  count?: number;
+  icon?: string | null;
+  title: string;
+}) {
   return (
     <div className="flex items-baseline justify-between px-1 pb-3">
-      <h2 className="text-xl leading-tight font-semibold tracking-tight">
+      <h2 className="flex items-center gap-2 text-xl leading-tight font-semibold tracking-tight">
+        {icon === undefined ? null : (
+          <TablerIcon className="size-5" name={boardIconName(icon)} />
+        )}
         {title}
       </h2>
       {count !== undefined && (
@@ -192,7 +205,7 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
     return (
       <MainContent>
         <div className="min-w-0">
-          <ListHeader count={0} title={board.name} />
+          <ListHeader count={0} icon={board.icon} title={board.name} />
           <Empty className="border">
             <EmptyHeader>
               <EmptyTitle>{m.plane_strong_crow()}</EmptyTitle>
@@ -207,7 +220,7 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
   return (
     <MainContent>
       <div className="min-w-0">
-        <ListHeader count={posts.length} title={board.name} />
+        <ListHeader count={posts.length} icon={board.icon} title={board.name} />
         <div className="divide-border/40 border-border/60 w-full divide-y overflow-hidden rounded-lg border">
           {posts.map(({ post, postStatus }) => (
             <PostCollectionDataProvider

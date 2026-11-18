@@ -233,6 +233,7 @@ function movePostToStatus(
           {
             ...post,
             status: targetLane.status,
+            statusIcon: targetLane.statusIcon,
             statusId: targetLane.statusId,
           },
         ],
@@ -294,6 +295,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
       label={lane.label}
       name={lane.name}
       status={lane.status}
+      statusIcon={lane.statusIcon}
     >
       {lane.posts.length > 0 ? (
         lane.posts.map((post, postIndex) => (
@@ -349,6 +351,7 @@ const RoadmapBoardCard = memo(function RoadmapBoardCard({
       }
       rootRef={ref}
       status={post.status}
+      statusIcon={post.statusIcon}
       title={post.title}
       updatedAt={post.updatedAt}
     />

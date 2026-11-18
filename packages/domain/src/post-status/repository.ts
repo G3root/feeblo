@@ -26,6 +26,7 @@ const PostStatusColumns = {
   type: schema.postStatusTable.type,
   label: schema.postStatusTable.label,
   color: schema.postStatusTable.color,
+  icon: schema.postStatusTable.icon,
   orderIndex: schema.postStatusTable.orderIndex,
   isDefault: schema.postStatusTable.isDefault,
   organizationId: schema.postStatusTable.organizationId,
@@ -133,6 +134,7 @@ const makePostStatusRepository = Effect.gen(function* () {
           type: input.type,
           label: input.label,
           color: input.color,
+          icon: input.icon ?? null,
           orderIndex: input.orderIndex,
           // Never taken from the payload: a workspace has exactly one default,
           // and it is the seeded PENDING status until something deliberately
@@ -194,6 +196,7 @@ const makePostStatusRepository = Effect.gen(function* () {
                 type: input.type,
                 label: input.label,
                 color: input.color,
+                ...(input.icon === undefined ? {} : { icon: input.icon }),
                 orderIndex,
                 updatedAt: now,
               })

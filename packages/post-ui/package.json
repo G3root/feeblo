@@ -12,6 +12,10 @@
       "types": "./src/post-status.ts",
       "default": "./src/post-status.ts"
     },
+    "./post-status-icon": {
+      "types": "./src/post-status-icon.tsx",
+      "default": "./src/post-status-icon.tsx"
+    },
     "./post-properties": {
       "types": "./src/post-field.tsx",
       "default": "./src/post-field.tsx"
