@@ -15,9 +15,11 @@
     "./hooks/use-lazy-ref": "./src/hooks/use-lazy-ref.ts",
     "./hooks/use-media-query": "./src/hooks/use-media-query.ts",
     "./hooks/*": "./src/hooks/*.tsx",
+    "./icon-picker": "./src/icon-picker/index.tsx",
     "./*": "./src/*.tsx"
   },
   "scripts": {
+    "icons:generate": "node scripts/generate-tabler-filled-sprite.ts",
     "typecheck": "tsrs --noEmit"
   },
   "dependencies": {
