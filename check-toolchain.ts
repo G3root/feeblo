@@ -342,22 +342,57 @@ const checkToolchain = (
 
 /**
  * A package may not declare a tool the gate has retired, because a dependency
- * nothing invokes is indistinguishable from one that still does.
+ * nothing invokes is indistinguishable from one that still does. The
+ * declaration can hide behind an `npm:` alias — `"lint-engine":
+ * "npm:oxlint-tsgolint@7.0.2007"` installs the retired package under another
+ * name — so the spec is read as well as the key. Aliases of anything else are
+ * ordinary, and a value that names no package (a range, a tag, a workspace or
+ * catalog reference) is not an alias at all.
+ */
+const aliasTarget = (spec: string): string | undefined => {
+  if (!spec.startsWith("npm:")) return undefined;
+
+  const target = spec.slice("npm:".length);
+  // A scoped name opens with `@`, so its own `@` is not the version separator.
+  const separator = target.indexOf("@", 1);
+
+  return separator === -1 ? target : target.slice(0, separator);
+};
+
+/**
+ * Where a retired tool may still be declared: every dependency field of every
+ * manifest, the manifests' `npm:` aliases, and the workspace `overrides` block,
+ * which can re-add a package no manifest names.
  */
 const checkRetired = (
-  manifests: ReadonlyArray<Manifest>
+  manifests: ReadonlyArray<Manifest>,
+  overrides: Mapping
 ): ReadonlyArray<string> => {
   const failures: Array<string> = [];
 
   for (const manifest of manifests) {
     for (const field of dependencyFields) {
-      for (const name of retired) {
-        if (!(name in dependencies(manifest, field))) continue;
+      for (const [name, spec] of Object.entries(
+        dependencies(manifest, field)
+      )) {
+        const target = aliasTarget(spec);
 
-        failures.push(
-          `  ${manifest.file} ${field}.${name} is declared; the type-aware pass runs on tsrs, so nothing invokes it.`
-        );
+        for (const tool of retired) {
+          if (name !== tool && target !== tool) continue;
+
+          failures.push(
+            `  ${manifest.file} ${field}.${name} is declared; the type-aware pass runs on tsrs, so nothing invokes it.`
+          );
+        }
       }
+    }
+  }
+
+  for (const tool of retired) {
+    if (overrides.has(tool)) {
+      failures.push(
+        `  pnpm-workspace.yaml overrides.${tool} is declared; the type-aware pass runs on tsrs, so nothing invokes it.`
+      );
     }
   }
 
@@ -501,8 +536,34 @@ const selfTest = () => {
     json: { devDependencies: { "oxlint-tsgolint": "7.0.2001" } },
   };
 
-  assert.deepEqual(checkRetired([clean, rootFixture]), []);
-  assert.notDeepEqual(checkRetired([retiredFixture]), []);
+  const aliasedRetired: Manifest = {
+    file: "f/package.json",
+    json: {
+      devDependencies: { "lint-engine": "npm:oxlint-tsgolint@7.0.2001" },
+    },
+  };
+
+  // An alias of anything else is ordinary, and so is an alias with no version.
+  const aliasedOther: Manifest = {
+    file: "g/package.json",
+    json: {
+      devDependencies: {
+        engine: "npm:oxlint@1.82.0",
+        types: "npm:@types/node",
+      },
+    },
+  };
+
+  assert.deepEqual(
+    checkRetired([clean, rootFixture, aliasedOther], new Map()),
+    []
+  );
+  assert.notDeepEqual(checkRetired([retiredFixture], new Map()), []);
+  assert.notDeepEqual(checkRetired([aliasedRetired], new Map()), []);
+  assert.notDeepEqual(
+    checkRetired([clean], new Map([["oxlint-tsgolint", "7.0.2001"]])),
+    []
+  );
 };
 
 selfTest();
@@ -520,7 +581,7 @@ const manifests = readManifests();
 const failures = [
   ...checkEffectTrain(catalog, overrides, manifests),
   ...checkToolchain(catalog, manifests),
-  ...checkRetired(manifests),
+  ...checkRetired(manifests, overrides),
   ...checkPatches(patches),
 ];
 

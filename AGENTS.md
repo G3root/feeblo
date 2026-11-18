@@ -50,8 +50,8 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 | `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsrs --noEmit`, type-aware Oxlint (`effect-tsgo --tsrs-lint oxlint`) plus the formatter check, and Knip. |
 | `pnpm knip` | Unused files, dependencies and exports. Also runs inside `pnpm check`; see "Knip" below for what fails and what only prints. |
 | `pnpm typecheck` | Types only. Cached per package. |
-| `pnpm lint` | `oxlint && oxfmt --check .` |
-| `pnpm lint:fix` | The writer: `oxlint --fix && oxfmt`. |
+| `pnpm lint` | `effect-tsgo --tsrs-lint oxlint && oxfmt --check .` |
+| `pnpm lint:fix` | The writer: `effect-tsgo --tsrs-lint oxlint --fix && oxfmt`. |
 | `pnpm fmt` / `pnpm fmt:check` | Formatting only. |
 | `pnpm test` | Unit tests, `@feeblo/e2e` excluded. |
 | `pnpm test:e2e` | Playwright. Needs built apps; see `e2e/package.json`. |
