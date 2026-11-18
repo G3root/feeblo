@@ -1,6 +1,18 @@
 import { type Locator, type Page, expect } from "@playwright/test";
 
 /**
+ * A 1x1 transparent PNG.
+ *
+ * Enough for the logo upload: the endpoint and the avatar control only need a
+ * decodable image, and a generated buffer keeps the spec free of a fixture file
+ * that has to be kept in step with the rest.
+ */
+const TRANSPARENT_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64"
+);
+
+/**
  * The register wizard.
  *
  * Four steps now, so "create a workspace" is a walk rather than a click. Every
@@ -29,6 +41,45 @@ export class RegisterPage {
   async goto() {
     await this.page.goto("/register");
     await expect(this.workspaceNameInput).toBeVisible();
+  }
+
+  /** Types the workspace name on the first step. */
+  async fillIdentity(name: string) {
+    await this.workspaceNameInput.fill(name);
+  }
+
+  /** Picks a logo on the first step, from a generated image. */
+  async pickLogo() {
+    await this.page.locator('input[type="file"]').setInputFiles({
+      buffer: TRANSPARENT_PNG,
+      mimeType: "image/png",
+      name: "logo.png",
+    });
+  }
+
+  /** Moves to the next step, which asserts that Continue was usable. */
+  async continue() {
+    await expect(this.continueButton).toBeEnabled();
+    await this.continueButton.click();
+  }
+
+  /** Types the address on the url step and waits for the check to settle. */
+  async fillAddress(subdomain: string) {
+    await this.subdomainInput.fill(subdomain);
+  }
+
+  async expectAddressFree() {
+    await expect(this.page.getByText("This address is free.")).toBeVisible();
+  }
+
+  async addInvite(email: string) {
+    await this.page.getByRole("button", { name: "Add a teammate" }).click();
+    await this.page.getByRole("textbox", { name: "Invitation 1" }).fill(email);
+  }
+
+  async submit() {
+    await expect(this.createButton).toBeEnabled();
+    await this.createButton.click();
   }
 
   /**
