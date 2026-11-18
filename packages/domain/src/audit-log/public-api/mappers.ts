@@ -87,6 +87,32 @@ export const toAuditLogSource = (row: {
 const actorIdOf = (entry: PublicApiAuditLogSource): string | null =>
   entry.actorTokenId ?? entry.actorUserId;
 
+/**
+ * Metadata keys this surface withholds.
+ *
+ * Every other part of an entry is a named column the DTO chooses, but
+ * `metadata` is a record whose keys the writer chooses, so it is the one part
+ * that can carry something the contract refuses. A contact's create and update
+ * entries record the address a member typed, because the dashboard's log names
+ * the person an entry is about; a key takes an email as a lookup key and never
+ * receives one (`docs/public-api.md`, "Data exposure"). Dropping the key here,
+ * at the one place a stored row becomes a response, keeps the stored entry
+ * whole for the dashboard and the promise at the boundary that makes it.
+ */
+const WITHHELD_METADATA_KEYS: ReadonlySet<string> = new Set(["email"]);
+
+const toPublicApiMetadata = (
+  metadata: TAuditMetadata | null
+): TAuditMetadata | null => {
+  if (metadata === null) {
+    return null;
+  }
+
+  return Object.fromEntries(
+    Object.entries(metadata).filter(([key]) => !WITHHELD_METADATA_KEYS.has(key))
+  );
+};
+
 /** One entry as the audit-log endpoint returns it. */
 export const toPublicApiAuditLogEntry = (
   entry: PublicApiAuditLogSource
@@ -99,7 +125,7 @@ export const toPublicApiAuditLogEntry = (
   changes: entry.changes,
   denialReason: entry.denialReason,
   id: entry.id,
-  metadata: entry.metadata,
+  metadata: toPublicApiMetadata(entry.metadata),
   occurredAt: entry.occurredAt,
   outcome: entry.outcome,
   resourceId: entry.resourceId,

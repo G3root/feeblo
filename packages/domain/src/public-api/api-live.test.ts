@@ -1041,6 +1041,56 @@ layer(makeTestApp())("public api v1", (it) => {
     })
   );
 
+  it.effect("withholds a contact's email from audit metadata", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.auditLogTable).values({
+        id: "alog_contact",
+        organizationId: workspace.organizationId,
+        occurredAt: now,
+        recordedAt: now,
+        actorType: "user",
+        actorUserId: "user_audit_actor",
+        actorTokenId: null,
+        actorLabel: null,
+        actorRole: "admin",
+        affectedUserId: null,
+        source: "dashboard",
+        action: "contact.created",
+        outcome: "allowed",
+        denialReason: null,
+        resourceType: "contact",
+        resourceId: "cnt_audit_contact",
+        changes: null,
+        // What the dashboard's writer records for a contact; the address is a
+        // lookup key on this API and never a returned field.
+        metadata: { email: "ada@example.com", name: "Ada Lovelace" },
+        requestId: null,
+        originIp: null,
+        originCountry: null,
+        userAgent: null,
+      });
+
+      registerKey("fbk_audit_contact", workspace.organizationId, {
+        audit_log: ["read"],
+      });
+
+      const response = yield* executeRequest(
+        "/api/v1/audit-log",
+        "fbk_audit_contact"
+      );
+
+      expect(response.status).toBe(200);
+      expect(
+        decodeAuditLogPage(responseBody(response)).data[0]?.metadata
+      ).toEqual({ name: "Ada Lovelace" });
+      expect(responseBody(response)).not.toContain("ada@example.com");
+    })
+  );
+
   it.effect("creates a post, trimming its title and sanitizing its body", () =>
     Effect.gen(function* () {
       const workspace = yield* seedWorkspace();
