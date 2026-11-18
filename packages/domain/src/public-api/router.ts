@@ -2,6 +2,7 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
 import { AuditLogRecorder } from "../audit-log/recorder";
+import { AuditLogRepository } from "../audit-log/repository";
 import { BoardRepository } from "../board/repository";
 import { ChangelogRepository } from "../changelog/repository";
 import { CommentRepository } from "../comments/repository";
@@ -68,6 +69,10 @@ export const PublicApiInternals = Layer.mergeAll(
   // with the rest of the surface's private dependencies rather than being a
   // requirement every operation carries.
   AuditLogRecorder.layer,
+  // The log's read surface calls the repository's keyset page directly. The
+  // recorder builds the same static layer internally; Effect memoizes it, so
+  // the writer and the reader share one repository and one database handle.
+  AuditLogRepository.layer,
   BoardRepository.layer,
   ChangelogRepository.layer,
   CompanyRepository.layer,

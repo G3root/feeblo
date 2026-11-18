@@ -23,6 +23,7 @@ import {
 } from "./middleware";
 import { makePublicApiRoute } from "./router";
 import {
+  PublicApiAuditLogPage,
   PublicApiBoard,
   PublicApiBoardPage,
   PublicApiChangelog,
@@ -82,6 +83,10 @@ const OpenApiDocument = Schema.Struct({
 
 const decodePage = Schema.decodeUnknownSync(
   Schema.fromJsonString(PublicApiPostPage)
+);
+
+const decodeAuditLogPage = Schema.decodeUnknownSync(
+  Schema.fromJsonString(PublicApiAuditLogPage)
 );
 
 const decodeBoard = Schema.decodeUnknownSync(
@@ -815,6 +820,274 @@ layer(makeTestApp())("public api v1", (it) => {
       });
       expect(rows[0]?.actorTokenId).not.toBeNull();
       expect(rows[0]?.metadata).toEqual({ scope: "posts.read" });
+    })
+  );
+
+  it.effect("reads the audit log only with the audit_log.read scope", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const other = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+      const earlier = dateAt(now.getTime() - 60_000);
+
+      yield* db.insert(schema.auditLogTable).values([
+        {
+          id: "alog_older",
+          organizationId: workspace.organizationId,
+          occurredAt: earlier,
+          recordedAt: earlier,
+          actorType: "user",
+          actorUserId: "user_audit_actor",
+          actorTokenId: null,
+          actorLabel: null,
+          actorRole: "admin",
+          affectedUserId: null,
+          source: "dashboard",
+          action: "post.updated",
+          outcome: "allowed",
+          denialReason: null,
+          resourceType: "post",
+          resourceId: workspace.postId,
+          changes: {
+            before: { title: "Old" },
+            after: { title: "New" },
+            fields: ["title"],
+          },
+          metadata: { board: workspace.boardId },
+          // Forensics the public DTO must not echo.
+          requestId: "req_must_not_leak",
+          originIp: "203.0.113.7",
+          originCountry: "DE",
+          userAgent: "forensics-agent/1.0",
+        },
+        {
+          id: "alog_newer",
+          organizationId: workspace.organizationId,
+          occurredAt: now,
+          recordedAt: now,
+          actorType: "api_key",
+          actorUserId: null,
+          actorTokenId: "apikey_audit_actor",
+          actorLabel: "Sync key",
+          actorRole: null,
+          affectedUserId: null,
+          source: "public_api",
+          action: "board.exported",
+          outcome: "allowed",
+          denialReason: null,
+          resourceType: "board",
+          resourceId: workspace.boardId,
+          changes: null,
+          metadata: { format: "csv" },
+          requestId: null,
+          originIp: null,
+          originCountry: null,
+          userAgent: null,
+        },
+        {
+          id: "alog_other_workspace",
+          organizationId: other.organizationId,
+          occurredAt: now,
+          recordedAt: now,
+          actorType: "user",
+          actorUserId: "user_other_workspace",
+          actorTokenId: null,
+          actorLabel: null,
+          actorRole: "admin",
+          affectedUserId: null,
+          source: "dashboard",
+          action: "post.deleted",
+          outcome: "allowed",
+          denialReason: null,
+          resourceType: "post",
+          resourceId: other.postId,
+          changes: null,
+          metadata: null,
+          requestId: null,
+          originIp: null,
+          originCountry: null,
+          userAgent: null,
+        },
+      ]);
+
+      // A default key reads feedback; the log is an administrator's view and is
+      // never part of the default grant.
+      registerKey("fbk_audit_default", workspace.organizationId);
+
+      const refused = yield* executeRequest(
+        "/api/v1/audit-log",
+        "fbk_audit_default"
+      );
+
+      expect(refused.status).toBe(403);
+      expect(decodeError(responseBody(refused))._tag).toBe("FORBIDDEN_SCOPE");
+      expect(decodeError(responseBody(refused)).message).toContain(
+        "audit_log.read"
+      );
+
+      registerKey("fbk_audit_reader", workspace.organizationId, {
+        audit_log: ["read"],
+      });
+
+      // One page at a time, so the cursor is exercised on the log's own
+      // `(occurredAt, id)` ordering rather than assumed from another list.
+      const firstResponse = yield* executeRequest(
+        "/api/v1/audit-log?limit=1",
+        "fbk_audit_reader"
+      );
+
+      expect(firstResponse.status).toBe(200);
+      const first = decodeAuditLogPage(responseBody(firstResponse));
+      expect(first.data.map((entry) => entry.id)).toEqual(["alog_newer"]);
+      expect(first.data[0]).toMatchObject({
+        action: "board.exported",
+        actionLabel: "Exported board",
+        actorId: "apikey_audit_actor",
+        actorLabel: "Sync key",
+        actorType: "api_key",
+        changes: null,
+        metadata: { format: "csv" },
+        outcome: "allowed",
+        resourceId: workspace.boardId,
+        resourceType: "board",
+        source: "public_api",
+      });
+      expect(first.nextCursor).not.toBeNull();
+
+      const secondResponse = yield* executeRequest(
+        `/api/v1/audit-log?limit=1&cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
+        "fbk_audit_reader"
+      );
+
+      expect(secondResponse.status).toBe(200);
+      const second = decodeAuditLogPage(responseBody(secondResponse));
+      expect(second.data.map((entry) => entry.id)).toEqual(["alog_older"]);
+      expect(second.data[0]?.actorId).toBe("user_audit_actor");
+      expect(second.data[0]?.actionLabel).toBe("Updated post");
+      expect(second.data[0]?.changes).toEqual({
+        after: { title: "New" },
+        before: { title: "Old" },
+        fields: ["title"],
+      });
+      expect(second.nextCursor).toBeNull();
+
+      // The request's origin, the user agent, the request id and the workspace
+      // are not part of the published entry; another workspace's log is not in
+      // the page at all.
+      const raw = responseBody(firstResponse) + responseBody(secondResponse);
+
+      for (const forbidden of [
+        "organizationId",
+        "originIp",
+        "originCountry",
+        "userAgent",
+        "requestId",
+        "req_must_not_leak",
+        "203.0.113.7",
+        "forensics-agent",
+        "alog_other_workspace",
+      ]) {
+        expect(raw).not.toContain(forbidden);
+      }
+
+      // A cursor that does not decode is the caller's mistake rather than a
+      // silent first page, and an action the catalog does not declare is
+      // refused rather than answered as an empty page.
+      const malformed = yield* executeRequest(
+        "/api/v1/audit-log?cursor=not-a-cursor",
+        "fbk_audit_reader"
+      );
+
+      expect(malformed.status).toBe(400);
+      expect(decodeError(responseBody(malformed))._tag).toBe("INVALID_REQUEST");
+
+      const unknownAction = yield* executeRequest(
+        "/api/v1/audit-log?action=post.exploded",
+        "fbk_audit_reader"
+      );
+
+      expect(unknownAction.status).toBe(400);
+      expect(decodeError(responseBody(unknownAction))._tag).toBe(
+        "INVALID_REQUEST"
+      );
+
+      // The actor-type filter narrows the page to the credential that acted,
+      // and a date that does not exist is refused rather than rolled into
+      // March; a `kind` outside the two halves is refused for the same reason.
+      const byActorType = yield* executeRequest(
+        "/api/v1/audit-log?actorType=api_key",
+        "fbk_audit_reader"
+      );
+
+      expect(byActorType.status).toBe(200);
+      expect(
+        decodeAuditLogPage(responseBody(byActorType)).data.map(
+          (entry) => entry.id
+        )
+      ).toEqual(["alog_newer"]);
+
+      for (const query of ["since=2026-02-30", "kind=everything"]) {
+        const refusedQuery = yield* executeRequest(
+          `/api/v1/audit-log?${query}`,
+          "fbk_audit_reader"
+        );
+
+        expect(refusedQuery.status, query).toBe(400);
+        expect(decodeError(responseBody(refusedQuery))._tag, query).toBe(
+          "INVALID_REQUEST"
+        );
+      }
+    })
+  );
+
+  it.effect("withholds a contact's email from audit metadata", () =>
+    Effect.gen(function* () {
+      const workspace = yield* seedWorkspace();
+      const db = yield* currentDb;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.auditLogTable).values({
+        id: "alog_contact",
+        organizationId: workspace.organizationId,
+        occurredAt: now,
+        recordedAt: now,
+        actorType: "user",
+        actorUserId: "user_audit_actor",
+        actorTokenId: null,
+        actorLabel: null,
+        actorRole: "admin",
+        affectedUserId: null,
+        source: "dashboard",
+        action: "contact.created",
+        outcome: "allowed",
+        denialReason: null,
+        resourceType: "contact",
+        resourceId: "cnt_audit_contact",
+        changes: null,
+        // What the dashboard's writer records for a contact; the address is a
+        // lookup key on this API and never a returned field.
+        metadata: { email: "ada@example.com", name: "Ada Lovelace" },
+        requestId: null,
+        originIp: null,
+        originCountry: null,
+        userAgent: null,
+      });
+
+      registerKey("fbk_audit_contact", workspace.organizationId, {
+        audit_log: ["read"],
+      });
+
+      const response = yield* executeRequest(
+        "/api/v1/audit-log",
+        "fbk_audit_contact"
+      );
+
+      expect(response.status).toBe(200);
+      expect(
+        decodeAuditLogPage(responseBody(response)).data[0]?.metadata
+      ).toEqual({ name: "Ada Lovelace" });
+      expect(responseBody(response)).not.toContain("ada@example.com");
     })
   );
 
@@ -4941,6 +5214,7 @@ layer(makeTestApp())("public api v1", (it) => {
       expect(response.status).toBe(200);
       const document = decodeDocument(responseBody(response));
       expect(Object.keys(document.paths).sort()).toEqual([
+        "/api/v1/audit-log",
         "/api/v1/boards",
         "/api/v1/boards/{boardId}",
         "/api/v1/boards/{boardId}/posts",

@@ -100,6 +100,8 @@ const operations = Object.entries(document.paths).flatMap(([path, item]) =>
   })
 );
 
+const AUDIT_LOG_PATH = "/api/v1/audit-log";
+
 const BOARDS_PATH = "/api/v1/boards";
 
 const BOARD_PATH = "/api/v1/boards/{boardId}";
@@ -168,6 +170,7 @@ describe("PublicApi contract", () => {
   it("publishes exactly the documented endpoints", () => {
     expect(Object.keys(document.paths).sort()).toEqual(
       [
+        AUDIT_LOG_PATH,
         BOARDS_PATH,
         BOARD_PATH,
         LIST_PATH,
@@ -206,6 +209,7 @@ describe("PublicApi contract", () => {
     // what puts the sections in a deliberate order rather than the order the
     // endpoints happen to be declared in.
     expect(document.tags.map((tag) => tag.name)).toEqual([
+      "Audit log",
       "Boards",
       "Changelog",
       "Comments",
@@ -229,6 +233,7 @@ describe("PublicApi contract", () => {
         ...new Set(operations.flatMap(({ operation }) => operation.tags ?? [])),
       ].sort()
     ).toEqual([
+      "Audit log",
       "Boards",
       "Changelog",
       "Comments",
@@ -282,6 +287,71 @@ describe("PublicApi contract", () => {
       expect(operation.security, `${method.toUpperCase()} ${path}`).toEqual([
         { apiKey: [] },
       ]);
+    }
+  });
+
+  it("documents the audit log without request forensics", () => {
+    const operation = document.paths[AUDIT_LOG_PATH]?.get;
+    const responses = operation?.responses ?? {};
+
+    // Reading the log is a read: it cannot collide with anything and cannot
+    // name a missing resource.
+    expect(Object.keys(responses).sort()).toEqual(READ_RESPONSE_CODES);
+    expect(JSON.stringify(responses)).not.toContain("CONFLICT");
+
+    // The filters an operator uses to answer "who changed this, and when".
+    const names = (operation?.parameters ?? []).map(
+      (parameter) => parameter.name
+    );
+
+    expect(names.sort()).toEqual([
+      "action",
+      "actorType",
+      "cursor",
+      "kind",
+      "limit",
+      "outcome",
+      "since",
+      "until",
+    ]);
+
+    const body = JSON.stringify(responses["200"]);
+
+    for (const field of [
+      "id",
+      "action",
+      "actionLabel",
+      "outcome",
+      "denialReason",
+      "actorType",
+      "actorId",
+      "actorLabel",
+      "source",
+      "resourceType",
+      "resourceId",
+      "changes",
+      "metadata",
+      "occurredAt",
+      "nextCursor",
+    ]) {
+      expect(body).toContain(field);
+    }
+
+    // The row also carries the request's origin, the user agent and the
+    // request id. They are administrator forensics, not part of an entry an
+    // integration exports, and neither is the workspace the key already names
+    // or the two actor columns this contract collapses into `actorId`.
+    for (const forbidden of [
+      "originIp",
+      "originCountry",
+      "userAgent",
+      "requestId",
+      "organizationId",
+      "actorUserId",
+      "actorTokenId",
+      "recordedAt",
+    ]) {
+      expect(body).not.toContain(forbidden);
     }
   });
 

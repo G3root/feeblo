@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as Layer from "effect/Layer";
 
+import { auditLogHandlers } from "../audit-log/public-api/http";
 import { boardHandlers } from "../board/public-api/http";
 import { changelogHandlers } from "../changelog/public-api/http";
 import { commentHandlers } from "../comments/public-api/http";
@@ -39,7 +40,7 @@ const captureDependencies = <A>(
  *
  * One group per resource, because a group is what carries the resource's tag
  * and its middleware; `HttpApiBuilder.group` is per-group, so this is the one
- * place that names all nine. A handler added to `post` is an edit to
+ * place that names all ten. A handler added to `post` is an edit to
  * `post/http.ts` and nothing else, so two changes to different resources do
  * not collide; a whole resource is one entry per list below.
  *
@@ -50,6 +51,11 @@ const captureDependencies = <A>(
  * caller and nothing else.
  */
 export const PublicApiLive = Layer.mergeAll(
+  HttpApiBuilder.group(PublicApi, "Audit log", (handlers) =>
+    captureDependencies((context) =>
+      handlers.handleAll(auditLogHandlers(context))
+    )
+  ),
   HttpApiBuilder.group(PublicApi, "Boards", (handlers) =>
     captureDependencies((context) => handlers.handleAll(boardHandlers(context)))
   ),
