@@ -83,7 +83,7 @@ type ProductboardEntity = Schema.Schema.Type<typeof ProductboardEntity>;
 const ProductboardPage = Schema.Struct({
   data: Schema.Array(ProductboardEntity),
   links: Schema.optionalKey(
-    Schema.Struct({ next: Schema.optionalKey(Schema.String) })
+    Schema.Struct({ next: Schema.optionalKey(Schema.NullOr(Schema.String)) })
   ),
 });
 
@@ -207,22 +207,37 @@ const fetchPage = ({
 
     const nextRaw = body.links?.next;
 
-    if (nextRaw === undefined) {
+    if (nextRaw === undefined || nextRaw === null) {
       return { entities: body.data, next: null };
     }
 
-    const next = new URL(nextRaw, PRODUCTBOARD_ORIGIN);
+    const next = yield* Effect.try({
+      try: () => new URL(nextRaw, PRODUCTBOARD_ORIGIN),
+      catch: () =>
+        new DataImportProviderResponseError({
+          message: `${label} returned an invalid pagination link.`,
+          provider: PRODUCTBOARD_PROVIDER_ID,
+        }),
+    });
 
-    return {
-      entities: body.data,
-      next: next.origin === PRODUCTBOARD_ORIGIN ? next.toString() : null,
-    };
+    if (next.origin !== PRODUCTBOARD_ORIGIN) {
+      return yield* new DataImportProviderResponseError({
+        message: `${label} returned a pagination link outside its API.`,
+        provider: PRODUCTBOARD_PROVIDER_ID,
+      });
+    }
+
+    return { entities: body.data, next: next.toString() };
   });
 
 /**
  * Reads every entity of one kind. `type[]` is Productboard's filter; a
  * `feature` and a `subfeature` are both features to this importer, so the
  * caller walks the rest of the graph to name their board.
+ *
+ * The filter asks for `feature` only. Subfeatures are still understood when
+ * the API returns them, but there is no workspace capability probe to safely
+ * request `type[]=subfeature` from every workspace.
  */
 const listEntities = (
   token: string,
@@ -234,11 +249,34 @@ const listEntities = (
 > =>
   Effect.gen(function* () {
     const collected: CollectedEntity[] = [];
+    const visited = new Set<string>();
+    let pages = 0;
 
     let url: string | null =
       `${PRODUCTBOARD_ORIGIN}/v2/entities?type[]=${type}`;
 
     while (url !== null) {
+      // A repeated URL is a cycle even when the links differ at first; the
+      // cap stops a provider that keeps inventing new pages instead.
+      if (visited.has(url)) {
+        return yield* new DataImportProviderResponseError({
+          message:
+            "Productboard repeated a pagination link. The import was stopped before it looped.",
+          provider: PRODUCTBOARD_PROVIDER_ID,
+        });
+      }
+
+      if (pages >= 500) {
+        return yield* new DataImportProviderResponseError({
+          message:
+            "Productboard returned too many pages to import. Contact support so this can be raised.",
+          provider: PRODUCTBOARD_PROVIDER_ID,
+        });
+      }
+
+      visited.add(url);
+      pages += 1;
+
       const page: {
         readonly entities: readonly ProductboardEntity[];
         readonly next: string | null;
@@ -256,11 +294,7 @@ const listEntities = (
         }
       }
 
-      if (collected.length > DATA_IMPORT_MAX_ROWS) {
-        return collected;
-      }
-
-      url = page.entities.length > 0 ? page.next : null;
+      url = page.next;
     }
 
     return collected;

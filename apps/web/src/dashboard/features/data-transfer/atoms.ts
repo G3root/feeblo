@@ -35,6 +35,13 @@ export const dataImportProvidersAtom = Atom.family((organizationId: string) =>
   )
 );
 
+/**
+ * One shared mutation atom for starting a provider import. The sources
+ * section serializes submissions through its own lock, including after a
+ * dialog closes, because two in-flight writes would otherwise contend for the
+ * atom's single result slot. The workspace's active-import slot is the
+ * server-side backstop.
+ */
 export const startProviderDataImportAtom = DashboardClient.mutation(
   "StartProviderDataImport"
 );

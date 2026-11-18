@@ -6,6 +6,7 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import {
   DataImportProviderCredentialError,
   DataImportProviderEmptyError,
+  DataImportProviderResponseError,
 } from "../errors";
 import { makeProductboardImportProvider } from "./productboard";
 
@@ -37,7 +38,7 @@ const entity = (overrides: Partial<EntityFixture>): EntityFixture => ({
 type ResponseBody =
   | {
       readonly data: readonly EntityFixture[];
-      readonly links?: { readonly next: string };
+      readonly links?: { readonly next: string | null };
     }
   | { readonly message: string };
 
@@ -64,7 +65,7 @@ const pagedClient = (
       string,
       readonly {
         readonly data: readonly EntityFixture[];
-        readonly links?: { readonly next: string };
+        readonly links?: { readonly next: string | null };
       }[]
     >
   >
@@ -215,6 +216,117 @@ describe("Productboard import adapter", () => {
       );
 
       expect(error).toBeInstanceOf(DataImportProviderEmptyError);
+    })
+  );
+
+  it.effect("treats a null next link as the end of the list", () =>
+    Effect.gen(function* () {
+      const adapter = makeProductboardImportProvider({
+        httpClient: pagedClient({
+          feature: [
+            {
+              data: [entity({ id: "f-1" })],
+              links: { next: null },
+            },
+          ],
+        }),
+      });
+
+      const result = yield* adapter.fetchPosts({
+        credentials: { apiKey: "a-token" },
+      });
+
+      expect(result.rows).toHaveLength(1);
+    })
+  );
+
+  it.effect("rejects a malformed next link", () =>
+    Effect.gen(function* () {
+      const adapter = makeProductboardImportProvider({
+        httpClient: pagedClient({
+          feature: [
+            {
+              data: [entity({ id: "f-1" })],
+              links: { next: "http://[" },
+            },
+          ],
+        }),
+      });
+
+      const error = yield* Effect.flip(
+        adapter.fetchPosts({ credentials: { apiKey: "a-token" } })
+      );
+
+      expect(error).toBeInstanceOf(DataImportProviderResponseError);
+    })
+  );
+
+  it.effect("rejects a next link that leaves the API origin", () =>
+    Effect.gen(function* () {
+      const adapter = makeProductboardImportProvider({
+        httpClient: pagedClient({
+          feature: [
+            {
+              data: [entity({ id: "f-1" })],
+              links: { next: "https://example.com/v2/entities?page=2" },
+            },
+          ],
+        }),
+      });
+
+      const error = yield* Effect.flip(
+        adapter.fetchPosts({ credentials: { apiKey: "a-token" } })
+      );
+
+      expect(error).toBeInstanceOf(DataImportProviderResponseError);
+    })
+  );
+
+  it.effect("rejects a repeated pagination link instead of looping", () =>
+    Effect.gen(function* () {
+      const repeated =
+        "https://api.productboard.com/v2/entities?type[]=feature";
+
+      const adapter = makeProductboardImportProvider({
+        httpClient: pagedClient({
+          feature: [
+            {
+              data: [entity({ id: "f-1" })],
+              links: { next: repeated },
+            },
+          ],
+        }),
+      });
+
+      const error = yield* Effect.flip(
+        adapter.fetchPosts({ credentials: { apiKey: "a-token" } })
+      );
+
+      expect(error).toBeInstanceOf(DataImportProviderResponseError);
+    })
+  );
+
+  it.effect("follows a next link even when a page has no entities", () =>
+    Effect.gen(function* () {
+      const adapter = makeProductboardImportProvider({
+        httpClient: pagedClient({
+          feature: [
+            {
+              data: [],
+              links: {
+                next: "https://api.productboard.com/v2/entities?type[]=feature&page=2",
+              },
+            },
+            { data: [entity({ id: "f-2" })] },
+          ],
+        }),
+      });
+
+      const result = yield* adapter.fetchPosts({
+        credentials: { apiKey: "a-token" },
+      });
+
+      expect(result.rows).toHaveLength(1);
     })
   );
 

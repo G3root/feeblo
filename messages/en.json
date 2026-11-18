@@ -116,6 +116,7 @@
   "data_import_sources_busy_hint": "Finish or cancel the current import before starting another.",
   "data_import_sources_description": "Move existing requests in from another tool or a file. Every source stages a preview first; nothing is written until you confirm.",
   "data_import_sources_load_failed": "Import sources could not be loaded. Refresh the page to try again.",
+  "data_import_sources_starting_hint": "An import is starting. Wait for it to finish before choosing another source.",
   "data_import_sources_title": "Import feedback",
   "data_import_staged_description": "Nothing has been written yet. Review the rows, then confirm the import.",
   "data_import_staged_title": "Ready to review",

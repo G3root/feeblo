@@ -23,7 +23,7 @@ async function stageCsv(page: Page, name: string, contents: string) {
   await dialog.getByRole("button", { name: "Stage import" }).click();
 
   await expect(dialog.getByText("Ready to review")).toBeVisible();
-  await dialog.getByRole("button", { name: "Close" }).click();
+  await dialog.getByText("Close", { exact: true }).click();
 }
 
 test.describe("data import", () => {
@@ -33,7 +33,7 @@ test.describe("data import", () => {
     const owner = await createAuthenticatedWorkspace(page);
     await page.goto(dataSettingsUrl(owner.organizationUrl));
 
-    await expect(page.getByText("CSV file")).toBeVisible();
+    await expect(page.getByText("CSV file", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Import from Canny" })
     ).toBeVisible();

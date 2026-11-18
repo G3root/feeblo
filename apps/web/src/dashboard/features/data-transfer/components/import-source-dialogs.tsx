@@ -146,11 +146,13 @@ function ImportDisclosure({
 export function CsvImportDialog({
   onOpenChange,
   onStaged,
+  onStartingChange,
   open,
   organizationId,
 }: {
   readonly onOpenChange: (open: boolean) => void;
   readonly onStaged: (job: TDataImportJobSummary) => void;
+  readonly onStartingChange: (starting: boolean) => void;
   readonly open: boolean;
   readonly organizationId: string;
 }) {
@@ -193,38 +195,49 @@ export function CsvImportDialog({
       return;
     }
 
-    await start.run(async () => {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("organizationId", organizationId);
+    onStartingChange(true);
 
-      const response = await fetch(`${dataTransferApiBase()}/api/data/import`, {
-        body,
-        credentials: "include",
-        method: "POST",
+    try {
+      await start.run(async () => {
+        const body = new FormData();
+        body.append("file", file);
+        body.append("organizationId", organizationId);
+
+        const response = await fetch(
+          `${dataTransferApiBase()}/api/data/import`,
+          {
+            body,
+            credentials: "include",
+            method: "POST",
+          }
+        );
+
+        if (!response.ok) {
+          const message = await errorEnvelopeMessage(response);
+
+          throw new Error(message ?? m.data_import_csv_failed());
+        }
+
+        const payload: unknown = await response.json();
+
+        // SAFETY: the endpoint contract returns a DataImportJobSummary; the
+        // schema rejects drift instead of letting it reach the review panel.
+        // This is a React event handler, not Effect code, so the Option is
+        // the recovery path.
+        // eslint-disable-next-line effecttsgo/schema-sync -- non-Effect React boundary
+        const decoded =
+          Schema.decodeUnknownOption(DataImportJobSummary)(payload);
+
+        if (Option.isNone(decoded)) {
+          throw new Error(m.data_import_csv_failed());
+        }
+
+        setStagedJob(decoded.value);
+        onStaged(decoded.value);
       });
-
-      if (!response.ok) {
-        const message = await errorEnvelopeMessage(response);
-
-        throw new Error(message ?? m.data_import_csv_failed());
-      }
-
-      const payload: unknown = await response.json();
-      // SAFETY: the endpoint contract returns a DataImportJobSummary; the
-      // schema rejects drift instead of letting it reach the review panel.
-      // This is a React event handler, not Effect code, so the Option is the
-      // recovery path.
-      // eslint-disable-next-line effecttsgo/schema-sync -- non-Effect React boundary
-      const decoded = Schema.decodeUnknownOption(DataImportJobSummary)(payload);
-
-      if (Option.isNone(decoded)) {
-        throw new Error(m.data_import_csv_failed());
-      }
-
-      setStagedJob(decoded.value);
-      onStaged(decoded.value);
-    });
+    } finally {
+      onStartingChange(false);
+    }
   };
 
   return (
@@ -374,12 +387,14 @@ export function CsvImportDialog({
 export function ProviderImportDialog({
   onOpenChange,
   onStaged,
+  onStartingChange,
   open,
   organizationId,
   provider,
 }: {
   readonly onOpenChange: (open: boolean) => void;
   readonly onStaged: (job: TDataImportJobSummary) => void;
+  readonly onStartingChange: (starting: boolean) => void;
   readonly open: boolean;
   readonly organizationId: string;
   readonly provider: TDataImportProviderDescriptor;
@@ -419,18 +434,24 @@ export function ProviderImportDialog({
       ),
     },
     onSubmit: async ({ value }) => {
-      await start.run(async () => {
-        const job = await startImport({
-          payload: {
-            credentials: value,
-            organizationId,
-            provider: provider.id,
-          },
-        });
+      onStartingChange(true);
 
-        setStagedJob(job);
-        onStaged(job);
-      });
+      try {
+        await start.run(async () => {
+          const job = await startImport({
+            payload: {
+              credentials: value,
+              organizationId,
+              provider: provider.id,
+            },
+          });
+
+          setStagedJob(job);
+          onStaged(job);
+        });
+      } finally {
+        onStartingChange(false);
+      }
     },
   });
 

@@ -498,10 +498,15 @@ export function DataSettingsPage() {
 
   const cancelImport = useAtomSet(cancelDataImportAtom, { mode: "promise" });
   const jobs = useTransferJobs(organizationId);
+
   // The watch stream can lag one tick behind an import that just staged; the
   // local copy keeps the card honest until the list catches up, and disappears
-  // once it does.
-  const [localJob, setLocalJob] = useState<TDataImportJobSummary | null>(null);
+  // once it does. It carries its organization because a settings route can
+  // change workspace without unmounting this page.
+  const [localJob, setLocalJob] = useState<{
+    readonly job: TDataImportJobSummary;
+    readonly organizationId: string;
+  } | null>(null);
 
   const [cancelTarget, setCancelTarget] =
     useState<TDataImportJobSummary | null>(null);
@@ -511,8 +516,9 @@ export function DataSettingsPage() {
   const listedActive = jobs.find((job) => isActiveStatus(job.status)) ?? null;
 
   const unlistedLocal =
-    localJob !== null && !jobs.some((job) => job.id === localJob.id)
-      ? localJob
+    localJob?.organizationId === organizationId &&
+    !jobs.some((job) => job.id === localJob.job.id)
+      ? localJob.job
       : null;
 
   const activeJob = listedActive ?? unlistedLocal;
@@ -533,7 +539,7 @@ export function DataSettingsPage() {
     try {
       await cancelImport({ payload: { id: cancelTarget.id, organizationId } });
       setLocalJob((current) =>
-        current?.id === cancelTarget.id ? null : current
+        current?.job.id === cancelTarget.id ? null : current
       );
       setCancelTarget(null);
     } catch {
@@ -588,7 +594,7 @@ export function DataSettingsPage() {
             </div>
             <ImportSourcesSection
               disabled={activeJob !== null}
-              onStaged={setLocalJob}
+              onStaged={(job) => setLocalJob({ job, organizationId })}
               organizationId={organizationId}
             />
             {activeJob === null ? null : (

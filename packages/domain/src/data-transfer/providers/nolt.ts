@@ -2,7 +2,10 @@ import * as Effect from "effect/Effect";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
+import type * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Stream from "effect/Stream";
 
 import { parseCsvGrid } from "../csv";
 import type { ParsedBoardPostRow } from "../csv";
@@ -200,6 +203,66 @@ const toRows = (
   }));
 };
 
+/**
+ * Reads a response body while it streams, failing as soon as the bytes exceed
+ * the import cap. The old `response.text` read the whole body first, so a
+ * provider (or a proxy pretending to be one) could make the importer allocate
+ * far past the limit before the check ran.
+ */
+const readBoundedBody = (
+  response: HttpClientResponse.HttpClientResponse
+): Effect.Effect<string, DataImportProviderError> =>
+  Effect.gen(function* () {
+    const entries = yield* response.stream.pipe(
+      Stream.mapAccum(
+        () => 0,
+        (total, chunk) => {
+          const next = total + chunk.byteLength;
+
+          return [
+            next,
+            [{ chunk, exceeds: next > DATA_IMPORT_MAX_BYTES }],
+          ] as const;
+        }
+      ),
+      Stream.takeUntil((entry) => entry.exceeds),
+      Stream.runCollect,
+      Effect.mapError(
+        () =>
+          new DataImportProviderResponseError({
+            cause: new Error("Nolt response body could not be read."),
+            message:
+              "Nolt returned a response this importer could not read. Check the key and try again.",
+            provider: NOLT_PROVIDER_ID,
+          })
+      )
+    );
+
+    const collected = Array.from(entries);
+
+    if (collected.at(-1)?.exceeds === true) {
+      return yield* new DataImportProviderResponseError({
+        message: `Nolt's export is larger than ${Math.round(
+          DATA_IMPORT_MAX_BYTES / (1024 * 1024)
+        )} MB. Import a smaller board or split it first.`,
+        provider: NOLT_PROVIDER_ID,
+      });
+    }
+
+    const bytes = new Uint8Array(
+      collected.reduce((total, entry) => total + entry.chunk.byteLength, 0)
+    );
+
+    let offset = 0;
+
+    for (const entry of collected) {
+      bytes.set(entry.chunk, offset);
+      offset += entry.chunk.byteLength;
+    }
+
+    return new TextDecoder("utf-8").decode(bytes);
+  });
+
 const makeNoltImportProvider = (options: {
   readonly httpClient?: HttpClient.HttpClient | undefined;
 }): ImportProviderAdapter => {
@@ -237,31 +300,16 @@ const makeNoltImportProvider = (options: {
       const response = yield* executeProviderRequest({
         label: PROVIDER_LABELS.nolt,
         provider: NOLT_PROVIDER_ID,
-        request: HttpClientRequest.get(
-          `${origin}/api/csv?apikey=${encodeURIComponent(apiKey)}`
-        ).pipe(HttpClientRequest.accept("text/csv")),
+        request: HttpClientRequest.get(`${origin}/api/csv`).pipe(
+          // Redacted values are sent unwrapped but stay redacted in
+          // inspection, errors and client spans, so the key can stay in the
+          // query string without reaching telemetry.
+          HttpClientRequest.setUrlParam("apikey", Redacted.make(apiKey)),
+          HttpClientRequest.accept("text/csv")
+        ),
       });
 
-      const text = yield* response.text.pipe(
-        Effect.mapError(
-          () =>
-            new DataImportProviderResponseError({
-              cause: new Error("Nolt response body could not be read."),
-              message:
-                "Nolt returned a response this importer could not read. Check the key and try again.",
-              provider: NOLT_PROVIDER_ID,
-            })
-        )
-      );
-
-      if (text.length > DATA_IMPORT_MAX_BYTES) {
-        return yield* new DataImportProviderResponseError({
-          message: `Nolt's export is larger than ${Math.round(
-            DATA_IMPORT_MAX_BYTES / (1024 * 1024)
-          )} MB. Import a smaller board or split it first.`,
-          provider: NOLT_PROVIDER_ID,
-        });
-      }
+      const text = yield* readBoundedBody(response);
 
       const grid = yield* parseCsvGrid(text).pipe(
         Effect.mapError(

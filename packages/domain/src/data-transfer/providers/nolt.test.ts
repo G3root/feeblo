@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
+import * as UrlParams from "effect/http/UrlParams";
 
 import {
   DataImportProviderCredentialError,
@@ -9,6 +10,7 @@ import {
   DataImportProviderRateLimitedError,
   DataImportProviderResponseError,
 } from "../errors";
+import { DATA_IMPORT_MAX_BYTES } from "../limits";
 import { makeNoltImportProvider, resolveNoltBoardOrigin } from "./nolt";
 
 const textResponse = (
@@ -147,6 +149,50 @@ describe("Nolt import adapter", () => {
       );
 
       expect(error).toBeInstanceOf(DataImportProviderEmptyError);
+    })
+  );
+
+  it.effect("sends the key unwrapped in the query", () =>
+    Effect.gen(function* () {
+      let requestQuery = "";
+
+      const adapter = makeNoltImportProvider({
+        httpClient: HttpClient.make((request) => {
+          requestQuery = UrlParams.toString(request.urlParams);
+
+          return Effect.succeed(
+            textResponse(
+              request,
+              200,
+              [CSV_HEADER, "n-1,A post,Body,,,0,,,,"].join("\n")
+            )
+          );
+        }),
+      });
+
+      yield* adapter.fetchPosts({
+        credentials: { apiKey: "a-key", boardUrl: "acme.nolt.io" },
+      });
+
+      expect(requestQuery).toContain("apikey=a-key");
+    })
+  );
+
+  it.effect("refuses an export past the byte cap", () =>
+    Effect.gen(function* () {
+      const oversized = `"${"x".repeat(DATA_IMPORT_MAX_BYTES)}"`;
+
+      const adapter = makeNoltImportProvider({
+        httpClient: csvResponse([oversized]),
+      });
+
+      const error = yield* Effect.flip(
+        adapter.fetchPosts({
+          credentials: { apiKey: "a-key", boardUrl: "acme.nolt.io" },
+        })
+      );
+
+      expect(error).toBeInstanceOf(DataImportProviderResponseError);
     })
   );
 

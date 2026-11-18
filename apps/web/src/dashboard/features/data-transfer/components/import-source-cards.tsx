@@ -150,15 +150,26 @@ export function ImportSourcesSection({
 }) {
   const { failed, providers } = useImportProviders(organizationId);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   const [openProvider, setOpenProvider] =
     useState<TDataImportProviderDescriptor | null>(null);
+
+  // A submission holds this lock until it settles, not until its dialog
+  // closes: the mutation atom is shared, so a second start while the first is
+  // in flight could receive the first request's result.
+  const sourcesDisabled = disabled || isStarting;
 
   return (
     <>
       {disabled ? (
         <p className="text-muted-foreground text-xs">
           {m.data_import_sources_busy_hint()}
+        </p>
+      ) : null}
+      {isStarting ? (
+        <p className="text-muted-foreground text-xs">
+          {m.data_import_sources_starting_hint()}
         </p>
       ) : null}
       {failed ? (
@@ -175,7 +186,7 @@ export function ImportSourcesSection({
             m.data_import_csv_chip_author(),
           ]}
           description={m.data_import_csv_card_description()}
-          disabled={disabled}
+          disabled={sourcesDisabled}
           icon={FileSpreadsheetIcon}
           onAction={() => setCsvOpen(true)}
           title={m.data_import_csv_card_title()}
@@ -187,7 +198,7 @@ export function ImportSourcesSection({
             })}
             chips={provider.carries}
             description={provider.tagline}
-            disabled={disabled}
+            disabled={sourcesDisabled}
             icon={PROVIDER_ICONS[provider.id]}
             iconClassName={`size-4 ${PROVIDER_ICON_TONES[provider.id]}`}
             key={provider.id}
@@ -197,12 +208,15 @@ export function ImportSourcesSection({
         ))}
       </div>
 
-      <CsvImportDialog
-        onOpenChange={setCsvOpen}
-        onStaged={onStaged}
-        open={csvOpen}
-        organizationId={organizationId}
-      />
+      {csvOpen ? (
+        <CsvImportDialog
+          onOpenChange={setCsvOpen}
+          onStaged={onStaged}
+          onStartingChange={setIsStarting}
+          open
+          organizationId={organizationId}
+        />
+      ) : null}
       {openProvider === null ? null : (
         <ProviderImportDialog
           onOpenChange={(open) => {
@@ -211,6 +225,7 @@ export function ImportSourcesSection({
             }
           }}
           onStaged={onStaged}
+          onStartingChange={setIsStarting}
           open
           organizationId={organizationId}
           provider={openProvider}
