@@ -14,6 +14,8 @@ export const WidgetBoard = S.Struct({
   id: S.String,
   name: S.String,
   slug: S.String,
+  /** A Tabler name chosen in the dashboard; null uses the client default. */
+  icon: S.NullOr(S.String),
   organizationId: S.String,
   createdAt: S.DateFromString,
   updatedAt: S.DateFromString,

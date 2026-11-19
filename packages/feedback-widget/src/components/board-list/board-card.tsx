@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 
 import type { Board } from "../../lib/boards";
 import { Icon } from "../ui/icon";
+import { TablerIcon } from "../ui/tabler-icon";
 
 export function BoardCard(props: { board: Board }) {
   return (
@@ -10,6 +11,10 @@ export function BoardCard(props: { board: Board }) {
       draggable={false}
       href={`/board/${props.board.id}`}
     >
+      <TablerIcon
+        class="text-muted-foreground size-4"
+        name={props.board.icon ?? "layout-grid"}
+      />
       <span class="min-w-0 flex-1 truncate">{props.board.name}</span>
       <Icon class="text-muted-foreground/50 size-4" name="ArrowRight01Icon" />
     </A>
