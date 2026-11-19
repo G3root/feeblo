@@ -17,7 +17,7 @@ import { subscriptionRevocationMaintenance } from "@feeblo/domain/billing/revoca
 import { PolarService } from "@feeblo/domain/billing/service";
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { HelpCenterArticleRepository } from "@feeblo/domain/help-center-article/repository";
-import { helpCenterArticleViewRetention } from "@feeblo/domain/help-center-article/retention";
+import { helpCenterRetention } from "@feeblo/domain/help-center-article/retention";
 import { WebhookIntegrationConfig } from "@feeblo/domain/integration/config";
 import { DiscordIntegrationConfig } from "@feeblo/domain/integration/discord/config";
 import { ExternalResourceServiceLive } from "@feeblo/domain/integration/external-resource/live";
@@ -238,7 +238,8 @@ export const program = Effect.gen(function* () {
 
   // The help center's read events age out on the same terms, for the same
   // reason: the counter beside them is the number a customer reads and is never
-  // pruned, so the events only need to answer the recent window.
+  // pruned, so the events only need to answer the recent window. The same pass
+  // prunes the search buckets, whose key is the reader's text.
   //
   // Off means nothing writes a read event, so the sweep is not scheduled at
   // all — the same rule the audit-log sweep below applies.
@@ -247,7 +248,7 @@ export const program = Effect.gen(function* () {
       HelpCenterArticleRepository.layer
     );
 
-    yield* helpCenterArticleViewRetention.pipe(
+    yield* helpCenterRetention.pipe(
       Effect.provide(helpCenterTrafficRuntime),
       Effect.forkScoped
     );

@@ -425,9 +425,12 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         const now = yield* DateTime.now;
 
+        // A window of N days is N dates *including* today, so the first day
+        // is `today - (N - 1)`. Subtracting N would make "7 days" an
+        // eight-date range and quietly widen every number the panel shows.
         const since = DateTime.formatIsoDateUtc(
           DateTime.subtract({
-            days: HELP_CENTER_ANALYTICS_RANGE_DAYS[args.range],
+            days: HELP_CENTER_ANALYTICS_RANGE_DAYS[args.range] - 1,
           })(now)
         );
 

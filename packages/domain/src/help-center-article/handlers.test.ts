@@ -14,6 +14,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import { TestClock } from "effect/testing";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
@@ -622,6 +623,13 @@ describe("HelpCenterArticleRpcHandlers", () => {
           query: "invoicing",
         });
 
+        // Punctuation is not a search: there is no term a full-text index
+        // could match, so counting it would put noise in the gaps list.
+        yield* handlers.SearchHelpCenterArticlesPublic({
+          organizationId: fixture.organizationId,
+          query: "!!!",
+        });
+
         const rows = yield* (
           db
             .select({
@@ -647,6 +655,61 @@ describe("HelpCenterArticleRpcHandlers", () => {
           { emptySearches: 1, query: "invoicing", searches: 1 },
           { emptySearches: 0, query: "password", searches: 2 },
         ]);
+      })
+    );
+
+    it.effect("counts a window of N days as N dates ending today", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const id = yield* HelpCenterArticleId.generate;
+
+        yield* create(fixture, id, "Windowed article", "windowed-article");
+
+        // Pin the clock: the handler reads "now" through `Clock`, and the
+        // assertion is about which days that puts inside the window.
+        yield* TestClock.setTime(
+          DateTime.toEpochMillis(
+            DateTime.makeUnsafe("2026-03-10T12:00:00.000Z")
+          )
+        );
+
+        yield* db.insert(schema.helpCenterArticleDailyTable).values([
+          // Seven days back is outside a window that starts six days back.
+          {
+            articleId: id,
+            day: "2026-03-03",
+            organizationId: fixture.organizationId,
+            views: 1,
+          },
+          // The window's first day, inclusive.
+          {
+            articleId: id,
+            day: "2026-03-04",
+            organizationId: fixture.organizationId,
+            views: 2,
+          },
+          {
+            articleId: id,
+            day: "2026-03-10",
+            organizationId: fixture.organizationId,
+            views: 4,
+          },
+        ]);
+
+        const analytics = yield* handlers
+          .GetHelpCenterAnalytics({
+            organizationId: fixture.organizationId,
+            range: "7d",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        // 10 March minus six days: the first of seven dates, today included.
+        expect(analytics.since).toBe("2026-03-04");
+        expect(analytics.totals.views).toBe(6);
+        expect(analytics.articles[0]?.views).toBe(6);
       })
     );
 
@@ -892,6 +955,77 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
           expect(state?.embeddingModel).toBe("test-embedding");
           expect(state?.embeddedAt).not.toBeNull();
+        })
+      );
+
+      it.effect("clears the vector when the text changes, and only then", () =>
+        Effect.gen(function* () {
+          const repository = yield* HelpCenterArticleRepository;
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const id = yield* HelpCenterArticleId.generate;
+          const now = yield* DateTime.nowAsDate;
+
+          yield* create(fixture, id, "Original title", "original-title");
+
+          const current = yield* readContent(id);
+
+          if (current === undefined) {
+            return yield* Effect.die(new Error("fixture article missing"));
+          }
+
+          yield* repository.saveEmbedding({
+            articleId: id,
+            content: current.content,
+            model: "test-embedding",
+            now,
+            organizationId: fixture.organizationId,
+            title: current.title,
+            vector: unitVector(0),
+          });
+
+          // A reorder is not a text change: the vector still describes the
+          // words on the page, so it is kept.
+          yield* handlers
+            .UpdateHelpCenterArticle({
+              content: current.content,
+              expectedStatus: "published",
+              id,
+              organizationId: fixture.organizationId,
+              position: 5,
+              publishedAt: null,
+              slug: "original-title",
+              status: "published",
+              title: current.title,
+              topicId: fixture.topicId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const afterMove = yield* readEmbeddingState(id);
+
+          expect(afterMove?.embedding).not.toBeNull();
+
+          yield* handlers
+            .UpdateHelpCenterArticle({
+              content: `${current.content}\n\nOne more line.`,
+              expectedStatus: "published",
+              id,
+              organizationId: fixture.organizationId,
+              position: 5,
+              publishedAt: null,
+              slug: "original-title",
+              status: "published",
+              title: current.title,
+              topicId: fixture.topicId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          const afterEdit = yield* readEmbeddingState(id);
+
+          // Keeping it would let a search match words the article no longer
+          // has, until the detached refresh lands.
+          expect(afterEdit?.embedding).toBeNull();
         })
       );
 

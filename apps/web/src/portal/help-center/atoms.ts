@@ -1,3 +1,4 @@
+import type { THelpCenterArticleSearchPublic } from "@feeblo/domain/help-center-article/schema";
 import * as Atom from "effect/reactivity/Atom";
 
 import { DashboardClient, dashboardSWR } from "@/lib/atom-rpc";
@@ -45,10 +46,17 @@ export const helpCenterArticlesPublicAtom = Atom.family(
     ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
-export type HelpCenterSearchAtomArgs = {
-  readonly organizationId: string;
-  readonly query: string;
-};
+/**
+ * The portal's search arguments.
+ *
+ * Derivable from `THelpCenterArticleSearchPublic` the way the dashboard's are,
+ * but declared plainly here: the portal has one such atom, and a shared helper
+ * for one call would be more indirection than the derivation is worth.
+ */
+export type HelpCenterSearchAtomArgs = Readonly<{
+  organizationId: string;
+  query: string;
+}>;
 
 /**
  * The portal's search.
@@ -64,9 +72,14 @@ export type HelpCenterSearchAtomArgs = {
  */
 export const helpCenterSearchPublicAtom = Atom.family(
   (args: HelpCenterSearchAtomArgs) =>
+    // No stale-while-revalidate here, unlike the reads above. Those answer
+    // "what is in the help center", so a revalidation on focus keeps them
+    // current; this one answers "what matches this text", and only the text
+    // changing should ask again. The idle TTL still drops an entry once the
+    // reader has stopped typing, which is the only invalidation it needs.
     DashboardClient.query("SearchHelpCenterArticlesPublic", args, {
       reactivityKeys: helpCenterPublicReactivityKeys(args.organizationId),
-    }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("1 minute"))
+    }).pipe(Atom.setIdleTTL("1 minute"))
 );
 
 export type HelpCenterArticlePublicAtomArgs = {

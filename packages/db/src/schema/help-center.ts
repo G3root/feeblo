@@ -458,10 +458,12 @@ export const helpCenterArticleDailyTable = pgTable(
  * `export  csv` as two rows with one search each.
  *
  * The composite key includes `query`, so the table grows with distinct queries
- * rather than with searches. A help center sees human-entered text, where
- * distinct-by-day is bounded by what people actually ask; there is no retention
- * pass, and this is the table that would need one first if that assumption ever
- * stops holding.
+ * rather than with searches: a help center sees human-entered text, where
+ * distinct-by-day is bounded by what people actually ask. That bound is not a
+ * guarantee, so rows are pruned by day after `HELP_CENTER_SEARCH_RETENTION_DAYS`
+ * (90) by the help center's daily retention pass — the same window as the raw
+ * view events, and one day longer than the longest analytics range, so the
+ * sweep can never delete a bucket a panel still reports on.
  */
 export const helpCenterSearchDailyTable = pgTable(
   "help_center_search_daily",

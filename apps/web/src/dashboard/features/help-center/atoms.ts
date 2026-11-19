@@ -1,7 +1,24 @@
-import type { THelpCenterAnalyticsRange } from "@feeblo/domain/help-center-article/schema";
+import type {
+  THelpCenterAnalyticsPayload,
+  THelpCenterAnalyticsRange,
+  THelpCenterArticleSearch,
+} from "@feeblo/domain/help-center-article/schema";
 import * as Atom from "effect/reactivity/Atom";
 
 import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
+
+/**
+ * The client's view of an operation's payload.
+ *
+ * Derived from the domain type with the branded id widened to `string`: the
+ * brand exists so a server route cannot pass one id where another belongs, and
+ * a React prop is not that boundary. Every other field comes from the
+ * operation, so a field it gains is a field this atom sends rather than one it
+ * silently omits.
+ */
+type ClientPayload<T extends { readonly organizationId: string }> = Readonly<
+  Omit<T, "organizationId"> & { readonly organizationId: string }
+>;
 
 /**
  * The editor's single-article read is Effect Atom, not `useQuery`.
@@ -63,10 +80,16 @@ export const deleteHelpCenterArticleAtom = DashboardClient.mutation(
   "DeleteHelpCenterArticle"
 );
 
-export type HelpCenterAnalyticsAtomArgs = {
-  readonly organizationId: string;
-  readonly range: THelpCenterAnalyticsRange;
-};
+/**
+ * The analytics read's arguments, derived from the operation's payload.
+ *
+ * `Codec.Encoded` rather than the payload's decoded type: this is what the
+ * client actually sends, and the decoded side brands `organizationId`, which a
+ * React prop is not. Deriving it means a field the operation gains is a field
+ * this panel sends, instead of one it silently leaves out.
+ */
+export type HelpCenterAnalyticsAtomArgs =
+  ClientPayload<THelpCenterAnalyticsPayload>;
 
 /** The window the panel opens on. */
 export const DEFAULT_HELP_CENTER_ANALYTICS_RANGE =
@@ -88,10 +111,11 @@ export const helpCenterAnalyticsAtom = Atom.family(
     }).pipe(dashboardSWR("60 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
-export type HelpCenterSearchAtomArgs = {
-  readonly organizationId: string;
-  readonly query: string;
-};
+/** The same rule as the analytics args: derived from the operation. */
+export type HelpCenterSearchAtomArgs = Pick<
+  ClientPayload<THelpCenterArticleSearch>,
+  "organizationId" | "query"
+>;
 
 /**
  * The dashboard's article search.

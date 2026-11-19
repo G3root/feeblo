@@ -180,12 +180,14 @@ function TrafficTotals({
 
   return (
     <div className="grid gap-3 sm:grid-cols-3">
+      {/*
+       * No article count here. `articles` is the top ten by views, so a count
+       * of it would read as "the help center has ten articles" on any
+       * workspace bigger than that. The views total is the whole window and
+       * needs no such qualifier.
+       */}
       <Stat
-        detail={`Across ${
-          analytics.articles.length === 1
-            ? "1 article"
-            : `${analytics.articles.length} articles`
-        } in the last ${RANGE_LABELS[range]}`}
+        detail={`In the last ${RANGE_LABELS[range]}`}
         label="Views"
         value={totals.views}
       />

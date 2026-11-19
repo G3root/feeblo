@@ -522,8 +522,17 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     expectedStatus: THelpCenterArticleState;
     now: Date;
     write: NormalizedHelpCenterArticleWrite;
-  }) =>
-    db
+  }) => {
+    /**
+     * Whether this statement is changing the text an embedding describes.
+     *
+     * A `SET` expression reads the row as it was, so this compares the stored
+     * title and body against the ones being written — one statement, no read
+     * before it and no race between the two.
+     */
+    const textChanged = sql`${article.title} is distinct from ${write.title} or ${article.content} is distinct from ${write.content}`;
+
+    return db
       .update(article)
       .set({
         topicId,
@@ -535,6 +544,16 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         status: write.status,
         publishedAt: write.publishedAt,
         updatedAt: now,
+        // A vector describes the text it was generated from. Clearing it here,
+        // in the same statement that changes the text, closes the window in
+        // which a search could match words the article no longer has; the
+        // detached job fills it again. Only a text change clears it — a
+        // reorder, a retitle of the topic or a status move leaves the
+        // article's meaning, and therefore its vector, alone. The three
+        // columns move together because the table's check requires them to.
+        embedding: sql`case when ${textChanged} then null else ${article.embedding} end`,
+        embeddingModel: sql`case when ${textChanged} then null else ${article.embeddingModel} end`,
+        embeddedAt: sql`case when ${textChanged} then null else ${article.embeddedAt} end`,
       })
       .where(
         and(
@@ -545,6 +564,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
       )
       .returning({ id: article.id })
       .pipe(Effect.map((rows) => rows.map((row) => row.id)));
+  };
 
   const remove = ({
     organizationId,
@@ -652,6 +672,15 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     });
 
   /**
+   * Drop search buckets older than `before`.
+   *
+   * `before` is a `YYYY-MM-DD` day rather than an instant, because the key is a
+   * calendar day and the analytics windows are inclusive ranges of them.
+   */
+  const deleteSearchesBefore = (before: string) =>
+    db.delete(searchDaily).where(lt(searchDaily.day, before));
+
+  /**
    * Drop the raw events older than `before`.
    *
    * The counter is untouched: it is the all-time number and outlives the
@@ -685,7 +714,11 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
   }) => {
     const normalized = normalizeHelpCenterSearchQuery(query);
 
-    if (normalized.length === 0) {
+    // No terms means nothing a full-text index could ever match — a box the
+    // reader filled with punctuation, or one they cleared. Recording it would
+    // put noise in "top searches" and in "documentation gaps", and the
+    // potential gaps are the list someone is expected to act on.
+    if (helpCenterSearchTerms(normalized).length === 0) {
       return Effect.void;
     }
 
@@ -823,6 +856,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
   return {
     analytics,
     deleteEventsBefore,
+    deleteSearchesBefore,
     findMany,
     findManyPublic,
     findById,

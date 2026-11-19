@@ -1,6 +1,7 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import type { THelpCenterArticleSearchHit } from "@feeblo/domain/help-center-article/schema";
 import { Badge } from "@feeblo/ui/badge";
+import { Button } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
   InputGroup,
@@ -76,8 +77,9 @@ function SearchResults({
     [organizationId, query]
   );
 
-  const result = useAtomValue(helpCenterSearchAtom(args));
-  const hits = Result.getOrElse(result, () => []);
+  const atom = helpCenterSearchAtom(args);
+  const result = useAtomValue(atom);
+  const refresh = useAtomRefresh(atom);
 
   if (Result.isInitial(result)) {
     return (
@@ -87,6 +89,24 @@ function SearchResults({
       </div>
     );
   }
+
+  // A failed request is not an empty result. Reporting "no article matches"
+  // for a request that never completed would send an editor off to write a
+  // page that already exists.
+  if (Result.isFailure(result)) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+        <p className="text-muted-foreground text-sm">
+          Search could not be loaded.
+        </p>
+        <Button onClick={refresh} size="sm" type="button" variant="outline">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const hits = Result.getOrElse(result, () => []);
 
   if (hits.length === 0) {
     return (

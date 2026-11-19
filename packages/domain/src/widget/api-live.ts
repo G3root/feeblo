@@ -432,12 +432,12 @@ export const WidgetApiLive = HttpApiBuilder.group(
         )
         .handle("helpArticles", ({ payload }) =>
           findWidgetHelpArticles(payload).pipe(
-            // A search that fails is answered as "nothing to offer", not as an
-            // error: the composer's primary job is creating feedback, and a
-            // documentation hint that cannot be fetched must not block it.
-            Effect.catchCause(() =>
-              Effect.succeed({ articles: [], enabled: false })
-            ),
+            // A failure propagates, and the client's own `failed` state keeps
+            // the panel empty without latching `enabled: false`. Swallowing it
+            // into `enabled: false` would tell the widget the workspace has no
+            // help center — permanently, for that session — on a transient
+            // database error. Creating feedback is a separate request, so a
+            // failed hint cannot block it either way.
             provideHandlerEnvironment,
             RateLimit.withPublicHttpRateLimit({
               name: "WidgetHelpArticles",

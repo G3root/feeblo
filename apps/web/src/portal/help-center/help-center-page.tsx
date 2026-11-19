@@ -1,7 +1,9 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
+import type { THelpCenterArticleSearchResult } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Badge } from "@feeblo/ui/badge";
+import { Button } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
   Empty,
@@ -172,18 +174,20 @@ export function HelpCenterPage() {
   );
 }
 
+/**
+ * One article in a topic's list, or one search hit.
+ *
+ * The fields come from the public search projection rather than being restated:
+ * a list row is that same projection plus counters, so the two surfaces cannot
+ * drift into rendering different fields from the same article.
+ */
+type ArticleRowItem = Pick<
+  THelpCenterArticleSearchResult,
+  "excerpt" | "id" | "isArchived" | "slug" | "title"
+>;
+
 /** One article in a topic's list. */
-function ArticleRow({
-  article,
-}: {
-  article: {
-    readonly id: string;
-    readonly slug: string;
-    readonly title: string;
-    readonly excerpt: string;
-    readonly isArchived: boolean;
-  };
-}) {
+function ArticleRow({ article }: { article: ArticleRowItem }) {
   return (
     <li>
       <Link
@@ -229,9 +233,9 @@ function HelpCenterSearchResults({
     [organizationId, query]
   );
 
-  const result = useAtomValue(helpCenterSearchPublicAtom(args));
-
-  const hits = Result.getOrElse(result, () => []);
+  const atom = helpCenterSearchPublicAtom(args);
+  const result = useAtomValue(atom);
+  const refresh = useAtomRefresh(atom);
 
   if (Result.isInitial(result)) {
     return (
@@ -242,6 +246,23 @@ function HelpCenterSearchResults({
       </div>
     );
   }
+
+  // A failed request is not "nothing matches": telling a reader the answer does
+  // not exist because the network dropped is worse than saying so.
+  if (Result.isFailure(result)) {
+    return (
+      <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border px-4 py-3">
+        <p className="text-muted-foreground text-sm">
+          Search could not be loaded.
+        </p>
+        <Button onClick={refresh} size="sm" type="button" variant="outline">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const hits = Result.getOrElse(result, () => []);
 
   if (hits.length === 0) {
     return (

@@ -73,12 +73,12 @@ The widget's deflection passes `strict`, which restricts the lexical match to th
 
 ## Analytics
 
-The panel on the dashboard's help center index reads two day-bucketed tables over a 7, 30 or 90 day window:
+The panel on the dashboard's help center index reads two day-bucketed tables over a 7, 30 or 90 day window. A window of N days is N UTC dates **including today**, so its first day is `today - (N - 1)`; the boundary is pinned by a test that writes one bucket on the first included day and one on the day before it.
 
 - `help_center_article_daily` counts views and verdicts per article per UTC day. The view counter moves inside the same transaction as the all-time counter, so the two cannot disagree. The verdict counters count verdicts **cast** that day, not the standing distribution — a flip adds an unhelpful to today and leaves the earlier helpful where it was. The standing distribution is the feedback table's own `count(*)`, and a second, slower-moving copy of it here would be a number that disagrees with the article page.
 - `help_center_search_daily` counts searches and how many of them returned nothing, keyed on the normalized query. Both numbers live in one row so "what people look for" and "what we do not document" cannot disagree about how many searches there were.
 
-Writes to either table are **advisory**: a failure is logged and swallowed, because a reader's search must not fail because an analytics write did, and a verdict must not be lost because its bucket was. The search write is the only public read that writes at all.
+Writes to either table are **advisory**: a failure is logged and swallowed, because a reader's search must not fail because an analytics write did, and a verdict must not be lost because its bucket was. The search write is the only public read that writes at all. A query with no searchable term — punctuation, or a box the reader cleared — is not recorded: it can never match, so counting it would put noise in both "top searches" and the gaps list.
 
 ## Widget deflection
 
@@ -92,7 +92,7 @@ The feature ships behind `HELP_CENTER` in `packages/domain/src/feature-flags.ts`
 
 - `help-center/flag.ts` exposes `HelpCenterEnabled`, a `Context.Reference` defaulting to the flag. Tests provide `true`; production reads the default.
 - `helpCenterFeatureGate` is a **public** policy (the portal has no session to check) that fails with `PolicyDeniedError`, which every operation already declares — so the flag adds no new error vocabulary at the RPC boundary. It is applied **last** in each handler's pipe, which makes it the outermost check: a deployment with the feature off refuses before it reads a row or spends a rate-limit token.
-- The raw-event retention loop is forked only when the flag is on, matching the audit sweep: with the feature off nothing writes a read event, so a daily pass would only wake the worker to delete nothing.
+- The retention loop is forked only when the flag is on, matching the audit sweep: with the feature off nothing writes a read event or a search, so a daily pass would only wake the worker to delete nothing. The same loop prunes both tables — raw read events older than 90 days, and search buckets whose day is older than 90 days. The day comparison is `day < cutoff`, so the cut day itself survives; with a 90-day window and a 90-day analytics range that starts 89 days back, the sweep can never delete a bucket a panel still reports on.
 - Every surface asks the same flag: the dashboard nav entry, the mobile tab, the settings section, the three dashboard routes and the settings route (an "unavailable" state for a deep link, not a 404), the portal pages, the portal nav tab, `sitemap.xml`, `llms.txt`, and the article page's SSR metadata.
 
 Turning it on is therefore a single-line change with no migration: no article can exist while the gate is closed, so `site.help_center_visibility` defaulting to `PUBLIC` cannot publish anything on the day the flag flips.
