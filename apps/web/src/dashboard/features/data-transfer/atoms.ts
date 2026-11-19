@@ -22,6 +22,31 @@ export type DataTransferBoard = Atom.Success<
 >[number];
 
 /**
+ * The import sources this deployment offers.
+ *
+ * The catalog is a server RPC rather than a list in this bundle so a new
+ * provider ships as an adapter and a descriptor on the server, and its card
+ * and credential form appear without a web release.
+ */
+export const dataImportProvidersAtom = Atom.family((organizationId: string) =>
+  DashboardClient.query("ListDataImportProviders", { organizationId }).pipe(
+    dashboardSWR("5 minutes"),
+    Atom.setIdleTTL("30 minutes")
+  )
+);
+
+/**
+ * One shared mutation atom for starting a provider import. The sources
+ * section serializes submissions through its own lock, including after a
+ * dialog closes, because two in-flight writes would otherwise contend for the
+ * atom's single result slot. The workspace's active-import slot is the
+ * server-side backstop.
+ */
+export const startProviderDataImportAtom = DashboardClient.mutation(
+  "StartProviderDataImport"
+);
+
+/**
  * The workspace's import jobs, newest first.
  *
  * This is a watch RPC rather than a query: the server re-reads the list on an

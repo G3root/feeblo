@@ -413,7 +413,9 @@ export function ImportReviewPage({
 
       await downloadResponse(
         response,
-        `${job.fileName.replace(csvFileNamePattern, "")}-import-problems.csv`
+        `${job.fileName
+          .replace(csvFileNamePattern, "")
+          .replace(/\s+import$/iu, "")}-import-problems.csv`
       );
     } catch {
       toastManager.add({ title: m.sunny_kind_gecko(), type: "error" });
@@ -503,6 +505,26 @@ export function ImportReviewPage({
             ) : null}
           </div>
         </div>
+
+        {awaiting ? (
+          <Alert variant="info">
+            <AlertTitle>{m.data_import_review_pending_title()}</AlertTitle>
+            <AlertDescription>
+              {m.data_import_review_pending_description({
+                count: plannedRowCount(job),
+              })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        {job.status === "completed" ? (
+          <Alert variant="success">
+            <AlertTitle>{m.data_import_review_completed_title()}</AlertTitle>
+            <AlertDescription>
+              {m.data_import_review_completed_description()}
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         {job.status === "running" || job.status === "queued" ? (
           <Card>

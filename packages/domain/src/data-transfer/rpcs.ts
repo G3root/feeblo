@@ -4,6 +4,7 @@ import * as Schema from "effect/Schema";
 
 import { AuthMiddleware } from "../session-middleware";
 import { DataTransferServiceErrors } from "./errors";
+import { DataImportProviderDescriptor } from "./provider-schema";
 import {
   DataImportCancel,
   DataImportConfirm,
@@ -11,6 +12,8 @@ import {
   DataImportJobDetail,
   DataImportJobSummary,
   DataImportList,
+  DataImportProviderList,
+  DataImportProviderStart,
 } from "./schema";
 
 /**
@@ -24,6 +27,20 @@ export class DataTransferRpcs extends RpcGroup.make(
     error: DataTransferServiceErrors,
     payload: DataImportList,
     success: Schema.Array(DataImportJobSummary),
+  }).middleware(AuthMiddleware),
+  // The provider import's two controls: what this deployment offers, and the
+  // one call that fetches a provider's posts and stages them. Both stay RPCs
+  // on purpose — a provider API key must not travel through the dashboard's
+  // file-transfer routes, which are for bytes a browser already holds.
+  Rpc.make("ListDataImportProviders", {
+    error: DataTransferServiceErrors,
+    payload: DataImportProviderList,
+    success: Schema.Array(DataImportProviderDescriptor),
+  }).middleware(AuthMiddleware),
+  Rpc.make("StartProviderDataImport", {
+    error: DataTransferServiceErrors,
+    payload: DataImportProviderStart,
+    success: DataImportJobSummary,
   }).middleware(AuthMiddleware),
   Rpc.make("GetDataImport", {
     error: DataTransferServiceErrors,

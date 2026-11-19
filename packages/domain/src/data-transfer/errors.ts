@@ -7,6 +7,7 @@ import {
   InternalServerError,
   UnauthorizedError,
 } from "../rpc-errors";
+import { DataImportProviderId } from "./provider-schema";
 
 /**
  * The file is not a board CSV this feature can read: not UTF-8 text, an
@@ -103,6 +104,97 @@ export class DataTransferRepositoryError extends Schema.TaggedError<DataTransfer
   { identifier: "DataTransferRepositoryError" }
 ) {}
 
+/**
+ * The caller named an import provider this deployment does not offer. Distinct
+ * from a credential failure: no key could fix it, and the provider list RPC is
+ * the authority on what is available.
+ */
+export class UnknownDataImportProviderError extends Schema.TaggedError<UnknownDataImportProviderError>()(
+  "UnknownDataImportProviderError",
+  {
+    provider: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 400, identifier: "UnknownDataImportProviderError" }
+) {}
+
+/**
+ * The provider refused the credential. The message is static and names the
+ * provider; the credential itself is never echoed, hashed into an error, or
+ * written to a job.
+ */
+export class DataImportProviderCredentialError extends Schema.TaggedError<DataImportProviderCredentialError>()(
+  "DataImportProviderCredentialError",
+  {
+    provider: DataImportProviderId,
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+  },
+  { httpApiStatus: 400, identifier: "DataImportProviderCredentialError" }
+) {}
+
+/**
+ * The provider's rate limit stopped the fetch before a job was staged. The
+ * adapter does not wait out an hourly window inside an RPC: the caller gets
+ * the wait the provider asked for and can try again after it.
+ */
+export class DataImportProviderRateLimitedError extends Schema.TaggedError<DataImportProviderRateLimitedError>()(
+  "DataImportProviderRateLimitedError",
+  {
+    provider: DataImportProviderId,
+    cause: Schema.optionalKey(Schema.Defect()),
+    /** The provider's `Retry-After`, in seconds, when it sent one. */
+    retryAfterSeconds: Schema.NullOr(Schema.Finite),
+    message: Schema.String,
+  },
+  { httpApiStatus: 429, identifier: "DataImportProviderRateLimitedError" }
+) {}
+
+/** The provider could not be reached, or answered a server failure. */
+export class DataImportProviderUnavailableError extends Schema.TaggedError<DataImportProviderUnavailableError>()(
+  "DataImportProviderUnavailableError",
+  {
+    provider: DataImportProviderId,
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+  },
+  { httpApiStatus: 502, identifier: "DataImportProviderUnavailableError" }
+) {}
+
+/**
+ * The provider answered, but not in a shape this importer can read. The cause
+ * is a provider API change or a permission that hides a field, never a value
+ * from the response body.
+ */
+export class DataImportProviderResponseError extends Schema.TaggedError<DataImportProviderResponseError>()(
+  "DataImportProviderResponseError",
+  {
+    provider: DataImportProviderId,
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+  },
+  { httpApiStatus: 502, identifier: "DataImportProviderResponseError" }
+) {}
+
+/** The credential is valid but the provider account has no posts to import. */
+export class DataImportProviderEmptyError extends Schema.TaggedError<DataImportProviderEmptyError>()(
+  "DataImportProviderEmptyError",
+  {
+    provider: DataImportProviderId,
+    cause: Schema.optionalKey(Schema.Defect()),
+    message: Schema.String,
+  },
+  { httpApiStatus: 422, identifier: "DataImportProviderEmptyError" }
+) {}
+
+/** The complete failure vocabulary of one provider adapter. */
+export type DataImportProviderError =
+  | DataImportProviderCredentialError
+  | DataImportProviderRateLimitedError
+  | DataImportProviderUnavailableError
+  | DataImportProviderResponseError
+  | DataImportProviderEmptyError;
+
 /** The RPC surface's complete expected-failure vocabulary. */
 export const DataTransferServiceErrors = Schema.Union([
   UnauthorizedError,
@@ -117,5 +209,11 @@ export const DataTransferServiceErrors = Schema.Union([
   DataImportNotFoundError,
   DataTransferBoardNotFoundError,
   DataExportTooLargeError,
+  UnknownDataImportProviderError,
+  DataImportProviderCredentialError,
+  DataImportProviderRateLimitedError,
+  DataImportProviderUnavailableError,
+  DataImportProviderResponseError,
+  DataImportProviderEmptyError,
   LegidError,
 ]);

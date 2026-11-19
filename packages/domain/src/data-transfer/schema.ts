@@ -5,6 +5,8 @@ import {
 import { DataImportJobId } from "@feeblo/id";
 import * as S from "effect/Schema";
 
+import { DataImportProviderId } from "./provider-schema";
+
 /** One staged job as the dashboard lists and describes it. */
 export const DataImportJobSummary = S.Struct({
   id: S.String,
@@ -188,6 +190,34 @@ export const DataImportCancel = S.Struct({
 });
 
 export type TDataImportCancel = S.Schema.Type<typeof DataImportCancel>;
+
+/**
+ * The provider catalog is read per workspace because the permission gate is
+ * the workspace's: a member who cannot import posts is not shown a card that
+ * would only fail. The list itself is deployment-wide.
+ */
+export const DataImportProviderList = S.Struct({
+  organizationId: S.String,
+});
+
+export type TDataImportProviderList = S.Schema.Type<
+  typeof DataImportProviderList
+>;
+
+/**
+ * Starting a provider import: the provider key, and the values its descriptor
+ * declared. Credentials are used once, are never written to the job, and are
+ * the only thing on this surface that is not persisted.
+ */
+export const DataImportProviderStart = S.Struct({
+  organizationId: S.String,
+  provider: DataImportProviderId,
+  credentials: S.Record(S.String, S.String),
+});
+
+export type TDataImportProviderStart = S.Schema.Type<
+  typeof DataImportProviderStart
+>;
 
 /** The row report download's query: the job is the path segment. */
 export const DataImportProblemsQuery = S.Struct({

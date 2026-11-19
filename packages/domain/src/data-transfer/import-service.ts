@@ -15,23 +15,38 @@ import { PostStatusRepository } from "../post-status/repository";
 import { InternalServerError, withRemapDbErrors } from "../rpc-errors";
 import { CurrentSession } from "../session-middleware";
 import { decodeBoardPostCsv, parseBoardPostCsv } from "./csv";
+import type { ParsedBoardPostRow } from "./csv";
 import {
   ACTIVE_IMPORT_MESSAGE,
   DataImportAlreadyActiveError,
+  type DataImportProviderError,
   DataImportFileTooLargeError,
   DataImportNotConfirmableError,
   DataImportNotFoundError,
   DataImportRowLimitError,
   type DataTransferRepositoryError,
   InvalidBoardPostCsvError,
+  UnknownDataImportProviderError,
 } from "./errors";
-import { DATA_IMPORT_MAX_BYTES, DATA_IMPORT_WATCH_MS } from "./limits";
+import {
+  DATA_IMPORT_MAX_BYTES,
+  DATA_IMPORT_MAX_ROWS,
+  DATA_IMPORT_WATCH_MS,
+} from "./limits";
 import {
   canConfirmDataImportStatus,
   isActiveDataImportStatus,
 } from "./machine";
 import { planImportRows } from "./plan";
 import { canImportPosts } from "./policies";
+import {
+  type ImportProviderCredentials,
+  ImportProviderRegistry,
+} from "./provider";
+import type {
+  TDataImportProviderDescriptor,
+  TDataImportProviderId,
+} from "./provider-schema";
 import {
   type DataImportJobRecord,
   type DataImportReportSummary,
@@ -64,6 +79,18 @@ export type DataImportJobDetail = {
   readonly newBoards: readonly string[];
 };
 
+export type StageProviderImportInput = {
+  readonly organizationId: string;
+  readonly userId: string;
+  readonly memberId: string | null;
+  readonly provider: TDataImportProviderId;
+  readonly credentials: ImportProviderCredentials;
+};
+
+export type DataImportProviderErrors =
+  | UnknownDataImportProviderError
+  | DataImportProviderError;
+
 export type DescribeImportInput = {
   readonly organizationId: string;
   readonly id: string;
@@ -87,6 +114,36 @@ export type DataImportServiceContract = {
     | Policy.PolicyDeniedError
     | InternalServerError
     | LegidError,
+    CurrentSession
+  >;
+  /**
+   * Pulls every post a provider credential can see and stages it through the
+   * same planner as a CSV upload. Network work happens before the transaction,
+   * so a slow provider never holds a database connection. Only an RPC exposes
+   * this: provider credentials never travel over the dashboard's file routes.
+   */
+  readonly stageProviderImport: (
+    input: StageProviderImportInput
+  ) => Effect.Effect<
+    DataImportJobRecord,
+    | DataImportProviderErrors
+    | DataImportRowLimitError
+    | DataImportAlreadyActiveError
+    | Policy.PolicyDeniedError
+    | InternalServerError
+    | LegidError,
+    CurrentSession
+  >;
+  /**
+   * The providers this deployment offers. The dashboard renders this list, so
+   * adding a fourth provider is a server-side adapter rather than a release
+   * of the web app.
+   */
+  readonly listProviders: (input: {
+    readonly organizationId: string;
+  }) => Effect.Effect<
+    readonly TDataImportProviderDescriptor[],
+    Policy.PolicyDeniedError,
     CurrentSession
   >;
   readonly confirmImport: (input: {
@@ -150,6 +207,8 @@ export type DataImportServiceContract = {
 
 /** The most recent jobs a workspace sees, newest first. */
 const IMPORT_JOB_LIST_LIMIT = 20;
+
+const textEncoder = new TextEncoder();
 
 /** Normalizes a store failure to one stable internal failure. */
 const fromStore = <A, R>(
@@ -247,27 +306,30 @@ const makeDataImportService = Effect.gen(function* () {
   const boards = yield* BoardRepository;
   const statuses = yield* PostStatusRepository;
   const digest = yield* Digest.Digest;
+  const importProviders = yield* ImportProviderRegistry;
 
   /** SHA-256 of the uploaded file, hex encoded; the import's idempotency key. */
   const hashBytes = (bytes: Uint8Array) =>
     digest.digestHex(Digest.sha256, bytes);
 
-  const stageBoardImport: DataImportServiceContract["stageBoardImport"] = (
-    input
-  ) =>
-    Effect.gen(function* () {
-      if (input.bytes.byteLength > DATA_IMPORT_MAX_BYTES) {
-        return yield* new DataImportFileTooLargeError({
-          maxBytes: DATA_IMPORT_MAX_BYTES,
-          message: `The file is larger than ${Math.round(
-            DATA_IMPORT_MAX_BYTES / (1024 * 1024)
-          )} MB.`,
-        });
-      }
+  /**
+   * The fingerprint of a provider pull is text, not a file. Hashing it gives a
+   * provider import the same duplicate-upload warning a CSV gets without a
+   * second identity column.
+   */
+  const hashText = (value: string) =>
+    digest.digestHex(Digest.sha256, textEncoder.encode(value));
 
+  /**
+   * The workspace's one active-import slot. The unique index is the authority;
+   * this is the fast path, shared by both staging entry points so a provider
+   * pull and a file upload cannot disagree about when a workspace is busy.
+   */
+  const requireNoActiveImport = (organizationId: string) =>
+    Effect.gen(function* () {
       const hasActive = yield* fromStore(
         "hasActiveJob",
-        repository.hasActiveJob({ organizationId: input.organizationId })
+        repository.hasActiveJob({ organizationId })
       );
 
       if (hasActive) {
@@ -275,16 +337,40 @@ const makeDataImportService = Effect.gen(function* () {
           message: ACTIVE_IMPORT_MESSAGE,
         });
       }
+    });
+
+  type StageParsedRowsInput = {
+    readonly organizationId: string;
+    readonly userId: string;
+    readonly memberId: string | null;
+    readonly fileName: string;
+    readonly fileHash: string;
+    readonly parsed: {
+      readonly rows: readonly ParsedBoardPostRow[];
+      readonly notices: readonly string[];
+    };
+    readonly duplicateNotice: (importedAt: Date) => string;
+  };
+
+  /**
+   * The shared plan-and-stage step. A CSV upload and a provider pull differ in
+   * how they produce rows and a fingerprint; from there the board/status
+   * resolution, the row report and the confirmation gate are one pipeline, so
+   * a provider can never invent a second interpretation of a staged row.
+   */
+  const stageParsedRows = (input: StageParsedRowsInput) =>
+    Effect.gen(function* () {
+      if (input.parsed.rows.length > DATA_IMPORT_MAX_ROWS) {
+        return yield* new DataImportRowLimitError({
+          maxRows: DATA_IMPORT_MAX_ROWS,
+          message: `The import has ${input.parsed.rows.length} rows; the limit is ${DATA_IMPORT_MAX_ROWS}.`,
+        });
+      }
 
       // Imports are not scoped to a board: the `board` column routes every
       // row. The oldest board is the fallback for a row with an empty cell,
       // and is null only when the workspace has no boards at all. The read
       // and the sort happen here so the plan stays a pure function of them.
-      // The two workspace reads (boards and statuses) and the two file
-      // computations (decode and hash) each need nothing the other produces,
-      // so the pairs run together: two round trips for the reads and a
-      // concurrent decode instead of four steps in sequence. `Effect.all` is
-      // sequential unless told otherwise.
       const [existingBoards, statusRows] = yield* Effect.all(
         [
           boards
@@ -305,11 +391,6 @@ const makeDataImportService = Effect.gen(function* () {
 
       const [defaultBoard = null] = sortedBoards;
 
-      const [text, fileHash] = yield* Effect.all(
-        [decodeBoardPostCsv(input.bytes), hashBytes(input.bytes)],
-        { concurrency: "unbounded" }
-      );
-
       // The workspace's stored default, not the `PENDING` type: a workspace may
       // repoint which status is the default, and several statuses may share a
       // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several).
@@ -324,12 +405,10 @@ const makeDataImportService = Effect.gen(function* () {
         });
       }
 
-      const parsed = yield* parseBoardPostCsv(text);
-
       const prior = yield* fromStore(
         "findPriorJobByHash",
         repository.findPriorJobByHash({
-          fileHash,
+          fileHash: input.fileHash,
           organizationId: input.organizationId,
         })
       );
@@ -338,17 +417,13 @@ const makeDataImportService = Effect.gen(function* () {
         boards: sortedBoards,
         defaultBoard,
         defaultStatus,
-        rows: parsed.rows,
+        rows: input.parsed.rows,
         statuses: statusRows,
       });
 
       const priorNotices = Option.match(prior, {
         onNone: (): readonly string[] => [],
-        onSome: (job) => [
-          `This file was already imported on ${job.createdAt
-            .toISOString()
-            .slice(0, 10)}.`,
-        ],
+        onSome: (job) => [input.duplicateNotice(job.createdAt)],
       });
 
       const rows: readonly NewStagedImportRow[] = plan.rows.map((row) =>
@@ -374,9 +449,9 @@ const makeDataImportService = Effect.gen(function* () {
           createdByMemberId: input.memberId,
           createdByUserId: input.userId,
           fileName: input.fileName,
-          fileHash,
+          fileHash: input.fileHash,
           id: jobId,
-          notices: [...parsed.notices, ...plan.notices, ...priorNotices],
+          notices: [...input.parsed.notices, ...plan.notices, ...priorNotices],
           organizationId: input.organizationId,
           rows,
         })
@@ -389,7 +464,84 @@ const makeDataImportService = Effect.gen(function* () {
             )
           )
         );
+    });
+
+  const stageBoardImport: DataImportServiceContract["stageBoardImport"] = (
+    input
+  ) =>
+    Effect.gen(function* () {
+      if (input.bytes.byteLength > DATA_IMPORT_MAX_BYTES) {
+        return yield* new DataImportFileTooLargeError({
+          maxBytes: DATA_IMPORT_MAX_BYTES,
+          message: `The file is larger than ${Math.round(
+            DATA_IMPORT_MAX_BYTES / (1024 * 1024)
+          )} MB.`,
+        });
+      }
+
+      yield* requireNoActiveImport(input.organizationId);
+
+      const [text, fileHash] = yield* Effect.all(
+        [decodeBoardPostCsv(input.bytes), hashBytes(input.bytes)],
+        { concurrency: "unbounded" }
+      );
+
+      const parsed = yield* parseBoardPostCsv(text);
+
+      return yield* stageParsedRows({
+        duplicateNotice: (importedAt) =>
+          `This file was already imported on ${importedAt
+            .toISOString()
+            .slice(0, 10)}.`,
+        fileName: input.fileName,
+        fileHash,
+        memberId: input.memberId,
+        organizationId: input.organizationId,
+        parsed,
+        userId: input.userId,
+      });
     }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
+
+  const stageProviderImport: DataImportServiceContract["stageProviderImport"] =
+    (input) =>
+      Effect.gen(function* () {
+        const adapter = importProviders.find(input.provider);
+
+        if (Option.isNone(adapter)) {
+          return yield* new UnknownDataImportProviderError({
+            message: `The "${input.provider}" import source is not available in this deployment.`,
+            provider: input.provider,
+          });
+        }
+
+        // Check the slot before the pull, not after: a crawler that takes
+        // minutes should not run for a workspace that cannot stage its result.
+        yield* requireNoActiveImport(input.organizationId);
+
+        const result = yield* adapter.value.fetchPosts({
+          credentials: input.credentials,
+        });
+
+        const fileHash = yield* hashText(result.fingerprint);
+
+        return yield* stageParsedRows({
+          duplicateNotice: (importedAt) =>
+            `These posts were already imported on ${importedAt
+              .toISOString()
+              .slice(0, 10)}.`,
+          fileName: `${adapter.value.descriptor.name} import`,
+          fileHash,
+          memberId: input.memberId,
+          organizationId: input.organizationId,
+          parsed: { notices: result.notices, rows: result.rows },
+          userId: input.userId,
+        });
+      }).pipe(Policy.withPolicy(canImportPosts(input.organizationId)));
+
+  const listProviders: DataImportServiceContract["listProviders"] = (input) =>
+    Effect.sync(() => importProviders.list()).pipe(
+      Policy.withPolicy(canImportPosts(input.organizationId))
+    );
 
   const confirmImport: DataImportServiceContract["confirmImport"] = (input) =>
     Effect.gen(function* () {
@@ -573,7 +725,9 @@ const makeDataImportService = Effect.gen(function* () {
     confirmImport,
     describeImport,
     listImports,
+    listProviders,
     stageBoardImport,
+    stageProviderImport,
     watchImport,
     watchImportList,
   } satisfies DataImportServiceContract;

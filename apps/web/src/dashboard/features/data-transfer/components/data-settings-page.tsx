@@ -1,20 +1,11 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import {
-  BOARD_POST_CSV_COLUMNS,
-  BOARD_POST_CSV_TEMPLATE,
-} from "@feeblo/domain-contracts/board-csv";
-import { DATA_IMPORT_MAX_BYTES } from "@feeblo/domain/data-transfer/limits";
-import {
-  DataImportJobSummary,
-  type TDataImportJobSummary,
-} from "@feeblo/domain/data-transfer/schema";
+import type { TDataImportJobSummary } from "@feeblo/domain/data-transfer/schema";
 import {
   Alert,
   AlertAction,
   AlertDescription,
   AlertTitle,
 } from "@feeblo/ui/alert";
-import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
   Card,
@@ -25,11 +16,6 @@ import {
   CardPanel,
   CardTitle,
 } from "@feeblo/ui/card";
-import {
-  Collapsible,
-  CollapsiblePanel,
-  CollapsibleTrigger,
-} from "@feeblo/ui/collapsible";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@feeblo/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { TablerIcon } from "@feeblo/ui/icon-picker";
@@ -58,18 +44,11 @@ import { cn } from "@feeblo/ui/utils";
 import * as dayjs from "@feeblo/utils/dayjs";
 import { boardIconName } from "@feeblo/web-shared/icons/defaults";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
-import {
-  ArrowDown01Icon,
-  FileDownloadIcon,
-  FileSpreadsheetIcon,
-  FileUploadIcon,
-  InboxDownloadIcon,
-} from "@hugeicons/core-free-icons";
+import { InboxDownloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Option from "effect/Option";
 import * as Result from "effect/reactivity/AsyncResult";
-import * as Schema from "effect/Schema";
 import { useState } from "react";
 
 import { m } from "@/paraglide/messages.js";
@@ -78,7 +57,6 @@ import { useOrganizationId } from "~/hooks/use-organization-id";
 
 import {
   dataTransferApiBase,
-  downloadBlob,
   downloadResponse,
   errorEnvelopeMessage,
 } from "../api";
@@ -88,8 +66,14 @@ import {
   dataTransferBoardsAtom,
   type DataTransferBoard,
 } from "../atoms";
-import { canConfirmStatus, isActiveStatus, plannedRowCount } from "../format";
+import {
+  canCancelStatus,
+  canConfirmStatus,
+  isActiveStatus,
+  plannedRowCount,
+} from "../format";
 import { CancelImportDialog } from "./import-dialogs";
+import { ImportSourcesSection } from "./import-source-cards";
 import {
   ImportProgressBar,
   ImportResultText,
@@ -100,44 +84,7 @@ import {
 /** The export picker's sentinel for "every board"; never a real board id. */
 const ALL_BOARDS = "__all_boards__";
 
-/** Imports and exports are CSV only; the picker checks the name, not the type. */
-const csvFileNamePattern = /\.csv$/iu;
-
-/**
- * Writes the download the importer accepts. The template comes from the same
- * contract the server parses, so a column the parser stops reading cannot
- * stay in a file the dashboard hands out.
- */
-const downloadImportTemplate = () => {
-  downloadBlob(
-    new Blob([BOARD_POST_CSV_TEMPLATE], { type: "text/csv;charset=utf-8" }),
-    "board-import-template.csv"
-  );
-};
-
-/**
- * Matches the export's server-side name: `<board-slug>-posts-<UTC date>.csv`,
- * or `posts-<UTC date>.csv` for the whole workspace.
- */
-const fallbackExportFileName = (
-  boards: readonly DataTransferBoard[],
-  boardId: string | null
-): string => {
-  const date = new Date().toISOString().slice(0, 10);
-
-  if (boardId === null) {
-    return `posts-${date}.csv`;
-  }
-
-  const slug = boards.find((board) => board.id === boardId)?.slug ?? "posts";
-
-  return `${slug}-posts-${date}.csv`;
-};
-
-/**
- * The boards the export picker names, read once for the card. The atom is a
- * family, so the picker and the fallback filename read the same query.
- */
+/** The boards the export picker names, read once for the card. */
 function useTransferBoards(organizationId: string) {
   const boardsResult = useAtomValue(dataTransferBoardsAtom(organizationId));
 
@@ -163,7 +110,7 @@ function useTransferBoards(organizationId: string) {
 function useTransferJobs(organizationId: string) {
   const jobsResult = useAtomValue(dataImportJobsAtom(organizationId));
 
-  const jobs = Result.builder(jobsResult)
+  return Result.builder(jobsResult)
     .onInitial(
       // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
       () => [] as readonly TDataImportJobSummary[]
@@ -177,8 +124,6 @@ function useTransferJobs(organizationId: string) {
     )
     .onSuccess((value) => value)
     .exhaustive();
-
-  return jobs;
 }
 
 function BoardPicker({
@@ -249,344 +194,127 @@ function BoardPicker({
 }
 
 /**
- * The upload surface: one dashed target that accepts a click or a drop. The
- * bytes are read only when the person presses Upload, so dropping the wrong
- * file costs nothing. There is no board choice: the file's `board` column
- * routes every row and missing boards are created when the import runs.
+ * The one active import, whichever source produced it.
+ *
+ * The list is the authority, so this card survives a reload; a staged job
+ * shows what confirming would create, and a running one shows how far the
+ * worker has got. The review page is the only place a job is confirmed.
  */
-function ImportDropzone({
-  disabled,
-  file,
-  onFileChange,
+function ActiveImportCard({
+  busyJobId,
+  job,
+  onCancel,
+  organizationId,
 }: {
-  readonly disabled: boolean;
-  readonly file: File | null;
-  readonly onFileChange: (file: File | null) => void;
+  readonly busyJobId: string | null;
+  readonly job: TDataImportJobSummary;
+  readonly onCancel: (job: TDataImportJobSummary) => void;
+  readonly organizationId: string;
 }) {
-  const [isDragging, setIsDragging] = useState(false);
-
-  const reject = (title: string) => {
-    toastManager.add({ title, type: "error" });
-  };
-
-  const accept = (candidate: File | null) => {
-    if (candidate === null) {
-      onFileChange(null);
-
-      return;
-    }
-
-    // The server holds the same limits; checking here turns a round trip into
-    // an immediate sentence about the file the person just picked.
-    if (!csvFileNamePattern.test(candidate.name)) {
-      reject(m.quiet_fresh_moth());
-
-      return;
-    }
-
-    if (candidate.size > DATA_IMPORT_MAX_BYTES) {
-      reject(m.brave_calm_kite());
-
-      return;
-    }
-
-    onFileChange(candidate);
-  };
+  const staged = canConfirmStatus(job.status);
+  const cancelable = canCancelStatus(job.status);
 
   return (
-    <label
-      className={cn(
-        "border-border/70 bg-muted/20 focus-within:ring-ring/24 hover:bg-muted/40 relative flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-8 text-center transition-colors focus-within:ring-[3px]",
-        isDragging && "border-primary/60 bg-muted/60",
-        disabled && "pointer-events-none opacity-64"
-      )}
-      onDragLeave={() => setIsDragging(false)}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setIsDragging(true);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        setIsDragging(false);
-        accept(event.dataTransfer.files[0] ?? null);
-      }}
-    >
-      <HugeiconsIcon
-        className="text-muted-foreground size-6"
-        icon={file === null ? FileUploadIcon : FileSpreadsheetIcon}
-      />
-      {file === null ? (
-        <>
-          <span className="text-sm font-medium">{m.tidy_clear_wren()}</span>
-          <span className="text-muted-foreground max-w-sm text-xs">
-            {m.warm_clear_newt()}
-          </span>
-        </>
-      ) : (
-        <span className="flex max-w-full items-center gap-2">
-          <span className="truncate text-sm font-medium">{file.name}</span>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {staged
+            ? m.data_import_active_staged_title()
+            : m.data_import_active_running_title()}
+        </CardTitle>
+        <CardDescription>{job.fileName}</CardDescription>
+        <CardAction>
+          <ImportStatusBadge status={job.status} />
+        </CardAction>
+      </CardHeader>
+      <CardPanel className="flex flex-col gap-4">
+        {staged ? (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <ImportStat
+                label={m.bold_fresh_puma()}
+                value={plannedRowCount(job)}
+              />
+              <ImportStat
+                label={m.gentle_smart_auk()}
+                tone="warning"
+                value={job.warningCount}
+              />
+              <ImportStat
+                label={m.rustic_young_stork()}
+                tone="destructive"
+                value={job.errorCount}
+              />
+            </div>
+            {job.notices.length === 0 ? null : (
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">
+                  {m.humble_sleek_carp()}
+                </span>
+                {job.notices.slice(0, 3).map((notice) => (
+                  <p className="text-muted-foreground text-xs" key={notice}>
+                    {notice}
+                  </p>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <ImportProgressBar job={job} />
+        )}
+        <div className="flex flex-wrap gap-2">
           <Button
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onFileChange(null);
-            }}
-            size="xs"
-            type="button"
-            variant="ghost"
+            render={(buttonProps) => (
+              <Link
+                {...buttonProps}
+                params={{ jobId: job.id, organizationId }}
+                to="/$organizationId/settings/data/imports/$jobId"
+              />
+            )}
+            size="sm"
           >
-            {m.kind_cool_bass()}
+            {staged ? m.data_import_review_action() : m.kind_brave_wren()}
           </Button>
-        </span>
-      )}
-      <input
-        accept=".csv,text/csv"
-        aria-label={m.keen_calm_swan()}
-        className="sr-only"
-        disabled={disabled}
-        onChange={(event) => accept(event.target.files?.[0] ?? null)}
-        type="file"
-      />
-    </label>
-  );
-}
-
-/** The column contract, one badge per column, with what each one does. */
-function TemplateGuide() {
-  return (
-    <Collapsible>
-      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm font-medium data-panel-open:[&_svg]:rotate-180">
-        <span>{m.soft_bold_wren()}</span>
-        <HugeiconsIcon
-          className="size-4 transition-transform"
-          icon={ArrowDown01Icon}
-        />
-      </CollapsibleTrigger>
-      <CollapsiblePanel>
-        <div className="flex flex-col gap-2 px-3 pt-3">
-          <div className="flex flex-wrap gap-1">
-            {BOARD_POST_CSV_COLUMNS.map((column) => (
-              <Badge key={column} variant="outline">
-                {column}
-              </Badge>
-            ))}
-          </div>
-          <p className="text-muted-foreground text-xs">{m.lucky_kind_auk()}</p>
+          {cancelable ? (
+            <Button
+              disabled={busyJobId === job.id}
+              onClick={() => onCancel(job)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {m.crisp_honest_wren()}
+            </Button>
+          ) : null}
         </div>
-      </CollapsiblePanel>
-    </Collapsible>
+        <p className="text-muted-foreground text-xs">
+          {staged
+            ? m.data_import_active_staged_hint()
+            : m.data_import_active_running_hint()}
+        </p>
+      </CardPanel>
+    </Card>
   );
 }
 
 /**
- * Import, review, confirm. The server stages every row before anything is
- * written, so the card shows the staged job's counts and notices, and the
- * review page is where a person reads the rows and confirms.
- *
- * The active job is read from the live list, not from this component's own
- * state, so the card survives a reload and a second tab sees the same gate.
+ * Matches the export's server-side name: `<board-slug>-posts-<UTC date>.csv`,
+ * or `posts-<UTC date>.csv` for the whole workspace.
  */
-function ImportCard({
-  activeJob,
-  busyJobId,
-  onCancel,
-  onStaged,
-  organizationId,
-}: {
-  readonly activeJob: TDataImportJobSummary | null;
-  readonly busyJobId: string | null;
-  readonly onCancel: (job: TDataImportJobSummary) => void;
-  readonly onStaged: (job: TDataImportJobSummary) => void;
-  readonly organizationId: string;
-}) {
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const staged = activeJob !== null && canConfirmStatus(activeJob.status);
+const fallbackExportFileName = (
+  boards: readonly DataTransferBoard[],
+  boardId: string | null
+): string => {
+  const date = new Date().toISOString().slice(0, 10);
 
-  const handleUpload = async () => {
-    if (file === null) {
-      return;
-    }
+  if (boardId === null) {
+    return `posts-${date}.csv`;
+  }
 
-    setIsUploading(true);
+  const slug = boards.find((board) => board.id === boardId)?.slug ?? "posts";
 
-    try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("organizationId", organizationId);
-
-      const response = await fetch(`${dataTransferApiBase()}/api/data/import`, {
-        body,
-        credentials: "include",
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        // 409 is the workspace's slot being taken, which reads better as the
-        // reserved conflict message; anything else shows the server's own
-        // explanation (an unknown status, the row limit) when it has one.
-        const title =
-          response.status === 409
-            ? m.grand_plain_moose()
-            : ((await errorEnvelopeMessage(response)) ?? m.solid_calm_cub());
-
-        toastManager.add({ title, type: "error" });
-
-        return;
-      }
-
-      const payload: unknown = await response.json();
-      // SAFETY: The endpoint contract returns a DataImportJobSummary; the
-      // schema rejects drift instead of leaking it into the review panel. This
-      // is a React event handler, not Effect code: the Option is the recovery.
-      // eslint-disable-next-line effecttsgo/schema-sync -- non-Effect React boundary
-      const decoded = Schema.decodeUnknownOption(DataImportJobSummary)(payload);
-
-      if (Option.isNone(decoded)) {
-        toastManager.add({ title: m.tidy_bold_yak(), type: "error" });
-
-        return;
-      }
-
-      onStaged(decoded.value);
-      setFile(null);
-    } catch {
-      toastManager.add({ title: m.tidy_bold_yak(), type: "error" });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  return (
-    <Card className="flex flex-col">
-      <CardHeader>
-        <CardTitle>{m.noble_sunny_crow()}</CardTitle>
-        <CardDescription>{m.proud_witty_fox()}</CardDescription>
-        {activeJob === null ? null : (
-          <CardAction>
-            <ImportStatusBadge status={activeJob.status} />
-          </CardAction>
-        )}
-      </CardHeader>
-      <CardPanel className="flex flex-1 flex-col gap-4">
-        <div className="border-border/70 bg-muted/20 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2">
-          <p className="text-muted-foreground text-xs">{m.kind_bold_moth()}</p>
-          <Button
-            onClick={downloadImportTemplate}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            <HugeiconsIcon icon={FileDownloadIcon} />
-            {m.sunny_plain_heron()}
-          </Button>
-        </div>
-        <TemplateGuide />
-
-        {activeJob === null ? (
-          <>
-            <ImportDropzone
-              disabled={isUploading}
-              file={file}
-              onFileChange={setFile}
-            />
-            <p className="text-muted-foreground text-xs">
-              {m.sturdy_bold_crab()}
-            </p>
-          </>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <span className="flex min-w-0 items-center gap-2">
-              <HugeiconsIcon
-                className="text-muted-foreground size-4.5 shrink-0"
-                icon={FileSpreadsheetIcon}
-              />
-              <span className="truncate text-sm font-medium">
-                {activeJob.fileName}
-              </span>
-            </span>
-            {staged ? (
-              <>
-                <div className="grid grid-cols-3 gap-3">
-                  <ImportStat
-                    label={m.bold_fresh_puma()}
-                    value={plannedRowCount(activeJob)}
-                  />
-                  <ImportStat
-                    label={m.gentle_smart_auk()}
-                    tone="warning"
-                    value={activeJob.warningCount}
-                  />
-                  <ImportStat
-                    label={m.rustic_young_stork()}
-                    tone="destructive"
-                    value={activeJob.errorCount}
-                  />
-                </div>
-                {activeJob.notices.length > 0 ? (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium">
-                      {m.humble_sleek_carp()}
-                    </span>
-                    {activeJob.notices.map((notice) => (
-                      <p className="text-muted-foreground text-xs" key={notice}>
-                        {notice}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
-              </>
-            ) : (
-              <ImportProgressBar job={activeJob} />
-            )}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                render={(buttonProps) => (
-                  <Link
-                    {...buttonProps}
-                    params={{ jobId: activeJob.id, organizationId }}
-                    to="/$organizationId/settings/data/imports/$jobId"
-                  />
-                )}
-                size="sm"
-              >
-                {m.kind_brave_wren()}
-              </Button>
-              {isActiveStatus(activeJob.status) ? (
-                <Button
-                  disabled={busyJobId === activeJob.id}
-                  onClick={() => onCancel(activeJob)}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  {m.crisp_honest_wren()}
-                </Button>
-              ) : null}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              {m.plain_bold_eagle()}
-            </p>
-          </div>
-        )}
-      </CardPanel>
-      {activeJob === null ? (
-        <CardFooter className="justify-end">
-          <Button
-            disabled={file === null}
-            loading={isUploading}
-            onClick={() => {
-              void handleUpload();
-            }}
-            type="button"
-          >
-            {m.warm_wise_toad()}
-          </Button>
-        </CardFooter>
-      ) : null}
-    </Card>
-  );
-}
+  return `${slug}-posts-${date}.csv`;
+};
 
 /** The workspace's posts as CSV, every board or one, through the download route. */
 function ExportCard({ organizationId }: { readonly organizationId: string }) {
@@ -705,7 +433,7 @@ function RecentImportsCard({
               <EmptyMedia variant="icon">
                 <HugeiconsIcon icon={InboxDownloadIcon} />
               </EmptyMedia>
-              <EmptyTitle>{m.plain_gentle_robin()}</EmptyTitle>
+              <EmptyTitle>{m.data_import_history_empty()}</EmptyTitle>
             </EmptyHeader>
           </Empty>
         ) : (
@@ -794,9 +522,15 @@ export function DataSettingsPage() {
 
   const cancelImport = useAtomSet(cancelDataImportAtom, { mode: "promise" });
   const jobs = useTransferJobs(organizationId);
-  // The watch stream can lag one tick behind an upload; the local copy keeps
-  // the card honest until the list catches up, and disappears once it does.
-  const [localJob, setLocalJob] = useState<TDataImportJobSummary | null>(null);
+
+  // The watch stream can lag one tick behind an import that just staged; the
+  // local copy keeps the card honest until the list catches up, and disappears
+  // once it does. It carries its organization because a settings route can
+  // change workspace without unmounting this page.
+  const [localJob, setLocalJob] = useState<{
+    readonly job: TDataImportJobSummary;
+    readonly organizationId: string;
+  } | null>(null);
 
   const [cancelTarget, setCancelTarget] =
     useState<TDataImportJobSummary | null>(null);
@@ -806,8 +540,9 @@ export function DataSettingsPage() {
   const listedActive = jobs.find((job) => isActiveStatus(job.status)) ?? null;
 
   const unlistedLocal =
-    localJob !== null && !jobs.some((job) => job.id === localJob.id)
-      ? localJob
+    localJob?.organizationId === organizationId &&
+    !jobs.some((job) => job.id === localJob.job.id)
+      ? localJob.job
       : null;
 
   const activeJob = listedActive ?? unlistedLocal;
@@ -828,7 +563,7 @@ export function DataSettingsPage() {
     try {
       await cancelImport({ payload: { id: cancelTarget.id, organizationId } });
       setLocalJob((current) =>
-        current?.id === cancelTarget.id ? null : current
+        current?.job.id === cancelTarget.id ? null : current
       );
       setCancelTarget(null);
     } catch {
@@ -871,31 +606,49 @@ export function DataSettingsPage() {
           </Alert>
         )}
 
+        {showImport ? (
+          <section className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-semibold">
+                {m.data_import_sources_title()}
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                {m.data_import_sources_description()}
+              </p>
+            </div>
+            <ImportSourcesSection
+              disabled={activeJob !== null}
+              onStaged={(job) => setLocalJob({ job, organizationId })}
+              organizationId={organizationId}
+            />
+            {activeJob === null ? null : (
+              <ActiveImportCard
+                busyJobId={busyJobId}
+                job={activeJob}
+                onCancel={setCancelTarget}
+                organizationId={organizationId}
+              />
+            )}
+          </section>
+        ) : null}
+
         <div
           className={cn(
             "grid gap-6",
-            showImport && showExport && "lg:grid-cols-2"
+            showImport &&
+              showExport &&
+              "xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
           )}
         >
           {showImport ? (
-            <ImportCard
-              activeJob={activeJob}
+            <RecentImportsCard
               busyJobId={busyJobId}
               onCancel={setCancelTarget}
-              onStaged={setLocalJob}
               organizationId={organizationId}
             />
           ) : null}
           {showExport ? <ExportCard organizationId={organizationId} /> : null}
         </div>
-
-        {showImport ? (
-          <RecentImportsCard
-            busyJobId={busyJobId}
-            onCancel={setCancelTarget}
-            organizationId={organizationId}
-          />
-        ) : null}
       </SettingsLayout.Content>
 
       {cancelTarget === null ? null : (

@@ -28,6 +28,7 @@ import { TagRepository } from "../tag/repository";
 import { UserRepository } from "../user/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import { DataImportService } from "./import-service";
+import { ImportProviderRegistryLive } from "./providers";
 import { DataTransferRepository } from "./repository";
 import { runDataImportPass } from "./worker";
 
@@ -153,6 +154,7 @@ const TestLayer = Layer.mergeAll(
   TagRepository.layer,
   PostStatusRepository.layer
 ).pipe(
+  Layer.provide(ImportProviderRegistryLive),
   // Provided once, at the end, so every layer in the merge sees the same
   // dependencies. Piping them into `PostWriteService.layer` alone left the
   // other layers with a second copy of the graph and made the dependencies

@@ -151,6 +151,9 @@
     "./data-transfer/machine": {
       "default": "./src/data-transfer/machine.ts"
     },
+    "./data-transfer/provider-schema": {
+      "default": "./src/data-transfer/provider-schema.ts"
+    },
     "./data-transfer/repository": {
       "default": "./src/data-transfer/repository.ts"
     },
