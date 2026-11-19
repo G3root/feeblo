@@ -309,6 +309,7 @@ export function BoardGridView({
                   id={laneId}
                   index={columnIndex}
                   key={lane.id}
+                  boardIcon={lane.boardIcon}
                   label={lane.label}
                   status={lane.status}
                   statusIcon={lane.statusIcon}

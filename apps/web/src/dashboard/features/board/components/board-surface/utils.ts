@@ -184,7 +184,10 @@ function groupByAssignee(
 }
 
 function groupByBoard(posts: readonly BoardPostRow[]): BoardPostLane[] {
-  const byBoard = new Map<string, { label: string; posts: BoardPostRow[] }>();
+  const byBoard = new Map<
+    string,
+    { boardIcon?: string | null; label: string; posts: BoardPostRow[] }
+  >();
 
   for (const post of posts) {
     const board = byBoard.get(post.boardId);
@@ -193,6 +196,7 @@ function groupByBoard(posts: readonly BoardPostRow[]): BoardPostLane[] {
       board.posts.push(post);
     } else {
       byBoard.set(post.boardId, {
+        boardIcon: post.boardIcon,
         label: post.boardName || "No board",
         posts: [post],
       });
@@ -202,6 +206,7 @@ function groupByBoard(posts: readonly BoardPostRow[]): BoardPostLane[] {
   return [...byBoard.entries()]
     .toSorted((left, right) => left[1].label.localeCompare(right[1].label))
     .map(([id, board]) => ({
+      boardIcon: board.boardIcon,
       id,
       label: board.label,
       posts: board.posts,

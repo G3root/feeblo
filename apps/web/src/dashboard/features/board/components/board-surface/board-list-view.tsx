@@ -162,6 +162,7 @@ function BoardListLaneHeader({
                 strokeWidth={2}
               />
               <BoardLaneIcon
+                boardIcon={lane.boardIcon}
                 groupBy={groupBy}
                 status={lane.status}
                 statusIcon={lane.statusIcon}

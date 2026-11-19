@@ -1,3 +1,4 @@
+import { PostStatusIcon } from "@feeblo/post-ui/post-status-icon";
 import { Button } from "@feeblo/ui/button";
 import {
   Menu,
@@ -42,7 +43,12 @@ export function HomeStatusMenu({ className }: { className?: string }) {
         >
           {statusItems.map((item) => (
             <MenuRadioItem closeOnClick key={item.value} value={item.value}>
-              {item.label}
+              <span className="flex items-center gap-2">
+                {item.statusType ? (
+                  <PostStatusIcon icon={item.icon} type={item.statusType} />
+                ) : null}
+                {item.label}
+              </span>
             </MenuRadioItem>
           ))}
         </MenuRadioGroup>

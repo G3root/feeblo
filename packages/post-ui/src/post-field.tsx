@@ -9,13 +9,15 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@feeblo/ui/combobox";
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import { SelectButton } from "@feeblo/ui/select";
 import { cn } from "@feeblo/ui/utils";
 import {
   BOARD_LANE_COLOR_MAP,
   type BoardPostStatus,
 } from "@feeblo/web-shared/board/constants";
-import { DashedLine02Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
+import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import { m } from "./paraglide/messages.js";
@@ -186,7 +188,7 @@ export function StatusField({
 }
 
 type PostBoardSelectProps = {
-  boards: { id: string; name: string }[];
+  boards: { icon?: string | null; id: string; name: string }[];
   currentBoardId: string;
   onValueChange: (boardId: string | null) => void;
   disabled?: boolean;
@@ -205,8 +207,9 @@ export function PostBoardSelect({
   const currentBoard = boards.find((b) => b.id === currentBoardId);
 
   const items = boards.map((board) => ({
-    value: board.id,
+    icon: board.icon,
     label: board.name,
+    value: board.id,
   }));
 
   return (
@@ -216,7 +219,11 @@ export function PostBoardSelect({
       onValueChange={(board) => onValueChange(board?.value ?? null)}
       value={
         currentBoard
-          ? { value: currentBoard.id, label: currentBoard.name }
+          ? {
+              icon: currentBoard.icon,
+              label: currentBoard.name,
+              value: currentBoard.id,
+            }
           : null
       }
     >
@@ -234,11 +241,7 @@ export function PostBoardSelect({
             <span className="flex items-center gap-2">
               {value ? (
                 <>
-                  <HugeiconsIcon
-                    className="text-primary-blue size-4"
-                    icon={DashedLine02Icon}
-                    strokeWidth={2}
-                  />
+                  <TablerIcon name={boardIconName(value.icon)} />
                   {value.label}
                 </>
               ) : (
@@ -264,11 +267,7 @@ export function PostBoardSelect({
           {(item) => (
             <ComboboxItem key={item.value} value={item}>
               <span className="flex items-center gap-2 whitespace-nowrap">
-                <HugeiconsIcon
-                  className="text-primary-blue size-4"
-                  icon={DashedLine02Icon}
-                  strokeWidth={2}
-                />
+                <TablerIcon name={boardIconName(item.icon)} />
                 {item.label}
               </span>
             </ComboboxItem>

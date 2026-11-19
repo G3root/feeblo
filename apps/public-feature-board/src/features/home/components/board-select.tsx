@@ -1,3 +1,4 @@
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import {
   Select,
   SelectItem,
@@ -6,6 +7,7 @@ import {
   SelectValue,
 } from "@feeblo/ui/select";
 import { cn } from "@feeblo/ui/utils";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
 
 import { useHome } from "../home-context";
 
@@ -24,12 +26,32 @@ export function HomeBoardSelect({ className }: { className?: string }) {
       value={selectedBoard}
     >
       <SelectTrigger className={cn("min-w-0", className)}>
-        <SelectValue />
+        <SelectValue>
+          {(value: string) => {
+            const item = boardItems.find(
+              (candidate) => candidate.value === value
+            );
+
+            return item ? (
+              <span className="flex items-center gap-2">
+                {item.icon === undefined ? null : (
+                  <TablerIcon name={boardIconName(item.icon)} />
+                )}
+                {item.label}
+              </span>
+            ) : null;
+          }}
+        </SelectValue>
       </SelectTrigger>
       <SelectPopup>
         {boardItems.map((item) => (
           <SelectItem key={item.value} value={item.value}>
-            {item.label}
+            <span className="flex items-center gap-2">
+              {item.icon === undefined ? null : (
+                <TablerIcon name={boardIconName(item.icon)} />
+              )}
+              {item.label}
+            </span>
           </SelectItem>
         ))}
       </SelectPopup>

@@ -32,6 +32,7 @@ import {
 } from "@feeblo/ui/collapsible";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@feeblo/ui/empty";
 import { Field, FieldDescription, FieldLabel } from "@feeblo/ui/field";
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import {
   Select,
   SelectItem,
@@ -55,6 +56,7 @@ import {
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
 import * as dayjs from "@feeblo/utils/dayjs";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
   ArrowDown01Icon,
@@ -193,8 +195,12 @@ function BoardPicker({
   const { boards, isLoading } = useTransferBoards(organizationId);
 
   const items = [
-    { label: m.leafy_calm_jay(), value: ALL_BOARDS },
-    ...boards.map((board) => ({ label: board.name, value: board.id })),
+    { icon: undefined, label: m.leafy_calm_jay(), value: ALL_BOARDS },
+    ...boards.map((board) => ({
+      icon: board.icon,
+      label: board.name,
+      value: board.id,
+    })),
   ];
 
   return (
@@ -207,12 +213,30 @@ function BoardPicker({
         value={value === "" ? null : value}
       >
         <SelectTrigger className="w-full">
-          <SelectValue placeholder={m.swift_calm_bass()} />
+          <SelectValue placeholder={m.swift_calm_bass()}>
+            {(value: string) => {
+              const item = items.find((candidate) => candidate.value === value);
+
+              return item ? (
+                <span className="flex items-center gap-2">
+                  {item.icon === undefined ? null : (
+                    <TablerIcon name={boardIconName(item.icon)} />
+                  )}
+                  {item.label}
+                </span>
+              ) : null;
+            }}
+          </SelectValue>
         </SelectTrigger>
         <SelectPopup>
           {items.map((item) => (
             <SelectItem key={item.value} value={item.value}>
-              {item.label}
+              <span className="flex items-center gap-2">
+                {item.icon === undefined ? null : (
+                  <TablerIcon name={boardIconName(item.icon)} />
+                )}
+                {item.label}
+              </span>
             </SelectItem>
           ))}
         </SelectPopup>

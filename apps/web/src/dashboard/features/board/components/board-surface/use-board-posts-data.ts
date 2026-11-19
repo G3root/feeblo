@@ -323,6 +323,7 @@ export function useBoardPostsData({
           archivedAt: post.archivedAt,
           assigneeMemberId: post.assigneeMemberId,
           authorIsMember: post.authorIsMember,
+          boardIcon: board.icon,
           boardId: post.boardId,
           boardName: coalesce(board.name, ""),
           boardSlug: coalesce(board.slug, ""),

@@ -147,6 +147,7 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
             type: postStatus.type,
             label: postStatus.label,
             color: postStatus.color,
+            icon: postStatus.icon,
           },
         }));
     },
@@ -233,7 +234,9 @@ export function BoardPage({ boardSlug }: { readonly boardSlug: string }) {
               <div className="[contain-intrinsic-size:auto_72px] [content-visibility:auto]">
                 <FeedbackCard
                   color={postStatus.color ?? undefined}
+                  icon={postStatus.icon}
                   label={postStatus.label || formatPostStatus(postStatus.type)}
+                  type={postStatus.type}
                 />
               </div>
             </PostCollectionDataProvider>
