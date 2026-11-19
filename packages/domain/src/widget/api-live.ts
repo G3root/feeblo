@@ -199,7 +199,12 @@ const findWidgetHelpArticles = Effect.fn("Widget.helpArticles")(function* ({
 
   yield* repository
     .recordSearch({ found: hits.length > 0, now, organizationId, query })
-    .pipe(Effect.ignoreCause);
+    .pipe(
+      Effect.tapCause((cause) =>
+        Effect.logWarning("Failed to record a widget help center search", cause)
+      ),
+      Effect.ignoreCause
+    );
 
   const portalUrl = buildPublicSiteUrl(site, config.rootDomain);
 

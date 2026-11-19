@@ -98,18 +98,31 @@ export const DEFAULT_HELP_CENTER_ANALYTICS_RANGE =
 /**
  * One window of help center traffic, verdicts and searches.
  *
- * Keyed by the window as well as the workspace, so switching the toggle is a
- * cache lookup rather than a refetch of the other two windows. It shares the
- * article reactivity key because a verdict cast on the portal changes what this
- * panel reports: the reader's own write should move the number they are looking
- * at.
+ * Two nested families rather than one family taking `{ organizationId, range }`.
+ * `Atom.family` memoizes on its argument with `MutableHashMap`, which compares
+ * object keys by identity and string keys by value — so a single family given an
+ * object literal is a new atom on every render unless the caller memoizes it,
+ * and a caller that forgets is a request per render. Composing one string-keyed
+ * family per field makes the cache value-based: the same workspace and window
+ * always produce the same atom, and switching the toggle back is the cached
+ * answer rather than a refetch.
+ *
+ * It shares the article reactivity key because a verdict cast on the portal
+ * changes what this panel reports: the reader's own write should move the number
+ * they are looking at.
  */
-export const helpCenterAnalyticsAtom = Atom.family(
-  (args: HelpCenterAnalyticsAtomArgs) =>
-    DashboardClient.query("GetHelpCenterAnalytics", args, {
-      reactivityKeys: helpCenterArticleReactivityKeys(args.organizationId),
-    }).pipe(dashboardSWR("60 seconds"), Atom.setIdleTTL("5 minutes"))
+const analyticsAtoms = Atom.family((organizationId: string) =>
+  Atom.family((range: THelpCenterAnalyticsRange) =>
+    DashboardClient.query(
+      "GetHelpCenterAnalytics",
+      { organizationId, range },
+      { reactivityKeys: helpCenterArticleReactivityKeys(organizationId) }
+    ).pipe(dashboardSWR("60 seconds"), Atom.setIdleTTL("5 minutes"))
+  )
 );
+
+export const helpCenterAnalyticsAtom = (args: HelpCenterAnalyticsAtomArgs) =>
+  analyticsAtoms(args.organizationId)(args.range);
 
 /** The same rule as the analytics args: derived from the operation. */
 export type HelpCenterSearchAtomArgs = Pick<
@@ -120,14 +133,21 @@ export type HelpCenterSearchAtomArgs = Pick<
 /**
  * The dashboard's article search.
  *
- * A family keyed by the query, like the portal's, so a keystroke is a cache
- * lookup and a deleted character is an answer that already exists. It shares
- * the article reactivity key: renaming an article should refresh a search that
- * would have matched the old title.
+ * Nested families for the same reason as the analytics read: the query is a
+ * string key, so a keystroke is a cache lookup and a deleted character is an
+ * answer that already exists, with no `useMemo` to forget. It shares the article
+ * reactivity key: renaming an article should refresh a search that would have
+ * matched the old title.
  */
-export const helpCenterSearchAtom = Atom.family(
-  (args: HelpCenterSearchAtomArgs) =>
-    DashboardClient.query("SearchHelpCenterArticles", args, {
-      reactivityKeys: helpCenterArticleReactivityKeys(args.organizationId),
-    }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("1 minute"))
+const searchAtoms = Atom.family((organizationId: string) =>
+  Atom.family((query: string) =>
+    DashboardClient.query(
+      "SearchHelpCenterArticles",
+      { organizationId, query },
+      { reactivityKeys: helpCenterArticleReactivityKeys(organizationId) }
+    ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("1 minute"))
+  )
 );
+
+export const helpCenterSearchAtom = (args: HelpCenterSearchAtomArgs) =>
+  searchAtoms(args.organizationId)(args.query);

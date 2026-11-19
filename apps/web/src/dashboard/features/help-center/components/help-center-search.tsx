@@ -13,9 +13,9 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import { helpCenterSearchAtom, type HelpCenterSearchAtomArgs } from "../atoms";
+import { helpCenterSearchAtom } from "../atoms";
 
 /** Shorter than this is "typing", not a search. Same floor the portal uses. */
 const MIN_SEARCH_LENGTH = 2;
@@ -72,12 +72,8 @@ function SearchResults({
   organizationId: string;
   query: string;
 }) {
-  const args = useMemo<HelpCenterSearchAtomArgs>(
-    () => ({ organizationId, query }),
-    [organizationId, query]
-  );
-
-  const atom = helpCenterSearchAtom(args);
+  // No `useMemo`: the family keys on the workspace and the query by value.
+  const atom = helpCenterSearchAtom({ organizationId, query });
   const result = useAtomValue(atom);
   const refresh = useAtomRefresh(atom);
 

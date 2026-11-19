@@ -216,7 +216,13 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
             unhelpfulVerdicts: sql`${daily.unhelpfulVerdicts} + ${helpful ? 0 : 1}`,
           },
         })
-        .pipe(Effect.asVoid, Effect.ignoreCause);
+        .pipe(
+          Effect.tapCause((cause) =>
+            Effect.logWarning("Failed to record a help center verdict", cause)
+          ),
+          Effect.asVoid,
+          Effect.ignoreCause
+        );
     });
 
   /**

@@ -23,13 +23,12 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
   helpCenterArticlesPublicAtom,
   helpCenterSearchPublicAtom,
   helpCenterTopicsPublicAtom,
-  type HelpCenterSearchAtomArgs,
 } from "./atoms";
 
 /**
@@ -228,12 +227,9 @@ function HelpCenterSearchResults({
   organizationId: string;
   query: string;
 }) {
-  const args = useMemo<HelpCenterSearchAtomArgs>(
-    () => ({ organizationId, query }),
-    [organizationId, query]
-  );
-
-  const atom = helpCenterSearchPublicAtom(args);
+  // No `useMemo`: the family keys on the workspace and the query by value, so a
+  // fresh object resolves to the same atom.
+  const atom = helpCenterSearchPublicAtom({ organizationId, query });
   const result = useAtomValue(atom);
   const refresh = useAtomRefresh(atom);
 

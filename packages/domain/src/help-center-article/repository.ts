@@ -435,6 +435,12 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         embeddedAt: now,
         embedding: [...vector],
         embeddingModel: model,
+        // Assigned to the column itself, which is what pins it: `updatedAt`
+        // carries `$onUpdate`, so any statement that omits it is stamped with
+        // the current time by Drizzle. A refresh is an index rebuild, not an
+        // edit — without this an embedding job would move the date a reader
+        // sees on the page and invalidate every cache keyed on it.
+        updatedAt: article.updatedAt,
       })
       .where(
         and(

@@ -1,3 +1,4 @@
+import * as Data from "effect/Data";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Schedule from "effect/Schedule";
@@ -26,6 +27,20 @@ export const HELP_CENTER_SEARCH_RETENTION_DAYS = 90;
 
 /** Once a day is plenty for a table that grows at human page-view rate. */
 const RETENTION_PASS_INTERVAL = "24 hours";
+
+/** The tables the sweep prunes, so a failure names its own. */
+export type HelpCenterRetentionTarget = "article_view_events" | "searches";
+
+/**
+ * A pass in which at least one table's prune failed.
+ *
+ * Each failure is already logged with its cause where it happened; this exists
+ * so the pass as a whole still reports failure, which is what keeps a broken
+ * prune from looking like a clean run for a week.
+ */
+export class HelpCenterRetentionError extends Data.TaggedError(
+  "HelpCenterRetentionError"
+)<{ readonly failed: readonly HelpCenterRetentionTarget[] }> {}
 
 /**
  * The help center's daily sweep: raw read events, and search buckets.
@@ -57,13 +72,38 @@ export const helpCenterRetention = Effect.gen(function* () {
     DateTime.subtract({ days: HELP_CENTER_SEARCH_RETENTION_DAYS })(now)
   );
 
-  yield* Effect.all(
+  // One prune per table, each absorbing its own failure into an outcome. Run
+  // together they would be fail-fast: one table's bad day would cancel the
+  // other's delete, so a table that can never be pruned would keep the working
+  // one from ever being pruned either.
+  const prune = <E>(
+    target: HelpCenterRetentionTarget,
+    effect: Effect.Effect<void, E>
+  ) =>
+    effect.pipe(
+      Effect.tapCause((cause) =>
+        Effect.logError(`Failed to prune ${target}`, cause)
+      ),
+      Effect.as(true),
+      Effect.catchCause(() => Effect.succeed(false))
+    );
+
+  const [viewsPruned, searchesPruned] = yield* Effect.all(
     [
-      repository.deleteEventsBefore(eventsBefore),
-      repository.deleteSearchesBefore(searchesBefore),
+      prune("article_view_events", repository.deleteEventsBefore(eventsBefore)),
+      prune("searches", repository.deleteSearchesBefore(searchesBefore)),
     ],
     { concurrency: "unbounded" }
   );
+
+  const failed = [
+    ...(viewsPruned ? [] : ["article_view_events" as const]),
+    ...(searchesPruned ? [] : ["searches" as const]),
+  ];
+
+  if (failed.length > 0) {
+    return yield* new HelpCenterRetentionError({ failed });
+  }
 }).pipe(
   Effect.tap(() => Effect.logDebug("Ran the help-center retention pass")),
   Effect.catch((error) =>

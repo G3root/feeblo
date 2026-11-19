@@ -793,6 +793,7 @@ describe("HelpCenterArticleRpcHandlers", () => {
             embeddedAt: schema.helpCenterArticleTable.embeddedAt,
             embedding: schema.helpCenterArticleTable.embedding,
             embeddingModel: schema.helpCenterArticleTable.embeddingModel,
+            updatedAt: schema.helpCenterArticleTable.updatedAt,
           })
           .from(schema.helpCenterArticleTable)
           .where(eq(schema.helpCenterArticleTable.id, id));
@@ -916,8 +917,9 @@ describe("HelpCenterArticleRpcHandlers", () => {
           yield* create(fixture, id, "Original title", "original-title");
 
           const current = yield* readContent(id);
+          const before = yield* readEmbeddingState(id);
 
-          if (current === undefined) {
+          if (current === undefined || before === undefined) {
             return yield* Effect.die(new Error("fixture article missing"));
           }
 
@@ -955,6 +957,10 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
           expect(state?.embeddingModel).toBe("test-embedding");
           expect(state?.embeddedAt).not.toBeNull();
+          // The refresh is an index rebuild, not an edit. `updatedAt` carries
+          // `$onUpdate`, so a statement that omits it would silently stamp the
+          // current time and move the date a reader sees on the page.
+          expect(state?.updatedAt?.getTime()).toBe(before.updatedAt.getTime());
         })
       );
 

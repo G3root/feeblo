@@ -14,11 +14,10 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
   DEFAULT_HELP_CENTER_ANALYTICS_RANGE,
-  type HelpCenterAnalyticsAtomArgs,
   helpCenterAnalyticsAtom,
 } from "../atoms";
 
@@ -49,12 +48,11 @@ export function HelpCenterAnalytics({
     DEFAULT_HELP_CENTER_ANALYTICS_RANGE
   );
 
-  const args = useMemo<HelpCenterAnalyticsAtomArgs>(
-    () => ({ organizationId, range }),
-    [organizationId, range]
+  // No `useMemo`: the atom family keys on the workspace and the window by
+  // value, so a fresh object literal still resolves to the same atom.
+  const result = useAtomValue(
+    helpCenterAnalyticsAtom({ organizationId, range })
   );
-
-  const result = useAtomValue(helpCenterAnalyticsAtom(args));
 
   return (
     <section className="space-y-3">

@@ -391,7 +391,15 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
             organizationId: args.organizationId,
             query: args.query,
           })
-          .pipe(Effect.ignoreCause);
+          .pipe(
+            // Logged before it is discarded: the counter is advisory, but a
+            // write that has been failing for a week should be visible in the
+            // logs rather than absent from them.
+            Effect.tapCause((cause) =>
+              Effect.logWarning("Failed to record a help center search", cause)
+            ),
+            Effect.ignoreCause
+          );
 
         return hits.map((hit) => ({
           excerpt: hit.excerpt,
