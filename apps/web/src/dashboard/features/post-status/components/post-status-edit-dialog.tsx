@@ -85,9 +85,9 @@ type EditableStatus = Pick<TPostStatus, "icon" | "id" | "label" | "type"> & {
 function PostStatusEditForm({ status }: { status: EditableStatus }) {
   const { postStatusCollection } = useDashboardCollections();
   const store = usePostStatusEditDialogContext();
-  // The value the form opened with; a save that only renamed the status must
-  // not repoint its icon at a concurrent change.
-  const initialIcon = useRef(status.icon);
+  // Whether the picker was used; an untouched icon is omitted, and selecting
+  // the current section's default is stored as null rather than a name.
+  const iconTouched = useRef(false);
 
   const form = useAppForm({
     defaultValues: {
@@ -126,14 +126,12 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
             ) + 1
           : undefined;
 
-        const iconChanged = data.value.icon !== initialIcon.current;
-
         const tx = postStatusCollection.update(status.id, (draft) => {
           draft.color = data.value.color;
           draft.label = data.value.label;
           draft.type = data.value.type;
 
-          if (iconChanged) {
+          if (iconTouched.current) {
             draft.icon = data.value.icon;
           }
 
@@ -191,7 +189,10 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
                   <IconPickerField
                     fallbackIcon={DEFAULT_POST_STATUS_ICONS[type]}
                     label="Choose icon"
-                    onChange={(icon) => field.handleChange(icon)}
+                    onChange={(icon) => {
+                      iconTouched.current = true;
+                      field.handleChange(icon);
+                    }}
                     value={field.state.value}
                   />
                 </Field>

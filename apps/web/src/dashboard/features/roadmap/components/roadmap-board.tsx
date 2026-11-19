@@ -136,8 +136,8 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
 
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const targetStatusId =
-        dragPreview?.targetStatusId ??
         dragState?.targetStatusId ??
+        dragPreview?.targetStatusId ??
         (target?.data?.statusId as string | undefined);
 
       if (
