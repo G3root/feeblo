@@ -4,6 +4,7 @@ import { FeedbackFormFrame } from "./feedback-form";
 import { FeedbackFormFields } from "./fields";
 import { FeedbackFormError } from "./form-error";
 import { FeedbackFormHeader } from "./header";
+import { FeedbackFormHelpArticles } from "./help-articles";
 import { BoardNotFound } from "./not-found";
 import { FeedbackFormProvider } from "./provider";
 import { FeedbackFormSubmitButton } from "./submit-button";
@@ -18,6 +19,7 @@ export const FeedbackForm = {
   Fields: FeedbackFormFields,
   TitleField: FeedbackFormTitleField,
   ContentField: FeedbackFormContentField,
+  HelpArticles: FeedbackFormHelpArticles,
   Suggestions: FeedbackFormSuggestions,
   Actions: FeedbackFormActions,
   SubmitButton: FeedbackFormSubmitButton,

@@ -6,6 +6,8 @@ import { PublicRpcRateLimitMiddleware, RateLimitErrors } from "../rate-limit";
 import { AuthMiddleware, OptionalAuthMiddleware } from "../session-middleware";
 import { HelpCenterArticleServiceErrors } from "./errors";
 import {
+  HelpCenterAnalytics,
+  HelpCenterAnalyticsPayload,
   HelpCenterArticle,
   HelpCenterArticleCreate,
   HelpCenterArticleDelete,
@@ -15,6 +17,10 @@ import {
   HelpCenterArticleListPublic,
   HelpCenterArticlePublic,
   HelpCenterArticlePublicSummary,
+  HelpCenterArticleSearch,
+  HelpCenterArticleSearchHit,
+  HelpCenterArticleSearchPublic,
+  HelpCenterArticleSearchResult,
   HelpCenterArticleSummary,
   HelpCenterArticleUpdate,
   HelpCenterArticleViewAccepted,
@@ -87,5 +93,48 @@ export class HelpCenterArticleRpcs extends RpcGroup.make(
     error: Schema.Union([HelpCenterArticleServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)
-    .middleware(PublicRpcRateLimitMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  /**
+   * The dashboard's search: every state, including the draft being written.
+   *
+   * Behind the session middleware rather than the public limiter because an
+   * editor is already authenticated, and behind no extra permission because
+   * every member may read the documentation.
+   */
+  Rpc.make("SearchHelpCenterArticles", {
+    payload: HelpCenterArticleSearch,
+    success: Schema.Array(HelpCenterArticleSearchHit),
+    error: HelpCenterArticleServiceErrors,
+  }).middleware(AuthMiddleware),
+
+  /**
+   * The portal's search.
+   *
+   * It returns the same projection the public list does, and it is the one
+   * public read that also **writes**: the query is counted, with whether it
+   * found anything, because "what do readers look for and not find" is the
+   * only signal that says which article to write next. The write never fails
+   * the read.
+   */
+  Rpc.make("SearchHelpCenterArticlesPublic", {
+    payload: HelpCenterArticleSearchPublic,
+    success: Schema.Array(HelpCenterArticleSearchResult),
+    error: Schema.Union([HelpCenterArticleServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  /**
+   * The dashboard's analytics for one window.
+   *
+   * One operation for the whole panel, for the same reason the insights page is
+   * one: the page renders every number together, and a per-metric operation
+   * would make the panel's cost the sum of its round trips.
+   */
+  Rpc.make("GetHelpCenterAnalytics", {
+    payload: HelpCenterAnalyticsPayload,
+    success: HelpCenterAnalytics,
+    error: HelpCenterArticleServiceErrors,
+  }).middleware(AuthMiddleware)
 ) {}

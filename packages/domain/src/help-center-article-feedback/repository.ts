@@ -14,6 +14,8 @@ const article = schema.helpCenterArticleTable;
 
 const viewTotal = schema.helpCenterArticleViewTotalTable;
 
+const daily = schema.helpCenterArticleDailyTable;
+
 /** The two counts plus this reader's verdict, for the widget. */
 export type TFeedbackTally = THelpCenterArticleFeedbackPublic;
 
@@ -191,6 +193,30 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
           },
         })
         .pipe(Effect.asVoid);
+
+      // The day's bucket, which counts verdicts *cast* rather than the standing
+      // distribution: a flip adds one to today and leaves the earlier day's
+      // count alone. Deliberately not part of the verdict's own write path — a
+      // counter that could fail would be a vote the reader cannot cast, so a
+      // failed bucket is logged and the verdict stands.
+      yield* db
+        .insert(daily)
+        .values({
+          articleId,
+          day: DateTime.formatIsoDateUtc(DateTime.fromDateUnsafe(now)),
+          helpfulVerdicts: helpful ? 1 : 0,
+          organizationId,
+          unhelpfulVerdicts: helpful ? 0 : 1,
+          views: 0,
+        })
+        .onConflictDoUpdate({
+          target: [daily.articleId, daily.day],
+          set: {
+            helpfulVerdicts: sql`${daily.helpfulVerdicts} + ${helpful ? 1 : 0}`,
+            unhelpfulVerdicts: sql`${daily.unhelpfulVerdicts} + ${helpful ? 0 : 1}`,
+          },
+        })
+        .pipe(Effect.asVoid, Effect.ignoreCause);
     });
 
   /**

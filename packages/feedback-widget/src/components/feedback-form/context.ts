@@ -1,7 +1,11 @@
 import type { useSubmission } from "@solidjs/router";
 import { type Accessor, createContext, useContext } from "solid-js";
 
-import type { FeedbackResult, WidgetSuggestion } from "../../lib/api";
+import type {
+  FeedbackResult,
+  WidgetHelpArticle,
+  WidgetSuggestion,
+} from "../../lib/api";
 import type { Board } from "../../lib/boards";
 
 type FeedbackFormSubmission = ReturnType<
@@ -10,6 +14,10 @@ type FeedbackFormSubmission = ReturnType<
 
 export interface FeedbackFormState {
   content: Accessor<string>;
+  helpArticles: Accessor<readonly WidgetHelpArticle[]>;
+  /** False once the deployment or workspace has no help center to deflect to. */
+  helpArticlesEnabled: Accessor<boolean>;
+  helpArticlesPending: Accessor<boolean>;
   submission: FeedbackFormSubmission;
   suggestions: Accessor<readonly WidgetSuggestion[]>;
   suggestionsPending: Accessor<boolean>;

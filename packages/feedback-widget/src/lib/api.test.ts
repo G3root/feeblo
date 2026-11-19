@@ -6,6 +6,7 @@ import {
   fetchSuggestions,
   getOrganizationId,
   requestBoards,
+  requestHelpArticles,
   requestUpdates,
   submitFeedback,
 } from "./requests";
@@ -49,6 +50,13 @@ const suggestion = {
   title: "Similar",
   excerpt: "Similar",
   slug: "similar",
+};
+
+const helpArticle = {
+  id: "hca_1",
+  title: "Invite your team",
+  excerpt: "Add teammates from workspace settings.",
+  url: "https://acme.feeblo.test/help/invite-your-team",
 };
 
 const stubBootEnv = () => {
@@ -116,6 +124,49 @@ describe("widget api boundary", () => {
     );
 
     expect(suggestions).toEqual([suggestion]);
+  });
+
+  it("posts a help-article query and decodes the answer", async () => {
+    stubBootEnv();
+    let sentUrl: string | undefined;
+    let sentBody: Json | undefined;
+
+    const fetchSpy = vi.fn((url: string, init?: RequestInit) => {
+      sentUrl = url;
+      const body = init?.body;
+      sentBody = isString(body) ? JSON.parse(body) : undefined;
+
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ articles: [helpArticle], enabled: true }),
+          { status: 200 }
+        )
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await requestHelpArticles(
+      { organizationId, query: "invite team" },
+      new AbortController().signal
+    );
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(sentUrl).toBe(`${apiUrl}//api/widget/v1/help-articles`);
+    expect(sentBody).toEqual({ organizationId, query: "invite team" });
+    expect(result).toEqual({ articles: [helpArticle], enabled: true });
+  });
+
+  it("decodes a disabled help-center answer instead of treating it as a failure", async () => {
+    stubBootEnv();
+    stubFetch({ articles: [], enabled: false });
+
+    const result = await requestHelpArticles(
+      { organizationId, query: "invite team" },
+      new AbortController().signal
+    );
+
+    expect(result).toEqual({ articles: [], enabled: false });
   });
 
   it("reads the organization id through the boot contract", () => {

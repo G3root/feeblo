@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import { PUBLISHED_CHANGELOG_STATUS } from "../changelog/machine";
 import type { EmailSubscriptionTopic } from "../email-subscription/schema";
 import { CLOSING_POST_STATUS_TYPE } from "../post/status-intent";
+import { buildPublicSiteUrl } from "../site/url";
 import type { PostBoardVisibility } from "./access";
 import type {
   ChangelogTemplatePayload,
@@ -12,12 +13,6 @@ import type {
   EmailOutboxRecord,
   NotificationTemplatePayload,
 } from "./schema";
-
-/** A custom domain is stored as a bare host, but a person may paste a URL. */
-const urlSchemePattern = /^https?:\/\//;
-
-/** The trailing slash the same paste may carry. */
-const trailingSlashPattern = /\/$/;
 
 type ChangelogNotificationContent = {
   readonly template: "changelog";
@@ -206,21 +201,6 @@ export const isChangelogPubliclyVisible = (
       return entry?.status === PUBLISHED_CHANGELOG_STATUS;
     })
   );
-
-const buildPublicSiteUrl = (
-  site: { readonly subdomain: string; readonly customDomain: string | null },
-  appRootDomain: string
-): string => {
-  if (site.customDomain) {
-    const host = site.customDomain
-      .replace(urlSchemePattern, "")
-      .replace(trailingSlashPattern, "");
-
-    return `https://${host}`;
-  }
-
-  return `https://${site.subdomain}.${appRootDomain}`;
-};
 
 /** Resolves current product data into an immutable subscription-mail snapshot. */
 export const resolveSubscriptionNotificationContent = (

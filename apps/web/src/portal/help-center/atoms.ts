@@ -45,6 +45,30 @@ export const helpCenterArticlesPublicAtom = Atom.family(
     ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
 
+export type HelpCenterSearchAtomArgs = {
+  readonly organizationId: string;
+  readonly query: string;
+};
+
+/**
+ * The portal's search.
+ *
+ * A family keyed by the query, so typing is a series of cache lookups rather
+ * than a series of writes to one entry: a reader who deletes a character and
+ * retypes it gets the earlier answer back instead of a spinner. The idle TTL is
+ * shorter than the other reads because the key includes text that only exists
+ * for as long as somebody is typing it.
+ *
+ * Callers must memoize `args` — `Atom.family` keys on identity, so a fresh
+ * object literal per render is a fresh atom and a fresh request per render.
+ */
+export const helpCenterSearchPublicAtom = Atom.family(
+  (args: HelpCenterSearchAtomArgs) =>
+    DashboardClient.query("SearchHelpCenterArticlesPublic", args, {
+      reactivityKeys: helpCenterPublicReactivityKeys(args.organizationId),
+    }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("1 minute"))
+);
+
 export type HelpCenterArticlePublicAtomArgs = {
   readonly organizationId: string;
   readonly slug: string;

@@ -1,3 +1,4 @@
+import type { THelpCenterAnalyticsRange } from "@feeblo/domain/help-center-article/schema";
 import * as Atom from "effect/reactivity/Atom";
 
 import { DashboardClient, dashboardSWR } from "~/lib/atom-rpc";
@@ -60,4 +61,49 @@ export const updateHelpCenterArticleAtom = DashboardClient.mutation(
 
 export const deleteHelpCenterArticleAtom = DashboardClient.mutation(
   "DeleteHelpCenterArticle"
+);
+
+export type HelpCenterAnalyticsAtomArgs = {
+  readonly organizationId: string;
+  readonly range: THelpCenterAnalyticsRange;
+};
+
+/** The window the panel opens on. */
+export const DEFAULT_HELP_CENTER_ANALYTICS_RANGE =
+  "30d" satisfies THelpCenterAnalyticsRange;
+
+/**
+ * One window of help center traffic, verdicts and searches.
+ *
+ * Keyed by the window as well as the workspace, so switching the toggle is a
+ * cache lookup rather than a refetch of the other two windows. It shares the
+ * article reactivity key because a verdict cast on the portal changes what this
+ * panel reports: the reader's own write should move the number they are looking
+ * at.
+ */
+export const helpCenterAnalyticsAtom = Atom.family(
+  (args: HelpCenterAnalyticsAtomArgs) =>
+    DashboardClient.query("GetHelpCenterAnalytics", args, {
+      reactivityKeys: helpCenterArticleReactivityKeys(args.organizationId),
+    }).pipe(dashboardSWR("60 seconds"), Atom.setIdleTTL("5 minutes"))
+);
+
+export type HelpCenterSearchAtomArgs = {
+  readonly organizationId: string;
+  readonly query: string;
+};
+
+/**
+ * The dashboard's article search.
+ *
+ * A family keyed by the query, like the portal's, so a keystroke is a cache
+ * lookup and a deleted character is an answer that already exists. It shares
+ * the article reactivity key: renaming an article should refresh a search that
+ * would have matched the old title.
+ */
+export const helpCenterSearchAtom = Atom.family(
+  (args: HelpCenterSearchAtomArgs) =>
+    DashboardClient.query("SearchHelpCenterArticles", args, {
+      reactivityKeys: helpCenterArticleReactivityKeys(args.organizationId),
+    }).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("1 minute"))
 );

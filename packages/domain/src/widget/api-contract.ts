@@ -16,6 +16,8 @@ import {
   WidgetBoard,
   WidgetFeedbackCreate,
   WidgetFeedbackResponse,
+  WidgetHelpArticleRequest,
+  WidgetHelpArticles,
   WidgetSuggestion,
   WidgetSuggestionRequest,
   WidgetUpdate,
@@ -51,6 +53,23 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
     })
       .annotate(OpenApi.Title, "Suggest Posts")
       .annotate(OpenApi.Summary, "Find similar public posts")
+  )
+  .add(
+    HttpApiEndpoint.post("helpArticles", "/help-articles", {
+      payload: WidgetHelpArticleRequest,
+      success: WidgetHelpArticles,
+      error: Schema.Union([
+        DataValidationError,
+        InternalServerError,
+        RateLimitErrors,
+      ]),
+    })
+      .annotate(OpenApi.Title, "Help Articles")
+      .annotate(OpenApi.Summary, "Find help center articles that may answer it")
+      .annotate(
+        OpenApi.Description,
+        "Returns published help center articles that match the question being written, so the composer can offer existing documentation before a new post is created."
+      )
   )
   .add(
     HttpApiEndpoint.post("createFeedback", "/feedback", {

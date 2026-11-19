@@ -1,11 +1,14 @@
+import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-center-article";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
 import { helpCenterFeatureGate } from "../help-center/flag";
 import * as Policy from "../policy";
+import { PostEmbeddingService } from "../post/embedding-service";
 import * as RateLimit from "../rate-limit";
 import {
   BadRequestError,
@@ -16,23 +19,36 @@ import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
+  type HelpCenterEmbedder,
+  type HelpCenterEmbedding,
+  scheduleHelpCenterArticleEmbedding,
+} from "./embedding";
+import {
   FailedToDeleteHelpCenterArticleError,
   HelpCenterArticleChangedError,
   HelpCenterArticleSlugTakenError,
 } from "./errors";
-import { canTransitionHelpCenterArticle } from "./machine";
+import { makeHelpCenterSearch } from "./hybrid-search";
+import {
+  canTransitionHelpCenterArticle,
+  isHelpCenterArticleReadable,
+} from "./machine";
 import { HelpCenterArticlePolicy } from "./policies";
 import { HelpCenterArticleRepository } from "./repository";
 import { HelpCenterArticleRpcs } from "./rpcs";
-import type {
-  THelpCenterArticleCreate,
-  THelpCenterArticleDelete,
-  THelpCenterArticleGet,
-  THelpCenterArticleGetPublic,
-  THelpCenterArticleList,
-  THelpCenterArticleListPublic,
-  THelpCenterArticleUpdate,
-  THelpCenterArticleViewRecord,
+import {
+  HELP_CENTER_ANALYTICS_RANGE_DAYS,
+  type THelpCenterAnalyticsPayload,
+  type THelpCenterArticleCreate,
+  type THelpCenterArticleDelete,
+  type THelpCenterArticleGet,
+  type THelpCenterArticleGetPublic,
+  type THelpCenterArticleList,
+  type THelpCenterArticleListPublic,
+  type THelpCenterArticleSearch,
+  type THelpCenterArticleSearchPublic,
+  type THelpCenterArticleUpdate,
+  type THelpCenterArticleViewRecord,
 } from "./schema";
 import { normalizeArticleWrite } from "./write";
 
@@ -43,6 +59,83 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
   const repository = yield* HelpCenterArticleRepository;
   const articlePolicy = yield* HelpCenterArticlePolicy;
   const sitePolicy = yield* SitePolicy;
+
+  /**
+   * The deployment's embedder, when it has one.
+   *
+   * `serviceOption` rather than a layer requirement: an embedding service is an
+   * enhancement, and a process that has no API key configured must still serve
+   * a help center. The service is the post module's only because there is one
+   * model, one dimension, one key and one vector space — the article column and
+   * `post.embedding` are the same width and compared with the same metric, so a
+   * second embedder would be a second source of truth about which vectors may
+   * be compared.
+   */
+  const embeddingService = yield* Effect.serviceOption(PostEmbeddingService);
+
+  /**
+   * The deployment's embedder behind this module's infallible port.
+   *
+   * The provider's errors — a dimension mismatch, a timeout, an AI-layer
+   * failure — are all "we could not embed this" from here, and the caller
+   * treats them the same way: log, and let the article save or the search
+   * answer without a vector. Absorbing them here is what keeps a provider's
+   * union out of the write path's error channel.
+   */
+  const embeddings = Option.map(
+    embeddingService,
+    (service): HelpCenterEmbedder => ({
+      embed: (input) =>
+        service
+          .embed(input)
+          .pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning(
+                "Failed to generate a help center embedding",
+                cause
+              ).pipe(Effect.as(Option.none<HelpCenterEmbedding>()))
+            )
+          ),
+    })
+  );
+
+  const search = makeHelpCenterSearch({
+    embeddings,
+    lexical: repository.search,
+    semantic: repository.searchByVector,
+  });
+
+  /**
+   * Refresh an article's search embedding after a write, detached.
+   *
+   * Only for a state a reader can open: embedding a draft would spend a model
+   * call on a page no search may return, and the publication that makes it
+   * readable is itself an update, which schedules its own job.
+   */
+  const scheduleEmbedding = (args: {
+    readonly articleId: string;
+    readonly content: string;
+    readonly organizationId: string;
+    readonly status: THelpCenterArticleState;
+    readonly title: string;
+  }) =>
+    Effect.gen(function* () {
+      if (
+        !isHelpCenterArticleReadable(args.status) ||
+        Option.isNone(embeddings)
+      ) {
+        return;
+      }
+
+      yield* scheduleHelpCenterArticleEmbedding({
+        articleId: args.articleId,
+        content: args.content,
+        embedder: embeddings.value,
+        organizationId: args.organizationId,
+        repository,
+        title: args.title,
+      });
+    });
 
   return {
     ListHelpCenterArticles: (args: THelpCenterArticleList) =>
@@ -112,6 +205,14 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           position: args.position,
           now,
           write,
+        });
+
+        yield* scheduleEmbedding({
+          articleId: args.id,
+          content: write.content,
+          organizationId: args.organizationId,
+          status: write.status,
+          title: write.title,
         });
       }).pipe(
         Policy.withPolicy(articlePolicy.canCreate(args)),
@@ -183,6 +284,14 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         if (updated.length === 0) {
           return yield* new HelpCenterArticleChangedError();
         }
+
+        yield* scheduleEmbedding({
+          articleId: args.id,
+          content: write.content,
+          organizationId: args.organizationId,
+          status: write.status,
+          title: write.title,
+        });
       }).pipe(
         Policy.withPolicy(articlePolicy.canUpdate(args.organizationId)),
         withRemapDbErrors({
@@ -234,6 +343,104 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         // with a driver error, so the remap has to run after it to leave one
         // failure vocabulary on the channel.
         withRemapDbErrors("HelpCenterArticleView", "upsert"),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
+      ),
+
+    /**
+     * The dashboard's search.
+     *
+     * It counts no analytics: an editor searching their own workspace is not a
+     * reader looking for an answer, and counting it would make the "top
+     * searches" list an inventory of the team's drafts.
+     */
+    SearchHelpCenterArticles: (args: THelpCenterArticleSearch) =>
+      search({
+        includeUnreadable: true,
+        limit: args.limit ?? 10,
+        organizationId: args.organizationId,
+        query: args.query,
+      }).pipe(
+        Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
+        withRemapDbErrors("HelpCenterArticle", "select"),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
+      ),
+
+    /**
+     * The portal's search, and the only public read that writes.
+     *
+     * The counter is recorded after the rows are read, because "found" is the
+     * length of the answer. It is swallowed on failure: a reader's search must
+     * not fail because the analytics table is unavailable, and the read is the
+     * product.
+     */
+    SearchHelpCenterArticlesPublic: (args: THelpCenterArticleSearchPublic) =>
+      Effect.gen(function* () {
+        const hits = yield* search({
+          includeUnreadable: false,
+          limit: args.limit ?? 10,
+          organizationId: args.organizationId,
+          query: args.query,
+        });
+
+        const now = yield* DateTime.now;
+
+        yield* repository
+          .recordSearch({
+            found: hits.length > 0,
+            now,
+            organizationId: args.organizationId,
+            query: args.query,
+          })
+          .pipe(Effect.ignoreCause);
+
+        return hits.map((hit) => ({
+          excerpt: hit.excerpt,
+          id: hit.id,
+          isArchived: hit.status === "archived",
+          slug: hit.slug,
+          title: hit.title,
+          topicName: hit.topicName,
+          topicSlug: hit.topicSlug,
+        }));
+      }).pipe(
+        RateLimit.withPublicRpcRateLimit({
+          level: "read",
+          name: "SearchHelpCenterArticlesPublic",
+        }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewHelpCenter(args.organizationId)
+        ),
+        withRemapDbErrors("HelpCenterArticle", "select"),
+        Policy.withPublicPolicy(helpCenterFeatureGate)
+      ),
+
+    /**
+     * The dashboard's analytics.
+     *
+     * The window's first day is computed here rather than in the repository, so
+     * "now" is read through `Clock` once at the edge and a test can pin the
+     * range without reaching into the query.
+     */
+    GetHelpCenterAnalytics: (args: THelpCenterAnalyticsPayload) =>
+      Effect.gen(function* () {
+        const now = yield* DateTime.now;
+
+        const since = DateTime.formatIsoDateUtc(
+          DateTime.subtract({
+            days: HELP_CENTER_ANALYTICS_RANGE_DAYS[args.range],
+          })(now)
+        );
+
+        const result = yield* repository.analytics({
+          limit: 10,
+          organizationId: args.organizationId,
+          sinceDay: since,
+        });
+
+        return { ...result, range: args.range, since };
+      }).pipe(
+        Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
+        withRemapDbErrors("HelpCenterArticleAnalytics", "select"),
         Policy.withPublicPolicy(helpCenterFeatureGate)
       ),
   };

@@ -241,6 +241,44 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
       })
     );
 
+    it.effect("counts each verdict on the day it was cast", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const visitorId = visitorIdFor(fixture);
+
+        const cast = (helpful: boolean) =>
+          handlers
+            .SetHelpCenterArticleFeedback({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              helpful,
+              reason: helpful ? null : "Wrong section.",
+              visitorId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+        yield* cast(true);
+        yield* cast(false);
+
+        const rows = yield* db
+          .select({
+            helpful: schema.helpCenterArticleDailyTable.helpfulVerdicts,
+            unhelpful: schema.helpCenterArticleDailyTable.unhelpfulVerdicts,
+          })
+          .from(schema.helpCenterArticleDailyTable)
+          .where(
+            eq(schema.helpCenterArticleDailyTable.articleId, fixture.articleId)
+          );
+
+        // A flip is a second verdict cast, not a correction of the first: the
+        // bucket counts judgments made, which is what "was this helpful"
+        // measures. The standing distribution is the feedback table itself.
+        expect(rows).toStrictEqual([{ helpful: 1, unhelpful: 1 }]);
+      })
+    );
+
     it.effect("clears the reason when the verdict flips back to helpful", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
