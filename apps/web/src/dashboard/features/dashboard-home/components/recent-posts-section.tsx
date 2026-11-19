@@ -1,4 +1,5 @@
-import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
+import type { TBoard } from "@feeblo/domain/board/schema";
+import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { PostCard } from "@feeblo/post-ui/post/post-card";
 import { StandaloneUpvoteButton } from "@feeblo/post-ui/upvote-toggle";
@@ -39,20 +40,9 @@ interface Post {
   } | null;
 }
 
-interface Board {
-  icon: string | null;
-  id: string;
-  name: string;
-  slug: string;
-}
+type Board = Pick<TBoard, "icon" | "id" | "name" | "slug">;
 
-interface Status {
-  color?: string | null;
-  icon: string | null;
-  id: string;
-  label: string;
-  type: TPostStatusType;
-}
+type Status = Pick<TPostStatus, "color" | "icon" | "id" | "label" | "type">;
 
 interface RecentPostsSectionProps {
   organizationId: string;

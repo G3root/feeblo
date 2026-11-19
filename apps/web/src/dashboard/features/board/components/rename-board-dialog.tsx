@@ -83,9 +83,10 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
   const store = useRenameBoardDialogContext();
   const boardId = useSelector(store, (state) => state.context.data.boardId);
   const navigate = useNavigate();
-  // Captured when the sheet opened: a refetch can change the row under the
-  // form, and a save must compare against the value the editor started with.
-  const initialIcon = useRef(board.icon);
+  // Whether the picker was used, not whether the value differs from the row:
+  // a refetch can change the row under the form, and an untouched icon must be
+  // omitted rather than written back from a stale form value.
+  const iconTouched = useRef(false);
 
   const form = useAppForm({
     ...boardFormOpts,
@@ -102,11 +103,6 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
         const visibilityIsDirty =
           formApi.getFieldMeta("visibility")?.isDirty ?? false;
 
-        // Compare with the value the sheet opened with, not `isDirty`: the
-        // form's defaults can be replaced by a refetch, and a save that only
-        // changed one field must not repoint the others.
-        const iconChanged = value.icon !== initialIcon.current;
-
         const tx = boardCollection.update(boardId, (draft) => {
           if (nameIsDirty) {
             draft.name = value.name;
@@ -117,7 +113,7 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
             draft.visibility = value.visibility;
           }
 
-          if (iconChanged) {
+          if (iconTouched.current) {
             draft.icon = value.icon;
           }
         });
@@ -166,7 +162,10 @@ function RenameBoardFormFields({ board }: { board: RenameBoardRow }) {
             <IconPickerField
               fallbackIcon={DEFAULT_BOARD_ICON}
               label="Choose icon"
-              onChange={(icon) => field.handleChange(icon)}
+              onChange={(icon) => {
+                iconTouched.current = true;
+                field.handleChange(icon);
+              }}
               value={field.state.value}
             />
           )}

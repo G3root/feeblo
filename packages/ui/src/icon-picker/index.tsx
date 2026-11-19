@@ -1582,10 +1582,18 @@ function IconPickerField({
         <TablerIcon name={selected} />
         <span>{label}</span>
       </PopoverTrigger>
-      <PopoverPopup align="start" className="w-auto p-2" sideOffset={6}>
+      <PopoverPopup
+        align="start"
+        aria-label={label}
+        className="w-auto p-2"
+        sideOffset={6}
+      >
         <IconPickerContent
           onIconSelect={(icon) => {
-            onChange(icon.name);
+            // Selecting the entity default is the same "no override" state as
+            // "Use default"; storing the catalogue name would make it look
+            // like a custom choice after the default artwork changes.
+            onChange(icon.name === fallbackIcon ? null : icon.name);
             setOpen(false);
           }}
           value={selected}

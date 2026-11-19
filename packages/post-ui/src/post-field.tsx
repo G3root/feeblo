@@ -187,7 +187,7 @@ export function StatusField({
   );
 }
 
-type PostBoardSelectProps = {
+export type PostBoardSelectProps = {
   boards: { icon?: string | null; id: string; name: string }[];
   currentBoardId: string;
   onValueChange: (boardId: string | null) => void;

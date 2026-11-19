@@ -5,15 +5,24 @@ import { createContext, use } from "react";
 
 import type { HomePageSortOption } from "../../hooks/use-home-page-filters";
 
-export type HomeFilterItem = {
+type HomeFilterItemBase = {
   count: number;
-  /** The board or status mark; absent on the "all" row. */
-  icon?: string | null;
   label: string;
-  /** Present on status rows, absent on board rows and "all". */
-  statusType?: TPostStatus["type"];
   value: string;
 };
+
+/**
+ * A row in the board or status filter. The variants keep an "all" row from
+ * carrying a mark and a status row from omitting its vocabulary.
+ */
+export type HomeFilterItem =
+  | (HomeFilterItemBase & { kind: "all" })
+  | (HomeFilterItemBase & { icon: TBoard["icon"]; kind: "board" })
+  | (HomeFilterItemBase & {
+      icon: TPostStatus["icon"];
+      kind: "status";
+      statusType: TPostStatus["type"];
+    });
 
 export type HomePost = {
   board: TBoard;

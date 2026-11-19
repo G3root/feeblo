@@ -34,9 +34,9 @@ export function HomeBoardSelect({ className }: { className?: string }) {
 
             return item ? (
               <span className="flex items-center gap-2">
-                {item.icon === undefined ? null : (
+                {item.kind === "board" ? (
                   <TablerIcon name={boardIconName(item.icon)} />
-                )}
+                ) : null}
                 {item.label}
               </span>
             ) : null;
@@ -47,9 +47,9 @@ export function HomeBoardSelect({ className }: { className?: string }) {
         {boardItems.map((item) => (
           <SelectItem key={item.value} value={item.value}>
             <span className="flex items-center gap-2">
-              {item.icon === undefined ? null : (
+              {item.kind === "board" ? (
                 <TablerIcon name={boardIconName(item.icon)} />
-              )}
+              ) : null}
               {item.label}
             </span>
           </SelectItem>
