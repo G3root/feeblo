@@ -23,6 +23,10 @@ import solid from "vite-plugin-solid";
  * every deploy rewrites them, and the HTML shell is served no-store.
  */
 export default defineConfig({
+  // The iframe shell loads the bundle from `/widget`. Without a matching base,
+  // a `?url` asset would resolve to `/assets/...` even though the build writes
+  // it under `public/widget/assets/`.
+  base: "/widget/",
   plugins: [
     iconsSpritesheet({
       withTypes: true,
