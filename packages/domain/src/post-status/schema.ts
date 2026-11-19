@@ -30,6 +30,12 @@ const PostStatusFields = {
   type: PostStatusType,
   label: S.String,
   color: S.optional(S.NullOr(S.String)),
+  /**
+   * A Tabler icon name chosen in the dashboard's picker. Null keeps the
+   * type's default mark, so a status created before the picker existed still
+   * renders one.
+   */
+  icon: S.NullOr(S.String),
   orderIndex: S.Finite,
   isDefault: S.Boolean,
   organizationId: S.String,
@@ -63,6 +69,7 @@ export const PostStatusCreate = S.Struct({
   type: PostStatusType,
   label: S.String.check(S.isBetweenLength(1, 60)),
   color: S.NullOr(S.String),
+  icon: S.optional(S.NullOr(S.String)),
   orderIndex: S.Int,
 });
 
@@ -79,6 +86,7 @@ export const PostStatusUpdate = S.Struct({
   type: PostStatusType,
   label: S.String.check(S.isBetweenLength(1, 60)),
   color: S.NullOr(S.String),
+  icon: S.optional(S.NullOr(S.String)),
 });
 
 export type TPostStatusUpdate = S.Schema.Type<typeof PostStatusUpdate>;

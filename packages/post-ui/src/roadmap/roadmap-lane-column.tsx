@@ -16,6 +16,7 @@ interface RoadmapLaneColumnProps {
   label?: string;
   name?: string;
   status?: RoadmapStatus;
+  statusIcon?: string | null;
   totalPosts?: number;
 }
 
@@ -28,6 +29,7 @@ export function RoadmapLaneColumn({
   label,
   name,
   status,
+  statusIcon,
   totalPosts,
 }: RoadmapLaneColumnProps) {
   const readableStatus =
@@ -46,7 +48,10 @@ export function RoadmapLaneColumn({
       <div className="px-3 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            {icon ?? (status ? <RoadmapStatusIcon status={status} /> : null)}
+            {icon ??
+              (status ? (
+                <RoadmapStatusIcon icon={statusIcon} status={status} />
+              ) : null)}
             <h3 className="text-sm font-medium">{readableStatus}</h3>
           </div>
           {resolvedAction}

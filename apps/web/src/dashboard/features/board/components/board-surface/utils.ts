@@ -9,6 +9,8 @@ import type {
 } from "./types";
 
 type BoardGroupingStatus = {
+  /** Optional so a test fixture or a partial status row still groups. */
+  icon?: string | null;
   id: string;
   label: string;
   type: BoardPostStatus;
@@ -81,6 +83,7 @@ function groupByStatus(
       label: string;
       posts: BoardPostRow[];
       status: BoardPostStatus;
+      statusIcon?: string | null;
       statusId: string;
     }
   >(
@@ -90,6 +93,7 @@ function groupByStatus(
         label: status.label,
         posts: [],
         status: status.type,
+        statusIcon: status.icon,
         statusId: status.id,
       },
     ])
@@ -107,6 +111,7 @@ function groupByStatus(
       label: "",
       posts: [post],
       status: post.status,
+      statusIcon: post.statusIcon,
       statusId: post.statusId,
     });
   }
@@ -123,6 +128,7 @@ function groupByStatus(
       label: lane.label,
       posts: lane.posts,
       status: lane.status,
+      statusIcon: lane.statusIcon,
       statusId: lane.statusId,
     });
   }
@@ -178,7 +184,10 @@ function groupByAssignee(
 }
 
 function groupByBoard(posts: readonly BoardPostRow[]): BoardPostLane[] {
-  const byBoard = new Map<string, { label: string; posts: BoardPostRow[] }>();
+  const byBoard = new Map<
+    string,
+    { boardIcon?: string | null; label: string; posts: BoardPostRow[] }
+  >();
 
   for (const post of posts) {
     const board = byBoard.get(post.boardId);
@@ -187,6 +196,7 @@ function groupByBoard(posts: readonly BoardPostRow[]): BoardPostLane[] {
       board.posts.push(post);
     } else {
       byBoard.set(post.boardId, {
+        boardIcon: post.boardIcon,
         label: post.boardName || "No board",
         posts: [post],
       });
@@ -196,6 +206,7 @@ function groupByBoard(posts: readonly BoardPostRow[]): BoardPostLane[] {
   return [...byBoard.entries()]
     .toSorted((left, right) => left[1].label.localeCompare(right[1].label))
     .map(([id, board]) => ({
+      boardIcon: board.boardIcon,
       id,
       label: board.label,
       posts: board.posts,

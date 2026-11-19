@@ -1,19 +1,21 @@
 import { cn } from "@feeblo/ui/utils";
-import {
-  BOARD_LANE_COLOR_MAP,
-  BoardIconMap,
-} from "@feeblo/web-shared/board/constants";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { BOARD_LANE_COLOR_MAP } from "@feeblo/web-shared/board/constants";
 
+import { PostStatusIcon } from "../post-status-icon";
 import type { RoadmapStatus } from "./types";
 
-export function RoadmapStatusIcon({ status }: { status: RoadmapStatus }) {
-  const Icon = BoardIconMap[status] ?? BoardIconMap.PLANNED;
+export function RoadmapStatusIcon({
+  icon,
+  status,
+}: {
+  icon?: string | null;
+  status: RoadmapStatus;
+}) {
   const color = BOARD_LANE_COLOR_MAP[status];
 
   return (
     <span className={cn("inline-flex items-center justify-center", color)}>
-      <HugeiconsIcon className="size-4" icon={Icon} strokeWidth={2.5} />
+      <PostStatusIcon icon={icon} type={status} />
     </span>
   );
 }

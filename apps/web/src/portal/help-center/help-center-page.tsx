@@ -8,7 +8,9 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import { Skeleton } from "@feeblo/ui/skeleton";
+import { helpCenterTopicIconName } from "@feeblo/web-shared/icons/defaults";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 
@@ -92,7 +94,13 @@ export function HelpCenterPage() {
           return (
             <section key={topic.id} className="rounded-lg border">
               <header className="border-b px-4 py-3">
-                <h2 className="text-sm font-semibold">{topic.name}</h2>
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                  <TablerIcon
+                    className="text-muted-foreground size-4"
+                    name={helpCenterTopicIconName(topic.icon)}
+                  />
+                  {topic.name}
+                </h2>
                 {topic.description === null ? null : (
                   <p className="text-muted-foreground text-xs">
                     {topic.description}

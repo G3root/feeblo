@@ -9,18 +9,20 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@feeblo/ui/combobox";
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import { SelectButton } from "@feeblo/ui/select";
 import { cn } from "@feeblo/ui/utils";
 import {
   BOARD_LANE_COLOR_MAP,
-  BoardIconMap,
   type BoardPostStatus,
 } from "@feeblo/web-shared/board/constants";
-import { DashedLine02Icon, Search01Icon } from "@hugeicons/core-free-icons";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
+import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import { m } from "./paraglide/messages.js";
 import { formatPostStatus } from "./post-status";
+import { PostStatusIcon } from "./post-status-icon";
 
 export function FieldRow({
   label,
@@ -39,6 +41,13 @@ export function FieldRow({
   );
 }
 
+type PostStatusChoice = Pick<TPostStatus, "id" | "label" | "type"> &
+  /**
+   * Optional because a caller that builds its own option list may not carry
+   * the icon; the status then renders its type's default.
+   */
+  Partial<Pick<TPostStatus, "icon">>;
+
 export function StatusField({
   currentStatusId,
   statuses,
@@ -50,10 +59,8 @@ export function StatusField({
 }: {
   /** Null renders the placeholder: the field supports "nothing selected". */
   currentStatusId: string | null;
-  statuses: readonly Pick<TPostStatus, "id" | "label" | "type">[];
-  onValueChange: (
-    status: Pick<TPostStatus, "id" | "label" | "type"> | null
-  ) => void;
+  statuses: readonly PostStatusChoice[];
+  onValueChange: (status: PostStatusChoice | null) => void;
   disabled?: boolean;
   placeholder?: string;
   /** Hide the chevron for a row that renders the control as plain text. */
@@ -62,6 +69,7 @@ export function StatusField({
   triggerClassName?: string;
 }) {
   const items = statuses.map((postStatus) => ({
+    icon: postStatus.icon,
     label: postStatus.label || formatPostStatus(postStatus.type),
     type: postStatus.type,
     value: postStatus.id,
@@ -75,6 +83,7 @@ export function StatusField({
   const defaultValue = currentStatus
     ? {
         value: currentStatus.id,
+        icon: currentStatus.icon,
         label: currentStatus.label || formatPostStatus(currentStatus.type),
         type: currentStatus.type,
       }
@@ -91,6 +100,7 @@ export function StatusField({
           value
             ? {
                 id: value.value,
+                icon: value.icon,
                 label: value.label,
                 // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
                 type: value.type as BoardPostStatus,
@@ -109,25 +119,36 @@ export function StatusField({
         }
       >
         <ComboboxValue placeholder={placeholder}>
-          {(value) => (
-            <span className="flex items-center gap-2">
-              {value ? (
-                <>
-                  <HugeiconsIcon
-                    className={cn(
-                      "size-4",
-                      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                      BOARD_LANE_COLOR_MAP[value.type as BoardPostStatus]
-                    )}
-                    // SAFETY: The upstream contract guarantees this value here.
-                    icon={BoardIconMap[value.type as BoardPostStatus]}
-                    strokeWidth={2}
-                  />
-                  {value.label}
-                </>
-              ) : null}
-            </span>
-          )}
+          {(value) => {
+            if (!value) {
+              return null;
+            }
+
+            const current = statuses.find(
+              (status) => status.id === value.value
+            );
+
+            // One row decides every part of the trigger: an icon change and a
+            // section change that keep the id must not disagree.
+            // SAFETY: The items are built from TPostStatus rows, so both
+            // branches are a status type.
+            const type = (current?.type ?? value.type) as BoardPostStatus;
+            const icon = current === undefined ? value.icon : current.icon;
+
+            const label =
+              current === undefined
+                ? value.label
+                : current.label || formatPostStatus(current.type);
+
+            return (
+              <span className="flex items-center gap-2">
+                <span className={cn(BOARD_LANE_COLOR_MAP[type])}>
+                  <PostStatusIcon icon={icon} type={type} />
+                </span>
+                {label}
+              </span>
+            );
+          }}
         </ComboboxValue>
       </ComboboxTrigger>
       <ComboboxPopup aria-label={m.safe_jolly_shell()} className="w-full">
@@ -144,18 +165,18 @@ export function StatusField({
           {(item) => (
             <ComboboxItem key={item.value} value={item}>
               <span className="flex items-center gap-2 whitespace-nowrap">
-                <HugeiconsIcon
+                <span
                   className={cn(
                     // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
-                    // SAFETY: The upstream contract guarantees this value here.
-                    "size-4",
-                    // SAFETY: The upstream contract guarantees this value here.
                     BOARD_LANE_COLOR_MAP[item.type as BoardPostStatus]
                   )}
-                  // SAFETY: The upstream contract guarantees this value here.
-                  icon={BoardIconMap[item.type as BoardPostStatus]}
-                  strokeWidth={2}
-                />
+                >
+                  <PostStatusIcon
+                    icon={item.icon}
+                    // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+                    type={item.type as BoardPostStatus}
+                  />
+                </span>
                 {item.label}
               </span>
             </ComboboxItem>
@@ -167,7 +188,7 @@ export function StatusField({
 }
 
 type PostBoardSelectProps = {
-  boards: { id: string; name: string }[];
+  boards: { icon?: string | null; id: string; name: string }[];
   currentBoardId: string;
   onValueChange: (boardId: string | null) => void;
   disabled?: boolean;
@@ -186,8 +207,9 @@ export function PostBoardSelect({
   const currentBoard = boards.find((b) => b.id === currentBoardId);
 
   const items = boards.map((board) => ({
-    value: board.id,
+    icon: board.icon,
     label: board.name,
+    value: board.id,
   }));
 
   return (
@@ -197,7 +219,11 @@ export function PostBoardSelect({
       onValueChange={(board) => onValueChange(board?.value ?? null)}
       value={
         currentBoard
-          ? { value: currentBoard.id, label: currentBoard.name }
+          ? {
+              icon: currentBoard.icon,
+              label: currentBoard.name,
+              value: currentBoard.id,
+            }
           : null
       }
     >
@@ -215,11 +241,7 @@ export function PostBoardSelect({
             <span className="flex items-center gap-2">
               {value ? (
                 <>
-                  <HugeiconsIcon
-                    className="text-primary-blue size-4"
-                    icon={DashedLine02Icon}
-                    strokeWidth={2}
-                  />
+                  <TablerIcon name={boardIconName(value.icon)} />
                   {value.label}
                 </>
               ) : (
@@ -245,11 +267,7 @@ export function PostBoardSelect({
           {(item) => (
             <ComboboxItem key={item.value} value={item}>
               <span className="flex items-center gap-2 whitespace-nowrap">
-                <HugeiconsIcon
-                  className="text-primary-blue size-4"
-                  icon={DashedLine02Icon}
-                  strokeWidth={2}
-                />
+                <TablerIcon name={boardIconName(item.icon)} />
                 {item.label}
               </span>
             </ComboboxItem>

@@ -28,7 +28,7 @@ import {
   helpCenterArticleFormValues,
   type HelpCenterArticleFormValues,
 } from "../help-center-forms";
-import { HelpCenterTopicIcon } from "./help-center-topic-icons";
+import { HelpCenterTopicIcon } from "./help-center-topic-icon";
 
 /**
  * What the editor is editing, as a discriminated union rather than an optional

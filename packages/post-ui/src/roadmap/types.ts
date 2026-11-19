@@ -7,6 +7,7 @@ export type RoadmapColumnDefinition = {
   name: string;
   roadmapId: string;
   statusId: string;
+  statusIcon?: string | null;
   type: RoadmapStatus;
   label: string;
 };
@@ -17,6 +18,7 @@ export type RoadmapPost = {
   id: string;
   slug: string;
   status: RoadmapStatus;
+  statusIcon?: string | null;
   statusId: string;
   summary: string;
   title: string;
@@ -33,5 +35,6 @@ export type RoadmapLane<TPost extends RoadmapPost = RoadmapPost> = {
   name?: string;
   posts: TPost[];
   status: RoadmapStatus;
+  statusIcon?: string | null;
   statusId: string;
 };

@@ -233,6 +233,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
             type: status.type,
             label: status.label,
             color: status.color,
+            icon: status.icon,
           },
           createdAt: post.createdAt,
           upvoteCount: coalesce(upvoteCounts.upvoteCount, 0),
@@ -272,7 +273,9 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       { count: totalPosts, label: m.curly_many_badger(), value: "all" },
       ...statuses.map((status) => ({
         count: countMap.get(status.id) ?? 0,
+        icon: status.icon,
         label: status.label || formatPostStatus(status.type),
+        statusType: status.type,
         value: status.id,
       })),
     ];
@@ -298,6 +301,7 @@ export function HomeProvider({ children }: { children: ReactNode }) {
       { count: totalPosts, label: m.spry_male_nils(), value: "all" },
       ...boards.map((board) => ({
         count: countMap.get(board.slug) ?? 0,
+        icon: board.icon,
         label: board.name,
         value: board.slug,
       })),

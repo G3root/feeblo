@@ -20,7 +20,8 @@ type TCanDelete = {
 type TCanUpdate = {
   organizationId: string;
   boardId: string;
-  visibility: "PUBLIC" | "PRIVATE";
+  /** Omitted when the update does not change visibility. */
+  visibility?: "PUBLIC" | "PRIVATE" | undefined;
 };
 
 const makeBoardPolicy = Effect.gen(function* () {

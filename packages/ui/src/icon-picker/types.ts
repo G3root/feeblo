@@ -166,6 +166,26 @@ export type IconPickerActiveIconProps = {
   children: (props: IconPickerActiveIconRenderProps) => ReactNode;
 };
 
+/**
+ * The picker behind a trigger button, in a popover.
+ *
+ * A convenience composition rather than a fifth part: the picker itself does
+ * not own a popover, and the settings dialogs that select an entity icon would
+ * otherwise each repeat the same trigger, popup and preload wiring. `onChange`
+ * reports the Tabler name the caller stores, or null when "Use default" was
+ * chosen so the caller can persist "no override" rather than a catalogue name.
+ */
+export type IconPickerFieldProps = {
+  className?: string;
+  disabled?: boolean;
+  /** The icon a null value renders and "Use default" restores. */
+  fallbackIcon: string;
+  /** The trigger's visible text and accessible name. */
+  label?: string;
+  onChange: (name: string | null) => void;
+  value: string | null | undefined;
+};
+
 export type IconPickerContentProps = Omit<IconPickerRootProps, "children"> & {
   /**
    * The message shown when a search has no matches.

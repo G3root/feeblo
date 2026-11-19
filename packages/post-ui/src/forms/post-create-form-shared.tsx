@@ -184,7 +184,7 @@ export const PostBoardField = withForm({
   props: {
     // SAFETY: [] satisfies the boards contract; consumers always provide the
     // real board list when mounting the field.
-    boards: [] as Array<{ id: string; name: string }>,
+    boards: [] as Array<{ icon?: string | null; id: string; name: string }>,
   },
   render: ({ form, boards }) => {
     return (

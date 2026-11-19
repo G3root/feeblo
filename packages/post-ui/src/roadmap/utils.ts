@@ -31,6 +31,7 @@ export function groupRoadmapPostsByStatus<TPost extends RoadmapPost>(
         name: column.name,
         posts: [],
         status: column.type,
+        statusIcon: column.statusIcon,
         statusId: column.statusId,
       },
     ])

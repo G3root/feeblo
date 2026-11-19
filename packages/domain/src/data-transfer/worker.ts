@@ -280,6 +280,7 @@ const resolveBatchBoards = ({
         .create({
           creatorId: job.createdByUserId,
           creatorMemberId: job.createdByMemberId,
+          icon: null,
           id: yield* BoardId.generate,
           name,
           organizationId: job.organizationId,

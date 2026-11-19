@@ -4,19 +4,14 @@ import type { THelpCenterTopic } from "@feeblo/domain/help-center-topic/schema";
 import { formOptions } from "@tanstack/react-form";
 import { z } from "zod";
 
-import {
-  DEFAULT_HELP_CENTER_TOPIC_ICON,
-  HELP_CENTER_TOPIC_ICON_KEYS,
-  type THelpCenterTopicIcon,
-} from "./components/help-center-topic-icons";
-
 /**
  * The topic form's shape, and the labels its controls render.
  *
  * The schema mirrors the server's bounds rather than defining them: a courtesy
  * check that turns a round trip into an inline message, with the RPC as the
- * enforcement point. `icon` is an enum over the catalogue, so a stored value
- * the picker cannot render is a validation failure instead of an empty tile.
+ * enforcement point. `icon` is a Tabler name from the picker; an unknown name
+ * renders the client's default rather than an empty tile, so the form only
+ * enforces the column's length.
  */
 export const helpCenterTopicFormSchema = z.object({
   name: z
@@ -25,7 +20,7 @@ export const helpCenterTopicFormSchema = z.object({
     .min(1, "A section needs a name.")
     .max(100, "Use 100 characters or fewer."),
   description: z.string().trim().max(500, "Use 500 characters or fewer."),
-  icon: z.enum(HELP_CENTER_TOPIC_ICON_KEYS),
+  icon: z.string().trim().max(64).nullable(),
 });
 
 export type HelpCenterTopicFormValues = z.infer<
@@ -47,15 +42,12 @@ export type HelpCenterTopicFormSeed = Pick<
 >;
 
 export const helpCenterTopicFormValues = (
-  topic?: HelpCenterTopicFormSeed,
-  fallbackIcon: THelpCenterTopicIcon = DEFAULT_HELP_CENTER_TOPIC_ICON
+  topic?: HelpCenterTopicFormSeed
 ): HelpCenterTopicFormValues => ({
   description: topic?.description ?? "",
-  // `find` over the tuple already narrows to the icon union, so the fallback is
-  // the only `undefined` it can return.
-  icon:
-    HELP_CENTER_TOPIC_ICON_KEYS.find((key) => key === topic?.icon) ??
-    fallbackIcon,
+  // Null means "no override": the picker shows the client default, and a
+  // "Use default" reset stays null instead of persisting that default.
+  icon: topic?.icon ?? null,
   name: topic?.name ?? "",
 });
 

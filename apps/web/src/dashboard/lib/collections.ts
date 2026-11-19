@@ -339,6 +339,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
             type: newStatus.type,
             label: newStatus.label,
             color: newStatus.color ?? null,
+            icon: newStatus.icon ?? null,
             orderIndex: newStatus.orderIndex,
           })
         );
@@ -346,7 +347,7 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
-        const { modified: updatedStatus } = mutation;
+        const { modified: updatedStatus, original: previousStatus } = mutation;
         const organizationId = scope.organizationId;
 
         if (!organizationId) {
@@ -360,6 +361,9 @@ export function postStatusCollection(scope: DashboardCollectionScope) {
             type: updatedStatus.type,
             label: updatedStatus.label,
             color: updatedStatus.color ?? null,
+            ...(updatedStatus.icon === previousStatus.icon
+              ? {}
+              : { icon: updatedStatus.icon }),
           })
         );
         await collection.utils.refetch({ throwOnError: true });
@@ -788,6 +792,7 @@ export function boardCollection(scope: DashboardCollectionScope) {
             rpc.CreateBoard({
               id: newBoard.id,
               name: newBoard.name,
+              icon: newBoard.icon ?? null,
               visibility: newBoard.visibility,
               organizationId: newBoard.organizationId,
             }),
@@ -812,15 +817,25 @@ export function boardCollection(scope: DashboardCollectionScope) {
       },
       onUpdate: async ({ collection, transaction }) => {
         const mutation = transaction.mutations[0];
-        const { modified: updatedBoard } = mutation;
+        const { modified: updatedBoard, original: previousBoard } = mutation;
 
+        // Only the fields this edit actually changed. `UpdateBoard` treats an
+        // omitted field as "leave it alone", so a concurrent change to another
+        // field is not overwritten by this row's cached copy.
         await fetchRpc(
           (rpc) =>
             rpc.UpdateBoard({
               id: updatedBoard.id,
-              name: updatedBoard.name,
-              visibility: updatedBoard.visibility,
               organizationId: updatedBoard.organizationId,
+              ...(updatedBoard.name === previousBoard.name
+                ? {}
+                : { name: updatedBoard.name }),
+              ...(updatedBoard.icon === previousBoard.icon
+                ? {}
+                : { icon: updatedBoard.icon }),
+              ...(updatedBoard.visibility === previousBoard.visibility
+                ? {}
+                : { visibility: updatedBoard.visibility }),
             }),
           {}
         );

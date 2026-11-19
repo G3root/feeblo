@@ -3,13 +3,13 @@ import { DragDropProvider } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
+import { PostStatusIcon } from "@feeblo/post-ui/post-status-icon";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { toastManager } from "@feeblo/ui/toast";
 import { cn } from "@feeblo/ui/utils";
-import { BoardIconMap } from "@feeblo/web-shared/board/constants";
 import { hasPermission, PolicyGuard } from "@feeblo/web-shared/use-policy";
 import {
   CheckmarkBadge01Icon,
@@ -36,6 +36,7 @@ import { postStatusSections } from "../sections";
 
 type StatusRow = {
   color?: string | null;
+  icon?: string | null;
   id: string;
   isDefault: boolean;
   label: string;
@@ -261,7 +262,6 @@ function PostStatusRow({
     data: { type: status.type },
   });
 
-  const Icon = BoardIconMap[status.type];
   const label = status.label || formatPostStatus(status.type);
 
   /**
@@ -318,7 +318,7 @@ function PostStatusRow({
         className="inline-flex items-center justify-center"
         style={status.color ? { color: status.color } : undefined}
       >
-        <HugeiconsIcon className="size-4" icon={Icon} strokeWidth={2.5} />
+        <PostStatusIcon icon={status.icon} type={status.type} />
       </span>
 
       <span className="min-w-0 flex-1 truncate text-sm font-medium">

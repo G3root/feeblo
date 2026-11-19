@@ -1,3 +1,4 @@
+import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
 import { PostCard } from "@feeblo/post-ui/post/post-card";
 import { StandaloneUpvoteButton } from "@feeblo/post-ui/upvote-toggle";
@@ -39,16 +40,18 @@ interface Post {
 }
 
 interface Board {
+  icon: string | null;
   id: string;
   name: string;
   slug: string;
 }
 
 interface Status {
-  id: string;
-  type: string;
-  label: string;
   color?: string | null;
+  icon: string | null;
+  id: string;
+  label: string;
+  type: TPostStatusType;
 }
 
 interface RecentPostsSectionProps {
@@ -149,11 +152,15 @@ export function RecentPostsSection({
               {status && (
                 <PostCard.Status
                   color={status.color ?? undefined}
+                  icon={status.icon}
                   label={status.label || formatPostStatus(status.type)}
+                  type={status.type}
                 />
               )}
               {board?.name && (
-                <PostCard.BoardBadge>{board.name}</PostCard.BoardBadge>
+                <PostCard.BoardBadge icon={board.icon}>
+                  {board.name}
+                </PostCard.BoardBadge>
               )}
               <PostCard.Author
                 image={post.user?.image}

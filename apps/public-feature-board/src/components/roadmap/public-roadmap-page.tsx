@@ -198,6 +198,7 @@ function PublicRoadmapBoardContent() {
                   key={post.id}
                   onClick={() => openPost(post.slug)}
                   status={post.status}
+                  statusIcon={post.statusIcon}
                   title={post.title}
                   updatedAt={post.updatedAt}
                 />

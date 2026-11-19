@@ -20,8 +20,11 @@ interface BoardGridLaneColumnProps {
   id: string;
   index: number;
   label: string;
+  /** Present only for a board lane. */
+  boardIcon?: string | null;
   /** Present only for a status lane. */
   status?: BoardPostStatus;
+  statusIcon?: string | null;
   statusId?: string;
   totalPosts: number;
 }
@@ -31,7 +34,9 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
   index,
   children,
   totalPosts,
+  boardIcon,
   status,
+  statusIcon,
   statusId,
   boardId,
   groupBy,
@@ -74,7 +79,14 @@ const BoardGridLaneColumn = memo(function BoardGridLaneColumn({
         ) : undefined
       }
       contentRef={ref}
-      icon={<BoardLaneIcon groupBy={groupBy} status={status} />}
+      icon={
+        <BoardLaneIcon
+          boardIcon={boardIcon}
+          groupBy={groupBy}
+          status={status}
+          statusIcon={statusIcon}
+        />
+      }
       isHighlighted={isDropTarget}
       label={effectiveLabel}
       status={status}

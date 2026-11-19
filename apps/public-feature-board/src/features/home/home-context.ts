@@ -7,14 +7,18 @@ import type { HomePageSortOption } from "../../hooks/use-home-page-filters";
 
 export type HomeFilterItem = {
   count: number;
+  /** The board or status mark; absent on the "all" row. */
+  icon?: string | null;
   label: string;
+  /** Present on status rows, absent on board rows and "all". */
+  statusType?: TPostStatus["type"];
   value: string;
 };
 
 export type HomePost = {
   board: TBoard;
   post: TPostListItem;
-  status: Pick<TPostStatus, "color" | "label" | "type">;
+  status: Pick<TPostStatus, "color" | "icon" | "label" | "type">;
 };
 
 export type HomeFilters = {

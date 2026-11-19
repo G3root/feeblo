@@ -59,6 +59,7 @@ type UseBoardPostsDataOptions = {
  */
 function visiblePostStatuses(
   postStatuses: ReadonlyArray<{
+    icon: string | null;
     id: string;
     type: BoardPostStatus;
     label: string;
@@ -322,6 +323,7 @@ export function useBoardPostsData({
           archivedAt: post.archivedAt,
           assigneeMemberId: post.assigneeMemberId,
           authorIsMember: post.authorIsMember,
+          boardIcon: board.icon,
           boardId: post.boardId,
           boardName: coalesce(board.name, ""),
           boardSlug: coalesce(board.slug, ""),
@@ -330,6 +332,7 @@ export function useBoardPostsData({
           slug: post.slug,
           statusId: post.statusId,
           status: postStatus.type,
+          statusIcon: postStatus.icon,
           summary: post.excerpt,
           title: post.title,
           updatedAt: post.updatedAt,

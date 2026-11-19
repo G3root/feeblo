@@ -1,4 +1,7 @@
-import type { TPostStatusType } from "@feeblo/domain/post-status/schema";
+import type {
+  TPostStatus,
+  TPostStatusType,
+} from "@feeblo/domain/post-status/schema";
 import { Button } from "@feeblo/ui/button";
 import {
   Dialog,
@@ -12,6 +15,7 @@ import {
 } from "@feeblo/ui/dialog";
 import { Field, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { IconPickerField } from "@feeblo/ui/icon-picker";
 import {
   Select,
   SelectItem,
@@ -20,8 +24,10 @@ import {
   SelectValue,
 } from "@feeblo/ui/select";
 import { toastManager } from "@feeblo/ui/toast";
+import { DEFAULT_POST_STATUS_ICONS } from "@feeblo/web-shared/icons/defaults";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { useSelector } from "@xstate/store-react";
+import { useRef } from "react";
 import { z } from "zod";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
@@ -59,6 +65,7 @@ export function PostStatusEditDialog() {
             key={status.id}
             status={{
               color: status.color ?? null,
+              icon: status.icon ?? null,
               id: status.id,
               label: status.label,
               type: status.type,
@@ -70,26 +77,31 @@ export function PostStatusEditDialog() {
   );
 }
 
-type EditableStatus = {
-  color: string | null;
-  id: string;
-  label: string;
-  type: TPostStatusType;
+type EditableStatus = Pick<TPostStatus, "icon" | "id" | "label" | "type"> & {
+  /** The projection normalizes the optional column to an explicit null. */
+  color: Exclude<TPostStatus["color"], undefined>;
 };
 
 function PostStatusEditForm({ status }: { status: EditableStatus }) {
   const { postStatusCollection } = useDashboardCollections();
   const store = usePostStatusEditDialogContext();
+  // The value the form opened with; a save that only renamed the status must
+  // not repoint its icon at a concurrent change.
+  const initialIcon = useRef(status.icon);
 
   const form = useAppForm({
     defaultValues: {
       color: status.color,
+      icon: status.icon,
       label: status.label,
       type: status.type,
     },
     validators: {
       onSubmit: z.object({
         color: z.string().nullable(),
+        // No length rule here: an untouched stored icon must not block an
+        // unrelated edit. The picker can only emit catalogue names.
+        icon: z.string().trim().nullable(),
         label: z.string().min(1).max(60),
         type: z.enum([
           "PENDING",
@@ -114,10 +126,16 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
             ) + 1
           : undefined;
 
+        const iconChanged = data.value.icon !== initialIcon.current;
+
         const tx = postStatusCollection.update(status.id, (draft) => {
           draft.color = data.value.color;
           draft.label = data.value.label;
           draft.type = data.value.type;
+
+          if (iconChanged) {
+            draft.icon = data.value.icon;
+          }
 
           if (orderIndex !== undefined) {
             draft.orderIndex = orderIndex;
@@ -164,6 +182,23 @@ function PostStatusEditForm({ status }: { status: EditableStatus }) {
             </Field>
           )}
         </form.AppField>
+        <form.Subscribe selector={(state) => state.values.type}>
+          {(type) => (
+            <form.AppField name="icon">
+              {(field) => (
+                <Field>
+                  <FieldLabel>Icon</FieldLabel>
+                  <IconPickerField
+                    fallbackIcon={DEFAULT_POST_STATUS_ICONS[type]}
+                    label="Choose icon"
+                    onChange={(icon) => field.handleChange(icon)}
+                    value={field.state.value}
+                  />
+                </Field>
+              )}
+            </form.AppField>
+          )}
+        </form.Subscribe>
         <form.AppField name="type">
           {(field) => (
             <Field>

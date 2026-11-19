@@ -1,3 +1,4 @@
+import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import { usePostCollectionData } from "@feeblo/post-ui/post-page-context";
 import { PostCard as SharedPostCard } from "@feeblo/post-ui/post/post-card";
 import { UpvoteButton } from "@feeblo/post-ui/upvote-toggle";
@@ -56,7 +57,7 @@ function FeedbackPostCardBoardBadge({ children }: { children?: ReactNode }) {
   const { board } = usePostCollectionData();
 
   return (
-    <SharedPostCard.BoardBadge>
+    <SharedPostCard.BoardBadge icon={board.icon}>
       {children ?? board.name}
     </SharedPostCard.BoardBadge>
   );
@@ -120,11 +121,15 @@ export const PostCard = {
 
 // Convenience wrapper for feedback-page / board-page reuse
 export function FeedbackCard({
-  label,
   color,
+  icon,
+  label,
+  type,
 }: {
-  label: string;
   color?: string;
+  icon?: string | null;
+  label: string;
+  type?: TPostStatus["type"];
 }) {
   return (
     <PostCard.Root>
@@ -136,7 +141,7 @@ export function FeedbackCard({
         <PostCard.MobileMeta />
       </PostCard.Body>
       <PostCard.DesktopMeta>
-        <PostCard.Status color={color} label={label} />
+        <PostCard.Status color={color} icon={icon} label={label} type={type} />
         <PostCard.BoardBadge />
         <PostCard.Author />
       </PostCard.DesktopMeta>

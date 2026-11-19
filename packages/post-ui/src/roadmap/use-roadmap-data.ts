@@ -43,7 +43,12 @@ type PostRowLike = Pick<
 type PostStatusRowLike = Pick<
   TPostStatus,
   "id" | "label" | "organizationId" | "type"
->;
+> &
+  /**
+   * Optional so a collection fixture that predates the picker still satisfies
+   * the constraint; the production collection always carries it.
+   */
+  Partial<Pick<TPostStatus, "icon">>;
 
 type RoadmapRowLike = Pick<
   TRoadmap,
@@ -245,6 +250,7 @@ export function useRoadmapData<
           name: column.name,
           roadmapId: column.roadmapId,
           statusId: postStatus.id,
+          statusIcon: postStatus.icon ?? null,
           type: postStatus.type,
           label: postStatus.label,
         }))
@@ -294,6 +300,7 @@ export function useRoadmapData<
           id: post.id,
           slug: post.slug,
           status: postStatus.type,
+          statusIcon: postStatus.icon ?? null,
           statusId: post.statusId,
           summary: post.excerpt,
           title: post.title,

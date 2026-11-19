@@ -1,4 +1,5 @@
 import { isFunction, isString } from "@feeblo/utils/runtime-kind";
+import { isTablerFilledIconName } from "@feeblo/web-shared/icons/defaults";
 import { useSelector } from "@xstate/store-react";
 import {
   type ComponentProps,
@@ -22,7 +23,9 @@ import {
   type UIEvent as ReactUIEvent,
 } from "react";
 
+import { Button } from "../button";
 import { Input } from "../input";
+import { Popover, PopoverPopup, PopoverTrigger } from "../popover";
 import { cn } from "../utils";
 import { loadIconPickerCatalogue, preloadIconPickerCatalogue } from "./data";
 import { TABLER_FILLED_SYMBOL_PREFIX } from "./generated/tabler-filled-symbol-prefix";
@@ -49,6 +52,7 @@ import type {
   IconPickerDataCategory,
   IconPickerEmptyProps,
   IconPickerEmptyRenderProps,
+  IconPickerFieldProps,
   IconPickerIcon,
   IconPickerListCategoryHeaderProps,
   IconPickerListComponents,
@@ -1544,9 +1548,70 @@ function TablerIcon({
   );
 }
 
+function IconPickerField({
+  className,
+  disabled,
+  fallbackIcon,
+  label = "Choose icon",
+  onChange,
+  value,
+}: IconPickerFieldProps): ReactElement {
+  const [open, setOpen] = useState(false);
+
+  const trimmedValue = isString(value) ? value.trim() : "";
+
+  const selected = isTablerFilledIconName(trimmedValue)
+    ? trimmedValue
+    : fallbackIcon;
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger
+        render={
+          <Button
+            aria-label={label}
+            className={cn("w-full justify-start", className)}
+            disabled={disabled}
+            onFocus={() => preloadIconPickerCatalogue()}
+            onPointerEnter={() => preloadIconPickerCatalogue()}
+            type="button"
+            variant="outline"
+          />
+        }
+      >
+        <TablerIcon name={selected} />
+        <span>{label}</span>
+      </PopoverTrigger>
+      <PopoverPopup align="start" className="w-auto p-2" sideOffset={6}>
+        <IconPickerContent
+          onIconSelect={(icon) => {
+            onChange(icon.name);
+            setOpen(false);
+          }}
+          value={selected}
+        />
+        <div className="mt-1 flex justify-end">
+          <Button
+            onClick={() => {
+              onChange(null);
+              setOpen(false);
+            }}
+            size="xs"
+            type="button"
+            variant="ghost"
+          >
+            Use default
+          </Button>
+        </div>
+      </PopoverPopup>
+    </Popover>
+  );
+}
+
 const IconPicker = {
   ActiveIcon: IconPickerActiveIcon,
   Content: IconPickerContent,
+  Field: IconPickerField,
   Empty: IconPickerEmpty,
   Icon: TablerIcon,
   List: IconPickerList,
@@ -1564,6 +1629,7 @@ const IconPicker = {
 export {
   IconPicker,
   IconPickerActiveIcon,
+  IconPickerField,
   IconPickerContent,
   IconPickerEmpty,
   IconPickerList,
@@ -1586,6 +1652,7 @@ export type {
   IconPickerDataCategory,
   IconPickerDataRow,
   IconPickerEmptyProps,
+  IconPickerFieldProps,
   IconPickerIcon,
   IconPickerInteraction,
   IconPickerListCategoryHeaderProps,

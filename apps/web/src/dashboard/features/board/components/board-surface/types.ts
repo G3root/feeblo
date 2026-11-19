@@ -5,6 +5,7 @@ export type BoardPostRow = {
   /** The member working on this post; null when unassigned. */
   assigneeMemberId: string | null;
   authorIsMember: boolean;
+  boardIcon?: string | null;
   boardId: string;
   boardName?: string;
   boardSlug: string;
@@ -13,6 +14,7 @@ export type BoardPostRow = {
   slug: string;
   statusId: string;
   status: BoardPostStatus;
+  statusIcon?: string | null;
   title: string;
   summary: string;
   updatedAt: Date | string;
@@ -21,6 +23,8 @@ export type BoardPostRow = {
 };
 
 export type BoardPostLane = {
+  /** The board mark when the lane groups by board. */
+  boardIcon?: string | null;
   /** Stable across regroupings: a status id, member id, board id, tag id, or "all". */
   id: string;
   label: string;
@@ -31,6 +35,7 @@ export type BoardPostLane = {
    * status to write.
    */
   status?: BoardPostStatus;
+  statusIcon?: string | null;
   statusId?: string;
 };
 

@@ -161,7 +161,12 @@ function BoardListLaneHeader({
                 icon={ArrowUp01Icon}
                 strokeWidth={2}
               />
-              <BoardLaneIcon groupBy={groupBy} status={lane.status} />
+              <BoardLaneIcon
+                boardIcon={lane.boardIcon}
+                groupBy={groupBy}
+                status={lane.status}
+                statusIcon={lane.statusIcon}
+              />
               <h3 className="text-sm font-medium">{laneLabel}</h3>
               <span className="text-muted-foreground text-xs">
                 {lane.posts.length}

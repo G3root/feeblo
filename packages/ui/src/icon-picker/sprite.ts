@@ -1,7 +1,19 @@
 import { useEffect, useSyncExternalStore } from "react";
 
-import spriteUrl from "./generated/tabler-filled-sprite.svg?url";
 import type { IconPickerSpriteStatus } from "./types";
+
+/**
+ * The generated sprite as a Vite asset.
+ *
+ * `new URL(..., import.meta.url)` is resolved at build time into one emitted
+ * file, the same as a `?url` import, and it keeps the asset's type out of the
+ * package's ambient declarations: a consumer that imports the picker would
+ * otherwise need the `*.svg?url` declaration in its own program.
+ */
+const spriteUrl = new URL(
+  "./generated/tabler-filled-sprite.svg",
+  import.meta.url
+).href;
 
 const SPRITE_ATTRIBUTE = "data-icon-picker-sprite";
 

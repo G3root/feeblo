@@ -14,7 +14,9 @@ import {
 } from "@feeblo/ui/dialog";
 import { Field, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
+import { IconPickerField } from "@feeblo/ui/icon-picker";
 import { toastManager } from "@feeblo/ui/toast";
+import { DEFAULT_POST_STATUS_ICONS } from "@feeblo/web-shared/icons/defaults";
 import { useSelector } from "@xstate/store-react";
 import { z } from "zod";
 
@@ -58,11 +60,14 @@ function PostStatusCreateForm({ type }: { type: TPostStatusType }) {
   const form = useAppForm({
     defaultValues: {
       color: DEFAULT_POST_STATUS_COLORS[type],
+      // SAFETY: The form's icon is nullable; null means "use the type default".
+      icon: null as string | null,
       label: "",
     },
     validators: {
       onSubmit: z.object({
         color: z.string(),
+        icon: z.string().trim().max(64).nullable(),
         label: z.string().min(1).max(60),
       }),
     },
@@ -84,6 +89,7 @@ function PostStatusCreateForm({ type }: { type: TPostStatusType }) {
           id,
           color: data.value.color,
           createdAt: new Date(),
+          icon: data.value.icon,
           isDefault: false,
           label: data.value.label,
           orderIndex,
@@ -128,6 +134,19 @@ function PostStatusCreateForm({ type }: { type: TPostStatusType }) {
               <FieldLabel>Colour</FieldLabel>
               <PostStatusColorField
                 onChange={(color) => field.handleChange(color)}
+                value={field.state.value}
+              />
+            </Field>
+          )}
+        </form.AppField>
+        <form.AppField name="icon">
+          {(field) => (
+            <Field>
+              <FieldLabel>Icon</FieldLabel>
+              <IconPickerField
+                fallbackIcon={DEFAULT_POST_STATUS_ICONS[type]}
+                label="Choose icon"
+                onChange={(icon) => field.handleChange(icon)}
                 value={field.state.value}
               />
             </Field>

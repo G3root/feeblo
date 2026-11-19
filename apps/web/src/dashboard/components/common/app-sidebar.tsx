@@ -1,4 +1,5 @@
 import { useAtomMount } from "@effect/atom-react";
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import {
   Menu,
   MenuItem,
@@ -21,6 +22,7 @@ import {
   useSidebar,
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
 import { FeatureFlagGuard } from "@feeblo/web-shared/use-feature-flag";
 import {
   anyPolicy,
@@ -283,6 +285,7 @@ function BoardList() {
           <BoardItem
             boardPublicId={`board-id-${index}`}
             boardSlug={`board-slug-${index}`}
+            icon={null}
             key={`board-skeleton-${index}`}
             name="Loading"
           />
@@ -297,6 +300,7 @@ function BoardList() {
         <BoardItem
           boardPublicId={board.id}
           boardSlug={board.slug}
+          icon={board.icon}
           key={board.id}
           name={board.name}
         />
@@ -308,10 +312,11 @@ function BoardList() {
 interface BoardItemProp {
   boardPublicId: string;
   boardSlug: string;
+  icon: string | null;
   name: string;
 }
 
-function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
+function BoardItem({ boardPublicId, icon, name, boardSlug }: BoardItemProp) {
   const organizationId = useOrganizationId();
 
   const pathname = useRouterState({
@@ -331,6 +336,7 @@ function BoardItem({ boardPublicId, name, boardSlug }: BoardItemProp) {
               to="/$organizationId/board/$boardSlug"
               {...props}
             >
+              <TablerIcon name={boardIconName(icon)} />
               <span>{name}</span>
             </Link>
           )}

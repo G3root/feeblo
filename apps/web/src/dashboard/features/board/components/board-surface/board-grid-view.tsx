@@ -75,6 +75,7 @@ function movePostToColumn(
           {
             ...movedPost,
             status: targetStatus,
+            statusIcon: lane.statusIcon,
             statusId: targetLaneStatusId,
           },
           ...lane.posts,
@@ -308,8 +309,10 @@ export function BoardGridView({
                   id={laneId}
                   index={columnIndex}
                   key={lane.id}
+                  boardIcon={lane.boardIcon}
                   label={lane.label}
                   status={lane.status}
+                  statusIcon={lane.statusIcon}
                   statusId={lane.statusId}
                   totalPosts={rows.length}
                 >

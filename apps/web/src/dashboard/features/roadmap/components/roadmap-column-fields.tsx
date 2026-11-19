@@ -1,5 +1,6 @@
 import type { TPostStatus } from "@feeblo/domain/post-status/schema";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
+import { PostStatusIcon } from "@feeblo/post-ui/post-status-icon";
 import { Button } from "@feeblo/ui/button";
 import {
   Collapsible,
@@ -106,10 +107,18 @@ export function RoadmapColumnItem({
                                   (option) => option.id === value
                                 );
 
-                                return status
-                                  ? status.label ||
-                                      formatPostStatus(status.type)
-                                  : "Select a status";
+                                return status ? (
+                                  <span className="flex items-center gap-2">
+                                    <PostStatusIcon
+                                      icon={status.icon}
+                                      type={status.type}
+                                    />
+                                    {status.label ||
+                                      formatPostStatus(status.type)}
+                                  </span>
+                                ) : (
+                                  "Select a status"
+                                );
                               }}
                             </SelectValue>
                           </SelectTrigger>
@@ -123,7 +132,14 @@ export function RoadmapColumnItem({
                                 key={status.id}
                                 value={status.id}
                               >
-                                {status.label || formatPostStatus(status.type)}
+                                <span className="flex items-center gap-2">
+                                  <PostStatusIcon
+                                    icon={status.icon}
+                                    type={status.type}
+                                  />
+                                  {status.label ||
+                                    formatPostStatus(status.type)}
+                                </span>
                               </SelectItem>
                             ))}
                           </SelectPopup>

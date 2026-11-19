@@ -136,7 +136,9 @@ function HomeList() {
                   <PostCard.DesktopMeta>
                     <PostCard.Status
                       color={status.color ?? undefined}
+                      icon={status.icon}
                       label={status.label || formatPostStatus(status.type)}
+                      type={status.type}
                     />
                     <PostCard.BoardBadge />
                     <PostCard.Author />

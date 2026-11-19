@@ -1,18 +1,22 @@
+import { PostStatusIcon } from "@feeblo/post-ui/post-status-icon";
 import { cn } from "@feeblo/ui/utils";
 import {
   BOARD_LANE_COLOR_MAP,
-  BoardIconMap,
   type BoardPostStatus,
 } from "@feeblo/web-shared/board/constants";
-import { HugeiconsIcon } from "@hugeicons/react";
 
-export function StatusIcon({ status }: { status: BoardPostStatus }) {
-  const Icon = BoardIconMap[status] ?? BoardIconMap.PLANNED;
+export function StatusIcon({
+  icon,
+  status,
+}: {
+  icon?: string | null;
+  status: BoardPostStatus;
+}) {
   const color = BOARD_LANE_COLOR_MAP[status];
 
   return (
     <span className={cn("inline-flex items-center justify-center", color)}>
-      <HugeiconsIcon className="size-4" icon={Icon} strokeWidth={2.5} />
+      <PostStatusIcon icon={icon} type={status} />
     </span>
   );
 }

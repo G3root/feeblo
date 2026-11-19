@@ -9,6 +9,7 @@ import {
   type TBoardGrouping,
 } from "@feeblo/domain-contracts/board-query";
 import { formatPostStatus } from "@feeblo/post-ui/post-status";
+import { PostStatusIcon } from "@feeblo/post-ui/post-status-icon";
 import { Button } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import { Group, GroupText } from "@feeblo/ui/group";
@@ -88,6 +89,7 @@ type FilterMember = {
 };
 
 type FilterStatus = {
+  icon: string | null;
   id: string;
   label: string;
   type: BoardPostStatus;
@@ -202,13 +204,17 @@ const statusFilterItems = (
   return [
     ...postStatuses.map((status) => ({
       checked: selectedTypes.has(status.type),
+      icon: status.icon,
       key: status.type,
       label: status.label || formatPostStatus(status.type),
+      type: status.type,
     })),
     ...unknownTypes.map((type) => ({
       checked: true,
+      icon: undefined,
       key: type,
       label: formatPostStatus(type),
+      type,
     })),
   ];
 };
@@ -658,7 +664,10 @@ function BoardFilterTrigger() {
                       toggleStatus(item.key);
                     }}
                   >
-                    {item.label}
+                    <span className="flex items-center gap-2">
+                      <PostStatusIcon icon={item.icon} type={item.type} />
+                      {item.label}
+                    </span>
                   </MenuCheckboxItem>
                 ))}
               </MenuSubPopup>
@@ -1060,7 +1069,13 @@ function BoardFilterValueMenu<T extends string>({
   label,
   onToggle,
 }: {
-  items: Array<{ checked: boolean; key: T; label: string }>;
+  items: Array<{
+    checked: boolean;
+    icon?: string | null;
+    key: T;
+    label: string;
+    type?: BoardPostStatus;
+  }>;
   label: string;
   onToggle: (value: T) => void;
 }) {
@@ -1078,7 +1093,12 @@ function BoardFilterValueMenu<T extends string>({
                 onToggle(item.key);
               }}
             >
-              {item.label}
+              <span className="flex items-center gap-2">
+                {item.type ? (
+                  <PostStatusIcon icon={item.icon} type={item.type} />
+                ) : null}
+                {item.label}
+              </span>
             </MenuCheckboxItem>
           ))
         )}

@@ -1,9 +1,13 @@
+import { TablerIcon } from "@feeblo/ui/icon-picker";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { UserAvatar } from "@feeblo/ui/user-avatar";
 import { cn } from "@feeblo/ui/utils";
+import { type BoardPostStatus } from "@feeblo/web-shared/board/constants";
+import { boardIconName } from "@feeblo/web-shared/icons/defaults";
 import { Link } from "@tanstack/react-router";
 
 import { m } from "../paraglide/messages.js";
+import { PostStatusIcon } from "../post-status-icon";
 
 // ---------------------------------------------------------------------------
 // Shared composable PostCard — coss-style primitives (no useRender, no mergeProps)
@@ -141,17 +145,21 @@ export function PostCardDescription({
 export function PostCardBoardBadge({
   children,
   className,
+  icon,
   ...props
-}: React.ComponentProps<"span">) {
+}: React.ComponentProps<"span"> & { icon?: string | null }) {
   return (
     <span
       className={cn(
-        "bg-muted/70 text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium",
+        "bg-muted/70 text-muted-foreground inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
         className
       )}
       data-slot="post-card-board-badge"
       {...props}
     >
+      {icon === undefined ? null : (
+        <TablerIcon className="size-3" name={boardIconName(icon)} />
+      )}
       {children}
     </span>
   );
@@ -191,12 +199,40 @@ export function PostCardAuthor({
 }
 
 export function PostCardStatus({
-  label,
   color,
+  icon,
+  label,
+  type,
 }: {
-  label: string;
   color?: string;
+  icon?: string | null;
+  label: string;
+  type?: BoardPostStatus;
 }) {
+  if (type) {
+    return (
+      <div
+        className="flex items-center gap-1.5"
+        data-slot="post-card-status"
+        title={label}
+      >
+        <span
+          className="inline-flex shrink-0"
+          data-slot="post-card-status-icon"
+          style={color ? { color } : undefined}
+        >
+          <PostStatusIcon className="size-3.5" icon={icon} type={type} />
+        </span>
+        <span
+          className="text-muted-foreground text-xs whitespace-nowrap"
+          data-slot="post-card-status-label"
+        >
+          {label}
+        </span>
+      </div>
+    );
+  }
+
   return <StatusIndicator color={color} label={label} />;
 }
 

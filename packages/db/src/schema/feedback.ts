@@ -171,6 +171,13 @@ export const boardTable = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    /**
+     * A Tabler icon name chosen in the dashboard's icon picker, or null for a
+     * board that has never picked one. The client resolves null to its default
+     * rather than the database writing one, so the artwork can change without
+     * a migration.
+     */
+    icon: text("icon"),
     visibility: boardVisibilityEnum("visibility").notNull(),
     organizationId: text("organization_id")
       .notNull()
@@ -246,7 +253,8 @@ export const postStatusTable = pgTable(
     // oklch() color used for status indicators; null until a workspace
     // customizes the status.
     color: text("color"),
-    // Reserved for future icon payloads; kept in the db schema only.
+    // A Tabler icon name chosen in the dashboard's picker; null keeps the
+    // type's default mark on the client.
     icon: text("icon"),
     orderIndex: integer("order_index").notNull(),
     // The status a post lands in when no status is named, and the one status

@@ -7,22 +7,26 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import type { TBoardUpdate as TBoardUpdatePayload } from "./schema";
+
 interface TBoardCreate {
   /** Null when the board is created by an import whose uploader is gone. */
   creatorId: string | null;
   creatorMemberId: string | null;
+  icon: string | null;
   id: string;
   name: string;
   organizationId: string;
   visibility: "PUBLIC" | "PRIVATE";
 }
 
-interface TBoardUpdate {
+type TBoardUpdate = Pick<
+  TBoardUpdatePayload,
+  "icon" | "name" | "visibility"
+> & {
   id: string;
-  name?: string;
   organizationId: string;
-  visibility?: "PUBLIC" | "PRIVATE";
-}
+};
 
 interface TBoardFindById {
   id: string;
@@ -62,6 +66,7 @@ const BOARD_FIELDS = {
   id: schema.boardTable.id,
   name: schema.boardTable.name,
   slug: schema.boardTable.slug,
+  icon: schema.boardTable.icon,
   visibility: schema.boardTable.visibility,
   organizationId: schema.boardTable.organizationId,
   createdAt: schema.boardTable.createdAt,

@@ -47,11 +47,23 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
     hasPermission(organizationId, "posts.status")
   );
 
-  const [dragPreview, setDragPreview] = useState<
-    RoadmapLane<RoadmapBoardPost>[] | null
-  >(null);
+  /**
+   * The active drag, as the post and the lane it is hovering over.
+   *
+   * The preview is derived from `lanes` on every render rather than stored as
+   * a lane snapshot: a live-query refetch during a drag must refresh every
+   * field of the lanes the preview shows, while the hovered target stays where
+   * the pointer is.
+   */
+  const [dragPreview, setDragPreview] = useState<{
+    postId: string;
+    targetStatusId: string;
+  } | null>(null);
 
-  const items = dragPreview ?? lanes;
+  const items =
+    dragPreview === null
+      ? lanes
+      : movePostToStatus(lanes, dragPreview.postId, dragPreview.targetStatusId);
 
   const activeDrag = useRef<{
     sourceId: string;
@@ -99,18 +111,10 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
         activeDrag.current.targetStatusId = targetStatusId;
       }
 
-      setDragPreview((currentItems) =>
-        movePostToStatus(
-          // SAFETY: The upstream contract guarantees a string here.
-          // SAFETY: The upstream contract guarantees a string here.
-          currentItems ?? lanes,
-          // SAFETY: The upstream contract guarantees a string here.
-          source.id as string,
-          targetStatusId
-        )
-      );
+      // SAFETY: The upstream contract guarantees a string here.
+      setDragPreview({ postId: source.id as string, targetStatusId });
     },
-    [lanes]
+    []
   );
 
   const handleDragEnd = useCallback<DragDropEventHandlers["onDragEnd"]>(
@@ -132,6 +136,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
 
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const targetStatusId =
+        dragPreview?.targetStatusId ??
         dragState?.targetStatusId ??
         (target?.data?.statusId as string | undefined);
 
@@ -144,6 +149,15 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
         return;
         // SAFETY: The upstream contract guarantees a string here.
         // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      }
+
+      // The lane can disappear while the pointer is over it (a live-query
+      // refresh). Reject the drop rather than writing a status the roadmap no
+      // longer has a column for.
+      if (!lanes.some((lane) => lane.statusId === targetStatusId)) {
+        setDragPreview(null);
+
+        return;
       }
 
       // SAFETY: The upstream contract guarantees a string here.
@@ -164,7 +178,7 @@ export function RoadmapBoard({ lanes, organizationId }: RoadmapBoardProps) {
         }
       );
     },
-    [postCollection]
+    [dragPreview, lanes, postCollection]
   );
 
   return (
@@ -233,6 +247,7 @@ function movePostToStatus(
           {
             ...post,
             status: targetLane.status,
+            statusIcon: targetLane.statusIcon,
             statusId: targetLane.statusId,
           },
         ],
@@ -294,6 +309,7 @@ const RoadmapBoardLane = memo(function RoadmapBoardLane({
       label={lane.label}
       name={lane.name}
       status={lane.status}
+      statusIcon={lane.statusIcon}
     >
       {lane.posts.length > 0 ? (
         lane.posts.map((post, postIndex) => (
@@ -349,6 +365,7 @@ const RoadmapBoardCard = memo(function RoadmapBoardCard({
       }
       rootRef={ref}
       status={post.status}
+      statusIcon={post.statusIcon}
       title={post.title}
       updatedAt={post.updatedAt}
     />
