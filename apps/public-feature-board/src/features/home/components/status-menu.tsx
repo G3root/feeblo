@@ -44,7 +44,7 @@ export function HomeStatusMenu({ className }: { className?: string }) {
           {statusItems.map((item) => (
             <MenuRadioItem closeOnClick key={item.value} value={item.value}>
               <span className="flex items-center gap-2">
-                {item.statusType ? (
+                {item.kind === "status" ? (
                   <PostStatusIcon icon={item.icon} type={item.statusType} />
                 ) : null}
                 {item.label}

@@ -14,7 +14,11 @@ import { z } from "zod";
 
 import { emptyOnBehalfAuthor } from "../contact-combobox/contact-combobox";
 import { m } from "../paraglide/messages.js";
-import { PostBoardSelect, StatusField } from "../post-field";
+import {
+  PostBoardSelect,
+  type PostBoardSelectProps,
+  StatusField,
+} from "../post-field";
 import { PostTitleInput } from "../post-title-input";
 import { usePostCollections } from "../providers/post-collections-provider";
 
@@ -184,7 +188,7 @@ export const PostBoardField = withForm({
   props: {
     // SAFETY: [] satisfies the boards contract; consumers always provide the
     // real board list when mounting the field.
-    boards: [] as Array<{ icon?: string | null; id: string; name: string }>,
+    boards: [] as PostBoardSelectProps["boards"],
   },
   render: ({ form, boards }) => {
     return (

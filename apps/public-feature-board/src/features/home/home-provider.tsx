@@ -270,10 +270,16 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     const totalPosts = statusCounts.reduce((sum, s) => sum + s.count, 0);
 
     return [
-      { count: totalPosts, label: m.curly_many_badger(), value: "all" },
+      {
+        count: totalPosts,
+        kind: "all" as const,
+        label: m.curly_many_badger(),
+        value: "all",
+      },
       ...statuses.map((status) => ({
         count: countMap.get(status.id) ?? 0,
         icon: status.icon,
+        kind: "status" as const,
         label: status.label || formatPostStatus(status.type),
         statusType: status.type,
         value: status.id,
@@ -298,10 +304,16 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     const totalPosts = boardCounts.reduce((sum, b) => sum + b.count, 0);
 
     return [
-      { count: totalPosts, label: m.spry_male_nils(), value: "all" },
+      {
+        count: totalPosts,
+        kind: "all" as const,
+        label: m.spry_male_nils(),
+        value: "all",
+      },
       ...boards.map((board) => ({
         count: countMap.get(board.slug) ?? 0,
         icon: board.icon,
+        kind: "board" as const,
         label: board.name,
         value: board.slug,
       })),

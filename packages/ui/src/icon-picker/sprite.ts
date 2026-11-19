@@ -5,15 +5,13 @@ import type { IconPickerSpriteStatus } from "./types";
 /**
  * The generated sprite as a Vite asset.
  *
- * `new URL(..., import.meta.url)` is resolved at build time into one emitted
- * file, the same as a `?url` import, and it keeps the asset's type out of the
- * package's ambient declarations: a consumer that imports the picker would
- * otherwise need the `*.svg?url` declaration in its own program.
+ * Resolved lazily rather than at module scope: this module can be evaluated on
+ * the server, where `import.meta.url` is a file URL rather than a served
+ * asset. Vite still turns the static `new URL` into an emitted asset URL.
  */
-const spriteUrl = new URL(
-  "./generated/tabler-filled-sprite.svg",
-  import.meta.url
-).href;
+function getSpriteUrl(): string {
+  return new URL("./generated/tabler-filled-sprite.svg", import.meta.url).href;
+}
 
 const SPRITE_ATTRIBUTE = "data-icon-picker-sprite";
 
@@ -98,7 +96,7 @@ export function loadIconPickerSprite(): Promise<void> {
 
   setStatus("loading");
 
-  spriteState.loadPromise = fetch(spriteUrl)
+  spriteState.loadPromise = fetch(getSpriteUrl())
     .then((response) => {
       if (!response.ok) {
         throw new Error(
