@@ -1,174 +1,92 @@
 # Agent instructions
 
-Repo law. It holds the commands, the gate, and the changes that need a human decision.
+Feeblo is a customer-feedback product: a TanStack Start dashboard and portal (`apps/web`), a session-less public board (`apps/public-feature-board`), an Effect HTTP composition root (`apps/server`), an embeddable widget, and outbound integrations. Effect v4 throughout.
 
-Two other documents are authoritative for their own subject and are not duplicated here: `CONTEXT.md` fixes the product's vocabulary (Post, Connection, Capability, Route, Delivery, Public API, API key, Scope), and `docs/` holds the topic guides. This file is the source of truth for _how to change things_.
-
-## Stack contract
-
-Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and referenced as `catalog:`. Prefer that over writing a version in a package. `minimumReleaseAge: 1440` refuses a version published in the last day, so a bump waits a day or names the package in `minimumReleaseAgeExclude` with a reason.
-
-- pnpm workspaces + Turborepo. Node `26.4.0` (`.node-version`), pnpm `11.0.3` (`packageManager`). Do not introduce a second package manager.
-- Effect `4.1.4`, `@effect/platform-node` `4.1.4`, `@effect/vitest` `4.1.4`. These three are one release train; bump them together. Every `@effect/*` package shares the one version, so the catalog pins `effect`, `@effect/platform-node`, `@effect/vitest`, `@effect/sql-pg`, `@effect/sql-pglite`, `@effect/atom-react` and `@effect/ai-openai` in lockstep. 4.1 replaced the single `effect/Crypto` service with the `effect/crypto/*` family (`SecureRandom`, `Digest`, `Aead`, `Signature`, …), 4.1.3 split `effect/sql`'s `SqlClient` into `Base` plus `SqlClient`, so a driver client no longer extends the generic service and a layer that builds one of two drivers has to name `SqlClient` as its success type itself, and `@effect/sql-pglite` takes `@electric-sql/pglite` as a direct dependency where 4.0.5 took it as a peer, which is why the catalog pins pglite too: two copies give `drizzle({ client })` two structurally different `PGlite` classes and it stops compiling.
-- tsrs `0.25.0-ts7.1.0-beta`, Oxlint `1.94.0`, `@oxlint/plugins` `1.94.0`, `@effect/tsgo` `0.70.0`. These are one release train, and `pnpm lint` is what enforces it: `effect-tsgo --tsrs-lint oxlint` loads the Effect-patched Oxlint binding and the patched `tsrs` linter of the versions `@effect/tsgo` names, and refuses an installed Oxlint outside that list before linting anything. A bump moves all four or fails. `@effect/tsgo` is not cosmetic: it embeds the module paths its rules match on, so the version has to be one that knows the Effect version in the catalog or the diagnostics go quiet — `0.45` keyed off `effect/unstable/*` and would have reported nothing once the `unstable` segment was dropped. `pnpm check` runs `check-toolchain.ts`, which fails when these two trains disagree across the catalog, the manifests and the workspace overrides, when a `patchedDependencies` selector names a version that is not installed, or when `oxlint-tsgolint` is declared again. Each `@effect/tsgo` release names the compiler and Oxlint versions it supports; `0.70.0` accepts tsrs `0.25.0-ts7.1.0-beta` and Oxlint `1.91.0`–`1.94.0`, which is what pins those two. Read that matrix from the release that is installed, not from `npm view @effect/tsgo@<version> readme`: npm serves the newest publish's README, so a release whose README already lists a tsrs it does not accept is the normal case, and `0.67.3`'s own `patch` refused the two versions its README named. It is also the ceiling, not a preference: the train sits on the newest published release of every component today, so Oxlint `1.95.0` or tsrs `0.26.0` would each have to wait for the `@effect/tsgo` release that lists them. `--tsrs-lint` is `0.70.0`'s addition and the reason the train moved: Oxlint's type-aware pass runs on tsrs instead of on `oxlint-tsgolint`, so that package is not a dependency at all any more.
-- The compiler is [tsrs](https://github.com/oxc-project/tsrs), a Rust port of TypeScript's compiler, not the `typescript` package. Its version names the TypeScript release it ports (`0.25.0-ts7.1.0-beta` is a port of `7.1.0-beta`), so a tsrs bump is also a compiler-behavior bump: the port reproduces that release's diagnostics, including ones the previous compiler did not report. `typescript` still appears in `node_modules` because `@tanstack/db`, `msw` and the Paraglide toolchain peer on it; no workspace package depends on it, and the catalog must not pin it, or the two compilers become a second source of truth. `tsrs` is the binary in every `typecheck` script and the SDKs' declaration build.
-- Drizzle `1.0.0-rc.5` — `drizzle-orm` and `drizzle-kit` are one version — better-auth `1.7.18`, React `19`, TanStack Start for `apps/web`. rc.5's kit peers on the rc.5 ORM and reads snapshot format 9, so the two move together or neither runs. The committed snapshots in `packages/db/src/migrations` are format 9, which is a **diff chain**: each snapshot holds only its delta from its parent rather than the whole schema, so a snapshot is no longer self-contained and the chain has to stay intact and ordered. `drizzle-kit up` produced that rewrite; it is one-way, and going back means regenerating. The ORM's own migrator — what deployments run through `packages/db-migrator` — never reads a snapshot, so this is a tooling constraint and not a production one.
-
-`prepare` runs `effect-tsgo patch --tsrs`. That single command is what patches the installed `tsrs` binary with the Effect language service. The Oxlint side is not patched in `node_modules`: `--tsrs-lint` preloads `@effect/tsgo`'s own patched binding when it runs Oxlint, which is why a bare `oxlint` reports the plain rules and `pnpm lint` reports the `effecttsgo/*` ones too. Run the linter through the wrapper; there is no `oxlint` script that skips it. `.vscode/settings.json` points the TypeScript 7 editor extension at `./node_modules/tsrs/tsdk`, which launches the same package's per-platform binary.
-
-## Packages
-
-| Package | Path | Role |
-| --- | --- | --- |
-| `@feeblo/domain` | `packages/domain` | Domain behavior. Owns schemas, repositories, RPC contracts, handlers. Reads Postgres through `@feeblo/db`. |
-| `@feeblo/domain-contracts` | `packages/domain-contracts` | Effect Schema vocabularies and policy/error definitions that both browser and server may import. Depends only on `effect`. |
-| `@feeblo/db` | `packages/db` | Drizzle schema, migrations, PGlite test database, seed/nuke scripts. |
-| `@feeblo/db-migrator` | `packages/db-migrator` | Standalone migration runner for deployments. |
-| `@feeblo/auth` | `packages/auth` | better-auth wiring, the organization ACL, API-key plugin, session/API-key seams. |
-| `@feeblo/permissions` | `packages/permissions` | Member permission catalog, shared with the frontend. |
-| `@feeblo/id` | `packages/id` | Branded identifier types (`Legid`). |
-| `@feeblo/utils` | `packages/utils` | Shared primitives, including the `runtime-kind` guards (`isString`, `isPlainObject`, …) that replace bare `typeof`. |
-| `@feeblo/config` | `packages/config` | `tsconfig.base.json` and small Effect `Config` helpers. |
-| `@feeblo/rpc-client` | `packages/rpc-client` | Effect RPC client used by the dashboard and portal. |
-| `@feeblo/web-shared` | `packages/web-shared` | Shared browser code: collections helpers, auth context, RPC error parsing. |
-| `@feeblo/ui` | `packages/ui` | Shared React components. |
-| `@feeblo/post-ui` | `packages/post-ui` | The post/comment/roadmap surface, shared by the dashboard and the portal. |
-| `@feeblo/public-feature-board` | `apps/public-feature-board` | The public, session-less board app. |
-| `@feeblo/feedback-widget` | `packages/feedback-widget` | The Solid iframe bundle for embedding. |
-| `@feeblo/sdk`, `@feeblo/sdk-react` | `packages/sdk*` | Published client SDKs. `publishConfig.access: public`. |
-| `@feeblo/server` | `apps/server` | HTTP composition root: RPC route, Public API, integration providers. |
-| `@feeblo/web` | `apps/web` | TanStack Start dashboard and portal. |
-| `@feeblo/integration-core` | `integrations/core` | Provider registry, delivery worker, credential encryption, event recording. |
-| `@feeblo/integration-{webhook,slack,discord,github}` | `integrations/*` | One provider each. |
-| `@feeblo/transactional` | `packages/transactional` | Email templates and mailer. |
-| `@feeblo/e2e` | `e2e` | Playwright. Not part of `pnpm test`. |
+`CONTEXT.md` fixes the product vocabulary (Post, Connection, Capability, Route, Delivery, Public API, API key, Scope). `docs/` holds the topic guides. Each package's own `AGENTS.md` holds its local law. **This file is the source of truth for how to change things.**
 
 ## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm check` | **The gate.** `turbo run check` = the toolchain guard, every package's `tsrs --noEmit`, type-aware Oxlint (`effect-tsgo --tsrs-lint oxlint`) plus the formatter check, and Knip. |
-| `pnpm knip` | Unused files, dependencies and exports. Also runs inside `pnpm check`; see "Knip" below for what fails and what only prints. |
-| `pnpm typecheck` | Types only. Cached per package. |
-| `pnpm lint` | `effect-tsgo --tsrs-lint oxlint && oxfmt --check .` |
-| `pnpm lint:fix` | The writer: `effect-tsgo --tsrs-lint oxlint --fix && oxfmt`. |
-| `pnpm fmt` / `pnpm fmt:check` | Formatting only. |
-| `pnpm test` | Unit tests, `@feeblo/e2e` excluded. |
-| `pnpm test:e2e` | Playwright. Needs built apps; see `e2e/package.json`. |
-| `pnpm dev:server` / `dev:web` / `dev:native` | Dev servers. `pnpm dev` runs everything. |
-| `pnpm db:*` | `push`, `generate`, `migrate`, `seed`, `studio`, `start`, `stop`, `nuke`. |
-| `pnpm build` | `turbo build`. |
+```sh
+pnpm check        # the gate: toolchain guard, every tsrs --noEmit, type-aware lint + format check, knip
+pnpm typecheck    # types only, cached per package
+pnpm lint         # effect-tsgo --tsrs-lint oxlint && oxfmt --check .
+pnpm lint:fix     # the writer: oxlint --fix && oxfmt
+pnpm test         # unit tests, @feeblo/e2e excluded, cache off
+pnpm test:e2e     # Playwright, needs built apps
+pnpm dev:web      # dashboard + public board
+pnpm dev:server   # HTTP server
+pnpm db:generate  # migration from a schema change; also db:migrate, db:seed, db:studio, db:start, db:stop, db:nuke
+```
 
-`apps/web` needs generated Paraglide output before it typechecks, so the `typecheck` turbo task depends on `build:paraglide`. `pnpm check` handles this on its own; a bare `tsrs --noEmit` in `apps/web` will not.
+`pnpm check` needs no database, no build output and no environment file. `apps/web` typechecks only once `build:paraglide` has run; the gate wires that dependency itself, a bare `tsrs --noEmit` there does not.
 
-Run `pnpm check` before claiming a change is ready. It needs no database, no build output, and no environment file.
+## The gate
 
-## The fence
+Run `pnpm check` before claiming a change is ready. CI runs it on every push and pull request, beside `e2e`, `test` and a self-hosted compose smoke test.
 
-What actually enforces the rules:
+There is **no commit hook**, so nothing stops a commit that fails the gate; CI catches it about twenty minutes later. Never pass `--no-verify`.
 
-- CI (`checks` job) runs `pnpm check` on every push and pull request.
-- CI also runs `e2e` (Playwright against built apps, sharded three ways), `test` (unit), and `docker_smoke_test` (self-hosted compose stack).
-- `autofix.yml` runs `pnpm fmt` and `pnpm lint:fix` and commits the result. It is a writer, not a gate: a violation it cannot fix does not fail it.
-- `tools/oxlint/effect-tests` reports `Effect.run*` and `ManagedRuntime.make` in test files as an **error**, so hand-running an Effect fails the gate.
+When a check fails, fix the failure. A rule that is genuinely wrong for this codebase is turned `off` in `oxlint.config.ts` with a written reason directly above it, beside the `effecttsgo/*` and `typescript/*` overrides that are the pattern to copy. The reasoning for every rule and every pin already lives in that file and in `check-toolchain.ts`; read it there rather than trusting a document that can drift.
 
-**There is no commit hook.** Nothing stops a commit that fails the gate; CI catches it about twenty minutes later. Never pass `--no-verify` to git, and do not add a commit hook without deciding how it is protected from bypass.
-
-If a check fails, fix the failure. Do not loosen the rule to get green. If a rule is genuinely wrong for this codebase, turn it off in `oxlint.config.ts` with a written reason directly above it — the `effecttsgo/*` and `typescript/*` overrides in that file are the pattern to copy. A rule turned off without a reason is indistinguishable from a rule nobody could be bothered to satisfy.
-
-## Knip
-
-`knip.config.ts` finds unused files, dependencies and exports, and `pnpm check` runs it (`turbo` task `//#knip`, uncached, ~12s).
-
-- Every issue type is `error` except two. A finding in an `error` type fails the run.
-- `unlisted` is `warn`: 51 imports of packages no workspace declares. Under the hoisted node linker they resolve through a sibling's dependency, so they work by accident. The fix is to declare each package where it is imported, which is a dependency addition and therefore an owner decision, not a cleanup. `binaries` is `warn` for the same reason (`vite` in `apps/web`'s scripts).
-- Clean a type, then move its rule to `error` in the same change. Adding to the `warn` list to get a run green is the one thing that file is not for; when a type reaches zero, promote it.
-
-Two things in that file are configuration, not suppression, and both carry the reason inline: `ignoreExportsUsedInFile` (an export the same file also uses is a file-local helper, not a dead surface) and the Paraglide exception, which is conditional because the generated `src/paraglide` directory is gitignored — Knip skips it when it exists, and the relative imports into it cannot resolve when it does not. That conditional exists so the report is identical on a fresh clone, after a local build, and in CI.
-
-One `ignoreDependencies` is worth knowing about: `apps/server` declares `@feeblo/db-migrator` although nothing imports it, because the Dockerfile copies its build output into the image and the dependency is what puts it in the build graph. The others are tsconfig-only references (`@effect/language-service`, `react` as `jsxImportSource`) and the root Playwright config's `@playwright/test`, whose runner lives in `e2e`.
+`autofix.yml` runs `pnpm fmt` and `pnpm lint:fix` and commits the result. It is a writer, not a gate: a violation it cannot fix does not fail it.
 
 ## Effect code
 
-Effect diagnostics live in Oxlint (`effecttsgo/*`), not in the compiler. `packages/config/tsconfig.base.json` sets `diagnostics: false` on the language service so a finding is reported once, by the tool that can act on it. Put severity changes in `oxlint.config.ts`.
+Read `node_modules/effect/AGENTS.md` before writing, reviewing or refactoring Effect code. It ships with the version in the lockfile, so it is never stale.
 
-`oxlint.config.ts` extends two `@effect/tsgo` presets, `recommended` **and** `effect-native`, and both are load-bearing. `@effect/tsgo@0.46` moved twenty `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and `instance-of-schema` rules out of `recommended` into the opt-in `effect-native` preset, so extending only `recommended` drops `global-date-in-effect` — the defect this file's `off` entries are written against — with nothing failing to say so. The two presets together are exactly the rule set `0.45.0`'s `recommended` carried.
+- **Shapes.** `Effect.gen` inline, `Effect.fn("name")` when a span is useful, `Effect.fnUntraced` when it is not. No function that only wraps and returns an `Effect.gen`; attach behaviour with combinators.
+- **Errors.** `return yield* new SomeError({...})` over `Schema.TaggedError`, kept in the typed channel. Match by tag with `Schema.is(SomeError)(error)` or `Predicate.isTagged(error, "SomeError")`. A decoded error is a plain object carrying `_tag` with no prototype, so `instanceof` answers `false` for a real one and the branch silently takes its fallback.
+- **Environment.** Read randomness, time and environment through `Crypto`, `Clock` and `Config`, never the globals. `packages/domain/src/jwt-secret/repository.ts` is the shape to copy.
+- **Diagnostics.** Effect findings live in Oxlint (`effecttsgo/*`), not in the compiler; `packages/config/tsconfig.base.json` sets `diagnostics: false` so each is reported once, by the tool that can act on it. Run the linter through `pnpm lint`, since a bare `oxlint` has no `effecttsgo/*` rules by design.
+- **Tests.** `it.effect` and `it.layer` from `@effect/vitest`, never `Effect.runPromise`, `Effect.runSync` or `ManagedRuntime.make`. `it.effect` gives each test a `Scope`, the `TestClock` and layer memoization, and fails the test when the Effect fails; `tools/oxlint/effect-tests` reports violations as an error. The one exception is `packages/auth/src/api-key.test.ts`, which shares one PGlite database across the file, and its `oxlint-disable` carries the reason inline.
 
-Ten `effecttsgo/*` rules are `off` with reasons in that file. Four — `async-function`, `global-date`, `process-env`, `global-console` — name the code that legitimately does the thing outside Effect; their `-in-effect` siblings are on, and those are the ones that describe a defect, because `new Date()` inside Effect bypasses `Clock`, which is why services that do it cannot be tested against `TestClock`. `global-json` joined them with `@effect/tsgo@0.64.1`, which removed `prefer-schema-over-json`: `JSON.parse` and `JSON.stringify` outside Effect are Vite configs, the widget, the SDK and build scripts, and `global-json-in-effect` keeps the defect half `error` with the test-file exception `prefer-schema-over-json` used to carry. Three more, `prefer-effect-array`/`string`/`record` (2,514 findings between them), name a stylistic swap to an Effect module whose functions behave identically to the native method; roughly a thousand of those sites are in browser bundles, Playwright specs and the published SDK, where the import is bundle weight and the behaviour is unchanged, and `Array.find` → `Array.findFirst` is not even a drop-in. `schema-class-missing-brand` (127) is off because all 127 are `Schema.TaggedError`, whose required unique `_tag` already makes two such errors mutually unassignable — the brand would be a symbol nothing matches on. The ninth, `unstable-api-usage` (928 findings), is off for a different reason: Effect 4.0 moved `http`, `http-api`, `rpc`, `persistence` and `reactivity` to `effect/*` while keeping them `@stability unstable`, so the rule fires on the imports this repo is built out of and there is no stable alternative to move to. `typescript/no-unnecessary-type-arguments` is off for the same kind of reason: 131 findings that are all the same non-defect.
+## Boundaries
 
-`oxlint.config.ts` records the ratchet order for what is still a warning.
+- **Direction.** `apps` → `packages/domain` → `{db, id, permissions, utils, domain-contracts}`. Packages never import apps.
+- **Contracts.** `domain-contracts` holds the Effect Schema vocabularies and policy/error definitions that both browser and server import, and depends on `effect` alone.
+- **Client code.** `apps/web`, `apps/public-feature-board`, `post-ui`, `web-shared`, `ui`, `feedback-widget`, `sdk` and `sdk-react` never import `@feeblo/db`; an `oxlint` override enforces it. Import schemas and vocabulary from `@feeblo/domain` instead.
+- **Browser code.** Shared UI splits three ways: `ui` is presentational components (they depend on `web-shared`, never the reverse), `web-shared` is collections, auth context and RPC plumbing, and `post-ui` is the post, comment and roadmap surface the dashboard and portal both mount.
+- **Surfaces.** Dashboard RPC, Public API (`/api/v1`, API key), the published SDKs and the integration providers are four contracts that deliberately do not share one shape. See `apps/server/AGENTS.md`.
+- **Generated output** stays uncommitted: `src/paraglide/**`, `worker-configuration.d.ts`, `routeTree.gen.ts`, `*.tsbuildinfo`, `playwright-report/`, `test-results/`.
 
-A second rule set is vendored beside it. `tools/oxlint/anti-slop/` is k-mistele/anti-slop's Oxlint plugin, and `oxlint.config.ts` registers all three of its plugins: the generic rules, `anti-slop-effect` (services, Layers, tagged errors, spans) and `anti-slop-martinfowler` (code smells, at `warn`). Every generic and Effect rule is `error`; eleven are `off`, each with the count it reported and the migration that retires it written beside it. The paid halves — the Jev questions and the diff rules, one model request per file — are not installed. Read `tools/oxlint/anti-slop/UPSTREAM.md` before updating the copy: it records the revision, what was left out, and the procedure.
+## Needs owner sign-off
 
-Before writing, reviewing, or refactoring Effect code, read the installed package's own guide first: `node_modules/effect/AGENTS.md`. It ships with the version in the lockfile, so it is never stale, and it is a better reference than anything written down here.
+Ask before writing any of these, and land each in its own commit.
 
-Tests use `@effect/vitest`:
-
-- `it.effect` and `it.layer` — never `Effect.runPromise`, `Effect.runSync`, or `ManagedRuntime.make` inside a test file.
-- The reason is not style: `it.effect` gives each test a `Scope`, the `TestClock`, and layer memoization, and it fails the test when the Effect fails.
-- One documented exception, `packages/auth/src/api-key.test.ts`, which shares one PGlite database across the file and hands it to the better-auth adapter as a plain value. Its `oxlint-disable` carries the reason inline.
-
-Match errors by tag, not by prototype: `Schema.is(SomeError)(error)` or `Predicate.isTagged(error, "SomeError")`. A decoded error is a plain object carrying `_tag` with no prototype, so `instanceof` answers `false` for a real one and the branch silently takes its fallback. Read randomness, time, and environment through Effect services (`Crypto`, `Clock`, `Config`), not the globals; `packages/domain/src/jwt-secret/repository.ts` is a good example.
-
-A database transaction is retried. `transaction()` in `@feeblo/db` re-runs the whole transaction on `40P01` (deadlock), `40001` (serialization failure) and `55P03` (lock timeout), so a transaction body must be database work only: no HTTP call, no provider client, no filesystem write, because a retry replays it. Every connection carries a 5-second `lock_timeout` and a 30-second idle-in-transaction timeout, so a lock wait fails a request instead of holding a pooled connection forever. A mapping inside a transaction keeps the failure it replaced (`attachCause` from `@feeblo/db`): the retry reads the `cause` chain, so a message-only replacement turns a retryable abort into a 500. A lock that only serializes a count-and-write pair on one workspace is `FOR NO KEY UPDATE`; `FOR UPDATE` is for the case where blocking child inserts is the point, which today is only the account-deletion membership re-check.
-
-## Architecture
-
-Dependency direction: apps → `packages/domain` → `{db, id, permissions, utils, domain-contracts}`. **Packages never import apps** — that holds today and should keep holding. Client-side packages (`apps/web`, `apps/public-feature-board`, `post-ui`, `web-shared`, `ui`, `feedback-widget`, `sdk`) must not import `@feeblo/db` at all; an `oxlint` boundary override enforces it. Import schemas and vocabulary from `@feeblo/domain` instead.
-
-A domain module is `packages/domain/src/<entity>/` with a consistent shape: `schema.ts` (Effect Schema), `errors.ts` (tagged errors), `repository.ts` (Drizzle access), `rpcs.ts` (the RPC contract), `handlers.ts` (the layers), and `policies.ts` where authorization applies. Follow the shape of a neighbouring module rather than inventing one.
-
-A feature that has a Public API surface owns it in `<entity>/public-api/`: `schema.ts` (closed DTOs and HTTP shapes), `operations.ts` (the surface-neutral capability a future MCP tool binds), `http.ts` (the `HttpApiEndpoint`s and handlers), `mappers.ts`, and a `repository.ts` only where the public projection is genuinely different from the feature repository (the post and comment reads, the changelog publication orchestration). Tag and company operations call `<entity>/repository.ts` directly. The shared infrastructure — the operation helper, the registry, the key middleware, the error vocabulary, and the composition root — stays in `packages/domain/src/public-api/`.
-
-RPC registration is one registry in two halves, split because the browser reads one half:
-
-- `packages/domain/src/rpc-group.ts` lists every `*Rpcs` group in `RpcGroups` and derives `AllRpcs` from it. It imports no handler layer, so the dashboard and public board can bundle `AllRpcs` without pulling in repositories or the database.
-- `packages/domain/src/rpc-router.ts` pairs every group name with its handler layer in `RpcHandlerRegistrations`, marking the four provider-owned management groups as `"provider"`. Its `satisfies Record<RpcGroupName, …>` makes a group with no entry a compile error, and the route merges the in-domain layers from that record instead of an ad-hoc grouping.
-
-The composition root's provider map in `apps/server/src/app/router.ts` satisfies `ProviderOwnedRpcName`, so a fifth provider-owned group cannot be half-wired either. `rpc-router.test.ts` pins the registry at runtime. Adding an RPC group is now a line in `RpcGroups` and a line in `RpcHandlerRegistrations` (plus the provider map if a provider owns it), and nothing can compile with the two lists disagreeing.
-
-The four surfaces, deliberately not sharing one contract:
-
-1. **Dashboard RPC** — session-authenticated Effect RPC over `/rpc`.
-2. **Public API** — versioned, API-key-authenticated `/api/v1`. Its DTOs are hand-written in `packages/domain/src/public-api/schema.ts` and must never import dashboard or portal response schemas, which carry internal actor identifiers. An `oxlint` override enforces this.
-3. **SDKs** — `packages/sdk`, `packages/sdk-react`. Published, so treat the public shape as a contract.
-4. **Integrations** — provider registry plus the durable delivery worker. `packages/domain` does not depend on provider packages; `apps/server` is the composition root that supplies their handler layers.
-
-`apps/server` is the only place layers are assembled. If an Effect error or a requirement channel looks wrong at a boundary, the fix usually belongs there.
-
-## Boundaries and sign-off
-
-**Safe by default** — make these changes and record them in the PR:
-
-- Tests: new cases, tightened assertions, converting a test to `it.effect`.
-- A lint rule loosened _or tightened_ in `oxlint.config.ts`, with the reason written beside it.
-- Documentation: `README.md`, `CONTEXT.md`, `docs/`, a new page for a decision that has already been made.
-- New code inside an existing module, following that module's shape.
-- A targeted `oxlint-disable-next-line` with a written reason.
-
-**Needs owner sign-off before you write it** — ask, then do it in its own commit:
-
-- Any dependency addition or version change, including devDependencies. The catalog and the four-version tsgo train both make this a real decision.
-- Anything that loosens the fence: a rule moved to `off`, a compiler option relaxed in `packages/config/tsconfig.base.json`, a task removed from `check` in `turbo.json`, or a new `.github/workflows/` change.
+- Any dependency addition or version change, including devDependencies. The catalog and the compiler train both make this a real decision.
+- Anything that loosens enforcement: a rule moved to `off`, a compiler option relaxed in `packages/config/tsconfig.base.json`, a task removed from `check` in `turbo.json`, or a new `.github/workflows/` change.
 - The authorization and credential surface: `packages/auth`, `packages/domain/src/session-middleware.ts`, `packages/domain/src/auth-handler.ts`, `packages/domain/src/public-api/`, `packages/domain/src/api-key/`.
 - Money and limits: `packages/domain/src/billing/`, `packages/domain/src/plan-entitlements.ts`, `packages/domain/src/rate-limit.ts`.
-- Database migrations (`packages/db/src/migrations/`). They are irreversible in production.
-- Removing or widening the `eslint/no-restricted-imports` boundary overrides.
-- Publishing: anything that changes the public shape of `@feeblo/sdk` or `@feeblo/sdk-react`, or the `publish-sdks` workflow.
+- Database migrations in `packages/db/src/migrations/`. They are irreversible in production.
+- Removing or widening an `eslint/no-restricted-imports` boundary override.
+- Publishing: any change to the public shape of `@feeblo/sdk` or `@feeblo/sdk-react`, or to the `publish-sdks` workflow.
 - Adding a workspace package, or changing `.env.example` in a way that alters an existing variable's meaning.
 
 If a task seems to require one of these, do the rest and surface the decision instead of making it quietly.
 
+## Safe by default
+
+Tests, a lint rule loosened _or_ tightened with its reason beside it, documentation, new code inside an existing module following that module's shape, and a targeted `oxlint-disable-next-line` with a written reason. Record these in the PR.
+
 ## Source control
 
-- Inspect `git status` before editing. This repository is often worked in concurrently, so a dirty tree may not be yours.
-- Stage only the files changed for the current task. Do not sweep unrelated edits into a commit.
-- Do not commit generated output: `src/paraglide/**`, `worker-configuration.d.ts`, `routeTree.gen.ts`, `*.tsbuildinfo`, `playwright-report/`, `test-results/`.
-- Write commit messages that say what was wrong and why the change fixes it. A commit that only names the file is not a reviewable commit.
-- Use the existing branch and remote. Do not initialise a new repository or migrate the remote without approval. Never pass `--no-verify`.
+Inspect `git status` before editing, because this repository is often worked in concurrently and a dirty tree may not be yours. Stage only the files changed for the current task, never sweeping unrelated edits into a commit. Write a message that says what was wrong and why the change fixes it; a commit that only names the file is not reviewable. Use the existing branch and remote.
 
-## When something looks broken
+## Where to read next
 
-- **Effect diagnostics went quiet.** Check that `prepare` ran and patched the compiler — `pnpm exec effect-tsgo patch --tsrs --force` — and that the linter went through `effect-tsgo --tsrs-lint oxlint`. A bare `oxlint` has no `effecttsgo/*` rules by design. If `pnpm install` reported `skipped because its hash matches the replacement`, the pnpm store is serving a previously patched binary; `unpatch` then `patch --force` fixes it. This does not happen on a fresh CI runner.
-- **`tsrs --noEmit` fails in `apps/web` on a missing `@/paraglide/*`.** Run `pnpm --filter @feeblo/web build:paraglide`, or use `pnpm check`.
-- **A run of `pnpm test` is slow.** The `test` turbo task is `cache: false`, so nothing about a test run is reused. Filter to the package you are working in.
+| Touching | Read |
+| --- | --- |
+| `packages/domain`, RPC groups, handlers | `packages/domain/AGENTS.md` |
+| Drizzle schema, transactions, migrations | `packages/db/AGENTS.md` |
+| Sessions, API keys, org ACL, SSO | `packages/auth/AGENTS.md` |
+| Layer composition, provider wiring | `apps/server/AGENTS.md` |
+| Routes, dashboard, portal, i18n | `apps/web/AGENTS.md`, `docs/i18n/README.md` |
+| `/api/v1`, API keys, SDK-facing DTOs | `docs/public-api.md` |
+| Webhooks, Slack, Discord, GitHub | `docs/integrations.md`, `docs/webhooks.md` |
+| Permissions and member roles | `docs/permissions.md` |
+| Notifications, audit log, on-behalf | `docs/notifications.md`, `docs/audit-log.md`, `docs/on-behalf.md` |
+| Tracing, metrics, error reporting | `docs/telemetry.md` |
+| Dependency and compiler bumps | `docs/toolchain.md` |
+| `oxlint.config.ts`, `knip.config.ts` | the reason written above the entry you want changed |
+| Self-hosting, releases, R2 | `docs/self-hosting.md`, `docs/sdk-releases.md`, `docs/r2-production-checklist.md` |
+| Any Effect API question | `node_modules/effect/AGENTS.md` |
