@@ -1,6 +1,18 @@
 import { currentDb, schema, withTransactionAbortRetry } from "@feeblo/db";
 import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-center-article";
-import { and, asc, count, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  cosineDistance,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  sql,
+} from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -10,6 +22,11 @@ import {
   HELP_CENTER_ARTICLE_STATES,
   isHelpCenterArticleReadable,
 } from "./machine";
+import {
+  helpCenterSearchTerms,
+  helpCenterSearchTsQuery,
+  normalizeHelpCenterSearchQuery,
+} from "./search";
 import type { NormalizedHelpCenterArticleWrite } from "./write";
 
 const article = schema.helpCenterArticleTable;
@@ -21,6 +38,10 @@ const viewTotal = schema.helpCenterArticleViewTotalTable;
 const viewEvent = schema.helpCenterArticleViewEventTable;
 
 const feedback = schema.helpCenterArticleFeedbackTable;
+
+const daily = schema.helpCenterArticleDailyTable;
+
+const searchDaily = schema.helpCenterSearchDailyTable;
 
 const articleColumns = {
   id: article.id,
@@ -87,6 +108,58 @@ const articleOrder = [
   desc(article.publishedAt),
   asc(article.title),
 ] as const;
+
+/**
+ * The projection every search returns.
+ *
+ * One list for both halves of the search, so a lexical hit and a semantic hit
+ * are the same shape and a surface projects one type. `status` travels rather
+ * than a pre-computed `isArchived`, because the dashboard distinguishes a draft
+ * from an archived page and the portal collapses both into "readable".
+ */
+const searchHitColumns = {
+  id: article.id,
+  slug: article.slug,
+  title: article.title,
+  excerpt: article.excerpt,
+  status: article.status,
+  topicId: article.topicId,
+  topicSlug: topic.slug,
+  topicName: topic.name,
+} as const;
+
+/**
+ * The `tsquery` for a set of terms, or `undefined` when there are none.
+ *
+ * `to_tsquery` throws on malformed input, so the value bound here is always
+ * one `helpCenterSearchTsQuery` produced. A term list that collapsed to
+ * nothing yields `undefined`, which `and(...)` drops — and the caller never
+ * asks, because `search` returns early for it.
+ */
+const tsQuery = (queryText: string | null) =>
+  queryText === null ? undefined : sql`to_tsquery('english', ${queryText})`;
+
+/**
+ * Relevance, as the generated column's own weights describe it.
+ *
+ * `ts_rank_cd` rather than `ts_rank`: coverage density rewards an article that
+ * uses the terms repeatedly in a short space over one that mentions them once
+ * in a long body, which is the difference between the page someone wants and
+ * the page that happens to contain the word.
+ */
+const rankOf = (queryText: string) =>
+  sql<number>`ts_rank_cd(${article.searchVector}, ${tsQuery(queryText)})`;
+
+/**
+ * The title and summary as their own vector, for a strict search.
+ *
+ * Computed rather than stored because it is only used by the widget's
+ * deflection, where the corpus is one workspace's articles and a sequential
+ * scan is cheaper than a second generated column and its index. Its weights
+ * match the generated column's `A` and `B`, so a strict search and a full one
+ * cannot disagree about where a term was found.
+ */
+const titleExcerptVector = sql`to_tsvector('english'::regconfig, ${article.title} || ' ' || ${article.excerpt})`;
 
 const makeHelpCenterArticleRepository = Effect.gen(function* () {
   const db = yield* currentDb;
@@ -211,6 +284,175 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
       .where(eq(article.organizationId, organizationId))
       .pipe(Effect.map((rows) => rows[0]?.count ?? 0));
 
+  /**
+   * Ranked full-text search.
+   *
+   * Two callers, one query. The dashboard sees every state — an editor
+   * searching for the draft they half-wrote should find it — and the portal and
+   * widget pass `includeUnreadable: false`, which is the same `readableWhere`
+   * every other public read uses. Getting that backwards would publish a draft
+   * through a search box.
+   *
+   * `strict` narrows the match to the title and summary. The widget uses it
+   * because a suggestion beside a feedback form is only worth showing if it
+   * names the thing being asked about; a body match on a passing mention is a
+   * worse suggestion than none.
+   *
+   * No terms means no round trip: `helpCenterSearchTsQuery` returns null for
+   * input that survived normalization with nothing in it, and a query that
+   * cannot match should not be sent.
+   */
+  const search = ({
+    organizationId,
+    query,
+    limit,
+    includeUnreadable,
+    strict = false,
+  }: {
+    organizationId: string;
+    query: string;
+    limit: number;
+    includeUnreadable: boolean;
+    strict?: boolean | undefined;
+  }) => {
+    const queryText = helpCenterSearchTsQuery(helpCenterSearchTerms(query));
+
+    if (queryText === null) {
+      return Effect.succeed([]);
+    }
+
+    return (
+      db
+        .select(searchHitColumns)
+        .from(article)
+        .innerJoin(topic, eq(topic.id, article.topicId))
+        .where(
+          and(
+            eq(article.organizationId, organizationId),
+            includeUnreadable ? undefined : readableWhere,
+            sql`${article.searchVector} @@ ${tsQuery(queryText)}`,
+            strict
+              ? sql`${titleExcerptVector} @@ ${tsQuery(queryText)}`
+              : undefined
+          )
+        )
+        // `publishedAt` before `id` so the order is total without asking for a
+        // tiebreak column the caller would have to carry.
+        .orderBy(
+          desc(rankOf(queryText)),
+          desc(article.publishedAt),
+          asc(article.id)
+        )
+        .limit(limit)
+    );
+  };
+
+  /**
+   * Nearest articles by cosine distance, for the semantic half of a search.
+   *
+   * Rows are filtered on `embedding_model` as well as `is not null`: a vector
+   * from a different model lives in a different space, and comparing across
+   * models returns confident nonsense rather than an error. A deployment that
+   * switches `EMBEDDING_MODEL` therefore stops matching its old rows until they
+   * are re-embedded, which is the honest behaviour — the alternative is
+   * silently mixing two geometries.
+   *
+   * No ANN index is used here on purpose. `help_center_article` is bounded by
+   * the plan's article ceiling, so a sequential distance scan over one
+   * workspace is a few hundred rows; the HNSW index that exists for the column
+   * is there for a corpus that grows past that assumption.
+   */
+  const searchByVector = ({
+    organizationId,
+    embedding,
+    embeddingModel,
+    limit,
+    includeUnreadable,
+  }: {
+    organizationId: string;
+    embedding: readonly number[];
+    embeddingModel: string;
+    limit: number;
+    includeUnreadable: boolean;
+  }) => {
+    const distance = cosineDistance(article.embedding, [...embedding]);
+
+    return (
+      db
+        .select({
+          ...searchHitColumns,
+          distance: sql<number | null>`${distance}`,
+        })
+        .from(article)
+        .innerJoin(topic, eq(topic.id, article.topicId))
+        .where(
+          and(
+            eq(article.organizationId, organizationId),
+            includeUnreadable ? undefined : readableWhere,
+            isNotNull(article.embedding),
+            eq(article.embeddingModel, embeddingModel)
+          )
+        )
+        // `id` breaks a tie so the order is total; two articles can sit at the
+        // same distance and a page that reorders between renders looks broken.
+        .orderBy(asc(distance), asc(article.id))
+        .limit(limit)
+    );
+  };
+
+  /**
+   * Store an article's embedding, but only if the article has not changed.
+   *
+   * The guard is title and content equality, the same one the post embedding
+   * job uses: the job runs after the write, and an editor who saves again in
+   * that window must not end up with a vector describing the text they
+   * replaced. A refresh that matches nothing is not an error — it is a write
+   * that arrived too late.
+   *
+   * `updatedAt` is deliberately not touched: this is an index refresh, not a
+   * change to the article, and bumping it would make every save look like two.
+   */
+  const saveEmbedding = ({
+    articleId,
+    content,
+    model,
+    now,
+    organizationId,
+    title,
+    vector,
+  }: {
+    articleId: string;
+    content: string;
+    model: string;
+    now: Date;
+    organizationId: string;
+    title: string;
+    vector: readonly number[];
+  }) =>
+    db
+      .update(article)
+      .set({
+        embeddedAt: now,
+        embedding: [...vector],
+        embeddingModel: model,
+        // Assigned to the column itself, which is what pins it: `updatedAt`
+        // carries `$onUpdate`, so any statement that omits it is stamped with
+        // the current time by Drizzle. A refresh is an index rebuild, not an
+        // edit — without this an embedding job would move the date a reader
+        // sees on the page and invalidate every cache keyed on it.
+        updatedAt: article.updatedAt,
+      })
+      .where(
+        and(
+          eq(article.id, articleId),
+          eq(article.organizationId, organizationId),
+          eq(article.title, title),
+          eq(article.content, content)
+        )
+      )
+      .returning({ id: article.id })
+      .pipe(Effect.map((rows) => rows.length > 0));
+
   /** The row's lifecycle state and publication date, for the write path. */
   const findStateById = ({
     organizationId,
@@ -286,8 +528,17 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     expectedStatus: THelpCenterArticleState;
     now: Date;
     write: NormalizedHelpCenterArticleWrite;
-  }) =>
-    db
+  }) => {
+    /**
+     * Whether this statement is changing the text an embedding describes.
+     *
+     * A `SET` expression reads the row as it was, so this compares the stored
+     * title and body against the ones being written — one statement, no read
+     * before it and no race between the two.
+     */
+    const textChanged = sql`${article.title} is distinct from ${write.title} or ${article.content} is distinct from ${write.content}`;
+
+    return db
       .update(article)
       .set({
         topicId,
@@ -299,6 +550,16 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         status: write.status,
         publishedAt: write.publishedAt,
         updatedAt: now,
+        // A vector describes the text it was generated from. Clearing it here,
+        // in the same statement that changes the text, closes the window in
+        // which a search could match words the article no longer has; the
+        // detached job fills it again. Only a text change clears it — a
+        // reorder, a retitle of the topic or a status move leaves the
+        // article's meaning, and therefore its vector, alone. The three
+        // columns move together because the table's check requires them to.
+        embedding: sql`case when ${textChanged} then null else ${article.embedding} end`,
+        embeddingModel: sql`case when ${textChanged} then null else ${article.embeddingModel} end`,
+        embeddedAt: sql`case when ${textChanged} then null else ${article.embeddedAt} end`,
       })
       .where(
         and(
@@ -309,6 +570,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
       )
       .returning({ id: article.id })
       .pipe(Effect.map((rows) => rows.map((row) => row.id)));
+  };
 
   const remove = ({
     organizationId,
@@ -390,6 +652,23 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
                 },
               });
 
+            // The daily bucket, in the same transaction as the counter: a view
+            // that moved one and not the other would leave the dashboard
+            // disagreeing with the article page, and the retry helper replays
+            // the whole body so a retried beacon still counts once.
+            yield* db
+              .insert(daily)
+              .values({
+                articleId,
+                day: DateTime.formatIsoDateUtc(DateTime.fromDateUnsafe(now)),
+                organizationId,
+                views: 1,
+              })
+              .onConflictDoUpdate({
+                target: [daily.articleId, daily.day],
+                set: { views: sql`${daily.views} + 1` },
+              });
+
             return true;
           })
         )
@@ -397,6 +676,15 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
 
       return { accepted };
     });
+
+  /**
+   * Drop search buckets older than `before`.
+   *
+   * `before` is a `YYYY-MM-DD` day rather than an instant, because the key is a
+   * calendar day and the analytics windows are inclusive ranges of them.
+   */
+  const deleteSearchesBefore = (before: string) =>
+    db.delete(searchDaily).where(lt(searchDaily.day, before));
 
   /**
    * Drop the raw events older than `before`.
@@ -408,8 +696,173 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
   const deleteEventsBefore = (before: Date) =>
     db.delete(viewEvent).where(lt(viewEvent.occurredAt, before));
 
+  /**
+   * Count one search, and whether it found anything.
+   *
+   * A query that normalized to nothing is not recorded: it is a box the reader
+   * cleared, not a question the documentation failed to answer, and counting it
+   * would make "searches that found nothing" mostly empty strings.
+   *
+   * The caller swallows a failure here (see the public search handler):
+   * analytics must never fail the request that produced it, which is the same
+   * contract the post-traffic ingest states.
+   */
+  const recordSearch = ({
+    organizationId,
+    query,
+    found,
+    now,
+  }: {
+    organizationId: string;
+    query: string;
+    found: boolean;
+    now: DateTime.DateTime;
+  }) => {
+    const normalized = normalizeHelpCenterSearchQuery(query);
+
+    // No terms means nothing a full-text index could ever match — a box the
+    // reader filled with punctuation, or one they cleared. Recording it would
+    // put noise in "top searches" and in "documentation gaps", and the
+    // potential gaps are the list someone is expected to act on.
+    if (helpCenterSearchTerms(normalized).length === 0) {
+      return Effect.void;
+    }
+
+    return db
+      .insert(searchDaily)
+      .values({
+        day: DateTime.formatIsoDateUtc(now),
+        emptySearches: found ? 0 : 1,
+        organizationId,
+        query: normalized,
+        searches: 1,
+      })
+      .onConflictDoUpdate({
+        target: [
+          searchDaily.organizationId,
+          searchDaily.day,
+          searchDaily.query,
+        ],
+        set: {
+          emptySearches: sql`${searchDaily.emptySearches} + ${found ? 0 : 1}`,
+          searches: sql`${searchDaily.searches} + 1`,
+        },
+      })
+      .pipe(Effect.asVoid);
+  };
+
+  /**
+   * The dashboard's analytics for one window.
+   *
+   * Four reads over the same two tables, run together. `sinceDay` is a UTC
+   * calendar day supplied by the caller rather than computed here, so the
+   * window is read through `Clock` at the edge and a test can pin it.
+   *
+   * `articles` keeps the verdict counters beside the views because the page
+   * asks two questions of one table: what is read, and what is read and rated
+   * unhelpful. A separate "lowest rated" query would be a fourth round trip to
+   * answer what a `helpful` column in the same row already shows.
+   */
+  const analytics = ({
+    organizationId,
+    sinceDay,
+    limit,
+  }: {
+    organizationId: string;
+    sinceDay: string;
+    limit: number;
+  }) => {
+    const inWindow = and(
+      eq(daily.organizationId, organizationId),
+      gte(daily.day, sinceDay)
+    );
+
+    const searchesInWindow = and(
+      eq(searchDaily.organizationId, organizationId),
+      gte(searchDaily.day, sinceDay)
+    );
+
+    return Effect.all(
+      {
+        totals: db
+          .select({
+            views: sql<number>`coalesce(sum(${daily.views}), 0)::int`,
+            helpful: sql<number>`coalesce(sum(${daily.helpfulVerdicts}), 0)::int`,
+            unhelpful: sql<number>`coalesce(sum(${daily.unhelpfulVerdicts}), 0)::int`,
+          })
+          .from(daily)
+          .where(inWindow)
+          .pipe(
+            Effect.map(
+              (rows) => rows[0] ?? { helpful: 0, unhelpful: 0, views: 0 }
+            )
+          ),
+
+        articles: db
+          .select({
+            id: article.id,
+            title: article.title,
+            slug: article.slug,
+            status: article.status,
+            views: sql<number>`coalesce(sum(${daily.views}), 0)::int`,
+            helpful: sql<number>`coalesce(sum(${daily.helpfulVerdicts}), 0)::int`,
+            unhelpful: sql<number>`coalesce(sum(${daily.unhelpfulVerdicts}), 0)::int`,
+          })
+          .from(daily)
+          .innerJoin(article, eq(article.id, daily.articleId))
+          .where(inWindow)
+          .groupBy(article.id, article.title, article.slug, article.status)
+          .orderBy(
+            sql`coalesce(sum(${daily.views}), 0) desc`,
+            asc(article.title)
+          )
+          .limit(limit),
+
+        queries: db
+          .select({
+            query: searchDaily.query,
+            searches: sql<number>`coalesce(sum(${searchDaily.searches}), 0)::int`,
+            emptySearches: sql<number>`coalesce(sum(${searchDaily.emptySearches}), 0)::int`,
+          })
+          .from(searchDaily)
+          .where(searchesInWindow)
+          .groupBy(searchDaily.query)
+          .orderBy(
+            sql`coalesce(sum(${searchDaily.searches}), 0) desc`,
+            asc(searchDaily.query)
+          )
+          .limit(limit),
+
+        /**
+         * The documentation gap: queries that returned nothing, most frequent
+         * first. A subgroup of `queries` by construction, and a separate read
+         * because the window's most-searched phrase and its most-fruitless one
+         * are routinely different phrases.
+         */
+        emptyQueries: db
+          .select({
+            query: searchDaily.query,
+            searches: sql<number>`coalesce(sum(${searchDaily.searches}), 0)::int`,
+            emptySearches: sql<number>`coalesce(sum(${searchDaily.emptySearches}), 0)::int`,
+          })
+          .from(searchDaily)
+          .where(searchesInWindow)
+          .groupBy(searchDaily.query)
+          .having(sql`sum(${searchDaily.emptySearches}) > 0`)
+          .orderBy(
+            sql`coalesce(sum(${searchDaily.emptySearches}), 0) desc`,
+            asc(searchDaily.query)
+          )
+          .limit(limit),
+      },
+      { concurrency: "unbounded" }
+    );
+  };
+
   return {
+    analytics,
     deleteEventsBefore,
+    deleteSearchesBefore,
     findMany,
     findManyPublic,
     findById,
@@ -419,7 +872,11 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     create,
     update,
     remove,
+    recordSearch,
     recordView,
+    saveEmbedding,
+    search,
+    searchByVector,
   };
 });
 

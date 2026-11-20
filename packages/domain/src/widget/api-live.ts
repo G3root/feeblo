@@ -21,6 +21,9 @@ import { DataValidationError } from "../contact/errors";
 import { ContactRepository } from "../contact/repository";
 import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { makeHelpCenterSearch } from "../help-center-article/hybrid-search";
+import { HelpCenterArticleRepository } from "../help-center-article/repository";
+import { HelpCenterEnabled } from "../help-center/flag";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
@@ -42,6 +45,8 @@ import {
   withRemapDbErrors,
 } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
+import { SiteRepository } from "../site/repository";
+import { buildPublicSiteUrl, PortalUrlConfig } from "../site/url";
 import { ParticipationPolicy } from "../user-ban/policies";
 import { WidgetCreateFeedbackErrors } from "./api-contract";
 import {
@@ -121,6 +126,99 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
       publishedAt: entry.publishedAt ?? entry.createdAt,
     };
   });
+});
+
+/**
+ * Help-center articles that may already answer the question being written.
+ *
+ * Three answers, one shape. `enabled: false` covers every case where the
+ * surface does not exist — the feature is off for the deployment, the
+ * workspace is on a site with no help center, or the workspace has none — and
+ * the widget needs that as a value rather than a failure so it can stop asking
+ * instead of polling an endpoint that will keep returning nothing.
+ *
+ * The visibility check is the predicate `SitePolicy.canViewHelpCenter`
+ * applies, answered as "nothing" rather than an error. That difference is
+ * deliberate here: this endpoint is unauthenticated and names the workspace in
+ * its body, so a distinguishable failure would confirm which workspaces exist.
+ * The same reasoning keeps a hidden changelog answering `[]`.
+ *
+ * The search is `strict`, so a hit means the term is in an article's title or
+ * summary. A suggestion beside a feedback form is only worth showing if it
+ * names the thing being asked about; a body match on a passing mention would be
+ * a worse suggestion than none.
+ */
+const findWidgetHelpArticles = Effect.fn("Widget.helpArticles")(function* ({
+  organizationId,
+  query,
+}: {
+  organizationId: string;
+  query: string;
+}) {
+  const enabled = yield* HelpCenterEnabled;
+  const siteRepository = yield* SiteRepository;
+
+  if (!enabled) {
+    return { articles: [], enabled: false };
+  }
+
+  const site = yield* siteRepository
+    .findByOrganizationId({ organizationId })
+    .pipe(Effect.map(Option.getOrUndefined));
+
+  if (site === undefined || site.helpCenterVisibility !== "PUBLIC") {
+    return { articles: [], enabled: false };
+  }
+
+  const repository = yield* HelpCenterArticleRepository;
+  const config = yield* PortalUrlConfig;
+
+  // The same program the dashboard and portal run, built without an embedder:
+  // the deflection is strict and a strict search never reaches the semantic
+  // pass, so a deployment with no API key still answers it. Going through the
+  // program rather than straight to the repository is what keeps "strict"
+  // meaning one thing across the three surfaces.
+  const search = makeHelpCenterSearch({
+    embeddings: Option.none(),
+    lexical: repository.search,
+    semantic: repository.searchByVector,
+  });
+
+  const hits = yield* search({
+    includeUnreadable: false,
+    limit: 3,
+    organizationId,
+    query,
+    strict: true,
+  });
+
+  // Counted, because "the widget offered documentation and the reader posted
+  // anyway" and "the widget found nothing" are the two facts that say whether
+  // the deflection is working. A failed counter never fails the suggestion.
+  const now = yield* DateTime.now;
+
+  yield* repository
+    .recordSearch({ found: hits.length > 0, now, organizationId, query })
+    .pipe(
+      Effect.tapCause((cause) =>
+        Effect.logWarning("Failed to record a widget help center search", cause)
+      ),
+      Effect.ignoreCause
+    );
+
+  const portalUrl = buildPublicSiteUrl(site, config.rootDomain);
+
+  return {
+    articles: hits.map((hit) => ({
+      excerpt: hit.excerpt,
+      id: hit.id,
+      title: hit.title,
+      // Absolute, because the iframe is embedded on the customer's own origin:
+      // a relative link would resolve against the host page.
+      url: `${portalUrl}/s/help/articles/${encodeURIComponent(hit.slug)}`,
+    })),
+    enabled: true,
+  };
 });
 
 /**
@@ -259,6 +357,9 @@ export const WidgetApiLive = HttpApiBuilder.group(
       const postRepository = yield* PostRepository;
       const postEmbeddings = yield* PostEmbeddingService;
       const participation = yield* ParticipationPolicy;
+      const helpCenterArticles = yield* HelpCenterArticleRepository;
+      const siteRepository = yield* SiteRepository;
+      const portalUrlConfig = yield* PortalUrlConfig;
 
       // The same suggestion program the dashboard and public portal RPCs run,
       // with the widget's public-only rule. Its collaborators are captured
@@ -290,7 +391,13 @@ export const WidgetApiLive = HttpApiBuilder.group(
           Effect.provideService(JwtSecretRepository, jwtSecretRepository),
           Effect.provideService(OrganizationRepository, organizationRepository),
           Effect.provideService(PostStatusRepository, postStatusRepository),
-          Effect.provideService(SitePolicy, sitePolicy)
+          Effect.provideService(SitePolicy, sitePolicy),
+          Effect.provideService(
+            HelpCenterArticleRepository,
+            helpCenterArticles
+          ),
+          Effect.provideService(SiteRepository, siteRepository),
+          Effect.provideService(PortalUrlConfig, portalUrlConfig)
         );
 
       return handlers
@@ -326,6 +433,22 @@ export const WidgetApiLive = HttpApiBuilder.group(
               name: "WidgetSuggestPosts",
               level: "expensive",
             })
+          )
+        )
+        .handle("helpArticles", ({ payload }) =>
+          findWidgetHelpArticles(payload).pipe(
+            // A failure propagates, and the client's own `failed` state keeps
+            // the panel empty without latching `enabled: false`. Swallowing it
+            // into `enabled: false` would tell the widget the workspace has no
+            // help center — permanently, for that session — on a transient
+            // database error. Creating feedback is a separate request, so a
+            // failed hint cannot block it either way.
+            provideHandlerEnvironment,
+            RateLimit.withPublicHttpRateLimit({
+              name: "WidgetHelpArticles",
+              level: "read",
+            }),
+            withRemapDbErrors("HelpCenterArticle", "select")
           )
         )
         .handle("listBoards", ({ payload }) =>
@@ -494,12 +617,20 @@ export const WidgetApiLive = HttpApiBuilder.group(
       ChangelogRepository.layer,
       CompanyRepository.layer,
       ContactRepository.layer,
+      HelpCenterArticleRepository.layer,
       JwtSecretRepository.layer,
       OrganizationRepository.layer,
+      PortalUrlConfig.layer,
       PostEmbeddingService.layer,
       PostRepository.layer,
       PostStatusRepository.layer,
-      SitePolicy.layer,
+      // Provided into the policy rather than beside it: `Layer.mergeAll`
+      // builds in parallel, so a layer that depends on a sibling in the same
+      // call is a layer whose dependency is not there yet. The repository is
+      // still in the merge for the handler's own lookup of the workspace's
+      // public host, which is why both appear.
+      SitePolicy.layer.pipe(Layer.provide(SiteRepository.layer)),
+      SiteRepository.layer,
       ParticipationPolicy.layer
     )
   )

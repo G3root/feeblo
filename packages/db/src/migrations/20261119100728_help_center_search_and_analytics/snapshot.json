@@ -1,0 +1,662 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "4e1f4cd9-0ecc-47e1-bf8b-143d2a630181",
+  "prevIds": [
+    "863854fe-d0d7-47c3-8467-1f3e8a03d65a"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_daily"
+      ],
+      "writes": [
+        "s|tbl|public.help_center_article_daily",
+        "n|tbl|public.help_center_article_daily",
+        "e|tbl|public.help_center_article_daily",
+        "n|rel|public.help_center_article_daily",
+        "n|type|public.help_center_article_daily",
+        "n|rel|public.help_center_article_daily_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_search_daily"
+      ],
+      "writes": [
+        "s|tbl|public.help_center_search_daily",
+        "n|tbl|public.help_center_search_daily",
+        "e|tbl|public.help_center_search_daily",
+        "n|rel|public.help_center_search_daily",
+        "n|type|public.help_center_search_daily",
+        "n|rel|public.help_center_search_daily_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "help_center_article",
+        "search_vector"
+      ],
+      "writes": [
+        "s|col|public.help_center_article.search_vector",
+        "n|col|public.help_center_article.search_vector",
+        "e|col|public.help_center_article.search_vector"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_article_daily",
+        "help_center_article_daily_organizationId_day_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_article_daily_organizationId_day_idx",
+        "n|idx|public.help_center_article_daily_organizationId_day_idx",
+        "e|idx|public.help_center_article_daily_organizationId_day_idx",
+        "n|rel|public.help_center_article_daily_organizationId_day_idx"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_daily",
+        "n|sch|public",
+        "n|col|public.help_center_article_daily.organization_id",
+        "n|col|public.help_center_article_daily.day"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_article",
+        "help_center_article_search_vector_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_article_search_vector_idx",
+        "n|idx|public.help_center_article_search_vector_idx",
+        "e|idx|public.help_center_article_search_vector_idx",
+        "n|rel|public.help_center_article_search_vector_idx"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article",
+        "n|sch|public",
+        "n|col|public.help_center_article.search_vector"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_search_daily",
+        "help_center_search_daily_organizationId_day_searches_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_search_daily_organizationId_day_searches_idx",
+        "n|idx|public.help_center_search_daily_organizationId_day_searches_idx",
+        "e|idx|public.help_center_search_daily_organizationId_day_searches_idx",
+        "n|rel|public.help_center_search_daily_organizationId_day_searches_idx"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_search_daily",
+        "n|sch|public",
+        "n|col|public.help_center_search_daily.organization_id",
+        "n|col|public.help_center_search_daily.day"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_daily"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_daily.help_center_article_daily_organization_id_organization_id_fkey",
+        "n|fk|public.help_center_article_daily.help_center_article_daily_organization_id_organization_id_fkey",
+        "e|fk|public.help_center_article_daily.help_center_article_daily_organization_id_organization_id_fkey",
+        "n|con|public.help_center_article_daily.help_center_article_daily_organization_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_daily",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.help_center_article_daily.organization_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_daily"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey",
+        "n|fk|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey",
+        "e|fk|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey",
+        "n|con|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_daily",
+        "n|sch|public",
+        "n|tbl|public.help_center_article",
+        "n|sch|public",
+        "n|col|public.help_center_article_daily.article_id",
+        "n|col|public.help_center_article.id",
+        "e|uniqueness|public.help_center_article.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_daily"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_daily.help_center_article_daily_article_organization_fk",
+        "n|fk|public.help_center_article_daily.help_center_article_daily_article_organization_fk",
+        "e|fk|public.help_center_article_daily.help_center_article_daily_article_organization_fk",
+        "n|con|public.help_center_article_daily.help_center_article_daily_article_organization_fk"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_daily",
+        "n|sch|public",
+        "n|tbl|public.help_center_article",
+        "n|sch|public",
+        "n|col|public.help_center_article_daily.article_id",
+        "n|col|public.help_center_article_daily.organization_id",
+        "n|col|public.help_center_article.id",
+        "n|col|public.help_center_article.organization_id",
+        "e|uniqueness|public.help_center_article.id.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_search_daily"
+      ],
+      "writes": [
+        "s|fk|public.help_center_search_daily.help_center_search_daily_organization_id_organization_id_fkey",
+        "n|fk|public.help_center_search_daily.help_center_search_daily_organization_id_organization_id_fkey",
+        "e|fk|public.help_center_search_daily.help_center_search_daily_organization_id_organization_id_fkey",
+        "n|con|public.help_center_search_daily.help_center_search_daily_organization_id_organization_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_search_daily",
+        "n|sch|public",
+        "n|tbl|public.organization",
+        "n|sch|public",
+        "n|col|public.help_center_search_daily.organization_id",
+        "n|col|public.organization.id",
+        "e|uniqueness|public.organization.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "help_center_article_daily",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "help_center_search_daily",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "article_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "day",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "views",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "helpful_verdicts",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "unhelpful_verdicts",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article",
+        "name": "search_vector",
+        "type": "tsvector",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": {
+          "as": "setweight(to_tsvector('english'::regconfig, title), 'A') || setweight(to_tsvector('english'::regconfig, excerpt), 'B') || setweight(to_tsvector('english'::regconfig, content), 'C')",
+          "type": "stored"
+        },
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "day",
+        "type": "date",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "query",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "searches",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "empty_searches",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "help_center_article_daily_organizationId_day_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "day",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article",
+        "name": "help_center_article_search_vector_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "search_vector",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "gin",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "help_center_search_daily_organizationId_day_searches_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "day",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "\"searches\" desc",
+            "isExpression": true,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "help_center_article_daily_organization_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "organization_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "help_center_article_daily_pgDlPfJgnRiS_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "article_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "help_center_article",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "help_center_article_daily_article_organization_fk",
+        "nameExplicit": true,
+        "columns": [
+          "article_id",
+          "organization_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "help_center_article",
+        "columnsTo": [
+          "id",
+          "organization_id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "help_center_search_daily_organization_id_organization_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "organization_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organization",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "help_center_article_daily_pkey",
+        "columns": [
+          "article_id",
+          "day"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "help_center_search_daily_pkey",
+        "columns": [
+          "organization_id",
+          "day",
+          "query"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_daily",
+        "name": "help_center_article_daily_counts_chk",
+        "value": "\"views\" >= 0 and \"helpful_verdicts\" >= 0 and \"unhelpful_verdicts\" >= 0",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_search_daily",
+        "name": "help_center_search_daily_counts_chk",
+        "value": "\"searches\" >= 0 and \"empty_searches\" >= 0 and \"empty_searches\" <= \"searches\"",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

@@ -7,11 +7,14 @@ import {
   bigint,
   boolean,
   check,
+  customType,
+  date,
   foreignKey,
   index,
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -24,6 +27,18 @@ export const helpCenterVisibilityEnum = pgEnum("help_center_visibility", [
   "PUBLIC",
   "HIDDEN",
 ]);
+
+/**
+ * A Postgres `tsvector`.
+ *
+ * Only ever read and written by Postgres: the article's column is generated and
+ * the query builds its own vector from a parameter, so no application code
+ * stores or compares a `tsvector` value. It exists here so the column can be
+ * declared, indexed and generated inside the schema the migrator diffs.
+ */
+const tsvector = customType<{ data: string; driverData: string }>({
+  dataType: () => "tsvector",
+});
 
 /**
  * A section of the help center, and the container every article belongs to.
@@ -125,6 +140,26 @@ export const helpCenterArticleTable = pgTable(
      * `position`, which every topic has.
      */
     position: integer("position"),
+    /**
+     * The article as a full-text index, derived and never authored.
+     *
+     * A generated column rather than a trigger or a write-path update: the
+     * three inputs live on this row, so Postgres can always compute the value
+     * and no caller can forget to. That rules out the drift a trigger's
+     * `UPDATE` can miss (a restored dump, a bulk insert, a migration backfill)
+     * and needs no backfill pass when it ships.
+     *
+     * Weights are the ranking: a title match outranks a summary match, which
+     * outranks a body match. That is the whole relevance model — a help center
+     * is small, and a second signal would be a tuning knob nobody tunes.
+     *
+     * The `regconfig` is a literal, which is what makes the expression
+     * immutable and therefore admissible in a generated column. A parameterized
+     * config (`to_tsvector($1, …)`) would be rejected by Postgres at DDL time.
+     */
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`setweight(to_tsvector('english'::regconfig, title), 'A') || setweight(to_tsvector('english'::regconfig, excerpt), 'B') || setweight(to_tsvector('english'::regconfig, content), 'C')`
+    ),
     embedding: embeddingVector(DEFAULT_EMBEDDING_DIMENSIONS)("embedding"),
     embeddingModel: text("embedding_model"),
     embeddedAt: timestamp("embedded_at", { withTimezone: true }),
@@ -156,6 +191,14 @@ export const helpCenterArticleTable = pgTable(
       table.publishedAt
     ),
     index("help_center_article_creatorMemberId_idx").on(table.creatorMemberId),
+    // The search's only access path. GIN rather than GiST because the corpus is
+    // small, updates are rare and a read is the common case, which is the
+    // trade-off GIN is built for.
+    index("help_center_article_search_vector_idx").using(
+      "gin",
+      table.searchVector
+    ),
+
     index("help_center_article_embedding_hnsw_idx")
       .using("hnsw", sql`${table.embedding} vector_cosine_ops`)
       .where(sql`${table.embedding} is not null`),
@@ -339,6 +382,113 @@ export const helpCenterArticleFeedbackTable = pgTable(
         helpCenterArticleTable.organizationId,
       ],
     }).onDelete("cascade"),
+  ]
+);
+
+/**
+ * One article's traffic and verdicts, bucketed by UTC day.
+ *
+ * The row *is* the bucket, so the natural key is the primary key: a surrogate
+ * id would be a second identity for the same fact and a second way to write it
+ * twice. `onConflictDoUpdate` on that key is the whole write path.
+ *
+ * The two verdict counters count verdicts **cast** that day, not the current
+ * distribution of them. Flipping a vote from helpful to unhelpful adds an
+ * unhelpful to today and leaves the helpful on the day it was cast. Aggregating
+ * today's standing distribution is what the feedback table's own `count(*)`
+ * answers, and it is already what the article reads carry; keeping a second,
+ * slower-moving copy of it here would be two numbers that disagree.
+ *
+ * The `>= 0` check earns its place because the counters move by delta. A
+ * negative bucket is not a rounding artefact, it is a bug in the caller, and
+ * the constraint turns it into a failed write rather than a chart that says a
+ * page was un-read.
+ */
+export const helpCenterArticleDailyTable = pgTable(
+  "help_center_article_daily",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    articleId: text("article_id")
+      .notNull()
+      .references(() => helpCenterArticleTable.id, { onDelete: "cascade" }),
+    /** UTC calendar day, `YYYY-MM-DD`. */
+    day: date("day", { mode: "string" }).notNull(),
+    views: integer("views").notNull().default(0),
+    helpfulVerdicts: integer("helpful_verdicts").notNull().default(0),
+    unhelpfulVerdicts: integer("unhelpful_verdicts").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.articleId, table.day] }),
+    // The workspace-wide read: every article's buckets over a window.
+    index("help_center_article_daily_organizationId_day_idx").on(
+      table.organizationId,
+      table.day
+    ),
+    check(
+      "help_center_article_daily_counts_chk",
+      sql`${table.views} >= 0 and ${table.helpfulVerdicts} >= 0 and ${table.unhelpfulVerdicts} >= 0`
+    ),
+    // The same composite guard the verdict table carries: a bucket cannot name
+    // an article in another workspace, whatever a handler does.
+    foreignKey({
+      name: "help_center_article_daily_article_organization_fk",
+      columns: [table.articleId, table.organizationId],
+      foreignColumns: [
+        helpCenterArticleTable.id,
+        helpCenterArticleTable.organizationId,
+      ],
+    }).onDelete("cascade"),
+  ]
+);
+
+/**
+ * What readers searched the help center for, bucketed by UTC day.
+ *
+ * Two questions, two counters, one row. "What are people looking for" is
+ * `searches` descending; "what documentation do we not have" is
+ * `empty_searches` above zero, because a query with no answer is the gap. Both
+ * come from the same bucket so they cannot disagree about how many searches
+ * there were.
+ *
+ * `query` is normalized before it is stored: lowercased, whitespace collapsed,
+ * bounded to the same length the search input accepts. Case and spacing are not
+ * meaning, and a counter keyed on the raw text would hold `Export CSV` and
+ * `export  csv` as two rows with one search each.
+ *
+ * The composite key includes `query`, so the table grows with distinct queries
+ * rather than with searches: a help center sees human-entered text, where
+ * distinct-by-day is bounded by what people actually ask. That bound is not a
+ * guarantee, so rows are pruned by day after `HELP_CENTER_SEARCH_RETENTION_DAYS`
+ * (90) by the help center's daily retention pass — the same window as the raw
+ * view events, and one day longer than the longest analytics range, so the
+ * sweep can never delete a bucket a panel still reports on.
+ */
+export const helpCenterSearchDailyTable = pgTable(
+  "help_center_search_daily",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizationTable.id, { onDelete: "cascade" }),
+    /** UTC calendar day, `YYYY-MM-DD`. */
+    day: date("day", { mode: "string" }).notNull(),
+    query: text("query").notNull(),
+    searches: integer("searches").notNull().default(0),
+    /** The subset of `searches` that returned nothing. */
+    emptySearches: integer("empty_searches").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.day, table.query] }),
+    index("help_center_search_daily_organizationId_day_searches_idx").on(
+      table.organizationId,
+      table.day,
+      sql`${table.searches} desc`
+    ),
+    check(
+      "help_center_search_daily_counts_chk",
+      sql`${table.searches} >= 0 and ${table.emptySearches} >= 0 and ${table.emptySearches} <= ${table.searches}`
+    ),
   ]
 );
 

@@ -1,10 +1,16 @@
 import { useSubmission } from "@solidjs/router";
 import { createEffect, createSignal, type JSX } from "solid-js";
 
-import { createFeedBackAction, fetchSuggestions } from "../../lib/api";
+import {
+  createFeedBackAction,
+  fetchSuggestions,
+  requestHelpArticles,
+} from "../../lib/api";
 import type { Board } from "../../lib/boards";
 import { FeedbackFormContext, type FeedbackFormContextValue } from "./context";
+import { createHelpArticleSearch } from "./create-help-article-search";
 import { createSuggestionSearch } from "./create-suggestion-search";
+import { isHelpArticleSearchPending } from "./help-article-search";
 import {
   isSuggestionSearchPending,
   SUGGESTION_QUERY_MIN_LENGTH,
@@ -12,14 +18,12 @@ import {
 
 /**
  * The only place that knows how the feedback form state is managed:
- * title/content signals, the suggestion search, and the router submission.
+ * title/content signals, the two searches, and the router submission.
  * Consumers only see the context interface.
  *
- * The suggestion lifecycle is not in this file. It used to be a `createEffect`
- * holding a timer, an `AbortController` and an `isCurrent` flag; it is now
- * `suggestion-search.ts` (the graph, as a pure reducer) and
- * `create-suggestion-search.ts` (the timer and the abort). What is left here is
- * the one line that reports the field.
+ * Neither search lifecycle is in this file. Each is a reducer holding the
+ * graph plus a driver holding the timer and the abort. What is left here is
+ * the one line that reports the field to each.
  */
 export function FeedbackFormProvider(props: {
   board: Board;
@@ -29,6 +33,20 @@ export function FeedbackFormProvider(props: {
   const [title, setTitle] = createSignal("");
   const [content, setContent] = createSignal("");
   const suggestionSearch = createSuggestionSearch(fetchSuggestions);
+
+  const helpArticleSearch = createHelpArticleSearch((query, signal) =>
+    requestHelpArticles(
+      { organizationId: props.board.organizationId, query },
+      signal
+    )
+  );
+
+  createEffect(() => {
+    // Separate effect from the suggestion search on purpose: that one also
+    // reads the content field, and sharing it would reset this debounce (and
+    // abort its request) on every content keystroke.
+    helpArticleSearch.input(title());
+  });
 
   createEffect(() => {
     const nextTitle = title().trim();
@@ -47,6 +65,10 @@ export function FeedbackFormProvider(props: {
     state: {
       title,
       content,
+      helpArticles: () => helpArticleSearch.state().articles,
+      helpArticlesEnabled: () => helpArticleSearch.state().enabled,
+      helpArticlesPending: () =>
+        isHelpArticleSearchPending(helpArticleSearch.state()),
       suggestions: () => suggestionSearch.state().suggestions,
       suggestionsPending: () =>
         isSuggestionSearchPending(suggestionSearch.state()),

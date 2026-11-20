@@ -2,11 +2,14 @@ import {
   decodeWidgetBoards,
   decodeWidgetBootEnv,
   decodeWidgetError,
+  decodeWidgetHelpArticles,
   decodeWidgetSuggestions,
   decodeWidgetUpdates,
   type TWidgetBoard,
   type TWidgetBootEnv,
   type TWidgetFeedbackCreateWire,
+  type TWidgetHelpArticle,
+  type TWidgetHelpArticles,
   type TWidgetSuggestion,
   type TWidgetUpdate,
 } from "@feeblo/domain/widget/schema";
@@ -28,6 +31,10 @@ import { sendToParent } from "./messages";
 export type WidgetBoard = TWidgetBoard;
 
 export type WidgetSuggestion = TWidgetSuggestion;
+
+export type WidgetHelpArticle = TWidgetHelpArticle;
+
+export type WidgetHelpArticles = TWidgetHelpArticles;
 
 export type WidgetUpdate = TWidgetUpdate;
 
@@ -95,6 +102,31 @@ export async function fetchSuggestions(
   }
 
   return decodeWidgetSuggestions(await response.json());
+}
+
+/**
+ * Asks whether the help center already answers the question being written.
+ *
+ * Separate from `fetchSuggestions` rather than a widened one: the answer also
+ * carries `enabled`, which is a property of the deployment and the workspace
+ * instead of of the query, and the widget has to remember it past this request.
+ */
+export async function requestHelpArticles(
+  input: { organizationId: string; query: string },
+  signal: AbortSignal
+): Promise<WidgetHelpArticles> {
+  const response = await fetch(`${getApiBaseUrl()}/help-articles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch help articles: ${response.status}`);
+  }
+
+  return decodeWidgetHelpArticles(await response.json());
 }
 
 /**

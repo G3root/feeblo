@@ -15,6 +15,11 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
       contentType: "application/json",
       body: JSON.stringify([
         {
+          // `icon` is part of the board payload the widget decodes, so the
+          // fixture carries it even when the board has no override: a missing
+          // key fails the decode, which renders the boundary instead of the
+          // form.
+          icon: null,
           id: "board_features",
           name: "Feature requests",
           slug: "features",
@@ -100,8 +105,11 @@ test("Feeblo Hub moves between updates and feedback inside one placed widget", a
   await launcher.click();
 
   const widget = page.frameLocator("#feeblo-embed-container iframe");
+  // The hub opens straight onto the only board's form, and the form's header
+  // names that board. "Give us feedback" is the *board list's* heading, which
+  // this fixture never shows — one board means one destination.
   await expect(
-    widget.getByText("Give us feedback", { exact: true })
+    widget.getByText("Feature requests", { exact: true })
   ).toBeVisible();
   await widget.getByRole("link", { name: "Updates" }).click();
   await expect(widget.getByText("A faster feedback editor")).toBeVisible();

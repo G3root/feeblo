@@ -50,6 +50,7 @@ function FeedbackFormScreen() {
         <FeedbackForm.Fields>
           <FeedbackForm.TitleField />
           <FeedbackForm.ContentField />
+          <FeedbackForm.HelpArticles />
           <FeedbackForm.Suggestions />
         </FeedbackForm.Fields>
         <FeedbackForm.Actions>

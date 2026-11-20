@@ -13,6 +13,8 @@ This document is the design record for what shipped. The decisions themselves an
 | `help_center_article_view_event` | One row per read, with the client's idempotency key |
 | `help_center_article_view_total` | The all-time counter that outlives event retention |
 | `help_center_article_feedback` | One reader's "was this helpful?" verdict, flippable in place |
+| `help_center_article_daily` | One article's views and verdicts, bucketed by UTC day |
+| `help_center_search_daily` | What readers searched for, and how often it found nothing, bucketed by UTC day |
 | `site.help_center_visibility` | Whether the portal serves the help center at all |
 
 Every table carries `organization_id` with `onDelete: cascade`, and slugs are unique **per workspace** (`help_center_article_organizationId_slug_uidx`). The article's topic reference is a composite foreign key on `(topic_id, organization_id)` with `ON DELETE RESTRICT`, so an article cannot name another workspace's section and deleting a section cannot silently delete documentation.
@@ -53,13 +55,44 @@ A flip is an `UPDATE` of the same row. Flipping to helpful clears `reason`, beca
 
 **Portal routes.** `/s/help` and `/s/help/articles/$articleSlug`, which render the stored Markdown, offer "Copy as Markdown", fire the view beacon, and collect the verdict.
 
+## Search
+
+Lexical first, semantic as a rescue. Two signals, one program (`help-center-article/hybrid-search.ts`), three surfaces.
+
+**Lexical.** `help_center_article.search_vector` is a **generated** `tsvector` column — `setweight(title,'A') || setweight(excerpt,'B') || setweight(content,'C')` against `english` — with a GIN index. Generated rather than a trigger or a write-path update because the three inputs live on the same row, so Postgres can always compute the value and no caller can forget to; that also means no backfill and no drift from a restored dump or a bulk insert.
+
+The query is built in `help-center-article/search.ts`, which is the only producer of the string `to_tsquery` ever parses. It lowercases, collapses whitespace, keeps runs of letters and digits, drops one-character terms and duplicates, caps the term count, and ORs prefix branches (`export:* | csv:*`). Nothing a reader types can reach the parser as syntax: `&`, `|`, `!`, `(`, `)`, `:` and `'` are separators before they are operators. Ranking is `ts_rank_cd`, so coverage beats a single passing mention, and the three weights decide title over summary over body.
+
+**Semantic.** Articles carry an embedding (title + the first 6,000 characters of the body) written after every readable create or update, detached and best-effort — a model that is unreachable leaves the columns null and never fails the save. `searchByVector` orders by cosine distance and filters on `embedding_model` as well as `embedding is not null`: a vector from a different model lives in a different space, and comparing across models returns confident nonsense rather than an error.
+
+**The rule that joins them.** The semantic pass runs only when the lexical pass returned fewer than three pages, and its hits are appended behind the lexical ones. It is a rescue, not a ranker: `ts_rank_cd` is unbounded and depends on the query's term count, cosine distance is bounded and model-specific, and any arithmetic combining them would be a constant nobody could defend. The rule also bounds cost — a public search box must not spend a model call on the common case, and the common case is a query that matches.
+
+**The surfaces.** One difference between the dashboard and the portal: the dashboard includes every lifecycle state — an editor searching for the draft they half-wrote should find it — and the public one applies the same readable-state filter every other portal read applies. Getting that wrong publishes a draft through a search box, so the flag is a parameter of the repository call rather than something a caller can forget.
+
+The widget's deflection passes `strict`, which restricts the lexical match to the title or summary **and disables the semantic pass**. A suggestion beside a feedback form is only worth showing if it names the thing being asked about; a semantic neighbour with no word overlap is exactly the suggestion that looks like a mistake there. It is also why the widget needs no embedding configuration.
+
+## Analytics
+
+The panel on the dashboard's help center index reads two day-bucketed tables over a 7, 30 or 90 day window. A window of N days is N UTC dates **including today**, so its first day is `today - (N - 1)`; the boundary is pinned by a test that writes one bucket on the first included day and one on the day before it.
+
+- `help_center_article_daily` counts views and verdicts per article per UTC day. The view counter moves inside the same transaction as the all-time counter, so the two cannot disagree. The verdict counters count verdicts **cast** that day, not the standing distribution — a flip adds an unhelpful to today and leaves the earlier helpful where it was. The standing distribution is the feedback table's own `count(*)`, and a second, slower-moving copy of it here would be a number that disagrees with the article page.
+- `help_center_search_daily` counts searches and how many of them returned nothing, keyed on the normalized query. Both numbers live in one row so "what people look for" and "what we do not document" cannot disagree about how many searches there were.
+
+Writes to either table are **advisory**: a failure is logged and swallowed, because a reader's search must not fail because an analytics write did, and a verdict must not be lost because its bucket was. The search write is the only public read that writes at all. A query with no searchable term — punctuation, or a box the reader cleared — is not recorded: it can never match, so counting it would put noise in both "top searches" and the gaps list.
+
+## Widget deflection
+
+`POST /api/widget/v1/help-articles` answers `{ articles, enabled }` for the title being typed in the feedback composer. `enabled: false` covers every case where the surface does not exist — the deployment flag is off, the workspace hides its help center, or it has none — and is a value rather than an error on purpose: this endpoint is unauthenticated and names the workspace in its body, so a distinguishable failure would confirm which workspaces exist. The widget latches the flag and stops asking.
+
+Each hit carries an absolute `url` built by `site/url.ts`, because the iframe is embedded on the customer's own origin and a relative link would resolve against the host page. That module is the single rule for `<custom domain>` or `<subdomain>.<root>`; the email outbox's portal links go through it too.
+
 ## Rollout
 
 The feature ships behind `HELP_CENTER` in `packages/domain/src/feature-flags.ts`, default **off**. Unlike the audit log — where only the recorder is gated, since a read of an empty table is harmless — every operation is gated, because a read is as much a launch as a write when the tables are new and empty.
 
 - `help-center/flag.ts` exposes `HelpCenterEnabled`, a `Context.Reference` defaulting to the flag. Tests provide `true`; production reads the default.
 - `helpCenterFeatureGate` is a **public** policy (the portal has no session to check) that fails with `PolicyDeniedError`, which every operation already declares — so the flag adds no new error vocabulary at the RPC boundary. It is applied **last** in each handler's pipe, which makes it the outermost check: a deployment with the feature off refuses before it reads a row or spends a rate-limit token.
-- The raw-event retention loop is forked only when the flag is on, matching the audit sweep: with the feature off nothing writes a read event, so a daily pass would only wake the worker to delete nothing.
+- The retention loop is forked only when the flag is on, matching the audit sweep: with the feature off nothing writes a read event or a search, so a daily pass would only wake the worker to delete nothing. The same loop prunes both tables — raw read events older than 90 days, and search buckets whose day is older than 90 days. The day comparison is `day < cutoff`, so the cut day itself survives; with a 90-day window and a 90-day analytics range that starts 89 days back, the sweep can never delete a bucket a panel still reports on.
 - Every surface asks the same flag: the dashboard nav entry, the mobile tab, the settings section, the three dashboard routes and the settings route (an "unavailable" state for a deep link, not a 404), the portal pages, the portal nav tab, `sitemap.xml`, `llms.txt`, and the article page's SSR metadata.
 
 Turning it on is therefore a single-line change with no migration: no article can exist while the gate is closed, so `site.help_center_visibility` defaulting to `PUBLIC` cannot publish anything on the day the flag flips.
@@ -70,7 +103,8 @@ Turning it on is therefore a single-line change with no migration: no article ca
 
 ## Not built
 
-- **Semantic search.** The embedding columns exist at the shared 1536 dimensions and nothing writes them. There is no `tsvector` anywhere in this codebase; adding one is its own decision.
+- **Fused ranking.** The two halves are ordered by precedence, not by a shared score. A learned ranker or a weighted fusion needs data that does not exist yet.
+- **Re-embedding on a model switch.** Changing `EMBEDDING_MODEL` stops the semantic pass matching old rows until they are written again; there is no backfill sweep. Lexical search is unaffected, which is why the feature degrades quietly rather than breaking.
 - **GitHub sync.** `help_center_article.source` reserves the provenance value. The link table, the sync rule, and the file front-matter contract belong to that feature.
 - **Content translation.** The repo's i18n is chrome-only (Paraglide). A per-locale body is a product surface, not a column.
 - **`llms.txt` for the help center.** The route precedent is `apps/web/src/routes/s/llms[.]txt.ts`; it reads published articles through the same public projection.

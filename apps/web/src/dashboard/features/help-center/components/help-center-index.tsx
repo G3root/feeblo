@@ -38,6 +38,8 @@ import { useState } from "react";
 import { usePlan } from "~/hooks/use-plan";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+import { HelpCenterAnalytics } from "./help-center-analytics";
+import { HelpCenterSearch } from "./help-center-search";
 import {
   CreateHelpCenterTopicDialog,
   EditHelpCenterTopicDialog,
@@ -198,6 +200,10 @@ export function HelpCenterIndex({
           ) : null}
         </div>
       </header>
+
+      <HelpCenterSearch organizationId={organizationId} />
+
+      <HelpCenterAnalytics organizationId={organizationId} />
 
       <SkeletonLoader isLoading={isLoading}>
         <SkeletonWrapper>

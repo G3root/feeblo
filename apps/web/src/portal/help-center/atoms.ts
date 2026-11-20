@@ -1,3 +1,4 @@
+import type { THelpCenterArticleSearchPublic } from "@feeblo/domain/help-center-article/schema";
 import * as Atom from "effect/reactivity/Atom";
 
 import { DashboardClient, dashboardSWR } from "@/lib/atom-rpc";
@@ -44,6 +45,48 @@ export const helpCenterArticlesPublicAtom = Atom.family(
       { reactivityKeys: helpCenterPublicReactivityKeys(organizationId) }
     ).pipe(dashboardSWR("30 seconds"), Atom.setIdleTTL("5 minutes"))
 );
+
+/**
+ * The portal's search arguments.
+ *
+ * Derived from the operation, with the branded id widened back to `string`: the
+ * decoded payload carries `WorkspaceId`, and a React prop does not. `limit` is
+ * dropped because the page never sends one — the server's default is the page
+ * size.
+ */
+export type HelpCenterSearchAtomArgs = Readonly<
+  Omit<THelpCenterArticleSearchPublic, "limit" | "organizationId"> & {
+    readonly organizationId: string;
+  }
+>;
+
+/**
+ * The portal's search.
+ *
+ * Two nested families, so the cache is keyed by value: `Atom.family` compares an
+ * object argument by identity, and a query string is exactly the kind of key
+ * that should be compared by value. Typing is then a series of cache lookups
+ * rather than a series of writes to one entry — a reader who deletes a character
+ * and retypes it gets the earlier answer back instead of a spinner. The idle TTL
+ * is shorter than the other reads because the key includes text that only exists
+ * for as long as somebody is typing it.
+ *
+ * No stale-while-revalidate here, unlike the reads above. Those answer "what is
+ * in the help center", so a revalidation on focus keeps them current; this one
+ * answers "what matches this text", and only the text changing should ask again.
+ */
+const searchAtoms = Atom.family((organizationId: string) =>
+  Atom.family((query: string) =>
+    DashboardClient.query(
+      "SearchHelpCenterArticlesPublic",
+      { organizationId, query },
+      { reactivityKeys: helpCenterPublicReactivityKeys(organizationId) }
+    ).pipe(Atom.setIdleTTL("1 minute"))
+  )
+);
+
+export const helpCenterSearchPublicAtom = (args: HelpCenterSearchAtomArgs) =>
+  searchAtoms(args.organizationId)(args.query);
 
 export type HelpCenterArticlePublicAtomArgs = {
   readonly organizationId: string;

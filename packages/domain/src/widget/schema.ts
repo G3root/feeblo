@@ -118,6 +118,55 @@ export const WidgetSuggestion = S.Struct({
 
 export type TWidgetSuggestion = S.Schema.Type<typeof WidgetSuggestion>;
 
+/**
+ * The composer's help-center deflection.
+ *
+ * A separate request from `WidgetSuggestionRequest` because it answers a
+ * different question with a different corpus: that one asks "has someone
+ * already posted this?", this one asks "is this already documented?". The
+ * widget sends both for the same title, and the panels are distinct on screen
+ * because acting on one means upvoting and acting on the other means reading.
+ */
+export const WidgetHelpArticleRequest = S.Struct({
+  organizationId: WorkspaceId.schema,
+  query: S.String.check(S.isMaxLength(WIDGET_TITLE_MAX_LENGTH)),
+});
+
+export type TWidgetHelpArticleRequest = S.Schema.Type<
+  typeof WidgetHelpArticleRequest
+>;
+
+/**
+ * A documentation hit beside the feedback form.
+ *
+ * `url` is absolute and built server-side: the iframe is embedded on the
+ * customer's own origin, so a relative link would resolve against the host page
+ * instead of the portal. Only the portal's canonical help path is ever
+ * produced here.
+ */
+export const WidgetHelpArticle = S.Struct({
+  id: S.String,
+  title: S.String,
+  excerpt: S.String,
+  url: S.String,
+});
+
+export type TWidgetHelpArticle = S.Schema.Type<typeof WidgetHelpArticle>;
+
+/**
+ * The deflection's answer.
+ *
+ * `enabled` is the important half: the widget stops asking once a deployment or
+ * a workspace says no, instead of polling an endpoint that will keep returning
+ * nothing.
+ */
+export const WidgetHelpArticles = S.Struct({
+  articles: S.Array(WidgetHelpArticle),
+  enabled: S.Boolean,
+});
+
+export type TWidgetHelpArticles = S.Schema.Type<typeof WidgetHelpArticles>;
+
 export const WidgetUpdate = S.Struct({
   id: S.String,
   title: S.String,
@@ -229,6 +278,8 @@ export const decodeWidgetUpdates = S.decodeUnknownSync(S.Array(WidgetUpdate));
 export const decodeWidgetSuggestions = S.decodeUnknownSync(
   S.Array(WidgetSuggestion)
 );
+
+export const decodeWidgetHelpArticles = S.decodeUnknownSync(WidgetHelpArticles);
 
 export const decodeWidgetError = S.decodeUnknownSync(WidgetError);
 
