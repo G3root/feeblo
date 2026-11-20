@@ -84,8 +84,7 @@ export type THelpCenterArticle = S.Schema.Type<typeof HelpCenterArticle>;
  *
  * It names its topic by slug and title rather than making the reader join, and
  * it carries no `creatorMemberId` and no `organizationId` — internal
- * identifiers a public page has no use for (ADR 0004's rule, applied to a
- * portal payload).
+ * identifiers a public page has no use for.
  *
  * `isArchived` is a boolean rather than the raw status: a reader needs "this
  * page is out of date", not the workspace's internal vocabulary.
@@ -238,8 +237,7 @@ export type THelpCenterArticleSearchPublic = S.Schema.Type<
  *
  * The same projection the public list carries — slug, title, excerpt, topic —
  * and no `status`: a reader needs "this page is out of date", not the
- * workspace's internal lifecycle state (ADR 0004's rule, applied to a portal
- * payload).
+ * workspace's internal lifecycle state.
  */
 export const HelpCenterArticleSearchResult = S.Struct({
   id: S.String,

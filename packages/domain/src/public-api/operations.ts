@@ -25,7 +25,6 @@ import type { PublicApiCaller } from "./middleware";
  * description, typed input and output schemas, scope, and annotations are all
  * on the operation — and binds it to the same handlers the HTTP endpoints call,
  * so the two surfaces cannot drift into different answers for the same call.
- * See `docs/adr/0007` and `docs/adr/0008`.
  */
 export const PublicApiOperations = [
   ...auditLogOperations,

@@ -1002,8 +1002,8 @@ const makePostRepository = Effect.gen(function* () {
     /**
      * Re-attributes a post to a resolved on-behalf subject. A customer
      * subject sets `contactId` and clears `creatorMemberId`; a workspace
-     * member keeps its member row and may have a null `contactId`
-     * (ADR 0017). `authorName` is rewritten from the new subject so the
+     * member keeps its member row and may have a null `contactId`.
+     * `authorName` is rewritten from the new subject so the
      * display snapshot never names the previous author.
      */
     updateAuthor: ({

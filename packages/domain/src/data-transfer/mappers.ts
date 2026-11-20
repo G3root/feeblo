@@ -11,7 +11,7 @@ import type {
  *
  * Field by field on purpose: a column added to `data_import_job` must not ride
  * into an RPC or HTTP response because a spread happened to carry it. The same
- * rule the Public API's mappers follow (see `docs/adr/0004`).
+ * rule the Public API's mappers follow.
  */
 export const toDataImportJobSummary = (
   job: DataImportJobRecord

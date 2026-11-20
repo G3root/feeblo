@@ -7,7 +7,7 @@ import * as S from "effect/Schema";
  * new states don't require migrations; this Effect Schema is the single source
  * of truth, and the web UI reads the same names to label a job. It lives in
  * `@feeblo/domain-contracts` for the same reason every other stored vocabulary
- * does (see `docs/adr/0002`): the database package types its column from here
+ * does: the database package types its column from here
  * and the browser labels it, without either importing the other.
  *
  * The lifecycle is `awaiting_confirmation -> queued -> running -> completed`,
@@ -32,7 +32,7 @@ export type TDataImportStatus = S.Schema.Type<typeof DataImportStatus>;
  * The state graph itself lives in `@feeblo/domain` (`data-transfer/machine.ts`),
  * where the guarded SQL that enforces it also lives. This module keeps the
  * vocabulary because the database column and the browser labels both read it,
- * and neither may import the other (see `docs/adr/0002`).
+ * and neither may import the other.
  */
 
 /**

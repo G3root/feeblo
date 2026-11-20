@@ -22,7 +22,7 @@ import type { TPublicApiAuditLogEntry } from "./schema";
  *
  * The shape is written out rather than taken from the stored-entry type in
  * `../schema.ts`, because that module is the dashboard's contract and a public
- * surface is forbidden from importing it (`oxlint.config.ts`, ADR 0004). The
+ * surface is forbidden from importing it (`oxlint.config.ts`). The
  * repository row is assignable to what the mapper names, and a field it gains
  * is invisible here until it is added below.
  */

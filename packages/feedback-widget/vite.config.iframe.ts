@@ -10,8 +10,7 @@ import solid from "vite-plugin-solid";
  *
  * The dashboard app (TanStack Start, React) serves the widget's HTML shell
  * from a server-only route and loads this bundle as a static asset — that is
- * what keeps React out of the iframe (see
- * `docs/tanstack-start-migration-research.md`). It is a plain Vite + Solid
+ * what keeps React out of the iframe. It is a plain Vite + Solid
  * build rather than a second entry in the Start app because Start's client
  * environment allows exactly one entry.
  *

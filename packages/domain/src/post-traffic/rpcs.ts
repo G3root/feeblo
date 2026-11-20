@@ -17,7 +17,7 @@ import {
  * One operation, because the sidebar needs the number and its breakdowns
  * together and a separate call per dimension would make a small panel the sum
  * of four round trips. It is dashboard-only: the public board never renders a
- * count, and a Public API projection is a separate contract (ADR 0004).
+ * count, and a Public API projection is a separate contract.
  */
 export class PostTrafficRpcs extends RpcGroup.make(
   Rpc.make("GetPostTraffic", {

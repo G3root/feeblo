@@ -181,7 +181,7 @@ Most writers record inside the transaction that performs the write. Three do not
 
 `GET /api/v1/audit-log`, gated on the `audit_log.read` scope. It is appended to the scope vocabulary and deliberately left out of `PUBLIC_API_DEFAULT_SCOPES`: a key that can read the log can read every member's activity and every refused request.
 
-The DTO is hand-written per `docs/adr/0004` and does not import the dashboard RPC schema. It omits `originIp`, `originCountry`, `userAgent` and `requestId` — administrator forensics, not something to hand a key — and collapses the actor columns into one `actorId` (the credential when one acted, the session user otherwise).
+The DTO is hand-written and does not import the dashboard RPC schema. It omits `originIp`, `originCountry`, `userAgent` and `requestId` — administrator forensics, not something to hand a key — and collapses the actor columns into one `actorId` (the credential when one acted, the session user otherwise).
 
 Because `public-api/mcp.ts` derives the MCP toolkit from the operation registry, this endpoint is also an MCP tool. That is accepted: the scope gates it, and reading the workspace's own audit log is a legitimate agent task. A future surface that should not be agent-callable needs an explicit opt-out on `defineOperation`, not an exception here.
 

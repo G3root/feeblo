@@ -15,7 +15,7 @@ import { PublicApiOperations } from "./operations";
  * the few tools a task needs, with the TypeScript signature each one has inside
  * `execute`, and the model writes one program that calls them.
  *
- * Everything here is derived from the registry ADR 0007 made the unit, so the
+ * Everything here is derived from the operation registry, so the
  * signature a model reads is printed from the same schema the operation
  * validates with, and a new operation appears in `search` with no edit here.
  */

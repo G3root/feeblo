@@ -49,7 +49,7 @@ integrations/
 tools/                  Oxlint plugin and test runners
 e2e/                    Playwright end-to-end suite
 docker/                 Local development infrastructure
-docs/                   Topic docs and docs/adr/ decision records
+docs/                   Topic docs
 ```
 
 ## Tech stack
@@ -123,7 +123,7 @@ pnpm check
 
 That runs the toolchain guard, every package's `tsrs --noEmit`, type-aware Oxlint, the formatter check, and Knip. It needs no database, no build output, and no env file, and CI runs it on every push. Run it before opening a pull request.
 
-`AGENTS.md` is the repo law: commands, architecture, and the changes that need an owner decision. `CONTEXT.md` fixes the product's vocabulary. `docs/adr/` records why specific boundaries exist. See [Documentation](#documentation) for the topic guides.
+`AGENTS.md` is the repo law: commands, architecture, and the changes that need an owner decision. `CONTEXT.md` fixes the product's vocabulary. See [Documentation](#documentation) for the topic guides.
 
 ## Common scripts
 
@@ -162,7 +162,6 @@ That runs the toolchain guard, every package's `tsrs --noEmit`, type-aware Oxlin
 - [Widget SSO](./docs/widget-sso.md)
 - [Telemetry](./docs/telemetry.md)
 - [i18n](./docs/i18n/README.md)
-- [Architecture decisions](./docs/adr/)
 
 ## Feedback widget SDK
 
@@ -188,9 +187,9 @@ Supported plan values are `starter` and `professional`; supported variants are `
 
 After adding the webhook to an existing Polar organization, resend `product.created` or `product.updated` events for the current products so the local product catalog is populated before enabling billing.
 
-The workspace a subscription belongs to is the `metadata.org` value on the checkout, not the Polar customer. Polar resolves a checkout customer by email and allows one customer per email per organization, so a buyer who pays for several workspaces shares one Polar customer and one portal. Deleting an account never deletes a Polar customer for that reason; a deleted workspace's subscription is queued and revoked with retries (see `docs/adr/0013` and `docs/adr/0014`).
+The workspace a subscription belongs to is the `metadata.org` value on the checkout, not the Polar customer. Polar resolves a checkout customer by email and allows one customer per email per organization, so a buyer who pays for several workspaces shares one Polar customer and one portal. Deleting an account never deletes a Polar customer for that reason; a deleted workspace's subscription is queued and revoked with retries.
 
-Polar also caps a customer at one billable subscription unless the organization enables **Settings → Subscriptions → Allow multiple subscriptions**. Because the customer is resolved by email, that default caps a buyer across workspaces: a person who already pays for one workspace cannot check out a second one, and Polar refuses on its hosted checkout page after Feeblo has handed the buyer off. Enable the setting on any deployment where one person may pay for more than one workspace; the server logs a warning at startup when the token's organization has it off (see `docs/adr/0015`).
+Polar also caps a customer at one billable subscription unless the organization enables **Settings → Subscriptions → Allow multiple subscriptions**. Because the customer is resolved by email, that default caps a buyer across workspaces: a person who already pays for one workspace cannot check out a second one, and Polar refuses on its hosted checkout page after Feeblo has handed the buyer off. Enable the setting on any deployment where one person may pay for more than one workspace; the server logs a warning at startup when the token's organization has it off.
 
 ## Deployment
 
@@ -209,7 +208,7 @@ docker compose --env-file docker/.env.selfhost up -d
 
 The stack expects HTTPS hostnames (the session cookie is `Secure`), a working SMTP server (account verification sends a code by email), and S3-compatible object storage. See [docs/self-hosting.md](./docs/self-hosting.md) for DNS and TLS, reverse-proxy trust, OAuth callbacks, public-board subdomains, upgrades, and backups.
 
-The Cloudflare Worker is built from the `prod` branch, which only ever moves forward to a release tag: run the **Promote prod** workflow with the tag name (Actions → Promote prod → Run workflow), which checks first and does nothing else while **dry run** is checked, then run it again with that box cleared to move the branch. From a terminal that is `gh workflow run promote-prod.yml -f tag=v1.2.0 -f dry_run=true`, then the same command with `-f dry_run=false`; the tag must have a published Release, because the Docker images are published from that event. `prod` is never merged into and never force-pushed; see `docs/adr/0018`.
+The Cloudflare Worker is built from the `prod` branch, which only ever moves forward to a release tag: run the **Promote prod** workflow with the tag name (Actions → Promote prod → Run workflow), which checks first and does nothing else while **dry run** is checked, then run it again with that box cleared to move the branch. From a terminal that is `gh workflow run promote-prod.yml -f tag=v1.2.0 -f dry_run=true`, then the same command with `-f dry_run=false`; the tag must have a published Release, because the Docker images are published from that event. `prod` is never merged into and never force-pushed.
 
 Production startup enforces two safety checks: `AUTH_ENCRYPTION_KEY` must be at least 32 bytes, and `REDIS_URL` must be set so rate limits are shared across server instances.
 

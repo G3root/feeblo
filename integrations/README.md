@@ -1,6 +1,6 @@
 # Integration packages
 
-Provider adapters for external systems (`github`, `slack`, `discord`, `webhook`) plus the provider-neutral kernel (`core`). See `docs/adr/0001` for the event/delivery architecture and `docs/adr/0002` for how these packages relate to `@feeblo/domain`.
+Provider adapters for external systems (`github`, `slack`, `discord`, `webhook`) plus the provider-neutral kernel (`core`). Provider packages depend on `@feeblo/domain-contracts` and never on `@feeblo/domain`.
 
 ## Dependency rules
 
@@ -42,7 +42,7 @@ Naming: factories are `make<CamelCaseName>`; Live-layer inputs are `<Name>Input`
 
 ## Shared chat kernel
 
-`slack` and `discord` are one provider family (see `docs/adr/0016`). They share the provider-neutral kernel in `packages/domain/src/integration/chat/`: the management contract shape, the RPC authorization factory, the inbound feedback intake, the connection lookup/lock, the credential-decryption wrapper, the API-failure mapping, and the OAuth callback parser. A chat provider's `<provider>-management-shared.ts` binds the provider key, label, and credential shape; its `<provider>-rpc-handlers.ts` maps the shared handler record onto its own RPC method names. The protocol work — API client, signature verification, credential material, connection and channel services, payload schemas, routers, manifests, provider registration — stays in the provider package.
+`slack` and `discord` are one provider family. They share the provider-neutral kernel in `packages/domain/src/integration/chat/`: the management contract shape, the RPC authorization factory, the inbound feedback intake, the connection lookup/lock, the credential-decryption wrapper, the API-failure mapping, and the OAuth callback parser. A chat provider's `<provider>-management-shared.ts` binds the provider key, label, and credential shape; its `<provider>-rpc-handlers.ts` maps the shared handler record onto its own RPC method names. The protocol work — API client, signature verification, credential material, connection and channel services, payload schemas, routers, manifests, provider registration — stays in the provider package.
 
 ## Shared HTTP plumbing
 

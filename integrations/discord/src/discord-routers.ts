@@ -179,7 +179,7 @@ export const makeDiscordOAuthCallbackRouter = (appUrl: string) =>
 /**
  * Server HTTP adapters for the Discord OAuth callback and its interactions
  * endpoint. Built by the composition root so the provider package never
- * depends on server configuration (see docs/adr/0002).
+ * depends on server configuration.
  */
 export interface DiscordRoutersInput {
   /** Dashboard base URL used for post-installation redirects. */

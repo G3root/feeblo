@@ -7,7 +7,6 @@ import type * as Redacted from "effect/Redacted";
  * for endpoint credentials and the egress policy applied to every endpoint
  * URL before it is persisted or requested. The server composition root
  * supplies the values; secrets remain outside connection and route JSON
- * (see docs/adr/0002).
  */
 export interface WebhookIntegrationConfigContract {
   readonly encryptionKey: Redacted.Redacted<string>;

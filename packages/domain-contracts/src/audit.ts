@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
  *
  * It lives in this package rather than beside the endpoints it guards because
  * the dashboard labels and filters entries, and `@feeblo/domain` is not
- * importable from client packages (see `docs/adr/0002`). Nothing here touches
+ * importable from client packages. Nothing here touches
  * storage: `@feeblo/db/schema/audit` derives its column types from these, and
  * the recorder derives the row from the action, so the three cannot drift.
  */

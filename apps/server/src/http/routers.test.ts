@@ -15,7 +15,6 @@ import { BetterAuthRouterLive } from "./routers";
  * mounted at `/api/auth/*`, while RFC 8414 and RFC 9728 put them at the API
  * origin root. This pins the forwarding: if these paths stop reaching the
  * handler, an MCP client discovers nothing and the OAuth flow never starts
- * (docs/adr/0024).
  *
  * The handler is a stub, so the test asserts routing — which path arrived —
  * rather than the provider's document, which the provider's own tests cover.

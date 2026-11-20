@@ -32,8 +32,8 @@ export const getSessionCookieForApiUrl = getSessionCookieNameForUrl;
 /**
  * The credential seam lives in its own module so that authorization surfaces
  * which must never resolve a session can forbid this module outright — the
- * Public API does exactly that (see the boundary override in `oxlint.config.ts`
- * and ADR 0004). Re-exported here for the many call sites that already import
+ * Public API does exactly that (see the boundary override in `oxlint.config.ts`).
+ * Re-exported here for the many call sites that already import
  * it alongside session services.
  */
 export {

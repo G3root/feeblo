@@ -20,7 +20,6 @@ import type { Auth as AuthInstance } from "./server";
  * Everything here is Better Auth's vocabulary — issuer, audience, JWKS,
  * RFC 6750 challenges — and none of it crosses into `@feeblo/domain`, which
  * reaches this module only through the narrow `AuthHandler` seam. See
- * `docs/adr/0024`.
  */
 
 /**

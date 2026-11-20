@@ -9,7 +9,7 @@ import { WebhookEndpointSecurityError } from "./webhook-errors";
 /**
  * Explicit endpoint security policy; private-network egress is available only
  * to local development receivers. Canonical definition lives in
- * @feeblo/domain-contracts (see docs/adr/0002).
+ * @feeblo/domain-contracts.
  */
 export type { WebhookEndpointSecurityPolicy };
 

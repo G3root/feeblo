@@ -2,7 +2,7 @@
 
 Documentation a workspace publishes on its portal, beside the board, roadmap and changelog. Sections group articles; readers open an article, and the article tells the workspace whether it helped.
 
-This document is the design record for what shipped. The decisions themselves and their reasoning are `docs/adr/0029`.
+This document is the design record for what shipped.
 
 ## Shape
 
@@ -39,7 +39,7 @@ archived  --restore--> draft
 
 ## Counts
 
-**Views** are two tables, for ADR 0027's reason: the events are pruned and the number is not. The beacon is `AddHelpCenterArticleView`, called once per article per tab session, with a client-generated UUID that makes a retried beacon a no-op. It answers `accepted: boolean` and never states whether an article exists.
+**Views** are two tables, because the events are pruned and the number is not. The beacon is `AddHelpCenterArticleView`, called once per article per tab session, with a client-generated UUID that makes a retried beacon a no-op. It answers `accepted: boolean` and never states whether an article exists.
 
 **Verdicts** are one table and the counts are aggregates over it — there is no `helpful_count` column. A reader is identified by `user_id` (signed in) or `visitor_id` (a random id in `localStorage`), exactly one of the two, each with its own partial unique index. That is what makes "one vote per reader" true for anonymous readers too: a plain `unique(article_id, user_id)` treats every `NULL` as distinct and would allow one vote per request.
 

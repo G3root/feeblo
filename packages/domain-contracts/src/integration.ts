@@ -199,7 +199,7 @@ export type WebhookEndpointEnvironment = "development" | "production" | "test";
  * Explicit endpoint security policy for outbound webhooks; private-network
  * egress is available only to local development receivers. Canonical here so
  * the webhook management contract can reference it without depending on the
- * provider package (see docs/adr/0002).
+ * provider package.
  */
 export interface WebhookEndpointSecurityPolicy {
   readonly allowPrivateNetworkInDevelopment: boolean;

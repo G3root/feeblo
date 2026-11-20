@@ -55,7 +55,7 @@ import type { IntegrationRuntime } from "../integrations";
 
 /**
  * The provider-owned RPC handler layers the domain leaves to the composition
- * root (see docs/adr/0002). Keyed by the same names as the domain registry:
+ * root. Keyed by the same names as the domain registry:
  * the `satisfies` below fails the server's type if a provider-owned group is
  * added to `RpcHandlerRegistrations` and not bound here.
  */

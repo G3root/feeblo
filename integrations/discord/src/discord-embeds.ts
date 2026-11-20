@@ -5,7 +5,7 @@ export type { ChannelUpdateMessage } from "@feeblo/integration-core";
 /**
  * Rich Discord embed vocabulary; canonical definitions live in
  * @feeblo/domain-contracts so the interaction callback contract can reference
- * them (see docs/adr/0002).
+ * them.
  */
 import type {
   DiscordEmbed,

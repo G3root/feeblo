@@ -153,7 +153,7 @@ const makeGitHubAppWebhookRouter = (registry: IntegrationProviderRegistry) =>
 /**
  * Server HTTP adapters for GitHub App setup and its global webhook endpoint.
  * Built by the composition root so the provider package never depends on
- * server configuration (see docs/adr/0002).
+ * server configuration.
  */
 export interface GitHubRoutersInput {
   /** Dashboard base URL used for post-installation redirects. */

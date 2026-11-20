@@ -2,7 +2,7 @@ import * as S from "effect/Schema";
 
 /**
  * Canonical notification-preference vocabulary, shared by the browser and the
- * server (see `docs/adr/0002`).
+ * server.
  *
  * Preferences are per `(workspace, user)` and default **on**: a stored row is a
  * divergence from the default, not an opt-in. `email` is the only channel a

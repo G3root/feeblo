@@ -116,7 +116,7 @@ export const UserBanRpcHandlersEffect = Effect.gen(function* () {
         // The ban row and the participation it removes land together: a
         // purge that fails must not leave the person banned with their history
         // intact, and a ban that fails must not delete anything. Both halves
-        // are database work, so the transaction retry (ADR 0020) can replay
+        // are database work, so the transaction retry can replay
         // them.
         const { row, purged } = yield* transaction(
           Effect.gen(function* () {

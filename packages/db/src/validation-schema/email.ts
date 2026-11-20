@@ -1,2 +1,2 @@
-// Moved to @feeblo/domain-contracts; re-exported for compatibility (see docs/adr/0002).
+// Moved to @feeblo/domain-contracts; re-exported for compatibility.
 export * from "@feeblo/domain-contracts/email";

@@ -1408,7 +1408,7 @@ const seedChangelogs = ({
  * to reproduce the state a downgrade would leave behind.
  */
 /**
- * The account facts an on-behalf timeline entry snapshots (ADR 0023). A field
+ * The account facts an on-behalf timeline entry snapshots. A field
  * is omitted when the action would not have known it.
  */
 type SeedOnBehalfSubject = {
@@ -1600,7 +1600,7 @@ const seedCrmOnBehalf = ({
       },
       {
         // A customer record that predates the person joining the team: the
-        // resolver keeps it as the attribution anchor (ADR 0017).
+        // resolver keeps it as the attribution anchor.
         id: moContactId,
         organizationId,
         name: "Mo Member",

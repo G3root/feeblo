@@ -38,7 +38,7 @@ export type TPublicApiChangelogStatus = Schema.Schema.Type<
  * disagreed with the graph would accept a status no event enters, and
  * `scheduled` is exactly that — no worker publishes an entry when its time
  * arrives, so accepting it would file an entry that never goes live. The
- * response vocabulary above stays restated on purpose (`docs/adr/0004`); the
+ * response vocabulary above stays restated on purpose; the
  * writable set is a lifecycle fact both surfaces must share.
  */
 export const PublicApiChangelogWriteStatus = Schema.Literals(

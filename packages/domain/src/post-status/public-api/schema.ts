@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
  * a widening of it, so adding a field here cannot silently change every post
  * response: a post carries `{ id, name, type }`, while this resource carries
  * the fields a caller needs to render a status picker — its display order and
- * its color. See `docs/adr/0004`.
+ * its color.
  */
 
 /**

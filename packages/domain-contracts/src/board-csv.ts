@@ -7,10 +7,10 @@
  * dashboard cannot name the same field differently. This is deliberately not a
  * projection of the Public API's DTOs or of a dashboard response: this surface
  * carries an author email and human-readable names that neither of those
- * publishes (see `docs/adr/0004` and `docs/data-transfer.md`).
+ * publishes (see `docs/data-transfer.md`).
  *
  * It lives in `@feeblo/domain-contracts` because the dashboard downloads the
- * template that the server parses (ADR 0002). `@feeblo/domain`'s csv.ts
+ * template that the server parses. `@feeblo/domain`'s csv.ts
  * derives its parser and writer from these columns, so the two cannot drift.
  *
  * `vote_count`, `updated_at`, and `url` are read-only decoration — import

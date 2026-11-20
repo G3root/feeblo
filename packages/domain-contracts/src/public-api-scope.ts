@@ -14,7 +14,7 @@ import * as Schema from "effect/Schema";
  * guards because the dashboard's key form and the auth plugin's key
  * configuration both read the vocabulary: the browser and the credential layer
  * need the scope names and must not reach into the Public API's server module
- * to get them (see `docs/adr/0006`).
+ * to get them.
  *
  * Scopes are part of the versioned public contract: adding one is additive,
  * narrowing or renaming one is a breaking change. A write is its own scope

@@ -282,7 +282,7 @@ const makeBillingRepository = Effect.gen(function* () {
           // and the checksum proves the scheme, not the writer. Tenancy
           // isolation — one Polar org per deployment, no other actor writing
           // legid workspace ids into metadata.org — is an operational
-          // invariant of this path (ADR 0014); a shared org is unsupported
+          // invariant of this path; a shared org is unsupported
           // here, and the stamped-identifier check is the escalation path
           // if sharing ever becomes a requirement.
           // Anything failing verification could be an operator-stamped or

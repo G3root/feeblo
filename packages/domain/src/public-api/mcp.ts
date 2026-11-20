@@ -58,7 +58,7 @@ import { PublicApiInternals } from "./router";
  * The Model Context Protocol projection of the Public API.
  *
  * `/mcp` is a second surface over the same operations the `/api/v1` endpoints
- * serve (ADR 0007): a tool is `Tool.make`d from the operation's own schemas and
+ * serve: a tool is `Tool.make`d from the operation's own schemas and
  * annotations, and its handler is the operation's own handler — so a client
  * cannot receive a different answer for the same call than the HTTP surface
  * does, and neither surface owns the behavior.
@@ -108,7 +108,7 @@ export const MCP_PROTOCOLS = [
  *
  * `PublicApiOperations` is `as const`, so the union is precise: it is what lets
  * the projection read an operation's schemas and annotations without a cast,
- * and what `docs/adr/0007` means by "the operation is the unit".
+ * and what "the operation is the unit" means.
  */
 type PublicApiOperationUnion = (typeof PublicApiOperations)[number];
 
@@ -127,7 +127,7 @@ type PublicApiOperationUnion = (typeof PublicApiOperations)[number];
  * approval gate's refusal. The extra schema is surface-local on purpose: no
  * `/api/v1` endpoint can answer `APPROVAL_DENIED`, so adding it to the
  * operation's own failure union would publish a code that surface never
- * produces in the frozen vocabulary of ADR 0004.
+ * produces.
  */
 const toMcpTool = (operation: PublicApiOperationUnion) =>
   Tool.make(operation.name, {
@@ -179,7 +179,7 @@ const buildPublicApiMcpHandlers = () =>
     const handlers: Record<
       string,
       (
-        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The registry erases each operation's input to `unknown` (ADR 0007), and a record keyed by tool name cannot name one input type per key; the toolkit decodes a call's parameters with the operation's own schema before this handler runs, which is what turns the erased input back into the operation's input type.
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- The registry erases each operation's input to `unknown`, and a record keyed by tool name cannot name one input type per key; the toolkit decodes a call's parameters with the operation's own schema before this handler runs, which is what turns the erased input back into the operation's input type.
         parameters: unknown
       ) => Effect.Effect<
         unknown,
@@ -218,7 +218,7 @@ const buildPublicApiMcpHandlers = () =>
             // SAFETY: the erasure above, narrowed back for the cast. The handler
             // is the operation's own, so the value the toolkit decodes with
             // `operation.input` is exactly what it accepts.
-            // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- the erased handler is `Effect<unknown, unknown, ...>` by design (ADR 0007); the toolkit decodes a call's parameters with the operation's own schema before this runs.
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion, effecttsgo/any-unknown-in-error-context -- the erased handler is `Effect<unknown, unknown, ...>` by design; the toolkit decodes a call's parameters with the operation's own schema before this runs.
             (
               operation.handler as (
                 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- See the record's comment: this is the erased view of the operation's own input type.
@@ -355,7 +355,7 @@ const mcpChallengeResponse = (rejection: {
 /**
  * The credential gate for `/mcp`.
  *
- * Two credentials resolve to the same caller (docs/adr/0024):
+ * Two credentials resolve to the same caller:
  *
  * - `x-api-key` is a workspace's machine credential and is checked by
  *   `authenticatePublicApiKey`, the same function the `/api/v1` middleware

@@ -16,7 +16,7 @@ import { PUBLIC_API_PAGE_MAX_LIMIT } from "../../public-api/common";
  * and `requestId`, which are administrator forensics rather than data a key
  * should be able to export. Declaring the payload here means a column added to
  * the dashboard's read appears in this contract only when the DTO and its
- * mapper are edited too. See `docs/adr/0004`.
+ * mapper are edited too.
  *
  * What remains is the accountability record itself: what happened, to which
  * resource, by whom, and — for a change — the before/after diff the writer

@@ -25,7 +25,7 @@ import { handleBetterAuthRequest } from "./body-limit";
  * `/.well-known/oauth-protected-resource` (plus the resource path). The auth
  * handler is mounted under `/api/auth`, so these three paths would otherwise
  * never reach the provider — and the provider, not a hand-copied document, has
- * to be the authority. See `docs/adr/0024`.
+ * to be the authority.
  */
 const OAUTH_DISCOVERY_PATHS = [
   "/.well-known/oauth-protected-resource",

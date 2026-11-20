@@ -2,7 +2,7 @@
 
 Repo law. It holds the commands, the gate, and the changes that need a human decision.
 
-Two other documents are authoritative for their own subject and are not duplicated here: `CONTEXT.md` fixes the product's vocabulary (Post, Connection, Capability, Route, Delivery, Public API, API key, Scope), and `docs/adr/` records why specific boundaries exist. This file is the source of truth for _how to change things_.
+Two other documents are authoritative for their own subject and are not duplicated here: `CONTEXT.md` fixes the product's vocabulary (Post, Connection, Capability, Route, Delivery, Public API, API key, Scope), and `docs/` holds the topic guides. This file is the source of truth for _how to change things_.
 
 ## Stack contract
 
@@ -21,7 +21,7 @@ Dependencies are declared in the `catalog` block of `pnpm-workspace.yaml` and re
 | Package | Path | Role |
 | --- | --- | --- |
 | `@feeblo/domain` | `packages/domain` | Domain behavior. Owns schemas, repositories, RPC contracts, handlers. Reads Postgres through `@feeblo/db`. |
-| `@feeblo/domain-contracts` | `packages/domain-contracts` | Effect Schema vocabularies and policy/error definitions that both browser and server may import. Depends only on `effect`; see `docs/adr/0002`. |
+| `@feeblo/domain-contracts` | `packages/domain-contracts` | Effect Schema vocabularies and policy/error definitions that both browser and server may import. Depends only on `effect`. |
 | `@feeblo/db` | `packages/db` | Drizzle schema, migrations, PGlite test database, seed/nuke scripts. |
 | `@feeblo/db-migrator` | `packages/db-migrator` | Standalone migration runner for deployments. |
 | `@feeblo/auth` | `packages/auth` | better-auth wiring, the organization ACL, API-key plugin, session/API-key seams. |
@@ -92,13 +92,13 @@ One `ignoreDependencies` is worth knowing about: `apps/server` declares `@feeblo
 
 Effect diagnostics live in Oxlint (`effecttsgo/*`), not in the compiler. `packages/config/tsconfig.base.json` sets `diagnostics: false` on the language service so a finding is reported once, by the tool that can act on it. Put severity changes in `oxlint.config.ts`.
 
-`oxlint.config.ts` extends two `@effect/tsgo` presets, `recommended` **and** `effect-native`, and both are load-bearing. `@effect/tsgo@0.46` moved twenty `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and `instance-of-schema` rules out of `recommended` into the opt-in `effect-native` preset, so extending only `recommended` drops `global-date-in-effect` — the defect this file's `off` entries are written against — with nothing failing to say so. The two presets together are exactly the rule set `0.45.0`'s `recommended` carried. See `docs/adr/0005`.
+`oxlint.config.ts` extends two `@effect/tsgo` presets, `recommended` **and** `effect-native`, and both are load-bearing. `@effect/tsgo@0.46` moved twenty `global-*`, `crypto-*`, `process-env`, `new-promise`, `schema-sync` and `instance-of-schema` rules out of `recommended` into the opt-in `effect-native` preset, so extending only `recommended` drops `global-date-in-effect` — the defect this file's `off` entries are written against — with nothing failing to say so. The two presets together are exactly the rule set `0.45.0`'s `recommended` carried.
 
 Ten `effecttsgo/*` rules are `off` with reasons in that file. Four — `async-function`, `global-date`, `process-env`, `global-console` — name the code that legitimately does the thing outside Effect; their `-in-effect` siblings are on, and those are the ones that describe a defect, because `new Date()` inside Effect bypasses `Clock`, which is why services that do it cannot be tested against `TestClock`. `global-json` joined them with `@effect/tsgo@0.64.1`, which removed `prefer-schema-over-json`: `JSON.parse` and `JSON.stringify` outside Effect are Vite configs, the widget, the SDK and build scripts, and `global-json-in-effect` keeps the defect half `error` with the test-file exception `prefer-schema-over-json` used to carry. Three more, `prefer-effect-array`/`string`/`record` (2,514 findings between them), name a stylistic swap to an Effect module whose functions behave identically to the native method; roughly a thousand of those sites are in browser bundles, Playwright specs and the published SDK, where the import is bundle weight and the behaviour is unchanged, and `Array.find` → `Array.findFirst` is not even a drop-in. `schema-class-missing-brand` (127) is off because all 127 are `Schema.TaggedError`, whose required unique `_tag` already makes two such errors mutually unassignable — the brand would be a symbol nothing matches on. The ninth, `unstable-api-usage` (928 findings), is off for a different reason: Effect 4.0 moved `http`, `http-api`, `rpc`, `persistence` and `reactivity` to `effect/*` while keeping them `@stability unstable`, so the rule fires on the imports this repo is built out of and there is no stable alternative to move to. `typescript/no-unnecessary-type-arguments` is off for the same kind of reason: 131 findings that are all the same non-defect.
 
-`docs/adr/0005` records the ratchet order for what is still a warning.
+`oxlint.config.ts` records the ratchet order for what is still a warning.
 
-A second rule set is vendored beside it. `tools/oxlint/anti-slop/` is k-mistele/anti-slop's Oxlint plugin, and `oxlint.config.ts` registers all three of its plugins: the generic rules, `anti-slop-effect` (services, Layers, tagged errors, spans) and `anti-slop-martinfowler` (code smells, at `warn`). Every generic and Effect rule is `error`; eleven are `off`, each with the count it reported and the migration that retires it written beside it and summarised in `docs/adr/0029`. The paid halves — the Jev questions and the diff rules, one model request per file — are not installed. Read `tools/oxlint/anti-slop/UPSTREAM.md` before updating the copy: it records the revision, what was left out, and the procedure.
+A second rule set is vendored beside it. `tools/oxlint/anti-slop/` is k-mistele/anti-slop's Oxlint plugin, and `oxlint.config.ts` registers all three of its plugins: the generic rules, `anti-slop-effect` (services, Layers, tagged errors, spans) and `anti-slop-martinfowler` (code smells, at `warn`). Every generic and Effect rule is `error`; eleven are `off`, each with the count it reported and the migration that retires it written beside it. The paid halves — the Jev questions and the diff rules, one model request per file — are not installed. Read `tools/oxlint/anti-slop/UPSTREAM.md` before updating the copy: it records the revision, what was left out, and the procedure.
 
 Before writing, reviewing, or refactoring Effect code, read the installed package's own guide first: `node_modules/effect/AGENTS.md`. It ships with the version in the lockfile, so it is never stale, and it is a better reference than anything written down here.
 
@@ -110,7 +110,7 @@ Tests use `@effect/vitest`:
 
 Match errors by tag, not by prototype: `Schema.is(SomeError)(error)` or `Predicate.isTagged(error, "SomeError")`. A decoded error is a plain object carrying `_tag` with no prototype, so `instanceof` answers `false` for a real one and the branch silently takes its fallback. Read randomness, time, and environment through Effect services (`Crypto`, `Clock`, `Config`), not the globals; `packages/domain/src/jwt-secret/repository.ts` is a good example.
 
-A database transaction is retried. `transaction()` in `@feeblo/db` re-runs the whole transaction on `40P01` (deadlock), `40001` (serialization failure) and `55P03` (lock timeout), so a transaction body must be database work only: no HTTP call, no provider client, no filesystem write, because a retry replays it. Every connection carries a 5-second `lock_timeout` and a 30-second idle-in-transaction timeout, so a lock wait fails a request instead of holding a pooled connection forever. A mapping inside a transaction keeps the failure it replaced (`attachCause` from `@feeblo/db`): the retry reads the `cause` chain, so a message-only replacement turns a retryable abort into a 500. A lock that only serializes a count-and-write pair on one workspace is `FOR NO KEY UPDATE`; `FOR UPDATE` is for the case where blocking child inserts is the point, which today is only the account-deletion membership re-check. See `docs/adr/0020`.
+A database transaction is retried. `transaction()` in `@feeblo/db` re-runs the whole transaction on `40P01` (deadlock), `40001` (serialization failure) and `55P03` (lock timeout), so a transaction body must be database work only: no HTTP call, no provider client, no filesystem write, because a retry replays it. Every connection carries a 5-second `lock_timeout` and a 30-second idle-in-transaction timeout, so a lock wait fails a request instead of holding a pooled connection forever. A mapping inside a transaction keeps the failure it replaced (`attachCause` from `@feeblo/db`): the retry reads the `cause` chain, so a message-only replacement turns a retryable abort into a 500. A lock that only serializes a count-and-write pair on one workspace is `FOR NO KEY UPDATE`; `FOR UPDATE` is for the case where blocking child inserts is the point, which today is only the account-deletion membership re-check.
 
 ## Architecture
 
@@ -118,19 +118,19 @@ Dependency direction: apps → `packages/domain` → `{db, id, permissions, util
 
 A domain module is `packages/domain/src/<entity>/` with a consistent shape: `schema.ts` (Effect Schema), `errors.ts` (tagged errors), `repository.ts` (Drizzle access), `rpcs.ts` (the RPC contract), `handlers.ts` (the layers), and `policies.ts` where authorization applies. Follow the shape of a neighbouring module rather than inventing one.
 
-A feature that has a Public API surface owns it in `<entity>/public-api/`: `schema.ts` (closed DTOs and HTTP shapes), `operations.ts` (the surface-neutral capability a future MCP tool binds), `http.ts` (the `HttpApiEndpoint`s and handlers), `mappers.ts`, and a `repository.ts` only where the public projection is genuinely different from the feature repository (the post and comment reads, the changelog publication orchestration). Tag and company operations call `<entity>/repository.ts` directly. The shared infrastructure — the operation helper, the registry, the key middleware, the error vocabulary, and the composition root — stays in `packages/domain/src/public-api/`. See `docs/adr/0007`.
+A feature that has a Public API surface owns it in `<entity>/public-api/`: `schema.ts` (closed DTOs and HTTP shapes), `operations.ts` (the surface-neutral capability a future MCP tool binds), `http.ts` (the `HttpApiEndpoint`s and handlers), `mappers.ts`, and a `repository.ts` only where the public projection is genuinely different from the feature repository (the post and comment reads, the changelog publication orchestration). Tag and company operations call `<entity>/repository.ts` directly. The shared infrastructure — the operation helper, the registry, the key middleware, the error vocabulary, and the composition root — stays in `packages/domain/src/public-api/`.
 
 RPC registration is one registry in two halves, split because the browser reads one half:
 
 - `packages/domain/src/rpc-group.ts` lists every `*Rpcs` group in `RpcGroups` and derives `AllRpcs` from it. It imports no handler layer, so the dashboard and public board can bundle `AllRpcs` without pulling in repositories or the database.
-- `packages/domain/src/rpc-router.ts` pairs every group name with its handler layer in `RpcHandlerRegistrations`, marking the four provider-owned management groups as `"provider"` (see `docs/adr/0002`). Its `satisfies Record<RpcGroupName, …>` makes a group with no entry a compile error, and the route merges the in-domain layers from that record instead of an ad-hoc grouping.
+- `packages/domain/src/rpc-router.ts` pairs every group name with its handler layer in `RpcHandlerRegistrations`, marking the four provider-owned management groups as `"provider"`. Its `satisfies Record<RpcGroupName, …>` makes a group with no entry a compile error, and the route merges the in-domain layers from that record instead of an ad-hoc grouping.
 
 The composition root's provider map in `apps/server/src/app/router.ts` satisfies `ProviderOwnedRpcName`, so a fifth provider-owned group cannot be half-wired either. `rpc-router.test.ts` pins the registry at runtime. Adding an RPC group is now a line in `RpcGroups` and a line in `RpcHandlerRegistrations` (plus the provider map if a provider owns it), and nothing can compile with the two lists disagreeing.
 
 The four surfaces, deliberately not sharing one contract:
 
 1. **Dashboard RPC** — session-authenticated Effect RPC over `/rpc`.
-2. **Public API** — versioned, API-key-authenticated `/api/v1`. Its DTOs are hand-written in `packages/domain/src/public-api/schema.ts` and must never import dashboard or portal response schemas, which carry internal actor identifiers. `docs/adr/0004` and an `oxlint` override both enforce this.
+2. **Public API** — versioned, API-key-authenticated `/api/v1`. Its DTOs are hand-written in `packages/domain/src/public-api/schema.ts` and must never import dashboard or portal response schemas, which carry internal actor identifiers. An `oxlint` override enforces this.
 3. **SDKs** — `packages/sdk`, `packages/sdk-react`. Published, so treat the public shape as a contract.
 4. **Integrations** — provider registry plus the durable delivery worker. `packages/domain` does not depend on provider packages; `apps/server` is the composition root that supplies their handler layers.
 
@@ -142,7 +142,7 @@ The four surfaces, deliberately not sharing one contract:
 
 - Tests: new cases, tightened assertions, converting a test to `it.effect`.
 - A lint rule loosened _or tightened_ in `oxlint.config.ts`, with the reason written beside it.
-- Documentation: `README.md`, `CONTEXT.md`, `docs/`, a new ADR for a decision that has already been made.
+- Documentation: `README.md`, `CONTEXT.md`, `docs/`, a new page for a decision that has already been made.
 - New code inside an existing module, following that module's shape.
 - A targeted `oxlint-disable-next-line` with a written reason.
 

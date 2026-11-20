@@ -111,8 +111,7 @@ export const describeRevokeFailure = (
 /**
  * The one Polar organization setting Feeblo's billing behavior depends on.
  * `allowMultipleSubscriptions` is `false` by default, and because a checkout
- * customer is resolved by email (ADR 0013) that default caps a buyer across
- * workspaces — see ADR 0015.
+ * customer is resolved by email, that default caps a buyer across workspaces.
  */
 export interface PolarOrganizationSubscriptionSettings {
   readonly allowMultipleSubscriptions: boolean;
@@ -325,8 +324,8 @@ const makePolarService = Effect.gen(function* () {
      * The token organization's subscription settings, or `None` when billing
      * is not configured or Polar could not be read. `allowMultipleSubscriptions`
      * is `false` by default, and because a checkout customer is resolved by
-     * email (ADR 0013) that default caps a buyer across workspaces — see
-     * ADR 0015 and the startup warning in `packages/auth`.
+     * email, that default caps a buyer across workspaces — see the startup
+     * warning in `packages/auth`.
      */
     getOrganizationSettings: Effect.fn("PolarService.getOrganizationSettings")(
       function* () {

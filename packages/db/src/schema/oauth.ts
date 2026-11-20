@@ -23,8 +23,7 @@ import { sessionTable, userTable } from "./auth";
  * Keep the property names identical to the plugin's field names and the SQL
  * names snake_cased, the same convention `auth.ts` uses.
  *
- * See `docs/adr/0024` for why the MCP surface runs an authorization server at
- * all.
+ * These tables belong to the MCP surface's own authorization server.
  */
 
 /**
