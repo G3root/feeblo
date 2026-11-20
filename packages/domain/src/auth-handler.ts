@@ -81,7 +81,7 @@ export type AuthHandler = {
      * Better Auth owns the issuer, audience, JWKS, and the RFC 6750/9728
      * challenge; the result is the two things this side may act on — the
      * claims a caller is built from, or the response to refuse with. A
-     * library error never crosses this boundary. See `docs/adr/0024`.
+     * library error never crosses this boundary.
      */
     readonly verifyMcpAccessToken: (
       request: McpAccessTokenRequest

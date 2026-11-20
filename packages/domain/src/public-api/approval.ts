@@ -30,8 +30,8 @@ import * as Schema from "effect/Schema";
  *
  * The refusal is a failure of the *tool*, not of the operation: `approval.ts`
  * declares `ApprovalDenied` and `mcp.ts` adds it to the destructive tools'
- * declared failures, so `/api/v1` keeps the published error vocabulary ADR 0004
- * froze and an MCP client reads a declared failure instead of a protocol error.
+ * declared failures, so `/api/v1` keeps the published error vocabulary and an
+ * MCP client reads a declared failure instead of a protocol error.
  */
 
 /** The call a gate is deciding about, as the person answering it should see it. */

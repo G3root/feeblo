@@ -58,7 +58,7 @@ import { WorkspaceRpcs } from "./workspace/rpcs";
  * `rpc-router.test.ts` pins the same set at runtime.
  *
  * Provider-owned groups are listed here like any other — the domain still
- * defines their contract (`docs/adr/0002` keeps the handler layers in
+ * defines their contract (the handler layers live in
  * `integrations/*`), so `AllRpcs` covers every group while the four provider
  * entries are marked `"provider"` in the handler registry and supplied by the
  * composition root.
@@ -109,7 +109,7 @@ export const RpcGroups = [
   ["SlackManagement", SlackManagementRpcs],
   ["DiscordManagement", DiscordManagementRpcs],
   // GitHub RPC definitions are contracts; their handler layer is bound by the
-  // composition root (see docs/adr/0002).
+  // composition root.
   ["GitHubManagement", GitHubManagementRpcs],
 ] as const;
 

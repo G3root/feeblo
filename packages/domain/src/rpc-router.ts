@@ -55,7 +55,6 @@ import { WorkspaceRpcHandlers } from "./workspace/handlers";
 /**
  * The handler layer for every group in `RpcGroups`, or `"provider"` for the
  * groups whose layer a provider package owns and the composition root supplies
- * (see docs/adr/0002).
  *
  * This record is the pairing the two hand-maintained lists used to be: adding
  * a group to `RpcGroups` is a compile error here until it is paired, and the

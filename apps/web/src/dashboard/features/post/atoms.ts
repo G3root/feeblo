@@ -49,8 +49,7 @@ export type PostViewCountArgs = {
  *
  * Deliberately only the counter: the breakdowns are the analytics tab's read,
  * fetched when that tab is opened or prefetched. A count is an aggregate over
- * the workspace's history, so it is not part of the post's collections either
- * (ADR 0026).
+ * the workspace's history, so it is not part of the post's collections either.
  */
 export const postViewCountAtom = Atom.family((args: PostViewCountArgs) =>
   DashboardClient.query("GetPostViewCount", args).pipe(

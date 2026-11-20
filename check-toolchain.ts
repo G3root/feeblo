@@ -588,7 +588,7 @@ const failures = [
 if (failures.length > 0) {
   console.error(failures.join("\n").replace(/^\n/, ""));
   console.error(
-    "\nAGENTS.md's stack contract explains why these move together; `docs/adr/0005` covers the compiler train."
+    "\nAGENTS.md's stack contract explains why these move together."
   );
   process.exit(1);
 }

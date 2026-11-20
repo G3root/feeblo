@@ -45,7 +45,7 @@ import {
 /**
  * Live GitHub App adapter input. Mirrors the server-owned configuration the
  * adapter needs; the composition root reads these from its typed env so this
- * package never depends on server configuration (see docs/adr/0002).
+ * package never depends on server configuration.
  */
 export interface GitHubProviderLiveInput {
   /** Field names mirror ServerConfig so callers can pass them straight through. */

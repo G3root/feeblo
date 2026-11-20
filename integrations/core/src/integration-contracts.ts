@@ -148,7 +148,7 @@ export interface IntegrationEventEnvelopeV1 extends Schema.Schema.Type<
  * A person behind an event, reduced to a classification and safe identifiers.
  *
  * A member is only ever a display name: `mem_*` is an account identifier and
- * is never published (see docs/adr/0010). An end user is the join key an
+ * is never published. An end user is the join key an
  * integration needs, so it carries the contact id and the caller's own
  * `externalId`; email and phone are never part of this shape.
  */

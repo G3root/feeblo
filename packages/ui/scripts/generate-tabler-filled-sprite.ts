@@ -16,7 +16,7 @@
  *
  *   pnpm --filter @feeblo/ui icons:generate
  *
- * `docs/adr/0030` records why the sprite exists and how it is mounted.
+ * The output is generated; edit this script, not the generated files.
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";

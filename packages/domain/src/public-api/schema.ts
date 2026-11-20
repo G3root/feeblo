@@ -12,7 +12,7 @@
  * `creatorId` and `creatorMemberId`, which are internal actor identifiers the
  * portal nulls before responding, and a field added there must not silently
  * widen what an API key can read. Adding a field is therefore always two
- * edits — the DTO and its mapper — and is visible in review. See ADR 0004.
+ * edits — the DTO and its mapper — and is visible in review.
  */
 
 export * from "./common";

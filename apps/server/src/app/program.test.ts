@@ -13,7 +13,7 @@ import { makeServerApp } from "./program";
  *
  * `program.ts` is the only code that assembles the production layer tree, and
  * until this test nothing in `pnpm test` built it: a collaborator missing from
- * `ServiceLayers` stayed invisible until a request asked for it (ADR 0006).
+ * `ServiceLayers` stayed invisible until a request asked for it.
  * The same `makeServerApp` production uses is built here with
  * `NodeHttpServer.layerTest` in place of the bound port, a real PGlite database
  * in place of Postgres, and the test configs the Public API harness already

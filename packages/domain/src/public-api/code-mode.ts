@@ -30,11 +30,11 @@ import {
 /**
  * Code mode: the Public API as two tools instead of forty.
  *
- * `/mcp` projects every operation to its own tool (ADR 0008), which is the right
+ * `/mcp` projects every operation to its own tool, which is the right
  * shape for a client that calls one operation at a time. It is a poor shape for
  * an agent with a task: listing forty tools spends context on schemas the model
  * does not need, and chaining three calls costs three round trips. Code mode is
- * the second projection ADR 0028 records — `search` returns the few tools a task
+ * the second projection — `search` returns the few tools a task
  * needs *with the TypeScript signature each one has*, and `execute` runs one
  * JavaScript program that calls them, in a sandbox, against the same handlers.
  *
@@ -45,7 +45,6 @@ import {
  * cannot reach anything the other surfaces do not, and a change to an operation
  * is a change to all three surfaces at once.
  *
- * See `docs/adr/0028-code-mode-is-a-second-mcp-projection.md`.
  */
 
 /** Where the code-mode transport is mounted. */
@@ -156,7 +155,7 @@ const failureMessage = <Failure>(error: Failure): string => {
 /**
  * The erased view of one operation's handler.
  *
- * `PublicApiOperations` holds operations of many shapes (ADR 0007), and a
+ * `PublicApiOperations` holds operations of many shapes, and a
  * lookup by name produces `unknown` for both the input and the failure. The
  * input is decoded with the operation's own schema before it is passed here;
  * the failure is narrowed back to a message by `failureMessage`. The alias is
@@ -165,7 +164,7 @@ const failureMessage = <Failure>(error: Failure): string => {
 type ErasedOperationHandler = (
   // oxlint-disable-next-line anti-slop/no-unknown-parameters -- See the alias's comment: this is the erased boundary the registry's lookup produces.
   input: unknown
-) => // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- See the alias's comment: the operation's failure type is erased at this boundary by design (ADR 0007).
+) => // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- See the alias's comment: the operation's failure type is erased at this boundary by design.
 Effect.Effect<unknown, unknown, PublicApiDependencies | PublicApiCaller>;
 
 const buildPublicApiCodeModeHandlers = () =>
@@ -264,7 +263,7 @@ const buildPublicApiCodeModeHandlers = () =>
       );
 
       // Validated rather than asserted: the codec's encoded form is the
-      // published JSON DTO (ADR 0004), and a decode that fails is a bug in the
+      // published JSON DTO, and a decode that fails is a bug in the
       // operation's schema rather than something the program can cause.
       return yield* Schema.decodeEffect(Schema.Json)(encoded).pipe(
         Effect.mapError(() =>

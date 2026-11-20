@@ -28,7 +28,7 @@
     // thrashing a 16 GB machine to do less work than this one process does with
     // a single 2.3 GB program. The caching granularity is not worth 6x the
     // runtime; if this ever needs to get faster, the lever is the type-aware
-    // pass itself, not the task layout. See `docs/adr/0005`.
+    // pass itself, not the task layout.
     "//#lint": {
       "outputs": []
     },

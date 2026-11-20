@@ -25,7 +25,6 @@ import {
  * Scopes are mapped through the Public API's own vocabulary: OIDC scopes the
  * provider issues (`openid`, `profile`, `email`, `offline_access`) are dropped,
  * and a token that holds none of `PUBLIC_API_SCOPES` can call no operation.
- * See `docs/adr/0024`.
  */
 const isPublicApiScope = Schema.is(PublicApiScopeSchema);
 

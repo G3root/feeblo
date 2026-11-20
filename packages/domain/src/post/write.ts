@@ -84,8 +84,8 @@ export type PostWriteAuthor = {
  * already follow.
  *
  * The actor is a parameter rather than a `CurrentSession` context read because
- * the Public API cannot resolve one: a machine key must never become a member
- * (ADR 0003), and a shared write that read the session would drag the session
+ * the Public API cannot resolve one: a machine key must never become a member,
+ * and a shared write that read the session would drag the session
  * middleware into the public module.
  */
 export type PostWriteActor =

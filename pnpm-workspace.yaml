@@ -71,8 +71,7 @@ catalog:
   "@solidjs/router": ^1.0.1
   # The icons the icon picker searches are generated from this exact version, so
   # a bump is a regeneration of `packages/ui/src/icon-picker/generated` and a
-  # visible diff in the sprite, not an automatic range move. See
-  # `docs/adr/0030`.
+  # visible diff in the sprite, not an automatic range move.
   "@tabler/icons": 3.52.0
   "@tailwindcss/vite": ^4.3.4
   # The TanStack DB track is pinned to exact versions, not carets: `1.0.0-rc.1`

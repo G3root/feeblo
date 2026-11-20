@@ -5,7 +5,7 @@ import type * as Redacted from "effect/Redacted";
  * Runtime Slack integration configuration: app credentials, the request
  * signing secret, the OAuth redirect URL, and the at-rest encryption key.
  * The server composition root supplies the values; secrets remain outside
- * connection and route JSON (see docs/adr/0002).
+ * connection and route JSON.
  */
 export interface SlackIntegrationConfigContract {
   /** Dashboard base URL used for post-installation redirects. */

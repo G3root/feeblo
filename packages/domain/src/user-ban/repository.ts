@@ -646,7 +646,7 @@ const makeUserBanRepository = Effect.gen(function* () {
    * by a different account is left alone: that address is already banned, and
    * the named account gets its own account-address row instead. No row is ever
    * cleared or moved, so a later removal cannot strand an address. The whole
-   * thing is database work, so the transaction retry (ADR 0020) can replay it.
+   * thing is database work, so the transaction retry can replay it.
    */
   const upsert = Effect.fn("UserBanRepository.upsert")(function* (
     input: UpsertUserBanInput

@@ -393,7 +393,7 @@ const makeDataImportService = Effect.gen(function* () {
 
       // The workspace's stored default, not the `PENDING` type: a workspace may
       // repoint which status is the default, and several statuses may share a
-      // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several).
+      // type.
       // The name the row report shows for a substituted status must be the one
       // the worker's rows actually land in.
       const defaultStatus = pickDefaultPostStatus(statusRows);

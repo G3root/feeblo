@@ -68,7 +68,7 @@ import {
  * binding a port, and returns `makeServer`, which closes over that tree and
  * takes the one layer a caller owns: the HTTP server. `program` supplies
  * `NodeHttpServer`; a test supplies an in-memory server and builds the same
- * tree over PGlite and test configs. That is the gap ADR 0006 recorded — no
+ * tree over PGlite and test configs. That is the gap this test closes — no
  * test built the server layers, so a collaborator missing from `ServiceLayers`
  * stayed invisible until a request asked for it.
  *

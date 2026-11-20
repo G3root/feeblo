@@ -128,8 +128,8 @@ status list.
 - A client flow: `apps/web/src/dashboard/features/<feature>/lib/<name>-machine.ts`,
   with the hook beside it as a thin adapter (`send` on render, `toX` at the
   edge).
-- **Never** `@feeblo/domain-contracts`. That package depends only on `effect`
-  (`docs/adr/0002`); adding `xstate` there breaks the invariant that lets both
+- **Never** `@feeblo/domain-contracts`. That package depends only on `effect`;
+  adding `xstate` there breaks the invariant that lets both
   browser and server import it.
 - Client packages may import a machine from `@feeblo/domain`, but that puts
   `xstate` in the dashboard bundle. Say so in the PR when you do it.

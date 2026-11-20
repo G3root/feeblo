@@ -446,7 +446,7 @@ export const mcpServerCard = (origin: string) => ({
         required: true,
         scheme: PUBLIC_API_KEY_HEADER,
         // A hosted MCP client authenticates with OAuth instead; the provider
-        // serves this document at the API origin (docs/adr/0024).
+        // serves this document at the API origin.
         oauth: {
           resource_metadata: `${origin}/.well-known/oauth-protected-resource`,
         },

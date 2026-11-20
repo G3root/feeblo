@@ -319,7 +319,7 @@ export const makeIntegrationLayers: Effect.Effect<
   return {
     layer: Layer.mergeAll(
       // The management service's config requirement is resolved here so the
-      // runtime layer carries no unresolved configuration (see docs/adr/0002).
+      // runtime layer carries no unresolved configuration.
       WebhookManagementServiceLive.pipe(
         Layer.provide(Layer.succeed(WebhookIntegrationConfig, webhookConfig))
       ),

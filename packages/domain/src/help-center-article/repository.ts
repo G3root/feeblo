@@ -248,7 +248,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         publishedAt: article.publishedAt,
         updatedAt: article.updatedAt,
         // The author is named, never identified: a public page shows who wrote
-        // the documentation, not the internal member id (ADR 0004's rule).
+        // the documentation, not the internal member id.
         authorName: schema.userTable.name,
         isArchived: sql<boolean>`${article.status} = 'archived'`,
         ...countColumns,

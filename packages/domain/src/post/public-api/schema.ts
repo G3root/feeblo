@@ -125,7 +125,6 @@ export type TPublicApiPostTags = Schema.Schema.Type<typeof PublicApiPostTags>;
  * not a member and has no identity to attribute; the alternative would be to
  * invent one. The entry's internal identifiers — the actor's user and member
  * ids, and the on-behalf metadata — are not part of the payload
- * (see `docs/adr/0004`).
  */
 export const PublicApiPostActivity = Schema.Struct({
   id: Schema.String,

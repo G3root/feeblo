@@ -23,7 +23,7 @@ export type TEntitySource = S.Schema.Type<typeof EntitySource>;
  * not a dashboard create, and the Customers table says so. Companies have no
  * attribution path, so `EntitySource` stays the vocabulary that both columns
  * share and that the Public API company DTO mirrors; widening this union never
- * widens a published payload (see ADR 0004).
+ * widens a published payload.
  */
 export const ContactSource = S.Union([EntitySource, S.Literals(["ON_BEHALF"])]);
 

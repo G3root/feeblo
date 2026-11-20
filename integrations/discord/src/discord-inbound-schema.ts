@@ -5,7 +5,7 @@ import * as Schema from "effect/Schema";
  * Verified inbound payload contract; the canonical schemas (including the
  * interaction callback vocabulary) live in @feeblo/domain-contracts so the
  * domain inbound service can reference them without depending on this
- * provider package (see docs/adr/0002).
+ * provider package.
  */
 export {
   DiscordApplicationCommandData,

@@ -63,7 +63,7 @@ export const ORGANIZATION_ROLES = {
  * Derived from the ACL statement the api-key plugin itself checks on
  * `/api-key/create` (`apiKey: ["create"]`, granted to owner and admin), so a
  * consent that issues an OAuth grant cannot authorize more than the member
- * could authorize with a key. See `docs/adr/0024`.
+ * could authorize with a key.
  */
 const WORKSPACE_CREDENTIAL_ROLES: ReadonlySet<string> = new Set(
   Object.entries(ORGANIZATION_ROLES)

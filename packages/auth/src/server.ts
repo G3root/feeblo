@@ -163,11 +163,11 @@ export const initAuthHandler = (
 
     // Polar caps a customer at one billable subscription by default, enforced
     // on its hosted checkout page. Feeblo resolves a checkout customer by
-    // email (ADR 0013), so the cap is per buyer across workspaces: with the
+    // email, so the cap is per buyer across workspaces: with the
     // default, a person who already pays for one workspace cannot check out
     // another, and the refusal lands on Polar's page after Feeblo has already
     // handed the buyer off. Warn at startup so the operator sees the
-    // misconfiguration before a customer does. See docs/adr/0015.
+    // misconfiguration before a customer does.
     if (polarService.client) {
       const settings = yield* polarService.getOrganizationSettings();
 
@@ -871,7 +871,7 @@ export const initAuthHandler = (
           invitation: schema.invitationTable,
           twoFactor: schema.twoFactorTable,
           apikey: schema.apiKeyTable,
-          // The MCP authorization server's tables (docs/adr/0024). The keys
+          // The MCP authorization server's tables. The keys
           // are the provider's model names; the adapter resolves a model by
           // this key, so a rename here fails at request time, not compile time.
           jwks: schema.jwksTable,
@@ -990,7 +990,7 @@ export const initAuthHandler = (
       plugins: [
         ...baseConfig.plugins,
 
-        // The MCP surface's authorization server (docs/adr/0024). `jwt()` is
+        // The MCP surface's authorization server. `jwt()` is
         // required by the provider: it signs the access tokens and serves the
         // JWKS the `/mcp` route verifies against. `mcp()` *is* the OAuth
         // provider, so there must be no separate `oauthProvider()` plugin.

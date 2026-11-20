@@ -14,7 +14,7 @@ import { AuditLogListRequest, AuditLogPage } from "./schema";
  *
  * `AuthMiddleware` admits a session; the role gate (`auditLog.read`) lives in
  * the handler, and the Public API's equivalent is a later, separate contract
- * (ADR 0004) rather than a second consumer of this one.
+ * rather than a second consumer of this one.
  */
 export class AuditLogRpcs extends RpcGroup.make(
   Rpc.make("ListAuditLogEntries", {

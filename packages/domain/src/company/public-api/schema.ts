@@ -11,7 +11,7 @@ import { paramsOf, payloadOf } from "../../public-api/http-input";
  * type uses this same union, so a source added to the internal vocabulary fails
  * to compile there until it is named here too. That keeps a widening of the
  * public payload a deliberate edit — the DTO and its mapper — instead of
- * something a shared vocabulary does on its own. See ADR 0004.
+ * something a shared vocabulary does on its own.
  */
 export const PublicApiCompanySourceType = Schema.Literals([
   "DASHBOARD",

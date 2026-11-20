@@ -47,7 +47,7 @@ const statusName = (status: {
  * Every field is named explicitly. The mappers accept the repository's narrow
  * source types rather than dashboard rows, so a column added to a dashboard
  * read model cannot flow into a public response, and an internal actor
- * identifier has no name here to be passed through. See ADR 0004.
+ * identifier has no name here to be passed through.
  */
 export const toPublicApiPostSummary = (
   post: PublicApiListedPost,
@@ -146,9 +146,9 @@ export const toActivitySource = (row: {
  *
  * `ASSIGNEE_CHANGED` reports both values as `null`. Its values are `member` row
  * ids, and a member id is precisely the person identifier the public payload
- * excludes — the same rule that keeps the actor's user and member ids out (see
- * `docs/adr/0004`). The kind still says an assignment happened; who it moved
- * between stays on the dashboard. Every other kind passes its values through
+ * excludes — the same rule that keeps the actor's user and member ids out.
+ * The kind still says an assignment happened; who it moved between stays on
+ * the dashboard. Every other kind passes its values through
  * unchanged, because those name workspace resources (a status, a board, a tag,
  * a post), not people.
  */

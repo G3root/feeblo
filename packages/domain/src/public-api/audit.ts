@@ -11,7 +11,7 @@ import type { PublicApiCall } from "./api-key-auth";
  * Built here rather than in `audit-log/attribution.ts` on purpose: that module
  * reads the session middleware to name a dashboard user, and the Public API
  * must never reach it — a machine credential does not become a session
- * (`docs/adr/0004`, and the boundary override in `oxlint.config.ts`). An OAuth
+ * (and the boundary override in `oxlint.config.ts`). An OAuth
  * grant is different: it *is* a member's authority, delegated, so the subject
  * travels with it as the user behind the client.
  */

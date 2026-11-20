@@ -523,7 +523,7 @@ export const runDataImportPass = (claim: ClaimedDataImportJob) => {
 
     // The workspace's stored default, not the `PENDING` type: a workspace may
     // repoint which status is the default, and several statuses may share a
-    // type (docs/adr/0013-a-status-default-is-stored-and-a-type-may-hold-several),
+    // type,
     // so `pickDefaultPostStatus` is the rule every other surface that files a
     // post without a status already follows.
     const defaultStatus = pickDefaultPostStatus(statusRows);

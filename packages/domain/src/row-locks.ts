@@ -28,7 +28,7 @@ import { sql } from "drizzle-orm";
  *
  * `update` is still correct where blocking child inserts is the *point*; that is
  * the account-deletion membership re-check, which needs an invitation being
- * accepted to wait. `docs/adr/0020` records the whole decision.
+ * accepted to wait.
  *
  * ## Lifetime
  *

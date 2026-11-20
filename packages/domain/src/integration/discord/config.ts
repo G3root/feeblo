@@ -6,7 +6,6 @@ import type * as Redacted from "effect/Redacted";
  * the application-wide bot token, the interaction public key, the OAuth
  * redirect URL, and the at-rest encryption key. The server composition root
  * supplies the values; secrets remain outside connection and route JSON
- * (see docs/adr/0002).
  *
  * The bot token and public key are application-wide (one bot serves every
  * guild install), so they live in configuration — exactly like the Slack
