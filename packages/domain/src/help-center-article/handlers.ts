@@ -1,9 +1,16 @@
+import { transaction } from "@feeblo/db";
 import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-center-article";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import {
+  cleanupPreparedEditorAssets,
+  commitPreparedEditorAssets,
+  prepareEditorAssetContent,
+  rollbackPreparedEditorAssets,
+} from "../asset/service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
 import { helpCenterFeatureGate } from "../help-center/flag";
@@ -15,6 +22,7 @@ import {
   NotFoundError,
   withRemapDbErrors,
 } from "../rpc-errors";
+import { CurrentSession } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
@@ -186,6 +194,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
       Effect.gen(function* () {
         yield* articlePolicy.topicBelongsToWorkspace(args);
 
+        const session = yield* CurrentSession;
         const now = yield* DateTime.nowAsDate;
 
         const write = yield* normalizeArticleWrite({
@@ -198,21 +207,48 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           title: args.title,
         });
 
-        yield* repository.create({
-          id: args.id,
+        // Promote the images this save references out of the temporary prefix
+        // before the row stores their URLs. A promotion is an object copy, so
+        // it has to be undone when the write below fails: `rollback` deletes
+        // the permanent copies, and `cleanup` removes the temporary ones on
+        // either path.
+        const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
-          topicId: args.topicId,
-          position: args.position,
-          now,
-          write,
+          userId: session.session.userId,
+          content: write.content,
+          assetIds: args.assetIds,
+          coverImageUrl: args.coverImage,
         });
+
+        const stored = { ...write, content: prepared.content };
+
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* repository.create({
+              id: args.id,
+              organizationId: args.organizationId,
+              topicId: args.topicId,
+              position: args.position,
+              now,
+              write: stored,
+              coverImage: prepared.coverImage,
+            });
+
+            yield* commitPreparedEditorAssets(prepared.promotions);
+          })
+        ).pipe(
+          Effect.tapCause(() =>
+            rollbackPreparedEditorAssets(prepared.promotions)
+          ),
+          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+        );
 
         yield* scheduleEmbedding({
           articleId: args.id,
-          content: write.content,
+          content: stored.content,
           organizationId: args.organizationId,
-          status: write.status,
-          title: write.title,
+          status: stored.status,
+          title: stored.title,
         });
       }).pipe(
         Policy.withPolicy(articlePolicy.canCreate(args)),
@@ -252,6 +288,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           });
         }
 
+        const session = yield* CurrentSession;
         const now = yield* DateTime.nowAsDate;
 
         // The previous date is what keeps a typo fix from looking like a new
@@ -267,30 +304,52 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           title: args.title,
         });
 
-        const updated = yield* repository.update({
-          id: args.id,
+        const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
-          topicId: args.topicId,
-          position: args.position,
-          // What the editor had on screen, not what this request just read: a
-          // colleague's save in between is a conflict, not an overwrite. An
-          // API caller that does not track it falls back to the row as read,
-          // which is the weaker guarantee but the only one it can offer.
-          expectedStatus: args.expectedStatus ?? previous.status,
-          now,
-          write,
+          userId: session.session.userId,
+          content: write.content,
+          assetIds: args.assetIds,
+          coverImageUrl: args.coverImage,
         });
 
-        if (updated.length === 0) {
-          return yield* new HelpCenterArticleChangedError();
-        }
+        const stored = { ...write, content: prepared.content };
+
+        yield* transaction(
+          Effect.gen(function* () {
+            const updated = yield* repository.update({
+              id: args.id,
+              organizationId: args.organizationId,
+              topicId: args.topicId,
+              position: args.position,
+              // What the editor had on screen, not what this request just read:
+              // a colleague's save in between is a conflict, not an overwrite.
+              // An API caller that does not track it falls back to the row as
+              // read, which is the weaker guarantee but the only one it offers.
+              expectedStatus: args.expectedStatus ?? previous.status,
+              now,
+              write: stored,
+              coverImage: prepared.coverImage,
+            });
+
+            if (updated.length === 0) {
+              return yield* new HelpCenterArticleChangedError();
+            }
+
+            yield* commitPreparedEditorAssets(prepared.promotions);
+          })
+        ).pipe(
+          Effect.tapCause(() =>
+            rollbackPreparedEditorAssets(prepared.promotions)
+          ),
+          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+        );
 
         yield* scheduleEmbedding({
           articleId: args.id,
-          content: write.content,
+          content: stored.content,
           organizationId: args.organizationId,
-          status: write.status,
-          title: write.title,
+          status: stored.status,
+          title: stored.title,
         });
       }).pipe(
         Policy.withPolicy(articlePolicy.canUpdate(args.organizationId)),

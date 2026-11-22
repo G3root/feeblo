@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { InsightsPage } from "~/features/insights/components/insights-page";
 
 export const Route = createFileRoute(
-  "/_dashboard/$organizationId/_dashboard-layout/insights"
+  "/_dashboard/$organizationId/_dashboard-layout/insights/"
 )({
   component: RouteComponent,
 });
@@ -11,5 +11,5 @@ export const Route = createFileRoute(
 function RouteComponent() {
   const { organizationId } = Route.useParams();
 
-  return <InsightsPage organizationId={organizationId} />;
+  return <InsightsPage organizationId={organizationId} tab="feedback" />;
 }

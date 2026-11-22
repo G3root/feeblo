@@ -9,7 +9,7 @@ This document is the design record for what shipped.
 | Table | What it holds |
 | --- | --- |
 | `help_center_topic` | A section: name, slug, description, icon, position |
-| `help_center_article` | The page: title, slug, Markdown body, status, publication date, provenance |
+| `help_center_article` | The page: title, slug, Markdown body, cover image, status, publication date, provenance |
 | `help_center_article_view_event` | One row per read, with the client's idempotency key |
 | `help_center_article_view_total` | The all-time counter that outlives event retention |
 | `help_center_article_feedback` | One reader's "was this helpful?" verdict, flippable in place |
@@ -51,9 +51,9 @@ A flip is an `UPDATE` of the same row. Flipping to helpful clears `reason`, beca
 
 **Portal** (`ListHelpCenterTopicsPublic`, `ListHelpCenterArticlesPublic`, `GetHelpCenterArticlePublic`, `GetHelpCenterArticleFeedbackPublic`, `SetHelpCenterArticleFeedback`, `AddHelpCenterArticleView`) sees `published` and `archived` only, reads by slug, and gates on `SitePolicy.canViewHelpCenter`. A section that holds no published article is not listed, so publishing an empty section cannot disclose the draft pipeline.
 
-**Dashboard routes.** `/$organizationId/help-center` lists sections with their articles and the three counters; `/$organizationId/help-center/new` and `/$organizationId/help-center/$articleId` are the editor. The body is a Markdown textarea with a preview, and the list collection holds summaries only — the editor reads one article by id and writes through the RPC operations.
+**Dashboard routes.** `/$organizationId/help-center` lists the sections and their article counts, and is the only place a section is created. `/$organizationId/help-center/$topicId` is one section: its articles with the three counters, plus the section's edit and delete actions. `/$organizationId/help-center/$topicId/new` and `/$organizationId/help-center/article/$articleId` are the editor, opened on the create page with its section already chosen. It has the changelog editor's shape: a cover image, a title, the body, and a sidebar with the section. The slug is not a field — it is chosen in the publish dialog, so a save cannot move a live page's URL — and saving keeps the current status while publishing asks for the slug and date. The state changes the lifecycle does not derive from those (`archive`, `restore`) are offered beside the article's delete action. The body is edited in the same ProseKit editor the changelog uses and stored as Markdown — the editor serializes its document to Markdown and parses it back — so pasted images are written to `tmp/editor-media/` and the write's `assetIds` let the handler promote them to permanent objects before the row stores their URLs. The list collection holds summaries only — the editor reads one article by id and writes through the RPC operations. The dashboard's search is a command dialog behind an icon in the index toolbar; it reads the dashboard `SearchHelpCenterArticles` operation, so drafts are findable.
 
-**Portal routes.** `/s/help` and `/s/help/articles/$articleSlug`, which render the stored Markdown, offer "Copy as Markdown", fire the view beacon, and collect the verdict.
+**Portal routes.** `/s/help` and `/s/help/articles/$articleSlug`, which render the cover image and the stored Markdown, offer "Copy as Markdown", fire the view beacon, and collect the verdict.
 
 ## Search
 
@@ -73,7 +73,7 @@ The widget's deflection passes `strict`, which restricts the lexical match to th
 
 ## Analytics
 
-The panel on the dashboard's help center index reads two day-bucketed tables over a 7, 30 or 90 day window. A window of N days is N UTC dates **including today**, so its first day is `today - (N - 1)`; the boundary is pinned by a test that writes one bucket on the first included day and one on the day before it.
+The help center tab on the dashboard's insights page reads two day-bucketed tables over a 7, 30 or 90 day window. It lives there rather than on the help center index because it describes the documentation, while the help center pages manage it. A window of N days is N UTC dates **including today**, so its first day is `today - (N - 1)`; the boundary is pinned by a test that writes one bucket on the first included day and one on the day before it.
 
 - `help_center_article_daily` counts views and verdicts per article per UTC day. The view counter moves inside the same transaction as the all-time counter, so the two cannot disagree. The verdict counters count verdicts **cast** that day, not the standing distribution — a flip adds an unhelpful to today and leaves the earlier helpful where it was. The standing distribution is the feedback table's own `count(*)`, and a second, slower-moving copy of it here would be a number that disagrees with the article page.
 - `help_center_search_daily` counts searches and how many of them returned nothing, keyed on the normalized query. Both numbers live in one row so "what people look for" and "what we do not document" cannot disagree about how many searches there were.
@@ -93,7 +93,7 @@ The feature ships behind `HELP_CENTER` in `packages/domain/src/feature-flags.ts`
 - `help-center/flag.ts` exposes `HelpCenterEnabled`, a `Context.Reference` defaulting to the flag. Tests provide `true`; production reads the default.
 - `helpCenterFeatureGate` is a **public** policy (the portal has no session to check) that fails with `PolicyDeniedError`, which every operation already declares — so the flag adds no new error vocabulary at the RPC boundary. It is applied **last** in each handler's pipe, which makes it the outermost check: a deployment with the feature off refuses before it reads a row or spends a rate-limit token.
 - The retention loop is forked only when the flag is on, matching the audit sweep: with the feature off nothing writes a read event or a search, so a daily pass would only wake the worker to delete nothing. The same loop prunes both tables — raw read events older than 90 days, and search buckets whose day is older than 90 days. The day comparison is `day < cutoff`, so the cut day itself survives; with a 90-day window and a 90-day analytics range that starts 89 days back, the sweep can never delete a bucket a panel still reports on.
-- Every surface asks the same flag: the dashboard nav entry, the mobile tab, the settings section, the three dashboard routes and the settings route (an "unavailable" state for a deep link, not a 404), the portal pages, the portal nav tab, `sitemap.xml`, `llms.txt`, and the article page's SSR metadata.
+- Every surface asks the same flag: the dashboard nav entry, the mobile tab, the settings section, the dashboard routes and the settings route (an "unavailable" state for a deep link, not a 404), the portal pages, the portal nav tab, `sitemap.xml`, `llms.txt`, and the article page's SSR metadata.
 
 Turning it on is therefore a single-line change with no migration: no article can exist while the gate is closed, so `site.help_center_visibility` defaulting to `PUBLIC` cannot publish anything on the day the flag flips.
 

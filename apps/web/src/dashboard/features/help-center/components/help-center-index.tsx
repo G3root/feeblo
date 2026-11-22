@@ -1,5 +1,4 @@
-import { PLAN_ENTITLEMENTS } from "@feeblo/domain/plan-entitlements";
-import { Badge } from "@feeblo/ui/badge";
+import type { THelpCenterTopicWithCount } from "@feeblo/domain/help-center-topic/schema";
 import { Button } from "@feeblo/ui/button";
 import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import {
@@ -10,6 +9,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@feeblo/ui/empty";
+import { FloatingActionButton } from "@feeblo/ui/floating-action-button";
 import {
   Menu,
   MenuItem,
@@ -18,27 +18,32 @@ import {
   MenuTrigger,
 } from "@feeblo/ui/menu";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@feeblo/ui/table";
 import { toastManager } from "@feeblo/ui/toast";
-import { cn } from "@feeblo/ui/utils";
 import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
-  ArrowRight02Icon,
   BookOpen01Icon,
   Delete02Icon,
   Edit02Icon,
   Ellipsis,
-  PlusSignIcon,
+  Plus,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { usePlan } from "~/hooks/use-plan";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
-import { HelpCenterAnalytics } from "./help-center-analytics";
+import { HelpCenterArticleUsage } from "./help-center-article-usage";
 import { HelpCenterSearch } from "./help-center-search";
 import {
   CreateHelpCenterTopicDialog,
@@ -46,39 +51,49 @@ import {
 } from "./help-center-topic-dialog";
 import { HelpCenterTopicIcon } from "./help-center-topic-icon";
 
-/** The collection's own row: `description` and `icon` are nullable columns. */
-type THelpCenterTopicRow = {
-  articleCount: number;
-  description: string | null;
-  icon: string | null;
-  id: string;
-  name: string;
-  slug: string;
-};
+const mediumDateFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+});
+
+// Title and count survive on a phone; the rest is the table's own scroll.
+const headItems = [
+  { className: "", label: "Section" },
+  { className: "hidden sm:table-cell", label: "Articles" },
+  { className: "hidden sm:table-cell", label: "Updated" },
+];
 
 /**
- * The help center index.
+ * The help center's index: the sections, and nothing else.
  *
- * Sections come first and their articles hang under them, because that is the
- * shape of the product: a reader arrives at a section, not at a chronological
- * feed. The counts beside each section are the dashboard's (drafts included) —
- * the portal's read is a different number and is computed there.
+ * Articles live one level down, in their section's page. A reader arrives at a
+ * section, not at a chronological feed, and an index that inlined every
+ * article made a workspace with a dozen sections an unscannable page.
+ *
+ * The article allowance is shown here because the plan counts articles across
+ * the whole workspace, not per section, and this is the page that lists all of
+ * them.
  */
 export function HelpCenterIndex({
   organizationId,
 }: {
   organizationId: string;
 }) {
-  const { helpCenterTopicCollection, helpCenterArticleCollection } =
-    useDashboardCollections();
+  const { helpCenterTopicCollection } = useDashboardCollections();
 
   const { allowed: canManage } = usePolicy(
     hasPermission(organizationId, "helpCenterArticles.*")
   );
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<THelpCenterTopicRow | null>(null);
-  const [deleting, setDeleting] = useState<THelpCenterTopicRow | null>(null);
+
+  const [editing, setEditing] = useState<THelpCenterTopicWithCount | null>(
+    null
+  );
+
+  const [deleting, setDeleting] = useState<THelpCenterTopicWithCount | null>(
+    null
+  );
+
   const [deletePending, setDeletePending] = useState(false);
 
   const topicsQuery = useLiveQuery({
@@ -95,26 +110,13 @@ export function HelpCenterIndex({
         .orderBy(({ topic }) => topic.name, "asc"),
   });
 
-  const articlesQuery = useLiveQuery({
-    queryKey: [
-      "help-center-articles",
-      helpCenterArticleCollection.id,
-      organizationId,
-    ],
-    query: (q) =>
-      q
-        .from({ article: helpCenterArticleCollection })
-        .where(({ article }) => eq(article.organizationId, organizationId))
-        .orderBy(({ article }) => article.updatedAt, "desc"),
-  });
-
-  if (isLiveQueryFailed(topicsQuery) || isLiveQueryFailed(articlesQuery)) {
+  if (isLiveQueryFailed(topicsQuery)) {
     return (
       <Empty>
         <EmptyHeader>
           <EmptyTitle>Help center unavailable</EmptyTitle>
           <EmptyDescription>
-            There was a problem loading the help center.
+            There was a problem loading the sections.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -122,20 +124,11 @@ export function HelpCenterIndex({
   }
 
   const topics = topicsQuery.data ?? [];
-  const articles = articlesQuery.data ?? [];
-  const isLoading = topicsQuery.isLoading || articlesQuery.isLoading;
 
-  const articlesByTopic = new Map<string, typeof articles>();
-
-  for (const article of articles) {
-    const bucket = articlesByTopic.get(article.topicId);
-
-    if (bucket === undefined) {
-      articlesByTopic.set(article.topicId, [article]);
-    } else {
-      bucket.push(article);
-    }
-  }
+  const articleTotal = topics.reduce(
+    (total, topic) => total + topic.articleCount,
+    0
+  );
 
   const confirmDeleteSection = async () => {
     if (deleting === null) {
@@ -164,86 +157,139 @@ export function HelpCenterIndex({
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold tracking-tight">Help center</h1>
-          <p className="text-muted-foreground text-sm">
-            Documentation your customers read on your portal.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <ArticleAllowance used={articles.length} />
+    <div className="mx-auto w-full">
+      <div className="flex flex-wrap items-center gap-3 p-3">
+        <HelpCenterArticleUsage used={articleTotal} />
+        <div className="ml-auto flex items-center gap-2">
+          <HelpCenterSearch organizationId={organizationId} />
           {canManage ? (
             <>
               <Button
+                className="max-md:hidden"
                 onClick={() => setCreateOpen(true)}
                 type="button"
-                variant="outline"
+                variant="brand"
               >
-                <HugeiconsIcon icon={PlusSignIcon} />
+                <HugeiconsIcon icon={Plus} />
                 New section
               </Button>
-              <Button
-                render={
-                  <Link
-                    params={{ organizationId }}
-                    to="/$organizationId/help-center/new"
-                  />
-                }
-                type="button"
+              <FloatingActionButton
+                icon={<HugeiconsIcon icon={Plus} />}
+                onClick={() => setCreateOpen(true)}
               >
-                <HugeiconsIcon icon={PlusSignIcon} />
-                New article
-              </Button>
+                New section
+              </FloatingActionButton>
             </>
           ) : null}
         </div>
-      </header>
+      </div>
 
-      <HelpCenterSearch organizationId={organizationId} />
-
-      <HelpCenterAnalytics organizationId={organizationId} />
-
-      <SkeletonLoader isLoading={isLoading}>
-        <SkeletonWrapper>
-          {topics.length === 0 ? (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <HugeiconsIcon icon={BookOpen01Icon} />
-                </EmptyMedia>
-                <EmptyTitle>No sections yet</EmptyTitle>
-                <EmptyDescription>
-                  A section groups articles — “Getting started”, “Billing”,
-                  “Troubleshooting”.
-                </EmptyDescription>
-              </EmptyHeader>
-              {canManage ? (
-                <EmptyContent>
-                  <Button onClick={() => setCreateOpen(true)} type="button">
-                    Create the first section
-                  </Button>
-                </EmptyContent>
-              ) : null}
-            </Empty>
-          ) : (
-            <ul className="space-y-4">
-              {topics.map((topic) => (
-                <li key={topic.id}>
-                  <TopicCard
-                    articles={articlesByTopic.get(topic.id) ?? []}
-                    canManage={canManage}
-                    onDelete={() => setDeleting(topic)}
-                    onEdit={() => setEditing(topic)}
-                    organizationId={organizationId}
-                    topic={topic}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </SkeletonWrapper>
+      <SkeletonLoader isLoading={topicsQuery.isLoading}>
+        {!topicsQuery.isLoading && topics.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <HugeiconsIcon icon={BookOpen01Icon} />
+              </EmptyMedia>
+              <EmptyTitle>No sections yet</EmptyTitle>
+              <EmptyDescription>
+                A section holds the articles for one topic, like Billing or
+                Getting started.
+              </EmptyDescription>
+            </EmptyHeader>
+            {canManage ? (
+              <EmptyContent>
+                <Button onClick={() => setCreateOpen(true)} type="button">
+                  Create the first section
+                </Button>
+              </EmptyContent>
+            ) : null}
+          </Empty>
+        ) : (
+          <div className="p-3">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {headItems.map((item) => (
+                    <TableHead className={item.className} key={item.label}>
+                      <SkeletonWrapper>{item.label}</SkeletonWrapper>
+                    </TableHead>
+                  ))}
+                  <TableHead className="w-px">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topics.map((topic) => (
+                  <TableRow key={topic.id}>
+                    <TableCell className="whitespace-normal">
+                      <Link
+                        className="flex items-center gap-2"
+                        params={{ organizationId, topicId: topic.id }}
+                        to="/$organizationId/help-center/$topicId"
+                      >
+                        <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md">
+                          <HelpCenterTopicIcon
+                            className="size-4"
+                            icon={topic.icon}
+                          />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">
+                            {topic.name}
+                          </span>
+                          <span className="text-muted-foreground block truncate text-xs">
+                            {topic.description ?? `/help/${topic.slug}`}
+                          </span>
+                        </span>
+                      </Link>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <span className="tabular-nums">{topic.articleCount}</span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground hidden sm:table-cell">
+                      {mediumDateFormatter.format(topic.updatedAt)}
+                    </TableCell>
+                    <TableCell>
+                      {canManage ? (
+                        <Menu>
+                          <MenuTrigger
+                            render={
+                              <Button
+                                aria-label={`Actions for ${topic.name}`}
+                                size="icon-xs"
+                                type="button"
+                                variant="ghost"
+                              />
+                            }
+                          >
+                            <HugeiconsIcon icon={Ellipsis} />
+                          </MenuTrigger>
+                          <MenuPopup align="end">
+                            <MenuItem onClick={() => setEditing(topic)}>
+                              <HugeiconsIcon icon={Edit02Icon} />
+                              Edit section
+                            </MenuItem>
+                            <MenuSeparator />
+                            <MenuItem
+                              disabled={topic.articleCount > 0}
+                              onClick={() => setDeleting(topic)}
+                              variant="destructive"
+                            >
+                              <HugeiconsIcon icon={Delete02Icon} />
+                              Delete section
+                            </MenuItem>
+                          </MenuPopup>
+                        </Menu>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </SkeletonLoader>
 
       <CreateHelpCenterTopicDialog
@@ -284,180 +330,4 @@ export function HelpCenterIndex({
       />
     </div>
   );
-}
-
-/**
- * The plan's article allowance, shown only when it is a number.
- *
- * A paid workspace's limit is `null`, and rendering "unlimited" on every plan
- * that has no cap is noise on a page an editor already understands.
- */
-function ArticleAllowance({ used }: { used: number }) {
-  const planQuery = usePlan();
-  const plan = planQuery.data?.plan ?? "free";
-  const limit = PLAN_ENTITLEMENTS[plan].limits.helpCenterArticles;
-
-  if (limit === null) {
-    return null;
-  }
-
-  return (
-    <span
-      className={cn(
-        "text-muted-foreground hidden text-xs tabular-nums sm:inline",
-        used >= limit && "text-destructive"
-      )}
-    >
-      {used} of {limit} articles
-    </span>
-  );
-}
-
-function TopicCard({
-  articles,
-  canManage,
-  onDelete,
-  onEdit,
-  organizationId,
-  topic,
-}: {
-  articles: ReadonlyArray<{
-    excerpt: string;
-    helpfulCount: number;
-    id: string;
-    notHelpfulCount: number;
-    slug: string;
-    status: string;
-    title: string;
-    viewCount: number;
-  }>;
-  canManage: boolean;
-  onDelete: () => void;
-  onEdit: () => void;
-  organizationId: string;
-  topic: THelpCenterTopicRow;
-}) {
-  const { helpCenterTopicCollection } = useDashboardCollections();
-
-  return (
-    <section className="bg-card rounded-lg border">
-      <header className="flex items-start justify-between gap-3 border-b px-4 py-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="bg-muted text-muted-foreground mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md">
-            <HelpCenterTopicIcon className="size-4" icon={topic.icon} />
-          </span>
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold">{topic.name}</h2>
-            <p className="text-muted-foreground truncate text-xs">
-              {topic.description ?? `/help/${topic.slug}`}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <span className="text-muted-foreground text-xs tabular-nums">
-            {topic.articleCount}{" "}
-            {topic.articleCount === 1 ? "article" : "articles"}
-          </span>
-          {canManage ? (
-            <Menu>
-              <MenuTrigger
-                render={
-                  <Button
-                    aria-label={`Actions for ${topic.name}`}
-                    size="icon"
-                    type="button"
-                    variant="ghost"
-                  />
-                }
-              >
-                <HugeiconsIcon icon={Ellipsis} />
-              </MenuTrigger>
-              <MenuPopup align="end">
-                <MenuItem onClick={onEdit}>
-                  <HugeiconsIcon icon={Edit02Icon} />
-                  Edit section
-                </MenuItem>
-                <MenuSeparator />
-                <MenuItem
-                  disabled={topic.articleCount > 0}
-                  onClick={onDelete}
-                  variant="destructive"
-                >
-                  <HugeiconsIcon icon={Delete02Icon} />
-                  Delete section
-                </MenuItem>
-              </MenuPopup>
-            </Menu>
-          ) : null}
-        </div>
-      </header>
-
-      {articles.length === 0 ? (
-        <p className="text-muted-foreground px-4 py-6 text-sm">
-          No articles in this section yet.
-        </p>
-      ) : (
-        <ul className="divide-y">
-          {articles.map((article) => {
-            const votes = article.helpfulCount + article.notHelpfulCount;
-
-            return (
-              <li key={article.id}>
-                <Link
-                  className="group flex items-center gap-3 px-4 py-3"
-                  params={{ articleId: article.id, organizationId }}
-                  to="/$organizationId/help-center/$articleId"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">
-                        {article.title}
-                      </span>
-                      {article.status === "draft" ? (
-                        <Badge variant="secondary">Draft</Badge>
-                      ) : null}
-                      {article.status === "archived" ? (
-                        <Badge variant="outline">Archived</Badge>
-                      ) : null}
-                    </div>
-                    {article.excerpt.length > 0 ? (
-                      <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
-                        {article.excerpt}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="text-muted-foreground hidden shrink-0 items-center gap-4 text-xs tabular-nums sm:flex">
-                    <span title="Views">
-                      {formatCount(article.viewCount)} views
-                    </span>
-                    <span title="Helpful votes">
-                      {votes === 0
-                        ? "no votes"
-                        : `${Math.round((article.helpfulCount / votes) * 100)}% helpful`}
-                    </span>
-                  </div>
-
-                  <HugeiconsIcon
-                    className="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
-                    icon={ArrowRight02Icon}
-                  />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** 1200 → "1.2k". The dashboard's lists are scanned, not read. */
-function formatCount(value: number): string {
-  if (value < 1000) {
-    return String(value);
-  }
-
-  return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)}k`;
 }

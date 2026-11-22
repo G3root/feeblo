@@ -220,7 +220,12 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     id: string;
   }) =>
     db
-      .select({ ...articleColumns, content: article.content, ...countColumns })
+      .select({
+        ...articleColumns,
+        content: article.content,
+        coverImage: article.coverImage,
+        ...countColumns,
+      })
       .from(article)
       .where(
         and(eq(article.id, id), eq(article.organizationId, organizationId))
@@ -242,6 +247,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         title: article.title,
         excerpt: article.excerpt,
         content: article.content,
+        coverImage: article.coverImage,
         topicId: article.topicId,
         topicSlug: topic.slug,
         topicName: topic.name,
@@ -477,6 +483,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     position,
     now,
     write,
+    coverImage,
   }: {
     id: string;
     organizationId: string;
@@ -484,6 +491,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     position: number | null;
     now: Date;
     write: NormalizedHelpCenterArticleWrite;
+    coverImage: string | null;
   }) =>
     db
       .insert(article)
@@ -496,6 +504,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         title: write.title,
         content: write.content,
         excerpt: write.excerpt,
+        coverImage,
         status: write.status,
         publishedAt: write.publishedAt,
         createdAt: now,
@@ -520,6 +529,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     expectedStatus,
     now,
     write,
+    coverImage,
   }: {
     id: string;
     organizationId: string;
@@ -528,6 +538,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     expectedStatus: THelpCenterArticleState;
     now: Date;
     write: NormalizedHelpCenterArticleWrite;
+    coverImage: string | null;
   }) => {
     /**
      * Whether this statement is changing the text an embedding describes.
@@ -547,6 +558,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         title: write.title,
         content: write.content,
         excerpt: write.excerpt,
+        coverImage,
         status: write.status,
         publishedAt: write.publishedAt,
         updatedAt: now,

@@ -1,7 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
-import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import { CopyButton } from "@feeblo/ui/copy-button";
 import {
@@ -16,7 +15,6 @@ import { Textarea } from "@feeblo/ui/textarea";
 import { cn } from "@feeblo/ui/utils";
 import {
   ArrowLeft02Icon,
-  Copy01Icon,
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from "@hugeicons/core-free-icons";
@@ -127,6 +125,16 @@ export function HelpCenterArticlePage({
           Help center
         </Button>
 
+        {article.coverImage ? (
+          <img
+            alt=""
+            className="mt-4 aspect-[16/7] w-full rounded-xl border object-cover"
+            height={525}
+            src={article.coverImage}
+            width={1200}
+          />
+        ) : null}
+
         <header className="mt-4 space-y-2">
           <p className="text-muted-foreground text-xs">
             <Link className="hover:text-foreground" to="/s/help">
@@ -159,7 +167,6 @@ export function HelpCenterArticlePage({
             type="button"
             variant="ghost"
           >
-            <HugeiconsIcon icon={Copy01Icon} />
             Copy as Markdown
           </CopyButton>
         </div>

@@ -1,8 +1,9 @@
-import { useAtomValue } from "@effect/atom-react";
-import {
-  type THelpCenterAnalytics,
-  type THelpCenterAnalyticsRange,
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import type {
+  THelpCenterAnalytics,
+  THelpCenterAnalyticsRange,
 } from "@feeblo/domain/help-center-article/schema";
+import { Button } from "@feeblo/ui/button";
 import {
   Card,
   CardDescription,
@@ -11,116 +12,57 @@ import {
   CardTitle,
 } from "@feeblo/ui/card";
 import { Skeleton } from "@feeblo/ui/skeleton";
-import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useState } from "react";
 
-import {
-  DEFAULT_HELP_CENTER_ANALYTICS_RANGE,
-  helpCenterAnalyticsAtom,
-} from "../atoms";
+import { helpCenterAnalyticsAtom } from "~/features/help-center/atoms";
 
-const RANGE_LABELS = {
-  "7d": "7 days",
-  "30d": "30 days",
-  "90d": "90 days",
-} as const satisfies Record<THelpCenterAnalyticsRange, string>;
+import { InsightsStat } from "./insights-sections";
 
 /**
- * The help center's traffic, verdicts and searches.
+ * What readers do with the documentation, over one window.
  *
- * Three questions on one panel because they are read together: how much the
- * documentation is used, whether it answered, and what it failed to answer. The
- * third is the only one that names work to do, so it gets its own section and
- * the page links straight to the editor.
- *
- * A panel rather than a route: the index is where a member arrives when they
- * are thinking about the help center, and a separate analytics page would be a
- * second place to check for a workspace with a dozen articles.
+ * Three questions, three panels: how much the help center is used, what it
+ * failed to answer, and what people typed. The unanswered searches are the only
+ * list that names work to do, so it sits beside the article list rather than at
+ * the bottom.
  */
-export function HelpCenterAnalytics({
-  organizationId,
-}: {
-  organizationId: string;
-}) {
-  const [range, setRange] = useState<THelpCenterAnalyticsRange>(
-    DEFAULT_HELP_CENTER_ANALYTICS_RANGE
-  );
-
-  // No `useMemo`: the atom family keys on the workspace and the window by
-  // value, so a fresh object literal still resolves to the same atom.
-  const result = useAtomValue(
-    helpCenterAnalyticsAtom({ organizationId, range })
-  );
-
-  return (
-    <section className="space-y-3">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div className="space-y-0.5">
-          <h2 className="text-sm font-semibold">Documentation insights</h2>
-          <p className="text-muted-foreground text-xs">
-            Published and archived articles only. Reads and verdicts are counted
-            on the portal.
-          </p>
-        </div>
-        <ToggleGroup
-          aria-label="Window"
-          onValueChange={(value) => {
-            const next = value[0];
-
-            if (next === "7d" || next === "30d" || next === "90d") {
-              setRange(next);
-            }
-          }}
-          size="sm"
-          value={[range]}
-          variant="outline"
-        >
-          <ToggleGroupItem value="7d">7 days</ToggleGroupItem>
-          <ToggleGroupItem value="30d">30 days</ToggleGroupItem>
-          <ToggleGroupItem value="90d">90 days</ToggleGroupItem>
-        </ToggleGroup>
-      </header>
-
-      {Result.builder(result)
-        .onInitial(() => (
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ))
-        .onFailure(() => (
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>Insights could not be loaded</CardTitle>
-              <CardDescription>
-                The help center itself is unaffected; only this panel failed.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ))
-        .onSuccess((analytics) => (
-          <AnalyticsContent
-            analytics={analytics}
-            organizationId={organizationId}
-            range={range}
-          />
-        ))
-        .exhaustive()}
-    </section>
-  );
-}
-
-function AnalyticsContent({
-  analytics,
+export function InsightsHelpCenter({
   organizationId,
   range,
+  rangeLabel,
+}: {
+  readonly organizationId: string;
+  readonly range: THelpCenterAnalyticsRange;
+  readonly rangeLabel: string;
+}) {
+  // No `useMemo`: the atom family keys on the workspace and the window by
+  // value, so a fresh object literal still resolves to the same atom.
+  const atom = helpCenterAnalyticsAtom({ organizationId, range });
+  const result = useAtomValue(atom);
+  const refresh = useAtomRefresh(atom);
+
+  return Result.builder(result)
+    .onInitial(() => <HelpCenterLoading />)
+    .onFailure(() => <HelpCenterFailure onRetry={refresh} />)
+    .onSuccess((analytics) => (
+      <HelpCenterContent
+        analytics={analytics}
+        organizationId={organizationId}
+        rangeLabel={rangeLabel}
+      />
+    ))
+    .exhaustive();
+}
+
+function HelpCenterContent({
+  analytics,
+  organizationId,
+  rangeLabel,
 }: {
   readonly analytics: THelpCenterAnalytics;
   readonly organizationId: string;
-  readonly range: THelpCenterAnalyticsRange;
+  readonly rangeLabel: string;
 }) {
   const { totals } = analytics;
 
@@ -134,9 +76,11 @@ function AnalyticsContent({
     return (
       <Card size="sm">
         <CardHeader>
-          <CardTitle>No traffic in the last {RANGE_LABELS[range]}</CardTitle>
+          <CardTitle>
+            No traffic in the last {rangeLabel.toLowerCase()}
+          </CardTitle>
           <CardDescription>
-            Insights appear once readers open an article on the portal.
+            Views appear once readers open an article on your portal.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -144,8 +88,8 @@ function AnalyticsContent({
   }
 
   return (
-    <div className="space-y-3">
-      <TrafficTotals analytics={analytics} range={range} />
+    <>
+      <TrafficTotals analytics={analytics} rangeLabel={rangeLabel} />
 
       <div className="grid gap-3 lg:grid-cols-2">
         <ArticleTrafficCard
@@ -161,53 +105,53 @@ function AnalyticsContent({
       {analytics.queries.length === 0 ? null : (
         <TopSearchesCard queries={analytics.queries} />
       )}
-    </div>
+    </>
   );
 }
 
 /** Views and the two verdict counts, with what each number is a share of. */
 function TrafficTotals({
   analytics,
-  range,
+  rangeLabel,
 }: {
   readonly analytics: THelpCenterAnalytics;
-  readonly range: THelpCenterAnalyticsRange;
+  readonly rangeLabel: string;
 }) {
   const { totals } = analytics;
   const verdicts = totals.helpful + totals.unhelpful;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <section className="grid gap-3 sm:grid-cols-3">
       {/*
        * No article count here. `articles` is the top ten by views, so a count
        * of it would read as "the help center has ten articles" on any
        * workspace bigger than that. The views total is the whole window and
        * needs no such qualifier.
        */}
-      <Stat
-        detail={`In the last ${RANGE_LABELS[range]}`}
+      <InsightsStat
+        detail={`In the last ${rangeLabel}`}
         label="Views"
-        value={totals.views}
+        value={totals.views.toLocaleString()}
       />
-      <Stat
+      <InsightsStat
         detail={
           totals.helpful === 0
             ? "No helpful verdicts yet"
             : `${percentOf(totals.helpful, verdicts)} of verdicts`
         }
         label="Helpful"
-        value={totals.helpful}
+        value={totals.helpful.toLocaleString()}
       />
-      <Stat
+      <InsightsStat
         detail={
           totals.unhelpful === 0
             ? "Nothing rated unhelpful"
             : `${percentOf(totals.unhelpful, verdicts)} of verdicts`
         }
         label="Not helpful"
-        value={totals.unhelpful}
+        value={totals.unhelpful.toLocaleString()}
       />
-    </div>
+    </section>
   );
 }
 
@@ -222,9 +166,7 @@ function ArticleTrafficCard({
     <Card size="sm">
       <CardHeader>
         <CardTitle>Most-read articles</CardTitle>
-        <CardDescription>
-          Views, with the verdicts they collected.
-        </CardDescription>
+        <CardDescription>Views and verdicts per article.</CardDescription>
       </CardHeader>
       <CardPanel className="pt-0">
         <ul className="divide-y">
@@ -236,7 +178,7 @@ function ArticleTrafficCard({
               <Link
                 className="hover:underline"
                 params={{ articleId: article.id, organizationId }}
-                to="/$organizationId/help-center/$articleId"
+                to="/$organizationId/help-center/article/$articleId"
               >
                 <span className="text-sm">{article.title}</span>
                 {article.status === "draft" ? (
@@ -266,11 +208,8 @@ function SearchGapsCard({
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Documentation gaps</CardTitle>
-        <CardDescription>
-          Searches that returned nothing. An article for one of these closes the
-          gap.
-        </CardDescription>
+        <CardTitle>Unanswered searches</CardTitle>
+        <CardDescription>Searches that returned nothing.</CardDescription>
       </CardHeader>
       <CardPanel className="pt-0">
         {emptyQueries.length === 0 ? (
@@ -308,9 +247,7 @@ function TopSearchesCard({
     <Card size="sm">
       <CardHeader>
         <CardTitle>Top searches</CardTitle>
-        <CardDescription>
-          What readers look for, most frequent first.
-        </CardDescription>
+        <CardDescription>What readers look for.</CardDescription>
       </CardHeader>
       <CardPanel className="pt-0">
         <ul className="flex flex-wrap gap-1.5">
@@ -331,27 +268,33 @@ function TopSearchesCard({
   );
 }
 
-function Stat({
-  detail,
-  label,
-  value,
-}: {
-  readonly detail: string;
-  readonly label: string;
-  readonly value: number;
-}) {
+function HelpCenterLoading() {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-xl" />
+        <Skeleton className="h-24 rounded-xl" />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Skeleton className="h-56 rounded-xl" />
+        <Skeleton className="h-56 rounded-xl" />
+      </div>
+    </>
+  );
+}
+
+function HelpCenterFailure({ onRetry }: { readonly onRetry: () => void }) {
   return (
     <Card size="sm">
-      <CardPanel className="flex flex-col gap-1">
-        <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-          {label}
-        </span>
-        <span className="text-2xl font-semibold tracking-tight tabular-nums">
-          {value.toLocaleString()}
-        </span>
-        <span className="text-muted-foreground text-xs text-pretty">
-          {detail}
-        </span>
+      <CardHeader>
+        <CardTitle>Help center insights could not be loaded</CardTitle>
+        <CardDescription>Try again to reload these numbers.</CardDescription>
+      </CardHeader>
+      <CardPanel>
+        <Button onClick={onRetry} size="sm" variant="outline">
+          Try again
+        </Button>
       </CardPanel>
     </Card>
   );

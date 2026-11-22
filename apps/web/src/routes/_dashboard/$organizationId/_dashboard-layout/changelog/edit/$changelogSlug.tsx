@@ -12,6 +12,7 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { EditorLayout } from "~/components/editor-layout";
 import { ChangelogCompletedPosts } from "~/features/changelog/components/changelog-completed-posts";
 import {
   ChangelogEditorBackLink,
@@ -29,7 +30,6 @@ import {
   ChangelogDeleteDialog,
   ChangelogMoveToDraftDialog,
 } from "~/features/changelog/components/changelog-editor-alert-dialogs";
-import { ChangelogEditor } from "~/features/changelog/components/changelog-editor-layout";
 import {
   ChangelogDeleteDialogProvider,
   ChangelogMoveToDraftDialogProvider,
@@ -154,11 +154,11 @@ function RouteComponent() {
       <ChangelogMoveToDraftDialogProvider>
         <ChangelogDeleteDialogProvider>
           <ChangelogEditorForm>
-            <ChangelogEditor>
-              <ChangelogEditor.Main>
-                <ChangelogEditor.Header className="items-center gap-3">
+            <EditorLayout>
+              <EditorLayout.Main>
+                <EditorLayout.Header className="items-center gap-3">
                   <ChangelogEditorBackLink />
-                </ChangelogEditor.Header>
+                </EditorLayout.Header>
 
                 <ChangelogEditorCoverImageField />
                 <ChangelogEditorTitleField />
@@ -167,14 +167,14 @@ function RouteComponent() {
                 <div className="flex justify-end pt-2">
                   <ChangelogEditorSubmitAction />
                 </div>
-              </ChangelogEditor.Main>
-              <ChangelogEditor.Sidebar>
+              </EditorLayout.Main>
+              <EditorLayout.Sidebar>
                 <ChangelogEditorSidebarActions />
                 <ChangelogEditorCategoryField />
-                <ChangelogEditor.SidebarSeparator />
+                <EditorLayout.SidebarSeparator />
                 <ChangelogEditorDetails />
-              </ChangelogEditor.Sidebar>
-            </ChangelogEditor>
+              </EditorLayout.Sidebar>
+            </EditorLayout>
           </ChangelogEditorForm>
           <ChangelogMoveToDraftDialog />
           <ChangelogDeleteDialog />
@@ -187,13 +187,13 @@ function RouteComponent() {
 function ChangelogEditorLoadingState() {
   return (
     <SkeletonLoader isLoading>
-      <ChangelogEditor>
-        <ChangelogEditor.Main>
-          <ChangelogEditor.Header className="items-center gap-3">
+      <EditorLayout>
+        <EditorLayout.Main>
+          <EditorLayout.Header className="items-center gap-3">
             <SkeletonWrapper>
               <div className="bg-background size-8 rounded-full border" />
             </SkeletonWrapper>
-          </ChangelogEditor.Header>
+          </EditorLayout.Header>
 
           <SkeletonWrapper>
             <div className="h-10 w-3/5 rounded-md" />
@@ -208,8 +208,8 @@ function ChangelogEditorLoadingState() {
               <Button type="button">Save</Button>
             </SkeletonWrapper>
           </div>
-        </ChangelogEditor.Main>
-        <ChangelogEditor.Sidebar>
+        </EditorLayout.Main>
+        <EditorLayout.Sidebar>
           <div className="flex items-center justify-end gap-2">
             <SkeletonWrapper>
               <div className="bg-background size-8 rounded-full border" />
@@ -230,8 +230,8 @@ function ChangelogEditorLoadingState() {
           <SkeletonWrapper>
             <div className="h-6 w-20 rounded-full" />
           </SkeletonWrapper>
-        </ChangelogEditor.Sidebar>
-      </ChangelogEditor>
+        </EditorLayout.Sidebar>
+      </EditorLayout>
     </SkeletonLoader>
   );
 }

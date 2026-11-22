@@ -11,24 +11,60 @@ import { Button } from "@feeblo/ui/button";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { toastManager } from "@feeblo/ui/toast";
 import { useState } from "react";
+import { z } from "zod";
 
-import { publishChangelogFormOpts } from "../shared-form";
+const publishSchema = z.object({
+  slug: z.string().trim().min(1, "A slug is required"),
+  publishedAt: z
+    .string()
+    .trim()
+    .min(1, "A published date is required")
+    .refine(
+      (value) => !Number.isNaN(new Date(value).getTime()),
+      "Enter a valid published date"
+    ),
+});
 
-export function ChangelogPublishDialog({
+const publishFormOptions = {
+  defaultValues: {
+    slug: "",
+    publishedAt: "",
+  },
+  validators: {
+    onSubmit: publishSchema,
+  },
+};
+
+/**
+ * The "publish this" dialog: the public slug and the publication date.
+ *
+ * Shared by the changelog and help center editors because the two publish
+ * operations ask the same two questions, and two dialogs would eventually
+ * disagree about one of the answers.
+ */
+export function PublishDialog({
   defaultPublishedAt,
   defaultSlug,
+  description,
+  failureTitle,
   onPublish,
-  triggerLabel = "Save",
+  submitLabel = "Save",
+  title,
+  triggerLabel = "Publish",
 }: {
   defaultPublishedAt: Date | null;
   defaultSlug: string;
+  description: string;
+  failureTitle: string;
   onPublish: (values: { publishedAt: Date; slug: string }) => Promise<void>;
+  submitLabel?: string;
+  title: string;
   triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
 
   const form = useAppForm({
-    ...publishChangelogFormOpts,
+    ...publishFormOptions,
     defaultValues: {
       slug: defaultSlug,
       publishedAt: toDatetimeLocalValue(defaultPublishedAt ?? new Date()),
@@ -42,34 +78,44 @@ export function ChangelogPublishDialog({
         form.reset();
         setOpen(false);
       } catch {
-        toastManager.add({
-          title: "Failed to publish changelog",
-          type: "error",
-        });
+        toastManager.add({ title: failureTitle, type: "error" });
       }
     },
   });
 
+  /**
+   * Reset before opening, not when the form is created.
+   *
+   * The dialog is mounted with its trigger, so its defaults were read at page
+   * load. An editor may have typed a title or picked a slug since; seeding the
+   * fields on open is what makes the dialog describe the row as it is now.
+   */
+  const openDialog = () => {
+    form.reset({
+      slug: defaultSlug,
+      publishedAt: toDatetimeLocalValue(defaultPublishedAt ?? new Date()),
+    });
+    setOpen(true);
+  };
+
   return (
     <>
-      <Button onClick={() => setOpen(true)} type="button" variant="brand">
+      <Button onClick={openDialog} type="button" variant="brand">
         {triggerLabel}
       </Button>
       <AlertDialog onOpenChange={setOpen} open={open}>
         <AlertDialogPopup className="max-w-md">
           <form
             className="contents"
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            onSubmit={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
               void form.handleSubmit();
             }}
           >
             <AlertDialogHeader>
-              <AlertDialogTitle>Save changelog</AlertDialogTitle>
-              <AlertDialogDescription>
-                Choose the public URL and publication date for this changelog.
-              </AlertDialogDescription>
+              <AlertDialogTitle>{title}</AlertDialogTitle>
+              <AlertDialogDescription>{description}</AlertDialogDescription>
             </AlertDialogHeader>
 
             <div className="space-y-4 px-6 pb-6">
@@ -96,7 +142,7 @@ export function ChangelogPublishDialog({
                 )}
               </form.Subscribe>
               <form.AppForm>
-                <form.SubscribeButton label="Save" />
+                <form.SubscribeButton label={submitLabel} />
               </form.AppForm>
             </AlertDialogFooter>
           </form>
