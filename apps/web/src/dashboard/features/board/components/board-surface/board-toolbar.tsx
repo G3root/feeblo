@@ -18,9 +18,15 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSelector } from "@xstate/store-react";
 
+import {
+  BOARD_GROUPING_OPTIONS,
+  boardGroupingLabel,
+  isBoardGroupBy,
+} from "../../lib/grouping";
 import type { MyFeedbackView } from "../../lib/my-feedback-views";
 import {
   type BoardOrderField,
+  useBoardGrouping,
   useBoardOrdering,
   useBoardStore,
 } from "../../state/board-store-context";
@@ -110,6 +116,10 @@ function DisplayPopOver() {
             <span className="text-muted-foreground text-sm">Order by</span>
             <OrderingControls />
           </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 py-1">
+            <span className="text-muted-foreground text-sm">Group by</span>
+            <GroupingControls />
+          </div>
         </div>
       </PopoverPopup>
     </Popover>
@@ -163,7 +173,7 @@ function OrderingControls() {
       >
         <SelectTrigger
           aria-label={`Order by: ${activeLabel}`}
-          className="w-30"
+          className="w-32"
           size="sm"
         >
           <SelectValue>
@@ -182,6 +192,45 @@ function OrderingControls() {
         </SelectPopup>
       </Select>
     </div>
+  );
+}
+
+function GroupingControls() {
+  const store = useBoardStore();
+  const grouping = useBoardGrouping();
+  const activeLabel = boardGroupingLabel(grouping.field);
+
+  return (
+    <Select
+      onValueChange={(value) => {
+        // Base UI reports a cleared select as `null`; grouping has no cleared
+        // state, so only a real field is forwarded.
+        if (value !== null && isBoardGroupBy(value)) {
+          store.send({ type: "setGroupBy", field: value });
+        }
+      }}
+      value={grouping.field}
+    >
+      <SelectTrigger
+        aria-label={`Group by: ${activeLabel}`}
+        className="w-32"
+        size="sm"
+      >
+        <SelectValue>
+          {(value: string) =>
+            BOARD_GROUPING_OPTIONS.find((option) => option.value === value)
+              ?.label ?? "Status"
+          }
+        </SelectValue>
+      </SelectTrigger>
+      <SelectPopup align="end">
+        {BOARD_GROUPING_OPTIONS.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectPopup>
+    </Select>
   );
 }
 
