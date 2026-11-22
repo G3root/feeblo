@@ -16,8 +16,9 @@ export const insightsReactivityKeys = (organizationId: string) => ({
 /**
  * The window the insights page opens on.
  *
- * Exported so the sidebar's intent prefetch mounts the exact atom the page
- * will read; warming a different range would be a request nobody reuses.
+ * Exported so the intent prefetches (the sidebar entry, the range options)
+ * mount the exact atom the page will read; warming a different range would be
+ * a request nobody reuses.
  */
 export const DEFAULT_INSIGHTS_RANGE = "30d" satisfies TInsightsRange;
 

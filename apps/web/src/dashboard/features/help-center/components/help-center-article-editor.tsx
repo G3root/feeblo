@@ -3,7 +3,6 @@ import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-cent
 import { targetStatesFor } from "@feeblo/domain/help-center-article/machine";
 import { HelpCenterArticleId } from "@feeblo/id";
 import { Button } from "@feeblo/ui/button";
-import { FieldDescription, FieldLabel } from "@feeblo/ui/field";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
@@ -283,13 +282,19 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
               Delete
             </Button>
           )}
-          <form.SubscribeButton
-            // The header is outside the `<form>`, so the button is associated
-            // by id rather than by nesting.
-            form={ARTICLE_FORM_ID}
-            label={props.mode === "create" ? "Create article" : "Save changes"}
-            variant="default"
-          />
+          {/* The header is outside the `<form>` element, so the button is
+              associated by id rather than by nesting. It still needs
+              `AppForm` for its own context: `SubscribeButton` reads the form
+              from there, not from the DOM. */}
+          <form.AppForm>
+            <form.SubscribeButton
+              form={ARTICLE_FORM_ID}
+              label={
+                props.mode === "create" ? "Create article" : "Save changes"
+              }
+              variant="default"
+            />
+          </form.AppForm>
         </div>
       </header>
 
@@ -315,22 +320,14 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
           </form.AppField>
 
           <form.AppField name="slug">
-            {(field) => {
-              const { TextField } = field;
-
-              return (
-                <>
-                  <TextField
-                    label="URL slug"
-                    maxLength={200}
-                    placeholder="reset-my-password"
-                  />
-                  <FieldDescription>
-                    Leave empty to derive it from the title.
-                  </FieldDescription>
-                </>
-              );
-            }}
+            {(field) => (
+              <field.TextField
+                description="Leave empty to derive it from the title."
+                label="URL slug"
+                maxLength={200}
+                placeholder="reset-my-password"
+              />
+            )}
           </form.AppField>
 
           <form.AppField name="topicId">
@@ -360,9 +357,9 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                   ))}
                 </div>
                 {topics.length === 0 ? (
-                  <FieldDescription>
+                  <p className="text-muted-foreground text-xs">
                     Create a section first — every article belongs to one.
-                  </FieldDescription>
+                  </p>
                 ) : null}
               </fieldset>
             )}
@@ -390,11 +387,11 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                     </button>
                   ))}
                 </div>
-                <FieldDescription>
+                <p className="text-muted-foreground text-xs">
                   Archived articles stay reachable so old links do not break,
                   but the portal marks them as out of date. Only the moves the
                   article&apos;s lifecycle allows are offered.
-                </FieldDescription>
+                </p>
               </fieldset>
             )}
           </form.AppField>

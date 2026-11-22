@@ -1,4 +1,3 @@
-import { useAtomMount } from "@effect/atom-react";
 import { TablerIcon } from "@feeblo/ui/icon-picker";
 import {
   Menu,
@@ -59,11 +58,8 @@ import {
   useDeleteBoardDialogContext,
   useRenameBoardDialogContext,
 } from "~/features/board/dialog-stores";
-import {
-  DEFAULT_INSIGHTS_RANGE,
-  workspaceInsightsAtom,
-  workspaceTrafficAtom,
-} from "~/features/insights/atoms";
+import { DEFAULT_INSIGHTS_RANGE } from "~/features/insights/atoms";
+import { InsightsPrefetch } from "~/features/insights/components/insights-prefetch";
 import { useOrgBoards } from "~/hooks/use-org-boards";
 import { useOrganizationId } from "~/hooks/use-organization-id";
 import { usePlan } from "~/hooks/use-plan";
@@ -477,35 +473,14 @@ function InsightsNav({ pathname }: { pathname: string }) {
           </Link>
         )}
       />
-      {prefetch ? <InsightsPrefetch organizationId={organizationId} /> : null}
+      {prefetch ? (
+        <InsightsPrefetch
+          organizationId={organizationId}
+          range={DEFAULT_INSIGHTS_RANGE}
+        />
+      ) : null}
     </SidebarMenuItem>
   );
-}
-
-/**
- * Mounts both insights reads without subscribing to either.
- *
- * The dashboard's link preloading only covers route code and collection
- * reads; these atoms are the page's two server round trips, so they are what
- * a hover has to start to make the navigation feel instant. The component
- * subscribes to nothing, so it cannot re-render the sidebar when a result
- * arrives.
- */
-function InsightsPrefetch({ organizationId }: { organizationId: string }) {
-  useAtomMount(
-    workspaceInsightsAtom({
-      organizationId,
-      range: DEFAULT_INSIGHTS_RANGE,
-    })
-  );
-  useAtomMount(
-    workspaceTrafficAtom({
-      organizationId,
-      range: DEFAULT_INSIGHTS_RANGE,
-    })
-  );
-
-  return null;
 }
 
 function RoadmapNav({ pathname }: { pathname: string }) {

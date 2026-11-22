@@ -33,6 +33,7 @@ import {
   workspaceInsightsAtom,
   workspaceTrafficAtom,
 } from "../atoms";
+import { InsightsPrefetch } from "./insights-prefetch";
 import {
   InsightsStat,
   InsightsUntouchedPosts,
@@ -55,6 +56,13 @@ const RANGE_LABELS = {
   "30d": "30 days",
   "90d": "90 days",
 } as const satisfies Record<TInsightsRange, string>;
+
+/** Narrowest first, matching the toggle's left-to-right order. */
+const RANGE_OPTIONS = [
+  "7d",
+  "30d",
+  "90d",
+] as const satisfies readonly TInsightsRange[];
 
 /** A duration as a coarse, readable span: "3h 12m", "2d 4h". */
 function formatDuration(seconds: number | null): string {
@@ -141,23 +149,11 @@ export function InsightsPage({
             How feedback is moving through this workspace.
           </p>
         </div>
-        <ToggleGroup
-          aria-label="Window"
-          onValueChange={(value) => {
-            const next = value[0];
-
-            if (next === "7d" || next === "30d" || next === "90d") {
-              setRange(next);
-            }
-          }}
-          size="sm"
-          value={[range]}
-          variant="outline"
-        >
-          <ToggleGroupItem value="7d">7 days</ToggleGroupItem>
-          <ToggleGroupItem value="30d">30 days</ToggleGroupItem>
-          <ToggleGroupItem value="90d">90 days</ToggleGroupItem>
-        </ToggleGroup>
+        <InsightsRangeToggle
+          onRangeChange={setRange}
+          organizationId={organizationId}
+          range={range}
+        />
       </header>
 
       {Result.builder(result)
@@ -173,6 +169,58 @@ export function InsightsPage({
         ))
         .exhaustive()}
     </div>
+  );
+}
+
+/**
+ * The window toggle, with a prefetch on intent.
+ *
+ * The page's two reads are keyed by window, so each option is a separate cache
+ * entry. Starting that entry's reads when the pointer or focus reaches the
+ * option means picking it joins an in-flight request; the prefetch is skipped
+ * for the window already on screen, which the page has mounted anyway.
+ */
+function InsightsRangeToggle({
+  onRangeChange,
+  organizationId,
+  range,
+}: {
+  readonly onRangeChange: (range: TInsightsRange) => void;
+  readonly organizationId: string;
+  readonly range: TInsightsRange;
+}) {
+  const [warmRange, setWarmRange] = React.useState<TInsightsRange | null>(null);
+
+  return (
+    <>
+      <ToggleGroup
+        aria-label="Window"
+        onValueChange={(value) => {
+          const next = value[0];
+
+          if (next === "7d" || next === "30d" || next === "90d") {
+            onRangeChange(next);
+          }
+        }}
+        size="sm"
+        value={[range]}
+        variant="outline"
+      >
+        {RANGE_OPTIONS.map((option) => (
+          <ToggleGroupItem
+            key={option}
+            onFocus={() => setWarmRange(option)}
+            onMouseEnter={() => setWarmRange(option)}
+            value={option}
+          >
+            {RANGE_LABELS[option]}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {warmRange === null || warmRange === range ? null : (
+        <InsightsPrefetch organizationId={organizationId} range={warmRange} />
+      )}
+    </>
   );
 }
 
