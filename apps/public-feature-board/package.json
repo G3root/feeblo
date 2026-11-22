@@ -28,6 +28,10 @@
       "types": "./src/i18n.ts",
       "default": "./src/i18n.ts"
     },
+    "./home-preview": {
+      "types": "./src/features/home/home-preview.tsx",
+      "default": "./src/features/home/home-preview.tsx"
+    },
     "./pages/board": {
       "types": "./src/pages/board-page.tsx",
       "default": "./src/pages/board-page.tsx"
