@@ -2,9 +2,9 @@
   "type": "diff",
   "version": "9",
   "dialect": "postgres",
-  "id": "074233e5-4855-4705-89c9-a2e7f0c9c839",
+  "id": "2a152b1a-bf45-4024-a1cd-4305627f1b89",
   "prevIds": [
-    "632b8067-586f-47c4-ae47-a6a6da76e37c"
+    "4e1f4cd9-0ecc-47e1-bf8b-143d2a630181"
   ],
   "footprints": [
     {
@@ -23,6 +23,24 @@
         "n|rel|public.help_center_article_asset_pkey"
       ],
       "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "help_center_article",
+        "cover_image"
+      ],
+      "writes": [
+        "s|col|public.help_center_article.cover_image",
+        "n|col|public.help_center_article.cover_image",
+        "e|col|public.help_center_article.cover_image"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article",
         "n|sch|public"
       ]
     },
@@ -101,6 +119,22 @@
         "name": "help_center_article_asset",
         "isRlsEnabled": false,
         "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article",
+        "name": "cover_image",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
       }
     },
     {

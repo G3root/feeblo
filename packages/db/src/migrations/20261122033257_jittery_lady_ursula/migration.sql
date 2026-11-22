@@ -1,1 +1,0 @@
-ALTER TABLE "help_center_article" ADD COLUMN "cover_image" text;

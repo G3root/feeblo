@@ -4,6 +4,7 @@ CREATE TABLE "help_center_article_asset" (
 	CONSTRAINT "help_center_article_asset_pkey" PRIMARY KEY("article_id","asset_id")
 );
 --> statement-breakpoint
+ALTER TABLE "help_center_article" ADD COLUMN "cover_image" text;--> statement-breakpoint
 CREATE INDEX "help_center_article_asset_assetId_idx" ON "help_center_article_asset" ("asset_id");--> statement-breakpoint
 ALTER TABLE "help_center_article_asset" ADD CONSTRAINT "help_center_article_asset_XmWukhrMT5DN_fkey" FOREIGN KEY ("article_id") REFERENCES "help_center_article"("id") ON DELETE CASCADE;--> statement-breakpoint
 ALTER TABLE "help_center_article_asset" ADD CONSTRAINT "help_center_article_asset_asset_id_asset_id_fkey" FOREIGN KEY ("asset_id") REFERENCES "asset"("id") ON DELETE CASCADE;--> statement-breakpoint
