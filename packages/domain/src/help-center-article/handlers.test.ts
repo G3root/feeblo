@@ -682,6 +682,84 @@ describe("HelpCenterArticleRpcHandlers", () => {
       })
     );
 
+    it.effect("records image URLs whose asset ids were not submitted", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const assetId = "asset_referenced_by_url";
+
+        const assetUrl = "https://assets.example/editor-media/by-url.png";
+
+        yield* db.insert(schema.assetTable).values({
+          id: assetId,
+          bucket: "test-bucket",
+          key: "editor-media/org/by-url.png",
+          url: assetUrl,
+          kind: "editor_image",
+          organizationId: fixture.organizationId,
+        });
+
+        const readReferences = (articleId: string) =>
+          Effect.gen(function* () {
+            const references = yield* db
+              .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+              .from(schema.helpCenterArticleAssetTable)
+              .where(
+                eq(schema.helpCenterArticleAssetTable.articleId, articleId)
+              );
+
+            return references.map(({ assetId: referencedId }) => referencedId);
+          });
+
+        // A create: the caller wrote Markdown with the URL and sent no ids.
+        const createdId = yield* HelpCenterArticleId.generate;
+
+        yield* handlers
+          .CreateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
+            content: `![image](${assetUrl})`,
+            id: createdId,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "created-by-url",
+            status: "draft",
+            title: "Created by URL",
+            topicId: fixture.topicId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        expect(yield* readReferences(createdId)).toEqual([assetId]);
+
+        // An update: the editor was reopened from content that names the URL.
+        const updatedId = yield* HelpCenterArticleId.generate;
+
+        yield* create(fixture, updatedId, "Updated by URL");
+
+        yield* handlers
+          .UpdateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
+            content: `![image](${assetUrl})`,
+            expectedStatus: "published",
+            id: updatedId,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "updated-by-url",
+            status: "published",
+            title: "Updated by URL",
+            topicId: fixture.topicId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        expect(yield* readReferences(updatedId)).toEqual([assetId]);
+      })
+    );
+
     it.effect("refuses a create naming another workspace's section", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleRpcHandlersEffect;

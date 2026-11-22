@@ -1,6 +1,33 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { isTemporaryEditorMediaKey, objectCacheControl } from "./s3";
+import {
+  isTemporaryEditorMediaKey,
+  objectCacheControl,
+  promotedEditorKey,
+} from "./s3";
+
+describe("promotedEditorKey", () => {
+  const sourceKey = "tmp/editor-media/user_1/image/1-a.png";
+
+  it("drops the temporary prefix and keeps the extension", () => {
+    expect(promotedEditorKey(sourceKey, "ast_first")).toBe(
+      "editor-media/user_1/image/1-a-ast_first.png"
+    );
+  });
+
+  it("keeps no-extension keys usable", () => {
+    expect(
+      promotedEditorKey("tmp/editor-media/user_1/image/recording", "ast_x")
+    ).toBe("editor-media/user_1/image/recording-ast_x");
+  });
+
+  it("gives each promotion attempt its own object", () => {
+    // A failed save rolls its copy back; the winner's key must be untouched.
+    expect(promotedEditorKey(sourceKey, "ast_first")).not.toBe(
+      promotedEditorKey(sourceKey, "ast_second")
+    );
+  });
+});
 
 describe("isTemporaryEditorMediaKey", () => {
   it("matches the temporary prefix and nothing else", () => {

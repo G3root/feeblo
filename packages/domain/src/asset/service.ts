@@ -253,19 +253,23 @@ const findCurrentEditorAssetsInContent = ({
     return assets.filter(({ url }) => content.includes(url));
   });
 
-const findEditorAssetsByUrl = ({
+const findEditorAssetsByUrls = ({
   organizationId,
   userId,
-  url,
+  urls,
 }: {
   readonly organizationId: string;
   readonly userId?: string;
-  readonly url: string;
+  readonly urls: readonly string[];
 }) =>
   Effect.gen(function* () {
+    if (urls.length === 0) {
+      return [];
+    }
+
     const db = yield* currentDb;
 
-    const assets = yield* db
+    return yield* db
       .select({
         id: schema.assetTable.id,
         bucket: schema.assetTable.bucket,
@@ -282,12 +286,45 @@ const findEditorAssetsByUrl = ({
               )
             : eq(schema.assetTable.organizationId, organizationId),
           inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
-          eq(schema.assetTable.url, url)
+          inArray(schema.assetTable.url, urls)
         )
       );
-
-    return assets.slice(0, 1);
   });
+
+const findEditorAssetsByUrl = ({
+  organizationId,
+  userId,
+  url,
+}: {
+  readonly organizationId: string;
+  readonly userId?: string;
+  readonly url: string;
+}) =>
+  findEditorAssetsByUrls({
+    organizationId,
+    ...(userId && { userId }),
+    urls: [url],
+  }).pipe(Effect.map((assets) => assets.slice(0, 1)));
+
+/**
+ * The `http(s)` URLs a Markdown editor document contains.
+ *
+ * An editor asset can reach a document without its id travelling with the
+ * write: an API caller writes Markdown with the URL, or the editor is reopened
+ * from content that already names it. The exact lookup over the asset table is
+ * what decides whether a candidate is an editor asset, so this scan is
+ * deliberately generous rather than a Markdown parser; trailing sentence
+ * punctuation is dropped so a bare URL next to prose still matches.
+ */
+const CONTENT_URL_PATTERN = /https?:\/\/[^\s"'<>)]+/giu;
+
+const editorAssetUrlsInContent = (content: string) => [
+  ...new Set(
+    [...content.matchAll(CONTENT_URL_PATTERN)].map(([url]) =>
+      url.replace(/[.,;:!?]+$/u, "")
+    )
+  ),
+];
 
 export const prepareEditorAssetContent = ({
   organizationId,
@@ -322,6 +359,18 @@ export const prepareEditorAssetContent = ({
       };
     }
 
+    /**
+     * The suffix that makes this attempt's permanent keys its own.
+     *
+     * Promotion copies happen before the caller's transaction, so a lock held
+     * by a promotion commit cannot cover them. Two saves promoting the same
+     * temporary upload therefore get distinct objects, and one failing can
+     * only ever roll back the object it copied — never the one the other
+     * save's committed row names. The generation is the same one every other
+     * row id uses, so it needs no service of its own.
+     */
+    const promotionId = yield* AssetId.generate;
+
     const s3 = yield* S3UploadService;
     const completedPromotions: PromotedEditorAsset[] = [];
 
@@ -333,23 +382,29 @@ export const prepareEditorAssetContent = ({
     const promotionExits = yield* Effect.forEach(
       temporaryAssets,
       (asset) =>
-        s3.promoteEditorMedia({ bucket: asset.bucket, key: asset.key }).pipe(
-          Effect.map((permanentObject) => {
-            const promotion = {
-              asset,
-              temporaryObject: { bucket: asset.bucket, key: asset.key },
-              permanentObject,
-            };
+        s3
+          .promoteEditorMedia({
+            bucket: asset.bucket,
+            key: asset.key,
+            promotionId,
+          })
+          .pipe(
+            Effect.map((permanentObject) => {
+              const promotion = {
+                asset,
+                temporaryObject: { bucket: asset.bucket, key: asset.key },
+                permanentObject,
+              };
 
-            // Recorded in the continuation, not in a later `tap`: the copy has
-            // landed by the time this runs, and an interruption before the next
-            // step must not hide that object from the rollback.
-            completedPromotions.push(promotion);
+              // Recorded in the continuation, not in a later `tap`: the copy has
+              // landed by the time this runs, and an interruption before the next
+              // step must not hide that object from the rollback.
+              completedPromotions.push(promotion);
 
-            return promotion;
-          }),
-          Effect.exit
-        ),
+              return promotion;
+            }),
+            Effect.exit
+          ),
       { concurrency: EDITOR_ASSET_IO_CONCURRENCY }
     ).pipe(
       // The loop cannot fail — every copy's exit is captured — so this is the
@@ -735,6 +790,16 @@ export const syncHelpCenterArticleAssetReferences = ({
       assetIds,
     });
 
+    // The content can name an editor asset the request did not submit an id
+    // for, so resolve its URL to the row that owns it. Without this the write
+    // stores a URL with no reference, and the orphan sweep later deletes the
+    // image out from under the article.
+    const contentAssets = yield* findEditorAssetsByUrls({
+      organizationId,
+      ...(userId && { userId }),
+      urls: editorAssetUrlsInContent(content),
+    });
+
     const coverAssets =
       coverImageUrl === undefined || coverImageUrl === null
         ? []
@@ -748,6 +813,12 @@ export const syncHelpCenterArticleAssetReferences = ({
 
     for (const asset of currentAssets) {
       assetsById.set(asset.id, asset);
+    }
+
+    for (const asset of contentAssets) {
+      if (!assetsById.has(asset.id)) {
+        assetsById.set(asset.id, asset);
+      }
     }
 
     for (const asset of coverAssets) {
@@ -892,12 +963,11 @@ export const commitPreparedEditorAssets = (
 /**
  * Whether a promotion's permanent object is still named by a committed row.
  *
- * The permanent key is derived from the temporary one, so two saves that
- * promote the same upload copy to the same object. When one of them then
- * fails, its rollback must not delete the object the other one's committed
- * asset row now points at — including the article, post or changelog that row
- * was written for, since a content write moves its asset row in the same
- * transaction. The row is therefore the authority, not this attempt's copy.
+ * Each attempt copies to its own permanent key, so a failed attempt's object
+ * is normally unreferenced and this answers `false`. The check stays as the
+ * invariant independent of how the key is chosen: nothing may delete an
+ * object an asset row — and therefore the article, post or changelog written
+ * with it — still names.
  *
  * A lookup that cannot run keeps the object: rollback is best-effort cleanup
  * on an error path, and deleting on an unknown is the failure this guard
@@ -933,6 +1003,16 @@ const isPromotedObjectReferenced = (
     )
   );
 
+/**
+ * Remove the copies a failed save made, and only those.
+ *
+ * A lock shared with the promotion commit cannot make this atomic: the copy
+ * happens before the caller's transaction, so the lock would cover neither
+ * the copy nor another attempt's. The distinct permanent key does the work
+ * instead — the object this attempt copied cannot be one a concurrent save
+ * commits — and the row check below keeps the stronger invariant if that key
+ * policy ever changes.
+ */
 export const rollbackPreparedEditorAssets = (
   promotions: readonly PromotedEditorAsset[]
 ) =>
