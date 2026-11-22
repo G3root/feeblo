@@ -351,6 +351,25 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     });
   }
 
+  /**
+   * Publish through the dialog, failing loudly.
+   *
+   * The form's `onSubmit` catches a refused write so it can render the
+   * server's message; that also makes `handleSubmit` resolve, which the dialog
+   * reads as success and answers by closing and discarding the slug and date
+   * it was given. Publishing therefore calls the submit path directly and
+   * rethrows, so a refused publication leaves the dialog open on the values the
+   * editor entered.
+   */
+  const publish = async (overrides: { publishedAt: Date; slug: string }) => {
+    try {
+      await submit(form.state.values, { ...overrides, status: "published" });
+    } catch (cause) {
+      setSubmitError(parseRpcError(cause).message);
+      throw cause;
+    }
+  };
+
   const remove = async () => {
     if (article === undefined) {
       return;
@@ -516,15 +535,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                         }
                         description="Choose the public URL and publication date for this article."
                         failureTitle="Failed to publish article"
-                        onPublish={({ publishedAt, slug }) =>
-                          form.handleSubmit({
-                            overrides: {
-                              publishedAt,
-                              slug,
-                              status: "published",
-                            },
-                          })
-                        }
+                        onPublish={publish}
                         submitLabel="Publish"
                         title="Publish article"
                       />

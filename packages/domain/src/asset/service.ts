@@ -253,6 +253,42 @@ const findCurrentEditorAssetsInContent = ({
     return assets.filter(({ url }) => content.includes(url));
   });
 
+const findEditorAssetsByUrl = ({
+  organizationId,
+  userId,
+  url,
+}: {
+  readonly organizationId: string;
+  readonly userId?: string;
+  readonly url: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+
+    const assets = yield* db
+      .select({
+        id: schema.assetTable.id,
+        bucket: schema.assetTable.bucket,
+        key: schema.assetTable.key,
+        url: schema.assetTable.url,
+      })
+      .from(schema.assetTable)
+      .where(
+        and(
+          userId
+            ? or(
+                eq(schema.assetTable.organizationId, organizationId),
+                eq(schema.assetTable.userId, userId)
+              )
+            : eq(schema.assetTable.organizationId, organizationId),
+          inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
+          eq(schema.assetTable.url, url)
+        )
+      );
+
+    return assets.slice(0, 1);
+  });
+
 export const prepareEditorAssetContent = ({
   organizationId,
   userId,
@@ -501,6 +537,38 @@ const syncChangelogReferences = ({
     });
   });
 
+const syncHelpCenterArticleReferences = ({
+  articleId,
+  assets,
+}: {
+  readonly articleId: string;
+  readonly assets: readonly EditorAsset[];
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+    yield* syncReferences({
+      assets,
+      findCurrent: db
+        .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+        .from(schema.helpCenterArticleAssetTable)
+        .where(eq(schema.helpCenterArticleAssetTable.articleId, articleId)),
+      deleteStale: (assetIds) =>
+        db
+          .delete(schema.helpCenterArticleAssetTable)
+          .where(
+            and(
+              eq(schema.helpCenterArticleAssetTable.articleId, articleId),
+              inArray(schema.helpCenterArticleAssetTable.assetId, assetIds)
+            )
+          ),
+      insertNew: (assetIds) =>
+        db
+          .insert(schema.helpCenterArticleAssetTable)
+          .values(assetIds.map((assetId) => ({ articleId, assetId })))
+          .onConflictDoNothing(),
+    });
+  });
+
 export const syncPostAssetReferences = ({
   postId,
   organizationId,
@@ -596,26 +664,11 @@ export const syncChangelogAssetReferences = ({
     const coverAssets =
       coverImageUrl === undefined || coverImageUrl === null
         ? []
-        : (yield* db
-            .select({
-              id: schema.assetTable.id,
-              bucket: schema.assetTable.bucket,
-              key: schema.assetTable.key,
-              url: schema.assetTable.url,
-            })
-            .from(schema.assetTable)
-            .where(
-              and(
-                userId
-                  ? or(
-                      eq(schema.assetTable.organizationId, organizationId),
-                      eq(schema.assetTable.userId, userId)
-                    )
-                  : eq(schema.assetTable.organizationId, organizationId),
-                inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
-                eq(schema.assetTable.url, coverImageUrl)
-              )
-            )).slice(0, 1);
+        : yield* findEditorAssetsByUrl({
+            organizationId,
+            ...(userId && { userId }),
+            url: coverImageUrl,
+          });
 
     const assetsById = new Map<string, EditorAsset>();
 
@@ -641,7 +694,81 @@ export const syncChangelogAssetReferences = ({
     });
   });
 
-const unreferencedByPostOrChangelog = (db: PgDrizzle.EffectPgDatabase) =>
+export const syncHelpCenterArticleAssetReferences = ({
+  articleId,
+  organizationId,
+  userId,
+  content,
+  assetIds,
+  coverImageUrl,
+}: {
+  readonly articleId: string;
+  readonly organizationId: string;
+  readonly userId?: string;
+  readonly content: string;
+  readonly assetIds: readonly string[];
+  /**
+   * URL of the article cover image. Like the changelog cover, it lives in its
+   * own column rather than the body, so it needs its own reference or the
+   * orphan cleanup would delete the promoted object.
+   */
+  readonly coverImageUrl?: string | null;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+
+    const current = yield* db
+      .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+      .from(schema.helpCenterArticleAssetTable)
+      .where(eq(schema.helpCenterArticleAssetTable.articleId, articleId));
+
+    const currentAssets = yield* findCurrentEditorAssetsInContent({
+      organizationId,
+      ...(userId && { userId }),
+      content,
+      currentAssetIds: current.map(({ assetId }) => assetId),
+    });
+
+    const submittedAssets = yield* findEditorAssetsByIds({
+      organizationId,
+      ...(userId && { userId }),
+      assetIds,
+    });
+
+    const coverAssets =
+      coverImageUrl === undefined || coverImageUrl === null
+        ? []
+        : yield* findEditorAssetsByUrl({
+            organizationId,
+            ...(userId && { userId }),
+            url: coverImageUrl,
+          });
+
+    const assetsById = new Map<string, EditorAsset>();
+
+    for (const asset of currentAssets) {
+      assetsById.set(asset.id, asset);
+    }
+
+    for (const asset of coverAssets) {
+      if (!assetsById.has(asset.id)) {
+        assetsById.set(asset.id, asset);
+      }
+    }
+
+    for (const asset of submittedAssets) {
+      if (!assetsById.has(asset.id) && content.includes(asset.url)) {
+        assetsById.set(asset.id, asset);
+      }
+    }
+
+    yield* syncHelpCenterArticleReferences({
+      articleId,
+      assets: [...assetsById.values()],
+    });
+  });
+
+const unreferencedByContent = (db: PgDrizzle.EffectPgDatabase) =>
   and(
     notExists(
       db
@@ -654,6 +781,14 @@ const unreferencedByPostOrChangelog = (db: PgDrizzle.EffectPgDatabase) =>
         .select({ assetId: schema.changelogAssetTable.assetId })
         .from(schema.changelogAssetTable)
         .where(eq(schema.changelogAssetTable.assetId, schema.assetTable.id))
+    ),
+    notExists(
+      db
+        .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+        .from(schema.helpCenterArticleAssetTable)
+        .where(
+          eq(schema.helpCenterArticleAssetTable.assetId, schema.assetTable.id)
+        )
     )
   );
 
@@ -692,7 +827,7 @@ export const cleanupOrphanedEditorAssets = ({
               eq(schema.assetTable.organizationId, organizationId),
               inArray(schema.assetTable.kind, EDITOR_ASSET_KINDS),
               lt(schema.assetTable.createdAt, createdBefore),
-              unreferencedByPostOrChangelog(db)
+              unreferencedByContent(db)
             )
           )
           .for("update", { skipLocked: true });
@@ -714,7 +849,7 @@ export const cleanupOrphanedEditorAssets = ({
                 schema.assetTable.id,
                 candidates.map(({ id }) => id)
               ),
-              unreferencedByPostOrChangelog(db)
+              unreferencedByContent(db)
             )
           );
 
@@ -754,15 +889,65 @@ export const commitPreparedEditorAssets = (
   promotions: readonly PromotedEditorAsset[]
 ) => commitEditorAssetPromotions(promotions);
 
+/**
+ * Whether a promotion's permanent object is still named by a committed row.
+ *
+ * The permanent key is derived from the temporary one, so two saves that
+ * promote the same upload copy to the same object. When one of them then
+ * fails, its rollback must not delete the object the other one's committed
+ * asset row now points at — including the article, post or changelog that row
+ * was written for, since a content write moves its asset row in the same
+ * transaction. The row is therefore the authority, not this attempt's copy.
+ *
+ * A lookup that cannot run keeps the object: rollback is best-effort cleanup
+ * on an error path, and deleting on an unknown is the failure this guard
+ * exists to prevent.
+ */
+const isPromotedObjectReferenced = (
+  object: Pick<UploadedAsset, "bucket" | "key">
+) =>
+  Effect.gen(function* () {
+    const db = yield* currentDb;
+
+    const [row] = yield* db
+      .select({ id: schema.assetTable.id })
+      .from(schema.assetTable)
+      .where(
+        and(
+          eq(schema.assetTable.bucket, object.bucket),
+          eq(schema.assetTable.key, object.key)
+        )
+      )
+      .limit(1);
+
+    return row !== undefined;
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning(
+        "Failed to check whether a failed editor asset promotion is referenced",
+        cause
+      ).pipe(
+        Effect.annotateLogs({ bucket: object.bucket, key: object.key }),
+        Effect.as(true)
+      )
+    )
+  );
+
 export const rollbackPreparedEditorAssets = (
   promotions: readonly PromotedEditorAsset[]
 ) =>
   Effect.forEach(
     promotions,
     ({ permanentObject }) =>
-      deleteObjectBestEffort(
-        permanentObject,
-        "Failed to remove a failed editor asset promotion"
-      ),
+      Effect.gen(function* () {
+        if (yield* isPromotedObjectReferenced(permanentObject)) {
+          return;
+        }
+
+        yield* deleteObjectBestEffort(
+          permanentObject,
+          "Failed to remove a failed editor asset promotion"
+        );
+      }),
     { concurrency: EDITOR_ASSET_IO_CONCURRENCY, discard: true }
   );

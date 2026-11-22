@@ -29,7 +29,6 @@ import * as Result from "effect/reactivity/AsyncResult";
 import * as React from "react";
 
 import {
-  DEFAULT_INSIGHTS_RANGE,
   type InsightsAtomArgs,
   type InsightsSummary,
   type WorkspaceInsights,
@@ -119,25 +118,26 @@ function plural(count: number, singular: string): string {
  *
  * Feedback and help center traffic answer different questions and are collected
  * by different operations, so they get a tab each rather than sharing one range
- * of cards. The window is held here so switching tabs keeps it.
+ * of cards. The window is the route's search param (`insights/search.ts`),
+ * which is what lets it outlive the remount a tab switch causes.
  */
 export function InsightsPage({
+  onRangeChange,
   organizationId,
+  range,
   tab,
 }: {
+  readonly onRangeChange: (range: TInsightsRange) => void;
   readonly organizationId: string;
+  readonly range: TInsightsRange;
   readonly tab: InsightsTab;
 }) {
-  const [range, setRange] = React.useState<TInsightsRange>(
-    DEFAULT_INSIGHTS_RANGE
-  );
-
   const helpCenterEnabled = useFeatureFlag("HELP_CENTER");
 
   return (
     <div className="mx-auto w-full">
       <InsightsToolbar
-        onRangeChange={setRange}
+        onRangeChange={onRangeChange}
         organizationId={organizationId}
         range={range}
         tab={tab}
@@ -166,8 +166,9 @@ export function InsightsPage({
  *
  * The tabs are links because each one is a route, which is what makes the
  * section bookmarkable and what keeps the range toggle from resetting the page
- * it applies to. The styling is the changelog toolbar's, so the two lists read
- * as the same control.
+ * it applies to. Each link carries the current window, so a tab switch keeps
+ * the range the reader chose. The styling is the changelog toolbar's, so the
+ * two lists read as the same control.
  */
 function InsightsToolbar({
   onRangeChange,
@@ -190,6 +191,7 @@ function InsightsToolbar({
           activeProps={{ "data-pressed": "true" }}
           className={toggleVariants({ size: "sm", variant: "outline" })}
           params={{ organizationId }}
+          search={{ range }}
           to="/$organizationId/insights"
         >
           Feedback
@@ -200,6 +202,7 @@ function InsightsToolbar({
             activeProps={{ "data-pressed": "true" }}
             className={toggleVariants({ size: "sm", variant: "outline" })}
             params={{ organizationId }}
+            search={{ range }}
             to="/$organizationId/insights/help-center"
           >
             Help center

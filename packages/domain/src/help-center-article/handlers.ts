@@ -10,6 +10,7 @@ import {
   commitPreparedEditorAssets,
   prepareEditorAssetContent,
   rollbackPreparedEditorAssets,
+  syncHelpCenterArticleAssetReferences,
 } from "../asset/service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
@@ -210,8 +211,8 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         // Promote the images this save references out of the temporary prefix
         // before the row stores their URLs. A promotion is an object copy, so
         // it has to be undone when the write below fails: `rollback` deletes
-        // the permanent copies, and `cleanup` removes the temporary ones on
-        // either path.
+        // the permanent copies, while the temporary originals survive so the
+        // editor's next attempt can promote them again.
         const prepared = yield* prepareEditorAssetContent({
           organizationId: args.organizationId,
           userId: session.session.userId,
@@ -235,12 +236,26 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
             });
 
             yield* commitPreparedEditorAssets(prepared.promotions);
+            // Record what the row references before the transaction commits:
+            // the orphan sweep keeps an asset alive through these rows, just
+            // as a post and a changelog record theirs.
+            yield* syncHelpCenterArticleAssetReferences({
+              articleId: args.id,
+              organizationId: args.organizationId,
+              userId: session.session.userId,
+              content: prepared.content,
+              assetIds: args.assetIds,
+              coverImageUrl: prepared.coverImage,
+            });
           })
         ).pipe(
           Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
           ),
-          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+          // Only a committed article makes its temporary originals disposable.
+          // Removing them on a failed write would leave the editor's retry
+          // pointing at objects that no longer exist.
+          Effect.tap(() => cleanupPreparedEditorAssets(prepared.promotions))
         );
 
         yield* scheduleEmbedding({
@@ -336,12 +351,25 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
             }
 
             yield* commitPreparedEditorAssets(prepared.promotions);
+            // The reference rows are what keeps the orphan sweep from
+            // deleting a promoted image once it is an hour old; they move in
+            // the same transaction as the content that names their URLs.
+            yield* syncHelpCenterArticleAssetReferences({
+              articleId: args.id,
+              organizationId: args.organizationId,
+              userId: session.session.userId,
+              content: prepared.content,
+              assetIds: args.assetIds,
+              coverImageUrl: prepared.coverImage,
+            });
           })
         ).pipe(
           Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
           ),
-          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+          // A refused update — a slug conflict, a stale status — keeps the
+          // temporary originals so the editor can retry the same upload.
+          Effect.tap(() => cleanupPreparedEditorAssets(prepared.promotions))
         );
 
         yield* scheduleEmbedding({

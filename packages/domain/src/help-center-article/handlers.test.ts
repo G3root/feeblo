@@ -370,12 +370,22 @@ describe("HelpCenterArticleRpcHandlers", () => {
           .from(schema.assetTable)
           .orderBy(schema.assetTable.id);
 
+        const references = yield* db
+          .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+          .from(schema.helpCenterArticleAssetTable)
+          .where(eq(schema.helpCenterArticleAssetTable.articleId, id));
+
         expect(article?.content).toContain(permanentUrl);
         expect(article?.coverImage).toBe(coverPermanentUrl);
         expect(assets).toEqual([
           { key: "editor-media/org/cover.png", url: coverPermanentUrl },
           { key: "editor-media/org/image.png", url: permanentUrl },
         ]);
+        // The orphan sweep keeps an asset by these rows, so a body image and a
+        // cover are both recorded even though only the body names its URL.
+        expect(references.map(({ assetId }) => assetId).sort()).toEqual(
+          [assetId, coverAssetId].sort()
+        );
         expect(
           (yield* Ref.get(promotions)).toSorted((left, right) =>
             left.key.localeCompare(right.key)
@@ -408,6 +418,267 @@ describe("HelpCenterArticleRpcHandlers", () => {
         );
 
         expect(error._tag).toBe("HelpCenterArticleSlugTakenError");
+      })
+    );
+
+    it.effect(
+      "keeps the temporary upload when a refused save rolls back its promotion",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const id = yield* HelpCenterArticleId.generate;
+          const assetId = `asset_${id}`;
+          const temporaryKey = "tmp/editor-media/org/retry.png";
+
+          const temporaryUrl =
+            "https://assets.example/tmp/editor-media/retry.png";
+
+          const permanentKey = "editor-media/org/retry.png";
+
+          const permanentUrl = "https://assets.example/editor-media/retry.png";
+
+          const deletedKeys = yield* Ref.make<string[]>([]);
+
+          yield* create(
+            fixture,
+            yield* HelpCenterArticleId.generate,
+            "First",
+            "shared"
+          );
+
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: "test-bucket",
+            key: temporaryKey,
+            url: temporaryUrl,
+            kind: "editor_image",
+            organizationId: fixture.organizationId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateHelpCenterArticle({
+                assetIds: [assetId],
+                coverImage: null,
+                content: `![retry](${temporaryUrl})`,
+                id,
+                organizationId: fixture.organizationId,
+                position: null,
+                publishedAt: null,
+                slug: "shared",
+                status: "draft",
+                title: "Second",
+                topicId: fixture.topicId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, session),
+                Effect.provideService(S3UploadService, {
+                  uploadProfileImage: () => Effect.die("not used in this test"),
+                  uploadOrganizationLogo: () =>
+                    Effect.die("not used in this test"),
+                  uploadEditorMedia: () => Effect.die("not used in this test"),
+                  promoteEditorMedia: ({ bucket }) =>
+                    Effect.succeed({
+                      bucket,
+                      key: permanentKey,
+                      url: permanentUrl,
+                    }),
+                  deleteObject: (_bucket, key) =>
+                    Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
+                      Effect.as({ $metadata: { httpStatusCode: 204 } })
+                    ),
+                })
+              )
+          );
+
+          expect(error._tag).toBe("HelpCenterArticleSlugTakenError");
+
+          const [asset] = yield* db
+            .select({ key: schema.assetTable.key })
+            .from(schema.assetTable)
+            .where(eq(schema.assetTable.id, assetId));
+
+          // The permanent copy of the failed write is rolled back, but the
+          // temporary original is the retry's only source and must survive it.
+          expect(yield* Ref.get(deletedKeys)).toEqual([permanentKey]);
+          expect(asset).toEqual({ key: temporaryKey });
+        })
+    );
+
+    it.effect(
+      "keeps the temporary upload when a status conflict refuses an update",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const id = yield* HelpCenterArticleId.generate;
+          const assetId = `asset_${id}`;
+
+          const temporaryKey = "tmp/editor-media/org/conflict.png";
+
+          const temporaryUrl =
+            "https://assets.example/tmp/editor-media/conflict.png";
+
+          const permanentKey = "editor-media/org/conflict.png";
+
+          const permanentUrl =
+            "https://assets.example/editor-media/conflict.png";
+
+          const deletedKeys = yield* Ref.make<string[]>([]);
+
+          yield* create(fixture, id, "Conflict");
+
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: "test-bucket",
+            key: temporaryKey,
+            url: temporaryUrl,
+            kind: "editor_image",
+            organizationId: fixture.organizationId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdateHelpCenterArticle({
+                assetIds: [assetId],
+                coverImage: null,
+                content: `![image](${temporaryUrl})`,
+                // The row is published, so this editor's draft assumption is
+                // the stale-status conflict the guard refuses.
+                expectedStatus: "draft",
+                id,
+                organizationId: fixture.organizationId,
+                position: null,
+                publishedAt: null,
+                slug: "conflict",
+                status: "published",
+                title: "Conflict",
+                topicId: fixture.topicId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, session),
+                Effect.provideService(S3UploadService, {
+                  uploadProfileImage: () => Effect.die("not used in this test"),
+                  uploadOrganizationLogo: () =>
+                    Effect.die("not used in this test"),
+                  uploadEditorMedia: () => Effect.die("not used in this test"),
+                  promoteEditorMedia: ({ bucket }) =>
+                    Effect.succeed({
+                      bucket,
+                      key: permanentKey,
+                      url: permanentUrl,
+                    }),
+                  deleteObject: (_bucket, key) =>
+                    Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
+                      Effect.as({ $metadata: { httpStatusCode: 204 } })
+                    ),
+                })
+              )
+          );
+
+          expect(error._tag).toBe("HelpCenterArticleChangedError");
+
+          const [asset] = yield* db
+            .select({ key: schema.assetTable.key })
+            .from(schema.assetTable)
+            .where(eq(schema.assetTable.id, assetId));
+
+          expect(yield* Ref.get(deletedKeys)).toEqual([permanentKey]);
+          expect(asset).toEqual({ key: temporaryKey });
+        })
+    );
+
+    it.effect("records and prunes the images an update references", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const id = yield* HelpCenterArticleId.generate;
+        const assetId = `asset_${id}`;
+
+        const temporaryUrl =
+          "https://assets.example/tmp/editor-media/update.png";
+
+        const permanentUrl = "https://assets.example/editor-media/update.png";
+
+        yield* create(fixture, id, "Referenced images");
+
+        yield* db.insert(schema.assetTable).values({
+          id: assetId,
+          bucket: "test-bucket",
+          key: "tmp/editor-media/org/update.png",
+          url: temporaryUrl,
+          kind: "editor_image",
+          organizationId: fixture.organizationId,
+        });
+
+        yield* handlers
+          .UpdateHelpCenterArticle({
+            assetIds: [assetId],
+            coverImage: null,
+            content: `![image](${temporaryUrl})`,
+            expectedStatus: "published",
+            id,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "referenced-images",
+            status: "published",
+            title: "Referenced images",
+            topicId: fixture.topicId,
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, session),
+            Effect.provideService(S3UploadService, {
+              uploadProfileImage: () => Effect.die("not used in this test"),
+              uploadOrganizationLogo: () => Effect.die("not used in this test"),
+              uploadEditorMedia: () => Effect.die("not used in this test"),
+              promoteEditorMedia: ({ bucket }) =>
+                Effect.succeed({
+                  bucket,
+                  key: "editor-media/org/update.png",
+                  url: permanentUrl,
+                }),
+              deleteObject: () =>
+                Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
+            })
+          );
+
+        const readReferences = Effect.gen(function* () {
+          const references = yield* db
+            .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+            .from(schema.helpCenterArticleAssetTable)
+            .where(eq(schema.helpCenterArticleAssetTable.articleId, id));
+
+          return references.map(({ assetId: referencedId }) => referencedId);
+        });
+
+        expect(yield* readReferences).toEqual([assetId]);
+
+        yield* handlers
+          .UpdateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
+            content: "Body without the image.",
+            expectedStatus: "published",
+            id,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "referenced-images",
+            status: "published",
+            title: "Referenced images",
+            topicId: fixture.topicId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        expect(yield* readReferences).toEqual([]);
       })
     );
 

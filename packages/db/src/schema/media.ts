@@ -12,6 +12,7 @@ import {
 import type { TAssetKind } from "../validation-schema/asset-kind";
 import { organizationTable, userTable } from "./auth";
 import { changelogTable, postTable } from "./feedback";
+import { helpCenterArticleTable } from "./help-center";
 
 export const assetTable = pgTable(
   "asset",
@@ -80,6 +81,22 @@ export const changelogAssetTable = pgTable(
   (table) => [
     primaryKey({ columns: [table.changelogId, table.assetId] }),
     index("changelog_asset_assetId_idx").on(table.assetId),
+  ]
+);
+
+export const helpCenterArticleAssetTable = pgTable(
+  "help_center_article_asset",
+  {
+    articleId: text("article_id")
+      .notNull()
+      .references(() => helpCenterArticleTable.id, { onDelete: "cascade" }),
+    assetId: text("asset_id")
+      .notNull()
+      .references(() => assetTable.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.articleId, table.assetId] }),
+    index("help_center_article_asset_assetId_idx").on(table.assetId),
   ]
 );
 

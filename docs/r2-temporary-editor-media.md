@@ -1,6 +1,6 @@
 # Temporary editor media
 
-Editor uploads are written under `tmp/editor-media/`. Saving a post or changelog copies referenced objects to `editor-media/`, updates the stored URL, and removes the temporary object after the database transaction succeeds. The promoted copy keeps the temporary object's content type and cache metadata.
+Editor uploads are written under `tmp/editor-media/`. Saving a post, changelog or help center article copies referenced objects to `editor-media/`, updates the stored URL, and removes the temporary object only after the database transaction succeeds. A refused write rolls back the permanent copies and keeps the temporary originals, so the editor's retry can promote the same upload again. The promoted copy keeps the temporary object's content type and cache metadata.
 
 An upload the author never saves is reaped by the bucket lifecycle rule alone: `cleanupOrphanedEditorAssets` skips temporary keys on purpose, because the asset row is the only record of an object a still-open editor may yet promote.
 

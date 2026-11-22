@@ -23,6 +23,7 @@ import {
   prepareEditorAssetContent,
   registerUploadedAsset,
   replaceSingletonAsset,
+  rollbackPreparedEditorAssets,
   syncChangelogAssetReferences,
   syncPostAssetReferences,
 } from "./service";
@@ -450,6 +451,60 @@ describe("registerUploadedAsset", () => {
         })
     );
 
+    it.effect(
+      "keeps a permanent object a committed asset row still references",
+      () =>
+        Effect.gen(function* () {
+          const db = yield* currentDb;
+          const organizationId = "org_referenced_rollback";
+          const deletedKeys = yield* Ref.make<string[]>([]);
+
+          const permanentObject = {
+            bucket: "test-bucket",
+            key: "editor-media/user/image/referenced.png",
+            url: "https://assets.example/referenced.png",
+          };
+
+          yield* db.insert(schema.organizationTable).values({
+            id: organizationId,
+            name: "Referenced Rollback",
+            slug: organizationId,
+            createdAt: yield* DateTime.nowAsDate,
+          });
+          // The asset row a concurrent save committed after promoting the same
+          // temporary upload. Its URL is what the saved article renders; this
+          // request's failed copy must not remove it.
+          yield* db.insert(schema.assetTable).values({
+            id: "asset_committed_promotion",
+            bucket: permanentObject.bucket,
+            key: permanentObject.key,
+            url: permanentObject.url,
+            kind: "editor_image",
+            organizationId,
+          });
+
+          yield* rollbackPreparedEditorAssets([
+            {
+              asset: {
+                id: "asset_committed_promotion",
+                bucket: permanentObject.bucket,
+                key: permanentObject.key,
+                url: permanentObject.url,
+              },
+              temporaryObject: {
+                bucket: "test-bucket",
+                key: "tmp/editor-media/user/image/referenced.png",
+              },
+              permanentObject,
+            },
+          ]).pipe(
+            Effect.provideService(S3UploadService, recordingS3(deletedKeys))
+          );
+
+          expect(yield* Ref.get(deletedKeys)).toEqual([]);
+        })
+    );
+
     it.effect("removes only aged editor assets with no references", () =>
       Effect.gen(function* () {
         const db = yield* currentDb;
@@ -501,6 +556,69 @@ describe("registerUploadedAsset", () => {
         expect(yield* Ref.get(deletedKeys)).toEqual([
           "editor-media/user/image/orphaned.png",
         ]);
+      })
+    );
+
+    it.effect("keeps an aged image a help center article references", () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const nowUtc = yield* DateTime.now;
+        const now = DateTime.toDate(nowUtc);
+        const organizationId = "org_article_asset_cleanup";
+        const topicId = "topic_article_asset_cleanup";
+        const articleId = "article_asset_cleanup";
+        const deletedKeys = yield* Ref.make<string[]>([]);
+
+        yield* db.insert(schema.organizationTable).values({
+          id: organizationId,
+          name: "Article Asset Cleanup",
+          slug: organizationId,
+          createdAt: now,
+        });
+        yield* db.insert(schema.helpCenterTopicTable).values({
+          id: topicId,
+          organizationId,
+          slug: "topic",
+          name: "Topic",
+        });
+        yield* db.insert(schema.helpCenterArticleTable).values({
+          id: articleId,
+          organizationId,
+          topicId,
+          slug: "referenced-image",
+          title: "Referenced image",
+          content: "![image](https://assets.example/article.png)",
+          status: "draft",
+          createdAt: now,
+          updatedAt: now,
+        });
+        yield* db.insert(schema.assetTable).values({
+          id: "asset_article_reference",
+          bucket: "test-bucket",
+          key: "editor-media/user/image/article.png",
+          url: "https://assets.example/article.png",
+          kind: "editor_image",
+          organizationId,
+          createdAt: DateTime.toDate(
+            DateTime.subtractDuration(nowUtc, Duration.hours(2))
+          ),
+        });
+        yield* db.insert(schema.helpCenterArticleAssetTable).values({
+          articleId,
+          assetId: "asset_article_reference",
+        });
+
+        yield* cleanupOrphanedEditorAssets({ organizationId }).pipe(
+          Effect.provideService(S3UploadService, recordingS3(deletedKeys))
+        );
+
+        const assets = yield* db
+          .select({ id: schema.assetTable.id })
+          .from(schema.assetTable)
+          .where(eq(schema.assetTable.organizationId, organizationId));
+
+        expect(assets).toEqual([{ id: "asset_article_reference" }]);
+        expect(yield* Ref.get(deletedKeys)).toEqual([]);
       })
     );
 
