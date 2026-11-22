@@ -124,6 +124,13 @@ export const helpCenterArticleTable = pgTable(
     content: text("content").notNull(),
     /** Derived from the rendered body at write time, never authored. */
     excerpt: text("excerpt").notNull().default(""),
+    /**
+     * A 16:7 cover image, the same shape the changelog's pages use.
+     *
+     * The URL, not an asset id: the editor promotes the uploaded object before
+     * the row stores it, and the public page only needs something to render.
+     */
+    coverImage: text("cover_image"),
     status: text("status").$type<THelpCenterArticleState>().notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     source: text("source")

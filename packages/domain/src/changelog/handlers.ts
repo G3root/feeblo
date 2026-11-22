@@ -194,7 +194,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
           ),
-          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+          Effect.tap(() => cleanupPreparedEditorAssets(prepared.promotions))
         );
 
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);
@@ -379,7 +379,7 @@ export const ChangelogRpcHandlersEffect = Effect.gen(function* () {
           Effect.tapCause(() =>
             rollbackPreparedEditorAssets(prepared.promotions)
           ),
-          Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+          Effect.tap(() => cleanupPreparedEditorAssets(prepared.promotions))
         );
 
         yield* wakeEmailOutboxBestEffort(outboxId, args.organizationId);

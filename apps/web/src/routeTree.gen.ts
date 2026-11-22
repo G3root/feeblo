@@ -49,7 +49,6 @@ import { Route as SPSlugRouteImport } from "./routes/s/p/$slug"
 import { Route as SRoadmapIndexRouteImport } from "./routes/s/roadmap/index"
 import { Route as SRoadmapSlugRouteImport } from "./routes/s/roadmap/$slug"
 import { Route as DashboardOrganizationIdDashboardLayoutIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/index"
-import { Route as DashboardOrganizationIdDashboardLayoutInsightsRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/insights"
 import { Route as DashboardOrganizationIdSettingsIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/index"
 import { Route as DashboardOrganizationIdSettingsBillingRouteImport } from "./routes/_dashboard/$organizationId/settings/billing"
 import { Route as DashboardOrganizationIdSettingsChangelogCategoriesRouteImport } from "./routes/_dashboard/$organizationId/settings/changelog-categories"
@@ -78,8 +77,8 @@ import { Route as DashboardOrganizationIdDashboardLayoutFeedbackIndexRouteImport
 import { Route as DashboardOrganizationIdDashboardLayoutFeedbackActiveRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/feedback/active"
 import { Route as DashboardOrganizationIdDashboardLayoutFeedbackBacklogRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/feedback/backlog"
 import { Route as DashboardOrganizationIdDashboardLayoutHelpCenterIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/help-center/index"
-import { Route as DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/help-center/$articleId"
-import { Route as DashboardOrganizationIdDashboardLayoutHelpCenterNewRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/help-center/new"
+import { Route as DashboardOrganizationIdDashboardLayoutInsightsIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/insights/index"
+import { Route as DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/insights/help-center"
 import { Route as DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/my-feedback/index"
 import { Route as DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/my-feedback/assigned"
 import { Route as DashboardOrganizationIdDashboardLayoutRoadmapIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/roadmap/index"
@@ -93,6 +92,9 @@ import { Route as DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRout
 import { Route as DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
 import { Route as DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
 import { Route as DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/feedback/view/$viewId"
+import { Route as DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/index"
+import { Route as DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/new"
+import { Route as DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/help-center/article/$articleId"
 import { Route as DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
 import { Route as DashboardOrganizationIdSettingsDataImportsJobIdRouteImport } from "./routes/_dashboard/$organizationId/settings/data/imports/$jobId"
 import { Route as DashboardOrganizationIdSettingsIntegrationsDiscordIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/discord/index"
@@ -303,12 +305,6 @@ const DashboardOrganizationIdDashboardLayoutIndexRoute =
     path: "/",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
-const DashboardOrganizationIdDashboardLayoutInsightsRoute =
-  DashboardOrganizationIdDashboardLayoutInsightsRouteImport.update({
-    id: "/insights",
-    path: "/insights",
-    getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
-  } as any)
 const DashboardOrganizationIdSettingsIndexRoute =
   DashboardOrganizationIdSettingsIndexRouteImport.update({
     id: "/",
@@ -477,16 +473,16 @@ const DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute =
     path: "/help-center/",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
-const DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute =
-  DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRouteImport.update({
-    id: "/help-center/$articleId",
-    path: "/help-center/$articleId",
+const DashboardOrganizationIdDashboardLayoutInsightsIndexRoute =
+  DashboardOrganizationIdDashboardLayoutInsightsIndexRouteImport.update({
+    id: "/insights/",
+    path: "/insights/",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
-const DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute =
-  DashboardOrganizationIdDashboardLayoutHelpCenterNewRouteImport.update({
-    id: "/help-center/new",
-    path: "/help-center/new",
+const DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute =
+  DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRouteImport.update({
+    id: "/insights/help-center",
+    path: "/insights/help-center",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
 const DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute =
@@ -571,6 +567,28 @@ const DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute =
     path: "/feedback/view/$viewId",
     getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
   } as any)
+const DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute =
+  DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRouteImport.update(
+    {
+      id: "/help-center/$topicId/",
+      path: "/help-center/$topicId/",
+      getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
+    } as any,
+  )
+const DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute =
+  DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRouteImport.update({
+    id: "/help-center/$topicId/new",
+    path: "/help-center/$topicId/new",
+    getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
+  } as any)
+const DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute =
+  DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRouteImport.update(
+    {
+      id: "/help-center/article/$articleId",
+      path: "/help-center/article/$articleId",
+      getParentRoute: () => DashboardOrganizationIdDashboardLayoutRoute,
+    } as any,
+  )
 const DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute =
   DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRouteImport.update(
     {
@@ -650,7 +668,6 @@ export interface FileRoutesByFullPath {
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/help/": typeof SHelpIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
-  "/$organizationId/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -675,8 +692,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/changelog/published": typeof DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute
   "/$organizationId/feedback/active": typeof DashboardOrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/feedback/backlog": typeof DashboardOrganizationIdDashboardLayoutFeedbackBacklogRoute
-  "/$organizationId/help-center/$articleId": typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute
-  "/$organizationId/help-center/new": typeof DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute
+  "/$organizationId/insights/help-center": typeof DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute
   "/$organizationId/my-feedback/assigned": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute
   "/$organizationId/roadmap/$slug": typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute
   "/$organizationId/settings/webhooks/$connectionId": typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
@@ -685,6 +701,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/contact/": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback/": typeof DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/help-center/": typeof DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute
+  "/$organizationId/insights/": typeof DashboardOrganizationIdDashboardLayoutInsightsIndexRoute
   "/$organizationId/my-feedback/": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute
   "/$organizationId/roadmap/": typeof DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute
   "/$organizationId/settings/data/": typeof DashboardOrganizationIdSettingsDataIndexRoute
@@ -694,9 +711,12 @@ export interface FileRoutesByFullPath {
   "/$organizationId/board/$boardSlug/backlog": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/$organizationId/feedback/view/$viewId": typeof DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute
+  "/$organizationId/help-center/$topicId/new": typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute
+  "/$organizationId/help-center/article/$articleId": typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/settings/data/imports/$jobId": typeof DashboardOrganizationIdSettingsDataImportsJobIdRoute
   "/$organizationId/board/$boardSlug/": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId/help-center/$topicId/": typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute
   "/$organizationId/settings/integrations/discord/": typeof DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute
   "/$organizationId/settings/integrations/github/": typeof DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute
   "/$organizationId/settings/integrations/slack/": typeof DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute
@@ -738,7 +758,6 @@ export interface FileRoutesByTo {
   "/s/changelog": typeof SChangelogIndexRoute
   "/s/help": typeof SHelpIndexRoute
   "/s/roadmap": typeof SRoadmapIndexRoute
-  "/$organizationId/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -762,8 +781,7 @@ export interface FileRoutesByTo {
   "/$organizationId/changelog/published": typeof DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute
   "/$organizationId/feedback/active": typeof DashboardOrganizationIdDashboardLayoutFeedbackActiveRoute
   "/$organizationId/feedback/backlog": typeof DashboardOrganizationIdDashboardLayoutFeedbackBacklogRoute
-  "/$organizationId/help-center/$articleId": typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute
-  "/$organizationId/help-center/new": typeof DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute
+  "/$organizationId/insights/help-center": typeof DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute
   "/$organizationId/my-feedback/assigned": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute
   "/$organizationId/roadmap/$slug": typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute
   "/$organizationId/settings/webhooks/$connectionId": typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
@@ -772,6 +790,7 @@ export interface FileRoutesByTo {
   "/$organizationId/contact": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
   "/$organizationId/feedback": typeof DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute
   "/$organizationId/help-center": typeof DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute
+  "/$organizationId/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsIndexRoute
   "/$organizationId/my-feedback": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute
   "/$organizationId/roadmap": typeof DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute
   "/$organizationId/settings/data": typeof DashboardOrganizationIdSettingsDataIndexRoute
@@ -781,9 +800,12 @@ export interface FileRoutesByTo {
   "/$organizationId/board/$boardSlug/backlog": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/$organizationId/changelog/edit/$changelogSlug": typeof DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/$organizationId/feedback/view/$viewId": typeof DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute
+  "/$organizationId/help-center/$topicId/new": typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute
+  "/$organizationId/help-center/article/$articleId": typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute
   "/$organizationId/post/$boardSlug/$postSlug": typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/$organizationId/settings/data/imports/$jobId": typeof DashboardOrganizationIdSettingsDataImportsJobIdRoute
   "/$organizationId/board/$boardSlug": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
+  "/$organizationId/help-center/$topicId": typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute
   "/$organizationId/settings/integrations/discord": typeof DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute
   "/$organizationId/settings/integrations/github": typeof DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute
   "/$organizationId/settings/integrations/slack": typeof DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute
@@ -830,7 +852,6 @@ export interface FileRoutesById {
   "/s/changelog/": typeof SChangelogIndexRoute
   "/s/help/": typeof SHelpIndexRoute
   "/s/roadmap/": typeof SRoadmapIndexRoute
-  "/_dashboard/$organizationId/_dashboard-layout/insights": typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   "/_dashboard/$organizationId/settings/billing": typeof DashboardOrganizationIdSettingsBillingRoute
   "/_dashboard/$organizationId/settings/changelog-categories": typeof DashboardOrganizationIdSettingsChangelogCategoriesRoute
   "/_dashboard/$organizationId/settings/changelog-privacy": typeof DashboardOrganizationIdSettingsChangelogPrivacyRoute
@@ -855,8 +876,7 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/_dashboard-layout/changelog/published": typeof DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute
   "/_dashboard/$organizationId/_dashboard-layout/feedback/active": typeof DashboardOrganizationIdDashboardLayoutFeedbackActiveRoute
   "/_dashboard/$organizationId/_dashboard-layout/feedback/backlog": typeof DashboardOrganizationIdDashboardLayoutFeedbackBacklogRoute
-  "/_dashboard/$organizationId/_dashboard-layout/help-center/$articleId": typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute
-  "/_dashboard/$organizationId/_dashboard-layout/help-center/new": typeof DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute
+  "/_dashboard/$organizationId/_dashboard-layout/insights/help-center": typeof DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute
   "/_dashboard/$organizationId/_dashboard-layout/my-feedback/assigned": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute
   "/_dashboard/$organizationId/_dashboard-layout/roadmap/$slug": typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute
   "/_dashboard/$organizationId/settings/webhooks/$connectionId": typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
@@ -865,6 +885,7 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/_dashboard-layout/contact/": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/feedback/": typeof DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/help-center/": typeof DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute
+  "/_dashboard/$organizationId/_dashboard-layout/insights/": typeof DashboardOrganizationIdDashboardLayoutInsightsIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/my-feedback/": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/roadmap/": typeof DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute
   "/_dashboard/$organizationId/settings/data/": typeof DashboardOrganizationIdSettingsDataIndexRoute
@@ -874,9 +895,12 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   "/_dashboard/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug": typeof DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   "/_dashboard/$organizationId/_dashboard-layout/feedback/view/$viewId": typeof DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute
+  "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/new": typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute
+  "/_dashboard/$organizationId/_dashboard-layout/help-center/article/$articleId": typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute
   "/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   "/_dashboard/$organizationId/settings/data/imports/$jobId": typeof DashboardOrganizationIdSettingsDataImportsJobIdRoute
   "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/": typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
+  "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/": typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute
   "/_dashboard/$organizationId/settings/integrations/discord/": typeof DashboardOrganizationIdSettingsIntegrationsDiscordIndexRoute
   "/_dashboard/$organizationId/settings/integrations/github/": typeof DashboardOrganizationIdSettingsIntegrationsGithubIndexRoute
   "/_dashboard/$organizationId/settings/integrations/slack/": typeof DashboardOrganizationIdSettingsIntegrationsSlackIndexRoute
@@ -922,7 +946,6 @@ export interface FileRouteTypes {
     | "/s/changelog/"
     | "/s/help/"
     | "/s/roadmap/"
-    | "/$organizationId/insights"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -947,8 +970,7 @@ export interface FileRouteTypes {
     | "/$organizationId/changelog/published"
     | "/$organizationId/feedback/active"
     | "/$organizationId/feedback/backlog"
-    | "/$organizationId/help-center/$articleId"
-    | "/$organizationId/help-center/new"
+    | "/$organizationId/insights/help-center"
     | "/$organizationId/my-feedback/assigned"
     | "/$organizationId/roadmap/$slug"
     | "/$organizationId/settings/webhooks/$connectionId"
@@ -957,6 +979,7 @@ export interface FileRouteTypes {
     | "/$organizationId/contact/"
     | "/$organizationId/feedback/"
     | "/$organizationId/help-center/"
+    | "/$organizationId/insights/"
     | "/$organizationId/my-feedback/"
     | "/$organizationId/roadmap/"
     | "/$organizationId/settings/data/"
@@ -966,9 +989,12 @@ export interface FileRouteTypes {
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
     | "/$organizationId/feedback/view/$viewId"
+    | "/$organizationId/help-center/$topicId/new"
+    | "/$organizationId/help-center/article/$articleId"
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/settings/data/imports/$jobId"
     | "/$organizationId/board/$boardSlug/"
+    | "/$organizationId/help-center/$topicId/"
     | "/$organizationId/settings/integrations/discord/"
     | "/$organizationId/settings/integrations/github/"
     | "/$organizationId/settings/integrations/slack/"
@@ -1010,7 +1036,6 @@ export interface FileRouteTypes {
     | "/s/changelog"
     | "/s/help"
     | "/s/roadmap"
-    | "/$organizationId/insights"
     | "/$organizationId/settings/billing"
     | "/$organizationId/settings/changelog-categories"
     | "/$organizationId/settings/changelog-privacy"
@@ -1034,8 +1059,7 @@ export interface FileRouteTypes {
     | "/$organizationId/changelog/published"
     | "/$organizationId/feedback/active"
     | "/$organizationId/feedback/backlog"
-    | "/$organizationId/help-center/$articleId"
-    | "/$organizationId/help-center/new"
+    | "/$organizationId/insights/help-center"
     | "/$organizationId/my-feedback/assigned"
     | "/$organizationId/roadmap/$slug"
     | "/$organizationId/settings/webhooks/$connectionId"
@@ -1044,6 +1068,7 @@ export interface FileRouteTypes {
     | "/$organizationId/contact"
     | "/$organizationId/feedback"
     | "/$organizationId/help-center"
+    | "/$organizationId/insights"
     | "/$organizationId/my-feedback"
     | "/$organizationId/roadmap"
     | "/$organizationId/settings/data"
@@ -1053,9 +1078,12 @@ export interface FileRouteTypes {
     | "/$organizationId/board/$boardSlug/backlog"
     | "/$organizationId/changelog/edit/$changelogSlug"
     | "/$organizationId/feedback/view/$viewId"
+    | "/$organizationId/help-center/$topicId/new"
+    | "/$organizationId/help-center/article/$articleId"
     | "/$organizationId/post/$boardSlug/$postSlug"
     | "/$organizationId/settings/data/imports/$jobId"
     | "/$organizationId/board/$boardSlug"
+    | "/$organizationId/help-center/$topicId"
     | "/$organizationId/settings/integrations/discord"
     | "/$organizationId/settings/integrations/github"
     | "/$organizationId/settings/integrations/slack"
@@ -1101,7 +1129,6 @@ export interface FileRouteTypes {
     | "/s/changelog/"
     | "/s/help/"
     | "/s/roadmap/"
-    | "/_dashboard/$organizationId/_dashboard-layout/insights"
     | "/_dashboard/$organizationId/settings/billing"
     | "/_dashboard/$organizationId/settings/changelog-categories"
     | "/_dashboard/$organizationId/settings/changelog-privacy"
@@ -1126,8 +1153,7 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/_dashboard-layout/changelog/published"
     | "/_dashboard/$organizationId/_dashboard-layout/feedback/active"
     | "/_dashboard/$organizationId/_dashboard-layout/feedback/backlog"
-    | "/_dashboard/$organizationId/_dashboard-layout/help-center/$articleId"
-    | "/_dashboard/$organizationId/_dashboard-layout/help-center/new"
+    | "/_dashboard/$organizationId/_dashboard-layout/insights/help-center"
     | "/_dashboard/$organizationId/_dashboard-layout/my-feedback/assigned"
     | "/_dashboard/$organizationId/_dashboard-layout/roadmap/$slug"
     | "/_dashboard/$organizationId/settings/webhooks/$connectionId"
@@ -1136,6 +1162,7 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/_dashboard-layout/contact/"
     | "/_dashboard/$organizationId/_dashboard-layout/feedback/"
     | "/_dashboard/$organizationId/_dashboard-layout/help-center/"
+    | "/_dashboard/$organizationId/_dashboard-layout/insights/"
     | "/_dashboard/$organizationId/_dashboard-layout/my-feedback/"
     | "/_dashboard/$organizationId/_dashboard-layout/roadmap/"
     | "/_dashboard/$organizationId/settings/data/"
@@ -1145,9 +1172,12 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
     | "/_dashboard/$organizationId/_dashboard-layout/changelog/edit/$changelogSlug"
     | "/_dashboard/$organizationId/_dashboard-layout/feedback/view/$viewId"
+    | "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/new"
+    | "/_dashboard/$organizationId/_dashboard-layout/help-center/article/$articleId"
     | "/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug"
     | "/_dashboard/$organizationId/settings/data/imports/$jobId"
     | "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/"
+    | "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/"
     | "/_dashboard/$organizationId/settings/integrations/discord/"
     | "/_dashboard/$organizationId/settings/integrations/github/"
     | "/_dashboard/$organizationId/settings/integrations/slack/"
@@ -1451,13 +1481,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
-    "/_dashboard/$organizationId/_dashboard-layout/insights": {
-      id: "/_dashboard/$organizationId/_dashboard-layout/insights"
-      path: "/insights"
-      fullPath: "/$organizationId/insights"
-      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsRouteImport
-      parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
-    }
     "/_dashboard/$organizationId/settings/": {
       id: "/_dashboard/$organizationId/settings/"
       path: "/"
@@ -1654,18 +1677,18 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterIndexRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
-    "/_dashboard/$organizationId/_dashboard-layout/help-center/$articleId": {
-      id: "/_dashboard/$organizationId/_dashboard-layout/help-center/$articleId"
-      path: "/help-center/$articleId"
-      fullPath: "/$organizationId/help-center/$articleId"
-      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRouteImport
+    "/_dashboard/$organizationId/_dashboard-layout/insights/": {
+      id: "/_dashboard/$organizationId/_dashboard-layout/insights/"
+      path: "/insights"
+      fullPath: "/$organizationId/insights/"
+      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsIndexRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
-    "/_dashboard/$organizationId/_dashboard-layout/help-center/new": {
-      id: "/_dashboard/$organizationId/_dashboard-layout/help-center/new"
-      path: "/help-center/new"
-      fullPath: "/$organizationId/help-center/new"
-      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterNewRouteImport
+    "/_dashboard/$organizationId/_dashboard-layout/insights/help-center": {
+      id: "/_dashboard/$organizationId/_dashboard-layout/insights/help-center"
+      path: "/insights/help-center"
+      fullPath: "/$organizationId/insights/help-center"
+      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
     "/_dashboard/$organizationId/_dashboard-layout/my-feedback/": {
@@ -1757,6 +1780,27 @@ declare module "@tanstack/react-router" {
       path: "/feedback/view/$viewId"
       fullPath: "/$organizationId/feedback/view/$viewId"
       preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRouteImport
+      parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
+    }
+    "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/": {
+      id: "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/"
+      path: "/help-center/$topicId"
+      fullPath: "/$organizationId/help-center/$topicId/"
+      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRouteImport
+      parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
+    }
+    "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/new": {
+      id: "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/new"
+      path: "/help-center/$topicId/new"
+      fullPath: "/$organizationId/help-center/$topicId/new"
+      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRouteImport
+      parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
+    }
+    "/_dashboard/$organizationId/_dashboard-layout/help-center/article/$articleId": {
+      id: "/_dashboard/$organizationId/_dashboard-layout/help-center/article/$articleId"
+      path: "/help-center/article/$articleId"
+      fullPath: "/$organizationId/help-center/article/$articleId"
+      preLoaderRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRouteImport
       parentRoute: typeof DashboardOrganizationIdDashboardLayoutRoute
     }
     "/_dashboard/$organizationId/_dashboard-layout/post/$boardSlug/$postSlug": {
@@ -1856,14 +1900,12 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface DashboardOrganizationIdDashboardLayoutRouteChildren {
-  DashboardOrganizationIdDashboardLayoutInsightsRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsRoute
   DashboardOrganizationIdDashboardLayoutIndexRoute: typeof DashboardOrganizationIdDashboardLayoutIndexRoute
   DashboardOrganizationIdDashboardLayoutChangelogDraftRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogDraftRoute
   DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogPublishedRoute
   DashboardOrganizationIdDashboardLayoutFeedbackActiveRoute: typeof DashboardOrganizationIdDashboardLayoutFeedbackActiveRoute
   DashboardOrganizationIdDashboardLayoutFeedbackBacklogRoute: typeof DashboardOrganizationIdDashboardLayoutFeedbackBacklogRoute
-  DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute
-  DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute
+  DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute
   DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute: typeof DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute
   DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute: typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute
   DashboardOrganizationIdDashboardLayoutChangelogIndexRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogIndexRoute
@@ -1871,21 +1913,23 @@ interface DashboardOrganizationIdDashboardLayoutRouteChildren {
   DashboardOrganizationIdDashboardLayoutContactIndexRoute: typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
   DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute: typeof DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute
   DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute
+  DashboardOrganizationIdDashboardLayoutInsightsIndexRoute: typeof DashboardOrganizationIdDashboardLayoutInsightsIndexRoute
   DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute: typeof DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute
   DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute: typeof DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute
   DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRoute: typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRoute
   DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute: typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRoute
   DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute: typeof DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute
   DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute: typeof DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute
+  DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute
+  DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute
   DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute: typeof DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute
   DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute: typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute
+  DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute: typeof DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute
   DashboardOrganizationIdDashboardLayoutBoardBoardSlugViewViewIdRoute: typeof DashboardOrganizationIdDashboardLayoutBoardBoardSlugViewViewIdRoute
 }
 
 const DashboardOrganizationIdDashboardLayoutRouteChildren: DashboardOrganizationIdDashboardLayoutRouteChildren =
   {
-    DashboardOrganizationIdDashboardLayoutInsightsRoute:
-      DashboardOrganizationIdDashboardLayoutInsightsRoute,
     DashboardOrganizationIdDashboardLayoutIndexRoute:
       DashboardOrganizationIdDashboardLayoutIndexRoute,
     DashboardOrganizationIdDashboardLayoutChangelogDraftRoute:
@@ -1896,10 +1940,8 @@ const DashboardOrganizationIdDashboardLayoutRouteChildren: DashboardOrganization
       DashboardOrganizationIdDashboardLayoutFeedbackActiveRoute,
     DashboardOrganizationIdDashboardLayoutFeedbackBacklogRoute:
       DashboardOrganizationIdDashboardLayoutFeedbackBacklogRoute,
-    DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute:
-      DashboardOrganizationIdDashboardLayoutHelpCenterArticleIdRoute,
-    DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute:
-      DashboardOrganizationIdDashboardLayoutHelpCenterNewRoute,
+    DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute:
+      DashboardOrganizationIdDashboardLayoutInsightsHelpCenterRoute,
     DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute:
       DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute,
     DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute:
@@ -1914,6 +1956,8 @@ const DashboardOrganizationIdDashboardLayoutRouteChildren: DashboardOrganization
       DashboardOrganizationIdDashboardLayoutFeedbackIndexRoute,
     DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute:
       DashboardOrganizationIdDashboardLayoutHelpCenterIndexRoute,
+    DashboardOrganizationIdDashboardLayoutInsightsIndexRoute:
+      DashboardOrganizationIdDashboardLayoutInsightsIndexRoute,
     DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute:
       DashboardOrganizationIdDashboardLayoutMyFeedbackIndexRoute,
     DashboardOrganizationIdDashboardLayoutRoadmapIndexRoute:
@@ -1926,10 +1970,16 @@ const DashboardOrganizationIdDashboardLayoutRouteChildren: DashboardOrganization
       DashboardOrganizationIdDashboardLayoutChangelogEditChangelogSlugRoute,
     DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute:
       DashboardOrganizationIdDashboardLayoutFeedbackViewViewIdRoute,
+    DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute:
+      DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdNewRoute,
+    DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute:
+      DashboardOrganizationIdDashboardLayoutHelpCenterArticleArticleIdRoute,
     DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute:
       DashboardOrganizationIdDashboardLayoutPostBoardSlugPostSlugRoute,
     DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute:
       DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute,
+    DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute:
+      DashboardOrganizationIdDashboardLayoutHelpCenterTopicIdIndexRoute,
     DashboardOrganizationIdDashboardLayoutBoardBoardSlugViewViewIdRoute:
       DashboardOrganizationIdDashboardLayoutBoardBoardSlugViewViewIdRoute,
   }

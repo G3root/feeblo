@@ -12,6 +12,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useMemo } from "react";
 
+import { EditorLayout } from "~/components/editor-layout";
 import {
   helpCenterArticleAtom,
   type HelpCenterArticleAtomArgs,
@@ -21,7 +22,7 @@ import { HelpCenterUnavailable } from "~/features/help-center/components/help-ce
 import { preloadHelpCenterEditor } from "~/lib/preloads";
 
 export const Route = createFileRoute(
-  "/_dashboard/$organizationId/_dashboard-layout/help-center/$articleId"
+  "/_dashboard/$organizationId/_dashboard-layout/help-center/article/$articleId"
 )({
   component: RouteComponent,
   beforeLoad: async () => {
@@ -61,11 +62,17 @@ function RouteComponent() {
 
   return Result.builder(articleResult)
     .onInitial(() => (
-      <div className="mx-auto w-full max-w-3xl space-y-4">
-        <Skeleton className="h-9 w-1/3" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
+      <EditorLayout>
+        <EditorLayout.Main>
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-96 w-full" />
+        </EditorLayout.Main>
+        <EditorLayout.Sidebar>
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </EditorLayout.Sidebar>
+      </EditorLayout>
     ))
     .onFailure((error) => (
       <Empty>

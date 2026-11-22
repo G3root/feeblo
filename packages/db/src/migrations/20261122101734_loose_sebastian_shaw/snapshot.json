@@ -1,0 +1,251 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "2a152b1a-bf45-4024-a1cd-4305627f1b89",
+  "prevIds": [
+    "4e1f4cd9-0ecc-47e1-bf8b-143d2a630181"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_asset"
+      ],
+      "writes": [
+        "s|tbl|public.help_center_article_asset",
+        "n|tbl|public.help_center_article_asset",
+        "e|tbl|public.help_center_article_asset",
+        "n|rel|public.help_center_article_asset",
+        "n|type|public.help_center_article_asset",
+        "n|rel|public.help_center_article_asset_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "help_center_article",
+        "cover_image"
+      ],
+      "writes": [
+        "s|col|public.help_center_article.cover_image",
+        "n|col|public.help_center_article.cover_image",
+        "e|col|public.help_center_article.cover_image"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_article_asset",
+        "help_center_article_asset_assetId_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_article_asset_assetId_idx",
+        "n|idx|public.help_center_article_asset_assetId_idx",
+        "e|idx|public.help_center_article_asset_assetId_idx",
+        "n|rel|public.help_center_article_asset_assetId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_asset",
+        "n|sch|public",
+        "n|col|public.help_center_article_asset.asset_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_asset"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_asset.help_center_article_asset_XmWukhrMT5DN_fkey",
+        "n|fk|public.help_center_article_asset.help_center_article_asset_XmWukhrMT5DN_fkey",
+        "e|fk|public.help_center_article_asset.help_center_article_asset_XmWukhrMT5DN_fkey",
+        "n|con|public.help_center_article_asset.help_center_article_asset_XmWukhrMT5DN_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_asset",
+        "n|sch|public",
+        "n|tbl|public.help_center_article",
+        "n|sch|public",
+        "n|col|public.help_center_article_asset.article_id",
+        "n|col|public.help_center_article.id",
+        "e|uniqueness|public.help_center_article.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_asset"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_asset.help_center_article_asset_asset_id_asset_id_fkey",
+        "n|fk|public.help_center_article_asset.help_center_article_asset_asset_id_asset_id_fkey",
+        "e|fk|public.help_center_article_asset.help_center_article_asset_asset_id_asset_id_fkey",
+        "n|con|public.help_center_article_asset.help_center_article_asset_asset_id_asset_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_asset",
+        "n|sch|public",
+        "n|tbl|public.asset",
+        "n|sch|public",
+        "n|col|public.help_center_article_asset.asset_id",
+        "n|col|public.asset.id",
+        "e|uniqueness|public.asset.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "help_center_article_asset",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article",
+        "name": "cover_image",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_asset",
+        "name": "article_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_asset",
+        "name": "asset_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_asset",
+        "name": "help_center_article_asset_assetId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "asset_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_asset",
+        "name": "help_center_article_asset_XmWukhrMT5DN_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "article_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "help_center_article",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_asset",
+        "name": "help_center_article_asset_asset_id_asset_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "asset_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "asset",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_asset",
+        "name": "help_center_article_asset_pkey",
+        "columns": [
+          "article_id",
+          "asset_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

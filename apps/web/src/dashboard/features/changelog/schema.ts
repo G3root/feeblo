@@ -26,15 +26,3 @@ export const updatedChangelogSchema = z.object({
   publishedAt: z.date().nullable(),
   organizationId: z.string(),
 });
-
-export const publishChangelogSchema = z.object({
-  slug: z.string().trim().min(1, "A slug is required"),
-  publishedAt: z
-    .string()
-    .trim()
-    .min(1, "A published date is required")
-    .refine(
-      (value) => !Number.isNaN(new Date(value).getTime()),
-      "Enter a valid published date"
-    ),
-});

@@ -19,20 +19,24 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Skeleton } from "@feeblo/ui/skeleton";
+import { toggleVariants } from "@feeblo/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
+import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { ChartLineData01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import * as React from "react";
 
 import {
-  DEFAULT_INSIGHTS_RANGE,
   type InsightsAtomArgs,
   type InsightsSummary,
   type WorkspaceInsights,
   workspaceInsightsAtom,
   workspaceTrafficAtom,
 } from "../atoms";
+import { InsightsHelpCenter } from "./insights-help-center";
+import { InsightsPrefetch } from "./insights-prefetch";
 import {
   InsightsStat,
   InsightsUntouchedPosts,
@@ -50,11 +54,21 @@ import {
 
 const numberFormatter = new Intl.NumberFormat();
 
+/** Which half of the page is showing. The route, not local state, owns it. */
+export type InsightsTab = "feedback" | "help-center";
+
 const RANGE_LABELS = {
   "7d": "7 days",
   "30d": "30 days",
   "90d": "90 days",
 } as const satisfies Record<TInsightsRange, string>;
+
+/** Narrowest first, matching the toggle's left-to-right order. */
+const RANGE_OPTIONS = [
+  "7d",
+  "30d",
+  "90d",
+] as const satisfies readonly TInsightsRange[];
 
 /** A duration as a coarse, readable span: "3h 12m", "2d 4h". */
 function formatDuration(seconds: number | null): string {
@@ -99,15 +113,178 @@ function plural(count: number, singular: string): string {
   return `${numberFormatter.format(count)} ${singular}${count === 1 ? "" : "s"}`;
 }
 
+/**
+ * The workspace's numbers, split into the two things they measure.
+ *
+ * Feedback and help center traffic answer different questions and are collected
+ * by different operations, so they get a tab each rather than sharing one range
+ * of cards. The window is the route's search param (`insights/search.ts`),
+ * which is what lets it outlive the remount a tab switch causes.
+ */
 export function InsightsPage({
+  onRangeChange,
   organizationId,
+  range,
+  tab,
+}: {
+  readonly onRangeChange: (range: TInsightsRange) => void;
+  readonly organizationId: string;
+  readonly range: TInsightsRange;
+  readonly tab: InsightsTab;
+}) {
+  const helpCenterEnabled = useFeatureFlag("HELP_CENTER");
+
+  return (
+    <div className="mx-auto w-full">
+      <InsightsToolbar
+        onRangeChange={onRangeChange}
+        organizationId={organizationId}
+        range={range}
+        tab={tab}
+      />
+      <div className="space-y-3 p-3">
+        {tab === "feedback" || !helpCenterEnabled ? (
+          <FeedbackInsights
+            organizationId={organizationId}
+            range={range}
+            rangeLabel={RANGE_LABELS[range]}
+          />
+        ) : (
+          <InsightsHelpCenter
+            organizationId={organizationId}
+            range={range}
+            rangeLabel={RANGE_LABELS[range]}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The page's tabs and window, in one row above the content.
+ *
+ * The tabs are links because each one is a route, which is what makes the
+ * section bookmarkable and what keeps the range toggle from resetting the page
+ * it applies to. Each link carries the current window, so a tab switch keeps
+ * the range the reader chose. The styling is the changelog toolbar's, so the
+ * two lists read as the same control.
+ */
+function InsightsToolbar({
+  onRangeChange,
+  organizationId,
+  range,
+  tab,
+}: {
+  readonly onRangeChange: (range: TInsightsRange) => void;
+  readonly organizationId: string;
+  readonly range: TInsightsRange;
+  readonly tab: InsightsTab;
+}) {
+  const helpCenterEnabled = useFeatureFlag("HELP_CENTER");
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 p-3">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <Link
+          activeOptions={{ exact: true }}
+          activeProps={{ "data-pressed": "true" }}
+          className={toggleVariants({ size: "sm", variant: "outline" })}
+          params={{ organizationId }}
+          search={{ range }}
+          to="/$organizationId/insights"
+        >
+          Feedback
+        </Link>
+        {helpCenterEnabled ? (
+          <Link
+            activeOptions={{ exact: true }}
+            activeProps={{ "data-pressed": "true" }}
+            className={toggleVariants({ size: "sm", variant: "outline" })}
+            params={{ organizationId }}
+            search={{ range }}
+            to="/$organizationId/insights/help-center"
+          >
+            Help center
+          </Link>
+        ) : null}
+      </div>
+
+      <InsightsRangeToggle
+        onRangeChange={onRangeChange}
+        organizationId={organizationId}
+        range={range}
+        tab={tab}
+      />
+    </div>
+  );
+}
+
+/**
+ * The window toggle, with a prefetch on intent.
+ *
+ * Each option is a cache entry keyed by window, so starting that entry's reads
+ * when the pointer or focus reaches the option means picking it joins an
+ * in-flight request instead of starting one. The help center tab has nothing to
+ * warm here: its own reads start when the tab is opened.
+ */
+function InsightsRangeToggle({
+  onRangeChange,
+  organizationId,
+  range,
+  tab,
+}: {
+  readonly onRangeChange: (range: TInsightsRange) => void;
+  readonly organizationId: string;
+  readonly range: TInsightsRange;
+  readonly tab: InsightsTab;
+}) {
+  const [warmRange, setWarmRange] = React.useState<TInsightsRange | null>(null);
+
+  return (
+    <>
+      <ToggleGroup
+        aria-label="Window"
+        onValueChange={(value) => {
+          const next = value[0];
+
+          if (next === "7d" || next === "30d" || next === "90d") {
+            onRangeChange(next);
+          }
+        }}
+        size="sm"
+        value={[range]}
+        variant="outline"
+      >
+        {RANGE_OPTIONS.map((option) => (
+          <ToggleGroupItem
+            key={option}
+            onFocus={() => setWarmRange(option)}
+            onMouseEnter={() => setWarmRange(option)}
+            value={option}
+          >
+            {RANGE_LABELS[option]}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {tab === "help-center" ||
+      warmRange === null ||
+      warmRange === range ? null : (
+        <InsightsPrefetch organizationId={organizationId} range={warmRange} />
+      )}
+    </>
+  );
+}
+
+function FeedbackInsights({
+  organizationId,
+  range,
+  rangeLabel,
 }: {
   readonly organizationId: string;
+  readonly range: TInsightsRange;
+  readonly rangeLabel: string;
 }) {
-  const [range, setRange] = React.useState<TInsightsRange>(
-    DEFAULT_INSIGHTS_RANGE
-  );
-
   const args = React.useMemo<InsightsAtomArgs>(
     () => ({ organizationId, range }),
     [organizationId, range]
@@ -126,70 +303,40 @@ export function InsightsPage({
     .onInitial(() => <InsightsTrafficSkeleton />)
     .onFailure(() => <InsightsTrafficFailure onRetry={refreshTraffic} />)
     .onSuccess((traffic) => (
-      <InsightsTraffic rangeLabel={RANGE_LABELS[range]} traffic={traffic} />
+      <InsightsTraffic rangeLabel={rangeLabel} traffic={traffic} />
     ))
     .exhaustive();
 
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl leading-tight font-semibold tracking-tight">
-            Insights
-          </h1>
-          <p className="text-muted-foreground text-sm text-pretty">
-            How feedback is moving through this workspace.
-          </p>
-        </div>
-        <ToggleGroup
-          aria-label="Window"
-          onValueChange={(value) => {
-            const next = value[0];
-
-            if (next === "7d" || next === "30d" || next === "90d") {
-              setRange(next);
-            }
-          }}
-          size="sm"
-          value={[range]}
-          variant="outline"
-        >
-          <ToggleGroupItem value="7d">7 days</ToggleGroupItem>
-          <ToggleGroupItem value="30d">30 days</ToggleGroupItem>
-          <ToggleGroupItem value="90d">90 days</ToggleGroupItem>
-        </ToggleGroup>
-      </header>
-
-      {Result.builder(result)
-        .onInitial(() => <InsightsLoading />)
-        .onFailure(() => <InsightsFailure onRetry={refresh} />)
-        .onSuccess((insights) => (
-          <InsightsContent
-            insights={insights}
-            organizationId={organizationId}
-            range={range}
-            trafficSection={trafficSection}
-          />
-        ))
-        .exhaustive()}
-    </div>
-  );
+  return Result.builder(result)
+    .onInitial(() => <InsightsLoading />)
+    .onFailure(() => <InsightsFailure onRetry={refresh} />)
+    .onSuccess((insights) => (
+      <InsightsContent
+        insights={insights}
+        organizationId={organizationId}
+        range={range}
+        rangeLabel={rangeLabel}
+        trafficSection={trafficSection}
+      />
+    ))
+    .exhaustive();
 }
 
 function InsightsContent({
   insights,
   organizationId,
   range,
+  rangeLabel,
   trafficSection,
 }: {
   readonly insights: WorkspaceInsights;
   readonly organizationId: string;
   readonly range: TInsightsRange;
+  readonly rangeLabel: string;
   readonly trafficSection: React.ReactNode;
 }) {
   const { summary, subscriptions } = insights;
   const days = INSIGHTS_RANGE_DAYS[range];
-  const rangeLabel = RANGE_LABELS[range];
 
   // A workspace can have no active posts and nothing new in the window and
   // still have real data: votes on posts that were later archived, merges, or
@@ -211,10 +358,10 @@ function InsightsContent({
             <EmptyMedia variant="icon">
               <HugeiconsIcon icon={ChartLineData01Icon} />
             </EmptyMedia>
-            <EmptyTitle>No feedback to measure yet</EmptyTitle>
+            <EmptyTitle>No feedback yet</EmptyTitle>
             <EmptyDescription>
-              Once people post and vote, this page shows volume, response time,
-              the status mix, and the posts waiting for an owner.
+              Volume, response time, and the status mix appear once people post
+              and vote.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -227,7 +374,7 @@ function InsightsContent({
 
   return (
     <>
-      <p className="text-muted-foreground -mt-3 text-sm tabular-nums">
+      <p className="text-muted-foreground text-sm tabular-nums">
         {plural(subscriptions.posts, "post follower")} ·{" "}
         {plural(subscriptions.changelog, "changelog follower")}
       </p>
@@ -342,10 +489,7 @@ function InsightsFailure({ onRetry }: { readonly onRetry: () => void }) {
     <Card size="sm">
       <CardHeader>
         <CardTitle>Insights could not be loaded</CardTitle>
-        <CardDescription>
-          The request failed. Retrying asks the server again; the numbers are
-          not cached anywhere else.
-        </CardDescription>
+        <CardDescription>Try again to reload these numbers.</CardDescription>
       </CardHeader>
       <CardPanel>
         <Button onClick={onRetry} size="sm" variant="outline">

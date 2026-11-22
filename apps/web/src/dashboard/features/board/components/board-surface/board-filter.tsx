@@ -61,7 +61,11 @@ import { useOrgPostStatuses } from "~/hooks/use-org-post-statuses";
 import { useOrgTags } from "~/hooks/use-org-tags";
 
 import { namesOrCount } from "../../lib/filter-summary";
-import { BOARD_GROUPING_OPTIONS, boardGroupingLabel } from "../../lib/grouping";
+import {
+  BOARD_GROUPING_OPTIONS,
+  boardGroupingLabel,
+  isBoardGroupBy,
+} from "../../lib/grouping";
 import {
   type BoardStatusOperator,
   type BoardTagOperator,
@@ -601,11 +605,9 @@ function BoardFilterTrigger() {
   const {
     currentMemberId,
     filters,
-    grouping,
     members,
     membersLoaded,
     postStatuses,
-    setGroupBy,
     tags,
     tagsLoaded,
     toggleAssignee,
@@ -762,21 +764,6 @@ function BoardFilterTrigger() {
             </MenuPortal>
           </MenuSub>
         </MenuGroup>
-        <MenuSeparator />
-        <MenuSub>
-          <MenuSubTrigger>
-            <HugeiconsIcon icon={GroupItemsIcon} />
-            Group by
-          </MenuSubTrigger>
-          <MenuPortal>
-            <MenuSubPopup>
-              <BoardGroupingRadioItems
-                onChange={setGroupBy}
-                value={grouping.field}
-              />
-            </MenuSubPopup>
-          </MenuPortal>
-        </MenuSub>
       </MenuPopup>
     </Menu>
   );
@@ -822,9 +809,6 @@ function BoardGroupingRadioItems({
     </MenuRadioGroup>
   );
 }
-
-const isBoardGroupBy = (value: string): value is TBoardGroupBy =>
-  BOARD_GROUPING_OPTIONS.some((option) => option.value === value);
 
 function BoardFilterActiveRow() {
   const { clearAllFilters, filters } = useBoardFilterContext();

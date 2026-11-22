@@ -25,6 +25,24 @@ const ArticleSlug = S.Trim.pipe(
 /** Bodies are bounded so a single paste cannot make one row unbounded. */
 const ArticleContent = S.String.pipe(S.check(S.isMaxLength(200_000)));
 
+/**
+ * The cover image contract, mirroring the changelog's.
+ *
+ * An `http(s)` URL, not a key or an asset id: the row stores what a page can
+ * render, and the editor's promotion step rewrites a temporary URL to the
+ * permanent one before this value is persisted.
+ */
+const COVER_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
+
+const COVER_IMAGE_URL_MAX_LENGTH = 2048;
+
+const coverImageWithDefault = S.NullOr(
+  S.String.pipe(
+    S.check(S.isPattern(COVER_IMAGE_URL_PATTERN)),
+    S.check(S.isMaxLength(COVER_IMAGE_URL_MAX_LENGTH))
+  )
+).pipe(S.withDecodingDefaultKey(Effect.succeed(null)));
+
 const ArticlePosition = S.NullOr(
   S.Int.pipe(
     S.check(S.isGreaterThanOrEqualTo(0)),
@@ -71,9 +89,10 @@ export type THelpCenterArticleSummary = S.Schema.Type<
   typeof HelpCenterArticleSummary
 >;
 
-/** The dashboard's detail row: the list row plus the body. */
+/** The dashboard's detail row: the list row, the body and the cover image. */
 export const HelpCenterArticle = S.Struct({
   ...HelpCenterArticleSummary.fields,
+  coverImage: S.NullOr(S.String),
   content: S.String,
 });
 
@@ -101,6 +120,7 @@ export const HelpCenterArticlePublic = S.Struct({
   publishedAt: S.NullOr(S.DateFromString),
   updatedAt: S.DateFromString,
   authorName: S.NullOr(S.String),
+  coverImage: S.NullOr(S.String),
   isArchived: S.Boolean,
   ...HelpCenterArticleCounts.fields,
 });
@@ -347,7 +367,22 @@ const positionWithDefault = ArticlePosition.pipe(
  * update requires it, because an editor that has already shown a reader a URL
  * must not have that URL silently recomputed from a renamed title.
  */
+/**
+ * The editor assets this write references.
+ *
+ * Optional over the wire and empty by default: a caller writing Markdown with
+ * absolute URLs has none. The dashboard sends the ids of the images it uploaded
+ * so the handler can promote them out of the bucket's temporary prefix before
+ * storing their URLs.
+ */
+const articleAssetIds = S.Array(S.String).pipe(
+  // SAFETY: Empty-state placeholder: an empty collection is valid until real data resolves.
+  S.withDecodingDefaultKey(Effect.succeed([] as string[]))
+);
+
 export const HelpCenterArticleCreate = S.Struct({
+  assetIds: articleAssetIds,
+  coverImage: coverImageWithDefault,
   id: HelpCenterArticleId.schema,
   organizationId: WorkspaceId.schema,
   topicId: HelpCenterTopicId.schema,
@@ -364,6 +399,8 @@ export type THelpCenterArticleCreate = S.Schema.Type<
 >;
 
 export const HelpCenterArticleUpdate = S.Struct({
+  assetIds: articleAssetIds,
+  coverImage: coverImageWithDefault,
   id: HelpCenterArticleId.schema,
   organizationId: WorkspaceId.schema,
   topicId: HelpCenterTopicId.schema,

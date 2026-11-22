@@ -1,19 +1,26 @@
 import { useSelector } from "@tanstack/react-store";
 import { useId } from "react";
 
-import { Field, FieldError } from "./field";
+import { Field, FieldDescription, FieldError } from "./field";
 import { useFieldContext } from "./form-context";
 import { Input } from "./input";
 import { Label } from "./label";
 import { cn } from "./utils";
 
 interface TextFieldProps extends React.ComponentProps<typeof Input> {
+  /**
+   * Rendered inside this field's `Field.Root`, so it stays associated with the
+   * input. A description placed beside `<TextField>` instead sits outside that
+   * root, where Base UI throws `FieldRootContext is missing`.
+   */
+  description?: React.ReactNode;
   hideLabel?: boolean;
   label: string;
 }
 
 export function TextField({
   label,
+  description,
   hideLabel,
   id: idProp,
   onChange,
@@ -50,6 +57,7 @@ export function TextField({
         }}
         value={field.state.value}
       />
+      {description ? <FieldDescription>{description}</FieldDescription> : null}
       <FieldError errors={errors} match={!isValid} />
     </Field>
   );

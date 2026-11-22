@@ -1,29 +1,30 @@
-import { DEFAULT_POST_STATUS_COLORS } from "@feeblo/domain-contracts/post-status-colors";
-import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
-
 import {
-  ProductPostShot,
-  type ProductShotPost,
-} from "~/components/product-shot/product-post-shot";
+  HomePreview,
+  type HomePreviewPost,
+} from "@feeblo/public-feature-board/home-preview";
+import { slugify } from "@feeblo/utils/url";
+import { getRuntimePublicEnv } from "@feeblo/web-shared/runtime-public-env";
 
 import type { RegisterBoardDraft } from "../lib/register-draft";
 
 /**
- * The workspace the reader is about to create, shown as the one screen the
- * product is for: a request, open.
+ * The workspace the reader is about to create, shown as the page they will
+ * land on: the board's home, with the three sample posts a new workspace opens
+ * with.
  *
- * A preview is worth showing only if it is the truth about the fields beside
- * it. The address at the top is the subdomain the server is checking, the name
- * is the name being typed, the logo is the logo just uploaded, the board is the
- * first board they kept, and the post is the real sample post every workspace
- * opens with — body and all, from `packages/domain/src/workspace/onboarding.ts`.
+ * The home page is the honest picture, not a post page. A workspace created a
+ * minute from now has three posts and no conversation, and the home page is the
+ * one screen that shows what those three posts are for: a feed with boards and
+ * statuses beside it. Its chrome and list are the public board's own
+ * components (`HomePreview`), so the preview cannot drift into an
+ * approximation of the page: the title, toolbar, filters and rows are the same
+ * parts the board renders.
  *
- * A whole board page would have to invent more than this one does: three posts
- * cannot fill a full-height panel, so a board view either floats in the middle
- * of it or pads the empty half with something the reader will never see. A post
- * with no comments is the honest state of a workspace created ten seconds from
- * now, and it leaves room for the composer, which is the half of the product a
- * new owner uses first.
+ * The details are live where the reader can change them: the address in the
+ * navbar is the subdomain the server is checking, the name and logo are the
+ * ones being typed and uploaded, and the boards are the ones they kept. The
+ * posts stay the seeds — inventing three more would make the preview lie about
+ * a feed that does not exist yet.
  *
  * Rendered at its natural size rather than scaled down: the register form is a
  * narrow column on a wide screen, so the panel only has to look right at one
@@ -38,43 +39,70 @@ const placeholderName = "Your workspace";
 
 const placeholderSlug = "your-workspace";
 
+/** The first board a create falls back to when the reader kept no named board. */
+const placeholderBoard = "Features";
+
 /**
- * The welcome post `createWorkspace` seeds, as the board will show it.
+ * The sample posts `createWorkspace` seeds, as the home feed will show them.
  *
  * Kept in step with `onboarding.ts` by naming the same words, not by importing
  * the templates: the server's copy is the one that ships, and this is a picture
- * of it. All three sample posts arrive Pending, which is why the status is not
- * a variable here.
+ * of it. All three arrive Pending, on the board named by their slug, with the
+ * first board the reader kept as the fallback — exactly the rule the seed uses.
  */
-const welcomePost: Omit<ProductShotPost, "board" | "author"> = {
-  intro:
-    "Your workspace is ready. It has boards, a public roadmap, a changelog and a help center. We added three sample posts so you can see how they fit together.",
-  sections: [
-    {
-      heading: "What you can do here",
-      points: [
-        "Collect posts on the Bugs and Features boards",
-        "Vote and comment so the most wanted work stays visible",
-        "Move a post's status to put it on the roadmap",
-        "Publish what shipped in the changelog",
-      ],
-    },
-    {
-      heading: "Suggested next steps",
-      points: [
-        "Open a sample post and change its status",
-        "Write your own with New post",
-        "Add your logo and colours in Settings",
-      ],
-    },
-  ],
-  status: {
-    color: DEFAULT_POST_STATUS_COLORS.PENDING,
-    label: "Pending",
+const samplePosts = [
+  {
+    boardSlug: "features",
+    excerpt:
+      "Your workspace is ready. It has boards, a public roadmap, a changelog and a help center. We added three sample posts so you can see how they fit together.",
+    title: "Welcome to your workspace",
   },
-  title: "Welcome to your workspace",
-  votes: 0,
-};
+  {
+    boardSlug: "features",
+    excerpt:
+      "Use the Features board for product ideas, improvements, and requests.",
+    title: "How ideas become roadmap items",
+  },
+  {
+    boardSlug: "bugs",
+    excerpt:
+      "Use the Bugs board when something is broken or behaves unexpectedly.",
+    title: "What makes a bug report useful",
+  },
+] as const;
+
+/**
+ * The boards a create will write: enabled, named, deduplicated by slug and in
+ * the reader's order.
+ *
+ * `createWorkspace` drops a name that slugifies to one already kept, so the
+ * preview has to drop it too; two "Features" rows in the sidebar would picture
+ * a workspace the server will not create.
+ */
+function keptBoardNames(
+  boards: readonly RegisterBoardDraft[]
+): readonly string[] {
+  const namedBoards = boards.flatMap((board) => {
+    const name = board.name.trim();
+    const slug = slugify(name);
+
+    return board.enabled && name.length > 0 && slug.length > 0
+      ? [{ name, slug }]
+      : [];
+  });
+
+  // The first name wins, as it does in the create: a later board whose slug
+  // matches one already kept is dropped rather than renamed.
+  const names = namedBoards.flatMap(({ name, slug }, index) =>
+    namedBoards.findIndex((board) => board.slug === slug) === index
+      ? [name]
+      : []
+  );
+
+  // The wizard refuses to leave the boards step without one, but the identity
+  // step previews a draft that has not reached that validation yet.
+  return names.length > 0 ? names : [placeholderBoard];
+}
 
 export function WorkspacePreview({
   authorName,
@@ -98,25 +126,40 @@ export function WorkspacePreview({
   const root = appRootDomain();
   const host = `${subdomain.trim() || placeholderSlug}${root ? `.${root}` : ""}`;
 
-  // A post belongs to one board, and the samples land on the first board the
-  // reader kept, so that is the board the picture has to name.
-  const board = boards.find(
-    (draft) => draft.enabled && draft.name.trim().length > 0
+  const boardNames = keptBoardNames(boards);
+
+  const boardBySlug = new Map(
+    boardNames.map((boardName) => [slugify(boardName), boardName] as const)
   );
 
+  const fallbackBoard = boardNames[0] ?? placeholderBoard;
+
+  // A post belongs to one board, and the seed files each template under the
+  // board its slug names, falling back to the first board the reader kept.
+  const posts: HomePreviewPost[] = samplePosts.map((post) => ({
+    boardName: boardBySlug.get(post.boardSlug) ?? fallbackBoard,
+    excerpt: post.excerpt,
+    title: post.title,
+  }));
+
   return (
-    <div className="bg-muted/40 relative h-full overflow-hidden dark:bg-black/30">
+    // The preview is a picture of a workspace that does not exist yet, so it
+    // is hidden from assistive technology and inert: a screen reader
+    // announcing sample posts and a vote count for a fictional board would be
+    // describing a page nobody can reach.
+    <div
+      aria-hidden
+      className="bg-muted/40 relative h-full overflow-hidden dark:bg-black/30"
+      inert
+    >
       <div className="bg-background border-border absolute top-8 right-0 bottom-0 left-8 flex flex-col overflow-hidden rounded-tl-2xl border-r-0 border-b-0 shadow-lg shadow-black/5">
-        <ProductPostShot
-          comments={[]}
+        <HomePreview
+          authorName={authorName}
+          boardNames={boardNames}
           host={host}
           logoUrl={logoUrl}
-          name={name}
-          post={{
-            ...welcomePost,
-            author: authorName,
-            board: board?.name.trim(),
-          }}
+          posts={posts}
+          workspaceName={name}
         />
       </div>
     </div>

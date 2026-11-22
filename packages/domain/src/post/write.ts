@@ -771,7 +771,7 @@ const makePostWriteService = Effect.gen(function* () {
         Effect.tapCause(() =>
           rollbackPreparedEditorAssets(prepared.promotions)
         ),
-        Effect.ensuring(cleanupPreparedEditorAssets(prepared.promotions))
+        Effect.tap(() => cleanupPreparedEditorAssets(prepared.promotions))
       );
 
       yield* wakeEmailOutboxBestEffort(persisted.outboxId, args.organizationId);
@@ -1169,7 +1169,7 @@ const makePostWriteService = Effect.gen(function* () {
                 Effect.tapCause(() =>
                   rollbackPreparedEditorAssets(prepared.promotions)
                 ),
-                Effect.ensuring(
+                Effect.tap(() =>
                   cleanupPreparedEditorAssets(prepared.promotions)
                 )
               )

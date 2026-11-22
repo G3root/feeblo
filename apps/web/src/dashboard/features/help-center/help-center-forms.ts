@@ -58,12 +58,19 @@ export const helpCenterTopicFormOptions = formOptions({
   },
 });
 
+// Mirrors the backend's cover image contract, like the changelog's form does:
+// an http(s) URL, because that is what the page renders.
+const coverImage = z
+  .string()
+  .max(2048)
+  .regex(/^https?:\/\/[^\s]+$/i, "Invalid cover image URL");
+
 /**
  * The article form's shape.
  *
- * `status` is the write vocabulary, not the full state union: a create may name
- * any initial state, and the editor narrows the *offered* options to the moves
- * the lifecycle graph permits from where the article is now.
+ * The slug is not a field: it is chosen in the publish dialog, so a save that
+ * is not a publication cannot rename a live page's URL. `status` is the write
+ * vocabulary, not the full state union: the editor's actions move it.
  */
 export const helpCenterArticleFormSchema = z.object({
   title: z
@@ -71,7 +78,7 @@ export const helpCenterArticleFormSchema = z.object({
     .trim()
     .min(1, "An article needs a title.")
     .max(200, "Use 200 characters or fewer."),
-  slug: z.string().trim().max(200, "Use 200 characters or fewer."),
+  coverImage: coverImage.nullable(),
   // A section is required by the table, so the form refuses the empty state
   // rather than letting the server answer it.
   topicId: z.string().min(1, "Choose a section for this article."),
@@ -99,14 +106,14 @@ export type HelpCenterArticleFormValues = z.infer<
 /** The row fields the editor seeds from, taken from the read schema. */
 export type HelpCenterArticleFormSeed = Pick<
   THelpCenterArticle,
-  "content" | "slug" | "status" | "title" | "topicId"
+  "content" | "coverImage" | "status" | "title" | "topicId"
 >;
 
 export const helpCenterArticleFormValues = (
   article?: HelpCenterArticleFormSeed
 ): HelpCenterArticleFormValues => ({
   content: article?.content ?? "",
-  slug: article?.slug ?? "",
+  coverImage: article?.coverImage ?? null,
   status: article?.status ?? "draft",
   title: article?.title ?? "",
   topicId: article?.topicId ?? "",

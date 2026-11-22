@@ -14,12 +14,15 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Ref from "effect/Ref";
 import { TestClock } from "effect/testing";
 
+import { AssetRepository } from "../asset/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
 import { HelpCenterEnabled } from "../help-center/flag";
 import { PostEmbeddingService } from "../post/embedding-service";
+import { S3UploadService } from "../services/s3";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -142,11 +145,27 @@ describe("HelpCenterArticleRpcHandlers", () => {
     });
 
   const Repositories = Layer.mergeAll(
+    AssetRepository.layer,
     HelpCenterArticleRepository.layer,
     HelpCenterTopicRepository.layer,
     SiteRepository.layer,
     WorkspaceRepository.layer
   ).pipe(Layer.provide(Database.PgliteDatabaseLive));
+
+  /**
+   * The object store, present only for the handler's type.
+   *
+   * A write with no `assetIds` never yields this service: promotion is skipped
+   * before the first S3 call. The one test that does promote provides its own
+   * recording stub.
+   */
+  const S3Test = Layer.succeed(S3UploadService, {
+    uploadProfileImage: () => Effect.die("not used in this test"),
+    uploadOrganizationLogo: () => Effect.die("not used in this test"),
+    uploadEditorMedia: () => Effect.die("not used in this test"),
+    promoteEditorMedia: () => Effect.die("not used in this test"),
+    deleteObject: () => Effect.die("not used in this test"),
+  });
 
   const Entitlements = EntitlementPolicy.layer.pipe(
     Layer.provide(Repositories)
@@ -161,6 +180,7 @@ describe("HelpCenterArticleRpcHandlers", () => {
   // case below proves the gate refuses when it is off.
   const TestLayer = Layer.mergeAll(
     Repositories,
+    S3Test,
     Entitlements,
     Policies,
     Database.PgliteDatabaseLive,
@@ -207,6 +227,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
       return yield* handlers
         .CreateHelpCenterArticle({
+          assetIds: [],
+          coverImage: null,
           id,
           organizationId: fixture.organizationId,
           topicId: fixture.topicId,
@@ -245,6 +267,136 @@ describe("HelpCenterArticleRpcHandlers", () => {
       })
     );
 
+    it.effect("promotes temporary media and stores the permanent URLs", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const db = yield* currentDb;
+        const id = yield* HelpCenterArticleId.generate;
+        const assetId = `asset_${id}`;
+        const coverAssetId = `asset_cover_${id}`;
+
+        const temporaryUrl =
+          "https://assets.example/tmp/editor-media/image.png";
+
+        const permanentUrl = "https://assets.example/editor-media/image.png";
+
+        const coverTemporaryUrl =
+          "https://assets.example/tmp/editor-media/cover.png";
+
+        const coverPermanentUrl =
+          "https://assets.example/editor-media/cover.png";
+
+        const promotions = yield* Ref.make<{ bucket: string; key: string }[]>(
+          []
+        );
+
+        yield* db.insert(schema.assetTable).values([
+          {
+            id: assetId,
+            bucket: "test-bucket",
+            key: "tmp/editor-media/org/image.png",
+            url: temporaryUrl,
+            kind: "editor_image",
+            organizationId: fixture.organizationId,
+          },
+          {
+            id: coverAssetId,
+            bucket: "test-bucket",
+            key: "tmp/editor-media/org/cover.png",
+            url: coverTemporaryUrl,
+            kind: "editor_image",
+            organizationId: fixture.organizationId,
+          },
+        ]);
+
+        yield* handlers
+          .CreateHelpCenterArticle({
+            assetIds: [assetId, coverAssetId],
+            coverImage: coverTemporaryUrl,
+            id,
+            organizationId: fixture.organizationId,
+            topicId: fixture.topicId,
+            title: "Screenshots",
+            slug: "screenshots",
+            content: `![image](${temporaryUrl})`,
+            status: "draft",
+            publishedAt: null,
+            position: null,
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, makeSession(fixture)),
+            Effect.provideService(S3UploadService, {
+              uploadProfileImage: () => Effect.die("not used in this test"),
+              uploadOrganizationLogo: () => Effect.die("not used in this test"),
+              uploadEditorMedia: () => Effect.die("not used in this test"),
+              promoteEditorMedia: ({ bucket, key }) =>
+                Ref.update(promotions, (records) => [
+                  ...records,
+                  { bucket, key },
+                ]).pipe(
+                  Effect.as(
+                    key.endsWith("cover.png")
+                      ? {
+                          bucket,
+                          key: "editor-media/org/cover.png",
+                          url: coverPermanentUrl,
+                        }
+                      : {
+                          bucket,
+                          key: "editor-media/org/image.png",
+                          url: permanentUrl,
+                        }
+                  )
+                ),
+              deleteObject: () =>
+                Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
+            })
+          );
+
+        const [article] = yield* db
+          .select({
+            content: schema.helpCenterArticleTable.content,
+            coverImage: schema.helpCenterArticleTable.coverImage,
+          })
+          .from(schema.helpCenterArticleTable)
+          .where(eq(schema.helpCenterArticleTable.id, id));
+
+        const assets = yield* db
+          .select({
+            key: schema.assetTable.key,
+            url: schema.assetTable.url,
+          })
+          .from(schema.assetTable)
+          .orderBy(schema.assetTable.id);
+
+        const references = yield* db
+          .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+          .from(schema.helpCenterArticleAssetTable)
+          .where(eq(schema.helpCenterArticleAssetTable.articleId, id));
+
+        expect(article?.content).toContain(permanentUrl);
+        expect(article?.coverImage).toBe(coverPermanentUrl);
+        expect(assets).toEqual([
+          { key: "editor-media/org/cover.png", url: coverPermanentUrl },
+          { key: "editor-media/org/image.png", url: permanentUrl },
+        ]);
+        // The orphan sweep keeps an asset by these rows, so a body image and a
+        // cover are both recorded even though only the body names its URL.
+        expect(references.map(({ assetId }) => assetId).sort()).toEqual(
+          [assetId, coverAssetId].sort()
+        );
+        expect(
+          (yield* Ref.get(promotions)).toSorted((left, right) =>
+            left.key.localeCompare(right.key)
+          )
+        ).toEqual([
+          { bucket: "test-bucket", key: "tmp/editor-media/org/cover.png" },
+          { bucket: "test-bucket", key: "tmp/editor-media/org/image.png" },
+        ]);
+      })
+    );
+
     it.effect("refuses a slug another article already holds", () =>
       Effect.gen(function* () {
         const fixture = yield* makeFixture();
@@ -269,6 +421,345 @@ describe("HelpCenterArticleRpcHandlers", () => {
       })
     );
 
+    it.effect(
+      "keeps the temporary upload when a refused save rolls back its promotion",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const id = yield* HelpCenterArticleId.generate;
+          const assetId = `asset_${id}`;
+          const temporaryKey = "tmp/editor-media/org/retry.png";
+
+          const temporaryUrl =
+            "https://assets.example/tmp/editor-media/retry.png";
+
+          const permanentKey = "editor-media/org/retry.png";
+
+          const permanentUrl = "https://assets.example/editor-media/retry.png";
+
+          const deletedKeys = yield* Ref.make<string[]>([]);
+
+          yield* create(
+            fixture,
+            yield* HelpCenterArticleId.generate,
+            "First",
+            "shared"
+          );
+
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: "test-bucket",
+            key: temporaryKey,
+            url: temporaryUrl,
+            kind: "editor_image",
+            organizationId: fixture.organizationId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .CreateHelpCenterArticle({
+                assetIds: [assetId],
+                coverImage: null,
+                content: `![retry](${temporaryUrl})`,
+                id,
+                organizationId: fixture.organizationId,
+                position: null,
+                publishedAt: null,
+                slug: "shared",
+                status: "draft",
+                title: "Second",
+                topicId: fixture.topicId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, session),
+                Effect.provideService(S3UploadService, {
+                  uploadProfileImage: () => Effect.die("not used in this test"),
+                  uploadOrganizationLogo: () =>
+                    Effect.die("not used in this test"),
+                  uploadEditorMedia: () => Effect.die("not used in this test"),
+                  promoteEditorMedia: ({ bucket }) =>
+                    Effect.succeed({
+                      bucket,
+                      key: permanentKey,
+                      url: permanentUrl,
+                    }),
+                  deleteObject: (_bucket, key) =>
+                    Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
+                      Effect.as({ $metadata: { httpStatusCode: 204 } })
+                    ),
+                })
+              )
+          );
+
+          expect(error._tag).toBe("HelpCenterArticleSlugTakenError");
+
+          const [asset] = yield* db
+            .select({ key: schema.assetTable.key })
+            .from(schema.assetTable)
+            .where(eq(schema.assetTable.id, assetId));
+
+          // The permanent copy of the failed write is rolled back, but the
+          // temporary original is the retry's only source and must survive it.
+          expect(yield* Ref.get(deletedKeys)).toEqual([permanentKey]);
+          expect(asset).toEqual({ key: temporaryKey });
+        })
+    );
+
+    it.effect(
+      "keeps the temporary upload when a status conflict refuses an update",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const id = yield* HelpCenterArticleId.generate;
+          const assetId = `asset_${id}`;
+
+          const temporaryKey = "tmp/editor-media/org/conflict.png";
+
+          const temporaryUrl =
+            "https://assets.example/tmp/editor-media/conflict.png";
+
+          const permanentKey = "editor-media/org/conflict.png";
+
+          const permanentUrl =
+            "https://assets.example/editor-media/conflict.png";
+
+          const deletedKeys = yield* Ref.make<string[]>([]);
+
+          yield* create(fixture, id, "Conflict");
+
+          yield* db.insert(schema.assetTable).values({
+            id: assetId,
+            bucket: "test-bucket",
+            key: temporaryKey,
+            url: temporaryUrl,
+            kind: "editor_image",
+            organizationId: fixture.organizationId,
+          });
+
+          const error = yield* Effect.flip(
+            handlers
+              .UpdateHelpCenterArticle({
+                assetIds: [assetId],
+                coverImage: null,
+                content: `![image](${temporaryUrl})`,
+                // The row is published, so this editor's draft assumption is
+                // the stale-status conflict the guard refuses.
+                expectedStatus: "draft",
+                id,
+                organizationId: fixture.organizationId,
+                position: null,
+                publishedAt: null,
+                slug: "conflict",
+                status: "published",
+                title: "Conflict",
+                topicId: fixture.topicId,
+              })
+              .pipe(
+                Effect.provideService(CurrentSession, session),
+                Effect.provideService(S3UploadService, {
+                  uploadProfileImage: () => Effect.die("not used in this test"),
+                  uploadOrganizationLogo: () =>
+                    Effect.die("not used in this test"),
+                  uploadEditorMedia: () => Effect.die("not used in this test"),
+                  promoteEditorMedia: ({ bucket }) =>
+                    Effect.succeed({
+                      bucket,
+                      key: permanentKey,
+                      url: permanentUrl,
+                    }),
+                  deleteObject: (_bucket, key) =>
+                    Ref.update(deletedKeys, (keys) => [...keys, key]).pipe(
+                      Effect.as({ $metadata: { httpStatusCode: 204 } })
+                    ),
+                })
+              )
+          );
+
+          expect(error._tag).toBe("HelpCenterArticleChangedError");
+
+          const [asset] = yield* db
+            .select({ key: schema.assetTable.key })
+            .from(schema.assetTable)
+            .where(eq(schema.assetTable.id, assetId));
+
+          expect(yield* Ref.get(deletedKeys)).toEqual([permanentKey]);
+          expect(asset).toEqual({ key: temporaryKey });
+        })
+    );
+
+    it.effect("records and prunes the images an update references", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const id = yield* HelpCenterArticleId.generate;
+        const assetId = `asset_${id}`;
+
+        const temporaryUrl =
+          "https://assets.example/tmp/editor-media/update.png";
+
+        const permanentUrl = "https://assets.example/editor-media/update.png";
+
+        yield* create(fixture, id, "Referenced images");
+
+        yield* db.insert(schema.assetTable).values({
+          id: assetId,
+          bucket: "test-bucket",
+          key: "tmp/editor-media/org/update.png",
+          url: temporaryUrl,
+          kind: "editor_image",
+          organizationId: fixture.organizationId,
+        });
+
+        yield* handlers
+          .UpdateHelpCenterArticle({
+            assetIds: [assetId],
+            coverImage: null,
+            content: `![image](${temporaryUrl})`,
+            expectedStatus: "published",
+            id,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "referenced-images",
+            status: "published",
+            title: "Referenced images",
+            topicId: fixture.topicId,
+          })
+          .pipe(
+            Effect.provideService(CurrentSession, session),
+            Effect.provideService(S3UploadService, {
+              uploadProfileImage: () => Effect.die("not used in this test"),
+              uploadOrganizationLogo: () => Effect.die("not used in this test"),
+              uploadEditorMedia: () => Effect.die("not used in this test"),
+              promoteEditorMedia: ({ bucket }) =>
+                Effect.succeed({
+                  bucket,
+                  key: "editor-media/org/update.png",
+                  url: permanentUrl,
+                }),
+              deleteObject: () =>
+                Effect.succeed({ $metadata: { httpStatusCode: 204 } }),
+            })
+          );
+
+        const readReferences = Effect.gen(function* () {
+          const references = yield* db
+            .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+            .from(schema.helpCenterArticleAssetTable)
+            .where(eq(schema.helpCenterArticleAssetTable.articleId, id));
+
+          return references.map(({ assetId: referencedId }) => referencedId);
+        });
+
+        expect(yield* readReferences).toEqual([assetId]);
+
+        yield* handlers
+          .UpdateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
+            content: "Body without the image.",
+            expectedStatus: "published",
+            id,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "referenced-images",
+            status: "published",
+            title: "Referenced images",
+            topicId: fixture.topicId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        expect(yield* readReferences).toEqual([]);
+      })
+    );
+
+    it.effect("records image URLs whose asset ids were not submitted", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const assetId = "asset_referenced_by_url";
+
+        const assetUrl = "https://assets.example/editor-media/by-url.png";
+
+        yield* db.insert(schema.assetTable).values({
+          id: assetId,
+          bucket: "test-bucket",
+          key: "editor-media/org/by-url.png",
+          url: assetUrl,
+          kind: "editor_image",
+          organizationId: fixture.organizationId,
+        });
+
+        const readReferences = (articleId: string) =>
+          Effect.gen(function* () {
+            const references = yield* db
+              .select({ assetId: schema.helpCenterArticleAssetTable.assetId })
+              .from(schema.helpCenterArticleAssetTable)
+              .where(
+                eq(schema.helpCenterArticleAssetTable.articleId, articleId)
+              );
+
+            return references.map(({ assetId: referencedId }) => referencedId);
+          });
+
+        // A create: the caller wrote Markdown with the URL and sent no ids.
+        const createdId = yield* HelpCenterArticleId.generate;
+
+        yield* handlers
+          .CreateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
+            content: `![image](${assetUrl})`,
+            id: createdId,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "created-by-url",
+            status: "draft",
+            title: "Created by URL",
+            topicId: fixture.topicId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        expect(yield* readReferences(createdId)).toEqual([assetId]);
+
+        // An update: the editor was reopened from content that names the URL.
+        const updatedId = yield* HelpCenterArticleId.generate;
+
+        yield* create(fixture, updatedId, "Updated by URL");
+
+        yield* handlers
+          .UpdateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
+            content: `![image](${assetUrl})`,
+            expectedStatus: "published",
+            id: updatedId,
+            organizationId: fixture.organizationId,
+            position: null,
+            publishedAt: null,
+            slug: "updated-by-url",
+            status: "published",
+            title: "Updated by URL",
+            topicId: fixture.topicId,
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        expect(yield* readReferences(updatedId)).toEqual([assetId]);
+      })
+    );
+
     it.effect("refuses a create naming another workspace's section", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleRpcHandlersEffect;
@@ -277,6 +768,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
         const error = yield* Effect.flip(
           handlers
             .CreateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               id: yield* HelpCenterArticleId.generate,
               organizationId: fixture.organizationId,
               // A section id from nowhere: the composite foreign key would
@@ -307,6 +800,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
         const error = yield* Effect.flip(
           handlers
             .CreateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               id: yield* HelpCenterArticleId.generate,
               organizationId: fixture.organizationId,
               topicId: fixture.topicId,
@@ -342,6 +837,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
         yield* handlers
           .UpdateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
             id,
             organizationId: fixture.organizationId,
             topicId: fixture.topicId,
@@ -377,6 +874,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
           yield* handlers
             .UpdateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               id,
               organizationId: fixture.organizationId,
               topicId: fixture.topicId,
@@ -413,6 +912,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
           yield* handlers
             .CreateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               id: draft,
               organizationId: fixture.organizationId,
               topicId: fixture.topicId,
@@ -428,6 +929,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
           yield* create(fixture, archived, "Withdrawn", "withdrawn");
           yield* handlers
             .UpdateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               id: archived,
               organizationId: fixture.organizationId,
               topicId: fixture.topicId,
@@ -513,6 +1016,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
         yield* handlers
           .CreateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
             id,
             organizationId: fixture.organizationId,
             topicId: fixture.topicId,
@@ -557,6 +1062,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
         yield* handlers
           .CreateHelpCenterArticle({
+            assetIds: [],
+            coverImage: null,
             id: yield* HelpCenterArticleId.generate,
             organizationId: fixture.organizationId,
             topicId: fixture.topicId,
@@ -842,6 +1349,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
           yield* handlers
             .CreateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               id,
               organizationId: fixture.organizationId,
               topicId: fixture.topicId,
@@ -886,6 +1395,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
           yield* handlers
             .CreateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               id,
               organizationId: fixture.organizationId,
               topicId: fixture.topicId,
@@ -995,6 +1506,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
           // words on the page, so it is kept.
           yield* handlers
             .UpdateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               content: current.content,
               expectedStatus: "published",
               id,
@@ -1014,6 +1527,8 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
           yield* handlers
             .UpdateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
               content: `${current.content}\n\nOne more line.`,
               expectedStatus: "published",
               id,

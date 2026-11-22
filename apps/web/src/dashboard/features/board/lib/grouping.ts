@@ -29,3 +29,13 @@ export const BOARD_GROUPING_OPTIONS = BOARD_GROUPING_ORDER.map((value) => ({
 
 export const boardGroupingLabel = (field: TBoardGroupBy) =>
   BOARD_GROUPING_LABELS[field];
+
+/**
+ * Narrows a control's string value back to a grouping field.
+ *
+ * The display popover's select and the saved-view editor's radio menu both
+ * hand back a `string`; this is the one place that decides which of them is a
+ * real `TBoardGroupBy`.
+ */
+export const isBoardGroupBy = (value: string): value is TBoardGroupBy =>
+  BOARD_GROUPING_OPTIONS.some((option) => option.value === value);

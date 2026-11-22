@@ -72,8 +72,7 @@ export function InsightsTrafficFailure({
         <CardHeader>
           <CardTitle>Traffic could not be loaded</CardTitle>
           <CardDescription>
-            The view counts are unavailable right now. Retrying asks the server
-            again; the feedback numbers above are unaffected.
+            The feedback numbers above are unaffected.
           </CardDescription>
         </CardHeader>
         <CardPanel>

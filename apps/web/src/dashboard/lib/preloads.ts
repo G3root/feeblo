@@ -162,8 +162,13 @@ export async function preloadChangelogEditor(): Promise<void> {
   ]);
 }
 
-/** The help center index: topics and their articles. */
+/** The help center index: the sections, with their article counts. */
 export async function preloadHelpCenter(): Promise<void> {
+  await dashboardCollections.helpCenterTopicCollection.preload();
+}
+
+/** One section: its own row plus the articles it lists. */
+export async function preloadHelpCenterSection(): Promise<void> {
   await Promise.all([
     dashboardCollections.helpCenterTopicCollection.preload(),
     dashboardCollections.helpCenterArticleCollection.preload(),

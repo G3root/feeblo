@@ -240,7 +240,12 @@ function TopicFields({
         <DialogClose render={<Button type="button" variant="ghost" />}>
           Cancel
         </DialogClose>
-        <form.SubscribeButton label={submitLabel} variant="default" />
+        {/* `SubscribeButton` reads the form from context, which only
+            `AppForm` provides; without it it throws and the dialog's error
+            boundary takes over. */}
+        <form.AppForm>
+          <form.SubscribeButton label={submitLabel} variant="default" />
+        </form.AppForm>
       </DialogFooter>
     </form>
   );

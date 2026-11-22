@@ -11,8 +11,8 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    // Nothing is rendered while the flag is off, so preloading both
-    // collections would be a request for a page that cannot use it.
+    // Nothing is rendered while the flag is off, so preloading the section list
+    // would be a request for a page that cannot use it.
     if (isFeatureEnabled("HELP_CENTER")) {
       await preloadHelpCenter();
     }
@@ -23,6 +23,11 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId } = Route.useParams();
+  const enabled = useFeatureFlag("HELP_CENTER");
+
+  if (!enabled) {
+    return <HelpCenterUnavailable />;
+  }
 
   return <HelpCenterIndex organizationId={organizationId} />;
 }

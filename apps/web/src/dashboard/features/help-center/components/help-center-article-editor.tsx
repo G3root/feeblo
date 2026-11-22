@@ -1,20 +1,42 @@
 import { useAtomSet } from "@effect/atom-react";
-import type { THelpCenterArticleState } from "@feeblo/domain-contracts/help-center-article";
-import { targetStatesFor } from "@feeblo/domain/help-center-article/machine";
+import type {
+  THelpCenterArticleState,
+  THelpCenterArticleWriteState,
+} from "@feeblo/domain-contracts/help-center-article";
 import { HelpCenterArticleId } from "@feeblo/id";
+import { PostContentEditor } from "@feeblo/post-ui/post-content";
 import { Button } from "@feeblo/ui/button";
-import { FieldDescription, FieldLabel } from "@feeblo/ui/field";
+import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
-import { MarkdownContent } from "@feeblo/ui/markdown-content";
-import { Tabs, TabsList, TabsPanel, TabsTab } from "@feeblo/ui/tabs";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
+import { toastManager } from "@feeblo/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { cn } from "@feeblo/ui/utils";
+import * as dayjs from "@feeblo/utils/dayjs";
+import { slugify } from "@feeblo/utils/url";
 import { parseRpcError } from "@feeblo/web-shared/rpc-error";
-import { ArrowLeft02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import {
+  Archive01Icon,
+  ArrowLeft02Icon,
+  Calendar03Icon,
+  Copy01Icon,
+  Delete02Icon,
+  Ellipsis,
+  Link03Icon,
+  LinkSquare02Icon,
+  RefreshIcon,
+  StatusIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import * as Match from "effect/Match";
+import { type ReactNode, useRef, useState } from "react";
 
+import { CoverImageField } from "~/components/cover-image-field";
+import { EditorLayout } from "~/components/editor-layout";
+import { PublishDialog } from "~/components/publish-dialog";
+import { usePublicSiteUrl } from "~/hooks/use-site";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
@@ -28,7 +50,26 @@ import {
   helpCenterArticleFormValues,
   type HelpCenterArticleFormValues,
 } from "../help-center-forms";
+import { HelpCenterArticleStatusBadge } from "./help-center-article-status";
 import { HelpCenterTopicIcon } from "./help-center-topic-icon";
+
+/**
+ * What one submit changes beyond the form's own values.
+ *
+ * The status is not a field: it moves through the actions below, the way the
+ * changelog's does, so there is one place that decides whether an article is
+ * live. `publishedAt` is an override too because "turn into draft" has to clear
+ * it while "archive" keeps it.
+ */
+type ArticleSubmitOverrides = {
+  publishedAt?: Date | null;
+  slug?: string;
+  status?: THelpCenterArticleWriteState;
+};
+
+type ArticleSubmitMeta = {
+  overrides?: ArticleSubmitOverrides;
+};
 
 /**
  * What the editor is editing, as a discriminated union rather than an optional
@@ -40,10 +81,24 @@ import { HelpCenterTopicIcon } from "./help-center-topic-icon";
  * a caller cannot read a row without having one.
  */
 export type HelpCenterArticleEditorProps =
-  | { readonly mode: "create"; readonly organizationId: string }
+  | {
+      /**
+       * The section a new article belongs to.
+       *
+       * It comes from the route (`/help-center/<topicId>/new`), so the create
+       * page opens with its section already chosen. The field is still editable
+       * because an article filed in the wrong place is worse than one more
+       * click.
+       */
+      readonly mode: "create";
+      readonly organizationId: string;
+      readonly topicId: string;
+    }
   | {
       readonly article: {
         readonly content: string;
+        readonly coverImage: string | null;
+        readonly createdAt: Date;
         readonly id: string;
         readonly position: number | null;
         readonly publishedAt: Date | null;
@@ -51,18 +106,11 @@ export type HelpCenterArticleEditorProps =
         readonly status: THelpCenterArticleState;
         readonly title: string;
         readonly topicId: string;
+        readonly updatedAt: Date;
       };
       readonly mode: "edit";
       readonly organizationId: string;
     };
-
-const ARTICLE_FORM_ID = "help-center-article-form";
-
-const STATUS_LABELS = {
-  archived: "Archived",
-  draft: "Draft",
-  published: "Published",
-} satisfies Record<THelpCenterArticleState, string>;
 
 /**
  * The article editor.
@@ -83,6 +131,32 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     useDashboardCollections();
 
   const navigate = useNavigate();
+  const publicSiteUrl = usePublicSiteUrl();
+
+  const article = props.mode === "edit" ? props.article : undefined;
+
+  const initialTopicId = props.mode === "create" ? props.topicId : undefined;
+
+  /**
+   * The upload scope of this editor, and the key that remounts the content
+   * editor when the row underneath it changes.
+   *
+   * The same arrangement the changelog editor uses: images are uploaded under a
+   * per-editor scope, so a save only promotes the files this editor uploaded
+   * and never a colleague's in-flight ones.
+   */
+  const [editorScope] = useState(() => crypto.randomUUID());
+
+  /**
+   * The asset id of the cover image this session uploaded.
+   *
+   * A cover uploads immediately, outside the body's deferred uploads, so its id
+   * has to be remembered here to travel in `assetIds` on save — otherwise the
+   * object stays in the temporary prefix and is reaped.
+   */
+  const coverImageAssetRef = useRef<string | null>(null);
+
+  const formResetKey = `${article?.id ?? "new"}:${article?.updatedAt.getTime() ?? 0}`;
 
   const topicsQuery = useLiveQuery({
     queryKey: [
@@ -99,20 +173,6 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
   });
 
   const topics = topicsQuery.data ?? [];
-
-  const article = props.mode === "edit" ? props.article : undefined;
-
-  /**
-   * The statuses the lifecycle permits from where this article is now.
-   *
-   * Derived from the domain machine rather than listed, so the editor cannot
-   * offer a move the graph says is unreachable — `draft → archived` is one,
-   * because a page nobody has published is deleted rather than withdrawn. The
-   * server asks the same machine, so this is the picker agreeing with the write
-   * instead of a second opinion.
-   */
-  const currentStatus: THelpCenterArticleState = article?.status ?? "draft";
-  const offeredStatuses = [currentStatus, ...targetStatesFor(currentStatus)];
 
   /**
    * The status the editor opened on, kept for the write's conflict check.
@@ -151,8 +211,15 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
 
   const form = useAppForm({
     ...helpCenterArticleFormOptions,
-    defaultValues: helpCenterArticleFormValues(article),
-    onSubmit: async ({ value }) => {
+    defaultValues: {
+      ...helpCenterArticleFormValues(article),
+      // Only the create flow has a section chosen before the form exists; an
+      // edit seeds its topic from the article itself.
+      ...(article === undefined && initialTopicId !== undefined
+        ? { topicId: initialTopicId }
+        : {}),
+    },
+    onSubmit: async ({ meta, value }) => {
       /**
        * A refused write is shown, not thrown.
        *
@@ -165,24 +232,73 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
        */
       setSubmitError(null);
 
+      // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
+      const overrides = (meta as ArticleSubmitMeta | undefined)?.overrides;
+
       try {
-        await submit(value);
+        await submit(value, overrides);
       } catch (cause) {
         setSubmitError(parseRpcError(cause).message);
       }
     },
   });
 
-  async function submit(value: HelpCenterArticleFormValues) {
+  const backTopicId = article === undefined ? initialTopicId : article.topicId;
+  const backTopic = topics.find((topic) => topic.id === backTopicId);
+
+  async function submit(
+    value: HelpCenterArticleFormValues,
+    overrides: ArticleSubmitOverrides | undefined
+  ) {
+    /**
+     * Resolve the images pasted into this editor before the write.
+     *
+     * `PostContentEditor` holds pasted files as object URLs until a save, and
+     * this is the save: the files go to the temporary prefix, the content is
+     * rewritten to their uploaded URLs, and the ids travel with the write so
+     * the server can promote them to permanent objects.
+     */
+    const finalized = await finalizeEditorContent(
+      value.content,
+      organizationId,
+      { scope: editorScope }
+    );
+
+    const content = finalized.content;
     const topicId = value.topicId;
     const title = value.title.trim();
-    const slug = value.slug.trim();
+    const status = overrides?.status ?? value.status;
+
+    // The slug is only ever set by the publish dialog. A save keeps the row's
+    // current slug (or lets the server derive one from the title on create),
+    // so editing cannot silently move a live page's URL.
+    const slug = overrides?.slug?.trim();
+
+    const coverImageAssetId = coverImageAssetRef.current;
+
+    const assetIds =
+      coverImageAssetId === null
+        ? finalized.assetIds
+        : [...finalized.assetIds, coverImageAssetId];
+
+    // An explicit override wins, including the explicit `null` that turning an
+    // article back into a draft needs. Without one the stored date is kept, so
+    // a typo fix does not look like a new release; a create has no stored date
+    // to keep.
+    const publishedAt =
+      overrides !== undefined && "publishedAt" in overrides
+        ? (overrides.publishedAt ?? null)
+        : status === "draft"
+          ? null
+          : (article?.publishedAt ?? new Date());
 
     if (article === undefined) {
       const id = await HelpCenterArticleId.unsafeGenerate();
 
       await createArticle({
         payload: {
+          assetIds,
+          coverImage: value.coverImage,
           id,
           organizationId,
           topicId,
@@ -190,10 +306,10 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
           // Omitted rather than sent as "": the server derives the slug from
           // the title, and an empty string is refused rather than treated as
           // "no preference".
-          slug: slug.length === 0 ? undefined : slug,
-          content: value.content,
-          status: value.status,
-          publishedAt: value.status === "draft" ? null : new Date(),
+          slug: slug === undefined || slug.length === 0 ? undefined : slug,
+          content,
+          status,
+          publishedAt,
           position: null,
         },
         reactivityKeys: helpCenterArticleReactivityKeys(organizationId),
@@ -201,36 +317,58 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     } else {
       await updateArticle({
         payload: {
+          assetIds,
+          coverImage: value.coverImage,
           id: article.id,
           organizationId,
           topicId,
           title,
-          slug: slug.length === 0 ? article.slug : slug,
-          content: value.content,
-          status: value.status,
+          slug: slug === undefined || slug.length === 0 ? article.slug : slug,
+          content,
+          status,
           // What this editor opened on, not what a background refresh has
           // since put there: a row that moved is refused as a conflict rather
           // than silently reverted.
           expectedStatus: openedStatus ?? article.status,
-          // A flip back to draft clears the date; the server applies the same
-          // rule, and sending the previous date for a non-draft status is what
-          // keeps a typo fix from looking like a new release.
-          publishedAt: value.status === "draft" ? null : article.publishedAt,
+          publishedAt,
           position: article.position,
         },
         reactivityKeys: helpCenterArticleReactivityKeys(organizationId),
       });
     }
 
+    // The write was accepted, so the uploaded files are permanent now and
+    // must not be re-uploaded by a later save from this editor.
+    finalized.commit();
+
     // The list's rows are summaries the collection owns; the write above
     // refreshed the single-article atom through its reactivity keys, so there
     // is no cache entry here to forget.
     await helpCenterArticleCollection.utils.refetch();
     await navigate({
-      params: { organizationId },
-      to: "/$organizationId/help-center",
+      params: { organizationId, topicId },
+      to: "/$organizationId/help-center/$topicId",
     });
   }
+
+  /**
+   * Publish through the dialog, failing loudly.
+   *
+   * The form's `onSubmit` catches a refused write so it can render the
+   * server's message; that also makes `handleSubmit` resolve, which the dialog
+   * reads as success and answers by closing and discarding the slug and date
+   * it was given. Publishing therefore calls the submit path directly and
+   * rethrows, so a refused publication leaves the dialog open on the values the
+   * editor entered.
+   */
+  const publish = async (overrides: { publishedAt: Date; slug: string }) => {
+    try {
+      await submit(form.state.values, { ...overrides, status: "published" });
+    } catch (cause) {
+      setSubmitError(parseRpcError(cause).message);
+      throw cause;
+    }
+  };
 
   const remove = async () => {
     if (article === undefined) {
@@ -247,8 +385,8 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
 
       await helpCenterArticleCollection.utils.refetch();
       await navigate({
-        params: { organizationId },
-        to: "/$organizationId/help-center",
+        params: { organizationId, topicId: article.topicId },
+        to: "/$organizationId/help-center/$topicId",
       });
     } catch (cause) {
       // The same message area the save uses: `remove` is not part of a submit,
@@ -259,79 +397,270 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
-      <header className="flex items-center justify-between gap-3">
-        <Button
-          render={
-            <Link
-              params={{ organizationId }}
-              to="/$organizationId/help-center"
-            />
-          }
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          <HugeiconsIcon icon={ArrowLeft02Icon} />
-          Help center
-        </Button>
+    <form
+      className="contents"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void form.handleSubmit();
+      }}
+    >
+      <EditorLayout>
+        <EditorLayout.Main>
+          <EditorLayout.Header className="items-center gap-3">
+            {backTopicId === undefined ? (
+              <Button
+                render={
+                  <Link
+                    params={{ organizationId }}
+                    to="/$organizationId/help-center"
+                  />
+                }
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                <HugeiconsIcon icon={ArrowLeft02Icon} />
+                Help center
+              </Button>
+            ) : (
+              <Button
+                render={
+                  <Link
+                    params={{ organizationId, topicId: backTopicId }}
+                    to="/$organizationId/help-center/$topicId"
+                  />
+                }
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                <HugeiconsIcon icon={ArrowLeft02Icon} />
+                {backTopic?.name ?? "Section"}
+              </Button>
+            )}
+          </EditorLayout.Header>
 
-        <div className="flex items-center gap-2">
-          {props.mode === "create" ? null : (
-            <Button onClick={() => void remove()} type="button" variant="ghost">
-              <HugeiconsIcon icon={Delete02Icon} />
-              Delete
-            </Button>
-          )}
-          <form.SubscribeButton
-            // The header is outside the `<form>`, so the button is associated
-            // by id rather than by nesting.
-            form={ARTICLE_FORM_ID}
-            label={props.mode === "create" ? "Create article" : "Save changes"}
-            variant="default"
-          />
-        </div>
-      </header>
-
-      <form
-        className="contents"
-        id={ARTICLE_FORM_ID}
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          void form.handleSubmit();
-        }}
-      >
-        <div className="space-y-5">
-          <form.AppField name="title">
+          <form.AppField name="coverImage">
             {(field) => (
-              <field.TextField
-                label="Title"
-                maxLength={200}
-                placeholder="How do I reset my password?"
+              <CoverImageField
+                assetRef={coverImageAssetRef}
+                onChange={field.handleChange}
+                organizationId={organizationId}
+                value={field.state.value}
               />
             )}
           </form.AppField>
 
-          <form.AppField name="slug">
-            {(field) => {
-              const { TextField } = field;
-
-              return (
-                <>
-                  <TextField
-                    label="URL slug"
-                    maxLength={200}
-                    placeholder="reset-my-password"
-                  />
-                  <FieldDescription>
-                    Leave empty to derive it from the title.
-                  </FieldDescription>
-                </>
-              );
-            }}
+          <form.AppField name="title">
+            {(field) => (
+              <field.TextField
+                className="rounded-md border-none bg-transparent font-medium tracking-tight md:text-2xl"
+                hideLabel
+                label="Title"
+                maxLength={200}
+                placeholder="Untitled article"
+              />
+            )}
           </form.AppField>
+
+          <form.AppField name="content">
+            {(field) => (
+              <PostContentEditor
+                editorScope={editorScope}
+                key={formResetKey}
+                onChange={field.handleChange}
+                organizationId={organizationId}
+                showBlockHandle
+                value={field.state.value}
+              />
+            )}
+          </form.AppField>
+
+          {submitError === null ? null : (
+            <p className="text-destructive text-sm">{submitError}</p>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <form.Subscribe
+              selector={(state) => ({
+                isSubmitting: state.isSubmitting,
+                title: state.values.title,
+              })}
+            >
+              {(state) => (
+                <div className="flex items-center gap-2">
+                  <Button
+                    loading={state.isSubmitting}
+                    type="submit"
+                    variant="outline"
+                  >
+                    Save
+                  </Button>
+                  {Match.value(article?.status).pipe(
+                    Match.when("published", () => (
+                      <Button
+                        disabled={state.isSubmitting}
+                        onClick={() =>
+                          void form.handleSubmit({
+                            overrides: { publishedAt: null, status: "draft" },
+                          })
+                        }
+                        type="button"
+                        variant="brand"
+                      >
+                        Turn into draft
+                      </Button>
+                    )),
+                    Match.when("archived", () => (
+                      <Button
+                        disabled={state.isSubmitting}
+                        onClick={() =>
+                          void form.handleSubmit({
+                            overrides: { publishedAt: null, status: "draft" },
+                          })
+                        }
+                        type="button"
+                        variant="brand"
+                      >
+                        Restore to draft
+                      </Button>
+                    )),
+                    Match.orElse(() => (
+                      <PublishDialog
+                        defaultPublishedAt={article?.publishedAt ?? null}
+                        defaultSlug={
+                          article?.slug ?? slugify(state.title.trim())
+                        }
+                        description="Choose the public URL and publication date for this article."
+                        failureTitle="Failed to publish article"
+                        onPublish={publish}
+                        submitLabel="Publish"
+                        title="Publish article"
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+            </form.Subscribe>
+          </div>
+        </EditorLayout.Main>
+
+        <EditorLayout.Sidebar>
+          {article === undefined ? null : (
+            <div className="flex items-center justify-end gap-2">
+              {publicSiteUrl === undefined ||
+              article.status === "draft" ? null : (
+                <>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={(triggerProps) => (
+                        <Button
+                          {...triggerProps}
+                          aria-label="Go to public article"
+                          className="rounded-full"
+                          render={(buttonProps) => (
+                            <a
+                              {...buttonProps}
+                              href={`${publicSiteUrl}/s/help/articles/${article.slug}`}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                            >
+                              <HugeiconsIcon icon={LinkSquare02Icon} />
+                            </a>
+                          )}
+                          size="icon-sm"
+                          type="button"
+                          variant="outline"
+                        />
+                      )}
+                    />
+                    <TooltipPopup>Go to public article</TooltipPopup>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={(triggerProps) => (
+                        <Button
+                          {...triggerProps}
+                          aria-label="Copy article link"
+                          className="rounded-full"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(
+                                `${publicSiteUrl}/s/help/articles/${article.slug}`
+                              );
+                              toastManager.add({
+                                title: "Article link copied to clipboard",
+                                type: "success",
+                              });
+                            } catch {
+                              toastManager.add({
+                                title: "Failed to copy article link",
+                                type: "error",
+                              });
+                            }
+                          }}
+                          size="icon-sm"
+                          type="button"
+                          variant="outline"
+                        />
+                      )}
+                    />
+                    <TooltipPopup>Copy article link</TooltipPopup>
+                  </Tooltip>
+                </>
+              )}
+              {article.status === "published" ? (
+                <Menu>
+                  <MenuTrigger
+                    render={
+                      <Button
+                        aria-label="More article actions"
+                        className="rounded-full"
+                        size="icon-sm"
+                        type="button"
+                        variant="outline"
+                      />
+                    }
+                  >
+                    <HugeiconsIcon icon={Ellipsis} />
+                  </MenuTrigger>
+                  <MenuPopup align="end">
+                    <MenuItem
+                      onClick={() =>
+                        void form.handleSubmit({
+                          overrides: { status: "archived" },
+                        })
+                      }
+                    >
+                      <HugeiconsIcon icon={Archive01Icon} />
+                      Archive article
+                    </MenuItem>
+                  </MenuPopup>
+                </Menu>
+              ) : null}
+              <Tooltip>
+                <TooltipTrigger
+                  render={(triggerProps) => (
+                    <Button
+                      {...triggerProps}
+                      aria-label="Delete article"
+                      className="rounded-full"
+                      onClick={() => void remove()}
+                      size="icon-sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} />
+                    </Button>
+                  )}
+                />
+                <TooltipPopup>Delete article</TooltipPopup>
+              </Tooltip>
+            </div>
+          )}
 
           <form.AppField name="topicId">
             {(field) => (
@@ -339,105 +668,132 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                 <legend className="text-sm font-medium">Section</legend>
                 <div className="flex flex-wrap gap-2">
                   {topics.map((topic) => (
-                    <button
-                      aria-pressed={field.state.value === topic.id}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors",
-                        field.state.value === topic.id
-                          ? "border-primary/50 bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      )}
+                    <EditorChip
+                      active={field.state.value === topic.id}
                       key={topic.id}
                       onClick={() => field.handleChange(topic.id)}
-                      type="button"
                     >
                       <HelpCenterTopicIcon
                         className="size-4"
                         icon={topic.icon}
                       />
                       {topic.name}
-                    </button>
+                    </EditorChip>
                   ))}
                 </div>
                 {topics.length === 0 ? (
-                  <FieldDescription>
+                  <p className="text-muted-foreground text-xs">
                     Create a section first — every article belongs to one.
-                  </FieldDescription>
+                  </p>
                 ) : null}
               </fieldset>
             )}
           </form.AppField>
 
-          <form.AppField name="status">
-            {(field) => (
-              <fieldset className="flex flex-col gap-2">
-                <legend className="text-sm font-medium">Status</legend>
-                <div className="flex flex-wrap gap-2">
-                  {offeredStatuses.map((option) => (
-                    <button
-                      aria-pressed={field.state.value === option}
-                      className={cn(
-                        "rounded-md border px-3 py-1.5 text-sm transition-colors",
-                        field.state.value === option
-                          ? "border-primary/50 bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      )}
-                      key={option}
-                      onClick={() => field.handleChange(option)}
-                      type="button"
-                    >
-                      {STATUS_LABELS[option]}
-                    </button>
-                  ))}
-                </div>
-                <FieldDescription>
-                  Archived articles stay reachable so old links do not break,
-                  but the portal marks them as out of date. Only the moves the
-                  article&apos;s lifecycle allows are offered.
-                </FieldDescription>
-              </fieldset>
-            )}
-          </form.AppField>
-        </div>
+          {article === undefined ? null : (
+            <>
+              <EditorLayout.SidebarSeparator />
+              <ArticleDetails article={article} />
+            </>
+          )}
+        </EditorLayout.Sidebar>
+      </EditorLayout>
+    </form>
+  );
+}
 
-        <Tabs className="mt-6" defaultValue="write">
-          <TabsList>
-            <TabsTab value="write">Write</TabsTab>
-            <TabsTab value="preview">Preview</TabsTab>
-          </TabsList>
-          <TabsPanel value="write">
-            <form.AppField name="content">
-              {(field) => (
-                <field.TextareaField
-                  className="min-h-[28rem] font-mono text-sm"
-                  hideLabel
-                  label="Article body"
-                  placeholder={"# Getting started\n\nWrite in Markdown."}
-                />
-              )}
-            </form.AppField>
-          </TabsPanel>
-          <TabsPanel value="preview">
-            <div className="bg-card min-h-[28rem] rounded-lg border p-6">
-              <form.Subscribe selector={(state) => state.values.content}>
-                {(content) =>
-                  content.trim().length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                      Nothing to preview.
-                    </p>
-                  ) : (
-                    <MarkdownContent content={content} />
-                  )
-                }
-              </form.Subscribe>
-            </div>
-          </TabsPanel>
-        </Tabs>
+function EditorChip({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={cn(
+        "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors",
+        active
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      )}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
 
-        {submitError === null ? null : (
-          <p className="text-destructive mt-4 text-sm">{submitError}</p>
-        )}
-      </form>
-    </div>
+/** What the row says about itself, read-only. */
+function ArticleDetails({
+  article,
+}: {
+  article: {
+    createdAt: Date;
+    publishedAt: Date | null;
+    slug: string;
+    status: THelpCenterArticleState;
+    updatedAt: Date;
+  };
+}) {
+  const details: Array<{
+    icon: typeof Calendar03Icon;
+    label: string;
+    value: ReactNode;
+  }> = [
+    {
+      icon: Link03Icon,
+      label: "Slug",
+      value: article.slug,
+    },
+    {
+      icon: StatusIcon,
+      label: "Status",
+      value: <HelpCenterArticleStatusBadge status={article.status} />,
+    },
+    {
+      icon: Calendar03Icon,
+      label: "Published",
+      value:
+        article.publishedAt === null
+          ? "Not published"
+          : dayjs.default(article.publishedAt).format("D MMM YYYY"),
+    },
+    {
+      icon: RefreshIcon,
+      label: "Updated",
+      value: dayjs.default(article.updatedAt).fromNow(),
+    },
+  ];
+
+  return (
+    <section aria-labelledby="help-center-article-details-heading">
+      <h2 className="sr-only" id="help-center-article-details-heading">
+        Details
+      </h2>
+      <dl className="space-y-2">
+        {details.map((detail) => (
+          <div
+            className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2 text-xs"
+            key={detail.label}
+          >
+            <HugeiconsIcon
+              aria-hidden="true"
+              className="text-muted-foreground/72 size-4"
+              icon={detail.icon}
+              strokeWidth={1.75}
+            />
+            <dt className="text-muted-foreground">{detail.label}</dt>
+            <dd className="text-foreground max-w-32 truncate font-medium">
+              {detail.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }

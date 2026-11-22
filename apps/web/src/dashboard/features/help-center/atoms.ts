@@ -91,12 +91,12 @@ export const deleteHelpCenterArticleAtom = DashboardClient.mutation(
 export type HelpCenterAnalyticsAtomArgs =
   ClientPayload<THelpCenterAnalyticsPayload>;
 
-/** The window the panel opens on. */
-export const DEFAULT_HELP_CENTER_ANALYTICS_RANGE =
-  "30d" satisfies THelpCenterAnalyticsRange;
-
 /**
  * One window of help center traffic, verdicts and searches.
+ *
+ * Read by the insights page's help center tab, not by the help center pages
+ * themselves: the numbers describe the documentation, which is what the tab is
+ * for, while the help center pages manage it.
  *
  * Two nested families rather than one family taking `{ organizationId, range }`.
  * `Atom.family` memoizes on its argument with `MutableHashMap`, which compares

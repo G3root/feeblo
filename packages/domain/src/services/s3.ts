@@ -42,6 +42,28 @@ export const isTemporaryEditorMediaKey = (key: string) =>
   key.startsWith(`${TEMPORARY_EDITOR_MEDIA_PREFIX}/`);
 
 /**
+ * The permanent key a promotion copies to.
+ *
+ * Only the temporary root is dropped, so
+ * `tmp/editor-media/<user>/…` lands under the `editor-media/` prefix the
+ * bucket layout documents.
+ *
+ * `promotionId` is unique per attempt, not per upload: two saves can promote
+ * the same temporary object at once, and the losing save's rollback must not
+ * delete the object the winner's row points at. The id goes before the
+ * extension so the key still reads as a file with the right type at a glance.
+ */
+export const promotedEditorKey = (sourceKey: string, promotionId: string) => {
+  const promotedKey = sourceKey.slice("tmp/".length);
+
+  const extensionIndex = promotedKey.lastIndexOf(".");
+
+  return extensionIndex === -1
+    ? `${promotedKey}-${promotionId}`
+    : `${promotedKey.slice(0, extensionIndex)}-${promotionId}${promotedKey.slice(extensionIndex)}`;
+};
+
+/**
  * `Cache-Control` for objects written to a permanent key. Keys carry a
  * timestamp and a UUID, so the object behind one is never rewritten — but it
  * can still be deleted (a replaced logo, an orphaned editor asset) while a
@@ -176,14 +198,21 @@ const makeS3UploadService = Effect.gen(function* () {
     promoteEditorMedia: ({
       bucket: sourceBucket,
       key: sourceKey,
+      promotionId,
     }: {
       bucket: string;
       key: string;
+      /**
+       * A value unique to this promotion attempt, appended to the permanent
+       * key. Two saves can promote the same temporary upload at once, and a
+       * failed one rolls its copy back; without this, both attempts would copy
+       * to the same object and the rollback could delete the copy the other
+       * one's committed row now points at.
+       */
+      promotionId: string;
     }) =>
       Effect.gen(function* () {
-        const finalKey = sourceKey.slice(
-          `${TEMPORARY_EDITOR_MEDIA_PREFIX}/`.length
-        );
+        const finalKey = promotedEditorKey(sourceKey, promotionId);
 
         // `copyObject` keeps the source's metadata (S3's default
         // `MetadataDirective: COPY`), so the promoted object inherits both the
