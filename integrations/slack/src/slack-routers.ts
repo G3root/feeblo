@@ -20,8 +20,13 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import type * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Schema from "effect/Schema";
 
-import { ParsedSlackInboundRequest } from "./slack-inbound-schema";
+import {
+  ParsedSlackInboundRequest,
+  SlackOAuthState,
+} from "./slack-inbound-schema";
 import {
   slackCommandsCapabilityKey,
   slackMessageActionCapabilityKey,
@@ -133,6 +138,16 @@ const makeSlackInteractiveRouter = (registry: IntegrationProviderRegistry) =>
     })
   );
 
+/** Reads the workspace id from the OAuth state when it decodes; the redirect and log continue without it otherwise. */
+const organizationIdFromOAuthState = (state: string | null) =>
+  state === null
+    ? undefined
+    : Option.getOrUndefined(
+        Schema.decodeOption(Schema.fromJsonString(SlackOAuthState))(state).pipe(
+          Option.map(({ organizationId }) => organizationId)
+        )
+      );
+
 /** OAuth callback router; completes the install and redirects to the dashboard settings page. */
 export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
   HttpRouter.use((router) =>
@@ -157,6 +172,13 @@ export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
           }
 
           if (code === null || state === null) {
+            yield* Effect.logWarning(
+              "Slack OAuth callback was missing its code or state",
+              {
+                organizationId: organizationIdFromOAuthState(state),
+                provider: "slack",
+              }
+            );
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
@@ -174,6 +196,11 @@ export const makeSlackOAuthCallbackRouter = (appUrl: string) =>
           );
 
           if (Exit.isFailure(completed)) {
+            yield* Effect.logError("Slack OAuth installation failed", {
+              cause: completed.cause,
+              organizationId: organizationIdFromOAuthState(state),
+              provider: "slack",
+            });
             return HttpServerResponse.redirect(
               settingsRedirect({
                 appUrl,
