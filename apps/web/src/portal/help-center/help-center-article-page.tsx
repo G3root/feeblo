@@ -14,7 +14,7 @@ import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { Textarea } from "@feeblo/ui/textarea";
 import { cn } from "@feeblo/ui/utils";
-import { markdownHeadings } from "@feeblo/utils/markdown";
+import { markdownHeadings, type MarkdownHeading } from "@feeblo/utils/markdown";
 import {
   ArrowLeft02Icon,
   ArrowRight01Icon,
@@ -25,7 +25,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   addHelpCenterArticleViewAtom,
@@ -36,6 +36,7 @@ import {
 } from "./atoms";
 import {
   buildHelpCenterSections,
+  findHelpCenterArticleBySlug,
   findHelpCenterSiblings,
   formatHelpDate,
   type HelpCenterNavArticle,
@@ -44,7 +45,11 @@ import {
 } from "./content";
 import { HelpCenterBreadcrumbs, HelpCenterNav } from "./help-center-nav";
 import { HelpCenterRailSearch } from "./help-center-rail-search";
-import { HelpCenterOutlineDisclosure, HelpCenterToc } from "./help-center-toc";
+import {
+  HelpCenterOutlineDisclosure,
+  HelpCenterToc,
+  scrollToHeading,
+} from "./help-center-toc";
 import { useHelpCenterVote } from "./use-help-center-vote";
 
 const VISITOR_KEY = "feeblo_help_visitor_id";
@@ -103,14 +108,35 @@ export function HelpCenterArticlePage({
     [articles, topics]
   );
 
+  const article = Result.getOrElse(articleResult, () => undefined);
+
+  /**
+   * The article being read, as early as possible.
+   *
+   * The detail once it arrives; before that, the list's own row for the same
+   * slug. The page renders its rails from this rather than from the detail, so
+   * a navigation does not unmount the navigation while the body loads — which
+   * would drop the reader's expanded sections, since that state lives in
+   * `HelpCenterNav`.
+   */
+  const activeArticle =
+    article ?? findHelpCenterArticleBySlug(articles, articleSlug);
+
+  const { section, previous, next } = findHelpCenterSiblings({
+    articleId: activeArticle?.id ?? "",
+    sections,
+  });
+
+  const headings = useMemo(
+    () => (article === undefined ? [] : markdownHeadings(article.content)),
+    [article]
+  );
+
   const visitorId = useVisitorId();
 
-  useViewBeacon({
-    articleId: Result.isSuccess(articleResult)
-      ? articleResult.value.id
-      : undefined,
-    organizationId,
-  });
+  useViewBeacon({ articleId: activeArticle?.id, organizationId });
+
+  useLandingHash(article?.id);
 
   if (!enabled) {
     return (
@@ -123,73 +149,13 @@ export function HelpCenterArticlePage({
     );
   }
 
-  return Result.builder(articleResult)
-    .onInitial(() => (
-      <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-8">
-        <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="h-9 w-2/3" />
-        <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    ))
-    .onFailure(() => (
-      <Empty className="py-16">
-        <EmptyHeader>
-          <EmptyTitle>Article not found</EmptyTitle>
-          <EmptyDescription>
-            It may have been removed, or the link is out of date.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    ))
-    .onSuccess((article) => (
-      <HelpCenterArticleView
-        article={article}
-        organizationId={organizationId}
-        sections={sections}
-        visitorId={visitorId}
-      />
-    ))
-    .exhaustive();
-}
-
-/**
- * One article, in the three columns the help center is read in.
- *
- * Split from the page above because everything here needs the article that has
- * arrived: the headings are derived from its body, the neighbouring pages come
- * from where it sits in the tree, and the outline is only meaningful beside a
- * body. Hooks cannot run inside `Result.onSuccess`, and a page full of `?`
- * reads would be the same split with more noise.
- */
-function HelpCenterArticleView({
-  article,
-  sections,
-  organizationId,
-  visitorId,
-}: {
-  article: THelpCenterArticlePublic;
-  sections: ReadonlyArray<HelpCenterNavSection>;
-  organizationId: string;
-  visitorId: string | undefined;
-}) {
-  const headings = useMemo(
-    () => markdownHeadings(article.content),
-    [article.content]
-  );
-
-  const { section, previous, next } = findHelpCenterSiblings({
-    articleId: article.id,
-    sections,
-  });
-
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-8 sm:px-6 md:grid-cols-[15rem_minmax(0,1fr)] lg:px-8 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]">
       <aside className="hidden md:block">
         <div className="sticky top-6 flex max-h-[calc(100dvh-9rem)] flex-col gap-6 overflow-y-auto pb-6">
           <HelpCenterRailSearch organizationId={organizationId} />
           <HelpCenterNav
-            activeArticleId={article.id}
+            activeArticleId={activeArticle?.id}
             activeSectionKey={section?.key}
             sections={sections}
           />
@@ -197,74 +163,168 @@ function HelpCenterArticleView({
       </aside>
 
       <article className="min-w-0">
-        <ArticleHeader article={article} section={section} />
-
-        {/* The outline rail appears at `xl`; below that the same headings fold
-            into a disclosure, so no screen is left without a way to jump. */}
-        <div className="mt-5 xl:hidden">
-          <HelpCenterOutlineDisclosure headings={headings} />
-        </div>
-
-        <div className="mt-5 flex justify-end">
-          <CopyButton
-            onCopy={() => article.content}
-            successMessage="Markdown copied"
-            type="button"
-            variant="ghost"
-          >
-            Copy as Markdown
-          </CopyButton>
-        </div>
-
-        <div className="border-border/70 mt-1 border-t pt-6">
-          <MarkdownContent content={article.content} headingAnchors />
-        </div>
-
-        {/*
-         * Rendered once the reader can be identified: the tally's key includes the
-         * visitor id, and an atom read before it resolves would be a request for a
-         * tally it cannot attribute.
-         *
-         * Keyed by the article: the verdict machine adopts one tally per article,
-         * and navigating from `/articles/a` to `/articles/b` keeps this route
-         * mounted. Without the key the widget would show A's verdict on B.
-         */}
-        {visitorId === undefined ? null : (
-          <VerdictSection
-            key={article.id}
-            articleId={article.id}
-            organizationId={organizationId}
-            visitorId={visitorId}
-          />
-        )}
-
-        {previous === undefined && next === undefined ? null : (
-          <nav
-            aria-label="More in this section"
-            className="mt-10 grid gap-x-10 gap-y-4 sm:grid-cols-2"
-          >
-            {previous === undefined ? null : (
-              <SiblingLink article={previous} direction="previous" />
-            )}
-            {next === undefined ? null : (
-              <SiblingLink article={next} direction="next" />
-            )}
-          </nav>
-        )}
-
-        <div className="mt-10 xl:hidden">
-          <StillStuck />
-        </div>
+        {Result.builder(articleResult)
+          .onInitial(() => <ArticleSkeleton />)
+          .onFailure(() => (
+            <Empty className="py-16">
+              <EmptyHeader>
+                <EmptyTitle>Article not found</EmptyTitle>
+                <EmptyDescription>
+                  It may have been removed, or the link is out of date.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ))
+          .onSuccess((loaded) => (
+            <ArticleBody
+              article={loaded}
+              headings={headings}
+              next={next}
+              organizationId={organizationId}
+              previous={previous}
+              section={section}
+              visitorId={visitorId}
+            />
+          ))
+          .exhaustive()}
       </article>
 
       <aside className="hidden xl:block">
         <div className="sticky top-6 flex flex-col gap-8">
-          <HelpCenterToc headings={headings} />
+          {headings.length === 0 ? null : <HelpCenterToc headings={headings} />}
           <StillStuck />
         </div>
       </aside>
     </div>
   );
+}
+
+/** The page's placeholder, sized like the page it replaces so nothing jumps. */
+function ArticleSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-4 w-1/3" />
+      <Skeleton className="h-9 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  );
+}
+
+/**
+ * One article's column: header, body, verdict and neighbouring pages.
+ *
+ * The body is the only part that needs the loaded article, so it is the only
+ * part that waits — the rails above render from the list's row and stay put.
+ */
+function ArticleBody({
+  article,
+  headings,
+  section,
+  previous,
+  next,
+  organizationId,
+  visitorId,
+}: {
+  article: THelpCenterArticlePublic;
+  headings: ReadonlyArray<MarkdownHeading>;
+  section: HelpCenterNavSection | undefined;
+  previous: HelpCenterNavArticle | undefined;
+  next: HelpCenterNavArticle | undefined;
+  organizationId: string;
+  visitorId: string | undefined;
+}) {
+  return (
+    <>
+      <ArticleHeader article={article} section={section} />
+
+      {/* The outline rail appears at `xl`; below that the same headings fold
+          into a disclosure, so no screen is left without a way to jump. */}
+      <div className="mt-5 xl:hidden">
+        <HelpCenterOutlineDisclosure headings={headings} />
+      </div>
+
+      <div className="mt-5 flex justify-end">
+        <CopyButton
+          onCopy={() => article.content}
+          successMessage="Markdown copied"
+          type="button"
+          variant="ghost"
+        >
+          Copy as Markdown
+        </CopyButton>
+      </div>
+
+      <div className="border-border/70 mt-1 border-t pt-6">
+        <MarkdownContent content={article.content} headingAnchors />
+      </div>
+
+      {/*
+       * Rendered once the reader can be identified: the tally's key includes the
+       * visitor id, and an atom read before it resolves would be a request for a
+       * tally it cannot attribute.
+       *
+       * Keyed by the article: the verdict machine adopts one tally per article,
+       * and navigating from `/articles/a` to `/articles/b` keeps this route
+       * mounted. Without the key the widget would show A's verdict on B.
+       */}
+      {visitorId === undefined ? null : (
+        <VerdictSection
+          key={article.id}
+          articleId={article.id}
+          organizationId={organizationId}
+          visitorId={visitorId}
+        />
+      )}
+
+      {previous === undefined && next === undefined ? null : (
+        <nav
+          aria-label="More in this section"
+          className="mt-10 grid gap-x-10 gap-y-4 sm:grid-cols-2"
+        >
+          {previous === undefined ? null : (
+            <SiblingLink article={previous} direction="previous" />
+          )}
+          {next === undefined ? null : (
+            <SiblingLink article={next} direction="next" />
+          )}
+        </nav>
+      )}
+
+      <div className="mt-10 xl:hidden">
+        <StillStuck />
+      </div>
+    </>
+  );
+}
+
+/**
+ * Lands on the section a `#hash` link named.
+ *
+ * The body is fetched after the first paint, so the browser's own anchor scroll
+ * runs while the heading does not exist yet and nothing happens. This retries
+ * once the body is in the document — once per article, so a reader who has
+ * scrolled away is never pulled back by a later render.
+ */
+function useLandingHash(articleId: string | undefined) {
+  const landedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (articleId === undefined || landedFor.current === articleId) {
+      return;
+    }
+
+    landedFor.current = articleId;
+
+    const id = decodeURIComponent(window.location.hash.slice(1));
+
+    if (id === "") {
+      return;
+    }
+
+    // The URL already names the section, so only the scroll is ours to do.
+    scrollToHeading(id, { updateHash: false });
+  }, [articleId]);
 }
 
 /**

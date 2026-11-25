@@ -19,17 +19,25 @@ const prefersReducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * Jump to a section without leaving the page.
+ * Scroll to a section without leaving the page.
  *
  * `scrollIntoView` rather than a hash assignment: the board's scroll container
  * is the app shell's `main`, not the window, and an anchor's default navigation
- * scrolls the window. The hash is still replaced so the URL stays shareable.
+ * scrolls the window. Returns whether the heading was in the document, so a
+ * caller restoring a `#hash` can tell "not rendered yet" from "not a section".
+ *
+ * The URL is updated with `replaceState` and the **current** history state, not
+ * `null`: the router keeps its own entry state there (an index and a key) and
+ * overwriting it drops the metadata its scroll restoration reads.
  */
-function jumpTo(id: string) {
+export function scrollToHeading(
+  id: string,
+  options: { readonly updateHash?: boolean } = {}
+): boolean {
   const heading = document.getElementById(id);
 
   if (heading === null) {
-    return;
+    return false;
   }
 
   heading.scrollIntoView({
@@ -37,7 +45,11 @@ function jumpTo(id: string) {
     behavior: prefersReducedMotion() ? "auto" : "smooth",
   });
 
-  window.history.replaceState(null, "", `#${id}`);
+  if (options.updateHash !== false) {
+    window.history.replaceState(window.history.state, "", `#${id}`);
+  }
+
+  return true;
 }
 
 /**
@@ -142,7 +154,7 @@ export function HelpCenterToc({
                 href={`#${heading.id}`}
                 onClick={(event) => {
                   event.preventDefault();
-                  jumpTo(heading.id);
+                  scrollToHeading(heading.id);
                 }}
                 style={{
                   paddingInlineStart: `${0.75 + (heading.level - top) * 0.75}rem`,
@@ -201,7 +213,7 @@ export function HelpCenterOutlineDisclosure({
               href={`#${heading.id}`}
               onClick={(event) => {
                 event.preventDefault();
-                jumpTo(heading.id);
+                scrollToHeading(heading.id);
               }}
               style={{
                 paddingInlineStart: `${0.5 + (heading.level - top) * 0.75}rem`,

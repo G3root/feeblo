@@ -90,6 +90,20 @@ export function buildHelpCenterSections({
 }
 
 /**
+ * The list's own row for one URL, if the list has it yet.
+ *
+ * The detail read and the list read arrive independently, and the rails need a
+ * row — an id to mark, a topic to open — before the body does. Falling back to
+ * the list is what lets the navigation stay mounted while an article loads.
+ */
+export function findHelpCenterArticleBySlug(
+  articles: ReadonlyArray<HelpCenterNavArticle>,
+  slug: string
+): HelpCenterNavArticle | undefined {
+  return articles.find((article) => article.slug === slug);
+}
+
+/**
  * Where one article sits in the tree, and what comes before and after it.
  *
  * A named shape rather than an inline one because three call sites read

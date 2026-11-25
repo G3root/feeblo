@@ -77,37 +77,61 @@ function headingText(node: ElementContent): string {
  * rewriting every one of them to add unused attributes would be a change
  * nobody asked for.
  *
- * Duplicates get a numeric suffix (`install`, `install-2`) instead of being
- * skipped: two sections may legitimately be called "Install", and the second
- * one silently having no anchor is the failure a reader would notice.
+ * Every assigned id is reserved, including an id the author already put on a
+ * heading and one an earlier heading generated. Counting occurrences of a base
+ * slug is not enough: `Install`, `Install` and `Install 2` would hand the middle
+ * heading `install-2` — the same id the third one slugs to — and both outline
+ * links would land on the third. So a candidate is bumped with a numeric suffix
+ * until it is unused, which keeps three identical headings at `install`,
+ * `install-2`, `install-3`.
  */
 export function rehypeHeadingIds(): (tree: Root) => void {
   return (tree: Root) => {
-    const occurrences = new Map<string, number>();
+    const headings: Element[] = [];
 
     visit(tree, "element", (node: Element) => {
-      if (!HEADING_TAGS.has(node.tagName)) {
-        return;
+      if (HEADING_TAGS.has(node.tagName)) {
+        headings.push(node);
       }
+    });
 
-      const text = headingText(node).trim();
+    // Reserve what is already taken before generating anything, so a generated
+    // anchor cannot take an id a later heading is keeping.
+    const used = new Set<string>();
 
-      if (text === "") {
-        return;
+    for (const heading of headings) {
+      const id = heading.properties["id"];
+
+      if (isString(id)) {
+        used.add(id);
       }
+    }
 
+    for (const heading of headings) {
       // A heading an author already anchored keeps its own id: it is the more
       // specific intent, and replacing it would move a link they wrote.
-      if (isString(node.properties["id"])) {
-        return;
+      if (isString(heading.properties["id"])) {
+        continue;
+      }
+
+      const text = headingText(heading).trim();
+
+      if (text === "") {
+        continue;
       }
 
       const base = headingAnchor(text);
-      const seen = occurrences.get(base) ?? 0;
-      occurrences.set(base, seen + 1);
+      let candidate = base;
+      let suffix = 1;
 
-      node.properties["id"] = seen === 0 ? base : `${base}-${seen + 1}`;
-    });
+      while (used.has(candidate)) {
+        suffix += 1;
+        candidate = `${base}-${suffix}`;
+      }
+
+      used.add(candidate);
+      heading.properties["id"] = candidate;
+    }
   };
 }
 

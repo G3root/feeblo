@@ -130,4 +130,24 @@ describe("markdown heading anchors", () => {
   it("folds accents into the anchor", () => {
     expect(markdownHeadings("## Résumé").at(0)?.id).toBe("resume");
   });
+
+  it("does not hand two headings the same id when a slug collides with a suffix", () => {
+    // "Install 2" slugs to `install-2`, which is also what the second "Install"
+    // would be given by a counter that only tracked base slugs. Both outline
+    // links would then land on the third heading.
+    const ids = markdownHeadings(
+      "## Install\n\n## Install\n\n## Install 2"
+    ).map((heading) => heading.id);
+
+    expect(ids).toEqual(["install", "install-2", "install-2-2"]);
+    expect(new Set(ids).size).toBe(3);
+  });
+
+  it("numbers three identical headings in order", () => {
+    expect(
+      markdownHeadings("## Install\n\n## Install\n\n## Install").map(
+        (heading) => heading.id
+      )
+    ).toEqual(["install", "install-2", "install-3"]);
+  });
 });

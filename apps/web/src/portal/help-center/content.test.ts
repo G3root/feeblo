@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildHelpCenterSections,
+  findHelpCenterArticleBySlug,
   findHelpCenterSiblings,
   formatHelpDate,
   readingMinutes,
@@ -72,6 +73,20 @@ describe("buildHelpCenterSections", () => {
     });
 
     expect(sections[0]?.articles).toEqual([]);
+  });
+});
+
+describe("findHelpCenterArticleBySlug", () => {
+  const articles = [article("a", "t1"), article("b", "t1", "second-article")];
+
+  it("finds the row the detail read has not arrived for yet", () => {
+    expect(findHelpCenterArticleBySlug(articles, "second-article")?.id).toBe(
+      "b"
+    );
+  });
+
+  it("returns nothing for a slug the list does not carry", () => {
+    expect(findHelpCenterArticleBySlug(articles, "missing")).toBeUndefined();
   });
 });
 
