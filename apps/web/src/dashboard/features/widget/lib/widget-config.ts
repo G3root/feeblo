@@ -16,15 +16,18 @@ const trailingSlashPattern = /\/+$/;
 export const WIDGET_MODULES = [
   "feedback",
   "updates",
+  "help",
 ] as const satisfies readonly WidgetModule[];
 
 export const WIDGET_MODULE_LABELS = {
   feedback: "Feedback",
   updates: "Updates",
+  help: "Help",
 } as const satisfies Record<WidgetModule, string>;
 
 export const WIDGET_MODE_LABELS = {
   feedback: "Feedback widget",
+  help: "Help widget",
   hub: "Hub",
   updates: "Updates widget",
 } as const satisfies Record<WidgetMode, string>;

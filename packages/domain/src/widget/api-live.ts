@@ -222,6 +222,120 @@ const findWidgetHelpArticles = Effect.fn("Widget.helpArticles")(function* ({
 });
 
 /**
+ * Whether the widget may read this workspace's help center.
+ *
+ * The same three answers as the deflection — the deployment flag, the
+ * workspace's site visibility, and (at the call site) whether anything is
+ * published — as one value rather than an error, for the same reason: the
+ * endpoint is unauthenticated and names the workspace, so a distinguishable
+ * failure would confirm which workspaces exist. `false` hides the widget's Help
+ * tab instead of showing a surface that will never fill.
+ */
+const widgetHelpCenterAvailable = Effect.fn("Widget.helpCenterAvailable")(
+  function* ({ organizationId }: { organizationId: string }) {
+    const flagEnabled = yield* HelpCenterEnabled;
+
+    if (!flagEnabled) {
+      return false;
+    }
+
+    const siteRepository = yield* SiteRepository;
+
+    const site = yield* siteRepository
+      .findByOrganizationId({ organizationId })
+      .pipe(Effect.map(Option.getOrUndefined));
+
+    return site !== undefined && site.helpCenterVisibility === "PUBLIC";
+  }
+);
+
+/**
+ * Every published article, with its section, for the widget's Help module.
+ *
+ * One read rather than a topic list beside an article list: `findManyPublic`
+ * already orders by the section's own position and then by the article's, so
+ * grouping these rows in order reproduces the tree the portal renders. The
+ * widget is a few hundred kilobytes of iframe; a second round trip to learn
+ * section names it can read off the rows is not worth it.
+ */
+export const listWidgetHelpCenter = Effect.fn("Widget.helpCenter")(function* ({
+  organizationId,
+}: {
+  organizationId: string;
+}) {
+  const available = yield* widgetHelpCenterAvailable({ organizationId });
+
+  if (!available) {
+    return { articles: [], enabled: false };
+  }
+
+  const repository = yield* HelpCenterArticleRepository;
+
+  const articles = yield* repository.findManyPublic({ organizationId });
+
+  return {
+    articles: articles.map((article) => ({
+      excerpt: article.excerpt,
+      id: article.id,
+      slug: article.slug,
+      title: article.title,
+      topicId: article.topicId,
+      topicName: article.topicName,
+      topicSlug: article.topicSlug,
+    })),
+    enabled: true,
+  };
+});
+
+/**
+ * One published article, rendered to HTML.
+ *
+ * `article: null` covers a slug that is not published here, which is the same
+ * answer as one that does not exist: a reader (or a crawler) cannot tell a
+ * draft from a typo, and neither should be able to.
+ */
+export const readWidgetHelpCenterArticle = Effect.fn(
+  "Widget.helpCenterArticle"
+)(function* ({
+  organizationId,
+  slug,
+}: {
+  organizationId: string;
+  slug: string;
+}) {
+  const available = yield* widgetHelpCenterAvailable({ organizationId });
+
+  if (!available) {
+    return { article: null, enabled: false };
+  }
+
+  const repository = yield* HelpCenterArticleRepository;
+
+  const article = yield* repository.findBySlugPublic({ organizationId, slug });
+
+  if (article === undefined) {
+    return { article: null, enabled: true };
+  }
+
+  return {
+    article: {
+      // Cached per version, like the updates module: the body is stored
+      // Markdown and rendering it per request would be the expensive part of
+      // this endpoint. The pipeline still drops unsafe URLs.
+      content: markdownToHtmlCached(
+        `${article.id}:${String(article.updatedAt)}`,
+        article.content
+      ),
+      slug: article.slug,
+      title: article.title,
+      topicName: article.topicName,
+      updatedAt: article.updatedAt,
+    },
+    enabled: true,
+  };
+});
+
+/**
  * Resolves the SSO customer a feedback submission is attributed to.
  *
  * The contact upsert and the participation check run in one transaction, so a
@@ -468,6 +582,26 @@ export const WidgetApiLive = HttpApiBuilder.group(
             }),
             provideHandlerEnvironment,
             withRemapDbErrors("Boards", "select")
+          )
+        )
+        .handle("helpCenter", ({ payload }) =>
+          listWidgetHelpCenter(payload).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "WidgetHelpCenter",
+              level: "read",
+            }),
+            provideHandlerEnvironment,
+            withRemapDbErrors("HelpCenterArticle", "select")
+          )
+        )
+        .handle("helpCenterArticle", ({ payload }) =>
+          readWidgetHelpCenterArticle(payload).pipe(
+            RateLimit.withPublicHttpRateLimit({
+              name: "WidgetHelpCenterArticle",
+              level: "read",
+            }),
+            provideHandlerEnvironment,
+            withRemapDbErrors("HelpCenterArticle", "select")
           )
         )
         .handle("createFeedback", ({ payload }) => {

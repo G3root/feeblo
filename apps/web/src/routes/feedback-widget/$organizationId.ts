@@ -60,7 +60,9 @@ export const Route = createFileRoute("/feedback-widget/$organizationId")({
         const requestedMode = url.searchParams.get("mode");
 
         const mode: WidgetMode =
-          requestedMode === "updates" || requestedMode === "hub"
+          requestedMode === "updates" ||
+          requestedMode === "help" ||
+          requestedMode === "hub"
             ? requestedMode
             : "feedback";
 
@@ -68,7 +70,7 @@ export const Route = createFileRoute("/feedback-widget/$organizationId")({
           .split(",")
           .filter(
             (module): module is WidgetModule =>
-              module === "feedback" || module === "updates"
+              module === "feedback" || module === "updates" || module === "help"
           );
 
         const modules: WidgetModule[] =

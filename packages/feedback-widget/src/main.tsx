@@ -1,7 +1,7 @@
 import { HashRouter, Route } from "@solidjs/router";
 import { lazy } from "solid-js";
 
-import { preloadBoards, preloadUpdates } from "./lib/api";
+import { preloadBoards, preloadHelpCenter, preloadUpdates } from "./lib/api";
 import { RootComponent } from "./routes/__root";
 
 export { isSupportedLocale, type WidgetConfig } from "./lib/config";
@@ -13,6 +13,10 @@ const LazyBoardDetail = lazy(() => import("./routes/board"));
 const LazyUpdates = lazy(() => import("./routes/updates"));
 
 const LazyUpdateDetail = lazy(() => import("./routes/update-detail"));
+
+const LazyHelp = lazy(() => import("./routes/help"));
+
+const LazyHelpArticle = lazy(() => import("./routes/help-article"));
 
 export function WidgetApp() {
   return (
@@ -28,6 +32,12 @@ export function WidgetApp() {
         component={LazyUpdateDetail}
         path="/updates/:updateId"
         preload={preloadUpdates}
+      />
+      <Route component={LazyHelp} path="/help" preload={preloadHelpCenter} />
+      <Route
+        component={LazyHelpArticle}
+        path="/help/:articleSlug"
+        preload={preloadHelpCenter}
       />
     </HashRouter>
   );

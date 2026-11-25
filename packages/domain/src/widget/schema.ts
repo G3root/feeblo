@@ -167,6 +167,81 @@ export const WidgetHelpArticles = S.Struct({
 
 export type TWidgetHelpArticles = S.Schema.Type<typeof WidgetHelpArticles>;
 
+/**
+ * One published article, as the widget's Help module lists it.
+ *
+ * The section travels as a name and a slug on every row rather than as a
+ * separate topic list: the public article read is already ordered by section
+ * position, so grouping the rows in order reproduces the tree without a second
+ * request and without the widget needing the topic repository.
+ */
+export const WidgetHelpCenterArticle = S.Struct({
+  id: S.String,
+  slug: S.String,
+  title: S.String,
+  excerpt: S.String,
+  topicId: S.String,
+  topicName: S.String,
+  topicSlug: S.String,
+});
+
+export type TWidgetHelpCenterArticle = S.Schema.Type<
+  typeof WidgetHelpCenterArticle
+>;
+
+/**
+ * The widget's help center read.
+ *
+ * `enabled` answers the same three questions the deflection's does — the
+ * deployment flag, the workspace's portal visibility, and whether anything is
+ * published — so a widget configured with the Help module can hide its tab
+ * instead of showing an empty surface it will never fill.
+ */
+export const WidgetHelpCenter = S.Struct({
+  articles: S.Array(WidgetHelpCenterArticle),
+  enabled: S.Boolean,
+});
+
+export type TWidgetHelpCenter = S.Schema.Type<typeof WidgetHelpCenter>;
+
+export const WidgetHelpCenterArticleRequest = S.Struct({
+  organizationId: WorkspaceId.schema,
+  slug: S.String.check(S.isMaxLength(200)),
+});
+
+export type TWidgetHelpCenterArticleRequest = S.Schema.Type<
+  typeof WidgetHelpCenterArticleRequest
+>;
+
+/**
+ * One article's page.
+ *
+ * `content` is HTML, rendered server-side from the stored Markdown through the
+ * same cached pipeline the updates module uses. Sending Markdown would put a
+ * second renderer in an iframe that loads in well under a second; the portal's
+ * cached HTML is already there.
+ */
+export const WidgetHelpCenterArticleDetail = S.Struct({
+  slug: S.String,
+  title: S.String,
+  topicName: S.String,
+  content: S.String,
+  updatedAt: S.DateFromString,
+});
+
+export type TWidgetHelpCenterArticleDetail = S.Schema.Type<
+  typeof WidgetHelpCenterArticleDetail
+>;
+
+export const WidgetHelpCenterArticleResponse = S.Struct({
+  article: S.NullOr(WidgetHelpCenterArticleDetail),
+  enabled: S.Boolean,
+});
+
+export type TWidgetHelpCenterArticleResponse = S.Schema.Type<
+  typeof WidgetHelpCenterArticleResponse
+>;
+
 export const WidgetUpdate = S.Struct({
   id: S.String,
   title: S.String,
@@ -280,6 +355,12 @@ export const decodeWidgetSuggestions = S.decodeUnknownSync(
 );
 
 export const decodeWidgetHelpArticles = S.decodeUnknownSync(WidgetHelpArticles);
+
+export const decodeWidgetHelpCenter = S.decodeUnknownSync(WidgetHelpCenter);
+
+export const decodeWidgetHelpCenterArticleResponse = S.decodeUnknownSync(
+  WidgetHelpCenterArticleResponse
+);
 
 export const decodeWidgetError = S.decodeUnknownSync(WidgetError);
 

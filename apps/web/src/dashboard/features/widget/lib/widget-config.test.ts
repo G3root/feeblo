@@ -102,6 +102,9 @@ describe("moveWidgetModule", () => {
     expect(moveWidgetModule(entries, 0, 1).map((entry) => entry.id)).toEqual([
       "updates",
       "feedback",
+      // Whatever the default carries beyond the pair being swapped: the
+      // assertion is about the move, not about how many modules exist.
+      ...entries.slice(2).map((entry) => entry.id),
     ]);
   });
 

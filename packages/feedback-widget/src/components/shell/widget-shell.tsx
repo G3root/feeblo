@@ -1,6 +1,15 @@
 import { A, useLocation } from "@solidjs/router";
-import { createEffect, createMemo, For, type JSX, on, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  For,
+  type JSX,
+  on,
+  Show,
+} from "solid-js";
 
+import { fetchHelpCenter } from "../../lib/api";
 import { getWidgetConfig, moduleForPath } from "../../lib/config";
 import { resolveView, widgetTabs } from "../../lib/navigation";
 import { Button, buttonVariants } from "../ui/button";
@@ -21,7 +30,29 @@ export function WidgetShell(props: {
   const location = useLocation();
   const config = getWidgetConfig();
   const view = createMemo(() => resolveView(location.pathname));
-  const tabs = createMemo(() => widgetTabs(config));
+
+  /**
+   * Whether the workspace actually has documentation.
+   *
+   * The config says the workspace *asked* for the Help module; whether anything
+   * is published is a fact only the server knows. Held as a resource so the tab
+   * appears once the answer arrives — and stays hidden for a workspace whose
+   * help center is off, rather than offering a surface that will never fill.
+   */
+  const [helpAvailable] = createResource(
+    () => config.modules.includes("help"),
+    (wanted) =>
+      wanted
+        ? fetchHelpCenter()
+            .then((helpCenter) => helpCenter.enabled)
+            .catch(() => false)
+        : Promise.resolve(false)
+  );
+
+  const tabs = createMemo(() =>
+    widgetTabs(config, { helpAvailable: helpAvailable() === true })
+  );
+
   const activeModule = createMemo(() => moduleForPath(location.pathname));
 
   const activeTabIndex = createMemo(() =>

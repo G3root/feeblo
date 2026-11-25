@@ -32,6 +32,14 @@ describe("widget view resolution", () => {
   it("does not mistake the update list for a detail", () => {
     expect(resolveView("/updates/")).toEqual({ backHref: null, kind: "root" });
   });
+
+  it("treats the help list as a root and an article as a pushed page", () => {
+    expect(resolveView("/help")).toEqual({ backHref: null, kind: "root" });
+    expect(resolveView("/help/publish-a-changelog")).toEqual({
+      backHref: "/help",
+      kind: "push",
+    });
+  });
 });
 
 describe("widget tabs", () => {
@@ -59,12 +67,50 @@ describe("widget tabs", () => {
       []
     );
   });
+
+  it("shows the help tab once the workspace confirms it has documentation", () => {
+    const hub = config({
+      mode: "hub",
+      modules: ["feedback", "updates", "help"],
+    });
+
+    expect(
+      widgetTabs(hub, { helpAvailable: true }).map((tab) => tab.module)
+    ).toEqual(["feedback", "updates", "help"]);
+  });
+
+  it("leaves the help tab out until it is known to exist", () => {
+    const hub = config({
+      mode: "hub",
+      modules: ["feedback", "updates", "help"],
+    });
+
+    // `undefined` is "not answered yet", not "yes": a tab must not appear and
+    // then vanish under the reader's finger.
+    expect(widgetTabs(hub).map((tab) => tab.module)).toEqual([
+      "feedback",
+      "updates",
+    ]);
+    expect(
+      widgetTabs(hub, { helpAvailable: false }).map((tab) => tab.module)
+    ).toEqual(["feedback", "updates"]);
+  });
+
+  it("does not show a bar for one surface plus an unavailable help module", () => {
+    expect(
+      widgetTabs(config({ mode: "hub", modules: ["updates", "help"] }), {
+        helpAvailable: false,
+      })
+    ).toEqual([]);
+  });
 });
 
 describe("active module", () => {
   it("keeps a surface highlighted while its pushed views are open", () => {
     expect(moduleForPath("/board/brd_1")).toBe("feedback");
     expect(moduleForPath("/updates/upd_1")).toBe("updates");
+    expect(moduleForPath("/help")).toBe("help");
+    expect(moduleForPath("/help/invoices")).toBe("help");
     expect(moduleForPath("/")).toBe("feedback");
   });
 });

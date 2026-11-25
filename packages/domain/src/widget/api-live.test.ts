@@ -1,6 +1,11 @@
 import { expect, layer } from "@effect/vitest";
 import { currentDb, Database, schema } from "@feeblo/db";
-import { ChangelogId, WorkspaceId } from "@feeblo/id";
+import {
+  ChangelogId,
+  HelpCenterArticleId,
+  HelpCenterTopicId,
+  WorkspaceId,
+} from "@feeblo/id";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
@@ -9,13 +14,19 @@ import * as Layer from "effect/Layer";
 import { ChangelogRepository } from "../changelog/repository";
 import { ClientIp } from "../client-ip";
 import { EntitlementPolicy } from "../entitlement/policies";
+import { HelpCenterArticleRepository } from "../help-center-article/repository";
+import { HelpCenterEnabled } from "../help-center/flag";
 import { withPublicHttpRateLimit } from "../rate-limit";
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
 import { WorkspaceRepository } from "../workspace/repository";
-import { listWidgetUpdates } from "./api-live";
+import {
+  listWidgetHelpCenter,
+  listWidgetUpdates,
+  readWidgetHelpCenterArticle,
+} from "./api-live";
 
 /** The `Date` for a known instant, built through `DateTime`. */
 const dateAt = (instant: string | number | Date): Date =>
@@ -281,5 +292,204 @@ layer(TestLayer)("widget updates", (it) => {
         }
       );
     }
+  );
+});
+
+/**
+ * The help center's own reads, against the same PGlite schema the portal tests
+ * use. `HelpCenterEnabled` is provided as `true` here because the flag is the
+ * deployment's answer; the workspace's answer is the site row each case writes.
+ */
+const HelpCenterTestLayer = Layer.mergeAll(
+  Database.PgliteDatabaseLive,
+  HelpCenterArticleRepository.layer.pipe(
+    Layer.provide(Database.PgliteDatabaseLive)
+  ),
+  SiteRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
+  Layer.succeed(HelpCenterEnabled, true)
+);
+
+layer(HelpCenterTestLayer)("widget help center", (it) => {
+  it.effect(
+    "lists published articles with their section, and nothing else",
+    () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const organizationId = yield* WorkspaceId.generate;
+        const topicId = yield* HelpCenterTopicId.generate;
+        const publishedId = yield* HelpCenterArticleId.generate;
+        const draftId = yield* HelpCenterArticleId.generate;
+        const now = yield* DateTime.nowAsDate;
+
+        yield* db.insert(schema.organizationTable).values({
+          createdAt: now,
+          id: organizationId,
+          name: "Docs org",
+          slug: organizationId,
+        });
+        yield* db.insert(schema.siteTable).values({
+          createdAt: now,
+          id: `site_${organizationId}`,
+          name: "Docs org",
+          organizationId,
+          subdomain: `docs-${organizationId}`,
+          updatedAt: now,
+        });
+        yield* db.insert(schema.helpCenterTopicTable).values({
+          createdAt: now,
+          id: topicId,
+          name: "Getting started",
+          organizationId,
+          position: 0,
+          slug: "getting-started",
+          updatedAt: now,
+        });
+        yield* db.insert(schema.helpCenterArticleTable).values([
+          {
+            content: "## Hello\n\nPublished body.",
+            createdAt: now,
+            excerpt: "Published body.",
+            id: publishedId,
+            organizationId,
+            publishedAt: now,
+            slug: "published",
+            status: "published",
+            title: "Published",
+            topicId,
+            updatedAt: now,
+          },
+          {
+            content: "## Draft\n\nNot yet.",
+            createdAt: now,
+            excerpt: "Not yet.",
+            id: draftId,
+            organizationId,
+            slug: "draft",
+            status: "draft",
+            title: "Draft",
+            topicId,
+            updatedAt: now,
+          },
+        ]);
+
+        const helpCenter = yield* listWidgetHelpCenter({ organizationId });
+
+        expect(helpCenter.enabled).toBe(true);
+        expect(helpCenter.articles.map((article) => article.slug)).toEqual([
+          "published",
+        ]);
+        expect(helpCenter.articles[0]?.topicName).toBe("Getting started");
+      })
+  );
+
+  it.effect("answers enabled: false for a workspace that hides it", () =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const organizationId = yield* WorkspaceId.generate;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.organizationTable).values({
+        createdAt: now,
+        id: organizationId,
+        name: "Hidden org",
+        slug: organizationId,
+      });
+      yield* db.insert(schema.siteTable).values({
+        createdAt: now,
+        helpCenterVisibility: "HIDDEN",
+        id: `site_${organizationId}`,
+        name: "Hidden org",
+        organizationId,
+        subdomain: `hidden-${organizationId}`,
+        updatedAt: now,
+      });
+
+      expect(yield* listWidgetHelpCenter({ organizationId })).toEqual({
+        articles: [],
+        enabled: false,
+      });
+      expect(
+        yield* readWidgetHelpCenterArticle({
+          organizationId,
+          slug: "published",
+        })
+      ).toEqual({ article: null, enabled: false });
+    })
+  );
+
+  it.effect("renders a published article to HTML and hides a draft", () =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+      const organizationId = yield* WorkspaceId.generate;
+      const topicId = yield* HelpCenterTopicId.generate;
+      const now = yield* DateTime.nowAsDate;
+
+      yield* db.insert(schema.organizationTable).values({
+        createdAt: now,
+        id: organizationId,
+        name: "Reader org",
+        slug: organizationId,
+      });
+      yield* db.insert(schema.siteTable).values({
+        createdAt: now,
+        id: `site_${organizationId}`,
+        name: "Reader org",
+        organizationId,
+        subdomain: `reader-${organizationId}`,
+        updatedAt: now,
+      });
+      yield* db.insert(schema.helpCenterTopicTable).values({
+        createdAt: now,
+        id: topicId,
+        name: "Billing",
+        organizationId,
+        position: 0,
+        slug: "billing",
+        updatedAt: now,
+      });
+      yield* db.insert(schema.helpCenterArticleTable).values([
+        {
+          content: "## Invoice\n\nDownload it from **Settings**.",
+          createdAt: now,
+          excerpt: "Download it.",
+          id: yield* HelpCenterArticleId.generate,
+          organizationId,
+          publishedAt: now,
+          slug: "invoices",
+          status: "published",
+          title: "Invoices",
+          topicId,
+          updatedAt: now,
+        },
+        {
+          content: "## Secret\n\nDraft body.",
+          createdAt: now,
+          excerpt: "Draft body.",
+          id: yield* HelpCenterArticleId.generate,
+          organizationId,
+          slug: "secret",
+          status: "draft",
+          title: "Secret",
+          topicId,
+          updatedAt: now,
+        },
+      ]);
+
+      const published = yield* readWidgetHelpCenterArticle({
+        organizationId,
+        slug: "invoices",
+      });
+
+      expect(published.enabled).toBe(true);
+      expect(published.article?.title).toBe("Invoices");
+      expect(published.article?.topicName).toBe("Billing");
+      // Rendered, not the stored Markdown: the iframe has no Markdown renderer.
+      expect(published.article?.content).toContain("<h2");
+      expect(published.article?.content).toContain("<strong>Settings</strong>");
+
+      expect(
+        yield* readWidgetHelpCenterArticle({ organizationId, slug: "secret" })
+      ).toEqual({ article: null, enabled: true });
+    })
   );
 });

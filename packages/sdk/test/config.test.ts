@@ -24,6 +24,19 @@ describe("normalizeWidgetConfig", () => {
     ).toMatchObject({ modules: ["updates", "feedback"] });
   });
 
+  it("accepts the help module, on its own or beside the others", () => {
+    expect(normalizeWidgetConfig({ mode: "help" })).toEqual({
+      mode: "help",
+      modules: ["help"],
+    });
+    expect(
+      normalizeWidgetConfig({
+        mode: "hub",
+        modules: ["feedback", "updates", "help"],
+      })
+    ).toMatchObject({ modules: ["feedback", "updates", "help"] });
+  });
+
   it.each([
     { mode: "hub" as const, modules: [] },
     { mode: "hub" as const, modules: ["feedback", "feedback"] as const },

@@ -55,7 +55,7 @@ export const HELP_CENTER_SEED_TOPICS: ReadonlyArray<HelpCenterSeedTopic> = [
 | **Changelog** | Release notes, so shipped work reaches the people who asked for it. |
 | **Help center** | Documentation your customers read before they ask you anything. |
 
-All four are readable without a dashboard session, and the embeddable widget brings the board, roadmap, changelog and help center inside your own product.
+All four are readable without a dashboard session, and the embeddable widget brings the board, your updates and your help center inside your own product.
 
 ## The unit of everything
 
@@ -260,7 +260,7 @@ Control who can do this in **Settings → Workspace**: whether visitors can read
 
 ## 2. The embeddable widget
 
-The widget puts the board, roadmap, changelog and help center inside your product, so a customer can vote without leaving the page they are on. Install it from **Settings → Widget** — see [Embed the widget](/help/articles/embed-the-widget).
+The widget puts the board, your updates and your help center inside your product, so a customer can vote — or find the answer without voting — without leaving the page they are on. Install it from **Settings → Widget** — see [Embed the widget](/help/articles/embed-the-widget).
 
 ## 3. Slack and Discord
 
@@ -822,12 +822,12 @@ Starter and Professional can pull from a supported feedback tool instead of a fi
         slug: "embed-the-widget",
         title: "Embed the widget",
         publishedDaysAgo: 20,
-        content: `The widget puts the feedback board, roadmap, changelog and help center inside your own application, so a customer can browse and vote without opening a new tab.
+        content: `The widget puts three surfaces inside your own application, so a customer never has to open a new tab: the feedback board, your product updates, and your help center.
 
 ## Install
 
 1. Open **Settings → Widget**.
-2. Choose the modules to show and how the widget opens — a hub, or one module.
+2. Turn on the modules to ship, and choose how the widget opens — one module, or a hub with a tab bar.
 3. Copy the generated snippet into your page, before the closing \`</body>\`.
 
 \`\`\`html
@@ -837,7 +837,7 @@ Starter and Professional can pull from a supported feedback tool instead of a fi
   data-feeblo-organization-id="org_..."
   data-feeblo-base-url="https://app.example.com"
   data-feeblo-mode="hub"
-  data-feeblo-modules="feedback,roadmap,changelog"
+  data-feeblo-modules="feedback,updates,help"
   data-feeblo-theme="auto"
 ></script>
 \`\`\`
@@ -846,11 +846,24 @@ Starter and Professional can pull from a supported feedback tool instead of a fi
 | --- | --- |
 | \`data-feeblo-organization-id\` | Which workspace the widget reads. Required. |
 | \`data-feeblo-base-url\` | The origin serving the portal. Required. |
-| \`data-feeblo-mode\` | \`hub\` for all modules behind one launcher, or one module's name. |
-| \`data-feeblo-modules\` | Which modules the hub exposes. Only with \`hub\`. |
+| \`data-feeblo-mode\` | \`hub\` for several surfaces behind one launcher, or \`feedback\`, \`updates\` or \`help\` for a single one. |
+| \`data-feeblo-modules\` | Which surfaces the hub exposes, in tab order. Only with \`hub\`. |
 | \`data-feeblo-theme\` | \`light\`, \`dark\` or \`auto\`. |
 
-The widget follows the same visibility settings as the portal: hide the roadmap, the changelog or the help center in the workspace settings and its tab disappears here too. There is nothing to configure twice.
+## What each module shows
+
+| Module | Content |
+| --- | --- |
+| \`feedback\` | Your boards and their posts: browse, vote, search for a duplicate, submit. |
+| \`updates\` | Your published changelog entries, newest first. |
+| \`help\` | Your help center: each section, and the articles in it. |
+
+Two of the three depend on something you publish, and the widget reads that live rather than trusting the snippet:
+
+- A **private board** is not offered in the widget, and a closed one refuses its posts there.
+- The **help tab disappears** until the workspace has published documentation and made the help center visible. Turning the help center off in **Settings → Help center privacy** removes the tab on the next open, without a snippet change.
+
+A hub with only one *available* surface renders that surface and no tab bar — a bar with one item is chrome for nothing.
 
 ## Identify the signed-in customer
 

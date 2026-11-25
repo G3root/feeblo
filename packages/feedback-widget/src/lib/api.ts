@@ -1,11 +1,19 @@
 import { action, query, type RoutePreloadFuncArgs } from "@solidjs/router";
 
-import { requestBoards, requestUpdates, submitFeedback } from "./requests";
+import {
+  requestBoards,
+  requestHelpCenter,
+  requestHelpCenterArticle,
+  requestUpdates,
+  submitFeedback,
+} from "./requests";
 
 export type {
   FeedbackResult,
   WidgetHelpArticle,
   WidgetHelpArticles,
+  WidgetHelpCenter,
+  WidgetHelpCenterArticleDetail,
   WidgetSuggestion,
   WidgetUpdate,
 } from "./requests";
@@ -24,12 +32,23 @@ export const fetchBoards = query(requestBoards, "boards");
 
 export const fetchUpdates = query(requestUpdates, "updates");
 
+export const fetchHelpCenter = query(requestHelpCenter, "helpCenter");
+
+export const fetchHelpCenterArticle = query(
+  requestHelpCenterArticle,
+  "helpCenterArticle"
+);
+
 export function preloadBoards(_args: RoutePreloadFuncArgs) {
   return fetchBoards();
 }
 
 export function preloadUpdates(_args: RoutePreloadFuncArgs) {
   return fetchUpdates();
+}
+
+export function preloadHelpCenter(_args: RoutePreloadFuncArgs) {
+  return fetchHelpCenter();
 }
 
 export const createFeedBackAction = action(submitFeedback, "createFeedback");

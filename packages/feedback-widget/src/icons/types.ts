@@ -3,6 +3,7 @@
 export const iconNames = [
   "ArrowLeft01Icon",
   "ArrowRight01Icon",
+  "Book01Icon",
   "Cancel01Icon",
   "CheckIcon",
   "Idea01Icon",
