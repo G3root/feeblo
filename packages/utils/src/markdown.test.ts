@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { sanitizeMarkdown } from "./markdown-sanitizer";
-import { htmlToMarkdown, markdownToHtml } from "./markdown/index";
+import {
+  htmlToMarkdown,
+  markdownHeadings,
+  markdownToHtml,
+} from "./markdown/index";
 import { attributeViolations } from "./test-helpers/hast-safety";
 
 describe("markdownToHtml URL safety", () => {
@@ -76,5 +80,54 @@ describe("sanitizeMarkdown XSS regression", () => {
 
     expect(sanitizedMarkdown).not.toContain("data:");
     expect(attributeViolations(sanitizedHtml)).toEqual([]);
+  });
+});
+
+describe("markdown heading anchors", () => {
+  it("leaves headings unanchored unless asked", () => {
+    expect(markdownToHtml("## Install")).not.toContain("id=");
+  });
+
+  it("anchors headings with a readable slug", () => {
+    expect(markdownToHtml("## Install", { headingIds: true })).toContain(
+      '<h2 id="install">Install</h2>'
+    );
+  });
+
+  it("builds the anchor from the heading's words, not its markup", () => {
+    const html = markdownToHtml("## Run `pnpm check` first", {
+      headingIds: true,
+    });
+
+    expect(html).toContain('id="run-pnpm-check-first"');
+  });
+
+  it("suffixes a duplicate heading instead of dropping its anchor", () => {
+    const headings = markdownHeadings("## Install\n\n## Install\n\n## Install");
+
+    expect(headings.map((heading) => heading.id)).toEqual([
+      "install",
+      "install-2",
+      "install-3",
+    ]);
+  });
+
+  it("reports the same ids the rendered page carries", () => {
+    const markdown = "# Setup\n\n## Custom domains\n\n### Steps";
+    const html = markdownToHtml(markdown, { headingIds: true });
+
+    for (const heading of markdownHeadings(markdown)) {
+      expect(html).toContain(`id="${heading.id}"`);
+    }
+
+    expect(markdownHeadings(markdown)).toEqual([
+      { id: "setup", level: 1, text: "Setup" },
+      { id: "custom-domains", level: 2, text: "Custom domains" },
+      { id: "steps", level: 3, text: "Steps" },
+    ]);
+  });
+
+  it("folds accents into the anchor", () => {
+    expect(markdownHeadings("## Résumé").at(0)?.id).toBe("resume");
   });
 });

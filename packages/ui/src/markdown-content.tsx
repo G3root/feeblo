@@ -8,14 +8,28 @@ type MarkdownContentProps = Omit<
   "children" | "dangerouslySetInnerHTML"
 > & {
   content: string;
+  /**
+   * Give every heading an `id`, so an outline beside the body can link to it.
+   *
+   * Opt-in because the anchors are only useful where something links to them;
+   * a body rendered on its own should not carry attributes no reader can reach.
+   * The ids themselves come from the render pipeline (`@feeblo/utils/markdown`),
+   * which is also what `markdownHeadings` reads, so the outline and the page
+   * cannot disagree about what a section is called.
+   */
+  headingAnchors?: boolean;
 };
 
 export function MarkdownContent({
   className,
   content,
+  headingAnchors = false,
   ...props
 }: MarkdownContentProps) {
-  const html = useMemo(() => markdownToHtml(content), [content]);
+  const html = useMemo(
+    () => markdownToHtml(content, { headingIds: headingAnchors }),
+    [content, headingAnchors]
+  );
 
   return (
     <div
