@@ -9,10 +9,11 @@ const DEFAULT_MODULES: WidgetModule[] = ["feedback", "updates"];
 const MODES: ReadonlySet<PropertyKey> = new Set<WidgetMode>([
   "feedback",
   "updates",
+  "help",
   "hub",
 ]);
 
-const MODULES = new Set<WidgetModule>(DEFAULT_MODULES);
+const MODULES = new Set<WidgetModule>([...DEFAULT_MODULES, "help"]);
 
 const PLACEMENTS: ReadonlySet<PropertyKey> = new Set<WidgetPlacement>([
   "bottom-left",
@@ -76,7 +77,9 @@ export function normalizeWidgetConfig(options: {
   }
 
   if (modules.some((module) => !MODULES.has(module))) {
-    invalidConfig("[feeblo-sdk] Hub modules must be `feedback` or `updates`.");
+    invalidConfig(
+      "[feeblo-sdk] Hub modules must be `feedback`, `updates` or `help`."
+    );
   }
 
   if (new Set(modules).size !== modules.length) {

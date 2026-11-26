@@ -1,11 +1,33 @@
-import { A, useLocation } from "@solidjs/router";
-import { createEffect, createMemo, For, type JSX, on, Show } from "solid-js";
+import { A, useLocation, useNavigate } from "@solidjs/router";
+import {
+  createEffect,
+  createMemo,
+  createResource,
+  For,
+  type JSX,
+  on,
+  Show,
+} from "solid-js";
 
+import { fetchHelpCenter } from "../../lib/api";
 import { getWidgetConfig, moduleForPath } from "../../lib/config";
-import { resolveView, widgetTabs } from "../../lib/navigation";
+import {
+  firstAvailableHref,
+  resolveView,
+  widgetTabs,
+} from "../../lib/navigation";
 import { Button, buttonVariants } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { PoweredByBadge } from "../ui/powered-by-badge";
+
+/**
+ * What the server said about the workspace's documentation.
+ *
+ * `unknown` is a failed request, kept apart from `disabled` so the difference
+ * between "there is nothing to read" and "we could not ask" survives long enough
+ * to matter — only the first should move a reader.
+ */
+type HelpAvailability = "disabled" | "enabled" | "unknown";
 
 /**
  * The widget's frame: a control header, one scrolling body, and — when the
@@ -19,10 +41,56 @@ export function WidgetShell(props: {
   onClose: () => void;
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const config = getWidgetConfig();
   const view = createMemo(() => resolveView(location.pathname));
-  const tabs = createMemo(() => widgetTabs(config));
+
+  /**
+   * Whether the workspace actually has documentation.
+   *
+   * Three answers, not two. The config says the workspace *asked* for the Help
+   * module; whether anything is published is a fact only the server knows, and a
+   * request that failed is not an answer at all. Letting a failure collapse into
+   * "no" would take a reader who has documentation in front of them and move
+   * them somewhere else, which is a worse outcome than a tab that arrives late.
+   */
+  const [helpAvailability] = createResource((): Promise<HelpAvailability> =>
+    config.modules.includes("help")
+      ? fetchHelpCenter()
+          .then((helpCenter): HelpAvailability =>
+            helpCenter.enabled ? "enabled" : "disabled"
+          )
+          .catch((): HelpAvailability => "unknown")
+      : Promise.resolve("disabled")
+  );
+
+  const isHelpAvailable = createMemo(() => helpAvailability() === "enabled");
+
+  const tabs = createMemo(() =>
+    widgetTabs(config, { helpAvailable: isHelpAvailable() })
+  );
+
   const activeModule = createMemo(() => moduleForPath(location.pathname));
+
+  /**
+   * Move a reader off a surface that turns out not to exist.
+   *
+   * Only a *successful* "disabled" moves anybody. Pending and unknown both leave
+   * the reader where they are: the Help page renders its own skeleton while the
+   * answer is on its way, and a failed request must not evict someone from
+   * documentation that is perfectly readable.
+   */
+  createEffect(() => {
+    if (helpAvailability() !== "disabled" || activeModule() !== "help") {
+      return;
+    }
+
+    const href = firstAvailableHref(config, { helpAvailable: false });
+
+    if (href !== null) {
+      navigate(href, { replace: true });
+    }
+  });
 
   const activeTabIndex = createMemo(() =>
     Math.max(

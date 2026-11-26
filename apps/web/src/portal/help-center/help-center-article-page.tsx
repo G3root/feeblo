@@ -1,5 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
+import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Button } from "@feeblo/ui/button";
 import { CopyButton } from "@feeblo/ui/copy-button";
@@ -13,21 +14,42 @@ import { MarkdownContent } from "@feeblo/ui/markdown-content";
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { Textarea } from "@feeblo/ui/textarea";
 import { cn } from "@feeblo/ui/utils";
+import { markdownHeadings, type MarkdownHeading } from "@feeblo/utils/markdown";
 import {
   ArrowLeft02Icon,
+  ArrowRight01Icon,
+  ArrowRight02Icon,
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   addHelpCenterArticleViewAtom,
   helpCenterArticlePublicAtom,
+  helpCenterArticlesPublicAtom,
   type HelpCenterArticlePublicAtomArgs,
+  helpCenterTopicsPublicAtom,
 } from "./atoms";
+import {
+  buildHelpCenterSections,
+  findHelpCenterArticleBySlug,
+  findHelpCenterSiblings,
+  formatHelpDate,
+  type HelpCenterNavArticle,
+  type HelpCenterNavSection,
+  readingMinutes,
+} from "./content";
+import { HelpCenterBreadcrumbs, HelpCenterNav } from "./help-center-nav";
+import { HelpCenterRailSearch } from "./help-center-rail-search";
+import {
+  HelpCenterOutlineDisclosure,
+  HelpCenterToc,
+  scrollToHeading,
+} from "./help-center-toc";
 import { useHelpCenterVote } from "./use-help-center-vote";
 
 const VISITOR_KEY = "feeblo_help_visitor_id";
@@ -35,27 +57,21 @@ const VISITOR_KEY = "feeblo_help_visitor_id";
 const VIEWED_PREFIX = "feeblo_help_viewed:";
 
 /**
- * One formatter for every date on the page.
- *
- * `toLocaleDateString()` with an options object builds a fresh
- * `Intl.DateTimeFormat` on every call, and an article page renders a date at
- * least once. Hoisted so the work happens once per module load rather than once
- * per render.
+ * Reused for every empty read, so a page that has not received its lists yet
+ * renders from the same array identity on every pass instead of rebuilding a
+ * new `[]` per render and re-deriving the tree.
  */
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-});
+const EMPTY: ReadonlyArray<never> = [];
 
 /**
  * The portal's article page.
  *
- * Three things happen here that the design of the tables exists to support:
- * the body renders from the stored Markdown (so "copy as Markdown" copies the
- * source rather than scraping the DOM), a view beacon fires once per article
- * per tab session, and the verdict widget is driven by its own machine
- * (`vote-machine.ts`) rather than by a pile of booleans.
+ * The shape mirrors the board's other browse surfaces: a rail of navigation, the
+ * page, and a rail of orientation. Everything the article carries is rendered
+ * from the public projections only — the body comes from the stored Markdown so
+ * "copy as Markdown" copies the source rather than scraping the DOM, a view
+ * beacon fires once per article per tab session, and the verdict widget is
+ * driven by its own machine (`vote-machine.ts`) rather than a pile of booleans.
  */
 export function HelpCenterArticlePage({
   articleSlug,
@@ -74,15 +90,53 @@ export function HelpCenterArticlePage({
   );
 
   const articleResult = useAtomValue(helpCenterArticlePublicAtom(articleArgs));
+  const topicsResult = useAtomValue(helpCenterTopicsPublicAtom(organizationId));
+
+  const articlesResult = useAtomValue(
+    helpCenterArticlesPublicAtom(organizationId)
+  );
+
+  // The nav tree is a second and third read, not part of the article: a reader
+  // who lands here from a search result needs the map of what else exists, and
+  // the article payload deliberately carries no list. Both reads are shared
+  // with the index page, so arriving here after the index costs nothing.
+  const topics = Result.getOrElse(topicsResult, () => EMPTY);
+  const articles = Result.getOrElse(articlesResult, () => EMPTY);
+
+  const sections = useMemo(
+    () => buildHelpCenterSections({ articles, topics }),
+    [articles, topics]
+  );
+
+  const article = Result.getOrElse(articleResult, () => undefined);
+
+  /**
+   * The article being read, as early as possible.
+   *
+   * The detail once it arrives; before that, the list's own row for the same
+   * slug. The page renders its rails from this rather than from the detail, so
+   * a navigation does not unmount the navigation while the body loads — which
+   * would drop the reader's expanded sections, since that state lives in
+   * `HelpCenterNav`.
+   */
+  const activeArticle =
+    article ?? findHelpCenterArticleBySlug(articles, articleSlug);
+
+  const { section, previous, next } = findHelpCenterSiblings({
+    articleId: activeArticle?.id ?? "",
+    sections,
+  });
+
+  const headings = useMemo(
+    () => (article === undefined ? [] : markdownHeadings(article.content)),
+    [article]
+  );
 
   const visitorId = useVisitorId();
 
-  useViewBeacon({
-    articleId: Result.isSuccess(articleResult)
-      ? articleResult.value.id
-      : undefined,
-    organizationId,
-  });
+  useViewBeacon({ articleId: activeArticle?.id, organizationId });
+
+  useLandingHash(article?.id);
 
   if (!enabled) {
     return (
@@ -95,106 +149,340 @@ export function HelpCenterArticlePage({
     );
   }
 
-  return Result.builder(articleResult)
-    .onInitial(() => (
-      <div className="mx-auto w-full max-w-3xl space-y-4 py-8">
-        <Skeleton className="h-9 w-2/3" />
-        <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="h-64 w-full" />
+  return (
+    <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-8 sm:px-6 md:grid-cols-[15rem_minmax(0,1fr)] lg:px-8 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]">
+      <aside className="hidden md:block">
+        <div className="sticky top-6 flex max-h-[calc(100dvh-9rem)] flex-col gap-6 overflow-y-auto pb-6">
+          <HelpCenterRailSearch organizationId={organizationId} />
+          <HelpCenterNav
+            activeArticleId={activeArticle?.id}
+            activeSectionKey={section?.key}
+            sections={sections}
+          />
+        </div>
+      </aside>
+
+      <article className="min-w-0">
+        {Result.builder(articleResult)
+          .onInitial(() => <ArticleSkeleton />)
+          .onFailure(() => (
+            <Empty className="py-16">
+              <EmptyHeader>
+                <EmptyTitle>Article not found</EmptyTitle>
+                <EmptyDescription>
+                  It may have been removed, or the link is out of date.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ))
+          .onSuccess((loaded) => (
+            <ArticleBody
+              article={loaded}
+              headings={headings}
+              next={next}
+              organizationId={organizationId}
+              previous={previous}
+              section={section}
+              visitorId={visitorId}
+            />
+          ))
+          .exhaustive()}
+      </article>
+
+      <aside className="hidden xl:block">
+        <div className="sticky top-6 flex flex-col gap-8">
+          {headings.length === 0 ? null : <HelpCenterToc headings={headings} />}
+          <StillStuck />
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+/** The page's placeholder, sized like the page it replaces so nothing jumps. */
+function ArticleSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-4 w-1/3" />
+      <Skeleton className="h-9 w-2/3" />
+      <Skeleton className="h-4 w-1/2" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  );
+}
+
+/**
+ * One article's column: header, body, verdict and neighbouring pages.
+ *
+ * The body is the only part that needs the loaded article, so it is the only
+ * part that waits — the rails above render from the list's row and stay put.
+ */
+function ArticleBody({
+  article,
+  headings,
+  section,
+  previous,
+  next,
+  organizationId,
+  visitorId,
+}: {
+  article: THelpCenterArticlePublic;
+  headings: ReadonlyArray<MarkdownHeading>;
+  section: HelpCenterNavSection | undefined;
+  previous: HelpCenterNavArticle | undefined;
+  next: HelpCenterNavArticle | undefined;
+  organizationId: string;
+  visitorId: string | undefined;
+}) {
+  return (
+    <>
+      <ArticleHeader article={article} section={section} />
+
+      {/* The outline rail appears at `xl`; below that the same headings fold
+          into a disclosure, so no screen is left without a way to jump. */}
+      <div className="mt-5 xl:hidden">
+        <HelpCenterOutlineDisclosure headings={headings} />
       </div>
-    ))
-    .onFailure(() => (
-      <Empty className="py-16">
-        <EmptyHeader>
-          <EmptyTitle>Article not found</EmptyTitle>
-          <EmptyDescription>
-            It may have been removed, or the link is out of date.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    ))
-    .onSuccess((article) => (
-      <article className="mx-auto w-full max-w-3xl py-8">
-        <Button
-          render={<Link to="/s/help" />}
-          size="sm"
+
+      <div className="mt-5 flex justify-end">
+        <CopyButton
+          onCopy={() => article.content}
+          successMessage="Markdown copied"
           type="button"
           variant="ghost"
         >
-          <HugeiconsIcon icon={ArrowLeft02Icon} />
-          Help center
-        </Button>
+          Copy as Markdown
+        </CopyButton>
+      </div>
 
-        {article.coverImage ? (
-          <img
-            alt=""
-            className="mt-4 aspect-[16/7] w-full rounded-xl border object-cover"
-            height={525}
-            src={article.coverImage}
-            width={1200}
-          />
-        ) : null}
+      <div className="border-border/70 mt-1 border-t pt-6">
+        <MarkdownContent content={article.content} headingAnchors />
+      </div>
 
-        <header className="mt-4 space-y-2">
-          <p className="text-muted-foreground text-xs">
-            <Link className="hover:text-foreground" to="/s/help">
-              {article.topicName}
-            </Link>
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {article.title}
-          </h1>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-            {article.authorName === null ? null : (
-              <span>Written by {article.authorName}</span>
-            )}
-            <span>Updated {DATE_FORMAT.format(article.updatedAt)}</span>
-            <span className="tabular-nums">
-              {article.viewCount.toLocaleString()} views
+      {/*
+       * Rendered once the reader can be identified: the tally's key includes the
+       * visitor id, and an atom read before it resolves would be a request for a
+       * tally it cannot attribute.
+       *
+       * Keyed by the article: the verdict machine adopts one tally per article,
+       * and navigating from `/articles/a` to `/articles/b` keeps this route
+       * mounted. Without the key the widget would show A's verdict on B.
+       */}
+      {visitorId === undefined ? null : (
+        <VerdictSection
+          key={article.id}
+          articleId={article.id}
+          organizationId={organizationId}
+          visitorId={visitorId}
+        />
+      )}
+
+      {previous === undefined && next === undefined ? null : (
+        <nav
+          aria-label="More in this section"
+          className="mt-10 grid gap-x-10 gap-y-4 sm:grid-cols-2"
+        >
+          {previous === undefined ? null : (
+            <SiblingLink article={previous} direction="previous" />
+          )}
+          {next === undefined ? null : (
+            <SiblingLink article={next} direction="next" />
+          )}
+        </nav>
+      )}
+
+      <div className="mt-10 xl:hidden">
+        <StillStuck />
+      </div>
+    </>
+  );
+}
+
+/**
+ * Lands on the section a `#hash` link named.
+ *
+ * The body is fetched after the first paint, so the browser's own anchor scroll
+ * runs while the heading does not exist yet and nothing happens. This retries
+ * once the body is in the document — once per article, so a reader who has
+ * scrolled away is never pulled back by a later render.
+ */
+/**
+ * The fragment as a heading id, or `undefined` when it cannot be read.
+ *
+ * A hash is user-editable and arrives from links written elsewhere, so it can be
+ * percent-encoded text that does not decode. That is a malformed URL, not a
+ * broken page: skipping the scroll is the whole consequence.
+ */
+function readHashTarget(): string | undefined {
+  const fragment = window.location.hash.slice(1);
+
+  try {
+    return decodeURIComponent(fragment);
+  } catch {
+    return undefined;
+  }
+}
+
+function useLandingHash(articleId: string | undefined) {
+  const landedFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (articleId === undefined || landedFor.current === articleId) {
+      return;
+    }
+
+    landedFor.current = articleId;
+
+    const id = readHashTarget();
+
+    if (id === "" || id === undefined) {
+      return;
+    }
+
+    // The URL already names the section, so only the scroll is ours to do.
+    scrollToHeading(id, { updateHash: false });
+  }, [articleId]);
+}
+
+/**
+ * The top of the page: where the reader is, what this is, who wrote it and when.
+ *
+ * Its own component because it is the one part of the page that reads only the
+ * article, while everything under it reads the article's place in the tree — and
+ * because the ordering inside it (breadcrumb, section, title, meta, cover) is
+ * the part a reader scans before deciding to keep reading.
+ *
+ * No summary. The article's excerpt is derived from the opening of the body
+ * (`help-center-article/write.ts`), so rendering it here would print the first
+ * paragraph twice in a row. It is a list row's summary and a search result's
+ * description, which is what the index and the metadata use it for.
+ */
+function ArticleHeader({
+  article,
+  section,
+}: {
+  article: THelpCenterArticlePublic;
+  section: HelpCenterNavSection | undefined;
+}) {
+  return (
+    <>
+      <HelpCenterBreadcrumbs title={article.title} />
+
+      <header className="mt-4">
+        {section === undefined ? null : (
+          <p className="text-muted-foreground text-xs">{section.name}</p>
+        )}
+        <h1 className="text-foreground mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+          {article.title}
+        </h1>
+        <div className="text-muted-foreground mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+          {article.authorName === null ? null : (
+            <span className="text-foreground font-medium">
+              {article.authorName}
             </span>
-          </div>
-          {article.isArchived ? (
-            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-              This article describes behaviour that is no longer current.
-            </p>
-          ) : null}
-        </header>
-
-        <div className="mt-4 flex justify-end">
-          <CopyButton
-            onCopy={() => article.content}
-            successMessage="Markdown copied"
-            type="button"
-            variant="ghost"
-          >
-            Copy as Markdown
-          </CopyButton>
+          )}
+          <span>Updated {formatHelpDate(article.updatedAt)}</span>
+          <span>{readingMinutes(article.content)} min read</span>
+          <span className="tabular-nums">
+            {article.viewCount.toLocaleString()}{" "}
+            {article.viewCount === 1 ? "view" : "views"}
+          </span>
         </div>
+        {article.isArchived ? (
+          <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+            This article describes behaviour that is no longer current.
+          </p>
+        ) : null}
+      </header>
 
-        <div className="mt-2 border-t pt-6">
-          <MarkdownContent content={article.content} />
-        </div>
+      {article.coverImage === null ? null : (
+        <img
+          alt=""
+          className="mt-6 aspect-[16/7] w-full rounded-xl border object-cover"
+          height={525}
+          src={article.coverImage}
+          width={1200}
+        />
+      )}
+    </>
+  );
+}
 
-        {/*
-         * Rendered once the reader can be identified: the tally's key includes the
-         * visitor id, and an atom read before it resolves would be a request for a
-         * tally it cannot attribute.
-         *
-         * Keyed by the article: the verdict machine adopts one tally per article,
-         * and navigating from `/articles/a` to `/articles/b` keeps this route
-         * mounted. Without the key the widget would show A's verdict on B.
-         */}
-        {visitorId === undefined ? null : (
-          <VerdictSection
-            key={article.id}
-            articleId={article.id}
-            organizationId={organizationId}
-            visitorId={visitorId}
+/**
+ * The next or previous page in the same section.
+ *
+ * Both arrows are drawn on both sides and the grid places them, rather than two
+ * components that would drift: the only difference between the two links is
+ * which way they point and which edge they align to.
+ */
+function SiblingLink({
+  article,
+  direction,
+}: {
+  article: HelpCenterNavArticle;
+  direction: "previous" | "next";
+}) {
+  const isNext = direction === "next";
+
+  return (
+    <Link
+      className={cn(
+        "group hover:bg-muted/50 flex min-w-0 flex-col gap-1 rounded-lg border p-3 transition-colors",
+        isNext ? "sm:col-start-2 sm:items-end sm:text-end" : "sm:col-start-1"
+      )}
+      params={{ articleSlug: article.slug }}
+      to="/s/help/articles/$articleSlug"
+    >
+      <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        {isNext ? null : (
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="size-3.5"
+            icon={ArrowLeft02Icon}
           />
         )}
-      </article>
-    ))
-    .exhaustive();
+        {isNext ? "Next" : "Previous"}
+        {isNext ? (
+          <HugeiconsIcon
+            aria-hidden="true"
+            className="size-3.5"
+            icon={ArrowRight02Icon}
+          />
+        ) : null}
+      </span>
+      <span className="group-hover:text-primary truncate text-sm font-medium">
+        {article.title}
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * The closing card: where to go when the documentation did not answer.
+ *
+ * It points at the board rather than at a contact form, because the answer a
+ * customer service page owes is the one the rest of the product already gives —
+ * a request the team answers in public.
+ */
+function StillStuck() {
+  return (
+    <div className="rounded-xl border p-4">
+      <p className="text-sm font-medium">Still stuck?</p>
+      <p className="text-muted-foreground mt-1 text-[13px] leading-5">
+        Post the question on the board. The team answers there, and everyone who
+        needs the same answer can follow it.
+      </p>
+      <Button
+        className="mt-3 w-full"
+        render={<Link to="/s" />}
+        size="sm"
+        variant="outline"
+      >
+        Ask on the board
+        <HugeiconsIcon aria-hidden="true" icon={ArrowRight01Icon} />
+      </Button>
+    </div>
+  );
 }
 
 function VerdictSection({
@@ -210,7 +498,7 @@ function VerdictSection({
   const total = vote.counts.helpful + vote.counts.notHelpful;
 
   return (
-    <section className="mt-10 border-t pt-6">
+    <section className="border-border/70 mt-10 border-t pt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium">Was this helpful?</p>
         <div className="flex items-center gap-2">
@@ -372,7 +660,6 @@ function useVisitorId(): string | undefined {
 
 /**
  * One view per article per tab session.
- *
  * The dedupe is a client-side convenience, not an identity: the server still
  * deduplicates on the beacon's own id, so a page that fires twice — a remount,
  * a retry — is still one read.

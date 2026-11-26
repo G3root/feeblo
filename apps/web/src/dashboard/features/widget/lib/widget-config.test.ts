@@ -24,6 +24,22 @@ const draftWith = (overrides: Partial<WidgetDraft> = {}): WidgetDraft => ({
   ...overrides,
 });
 
+describe("createWidgetDraft", () => {
+  it("starts as a two-surface hub and leaves help off the widget", () => {
+    const draft = createWidgetDraft("light");
+
+    // A hub, not a single module: the default widget shows both core surfaces.
+    expect(widgetEmbedConfig(draft).mode).toBe("hub");
+    expect(enabledWidgetModules(draft.modules)).toEqual([
+      "feedback",
+      "updates",
+    ]);
+    // Listed, so it can be switched on, but not shipped before the workspace
+    // has documentation for it to show.
+    expect(draft.modules.map((module) => module.id)).toContain("help");
+  });
+});
+
 describe("widgetEmbedConfig", () => {
   it("uses hub with the enabled order when both modules are on", () => {
     const config = widgetEmbedConfig(
@@ -102,6 +118,9 @@ describe("moveWidgetModule", () => {
     expect(moveWidgetModule(entries, 0, 1).map((entry) => entry.id)).toEqual([
       "updates",
       "feedback",
+      // Whatever the default carries beyond the pair being swapped: the
+      // assertion is about the move, not about how many modules exist.
+      ...entries.slice(2).map((entry) => entry.id),
     ]);
   });
 

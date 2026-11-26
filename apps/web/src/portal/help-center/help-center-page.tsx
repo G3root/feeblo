@@ -23,13 +23,14 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   helpCenterArticlesPublicAtom,
   helpCenterSearchPublicAtom,
   helpCenterTopicsPublicAtom,
 } from "./atoms";
+import { buildHelpCenterSections, type HelpCenterNavSection } from "./content";
 
 /**
  * How short a query has to be before it is not a search.
@@ -41,6 +42,15 @@ import {
  * something".
  */
 const MIN_SEARCH_LENGTH = 2;
+
+/**
+ * The empty read, as one array.
+ *
+ * `Atom.family` reads return the last value they had, so a pending or failed
+ * read falls back to a shared identity rather than a fresh `[]` per render —
+ * which would be a new `useMemo` dependency, and a rebuilt tree, on every pass.
+ */
+const EMPTY: ReadonlyArray<never> = [];
 
 /**
  * The portal's help center index.
@@ -71,10 +81,16 @@ export function HelpCenterPage() {
     helpCenterArticlesPublicAtom(organizationId)
   );
 
-  const topics = Result.getOrElse(topicsResult, () => []);
-  const articles = Result.getOrElse(articlesResult, () => []);
+  const topics = Result.getOrElse(topicsResult, () => EMPTY);
+  const articles = Result.getOrElse(articlesResult, () => EMPTY);
 
-  const articlesByTopic = groupArticlesByTopic(articles);
+  // Memoized because the search box re-renders this page on every keystroke: the
+  // tree is derived from two reads, not from the query, and rebuilding its maps
+  // per character would be work the reader never asked for.
+  const sections = useMemo(
+    () => buildHelpCenterSections({ articles, topics }),
+    [articles, topics]
+  );
 
   if (!enabled) {
     return (
@@ -98,7 +114,7 @@ export function HelpCenterPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl py-8">
+    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Help center</h1>
         <p className="text-muted-foreground text-sm">
@@ -129,7 +145,7 @@ export function HelpCenterPage() {
           organizationId={organizationId}
           query={trimmedQuery}
         />
-      ) : topics.length === 0 ? (
+      ) : sections.length === 0 ? (
         <Empty className="py-16">
           <EmptyHeader>
             <EmptyTitle>No documentation yet</EmptyTitle>
@@ -140,36 +156,42 @@ export function HelpCenterPage() {
         </Empty>
       ) : (
         <div className="mt-8 space-y-6">
-          {topics.map((topic) => {
-            const topicArticles = articlesByTopic.get(topic.id) ?? [];
-
-            return (
-              <section className="rounded-lg border" key={topic.id}>
-                <header className="border-b px-4 py-3">
-                  <h2 className="flex items-center gap-2 text-sm font-semibold">
-                    <TablerIcon
-                      className="text-muted-foreground size-4"
-                      name={helpCenterTopicIconName(topic.icon)}
-                    />
-                    {topic.name}
-                  </h2>
-                  {topic.description === null ? null : (
-                    <p className="text-muted-foreground text-xs">
-                      {topic.description}
-                    </p>
-                  )}
-                </header>
-                <ul className="divide-y">
-                  {topicArticles.map((article) => (
-                    <ArticleRow article={article} key={article.id} />
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
+          {sections.map((section) => (
+            <HelpCenterSection key={section.key} section={section} />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One section of the index: its name, its description and its articles.
+ *
+ * Fed by the same tree the article page's rail renders (`content.ts`), so the
+ * index and the sidebar cannot list different articles under one heading.
+ */
+function HelpCenterSection({ section }: { section: HelpCenterNavSection }) {
+  return (
+    <section className="rounded-lg border">
+      <header className="border-b px-4 py-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <TablerIcon
+            className="text-muted-foreground size-4"
+            name={helpCenterTopicIconName(section.icon)}
+          />
+          {section.name}
+        </h2>
+        {section.description === null ? null : (
+          <p className="text-muted-foreground text-xs">{section.description}</p>
+        )}
+      </header>
+      <ul className="divide-y">
+        {section.articles.map((article) => (
+          <ArticleRow article={article} key={article.id} />
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -286,30 +308,4 @@ function HelpCenterSearchResults({
       </ul>
     </div>
   );
-}
-
-/**
- * Articles bucketed by topic, in one pass.
- *
- * A plain function rather than a `useMemo`: the page re-renders when a query
- * settles, not on every keystroke, and the list is bounded by what a help
- * center publishes. Filtering inside the topic loop would be O(topics ×
- * articles) per render for no benefit.
- */
-function groupArticlesByTopic<Article extends { readonly topicId: string }>(
-  articles: ReadonlyArray<Article>
-): Map<string, Article[]> {
-  const byTopic = new Map<string, Article[]>();
-
-  for (const article of articles) {
-    const bucket = byTopic.get(article.topicId);
-
-    if (bucket === undefined) {
-      byTopic.set(article.topicId, [article]);
-    } else {
-      bucket.push(article);
-    }
-  }
-
-  return byTopic;
 }

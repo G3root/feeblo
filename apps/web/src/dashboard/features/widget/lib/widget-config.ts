@@ -16,15 +16,18 @@ const trailingSlashPattern = /\/+$/;
 export const WIDGET_MODULES = [
   "feedback",
   "updates",
+  "help",
 ] as const satisfies readonly WidgetModule[];
 
 export const WIDGET_MODULE_LABELS = {
   feedback: "Feedback",
   updates: "Updates",
+  help: "Help",
 } as const satisfies Record<WidgetModule, string>;
 
 export const WIDGET_MODE_LABELS = {
   feedback: "Feedback widget",
+  help: "Help widget",
   hub: "Hub",
   updates: "Updates widget",
 } as const satisfies Record<WidgetMode, string>;
@@ -71,10 +74,26 @@ export function isWidgetInstallTab(value: string): value is WidgetInstallTab {
   return value === "vanilla" || value === "react";
 }
 
+/**
+ * The modules a new widget ships with.
+ *
+ * Help is listed in the picker but starts off: its tab only appears once the
+ * workspace publishes documentation, so enabling it by default would make every
+ * fresh widget a three-module hub whose third tab nobody can see yet — and would
+ * turn "hide one of the two modules" into "you still have two" in the builder.
+ */
+const DEFAULT_ENABLED_MODULES: ReadonlySet<WidgetModule> = new Set([
+  "feedback",
+  "updates",
+]);
+
 export function createWidgetDraft(theme: WidgetTheme): WidgetDraft {
   return {
     launcher: "bottom-right",
-    modules: WIDGET_MODULES.map((id) => ({ enabled: true, id })),
+    modules: WIDGET_MODULES.map((id) => ({
+      enabled: DEFAULT_ENABLED_MODULES.has(id),
+      id,
+    })),
     theme,
   };
 }

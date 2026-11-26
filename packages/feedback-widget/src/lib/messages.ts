@@ -90,7 +90,9 @@ export function isParentMessage<T>(
     case "SET_MODULE":
       return (
         "module" in dataRecord &&
-        (dataRecord.module === "feedback" || dataRecord.module === "updates")
+        (dataRecord.module === "feedback" ||
+          dataRecord.module === "updates" ||
+          dataRecord.module === "help")
       );
     case "SET_BOARD":
       return (

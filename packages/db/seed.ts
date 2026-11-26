@@ -9,6 +9,8 @@ import {
   CommentId,
   CommentReactionId,
   ContactId,
+  HelpCenterArticleId,
+  HelpCenterTopicId,
   MemberId,
   PostActivityId,
   PostId,
@@ -24,6 +26,7 @@ import {
   WorkspaceId,
 } from "@feeblo/id";
 import { htmlToExcerpt } from "@feeblo/utils/html";
+import { markdownToHtml } from "@feeblo/utils/markdown";
 import { isObject } from "@feeblo/utils/runtime-kind";
 import { and, eq, inArray } from "drizzle-orm";
 import * as Data from "effect/Data";
@@ -36,6 +39,7 @@ import {
 } from "./seed-auth";
 import type { SeedAuth } from "./seed-auth";
 import { Database } from "./src";
+import { HELP_CENTER_SEED_TOPICS } from "./src/help-center-seed-content";
 import { nukeDatabase } from "./src/nuke";
 import {
   boardTable,
@@ -48,6 +52,8 @@ import {
   commentTable,
   contactTable,
   DEFAULT_CHANGELOG_CATEGORIES,
+  helpCenterArticleTable,
+  helpCenterTopicTable,
   DEFAULT_POST_STATUSES,
   memberTable,
   organizationTable,
@@ -2040,6 +2046,116 @@ const seedOverPlanWorkspace = (auth: SeedAuth) =>
     return org;
   });
 
+/**
+ * Documentation for the demo workspace.
+ *
+ * A help center is the one surface that looks broken when it is empty: a reader
+ * who opens the tab and finds nothing concludes the feature is missing, not that
+ * the workspace has not written anything yet. The content module holds the prose
+ * (`help-center-seed-content.ts`); this only turns it into rows.
+ *
+ * Published, dated in the past, and attributed to the seeding member — the same
+ * shape an article written through the dashboard would have, so the insights
+ * panels and the portal's navigation have something real to count. Embeddings
+ * are left null on purpose: they are written best-effort at write time, and the
+ * seed does not call a model.
+ */
+/**
+ * The excerpt a seeded article carries.
+ *
+ * The write path derives it from the whole rendered body, which is right for a
+ * page a person wrote — but flattening a table into prose produces a summary
+ * like "The roles Role Can do Owner The account…". The opening paragraph is the
+ * part that reads as a summary, so that is what a seeded row stores. The
+ * article page does not render an excerpt at all; this is a list row's line and
+ * a search result's description.
+ */
+const seedArticleExcerpt = (content: string): string => {
+  // The first block that is not a heading: the lede above the first one, or the
+  // paragraph under it for an article that starts at a heading.
+  const opening = content
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .find((block) => block.length > 0 && !block.startsWith("#"));
+
+  return htmlToExcerpt(markdownToHtml(opening ?? content));
+};
+
+const seedHelpCenter = ({
+  organizationId,
+  creatorMemberId,
+}: {
+  organizationId: string;
+  creatorMemberId: string;
+}) =>
+  Effect.gen(function* () {
+    const db = yield* Database.Database;
+
+    const [existing] = yield* db
+      .select({ id: helpCenterTopicTable.id })
+      .from(helpCenterTopicTable)
+      .where(eq(helpCenterTopicTable.organizationId, organizationId))
+      .limit(1);
+
+    if (existing) {
+      console.log("   Help center already exists, skipping");
+
+      return;
+    }
+
+    const now = new Date();
+    let articleCount = 0;
+
+    for (const [position, topic] of HELP_CENTER_SEED_TOPICS.entries()) {
+      const topicId = yield* HelpCenterTopicId.generate;
+
+      yield* db.insert(helpCenterTopicTable).values({
+        createdAt: now,
+        description: topic.description,
+        icon: topic.icon,
+        id: topicId,
+        name: topic.name,
+        organizationId,
+        position,
+        slug: topic.slug,
+        updatedAt: now,
+      });
+
+      for (const [articlePosition, article] of topic.articles.entries()) {
+        const publishedAt = addDays(now, -article.publishedDaysAgo);
+
+        yield* db.insert(helpCenterArticleTable).values({
+          content: article.content,
+          // Derived from the rendered body, exactly as the write path does it:
+          // the public list and search show the excerpt, so a null-ish default
+          // would leave every seeded row with an empty summary.
+          creatorMemberId,
+          createdAt: publishedAt,
+          excerpt: seedArticleExcerpt(article.content),
+          id: yield* HelpCenterArticleId.generate,
+          organizationId,
+          // A manual pin is what makes a section read in the order its articles
+          // were written: the fallback order is newest first, which inverts a
+          // documentation set that introduces before it explains.
+          position: articlePosition,
+          publishedAt,
+          slug: article.slug,
+          source: "EDITOR",
+          status: "published",
+          title: article.title,
+          topicId,
+          updatedAt: publishedAt,
+        });
+      }
+
+      articleCount += topic.articles.length;
+    }
+
+    console.log(
+      `   Seeded ${HELP_CENTER_SEED_TOPICS.length} help center topics with ${articleCount} articles`
+    );
+  });
+
 const seed = (auth: SeedAuth) =>
   Effect.gen(function* () {
     console.log("Starting database seed...\n");
@@ -2259,6 +2375,13 @@ const seed = (auth: SeedAuth) =>
       creatorId: primaryUser.id,
       creatorMemberId: primaryMember.id,
       posts: mainPosts,
+    });
+
+    console.log("5b) Seeding the help center in main org");
+
+    yield* seedHelpCenter({
+      creatorMemberId: primaryMember.id,
+      organizationId: primaryOrg.id,
     });
 
     yield* seedCrmOnBehalf({

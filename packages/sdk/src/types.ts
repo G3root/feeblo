@@ -59,7 +59,14 @@ export interface SubmittedFeedback {
   title: string;
 }
 
-export type WidgetMode = "feedback" | "updates" | "hub";
+/**
+ * The widget surfaces, plus `hub` for a launcher that shows several of them.
+ *
+ * `help` renders the workspace's published help center. A workspace whose help
+ * center is not published answers `enabled: false`, and the widget hides the tab
+ * rather than showing an empty surface.
+ */
+export type WidgetMode = "feedback" | "updates" | "help" | "hub";
 
 export type WidgetModule = Exclude<WidgetMode, "hub">;
 

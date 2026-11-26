@@ -14,9 +14,13 @@ import {
 } from "../rpc-errors";
 import {
   WidgetBoard,
+  WidgetBoardList,
   WidgetFeedbackCreate,
   WidgetFeedbackResponse,
   WidgetHelpArticleRequest,
+  WidgetHelpCenter,
+  WidgetHelpCenterArticleRequest,
+  WidgetHelpCenterArticleResponse,
   WidgetHelpArticles,
   WidgetSuggestion,
   WidgetSuggestionRequest,
@@ -69,6 +73,40 @@ export class WidgetApiGroup extends HttpApiGroup.make("WidgetApiGroup")
       .annotate(
         OpenApi.Description,
         "Returns published help center articles that match the question being written, so the composer can offer existing documentation before a new post is created."
+      )
+  )
+  .add(
+    HttpApiEndpoint.post("helpCenter", "/help-center", {
+      payload: WidgetBoardList,
+      success: WidgetHelpCenter,
+      error: Schema.Union([
+        DataValidationError,
+        InternalServerError,
+        RateLimitErrors,
+      ]),
+    })
+      .annotate(OpenApi.Title, "Help Center")
+      .annotate(OpenApi.Summary, "List the published documentation")
+      .annotate(
+        OpenApi.Description,
+        "Every published help center article with its section, for the widget's Help module. `enabled` is false when the surface does not exist for this workspace."
+      )
+  )
+  .add(
+    HttpApiEndpoint.post("helpCenterArticle", "/help-center/article", {
+      payload: WidgetHelpCenterArticleRequest,
+      success: WidgetHelpCenterArticleResponse,
+      error: Schema.Union([
+        DataValidationError,
+        InternalServerError,
+        RateLimitErrors,
+      ]),
+    })
+      .annotate(OpenApi.Title, "Help Center Article")
+      .annotate(OpenApi.Summary, "Read one published article")
+      .annotate(
+        OpenApi.Description,
+        "One published article, rendered to HTML, addressed by its slug. A draft or an article in another workspace answers `article: null`."
       )
   )
   .add(

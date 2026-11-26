@@ -28,11 +28,16 @@ interface PreviewConfig {
 }
 
 function isWidgetMode(value: string | null): value is WidgetMode {
-  return value === "feedback" || value === "updates" || value === "hub";
+  return (
+    value === "feedback" ||
+    value === "updates" ||
+    value === "help" ||
+    value === "hub"
+  );
 }
 
 function isWidgetModule(value: string): value is WidgetModule {
-  return value === "feedback" || value === "updates";
+  return value === "feedback" || value === "updates" || value === "help";
 }
 
 function isWidgetPlacement(value: string | null): value is WidgetPlacement {

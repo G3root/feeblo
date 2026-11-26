@@ -1,4 +1,11 @@
-export type WidgetModule = "feedback" | "updates";
+/**
+ * The widget's surfaces.
+ *
+ * `help` reads the workspace's published help center — the same documentation
+ * the portal serves — and is dropped at runtime when that surface does not
+ * exist for the workspace.
+ */
+export type WidgetModule = "feedback" | "updates" | "help";
 
 export type WidgetMode = WidgetModule | "hub";
 
@@ -31,5 +38,20 @@ export function getWidgetConfig(): WidgetConfig {
 }
 
 export function moduleForPath(pathname: string): WidgetModule {
-  return pathname.startsWith("/updates") ? "updates" : "feedback";
+  if (pathname.startsWith("/updates")) {
+    return "updates";
+  }
+
+  if (pathname.startsWith("/help")) {
+    return "help";
+  }
+
+  return "feedback";
 }
+
+/** Where each module's surface starts, for a parent that switches modules. */
+export const modulePaths = {
+  feedback: "/",
+  help: "/help",
+  updates: "/updates",
+} as const satisfies Record<WidgetModule, string>;

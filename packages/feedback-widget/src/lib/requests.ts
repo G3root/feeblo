@@ -3,6 +3,8 @@ import {
   decodeWidgetBootEnv,
   decodeWidgetError,
   decodeWidgetHelpArticles,
+  decodeWidgetHelpCenter,
+  decodeWidgetHelpCenterArticleResponse,
   decodeWidgetSuggestions,
   decodeWidgetUpdates,
   type TWidgetBoard,
@@ -10,6 +12,8 @@ import {
   type TWidgetFeedbackCreateWire,
   type TWidgetHelpArticle,
   type TWidgetHelpArticles,
+  type TWidgetHelpCenter,
+  type TWidgetHelpCenterArticleDetail,
   type TWidgetSuggestion,
   type TWidgetUpdate,
 } from "@feeblo/domain/widget/schema";
@@ -35,6 +39,10 @@ export type WidgetSuggestion = TWidgetSuggestion;
 export type WidgetHelpArticle = TWidgetHelpArticle;
 
 export type WidgetHelpArticles = TWidgetHelpArticles;
+
+export type WidgetHelpCenter = TWidgetHelpCenter;
+
+export type WidgetHelpCenterArticleDetail = TWidgetHelpCenterArticleDetail;
 
 export type WidgetUpdate = TWidgetUpdate;
 
@@ -127,6 +135,49 @@ export async function requestHelpArticles(
   }
 
   return decodeWidgetHelpArticles(await response.json());
+}
+
+/**
+ * The workspace's published documentation, for the Help module.
+ *
+ * One read, and the rows carry their section — the list is already ordered by
+ * section, so the view groups it in order rather than asking for a topic list
+ * first.
+ */
+export async function requestHelpCenter(): Promise<WidgetHelpCenter> {
+  const response = await fetch(`${getApiBaseUrl()}/help-center`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: getOrganizationId() }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch the help center: ${response.status}`);
+  }
+
+  return decodeWidgetHelpCenter(await response.json());
+}
+
+/**
+ * One article, as HTML the server rendered from the stored Markdown.
+ *
+ * `article: null` is the answer for a slug that is not published, so the
+ * caller shows "not found" instead of having to tell a 404 from a draft.
+ */
+export async function requestHelpCenterArticle(
+  slug: string
+): Promise<WidgetHelpCenterArticleDetail | null> {
+  const response = await fetch(`${getApiBaseUrl()}/help-center/article`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ organizationId: getOrganizationId(), slug }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch the article: ${response.status}`);
+  }
+
+  return decodeWidgetHelpCenterArticleResponse(await response.json()).article;
 }
 
 /**

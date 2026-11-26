@@ -6,6 +6,7 @@ import { Badge } from "@feeblo/ui/badge";
 import { Switch } from "@feeblo/ui/switch";
 import { cn } from "@feeblo/ui/utils";
 import {
+  BookOpen01Icon,
   DragDropVerticalIcon,
   Megaphone01Icon,
   MessageMultiple01Icon,
@@ -31,6 +32,14 @@ const WIDGET_MODULE_DETAILS = {
     description: "Your published changelog as a feed of product updates.",
     icon: Megaphone01Icon,
     label: WIDGET_MODULE_LABELS.updates,
+  },
+  help: {
+    // The tab is hidden until the workspace publishes something, so the row is
+    // the only place that can say why it is not showing up yet.
+    description:
+      "Your published help center — sections and articles. The tab appears once documentation is published.",
+    icon: BookOpen01Icon,
+    label: WIDGET_MODULE_LABELS.help,
   },
 } as const satisfies Record<WidgetModule, ModuleDetails>;
 

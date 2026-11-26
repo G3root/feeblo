@@ -12,8 +12,8 @@ import {
 import { ViewSkeleton } from "../components/shell/view-skeleton";
 import { WidgetShell } from "../components/shell/widget-shell";
 import { ErrorFallback } from "../components/ui/error-fallback";
-import { fetchBoards, fetchUpdates } from "../lib/api";
-import { getWidgetConfig, moduleForPath } from "../lib/config";
+import { fetchBoards, fetchHelpCenter, fetchUpdates } from "../lib/api";
+import { getWidgetConfig, moduleForPath, modulePaths } from "../lib/config";
 import { setWidgetContext } from "../lib/context";
 import { setWidgetIdentity } from "../lib/identity";
 import {
@@ -46,6 +46,10 @@ export function RootComponent(props: RouteSectionProps) {
     if (config.modules.includes("updates")) {
       void fetchUpdates().catch(() => undefined);
     }
+
+    if (config.modules.includes("help")) {
+      void fetchHelpCenter().catch(() => undefined);
+    }
   };
 
   const handleParentMessage = (message: ParentMessage) => {
@@ -66,7 +70,7 @@ export function RootComponent(props: RouteSectionProps) {
         break;
       case "SET_MODULE":
         if (config.modules.includes(message.data.module)) {
-          navigate(message.data.module === "updates" ? "/updates" : "/");
+          navigate(modulePaths[message.data.module]);
         }
 
         break;
