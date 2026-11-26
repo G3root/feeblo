@@ -23,7 +23,7 @@ import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   helpCenterArticlesPublicAtom,
@@ -42,6 +42,15 @@ import { buildHelpCenterSections, type HelpCenterNavSection } from "./content";
  * something".
  */
 const MIN_SEARCH_LENGTH = 2;
+
+/**
+ * The empty read, as one array.
+ *
+ * `Atom.family` reads return the last value they had, so a pending or failed
+ * read falls back to a shared identity rather than a fresh `[]` per render —
+ * which would be a new `useMemo` dependency, and a rebuilt tree, on every pass.
+ */
+const EMPTY: ReadonlyArray<never> = [];
 
 /**
  * The portal's help center index.
@@ -72,10 +81,16 @@ export function HelpCenterPage() {
     helpCenterArticlesPublicAtom(organizationId)
   );
 
-  const topics = Result.getOrElse(topicsResult, () => []);
-  const articles = Result.getOrElse(articlesResult, () => []);
+  const topics = Result.getOrElse(topicsResult, () => EMPTY);
+  const articles = Result.getOrElse(articlesResult, () => EMPTY);
 
-  const sections = buildHelpCenterSections({ articles, topics });
+  // Memoized because the search box re-renders this page on every keystroke: the
+  // tree is derived from two reads, not from the query, and rebuilding its maps
+  // per character would be work the reader never asked for.
+  const sections = useMemo(
+    () => buildHelpCenterSections({ articles, topics }),
+    [articles, topics]
+  );
 
   if (!enabled) {
     return (
