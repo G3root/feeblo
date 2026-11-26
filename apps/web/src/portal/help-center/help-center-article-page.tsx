@@ -306,6 +306,23 @@ function ArticleBody({
  * once the body is in the document — once per article, so a reader who has
  * scrolled away is never pulled back by a later render.
  */
+/**
+ * The fragment as a heading id, or `undefined` when it cannot be read.
+ *
+ * A hash is user-editable and arrives from links written elsewhere, so it can be
+ * percent-encoded text that does not decode. That is a malformed URL, not a
+ * broken page: skipping the scroll is the whole consequence.
+ */
+function readHashTarget(): string | undefined {
+  const fragment = window.location.hash.slice(1);
+
+  try {
+    return decodeURIComponent(fragment);
+  } catch {
+    return undefined;
+  }
+}
+
 function useLandingHash(articleId: string | undefined) {
   const landedFor = useRef<string | null>(null);
 
@@ -316,9 +333,9 @@ function useLandingHash(articleId: string | undefined) {
 
     landedFor.current = articleId;
 
-    const id = decodeURIComponent(window.location.hash.slice(1));
+    const id = readHashTarget();
 
-    if (id === "") {
+    if (id === "" || id === undefined) {
       return;
     }
 

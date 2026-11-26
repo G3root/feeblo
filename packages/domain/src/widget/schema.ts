@@ -183,6 +183,12 @@ export const WidgetHelpCenterArticle = S.Struct({
   topicId: S.String,
   topicName: S.String,
   topicSlug: S.String,
+  /**
+   * Readable but withdrawn. The portal shows the article with an "out of date"
+   * notice rather than hiding it, and a reader inside the widget reads the same
+   * documentation — so the flag travels and the surface says it too.
+   */
+  isArchived: S.Boolean,
 });
 
 export type TWidgetHelpCenterArticle = S.Schema.Type<
@@ -227,6 +233,7 @@ export const WidgetHelpCenterArticleDetail = S.Struct({
   topicName: S.String,
   content: S.String,
   updatedAt: S.DateFromString,
+  isArchived: S.Boolean,
 });
 
 export type TWidgetHelpCenterArticleDetail = S.Schema.Type<

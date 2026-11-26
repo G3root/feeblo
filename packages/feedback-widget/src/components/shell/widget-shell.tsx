@@ -1,4 +1,4 @@
-import { A, useLocation } from "@solidjs/router";
+import { A, useLocation, useNavigate } from "@solidjs/router";
 import {
   createEffect,
   createMemo,
@@ -11,7 +11,11 @@ import {
 
 import { fetchHelpCenter } from "../../lib/api";
 import { getWidgetConfig, moduleForPath } from "../../lib/config";
-import { resolveView, widgetTabs } from "../../lib/navigation";
+import {
+  firstAvailableHref,
+  resolveView,
+  widgetTabs,
+} from "../../lib/navigation";
 import { Button, buttonVariants } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { PoweredByBadge } from "../ui/powered-by-badge";
@@ -28,6 +32,7 @@ export function WidgetShell(props: {
   onClose: () => void;
 }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const config = getWidgetConfig();
   const view = createMemo(() => resolveView(location.pathname));
 
@@ -54,6 +59,25 @@ export function WidgetShell(props: {
   );
 
   const activeModule = createMemo(() => moduleForPath(location.pathname));
+
+  /**
+   * Move a reader off a surface that turns out not to exist.
+   *
+   * `false` is "the server says no", which is the only answer that should move
+   * anybody: while the resource is pending, the Help page renders its own
+   * skeleton rather than being bounced out from under the click that opened it.
+   */
+  createEffect(() => {
+    if (helpAvailable() !== false || activeModule() !== "help") {
+      return;
+    }
+
+    const href = firstAvailableHref(config, { helpAvailable: false });
+
+    if (href !== null) {
+      navigate(href, { replace: true });
+    }
+  });
 
   const activeTabIndex = createMemo(() =>
     Math.max(

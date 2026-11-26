@@ -105,8 +105,15 @@ function HelpListScreen() {
                               class="hover:bg-muted/60 block rounded-lg border p-3 transition-colors"
                               href={`#/help/${encodeURIComponent(article.slug)}`}
                             >
-                              <span class="text-foreground block text-sm font-medium">
-                                {article.title}
+                              <span class="flex items-center gap-2">
+                                <span class="text-foreground text-sm font-medium">
+                                  {article.title}
+                                </span>
+                                <Show when={article.isArchived}>
+                                  <span class="text-muted-foreground shrink-0 text-[11px]">
+                                    Out of date
+                                  </span>
+                                </Show>
                               </span>
                               <Show when={article.excerpt.length > 0}>
                                 <span class="text-muted-foreground mt-1 line-clamp-2 block text-xs">

@@ -1,5 +1,5 @@
 import type { IconName } from "../icons/types";
-import type { WidgetConfig, WidgetModule } from "./config";
+import { modulePaths, type WidgetConfig, type WidgetModule } from "./config";
 
 /**
  * The widget's navigation model, kept free of Solid and the router so the
@@ -53,6 +53,31 @@ const TAB_PRESENTATION = {
   updates: { href: "/updates", icon: "NewspaperIcon", label: "Updates" },
   help: { href: "/help", icon: "Book01Icon", label: "Help" },
 } as const satisfies Record<WidgetModule, Omit<WidgetTab, "module">>;
+
+/**
+ * Where to send a reader whose surface is not available.
+ *
+ * A hub can be configured with Help first and Feedback second. When the
+ * workspace has no published documentation the Help tab is hidden — and with one
+ * surface left, the whole bar is gone, because a bar with one item is not
+ * navigation. A reader who landed on `/help` (the hub opens on its first module,
+ * and a `#/help/…` deep link is a real URL) would then have no control to leave
+ * a page that will never fill.
+ *
+ * The first *available* module is the way out. `null` means there is none, which
+ * is the single-module case: there the empty state is the whole story and moving
+ * the reader anywhere would be worse.
+ */
+export function firstAvailableHref(
+  config: WidgetConfig,
+  options: { readonly helpAvailable?: boolean } = {}
+): string | null {
+  const module = config.modules.find(
+    (candidate) => candidate !== "help" || options.helpAvailable === true
+  );
+
+  return module === undefined ? null : modulePaths[module];
+}
 
 /**
  * The bottom tab bar is navigation between surfaces, so it exists only when

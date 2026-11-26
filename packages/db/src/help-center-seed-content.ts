@@ -861,7 +861,7 @@ Starter and Professional can pull from a supported feedback tool instead of a fi
 Two of the three depend on something you publish, and the widget reads that live rather than trusting the snippet:
 
 - A **private board** is not offered in the widget, and a closed one refuses its posts there.
-- The **help tab disappears** until the workspace has published documentation and made the help center visible. Turning the help center off in **Settings → Help center privacy** removes the tab on the next open, without a snippet change.
+- The **help tab disappears** until the workspace has published documentation *and* left the help center visible, and it comes back on the next open once both are true — turning the help center off in **Settings → Help center privacy** removes it without a snippet change. An archived article still appears, marked out of date, the same as on the portal.
 
 A hub with only one *available* surface renders that surface and no tab bar — a bar with one item is chrome for nothing.
 

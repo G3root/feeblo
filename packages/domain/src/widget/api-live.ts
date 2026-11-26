@@ -277,13 +277,17 @@ export const listWidgetHelpCenter = Effect.fn("Widget.helpCenter")(function* ({
     articles: articles.map((article) => ({
       excerpt: article.excerpt,
       id: article.id,
+      isArchived: article.isArchived,
       slug: article.slug,
       title: article.title,
       topicId: article.topicId,
       topicName: article.topicName,
       topicSlug: article.topicSlug,
     })),
-    enabled: true,
+    // `enabled` also answers "is there anything to show": the widget's tab is
+    // decided by this value alone, so a public workspace with an empty help
+    // center must not get a tab that opens an empty page.
+    enabled: articles.length > 0,
   };
 });
 
@@ -326,6 +330,7 @@ export const readWidgetHelpCenterArticle = Effect.fn(
         `${article.id}:${String(article.updatedAt)}`,
         article.content
       ),
+      isArchived: article.isArchived,
       slug: article.slug,
       title: article.title,
       topicName: article.topicName,

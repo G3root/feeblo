@@ -7,7 +7,7 @@ import {
 } from "../components/help/help-article";
 import { HelpListSkeleton } from "../components/help/help-list-skeleton";
 import { ViewTransition } from "../components/shell/view-transition";
-import { fetchHelpCenter, fetchHelpCenterArticle } from "../lib/api";
+import { fetchHelpCenterArticle } from "../lib/api";
 
 export default function HelpArticleRoute() {
   return (
@@ -21,25 +21,17 @@ export default function HelpArticleRoute() {
 
 function HelpArticleScreen() {
   const params = useParams();
-  const helpCenter = createAsync(() => fetchHelpCenter());
 
   const article = createAsync(() =>
     fetchHelpCenterArticle(params.articleSlug ?? "")
   );
 
+  // One "not found" for a slug that is unpublished and for one that never
+  // existed: the endpoint cannot distinguish them, and neither should the page.
+  // A workspace with no documentation never reaches this route — the shell moves
+  // it to a surface that exists.
   return (
-    <Show
-      fallback={
-        <Show
-          fallback={<HelpArticleNotFound />}
-          when={helpCenter()?.enabled === true}
-        >
-          <HelpArticleNotFound />
-        </Show>
-      }
-      keyed
-      when={article()}
-    >
+    <Show fallback={<HelpArticleNotFound />} keyed when={article()}>
       {(loaded) => <HelpArticle article={loaded} />}
     </Show>
   );

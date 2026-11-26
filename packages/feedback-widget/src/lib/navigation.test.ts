@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { moduleForPath, type WidgetConfig } from "./config";
-import { resolveView, widgetTabs } from "./navigation";
+import { firstAvailableHref, resolveView, widgetTabs } from "./navigation";
 
 const config = (value: Partial<WidgetConfig>): WidgetConfig => ({
   modules: ["feedback"],
@@ -102,6 +102,34 @@ describe("widget tabs", () => {
         helpAvailable: false,
       })
     ).toEqual([]);
+  });
+});
+
+describe("escaping an unavailable surface", () => {
+  it("sends a reader to the first module that exists", () => {
+    const hub = config({ mode: "hub", modules: ["help", "feedback"] });
+
+    expect(firstAvailableHref(hub, { helpAvailable: false })).toBe("/");
+    expect(firstAvailableHref(hub, { helpAvailable: true })).toBe("/help");
+  });
+
+  it("keeps the configured order among the modules that exist", () => {
+    expect(
+      firstAvailableHref(
+        config({ mode: "hub", modules: ["help", "updates", "feedback"] }),
+        { helpAvailable: false }
+      )
+    ).toBe("/updates");
+  });
+
+  it("has nowhere to go when help is the only module", () => {
+    // The single-module embed keeps its own empty state: moving the reader to a
+    // module they did not configure would be worse than the empty page.
+    expect(
+      firstAvailableHref(config({ mode: "help", modules: ["help"] }), {
+        helpAvailable: false,
+      })
+    ).toBeNull();
   });
 });
 

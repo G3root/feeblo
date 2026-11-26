@@ -483,6 +483,7 @@ layer(HelpCenterTestLayer)("widget help center", (it) => {
       expect(published.enabled).toBe(true);
       expect(published.article?.title).toBe("Invoices");
       expect(published.article?.topicName).toBe("Billing");
+      expect(published.article?.isArchived).toBe(false);
       // Rendered, not the stored Markdown: the iframe has no Markdown renderer.
       expect(published.article?.content).toContain("<h2");
       expect(published.article?.content).toContain("<strong>Settings</strong>");
