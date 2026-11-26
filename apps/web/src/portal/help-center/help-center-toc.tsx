@@ -73,15 +73,24 @@ function useActiveHeading(headings: ReadonlyArray<MarkdownHeading>): string {
       for (const heading of headings) {
         const element = document.getElementById(heading.id);
 
-        if (
-          element !== null &&
-          element.getBoundingClientRect().top <= ACTIVE_LINE
-        ) {
-          current = heading.id;
+        if (element === null) {
+          continue;
         }
+
+        // Headings are in document order, so the first one below the line ends
+        // the scan: everything after it is below the line too. That keeps a
+        // scroll frame to one or two layout reads instead of one per heading.
+        if (element.getBoundingClientRect().top > ACTIVE_LINE) {
+          break;
+        }
+
+        current = heading.id;
       }
 
-      setActive(current);
+      // Scroll fires in bursts and most of them do not change the answer. The
+      // functional form lets React bail out instead of re-rendering the rail on
+      // every frame of a glide.
+      setActive((previous) => (previous === current ? previous : current));
     };
 
     const schedule = () => {

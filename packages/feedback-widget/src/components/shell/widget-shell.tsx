@@ -21,6 +21,15 @@ import { Icon } from "../ui/icon";
 import { PoweredByBadge } from "../ui/powered-by-badge";
 
 /**
+ * What the server said about the workspace's documentation.
+ *
+ * `unknown` is a failed request, kept apart from `disabled` so the difference
+ * between "there is nothing to read" and "we could not ask" survives long enough
+ * to matter — only the first should move a reader.
+ */
+type HelpAvailability = "disabled" | "enabled" | "unknown";
+
+/**
  * The widget's frame: a control header, one scrolling body, and — when the
  * config has more than one surface — a bottom tab bar. The body is the only
  * scroller, so the header and the bar stay put while content moves between
@@ -39,23 +48,26 @@ export function WidgetShell(props: {
   /**
    * Whether the workspace actually has documentation.
    *
-   * The config says the workspace *asked* for the Help module; whether anything
-   * is published is a fact only the server knows. Held as a resource so the tab
-   * appears once the answer arrives — and stays hidden for a workspace whose
-   * help center is off, rather than offering a surface that will never fill.
+   * Three answers, not two. The config says the workspace *asked* for the Help
+   * module; whether anything is published is a fact only the server knows, and a
+   * request that failed is not an answer at all. Letting a failure collapse into
+   * "no" would take a reader who has documentation in front of them and move
+   * them somewhere else, which is a worse outcome than a tab that arrives late.
    */
-  const [helpAvailable] = createResource(
-    () => config.modules.includes("help"),
-    (wanted) =>
-      wanted
-        ? fetchHelpCenter()
-            .then((helpCenter) => helpCenter.enabled)
-            .catch(() => false)
-        : Promise.resolve(false)
+  const [helpAvailability] = createResource((): Promise<HelpAvailability> =>
+    config.modules.includes("help")
+      ? fetchHelpCenter()
+          .then((helpCenter): HelpAvailability =>
+            helpCenter.enabled ? "enabled" : "disabled"
+          )
+          .catch((): HelpAvailability => "unknown")
+      : Promise.resolve("disabled")
   );
 
+  const isHelpAvailable = createMemo(() => helpAvailability() === "enabled");
+
   const tabs = createMemo(() =>
-    widgetTabs(config, { helpAvailable: helpAvailable() === true })
+    widgetTabs(config, { helpAvailable: isHelpAvailable() })
   );
 
   const activeModule = createMemo(() => moduleForPath(location.pathname));
@@ -63,12 +75,13 @@ export function WidgetShell(props: {
   /**
    * Move a reader off a surface that turns out not to exist.
    *
-   * `false` is "the server says no", which is the only answer that should move
-   * anybody: while the resource is pending, the Help page renders its own
-   * skeleton rather than being bounced out from under the click that opened it.
+   * Only a *successful* "disabled" moves anybody. Pending and unknown both leave
+   * the reader where they are: the Help page renders its own skeleton while the
+   * answer is on its way, and a failed request must not evict someone from
+   * documentation that is perfectly readable.
    */
   createEffect(() => {
-    if (helpAvailable() !== false || activeModule() !== "help") {
+    if (helpAvailability() !== "disabled" || activeModule() !== "help") {
       return;
     }
 
