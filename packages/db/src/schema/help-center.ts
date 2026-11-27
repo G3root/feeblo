@@ -270,9 +270,11 @@ export const helpCenterArticleViewEventTable = pgTable(
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   },
   (table) => [
-    // The only read this table has: retention filters on time alone. Nothing
-    // asks "the views of one article" of this table — that is the all-time
-    // counter below — so there is no `article_id` index to maintain.
+    // The FK cascade check on article delete reads `article_id`; without an
+    // index Postgres scans the whole event table for every deleted article.
+    // This is the maintenance access path, not a read path: the only product
+    // read is retention, which filters on time alone.
+    index("help_center_article_view_event_articleId_idx").on(table.articleId),
     index("help_center_article_view_event_occurredAt_idx").on(table.occurredAt),
   ]
 );

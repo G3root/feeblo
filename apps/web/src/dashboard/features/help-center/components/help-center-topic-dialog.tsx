@@ -17,6 +17,7 @@ import { isRpcErrorTag, parseRpcError } from "@feeblo/web-shared/rpc-error";
 import * as Predicate from "effect/Predicate";
 import { useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
@@ -103,7 +104,7 @@ export function EditHelpCenterTopicDialog({
 
   return (
     <TopicDialogFrame
-      description="Renaming a section keeps its articles and its URL."
+      description={m.bold_wild_martin_zoom()}
       onOpenChange={onOpenChange}
       open={open}
       title="Edit section"
@@ -134,7 +135,7 @@ export function EditHelpCenterTopicDialog({
 const topicWriteErrorMessage = (cause: unknown): string =>
   isRpcErrorTag(cause, "HelpCenterTopicSlugTakenError") ||
   Predicate.isTagged(cause, "HelpCenterTopicSlugTakenError")
-    ? "That URL is already used by another section. Choose a different name."
+    ? m.tame_mean_quail_buy()
     : parseRpcError(cause).message;
 
 function TopicDialogFrame({

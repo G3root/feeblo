@@ -35,6 +35,7 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { HelpCenterArticleListView } from "./help-center-article-list-view";
@@ -342,7 +343,7 @@ export function HelpCenterSectionPage({
               <EmptyContent>
                 {atLimit ? (
                   <p className="text-muted-foreground text-sm">
-                    This workspace has reached its plan's article limit.
+                    {m.calm_good_turtle_foster()}
                   </p>
                 ) : (
                   <Button

@@ -28,6 +28,8 @@ import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useMemo, useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
+
 import {
   helpCenterArticlesPublicAtom,
   helpCenterSearchPublicAtom,
@@ -231,14 +233,12 @@ function HelpCenterUnavailable({ onRetry }: { onRetry: () => void }) {
   return (
     <Empty className="py-16">
       <EmptyHeader>
-        <EmptyTitle>Help center unavailable</EmptyTitle>
-        <EmptyDescription>
-          There was a problem loading the documentation.
-        </EmptyDescription>
+        <EmptyTitle>{m.alert_drab_kudu_zip()}</EmptyTitle>
+        <EmptyDescription>{m.misty_vexed_cod_learn()}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button onClick={onRetry} size="sm" type="button" variant="outline">
-          Retry
+          {m.even_seemly_bear()}
         </Button>
       </EmptyContent>
     </Empty>

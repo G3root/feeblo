@@ -13,6 +13,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useMemo } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { EditorLayout } from "~/components/editor-layout";
 import {
   helpCenterArticleAtom,
@@ -84,7 +85,7 @@ function RouteComponent() {
             </EmptyHeader>
             <EmptyContent>
               <Button onClick={refresh} type="button" variant="outline">
-                Retry
+                {m.even_seemly_bear()}
               </Button>
             </EmptyContent>
           </Empty>

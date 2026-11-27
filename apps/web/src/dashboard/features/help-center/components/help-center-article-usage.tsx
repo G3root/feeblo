@@ -48,7 +48,16 @@ function ArticleLimitInfoPopover({ limit }: { limit: number }) {
  */
 export function useHelpCenterArticleAllowance(used: number) {
   const planQuery = usePlan();
-  const plan = planQuery.data?.plan ?? "free";
+  const plan = planQuery.data?.plan;
+
+  // An unresolved plan is not the free plan. Applying the free ceiling while
+  // the entitlement is still loading would disable creation for a paid
+  // workspace until the query lands; keep the controls neutral instead and
+  // apply the resolved limit when it arrives.
+  if (plan === undefined) {
+    return { atLimit: false, limit: null };
+  }
+
   const limit = PLAN_ENTITLEMENTS[plan].limits.helpCenterArticles;
 
   return { atLimit: limit !== null && used >= limit, limit };

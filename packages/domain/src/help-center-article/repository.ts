@@ -605,7 +605,12 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         coverImage,
         status: write.status,
         publishedAt: write.publishedAt,
-        updatedAt: now,
+        // The timestamp is the same concurrency token the `WHERE` below
+        // compares, so an accepted write has to move it. Two saves inside one
+        // millisecond would otherwise leave it equal and let a stale editor
+        // through; the case makes it strictly monotonic even when the clock
+        // does not.
+        updatedAt: sql`case when ${article.updatedAt} >= ${now} then ${article.updatedAt} + interval '1 millisecond' else ${now} end`,
         // A vector describes the text it was generated from. Clearing it here,
         // in the same statement that changes the text, closes the window in
         // which a search could match words the article no longer has; the

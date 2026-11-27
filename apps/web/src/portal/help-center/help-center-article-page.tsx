@@ -14,7 +14,6 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { Textarea } from "@feeblo/ui/textarea";
 import { cn } from "@feeblo/ui/utils";
 import { markdownHeadings, type MarkdownHeading } from "@feeblo/utils/markdown";
-import { isRpcErrorTag } from "@feeblo/web-shared/rpc-error";
 import {
   ArrowLeft02Icon,
   ArrowRight01Icon,
@@ -24,9 +23,10 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
-import * as Predicate from "effect/Predicate";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { m } from "@/paraglide/messages.js";
 
 import {
   addHelpCenterArticleViewAtom,
@@ -40,6 +40,7 @@ import {
   findHelpCenterArticleBySlug,
   findHelpCenterSiblings,
   formatHelpDate,
+  isHelpCenterArticleNotFound,
   type HelpCenterNavArticle,
   type HelpCenterNavSection,
   readingMinutes,
@@ -163,26 +164,28 @@ export function HelpCenterArticlePage({
       <article className="min-w-0">
         {Result.builder(articleResult)
           .onInitial(() => <ArticleSkeleton />)
-          // A decoded RPC failure reaches the atom as the tagged error object
-          // itself, while the promise client wraps its cause in `RpcError`; a
-          // missing article has to answer "not found" from either shape.
-          .onFailure((error) =>
-            isRpcErrorTag(error, "NotFoundError") ||
-            Predicate.isTagged(error, "NotFoundError") ? (
+          // `onFailure` hands the whole failure cause, not the typed error it
+          // wraps. Pull the first declared failure out before matching the tag;
+          // otherwise every cause looks like an unavailable article and a
+          // removed page loses its not-found state.
+          .onFailure((cause) => {
+            const notFound = isHelpCenterArticleNotFound(cause);
+
+            return notFound ? (
               <Empty className="py-16">
                 <EmptyHeader>
-                  <EmptyTitle>Article not found</EmptyTitle>
+                  <EmptyTitle>{m.sea_topical_ocelot_love()}</EmptyTitle>
                   <EmptyDescription>
-                    It may have been removed, or the link is out of date.
+                    {m.giant_fancy_bobcat_mix()}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
             ) : (
               <Empty className="py-16">
                 <EmptyHeader>
-                  <EmptyTitle>Article unavailable</EmptyTitle>
+                  <EmptyTitle>{m.zany_tidy_giraffe_race()}</EmptyTitle>
                   <EmptyDescription>
-                    There was a problem loading this article.
+                    {m.lofty_happy_eagle_evoke()}
                   </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
@@ -192,12 +195,12 @@ export function HelpCenterArticlePage({
                     type="button"
                     variant="outline"
                   >
-                    Retry
+                    {m.even_seemly_bear()}
                   </Button>
                 </EmptyContent>
               </Empty>
-            )
-          )
+            );
+          })
           .onSuccess((loaded) => (
             <ArticleBody
               article={loaded}
@@ -533,7 +536,7 @@ function VerdictSection({
         {vote.failed ? (
           <div className="flex items-center gap-2">
             <p className="text-muted-foreground text-sm">
-              Feedback unavailable.
+              {m.mean_flaky_guppy()}
             </p>
             <Button
               onClick={vote.retry}
@@ -541,7 +544,7 @@ function VerdictSection({
               type="button"
               variant="outline"
             >
-              Retry
+              {m.even_seemly_bear()}
             </Button>
           </div>
         ) : (
@@ -563,10 +566,10 @@ function VerdictSection({
       {vote.reasonOpen ? (
         <div className="mt-3 space-y-2">
           <Textarea
-            aria-label="What was missing?"
+            aria-label={m.stale_grand_beaver_arrive()}
             maxLength={2000}
             onChange={(event) => vote.setReason(event.target.value)}
-            placeholder="What was missing? (optional)"
+            placeholder={m.stale_grand_beaver_arrive()}
             rows={3}
             value={vote.reason}
           />

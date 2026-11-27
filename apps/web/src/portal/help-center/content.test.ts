@@ -1,3 +1,4 @@
+import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +6,7 @@ import {
   findHelpCenterArticleBySlug,
   findHelpCenterSiblings,
   formatHelpDate,
+  isHelpCenterArticleNotFound,
   readingMinutes,
   UNLISTED_SECTION_KEY,
 } from "./content";
@@ -165,5 +167,30 @@ describe("formatHelpDate", () => {
 
     expect(formatHelpDate(value)).toBe(formatHelpDate(value.toISOString()));
     expect(formatHelpDate(value)).toContain("2026");
+  });
+});
+
+describe("isHelpCenterArticleNotFound", () => {
+  it("reads the tagged error out of the failure cause", () => {
+    expect(
+      isHelpCenterArticleNotFound(
+        Cause.fail({
+          _tag: "NotFoundError",
+          message: "The article does not exist.",
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("does not treat another typed failure as missing", () => {
+    expect(
+      isHelpCenterArticleNotFound(
+        Cause.fail({ _tag: "PolicyDenied", reason: "Hidden help center" })
+      )
+    ).toBe(false);
+  });
+
+  it("does not treat a defect as missing", () => {
+    expect(isHelpCenterArticleNotFound(Cause.die("database down"))).toBe(false);
   });
 });

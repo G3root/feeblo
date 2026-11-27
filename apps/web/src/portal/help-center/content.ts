@@ -1,5 +1,8 @@
 import type { THelpCenterArticlePublicSummary } from "@feeblo/domain/help-center-article/schema";
 import type { THelpCenterTopicPublic } from "@feeblo/domain/help-center-topic/schema";
+import * as Cause from "effect/Cause";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 
 /**
  * The shapes the portal's help center navigation works on.
@@ -193,4 +196,19 @@ const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
 
 export function formatHelpDate(value: Date | string): string {
   return DATE_FORMAT.format(value instanceof Date ? value : new Date(value));
+}
+
+/**
+ * Whether an atom query's failure cause carries the typed not-found error.
+ *
+ * `AsyncResult.builder.onFailure` hands the whole `Cause`, so matching the
+ * tagged error directly never sees it. Pull the first declared failure out
+ * before asking for the tag; a cause with no typed failure is not "missing".
+ */
+export function isHelpCenterArticleNotFound(
+  cause: Cause.Cause<unknown>
+): boolean {
+  const error = Option.getOrUndefined(Cause.findErrorOption(cause));
+
+  return error !== undefined && Predicate.isTagged(error, "NotFoundError");
 }

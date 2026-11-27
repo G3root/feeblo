@@ -697,6 +697,70 @@ describe("HelpCenterArticleRpcHandlers", () => {
       })
     );
 
+    it.effect(
+      "moves updatedAt forward when a save shares its millisecond",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* HelpCenterArticleRepository;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const id = yield* HelpCenterArticleId.generate;
+          const table = schema.helpCenterArticleTable;
+
+          yield* create(fixture, id, "Monotonic", "monotonic");
+
+          const [loaded] = yield* db
+            .select({
+              content: table.content,
+              coverImage: table.coverImage,
+              excerpt: table.excerpt,
+              position: table.position,
+              publishedAt: table.publishedAt,
+              slug: table.slug,
+              status: table.status,
+              title: table.title,
+              topicId: table.topicId,
+              updatedAt: table.updatedAt,
+            })
+            .from(table)
+            .where(eq(table.id, id));
+
+          if (loaded === undefined) {
+            return yield* Effect.die(new Error("fixture article missing"));
+          }
+
+          // The clock did not advance: without a monotonic write the second
+          // editor's expectedUpdatedAt would still match the row.
+          yield* repository.update({
+            coverImage: loaded.coverImage,
+            expectedStatus: loaded.status,
+            expectedUpdatedAt: loaded.updatedAt,
+            id,
+            now: loaded.updatedAt,
+            organizationId: fixture.organizationId,
+            position: loaded.position,
+            topicId: loaded.topicId,
+            write: {
+              content: loaded.content,
+              excerpt: loaded.excerpt,
+              publishedAt: loaded.publishedAt,
+              slug: loaded.slug,
+              status: loaded.status,
+              title: loaded.title,
+            },
+          });
+
+          const [after] = yield* db
+            .select({ updatedAt: table.updatedAt })
+            .from(table)
+            .where(eq(table.id, id));
+
+          expect(after?.updatedAt.getTime()).toBeGreaterThan(
+            loaded.updatedAt.getTime()
+          );
+        })
+    );
+
     it.effect("records and prunes the images an update references", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleRpcHandlersEffect;

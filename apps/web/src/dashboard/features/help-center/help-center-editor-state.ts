@@ -1,11 +1,4 @@
 /**
- * What the banner says, kept beside the predicate so the copy and the state
- * cannot disagree about why the editor stopped writing.
- */
-export const HELP_CENTER_ARTICLE_STALE_MESSAGE =
-  "This article changed in another tab. Reload to continue.";
-
-/**
  * Whether the row underneath an editor is still the row the editor loaded.
  *
  * The comparison is derived during render rather than held as state: the

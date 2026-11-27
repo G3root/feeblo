@@ -44,6 +44,7 @@ import { eq, useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { reorderHelpCenterTopicsAtom } from "../atoms";
@@ -169,7 +170,7 @@ export function HelpCenterIndex({
       await helpCenterTopicCollection.utils.refetch().catch(() => undefined);
     } catch {
       toastManager.add({
-        title: "Failed to reorder the sections",
+        title: m.livid_noble_crossbill_nurture(),
         type: "error",
       });
     } finally {
@@ -324,7 +325,7 @@ export function HelpCenterIndex({
                               onClick={() => void moveTopic(topic.id, -1)}
                             >
                               <HugeiconsIcon icon={ArrowUp01Icon} />
-                              Move up
+                              {m.light_proof_kestrel_mix()}
                             </MenuItem>
                             <MenuItem
                               disabled={
@@ -333,7 +334,7 @@ export function HelpCenterIndex({
                               onClick={() => void moveTopic(topic.id, 1)}
                             >
                               <HugeiconsIcon icon={ArrowDown01Icon} />
-                              Move down
+                              {m.fair_loved_quail_transform()}
                             </MenuItem>
                             <MenuSeparator />
                             <MenuItem

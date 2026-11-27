@@ -312,6 +312,36 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
       })
     );
 
+    it.effect("serializes overlapping identical casts", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const visitorId = visitorIdFor(fixture);
+
+        const cast = () =>
+          handlers
+            .SetHelpCenterArticleFeedback({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              helpful: true,
+              reason: null,
+              visitorId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+        // Two tabs can submit before either reads the other's row. The article
+        // lock serializes the read and the write, so the second cast sees the
+        // first verdict and does not move the daily bucket again.
+        yield* Effect.all([cast(), cast()], { concurrency: "unbounded" });
+
+        const rows = yield* readDaily(fixture.articleId);
+        expect(rows).toStrictEqual([{ helpful: 1, unhelpful: 0 }]);
+
+        const verdicts = yield* readVerdicts(fixture.articleId);
+        expect(verdicts).toHaveLength(1);
+      })
+    );
+
     it.effect(
       "records a reason sent after a no vote without counting a second verdict",
       () =>

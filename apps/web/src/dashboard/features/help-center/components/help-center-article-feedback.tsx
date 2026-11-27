@@ -6,6 +6,8 @@ import * as dayjs from "@feeblo/utils/dayjs";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import * as Result from "effect/reactivity/AsyncResult";
 
+import { m } from "@/paraglide/messages.js";
+
 import { helpCenterArticleFeedbackReasonsAtom } from "../atoms";
 
 /**
@@ -65,7 +67,7 @@ function FeedbackReasons({
         className="mb-2 text-sm font-medium"
         id="help-center-article-feedback-heading"
       >
-        Reader feedback
+        {m.agent_dirty_panda_grace()}
       </h2>
       {Result.builder(result)
         .onInitial(() => (
@@ -77,17 +79,17 @@ function FeedbackReasons({
         .onFailure(() => (
           <div className="space-y-2">
             <p className="text-muted-foreground text-xs">
-              Could not load reader feedback.
+              {m.any_cute_snail_ascend()}
             </p>
             <Button onClick={refresh} size="xs" type="button" variant="outline">
-              Retry
+              {m.even_seemly_bear()}
             </Button>
           </div>
         ))
         .onSuccess((entries) =>
           entries.length === 0 ? (
             <p className="text-muted-foreground text-xs">
-              No unhelpful votes with a reason yet.
+              {m.tired_lucky_halibut_hug()}
             </p>
           ) : (
             <ul className="space-y-3">
@@ -109,7 +111,7 @@ function FeedbackEntry({ entry }: { entry: THelpCenterArticleFeedback }) {
           sanitizing it would imply one. */}
       <p className="text-xs break-words whitespace-pre-wrap">{entry.reason}</p>
       <p className="text-muted-foreground text-[11px]">
-        {entry.authorName ?? "Anonymous"} ·{" "}
+        {entry.authorName ?? m.active_equal_hedgehog()} ·{" "}
         <time dateTime={entry.createdAt.toISOString()}>
           {dayjs.default(entry.createdAt).fromNow()}
         </time>

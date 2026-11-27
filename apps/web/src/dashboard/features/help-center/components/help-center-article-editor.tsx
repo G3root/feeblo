@@ -42,6 +42,7 @@ import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
 import { type ReactNode, useRef, useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { CoverImageField } from "~/components/cover-image-field";
 import { EditorLayout } from "~/components/editor-layout";
 import { PublishDialog } from "~/components/publish-dialog";
@@ -55,10 +56,7 @@ import {
   helpCenterArticleReactivityKeys,
   updateHelpCenterArticleAtom,
 } from "../atoms";
-import {
-  HELP_CENTER_ARTICLE_STALE_MESSAGE,
-  isHelpCenterArticleStale,
-} from "../help-center-editor-state";
+import { isHelpCenterArticleStale } from "../help-center-editor-state";
 import {
   helpCenterArticleFormOptions,
   helpCenterArticleFormValues,
@@ -99,11 +97,11 @@ const articleWriteErrorMessage = (cause: unknown): string => {
     isRpcErrorTag(cause, tag) || Predicate.isTagged(cause, tag);
 
   if (isTag("HelpCenterArticleChangedError")) {
-    return HELP_CENTER_ARTICLE_STALE_MESSAGE;
+    return m.steep_vivid_ocelot_pride();
   }
 
   if (isTag("HelpCenterArticleSlugTakenError")) {
-    return "That URL is already used by another article. Choose a different slug.";
+    return m.careful_mealy_ladybug_praise();
   }
 
   return parseRpcError(cause).message;
@@ -302,7 +300,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
       const overrides = (meta as ArticleSubmitMeta | undefined)?.overrides;
 
       if (stale) {
-        setSubmitError(HELP_CENTER_ARTICLE_STALE_MESSAGE);
+        setSubmitError(m.steep_vivid_ocelot_pride());
 
         return;
       }
@@ -319,15 +317,17 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
   const backTopic = topics.find((topic) => topic.id === backTopicId);
 
   /**
-   * Refreshes the article lists a write could have changed.
+   * Refreshes the lists a write could have changed.
    *
-   * The editor no longer waits on a workspace-wide list: the section page owns
-   * the articles it renders, and invalidating the workspace prefix marks the
-   * old and new section's cached lists — and the plan-usage meter — stale.
-   * Only the lists the reader next mounts are actually fetched.
+   * The editor no longer waits on a workspace-wide article list: the section
+   * page owns the articles it renders, and invalidating the workspace prefix
+   * marks the old and new section's cached lists — and the plan-usage meter —
+   * stale. The topic rows carry the per-section counts the allowance reads, so
+   * they are refreshed too; otherwise deleting the last article at the ceiling
+   * leaves “New article” disabled until a full preload.
    *
-   * A failed refetch is not a failed write, so the promise is deliberately not
-   * awaited and terminates in its own catch.
+   * A failed refresh is not a failed write, so the promises are deliberately not
+   * awaited and terminate in their own catch.
    */
   const invalidateArticleLists = () => {
     void queryClient
@@ -335,6 +335,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
         queryKey: helpCenterArticlesQueryKey(organizationId),
       })
       .catch(() => undefined);
+    void helpCenterTopicCollection.utils.refetch().catch(() => undefined);
   };
 
   /**
@@ -568,8 +569,10 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
             {stale ? (
               <Alert variant="warning">
                 <HugeiconsIcon icon={Alert02Icon} />
-                <AlertTitle>This article changed in another tab</AlertTitle>
-                <AlertDescription>Reload to continue.</AlertDescription>
+                <AlertTitle>{m.heavy_cool_butterfly_nudge()}</AlertTitle>
+                <AlertDescription>
+                  {m.fancy_zippy_orangutan_laugh()}
+                </AlertDescription>
                 <AlertAction>
                   <Button
                     onClick={() => window.location.reload()}
@@ -577,7 +580,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                     type="button"
                     variant="outline"
                   >
-                    Reload
+                    {m.aloof_front_pony_dig()}
                   </Button>
                 </AlertAction>
               </Alert>
@@ -706,7 +709,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                         render={(triggerProps) => (
                           <Button
                             {...triggerProps}
-                            aria-label="Go to public article"
+                            aria-label={m.formal_noisy_scallop_peek()}
                             className="rounded-full"
                             render={(buttonProps) => (
                               <a
@@ -724,7 +727,9 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                           />
                         )}
                       />
-                      <TooltipPopup>Go to public article</TooltipPopup>
+                      <TooltipPopup>
+                        {m.formal_noisy_scallop_peek()}
+                      </TooltipPopup>
                     </Tooltip>
 
                     <Tooltip>
@@ -732,7 +737,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                         render={(triggerProps) => (
                           <Button
                             {...triggerProps}
-                            aria-label="Copy article link"
+                            aria-label={m.flat_wild_flamingo_list()}
                             className="rounded-full"
                             onClick={async () => {
                               try {
@@ -740,12 +745,12 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                                   `${publicSiteUrl}/s/help/articles/${article.slug}`
                                 );
                                 toastManager.add({
-                                  title: "Article link copied to clipboard",
+                                  title: m.misty_main_pig_spin(),
                                   type: "success",
                                 });
                               } catch {
                                 toastManager.add({
-                                  title: "Failed to copy article link",
+                                  title: m.house_minor_butterfly_learn(),
                                   type: "error",
                                 });
                               }
@@ -756,7 +761,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                           />
                         )}
                       />
-                      <TooltipPopup>Copy article link</TooltipPopup>
+                      <TooltipPopup>{m.flat_wild_flamingo_list()}</TooltipPopup>
                     </Tooltip>
                   </>
                 )}
@@ -795,7 +800,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                     render={(triggerProps) => (
                       <Button
                         {...triggerProps}
-                        aria-label="Delete article"
+                        aria-label={m.misty_broad_florian_chop()}
                         className="rounded-full"
                         disabled={stale}
                         onClick={() => setDeleteOpen(true)}
@@ -807,7 +812,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
                       </Button>
                     )}
                   />
-                  <TooltipPopup>Delete article</TooltipPopup>
+                  <TooltipPopup>{m.misty_broad_florian_chop()}</TooltipPopup>
                 </Tooltip>
               </div>
             )}
@@ -859,13 +864,15 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
           submit the article form. */}
       {article === undefined ? null : (
         <ConfirmDialog
-          confirmLabel="Delete article"
+          confirmLabel={m.misty_broad_florian_chop()}
           confirmLoading={deletePending}
-          description="Deleting this article is permanent. Its public URL will stop working, and readers will be sent to a not-found page."
+          description={m.witty_mellow_hyena_catch()}
           onConfirm={() => void remove()}
           onOpenChange={setDeleteOpen}
           open={deleteOpen}
-          title={`Delete "${article.title || "this article"}"?`}
+          title={m.curly_brief_mink_read({
+            title: article.title || m.equal_novel_mongoose_roam(),
+          })}
         />
       )}
     </>

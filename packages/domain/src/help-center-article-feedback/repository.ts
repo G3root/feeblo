@@ -158,6 +158,22 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
 
       const previous = yield* transaction(
         Effect.gen(function* () {
+          // Serialize overlapping casts for one article. Without this lock two
+          // requests can both read the old verdict before either commits and
+          // both increment the daily bucket; the unique index only keeps the
+          // standing row single. The lock is released when the transaction
+          // ends, and the daily write stays outside it.
+          yield* db
+            .select({ id: article.id })
+            .from(article)
+            .where(
+              and(
+                eq(article.id, articleId),
+                eq(article.organizationId, organizationId)
+              )
+            )
+            .for("update");
+
           // The effective verdict before this cast: the account row when the
           // reader is signed in, the anonymous row as the fallback. Read before
           // the upsert, so the daily bucket can tell a new judgment from a
