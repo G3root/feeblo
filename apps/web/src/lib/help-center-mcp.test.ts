@@ -68,10 +68,8 @@ const article: THelpCenterArticlePublic = {
   content: "Feeblo is a customer feedback platform.",
   coverImage: null,
   excerpt: "Feeblo is a customer feedback platform.",
-  helpfulCount: 0,
   id: "article_1",
   isArchived: false,
-  notHelpfulCount: 0,
   publishedAt: new Date("2026-01-01T00:00:00.000Z"),
   slug: "what-is-feeblo",
   title: "What is Feeblo?",
@@ -84,10 +82,8 @@ const article: THelpCenterArticlePublic = {
 
 const summary: THelpCenterArticlePublicSummary = {
   excerpt: article.excerpt,
-  helpfulCount: 0,
   id: article.id,
   isArchived: false,
-  notHelpfulCount: 0,
   publishedAt: article.publishedAt,
   slug: article.slug,
   title: article.title,
@@ -95,7 +91,6 @@ const summary: THelpCenterArticlePublicSummary = {
   topicName: article.topicName,
   topicSlug: article.topicSlug,
   updatedAt: article.updatedAt,
-  viewCount: 0,
 };
 
 const dependencies = (

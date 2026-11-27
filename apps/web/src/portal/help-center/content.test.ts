@@ -18,8 +18,7 @@ const article = (id: string, topicId: string, slug = id) => ({
   topicId,
 });
 
-const topic = (id: string, articleCount = 1) => ({
-  articleCount,
+const topic = (id: string) => ({
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   description: null,
   icon: null,
@@ -69,7 +68,7 @@ describe("buildHelpCenterSections", () => {
   it("renders the topic rows from the topic read, not from the articles", () => {
     const sections = buildHelpCenterSections({
       articles: [],
-      topics: [topic("t1", 3)],
+      topics: [topic("t1")],
     });
 
     expect(sections[0]?.articles).toEqual([]);
@@ -98,7 +97,7 @@ describe("findHelpCenterSiblings", () => {
       article("d", "t1"),
       article("c", "t2"),
     ],
-    topics: [topic("t1", 3), topic("t2")],
+    topics: [topic("t1"), topic("t2")],
   });
 
   it("names the section an article sits in", () => {

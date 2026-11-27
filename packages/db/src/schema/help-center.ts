@@ -167,6 +167,18 @@ export const helpCenterArticleTable = pgTable(
     searchVector: tsvector("search_vector").generatedAlwaysAs(
       sql`setweight(to_tsvector('english'::regconfig, title), 'A') || setweight(to_tsvector('english'::regconfig, excerpt), 'B') || setweight(to_tsvector('english'::regconfig, content), 'C')`
     ),
+    /**
+     * The semantic half of search, and deliberately unindexed.
+     *
+     * The nearest-neighbour read filters on `organization_id`, `status` and
+     * `embedding_model` before it orders by distance, which is not the shape an
+     * ANN index serves: on a table this size the planner reads the workspace's
+     * rows and sorts them, so an HNSW index would be maintained on every embed
+     * and never chosen. `help_center_article` is bounded by the plan's article
+     * ceiling — a sequential distance scan over one workspace is a few hundred
+     * rows. Revisit this with an index keyed the way the read actually filters
+     * if the ceiling ever stops bounding the table.
+     */
     embedding: embeddingVector(DEFAULT_EMBEDDING_DIMENSIONS)("embedding"),
     embeddingModel: text("embedding_model"),
     embeddedAt: timestamp("embedded_at", { withTimezone: true }),
@@ -206,9 +218,6 @@ export const helpCenterArticleTable = pgTable(
       table.searchVector
     ),
 
-    index("help_center_article_embedding_hnsw_idx")
-      .using("hnsw", sql`${table.embedding} vector_cosine_ops`)
-      .where(sql`${table.embedding} is not null`),
     // A live article with no publication date is not a state the vocabulary
     // should admit: entering `published` means it went live, so the write
     // paths supply the timestamp and the column cannot hold the contradiction.
@@ -261,11 +270,9 @@ export const helpCenterArticleViewEventTable = pgTable(
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   },
   (table) => [
-    index("help_center_article_view_event_articleId_occurredAt_idx").on(
-      table.articleId,
-      table.occurredAt
-    ),
-    // The retention pass filters on time alone and cannot use the pair above.
+    // The only read this table has: retention filters on time alone. Nothing
+    // asks "the views of one article" of this table — that is the all-time
+    // counter below — so there is no `article_id` index to maintain.
     index("help_center_article_view_event_occurredAt_idx").on(table.occurredAt),
   ]
 );
@@ -314,9 +321,11 @@ export const helpCenterArticleFeedbackTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    articleId: text("article_id")
-      .notNull()
-      .references(() => helpCenterArticleTable.id, { onDelete: "cascade" }),
+    // No single-column reference: the composite `(article_id, organization_id)`
+    // foreign key below owns the tenant guard and the cascade, and a second
+    // constraint on the same column would add a second thing to keep in step
+    // without adding protection.
+    articleId: text("article_id").notNull(),
     /**
      * A signed-in reader: a member or an end user with an account.
      *
@@ -417,9 +426,7 @@ export const helpCenterArticleDailyTable = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizationTable.id, { onDelete: "cascade" }),
-    articleId: text("article_id")
-      .notNull()
-      .references(() => helpCenterArticleTable.id, { onDelete: "cascade" }),
+    articleId: text("article_id").notNull(),
     /** UTC calendar day, `YYYY-MM-DD`. */
     day: date("day", { mode: "string" }).notNull(),
     views: integer("views").notNull().default(0),
@@ -438,7 +445,9 @@ export const helpCenterArticleDailyTable = pgTable(
       sql`${table.views} >= 0 and ${table.helpfulVerdicts} >= 0 and ${table.unhelpfulVerdicts} >= 0`
     ),
     // The same composite guard the verdict table carries: a bucket cannot name
-    // an article in another workspace, whatever a handler does.
+    // an article in another workspace, whatever a handler does. It is the only
+    // article reference on this table — a single-column one beside it would add
+    // no protection and one more constraint to keep in step.
     foreignKey({
       name: "help_center_article_daily_article_organization_fk",
       columns: [table.articleId, table.organizationId],
@@ -486,12 +495,11 @@ export const helpCenterSearchDailyTable = pgTable(
     emptySearches: integer("empty_searches").notNull().default(0),
   },
   (table) => [
+    // The primary key's leading `(organization_id, day)` is the analytics
+    // filter's access path, and no second index on the same prefix serves the
+    // panel's `GROUP BY query ORDER BY sum(searches)` — that sorts an aggregate
+    // the index does not hold, so the index would be maintained for nothing.
     primaryKey({ columns: [table.organizationId, table.day, table.query] }),
-    index("help_center_search_daily_organizationId_day_searches_idx").on(
-      table.organizationId,
-      table.day,
-      sql`${table.searches} desc`
-    ),
     check(
       "help_center_search_daily_counts_chk",
       sql`${table.searches} >= 0 and ${table.emptySearches} >= 0 and ${table.emptySearches} <= ${table.searches}`

@@ -81,6 +81,19 @@ export const deleteHelpCenterArticleAtom = DashboardClient.mutation(
 );
 
 /**
+ * Reordering the sections, as one write for the whole list.
+ *
+ * A move that only swapped two rows would be a smaller payload, but the
+ * server's handler deliberately requires the complete order so an omitted
+ * section cannot end up at a colliding position. The atom carries no
+ * reactivity keys: the section list is a collection, and the caller refetches
+ * it after the write succeeds.
+ */
+export const reorderHelpCenterTopicsAtom = DashboardClient.mutation(
+  "ReorderHelpCenterTopics"
+);
+
+/**
  * The analytics read's arguments, derived from the operation's payload.
  *
  * `Codec.Encoded` rather than the payload's decoded type: this is what the
@@ -151,3 +164,32 @@ const searchAtoms = Atom.family((organizationId: string) =>
 
 export const helpCenterSearchAtom = (args: HelpCenterSearchAtomArgs) =>
   searchAtoms(args.organizationId)(args.query);
+
+/** The one article whose unhelpful reasons a manager is reviewing. */
+export type HelpCenterArticleFeedbackReasonsAtomArgs = {
+  readonly articleId: string;
+  readonly organizationId: string;
+};
+
+/**
+ * The recent "what was missing" answers for one article.
+ *
+ * Nested families for the same reason as the analytics read: both ids are
+ * strings, so the pair makes a value-keyed cache. It shares the article
+ * reactivity key because a verdict cast on the portal is exactly what this
+ * panel exists to show; the dashboard's own write path is the only other thing
+ * that can change the row.
+ */
+const feedbackReasonsAtoms = Atom.family((organizationId: string) =>
+  Atom.family((articleId: string) =>
+    DashboardClient.query(
+      "ListHelpCenterArticleFeedback",
+      { articleId, limit: 10, organizationId, reasonsOnly: true },
+      { reactivityKeys: helpCenterArticleReactivityKeys(organizationId) }
+    ).pipe(dashboardSWR("60 seconds"), Atom.setIdleTTL("5 minutes"))
+  )
+);
+
+export const helpCenterArticleFeedbackReasonsAtom = (
+  args: HelpCenterArticleFeedbackReasonsAtomArgs
+) => feedbackReasonsAtoms(args.organizationId)(args.articleId);

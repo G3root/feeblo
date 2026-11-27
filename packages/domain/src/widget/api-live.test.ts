@@ -20,8 +20,10 @@ import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError } from "../rpc-errors";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
+import { PortalUrlConfig } from "../site/url";
 import { WorkspaceRepository } from "../workspace/repository";
 import {
+  findWidgetHelpArticles,
   listWidgetHelpCenter,
   listWidgetUpdates,
   readWidgetHelpCenterArticle,
@@ -303,6 +305,7 @@ const HelpCenterTestLayer = Layer.mergeAll(
   HelpCenterArticleRepository.layer.pipe(
     Layer.provide(Database.PgliteDatabaseLive)
   ),
+  PortalUrlConfig.layer,
   SiteRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
 );
 
@@ -412,6 +415,62 @@ layer(HelpCenterTestLayer)("widget help center", (it) => {
         })
       ).toEqual({ article: null, enabled: false });
     })
+  );
+
+  it.effect(
+    "answers enabled: false for a public workspace with no readable article",
+    () =>
+      Effect.gen(function* () {
+        const db = yield* currentDb;
+        const organizationId = yield* WorkspaceId.generate;
+        const topicId = yield* HelpCenterTopicId.generate;
+        const now = yield* DateTime.nowAsDate;
+
+        yield* db.insert(schema.organizationTable).values({
+          createdAt: now,
+          id: organizationId,
+          name: "Empty docs org",
+          slug: organizationId,
+        });
+        yield* db.insert(schema.siteTable).values({
+          createdAt: now,
+          helpCenterVisibility: "PUBLIC",
+          id: `site_${organizationId}`,
+          name: "Empty docs org",
+          organizationId,
+          subdomain: `empty-docs-${organizationId}`,
+          updatedAt: now,
+        });
+        yield* db.insert(schema.helpCenterTopicTable).values({
+          createdAt: now,
+          id: topicId,
+          name: "Getting started",
+          organizationId,
+          position: 0,
+          slug: "getting-started",
+          updatedAt: now,
+        });
+        // A draft is not a corpus: the deflection must answer `enabled: false`
+        // rather than searching documentation no reader can open. Inserting
+        // one also proves the check is "has a readable article", not "has a
+        // row".
+        yield* db.insert(schema.helpCenterArticleTable).values({
+          content: "## Draft\n\nNot yet.",
+          createdAt: now,
+          excerpt: "Not yet.",
+          id: yield* HelpCenterArticleId.generate,
+          organizationId,
+          slug: "draft",
+          status: "draft",
+          title: "Draft",
+          topicId,
+          updatedAt: now,
+        });
+
+        expect(
+          yield* findWidgetHelpArticles({ organizationId, query: "draft" })
+        ).toEqual({ articles: [], enabled: false });
+      })
   );
 
   it.effect("renders a published article to HTML and hides a draft", () =>

@@ -47,11 +47,13 @@ export const HelpCenterTopic = S.Struct({
 export type THelpCenterTopic = S.Schema.Type<typeof HelpCenterTopic>;
 
 /**
- * The dashboard's read, and the portal's when a member is signed in.
+ * The dashboard's read.
  *
- * `articleCount` is the number of articles the reader can see, which is why it
- * is computed per surface rather than stored: the dashboard counts drafts and
- * the portal does not, and one stored number cannot be both.
+ * `articleCount` is a dashboard-only number: it counts every article filed
+ * under the section whatever its state, which is what the section list shows.
+ * The portal asks a different question — "does this section hold anything
+ * published?" — and answers it by excluding empty sections outright, so its
+ * read is `HelpCenterTopicPublic` and carries no count at all.
  */
 export const HelpCenterTopicWithCount = S.Struct({
   ...HelpCenterTopic.fields,
@@ -60,6 +62,22 @@ export const HelpCenterTopicWithCount = S.Struct({
 
 export type THelpCenterTopicWithCount = S.Schema.Type<
   typeof HelpCenterTopicWithCount
+>;
+
+/**
+ * The portal's read: a section, with no `articleCount`.
+ *
+ * The number would only ever restate the listing rule — `findManyPublished`
+ * already drops every section with no published article — and a count the
+ * public read does not use is one more field the portal's fixtures and
+ * consumers have to keep honest.
+ */
+export const HelpCenterTopicPublic = S.Struct({
+  ...HelpCenterTopic.fields,
+});
+
+export type THelpCenterTopicPublic = S.Schema.Type<
+  typeof HelpCenterTopicPublic
 >;
 
 export const HelpCenterTopicList = S.Struct({

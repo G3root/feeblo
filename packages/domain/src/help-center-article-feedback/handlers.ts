@@ -3,6 +3,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import { EntitlementPolicy } from "../entitlement/policies";
+import { isHelpCenterArticleReadable } from "../help-center-article/machine";
 import { HelpCenterArticleRepository } from "../help-center-article/repository";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
@@ -26,11 +27,11 @@ import type {
 /**
  * The reader's identity, as the vote table's two facets expect it.
  *
- * Exactly one of the two is ever set. A signed-in reader is keyed to the
- * account so the vote follows them across browsers; an anonymous reader is
- * keyed to the browser's own random id, so signing in later does not silently
- * discard a vote they already cast — the two are different rows, and the
- * account row wins once one exists.
+ * A stored verdict has exactly one facet: a signed-in reader is keyed to the
+ * account so the vote follows them across browsers, and an anonymous reader is
+ * keyed to the browser's own random id. A signed-in request may still carry the
+ * browser id, because it names the anonymous verdict the account's vote
+ * supersedes — the vote migrates instead of being silently lost.
  */
 export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
   function* () {
@@ -41,17 +42,22 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
     /**
      * A vote names an article, so it is only count-able against an article a
      * reader could open. A draft has no public page, and answering it would
-     * tell a caller that the draft exists.
+     * tell a caller that the draft exists. The lifecycle state is all the gate
+     * needs — reading the content or the counters to decide would be a second
+     * query for a decision the state already answers.
      */
     const requireReadableArticle = (args: {
       organizationId: string;
       articleId: string;
     }) =>
       articleRepository
-        .findById({ organizationId: args.organizationId, id: args.articleId })
+        .findStateById({
+          organizationId: args.organizationId,
+          id: args.articleId,
+        })
         .pipe(
           Effect.flatMap((found) =>
-            found === undefined || found.status === "draft"
+            found === undefined || !isHelpCenterArticleReadable(found.status)
               ? Effect.fail(
                   new NotFoundError({ message: "The article does not exist." })
                 )
@@ -66,7 +72,10 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
         if (Option.isSome(session)) {
           return {
             userId: session.value.session.userId,
-            visitorId: null,
+            // Kept, not dropped: a signed-in reader may be casting the vote
+            // they made before signing in, and the repository needs the id to
+            // migrate that row instead of counting them twice.
+            visitorId: visitorId ?? null,
           } as const;
         }
 
@@ -137,7 +146,7 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
                 Policy.hasMembership(args.organizationId),
                 Policy.canPermission(
                   args.organizationId,
-                  "helpCenterArticles.*"
+                  "helpCenterArticles.update"
                 )
               )
             ),

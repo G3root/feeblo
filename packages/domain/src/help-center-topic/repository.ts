@@ -80,23 +80,20 @@ const makeHelpCenterTopicRepository = Effect.gen(function* () {
       .orderBy(...displayOrder);
 
   /**
-   * The portal's list: only topics that hold at least one published article.
+   * The portal's read: only topics that hold at least one published article,
+   * with no article count.
    *
    * A topic whose every article is still a draft names unreleased
    * documentation, so publishing an empty section would disclose the draft
    * pipeline even though each article inside stays unpublished. Same rule as
    * `changelog-category`'s `findManyPublished`.
+   *
+   * No count: the `exists` filter below already means the number would never
+   * be zero, and the portal never renders it.
    */
   const findManyPublished = ({ organizationId }: { organizationId: string }) =>
     db
-      .select({
-        ...topicColumns,
-        articleCount: sql<number>`(
-          select count(*)::int from ${schema.helpCenterArticleTable}
-          where ${schema.helpCenterArticleTable.topicId} = ${schema.helpCenterTopicTable.id}
-            and ${schema.helpCenterArticleTable.status} = 'published'
-        )`,
-      })
+      .select(topicColumns)
       .from(schema.helpCenterTopicTable)
       .where(
         and(
@@ -109,25 +106,6 @@ const makeHelpCenterTopicRepository = Effect.gen(function* () {
         )
       )
       .orderBy(...displayOrder);
-
-  const findBySlug = ({
-    organizationId,
-    slug,
-  }: {
-    organizationId: string;
-    slug: string;
-  }) =>
-    db
-      .select(topicColumns)
-      .from(schema.helpCenterTopicTable)
-      .where(
-        and(
-          eq(schema.helpCenterTopicTable.organizationId, organizationId),
-          eq(schema.helpCenterTopicTable.slug, slug)
-        )
-      )
-      .limit(1)
-      .pipe(Effect.map((rows) => rows[0]));
 
   const countByOrganizationId = ({
     organizationId,
@@ -286,7 +264,6 @@ const makeHelpCenterTopicRepository = Effect.gen(function* () {
   return {
     findMany,
     findManyPublished,
-    findBySlug,
     countByOrganizationId,
     countArticlesByTopic,
     findIds,

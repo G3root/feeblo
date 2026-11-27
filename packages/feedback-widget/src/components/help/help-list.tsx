@@ -36,20 +36,21 @@ type HelpSection = {
  *
  * `findManyPublic` already orders by the section's position, so the sections are
  * the distinct topic ids in first-seen order and each one's articles are the
- * rows that share it. No accumulator and no grouping by hand: this is a
- * projection of an order the server already decided.
+ * rows that share it. `Map.groupBy` does both halves in one pass: a new key is
+ * inserted in first-seen order and every later row for that topic is appended.
+ * A set of ids followed by a `filter` per id would read the whole list once per
+ * section to answer a question the pass already answered.
  */
 function groupBySection(
   articles: WidgetHelpCenter["articles"]
 ): readonly HelpSection[] {
-  const topicIds = [...new Set(articles.map((article) => article.topicId))];
-
-  return topicIds.map((topicId) => ({
-    articles: articles.filter((article) => article.topicId === topicId),
-    name:
-      articles.find((article) => article.topicId === topicId)?.topicName ?? "",
-    topicId,
-  }));
+  return [...Map.groupBy(articles, (article) => article.topicId)].map(
+    ([topicId, rows]) => ({
+      articles: rows,
+      name: rows[0]?.topicName ?? "",
+      topicId,
+    })
+  );
 }
 
 function HelpListScreen() {

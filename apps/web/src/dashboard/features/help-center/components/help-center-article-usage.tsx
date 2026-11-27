@@ -39,21 +39,33 @@ function ArticleLimitInfoPopover({ limit }: { limit: number }) {
 }
 
 /**
+ * The plan's article allowance and whether this workspace has spent it.
+ *
+ * Shared by the usage line and the create action so the page cannot show "12 of
+ * 12 used" beside an enabled "New article" button. The server still enforces
+ * the limit; this only stops the UI inviting a request that is certain to be
+ * refused.
+ */
+export function useHelpCenterArticleAllowance(used: number) {
+  const planQuery = usePlan();
+  const plan = planQuery.data?.plan ?? "free";
+  const limit = PLAN_ENTITLEMENTS[plan].limits.helpCenterArticles;
+
+  return { atLimit: limit !== null && used >= limit, limit };
+}
+
+/**
  * The plan's article allowance, shown only when it is a number.
  *
  * A paid workspace's limit is `null`, and rendering "unlimited" on every plan
  * that has no cap is noise on a page an editor already understands.
  */
 export function HelpCenterArticleUsage({ used }: { used: number }) {
-  const planQuery = usePlan();
-  const plan = planQuery.data?.plan ?? "free";
-  const limit = PLAN_ENTITLEMENTS[plan].limits.helpCenterArticles;
+  const { atLimit, limit } = useHelpCenterArticleAllowance(used);
 
   if (limit === null) {
     return null;
   }
-
-  const atLimit = used >= limit;
 
   return (
     <p className="text-muted-foreground flex items-center gap-1.5 text-sm">

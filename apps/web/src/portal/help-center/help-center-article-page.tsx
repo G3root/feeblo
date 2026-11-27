@@ -1,9 +1,10 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
@@ -13,6 +14,7 @@ import { Skeleton } from "@feeblo/ui/skeleton";
 import { Textarea } from "@feeblo/ui/textarea";
 import { cn } from "@feeblo/ui/utils";
 import { markdownHeadings, type MarkdownHeading } from "@feeblo/utils/markdown";
+import { isRpcErrorTag } from "@feeblo/web-shared/rpc-error";
 import {
   ArrowLeft02Icon,
   ArrowRight01Icon,
@@ -22,6 +24,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
+import * as Predicate from "effect/Predicate";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -90,7 +93,12 @@ export function HelpCenterArticlePage({
     [organizationId, articleSlug]
   );
 
-  const articleResult = useAtomValue(helpCenterArticlePublicAtom(articleArgs));
+  const articleAtom = helpCenterArticlePublicAtom(articleArgs);
+
+  const articleResult = useAtomValue(articleAtom);
+
+  const refreshArticle = useAtomRefresh(articleAtom);
+
   const topicsResult = useAtomValue(helpCenterTopicsPublicAtom(organizationId));
 
   const articlesResult = useAtomValue(
@@ -155,16 +163,41 @@ export function HelpCenterArticlePage({
       <article className="min-w-0">
         {Result.builder(articleResult)
           .onInitial(() => <ArticleSkeleton />)
-          .onFailure(() => (
-            <Empty className="py-16">
-              <EmptyHeader>
-                <EmptyTitle>Article not found</EmptyTitle>
-                <EmptyDescription>
-                  It may have been removed, or the link is out of date.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ))
+          // A decoded RPC failure reaches the atom as the tagged error object
+          // itself, while the promise client wraps its cause in `RpcError`; a
+          // missing article has to answer "not found" from either shape.
+          .onFailure((error) =>
+            isRpcErrorTag(error, "NotFoundError") ||
+            Predicate.isTagged(error, "NotFoundError") ? (
+              <Empty className="py-16">
+                <EmptyHeader>
+                  <EmptyTitle>Article not found</EmptyTitle>
+                  <EmptyDescription>
+                    It may have been removed, or the link is out of date.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <Empty className="py-16">
+                <EmptyHeader>
+                  <EmptyTitle>Article unavailable</EmptyTitle>
+                  <EmptyDescription>
+                    There was a problem loading this article.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button
+                    onClick={refreshArticle}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Retry
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            )
+          )
           .onSuccess((loaded) => (
             <ArticleBody
               article={loaded}
@@ -497,23 +530,40 @@ function VerdictSection({
     <section className="border-border/70 mt-10 border-t pt-6 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium">Was this helpful?</p>
-        <div className="flex items-center gap-2">
-          <HelpfulVoteButton
-            active={vote.verdict === true}
-            disabled={vote.isPending || !vote.ready}
-            onClick={vote.markHelpful}
-          />
-          <NotHelpfulVoteButton
-            active={vote.verdict === false}
-            disabled={vote.isPending || !vote.ready}
-            onClick={vote.markUnhelpful}
-          />
-        </div>
+        {vote.failed ? (
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground text-sm">
+              Feedback unavailable.
+            </p>
+            <Button
+              onClick={vote.retry}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <HelpfulVoteButton
+              active={vote.verdict === true}
+              disabled={vote.isPending || !vote.ready}
+              onClick={vote.markHelpful}
+            />
+            <NotHelpfulVoteButton
+              active={vote.verdict === false}
+              disabled={vote.isPending || !vote.ready}
+              onClick={vote.markUnhelpful}
+            />
+          </div>
+        )}
       </div>
 
       {vote.reasonOpen ? (
         <div className="mt-3 space-y-2">
           <Textarea
+            aria-label="What was missing?"
             maxLength={2000}
             onChange={(event) => vote.setReason(event.target.value)}
             placeholder="What was missing? (optional)"

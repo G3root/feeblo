@@ -188,10 +188,28 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
 
     CreateHelpCenterArticle: (args: THelpCenterArticleCreate) =>
       Effect.gen(function* () {
+        // An article is archived through the lifecycle — published, then
+        // withdrawn — so a create cannot start there. A page readers never saw
+        // has nothing to take out of the documentation, and allowing it would
+        // make an unreachable tombstone a representable write.
+        if (args.status === "archived") {
+          return yield* new BadRequestError({
+            message:
+              "An article cannot be created as archived. Publish it and archive it through the lifecycle instead.",
+          });
+        }
+
         yield* articlePolicy.topicBelongsToWorkspace(args);
 
         const session = yield* CurrentSession;
         const now = yield* DateTime.nowAsDate;
+
+        // The author is the member writing, not a caller-supplied field: the
+        // public page names who wrote the documentation, which is why the id
+        // is stored on the row and joined at read time.
+        const creatorMemberId =
+          Policy.getMembership(session, args.organizationId)?.membershipId ??
+          null;
 
         const write = yield* normalizeArticleWrite({
           content: args.content,
@@ -225,6 +243,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
               organizationId: args.organizationId,
               topicId: args.topicId,
               position: args.position,
+              creatorMemberId,
               now,
               write: stored,
               coverImage: prepared.coverImage,
@@ -261,7 +280,17 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           title: stored.title,
         });
       }).pipe(
-        Policy.withPolicy(articlePolicy.canCreate(args)),
+        // Publishing is its own authority on top of creating: an article that
+        // starts live is in front of readers the moment it is stored, so the
+        // role must hold `publish` as well as `create`.
+        Policy.withPolicy(
+          args.status === "published"
+            ? Policy.all(
+                articlePolicy.canCreate(args),
+                articlePolicy.canPublish(args.organizationId)
+              )
+            : articlePolicy.canCreate(args)
+        ),
         withRemapDbErrors({
           action: "create",
           entity: "HelpCenterArticle",
@@ -295,6 +324,14 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           return yield* new BadRequestError({
             message: `An article cannot move from ${previous.status} to ${args.status}.`,
           });
+        }
+
+        // A move *into* `published` is a publication, whatever the state it
+        // came from, so it asks for the publish authority on top of `update`.
+        // An edit to an already-published article is not a publish: the page
+        // was already in front of readers.
+        if (args.status === "published" && previous.status !== "published") {
+          yield* articlePolicy.canPublish(args.organizationId);
         }
 
         const session = yield* CurrentSession;
@@ -335,6 +372,9 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
               // An API caller that does not track it falls back to the row as
               // read, which is the weaker guarantee but the only one it offers.
               expectedStatus: args.expectedStatus ?? previous.status,
+              // Same-status concurrent edits need the timestamp: the status
+              // guard above cannot see two saves of one draft.
+              expectedUpdatedAt: args.expectedUpdatedAt,
               now,
               write: stored,
               coverImage: prepared.coverImage,
@@ -405,12 +445,12 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
       repository.recordView(args).pipe(
         // The beacon is a count, not a feature: any failure to store one is
         // answered as "not accepted" so a reader's page is never blocked by its
-        // own analytics. Catching the whole channel rather than one tag is
-        // deliberate — the failure can arrive as a driver error, an abort, or a
-        // serialization failure, and none of them is the reader's problem. The
-        // rate limit and the surface gate below still propagate: a refusal is
-        // the caller's business.
-        Effect.orElseSucceed(() => ({ accepted: false })),
+        // own analytics. Catching the whole cause rather than the typed channel
+        // is deliberate — the failure can arrive as a driver error, an abort, a
+        // serialization failure or a defect, and none of them is the reader's
+        // problem. The rate limit and the surface gate below still propagate: a
+        // refusal is the caller's business.
+        Effect.catchCause(() => Effect.succeed({ accepted: false })),
         RateLimit.withPublicRpcRateLimit({
           name: "AddHelpCenterArticleView",
           level: "write",

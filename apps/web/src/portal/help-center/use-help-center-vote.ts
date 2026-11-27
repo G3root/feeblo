@@ -1,11 +1,11 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { useMachine } from "@xstate/react";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   helpCenterArticleFeedbackAtom,
-  helpCenterPublicReactivityKeys,
+  helpCenterFeedbackReactivityKeys,
   setHelpCenterArticleFeedbackAtom,
   type HelpCenterFeedbackAtomArgs,
 } from "./atoms";
@@ -15,6 +15,13 @@ import {
   toVoteLoadedEvent,
   type HelpCenterVoteView,
 } from "./vote-machine";
+
+/** The part of the tally the widget reads. */
+type HelpCenterTally = {
+  readonly helpfulCount: number;
+  readonly mine: boolean | null;
+  readonly notHelpfulCount: number;
+};
 
 /** What the verdict widget needs from this hook. */
 export type HelpCenterVote = HelpCenterVoteView & {
@@ -26,6 +33,8 @@ export type HelpCenterVote = HelpCenterVoteView & {
   readonly sendReason: () => void;
   readonly closeReason: () => void;
   readonly setReason: (value: string) => void;
+  /** Refreshes the tally and leaves the failed state. */
+  readonly retry: () => void;
   readonly isPending: boolean;
   readonly counts: { readonly helpful: number; readonly notHelpful: number };
 };
@@ -64,15 +73,13 @@ export function useHelpCenterVote({
     [articleId, organizationId, visitorId]
   );
 
-  const feedbackResult = useAtomValue(helpCenterArticleFeedbackAtom(tallyArgs));
+  const feedbackAtom = helpCenterArticleFeedbackAtom(tallyArgs);
+  const feedbackResult = useAtomValue(feedbackAtom);
+  const refreshFeedback = useAtomRefresh(feedbackAtom);
 
   const tally = Result.getOrElse(
     feedbackResult,
-    (): {
-      helpfulCount: number;
-      mine: boolean | null;
-      notHelpfulCount: number;
-    } | null => null
+    (): HelpCenterTally | null => null
   );
 
   /**
@@ -82,9 +89,21 @@ export function useHelpCenterVote({
    * rather than by the initial state. The guard is the article id, not the
    * tally: a refetch returns the same verdict, and re-sending it would yank a
    * reader out of the reason box they are typing in.
+   *
+   * A failure is the one case that clears the guard. `failed` is left only by a
+   * retry or by a tally that arrives anyway, and both need the adopted-once
+   * rule to start again — otherwise a reader who has already seen a verdict
+   * would be stuck in `loading` after the read recovers.
    */
   const adoptedFor = useRef<string | null>(null);
   useEffect(() => {
+    if (Result.isFailure(feedbackResult)) {
+      adoptedFor.current = null;
+      send({ type: "TALLY_FAILED" });
+
+      return;
+    }
+
     if (tally === null) {
       return;
     }
@@ -95,7 +114,7 @@ export function useHelpCenterVote({
 
     adoptedFor.current = articleId;
     send({ type: toVoteLoadedEvent(tally.mine) });
-  }, [articleId, send, tally]);
+  }, [articleId, feedbackResult, send, tally]);
 
   const setFeedback = useAtomSet(setHelpCenterArticleFeedbackAtom, {
     mode: "promise",
@@ -121,7 +140,7 @@ export function useHelpCenterVote({
         reason: helpful ? null : snapshot.context.reason.trim() || null,
         visitorId,
       },
-      reactivityKeys: helpCenterPublicReactivityKeys(organizationId),
+      reactivityKeys: helpCenterFeedbackReactivityKeys(organizationId),
     })
       .then(() =>
         send({
@@ -154,5 +173,11 @@ export function useHelpCenterVote({
     sendReason: () => cast(false),
     closeReason: () => send({ type: "CLOSE_REASON" }),
     setReason: (value: string) => send({ type: "SET_REASON", value }),
+    retry: () => {
+      // The loaded event is sent by the adoption effect once the refreshed
+      // tally arrives, so this only leaves `failed` for the loading state.
+      send({ type: "RETRY" });
+      refreshFeedback();
+    },
   };
 }

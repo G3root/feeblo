@@ -1,3 +1,4 @@
+import { useAtomSet } from "@effect/atom-react";
 import type { THelpCenterTopicWithCount } from "@feeblo/domain/help-center-topic/schema";
 import { Button } from "@feeblo/ui/button";
 import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
@@ -30,6 +31,8 @@ import { toastManager } from "@feeblo/ui/toast";
 import { isLiveQueryFailed } from "@feeblo/web-shared/collections";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import {
+  ArrowDown01Icon,
+  ArrowUp01Icon,
   BookOpen01Icon,
   Delete02Icon,
   Edit02Icon,
@@ -43,6 +46,7 @@ import { useState } from "react";
 
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
+import { reorderHelpCenterTopicsAtom } from "../atoms";
 import { HelpCenterArticleUsage } from "./help-center-article-usage";
 import { HelpCenterSearch } from "./help-center-search";
 import {
@@ -96,6 +100,12 @@ export function HelpCenterIndex({
 
   const [deletePending, setDeletePending] = useState(false);
 
+  const [reorderPending, setReorderPending] = useState(false);
+
+  const reorderTopics = useAtomSet(reorderHelpCenterTopicsAtom, {
+    mode: "promise",
+  });
+
   const topicsQuery = useLiveQuery({
     queryKey: [
       "help-center-topics",
@@ -129,6 +139,43 @@ export function HelpCenterIndex({
     (total, topic) => total + topic.articleCount,
     0
   );
+
+  /**
+   * Moves a section one row up or down.
+   *
+   * The write names the complete order because that is the operation the
+   * server accepts; a sequence of per-row position updates would leave a
+   * half-applied reorder behind if one call failed. The refetch is best-effort:
+   * the reorder already succeeded, and a failed read is the list's next-load
+   * problem rather than a failed move.
+   */
+  const moveTopic = async (topicId: string, direction: -1 | 1) => {
+    const index = topics.findIndex((topic) => topic.id === topicId);
+    const target = index + direction;
+
+    if (index === -1 || target < 0 || target >= topics.length) {
+      return;
+    }
+
+    const topicIds = topics.map((topic) => topic.id);
+    const moved = topicIds[index];
+    topicIds[index] = topicIds[target];
+    topicIds[target] = moved;
+
+    setReorderPending(true);
+
+    try {
+      await reorderTopics({ payload: { organizationId, topicIds } });
+      await helpCenterTopicCollection.utils.refetch().catch(() => undefined);
+    } catch {
+      toastManager.add({
+        title: "Failed to reorder the sections",
+        type: "error",
+      });
+    } finally {
+      setReorderPending(false);
+    }
+  };
 
   const confirmDeleteSection = async () => {
     if (deleting === null) {
@@ -221,7 +268,7 @@ export function HelpCenterIndex({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {topics.map((topic) => (
+                {topics.map((topic, index) => (
                   <TableRow key={topic.id}>
                     <TableCell className="whitespace-normal">
                       <Link
@@ -273,6 +320,23 @@ export function HelpCenterIndex({
                             </MenuItem>
                             <MenuSeparator />
                             <MenuItem
+                              disabled={reorderPending || index === 0}
+                              onClick={() => void moveTopic(topic.id, -1)}
+                            >
+                              <HugeiconsIcon icon={ArrowUp01Icon} />
+                              Move up
+                            </MenuItem>
+                            <MenuItem
+                              disabled={
+                                reorderPending || index === topics.length - 1
+                              }
+                              onClick={() => void moveTopic(topic.id, 1)}
+                            >
+                              <HugeiconsIcon icon={ArrowDown01Icon} />
+                              Move down
+                            </MenuItem>
+                            <MenuSeparator />
+                            <MenuItem
                               disabled={topic.articleCount > 0}
                               onClick={() => setDeleting(topic)}
                               variant="destructive"
@@ -311,7 +375,6 @@ export function HelpCenterIndex({
             }
           }}
           open
-          organizationId={organizationId}
           topic={editing}
         />
       )}

@@ -1,5 +1,5 @@
 import type { THelpCenterArticlePublicSummary } from "@feeblo/domain/help-center-article/schema";
-import type { THelpCenterTopicWithCount } from "@feeblo/domain/help-center-topic/schema";
+import type { THelpCenterTopicPublic } from "@feeblo/domain/help-center-topic/schema";
 
 /**
  * The shapes the portal's help center navigation works on.
@@ -47,7 +47,7 @@ export function buildHelpCenterSections({
   topics,
   articles,
 }: {
-  readonly topics: ReadonlyArray<THelpCenterTopicWithCount>;
+  readonly topics: ReadonlyArray<THelpCenterTopicPublic>;
   readonly articles: ReadonlyArray<HelpCenterNavArticle>;
 }): ReadonlyArray<HelpCenterNavSection> {
   const byTopic = new Map<string, HelpCenterNavArticle[]>();

@@ -37,16 +37,37 @@ const makeHelpCenterArticlePolicy = Effect.gen(function* () {
       })
     );
 
+  /**
+   * Editing an article.
+   *
+   * `update` rather than the resource wildcard: the action is the grant the
+   * table declares, and a manager's `helpCenterArticles.*` still satisfies it
+   * through the wildcard. A role that may edit is deliberately not the same
+   * set as one that may publish.
+   */
   const canUpdate = (organizationId: string) =>
     Policy.all(
       Policy.hasMembership(organizationId),
-      Policy.canPermission(organizationId, "helpCenterArticles.*")
+      Policy.canPermission(organizationId, "helpCenterArticles.update")
     );
 
   const canDelete = (organizationId: string) =>
     Policy.all(
       Policy.hasMembership(organizationId),
-      Policy.canPermission(organizationId, "helpCenterArticles.*")
+      Policy.canPermission(organizationId, "helpCenterArticles.delete")
+    );
+
+  /**
+   * Putting a page in front of readers.
+   *
+   * Separate from `canUpdate` because publishing is the one edit with a
+   * reader-visible consequence: it is the operation the portal serves, and a
+   * role may be trusted with drafts without being trusted with that.
+   */
+  const canPublish = (organizationId: string) =>
+    Policy.all(
+      Policy.hasMembership(organizationId),
+      Policy.canPermission(organizationId, "helpCenterArticles.publish")
     );
 
   /**
@@ -88,6 +109,7 @@ const makeHelpCenterArticlePolicy = Effect.gen(function* () {
     canCreate,
     canUpdate,
     canDelete,
+    canPublish,
     canRead,
     topicBelongsToWorkspace,
   };

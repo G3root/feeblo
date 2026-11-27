@@ -152,6 +152,19 @@ export function parseRpcError<T>(
     return { cause: error, kind: "rpc", message };
   }
 
+  // An atom query surfaces a declared RPC failure as the decoded tagged object
+  // itself, not the `RpcError` wrapper a promise call throws. Reading the
+  // allowed tags here keeps those surfaces from falling back to generic copy.
+  const decodedMessage = extractUserMessage(error);
+
+  if (decodedMessage !== undefined) {
+    return {
+      cause: Cause.fail(error),
+      kind: "rpc",
+      message: decodedMessage,
+    };
+  }
+
   return { kind: "unexpected", message: fallback };
 }
 

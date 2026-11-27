@@ -18,6 +18,7 @@ type PostWithTransientAuthor = {
 
 import {
   eqFilterValue,
+  organizationScopedKey,
   postSlugFromPath,
   refetchInBackground,
 } from "@feeblo/web-shared/collections";
@@ -696,6 +697,88 @@ export function helpCenterArticleCollection(scope: DashboardCollectionScope) {
       // single-article read. The editor writes through the help center's atom
       // mutations and refetches this list, so no collection callback has to
       // round-trip a field these rows never held.
+    })
+  );
+}
+
+/**
+ * The query-key prefix for every article list in one workspace.
+ *
+ * The workspace-wide usage meter and each section's topic-scoped list are
+ * children of this prefix, so one invalidation marks all of them stale without
+ * refetching the lists nobody is looking at. The topic-scoped key below stays
+ * specific so each section keeps its own cache entry.
+ */
+export function helpCenterArticlesQueryKey(
+  organizationId: string | undefined
+): string[] {
+  return organizationScopedKey(organizationId, "help-center-article");
+}
+
+/**
+ * The query key for one section's articles.
+ *
+ * The section page's collection and the editor's post-write invalidation both
+ * name the same rows, so the key is derived here rather than spelled twice. A
+ * drift between the two would leave the section page showing the article as it
+ * was before the save.
+ */
+export function helpCenterArticleTopicQueryKey(
+  organizationId: string | undefined,
+  topicId: string
+): string[] {
+  return organizationScopedKey(
+    organizationId,
+    "help-center-article",
+    "topicId",
+    topicId
+  );
+}
+
+/**
+ * One section's articles.
+ *
+ * A section page lists one topic, and the workspace-wide
+ * `helpCenterArticleCollection` stays for `useWorkspaceUsage` only. Scoping the
+ * collection by topic is what lets the editor invalidate exactly the lists a
+ * write could have changed, including both lists when an article moves
+ * sections. The operation filters by `topicId` on the server; the live query
+ * keeps its predicate as a second guard.
+ */
+export function helpCenterTopicArticleCollection(
+  scope: DashboardCollectionScope,
+  topicId: string
+) {
+  const id = `${organizationScopedCollectionId(
+    "helpCenterArticleCollection",
+    scope
+  )}:${topicId}`;
+
+  return collectionOptions(id, (client) =>
+    queryCollectionOptions({
+      id,
+      queryClient: client.requireDependency<QueryClient>("queryClient"),
+      queryKey: () =>
+        helpCenterArticleTopicQueryKey(scope.organizationId, topicId),
+      queryFn: async (ctx) => {
+        const organizationId = scope.organizationId;
+
+        if (!organizationId) {
+          return [];
+        }
+
+        // The list operation filters by workspace and optionally one section;
+        // the section's live query keeps its predicate as a second guard, but
+        // the rows never leave the server. The workspace-wide collection stays
+        // for the plan-usage meter.
+        const data = await fetchRpc(
+          (rpc) => rpc.ListHelpCenterArticles({ organizationId, topicId }),
+          { signal: ctx.signal }
+        );
+
+        return [...data];
+      },
+      getKey: (item) => item.id,
     })
   );
 }
@@ -2524,6 +2607,20 @@ const makeDashboardCollections = (
     return materialize(
       getBrowserDbClient(),
       helpCenterArticleCollection(getScope())
+    );
+  },
+  /**
+   * One section's articles, for the section page.
+   *
+   * A method rather than a getter because the topic is part of the surface the
+   * caller is rendering, not part of the workspace scope the accessor was made
+   * for. `DbClient` memoizes by descriptor id, so each section keeps one
+   * collection no matter how often the page reads it.
+   */
+  helpCenterTopicArticleCollection(topicId: string) {
+    return materialize(
+      getBrowserDbClient(),
+      helpCenterTopicArticleCollection(getScope(), topicId)
     );
   },
   get changelogCategoryCollection() {

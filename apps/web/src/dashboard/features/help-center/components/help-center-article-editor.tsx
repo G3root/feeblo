@@ -5,7 +5,14 @@ import type {
 } from "@feeblo/domain-contracts/help-center-article";
 import { HelpCenterArticleId } from "@feeblo/id";
 import { PostContentEditor } from "@feeblo/post-ui/post-content";
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@feeblo/ui/alert";
 import { Button } from "@feeblo/ui/button";
+import { ConfirmDialog } from "@feeblo/ui/confirm-dialog";
 import { finalizeEditorContent } from "@feeblo/ui/editor";
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@feeblo/ui/menu";
@@ -14,12 +21,12 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "@feeblo/ui/tooltip";
 import { cn } from "@feeblo/ui/utils";
 import * as dayjs from "@feeblo/utils/dayjs";
 import { slugify } from "@feeblo/utils/url";
-import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { isRpcErrorTag, parseRpcError } from "@feeblo/web-shared/rpc-error";
 import {
+  Alert02Icon,
   Archive01Icon,
   ArrowLeft02Icon,
   Calendar03Icon,
-  Copy01Icon,
   Delete02Icon,
   Ellipsis,
   Link03Icon,
@@ -29,14 +36,17 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { eq, useLiveQuery } from "@tanstack/react-db";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import * as Match from "effect/Match";
+import * as Predicate from "effect/Predicate";
 import { type ReactNode, useRef, useState } from "react";
 
 import { CoverImageField } from "~/components/cover-image-field";
 import { EditorLayout } from "~/components/editor-layout";
 import { PublishDialog } from "~/components/publish-dialog";
 import { usePublicSiteUrl } from "~/hooks/use-site";
+import { helpCenterArticlesQueryKey } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
@@ -46,10 +56,15 @@ import {
   updateHelpCenterArticleAtom,
 } from "../atoms";
 import {
+  HELP_CENTER_ARTICLE_STALE_MESSAGE,
+  isHelpCenterArticleStale,
+} from "../help-center-editor-state";
+import {
   helpCenterArticleFormOptions,
   helpCenterArticleFormValues,
   type HelpCenterArticleFormValues,
 } from "../help-center-forms";
+import { HelpCenterArticleFeedback } from "./help-center-article-feedback";
 import { HelpCenterArticleStatusBadge } from "./help-center-article-status";
 import { HelpCenterTopicIcon } from "./help-center-topic-icon";
 
@@ -69,6 +84,29 @@ type ArticleSubmitOverrides = {
 
 type ArticleSubmitMeta = {
   overrides?: ArticleSubmitOverrides;
+};
+
+/**
+ * The message a refused article write shows.
+ *
+ * The two help-center-specific conflicts carry no `message` of their own, so
+ * the generic parser cannot explain them; naming the tag here turns "something
+ * went wrong" into "reload" or "pick another URL". Everything else still goes
+ * through the shared allowlist, which never leaks an internal failure.
+ */
+const articleWriteErrorMessage = (cause: unknown): string => {
+  const isTag = (tag: string) =>
+    isRpcErrorTag(cause, tag) || Predicate.isTagged(cause, tag);
+
+  if (isTag("HelpCenterArticleChangedError")) {
+    return HELP_CENTER_ARTICLE_STALE_MESSAGE;
+  }
+
+  if (isTag("HelpCenterArticleSlugTakenError")) {
+    return "That URL is already used by another article. Choose a different slug.";
+  }
+
+  return parseRpcError(cause).message;
 };
 
 /**
@@ -127,11 +165,11 @@ export type HelpCenterArticleEditorProps =
 export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
   const { organizationId } = props;
 
-  const { helpCenterArticleCollection, helpCenterTopicCollection } =
-    useDashboardCollections();
+  const { helpCenterTopicCollection } = useDashboardCollections();
 
   const navigate = useNavigate();
   const publicSiteUrl = usePublicSiteUrl();
+  const queryClient = useQueryClient();
 
   const article = props.mode === "edit" ? props.article : undefined;
 
@@ -156,7 +194,26 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
    */
   const coverImageAssetRef = useRef<string | null>(null);
 
-  const formResetKey = `${article?.id ?? "new"}:${article?.updatedAt.getTime() ?? 0}`;
+  /**
+   * The row's timestamp as the editor loaded it.
+   *
+   * The snapshot the content editor and the stale check are keyed by. It is
+   * captured once, like `openedStatus`, so a stale-while-revalidate refresh
+   * cannot move the baseline this editor compares against.
+   */
+  const [openedUpdatedAt] = useState(() => article?.updatedAt);
+
+  const stale = isHelpCenterArticleStale(openedUpdatedAt, article?.updatedAt);
+
+  /**
+   * The remount key of the content editor.
+   *
+   * Derived from the row this component loaded, not from the current prop: a
+   * background refresh must not remount the Markdown editor under someone who
+   * is typing. A different article is a new React key at the route, so the id
+   * is enough to distinguish editors.
+   */
+  const formResetKey = `${article?.id ?? "new"}:${openedUpdatedAt?.getTime() ?? 0}`;
 
   const topicsQuery = useLiveQuery({
     queryKey: [
@@ -197,6 +254,15 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
    */
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  /**
+   * The delete confirmation and the request it is waiting on.
+   *
+   * Deleting a published page breaks a URL readers may have bookmarked, so it
+   * asks first — the same `ConfirmDialog` the section pages use for a section.
+   */
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+
   const createArticle = useAtomSet(createHelpCenterArticleAtom, {
     mode: "promise",
   });
@@ -235,16 +301,59 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
       // SAFETY: The runtime invariant checked by the surrounding code guarantees this type.
       const overrides = (meta as ArticleSubmitMeta | undefined)?.overrides;
 
+      if (stale) {
+        setSubmitError(HELP_CENTER_ARTICLE_STALE_MESSAGE);
+
+        return;
+      }
+
       try {
         await submit(value, overrides);
       } catch (cause) {
-        setSubmitError(parseRpcError(cause).message);
+        setSubmitError(articleWriteErrorMessage(cause));
       }
     },
   });
 
   const backTopicId = article === undefined ? initialTopicId : article.topicId;
   const backTopic = topics.find((topic) => topic.id === backTopicId);
+
+  /**
+   * Refreshes the article lists a write could have changed.
+   *
+   * The editor no longer waits on a workspace-wide list: the section page owns
+   * the articles it renders, and invalidating the workspace prefix marks the
+   * old and new section's cached lists — and the plan-usage meter — stale.
+   * Only the lists the reader next mounts are actually fetched.
+   *
+   * A failed refetch is not a failed write, so the promise is deliberately not
+   * awaited and terminates in its own catch.
+   */
+  const invalidateArticleLists = () => {
+    void queryClient
+      .invalidateQueries({
+        queryKey: helpCenterArticlesQueryKey(organizationId),
+      })
+      .catch(() => undefined);
+  };
+
+  /**
+   * Navigates to the section a write landed in.
+   *
+   * The write is committed by this point; a navigation failure is a separate
+   * problem from "the save did not happen" and must not take the form's error
+   * slot, which would tell the editor to retry a write that already succeeded.
+   */
+  const navigateToSection = async (topicId: string) => {
+    try {
+      await navigate({
+        params: { organizationId, topicId },
+        to: "/$organizationId/help-center/$topicId",
+      });
+    } catch {
+      // The write succeeded; the section's next load shows it.
+    }
+  };
 
   async function submit(
     value: HelpCenterArticleFormValues,
@@ -330,6 +439,10 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
           // since put there: a row that moved is refused as a conflict rather
           // than silently reverted.
           expectedStatus: openedStatus ?? article.status,
+          // The same rule for a same-status concurrent edit: a colleague's
+          // save moves `updatedAt`, and this editor is still holding the row
+          // it loaded.
+          expectedUpdatedAt: openedUpdatedAt ?? article.updatedAt,
           publishedAt,
           position: article.position,
         },
@@ -341,14 +454,11 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     // must not be re-uploaded by a later save from this editor.
     finalized.commit();
 
-    // The list's rows are summaries the collection owns; the write above
-    // refreshed the single-article atom through its reactivity keys, so there
-    // is no cache entry here to forget.
-    await helpCenterArticleCollection.utils.refetch();
-    await navigate({
-      params: { organizationId, topicId },
-      to: "/$organizationId/help-center/$topicId",
-    });
+    // The section page reads a topic-scoped list; refresh the one the article
+    // left and the one it joined (which are the same list on a normal save).
+    invalidateArticleLists();
+
+    await navigateToSection(topicId);
   }
 
   /**
@@ -365,7 +475,7 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
     try {
       await submit(form.state.values, { ...overrides, status: "published" });
     } catch (cause) {
-      setSubmitError(parseRpcError(cause).message);
+      setSubmitError(articleWriteErrorMessage(cause));
       throw cause;
     }
   };
@@ -375,6 +485,8 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
       return;
     }
 
+    setDeletePending(true);
+
     try {
       await deleteArticle({
         payload: { id: article.id, organizationId },
@@ -383,322 +495,380 @@ export function HelpCenterArticleEditor(props: HelpCenterArticleEditorProps) {
         reactivityKeys: helpCenterArticleReactivityKeys(organizationId),
       });
 
-      await helpCenterArticleCollection.utils.refetch();
-      await navigate({
-        params: { organizationId, topicId: article.topicId },
-        to: "/$organizationId/help-center/$topicId",
-      });
+      invalidateArticleLists();
+      setDeletePending(false);
+      setDeleteOpen(false);
+
+      await navigateToSection(article.topicId);
     } catch (cause) {
       // The same message area the save uses: `remove` is not part of a submit,
       // so throwing would surface as an unhandled rejection from the button's
-      // `void remove()` rather than as a message.
-      setSubmitError(parseRpcError(cause).message);
+      // `void remove()` rather than as a message. The dialog closes so the
+      // message is not painted under it.
+      setDeletePending(false);
+      setDeleteOpen(false);
+      setSubmitError(articleWriteErrorMessage(cause));
     }
   };
 
   return (
-    <form
-      className="contents"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void form.handleSubmit();
-      }}
-    >
-      <EditorLayout>
-        <EditorLayout.Main>
-          <EditorLayout.Header className="items-center gap-3">
-            {backTopicId === undefined ? (
-              <Button
-                render={
-                  <Link
-                    params={{ organizationId }}
-                    to="/$organizationId/help-center"
-                  />
-                }
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                <HugeiconsIcon icon={ArrowLeft02Icon} />
-                Help center
-              </Button>
-            ) : (
-              <Button
-                render={
-                  <Link
-                    params={{ organizationId, topicId: backTopicId }}
-                    to="/$organizationId/help-center/$topicId"
-                  />
-                }
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                <HugeiconsIcon icon={ArrowLeft02Icon} />
-                {backTopic?.name ?? "Section"}
-              </Button>
-            )}
-          </EditorLayout.Header>
+    <>
+      <form
+        className="contents"
+        noValidate
+        onSubmit={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
 
-          <form.AppField name="coverImage">
-            {(field) => (
-              <CoverImageField
-                assetRef={coverImageAssetRef}
-                onChange={field.handleChange}
-                organizationId={organizationId}
-                value={field.state.value}
-              />
-            )}
-          </form.AppField>
+          // A disabled submit button does not stop the browser's implicit
+          // submission, and a stale row must not be written at all.
+          if (stale) {
+            return;
+          }
 
-          <form.AppField name="title">
-            {(field) => (
-              <field.TextField
-                className="rounded-md border-none bg-transparent font-medium tracking-tight md:text-2xl"
-                hideLabel
-                label="Title"
-                maxLength={200}
-                placeholder="Untitled article"
-              />
-            )}
-          </form.AppField>
+          void form.handleSubmit();
+        }}
+      >
+        <EditorLayout>
+          <EditorLayout.Main>
+            <EditorLayout.Header className="items-center gap-3">
+              {backTopicId === undefined ? (
+                <Button
+                  render={
+                    <Link
+                      params={{ organizationId }}
+                      to="/$organizationId/help-center"
+                    />
+                  }
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <HugeiconsIcon icon={ArrowLeft02Icon} />
+                  Help center
+                </Button>
+              ) : (
+                <Button
+                  render={
+                    <Link
+                      params={{ organizationId, topicId: backTopicId }}
+                      to="/$organizationId/help-center/$topicId"
+                    />
+                  }
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <HugeiconsIcon icon={ArrowLeft02Icon} />
+                  {backTopic?.name ?? "Section"}
+                </Button>
+              )}
+            </EditorLayout.Header>
 
-          <form.AppField name="content">
-            {(field) => (
-              <PostContentEditor
-                editorScope={editorScope}
-                key={formResetKey}
-                onChange={field.handleChange}
-                organizationId={organizationId}
-                showBlockHandle
-                value={field.state.value}
-              />
-            )}
-          </form.AppField>
-
-          {submitError === null ? null : (
-            <p className="text-destructive text-sm">{submitError}</p>
-          )}
-
-          <div className="flex justify-end pt-2">
-            <form.Subscribe
-              selector={(state) => ({
-                isSubmitting: state.isSubmitting,
-                title: state.values.title,
-              })}
-            >
-              {(state) => (
-                <div className="flex items-center gap-2">
+            {stale ? (
+              <Alert variant="warning">
+                <HugeiconsIcon icon={Alert02Icon} />
+                <AlertTitle>This article changed in another tab</AlertTitle>
+                <AlertDescription>Reload to continue.</AlertDescription>
+                <AlertAction>
                   <Button
-                    loading={state.isSubmitting}
-                    type="submit"
+                    onClick={() => window.location.reload()}
+                    size="xs"
+                    type="button"
                     variant="outline"
                   >
-                    Save
+                    Reload
                   </Button>
-                  {Match.value(article?.status).pipe(
-                    Match.when("published", () => (
-                      <Button
-                        disabled={state.isSubmitting}
-                        onClick={() =>
-                          void form.handleSubmit({
-                            overrides: { publishedAt: null, status: "draft" },
-                          })
-                        }
-                        type="button"
-                        variant="brand"
-                      >
-                        Turn into draft
-                      </Button>
-                    )),
-                    Match.when("archived", () => (
-                      <Button
-                        disabled={state.isSubmitting}
-                        onClick={() =>
-                          void form.handleSubmit({
-                            overrides: { publishedAt: null, status: "draft" },
-                          })
-                        }
-                        type="button"
-                        variant="brand"
-                      >
-                        Restore to draft
-                      </Button>
-                    )),
-                    Match.orElse(() => (
-                      <PublishDialog
-                        defaultPublishedAt={article?.publishedAt ?? null}
-                        defaultSlug={
-                          article?.slug ?? slugify(state.title.trim())
-                        }
-                        description="Choose the public URL and publication date for this article."
-                        failureTitle="Failed to publish article"
-                        onPublish={publish}
-                        submitLabel="Publish"
-                        title="Publish article"
-                      />
-                    ))
-                  )}
-                </div>
+                </AlertAction>
+              </Alert>
+            ) : null}
+
+            <form.AppField name="coverImage">
+              {(field) => (
+                <CoverImageField
+                  assetRef={coverImageAssetRef}
+                  onChange={field.handleChange}
+                  organizationId={organizationId}
+                  value={field.state.value}
+                />
               )}
-            </form.Subscribe>
-          </div>
-        </EditorLayout.Main>
+            </form.AppField>
 
-        <EditorLayout.Sidebar>
-          {article === undefined ? null : (
-            <div className="flex items-center justify-end gap-2">
-              {publicSiteUrl === undefined ||
-              article.status === "draft" ? null : (
-                <>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={(triggerProps) => (
+            <form.AppField name="title">
+              {(field) => (
+                <field.TextField
+                  className="rounded-md border-none bg-transparent font-medium tracking-tight md:text-2xl"
+                  hideLabel
+                  label="Title"
+                  maxLength={200}
+                  placeholder="Untitled article"
+                />
+              )}
+            </form.AppField>
+
+            <form.AppField name="content">
+              {(field) => (
+                <PostContentEditor
+                  editorScope={editorScope}
+                  key={formResetKey}
+                  onChange={field.handleChange}
+                  organizationId={organizationId}
+                  showBlockHandle
+                  value={field.state.value}
+                />
+              )}
+            </form.AppField>
+
+            {submitError === null ? null : (
+              <p className="text-destructive text-sm">{submitError}</p>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <form.Subscribe
+                selector={(state) => ({
+                  isSubmitting: state.isSubmitting,
+                  title: state.values.title,
+                })}
+              >
+                {(state) => (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      disabled={stale}
+                      loading={state.isSubmitting}
+                      type="submit"
+                      variant="outline"
+                    >
+                      Save
+                    </Button>
+                    {Match.value(article?.status).pipe(
+                      Match.when("published", () => (
                         <Button
-                          {...triggerProps}
-                          aria-label="Go to public article"
-                          className="rounded-full"
-                          render={(buttonProps) => (
-                            <a
-                              {...buttonProps}
-                              href={`${publicSiteUrl}/s/help/articles/${article.slug}`}
-                              rel="noopener noreferrer"
-                              target="_blank"
-                            >
-                              <HugeiconsIcon icon={LinkSquare02Icon} />
-                            </a>
-                          )}
-                          size="icon-sm"
+                          disabled={state.isSubmitting || stale}
+                          onClick={() =>
+                            void form.handleSubmit({
+                              overrides: { publishedAt: null, status: "draft" },
+                            })
+                          }
                           type="button"
-                          variant="outline"
-                        />
-                      )}
-                    />
-                    <TooltipPopup>Go to public article</TooltipPopup>
-                  </Tooltip>
-
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={(triggerProps) => (
+                          variant="brand"
+                        >
+                          Turn into draft
+                        </Button>
+                      )),
+                      Match.when("archived", () => (
                         <Button
-                          {...triggerProps}
-                          aria-label="Copy article link"
-                          className="rounded-full"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(
-                                `${publicSiteUrl}/s/help/articles/${article.slug}`
-                              );
-                              toastManager.add({
-                                title: "Article link copied to clipboard",
-                                type: "success",
-                              });
-                            } catch {
-                              toastManager.add({
-                                title: "Failed to copy article link",
-                                type: "error",
-                              });
+                          disabled={state.isSubmitting || stale}
+                          onClick={() =>
+                            void form.handleSubmit({
+                              overrides: { publishedAt: null, status: "draft" },
+                            })
+                          }
+                          type="button"
+                          variant="brand"
+                        >
+                          Restore to draft
+                        </Button>
+                      )),
+                      Match.orElse(() =>
+                        stale ? (
+                          <Button disabled type="button" variant="brand">
+                            Publish
+                          </Button>
+                        ) : (
+                          <PublishDialog
+                            defaultPublishedAt={article?.publishedAt ?? null}
+                            defaultSlug={
+                              article?.slug ?? slugify(state.title.trim())
                             }
-                          }}
+                            description="Choose the public URL and publication date for this article."
+                            failureTitle="Failed to publish article"
+                            onPublish={publish}
+                            submitLabel="Publish"
+                            title="Publish article"
+                          />
+                        )
+                      )
+                    )}
+                  </div>
+                )}
+              </form.Subscribe>
+            </div>
+          </EditorLayout.Main>
+
+          <EditorLayout.Sidebar>
+            {article === undefined ? null : (
+              <div className="flex items-center justify-end gap-2">
+                {publicSiteUrl === undefined ||
+                article.status === "draft" ? null : (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={(triggerProps) => (
+                          <Button
+                            {...triggerProps}
+                            aria-label="Go to public article"
+                            className="rounded-full"
+                            render={(buttonProps) => (
+                              <a
+                                {...buttonProps}
+                                href={`${publicSiteUrl}/s/help/articles/${article.slug}`}
+                                rel="noopener noreferrer"
+                                target="_blank"
+                              >
+                                <HugeiconsIcon icon={LinkSquare02Icon} />
+                              </a>
+                            )}
+                            size="icon-sm"
+                            type="button"
+                            variant="outline"
+                          />
+                        )}
+                      />
+                      <TooltipPopup>Go to public article</TooltipPopup>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={(triggerProps) => (
+                          <Button
+                            {...triggerProps}
+                            aria-label="Copy article link"
+                            className="rounded-full"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(
+                                  `${publicSiteUrl}/s/help/articles/${article.slug}`
+                                );
+                                toastManager.add({
+                                  title: "Article link copied to clipboard",
+                                  type: "success",
+                                });
+                              } catch {
+                                toastManager.add({
+                                  title: "Failed to copy article link",
+                                  type: "error",
+                                });
+                              }
+                            }}
+                            size="icon-sm"
+                            type="button"
+                            variant="outline"
+                          />
+                        )}
+                      />
+                      <TooltipPopup>Copy article link</TooltipPopup>
+                    </Tooltip>
+                  </>
+                )}
+                {article.status === "published" ? (
+                  <Menu>
+                    <MenuTrigger
+                      render={
+                        <Button
+                          aria-label="More article actions"
+                          className="rounded-full"
                           size="icon-sm"
                           type="button"
                           variant="outline"
                         />
-                      )}
-                    />
-                    <TooltipPopup>Copy article link</TooltipPopup>
-                  </Tooltip>
-                </>
-              )}
-              {article.status === "published" ? (
-                <Menu>
-                  <MenuTrigger
-                    render={
+                      }
+                    >
+                      <HugeiconsIcon icon={Ellipsis} />
+                    </MenuTrigger>
+                    <MenuPopup align="end">
+                      <MenuItem
+                        disabled={stale}
+                        onClick={() =>
+                          void form.handleSubmit({
+                            overrides: { status: "archived" },
+                          })
+                        }
+                      >
+                        <HugeiconsIcon icon={Archive01Icon} />
+                        Archive article
+                      </MenuItem>
+                    </MenuPopup>
+                  </Menu>
+                ) : null}
+                <Tooltip>
+                  <TooltipTrigger
+                    render={(triggerProps) => (
                       <Button
-                        aria-label="More article actions"
+                        {...triggerProps}
+                        aria-label="Delete article"
                         className="rounded-full"
+                        disabled={stale}
+                        onClick={() => setDeleteOpen(true)}
                         size="icon-sm"
                         type="button"
                         variant="outline"
-                      />
-                    }
-                  >
-                    <HugeiconsIcon icon={Ellipsis} />
-                  </MenuTrigger>
-                  <MenuPopup align="end">
-                    <MenuItem
-                      onClick={() =>
-                        void form.handleSubmit({
-                          overrides: { status: "archived" },
-                        })
-                      }
-                    >
-                      <HugeiconsIcon icon={Archive01Icon} />
-                      Archive article
-                    </MenuItem>
-                  </MenuPopup>
-                </Menu>
-              ) : null}
-              <Tooltip>
-                <TooltipTrigger
-                  render={(triggerProps) => (
-                    <Button
-                      {...triggerProps}
-                      aria-label="Delete article"
-                      className="rounded-full"
-                      onClick={() => void remove()}
-                      size="icon-sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} />
-                    </Button>
-                  )}
-                />
-                <TooltipPopup>Delete article</TooltipPopup>
-              </Tooltip>
-            </div>
-          )}
-
-          <form.AppField name="topicId">
-            {(field) => (
-              <fieldset className="flex flex-col gap-2">
-                <legend className="text-sm font-medium">Section</legend>
-                <div className="flex flex-wrap gap-2">
-                  {topics.map((topic) => (
-                    <EditorChip
-                      active={field.state.value === topic.id}
-                      key={topic.id}
-                      onClick={() => field.handleChange(topic.id)}
-                    >
-                      <HelpCenterTopicIcon
-                        className="size-4"
-                        icon={topic.icon}
-                      />
-                      {topic.name}
-                    </EditorChip>
-                  ))}
-                </div>
-                {topics.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">
-                    Create a section first — every article belongs to one.
-                  </p>
-                ) : null}
-              </fieldset>
+                      >
+                        <HugeiconsIcon icon={Delete02Icon} />
+                      </Button>
+                    )}
+                  />
+                  <TooltipPopup>Delete article</TooltipPopup>
+                </Tooltip>
+              </div>
             )}
-          </form.AppField>
 
-          {article === undefined ? null : (
-            <>
-              <EditorLayout.SidebarSeparator />
-              <ArticleDetails article={article} />
-            </>
-          )}
-        </EditorLayout.Sidebar>
-      </EditorLayout>
-    </form>
+            <form.AppField name="topicId">
+              {(field) => (
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="text-sm font-medium">Section</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {topics.map((topic) => (
+                      <EditorChip
+                        active={field.state.value === topic.id}
+                        key={topic.id}
+                        onClick={() => field.handleChange(topic.id)}
+                      >
+                        <HelpCenterTopicIcon
+                          className="size-4"
+                          icon={topic.icon}
+                        />
+                        {topic.name}
+                      </EditorChip>
+                    ))}
+                  </div>
+                  {topics.length === 0 ? (
+                    <p className="text-muted-foreground text-xs">
+                      Create a section first — every article belongs to one.
+                    </p>
+                  ) : null}
+                </fieldset>
+              )}
+            </form.AppField>
+
+            {article === undefined ? null : (
+              <>
+                <EditorLayout.SidebarSeparator />
+                <ArticleDetails article={article} />
+                <EditorLayout.SidebarSeparator />
+                <HelpCenterArticleFeedback
+                  articleId={article.id}
+                  organizationId={organizationId}
+                />
+              </>
+            )}
+          </EditorLayout.Sidebar>
+        </EditorLayout>
+      </form>
+
+      {/* Outside the form: the confirm button's default type would otherwise
+          submit the article form. */}
+      {article === undefined ? null : (
+        <ConfirmDialog
+          confirmLabel="Delete article"
+          confirmLoading={deletePending}
+          description="Deleting this article is permanent. Its public URL will stop working, and readers will be sent to a not-found page."
+          onConfirm={() => void remove()}
+          onOpenChange={setDeleteOpen}
+          open={deleteOpen}
+          title={`Delete "${article.title || "this article"}"?`}
+        />
+      )}
+    </>
   );
 }
 
