@@ -1,5 +1,4 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { THelpCenterArticleSearchResult } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Badge } from "@feeblo/ui/badge";
@@ -70,7 +69,6 @@ const EMPTY: ReadonlyArray<never> = [];
 export function HelpCenterPage() {
   const site = useSite();
   const organizationId = site.organizationId;
-  const enabled = isFeatureEnabled("HELP_CENTER");
 
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
@@ -91,17 +89,6 @@ export function HelpCenterPage() {
     () => buildHelpCenterSections({ articles, topics }),
     [articles, topics]
   );
-
-  if (!enabled) {
-    return (
-      <Empty className="py-16">
-        <EmptyHeader>
-          <EmptyTitle>Not found</EmptyTitle>
-          <EmptyDescription>This page is not available.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
 
   if (Result.isInitial(topicsResult) || Result.isInitial(articlesResult)) {
     return (

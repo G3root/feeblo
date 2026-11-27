@@ -23,7 +23,6 @@ import { parsePersonAttributes } from "../contact/utils";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { makeHelpCenterSearch } from "../help-center-article/hybrid-search";
 import { HelpCenterArticleRepository } from "../help-center-article/repository";
-import { HelpCenterEnabled } from "../help-center/flag";
 import { Api } from "../http/api";
 import { JwtSecretRepository } from "../jwt-secret/repository";
 import {
@@ -131,11 +130,11 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
 /**
  * Help-center articles that may already answer the question being written.
  *
- * Three answers, one shape. `enabled: false` covers every case where the
- * surface does not exist — the feature is off for the deployment, the
- * workspace is on a site with no help center, or the workspace has none — and
- * the widget needs that as a value rather than a failure so it can stop asking
- * instead of polling an endpoint that will keep returning nothing.
+ * Two answers, one shape. `enabled: false` covers every case where the
+ * surface does not exist — the workspace is on a site with no help center, or
+ * the workspace has none — and the widget needs that as a value rather than a
+ * failure so it can stop asking instead of polling an endpoint that will keep
+ * returning nothing.
  *
  * The visibility check is the predicate `SitePolicy.canViewHelpCenter`
  * applies, answered as "nothing" rather than an error. That difference is
@@ -155,12 +154,7 @@ const findWidgetHelpArticles = Effect.fn("Widget.helpArticles")(function* ({
   organizationId: string;
   query: string;
 }) {
-  const enabled = yield* HelpCenterEnabled;
   const siteRepository = yield* SiteRepository;
-
-  if (!enabled) {
-    return { articles: [], enabled: false };
-  }
 
   const site = yield* siteRepository
     .findByOrganizationId({ organizationId })
@@ -224,21 +218,15 @@ const findWidgetHelpArticles = Effect.fn("Widget.helpArticles")(function* ({
 /**
  * Whether the widget may read this workspace's help center.
  *
- * The same three answers as the deflection — the deployment flag, the
- * workspace's site visibility, and (at the call site) whether anything is
- * published — as one value rather than an error, for the same reason: the
- * endpoint is unauthenticated and names the workspace, so a distinguishable
- * failure would confirm which workspaces exist. `false` hides the widget's Help
- * tab instead of showing a surface that will never fill.
+ * The same two answers as the deflection — the workspace's site visibility,
+ * and (at the call site) whether anything is published — as one value rather
+ * than an error, for the same reason: the endpoint is unauthenticated and
+ * names the workspace, so a distinguishable failure would confirm which
+ * workspaces exist. `false` hides the widget's Help tab instead of showing a
+ * surface that will never fill.
  */
 const widgetHelpCenterAvailable = Effect.fn("Widget.helpCenterAvailable")(
   function* ({ organizationId }: { organizationId: string }) {
-    const flagEnabled = yield* HelpCenterEnabled;
-
-    if (!flagEnabled) {
-      return false;
-    }
-
     const siteRepository = yield* SiteRepository;
 
     const site = yield* siteRepository

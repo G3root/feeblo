@@ -1,9 +1,6 @@
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
-import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { HelpCenterIndex } from "~/features/help-center/components/help-center-index";
-import { HelpCenterUnavailable } from "~/features/help-center/components/help-center-unavailable";
 import { preloadHelpCenter } from "~/lib/preloads";
 
 export const Route = createFileRoute(
@@ -11,11 +8,7 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    // Nothing is rendered while the flag is off, so preloading the section list
-    // would be a request for a page that cannot use it.
-    if (isFeatureEnabled("HELP_CENTER")) {
-      await preloadHelpCenter();
-    }
+    await preloadHelpCenter();
 
     return null;
   },
@@ -23,11 +16,6 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId } = Route.useParams();
-  const enabled = useFeatureFlag("HELP_CENTER");
-
-  if (!enabled) {
-    return <HelpCenterUnavailable />;
-  }
 
   return <HelpCenterIndex organizationId={organizationId} />;
 }

@@ -1,5 +1,4 @@
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { TSite } from "@feeblo/domain/site/schema";
 import { extractSubdomain } from "@feeblo/utils/url";
 import {
@@ -268,7 +267,7 @@ async function collectBoardContent(site: TSite): Promise<BoardContent> {
         boardId: null,
       })
     ),
-    isFeatureEnabled("HELP_CENTER") && site.helpCenterVisibility === "PUBLIC"
+    site.helpCenterVisibility === "PUBLIC"
       ? fetchRpcServer((rpc) =>
           rpc.ListHelpCenterArticlesPublic({
             organizationId: site.organizationId,
@@ -300,10 +299,7 @@ async function collectUrls(
     }
   }
 
-  if (
-    isFeatureEnabled("HELP_CENTER") &&
-    site.helpCenterVisibility === "PUBLIC"
-  ) {
+  if (site.helpCenterVisibility === "PUBLIC") {
     urls.push({ loc: `${origin}/help` });
 
     for (const article of helpArticles) {

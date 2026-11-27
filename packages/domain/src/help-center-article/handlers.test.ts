@@ -20,7 +20,6 @@ import { TestClock } from "effect/testing";
 import { AssetRepository } from "../asset/repository";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
-import { HelpCenterEnabled } from "../help-center/flag";
 import { PostEmbeddingService } from "../post/embedding-service";
 import { S3UploadService } from "../services/s3";
 import { CurrentSession, type Session } from "../session-middleware";
@@ -176,15 +175,12 @@ describe("HelpCenterArticleRpcHandlers", () => {
     SitePolicy.layer
   ).pipe(Layer.provide(Entitlements), Layer.provide(Repositories));
 
-  // The flag is on for these suites: they exercise the feature, and a separate
-  // case below proves the gate refuses when it is off.
   const TestLayer = Layer.mergeAll(
     Repositories,
     S3Test,
     Entitlements,
     Policies,
-    Database.PgliteDatabaseLive,
-    Layer.succeed(HelpCenterEnabled, true)
+    Database.PgliteDatabaseLive
   );
 
   /**
@@ -1263,24 +1259,6 @@ describe("HelpCenterArticleRpcHandlers", () => {
         ]);
         // A search that found something is not a documentation gap.
         expect(analytics.emptyQueries).toStrictEqual([]);
-      })
-    );
-
-    it.effect("refuses every operation while the flag is off", () =>
-      Effect.gen(function* () {
-        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
-        const fixture = yield* makeFixture();
-
-        const error = yield* Effect.flip(
-          handlers
-            .ListHelpCenterArticles({ organizationId: fixture.organizationId })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-              Effect.provideService(HelpCenterEnabled, false)
-            )
-        );
-
-        expect(error._tag).toBe("PolicyDenied");
       })
     );
   });

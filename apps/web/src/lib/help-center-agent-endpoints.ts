@@ -1,4 +1,3 @@
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import type { TSite } from "@feeblo/domain/site/schema";
 import * as Effect from "effect/Effect";
@@ -50,12 +49,6 @@ type ResolvedSite =
  * decides whether the content exists at all.
  */
 async function resolveReadableSite(request: Request): Promise<ResolvedSite> {
-  // The flag is synchronous and off by default, so check it before the site
-  // lookup: a disabled feature should not spend an RPC to answer `404`.
-  if (!isFeatureEnabled("HELP_CENTER")) {
-    return { kind: "not-found" };
-  }
-
   let site: TSite | null;
 
   try {

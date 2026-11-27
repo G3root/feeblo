@@ -1,9 +1,6 @@
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
-import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { HelpCenterArticleEditor } from "~/features/help-center/components/help-center-article-editor";
-import { HelpCenterUnavailable } from "~/features/help-center/components/help-center-unavailable";
 import { preloadHelpCenterEditor } from "~/lib/preloads";
 
 export const Route = createFileRoute(
@@ -11,9 +8,7 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    if (isFeatureEnabled("HELP_CENTER")) {
-      await preloadHelpCenterEditor();
-    }
+    await preloadHelpCenterEditor();
 
     return null;
   },
@@ -21,11 +16,6 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const { organizationId, topicId } = Route.useParams();
-  const enabled = useFeatureFlag("HELP_CENTER");
-
-  if (!enabled) {
-    return <HelpCenterUnavailable />;
-  }
 
   return (
     <HelpCenterArticleEditor

@@ -6,12 +6,10 @@ import {
   SwitchCardTitle,
 } from "@feeblo/ui/switch-card";
 import { toastManager } from "@feeblo/ui/toast";
-import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { hasPermission, usePolicy } from "@feeblo/web-shared/use-policy";
 import { createFileRoute } from "@tanstack/react-router";
 import { useTransition } from "react";
 
-import { HelpCenterUnavailable } from "~/features/help-center/components/help-center-unavailable";
 import { SettingsItem } from "~/features/settings/components/settings-item";
 import { SettingsLayout } from "~/features/settings/components/settings-layout";
 import { useOrganizationId } from "~/hooks/use-organization-id";
@@ -45,7 +43,6 @@ function HelpCenterPrivacySettingsPage() {
   );
 
   const site = useSite();
-  const enabled = useFeatureFlag("HELP_CENTER");
   const [isPending, startTransition] = useTransition();
 
   const handleCheckedChange = (checked: boolean) => {
@@ -76,10 +73,6 @@ function HelpCenterPrivacySettingsPage() {
       }
     });
   };
-
-  if (!enabled) {
-    return <HelpCenterUnavailable />;
-  }
 
   return (
     <SettingsLayout.Root>

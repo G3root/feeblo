@@ -15,7 +15,6 @@ import { ChangelogRepository } from "../changelog/repository";
 import { ClientIp } from "../client-ip";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterArticleRepository } from "../help-center-article/repository";
-import { HelpCenterEnabled } from "../help-center/flag";
 import { withPublicHttpRateLimit } from "../rate-limit";
 import { RateLimitService } from "../rate-limit/service";
 import { InternalServerError } from "../rpc-errors";
@@ -297,16 +296,14 @@ layer(TestLayer)("widget updates", (it) => {
 
 /**
  * The help center's own reads, against the same PGlite schema the portal tests
- * use. `HelpCenterEnabled` is provided as `true` here because the flag is the
- * deployment's answer; the workspace's answer is the site row each case writes.
+ * use. The workspace's answer is the site row each case writes.
  */
 const HelpCenterTestLayer = Layer.mergeAll(
   Database.PgliteDatabaseLive,
   HelpCenterArticleRepository.layer.pipe(
     Layer.provide(Database.PgliteDatabaseLive)
   ),
-  SiteRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive)),
-  Layer.succeed(HelpCenterEnabled, true)
+  SiteRepository.layer.pipe(Layer.provide(Database.PgliteDatabaseLive))
 );
 
 layer(HelpCenterTestLayer)("widget help center", (it) => {

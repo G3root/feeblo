@@ -1,5 +1,4 @@
 import { useAtomValue } from "@effect/atom-react";
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import {
   Empty,
   EmptyDescription,
@@ -7,7 +6,6 @@ import {
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Skeleton } from "@feeblo/ui/skeleton";
-import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { createFileRoute } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useMemo } from "react";
@@ -18,7 +16,6 @@ import {
   type HelpCenterArticleAtomArgs,
 } from "~/features/help-center/atoms";
 import { HelpCenterArticleEditor } from "~/features/help-center/components/help-center-article-editor";
-import { HelpCenterUnavailable } from "~/features/help-center/components/help-center-unavailable";
 import { preloadHelpCenterEditor } from "~/lib/preloads";
 
 export const Route = createFileRoute(
@@ -26,9 +23,7 @@ export const Route = createFileRoute(
 )({
   component: RouteComponent,
   beforeLoad: async () => {
-    if (isFeatureEnabled("HELP_CENTER")) {
-      await preloadHelpCenterEditor();
-    }
+    await preloadHelpCenterEditor();
 
     return null;
   },
@@ -47,7 +42,6 @@ export const Route = createFileRoute(
  */
 function RouteComponent() {
   const { organizationId, articleId } = Route.useParams();
-  const enabled = useFeatureFlag("HELP_CENTER");
 
   const args = useMemo<HelpCenterArticleAtomArgs>(
     () => ({ id: articleId, organizationId }),
@@ -55,10 +49,6 @@ function RouteComponent() {
   );
 
   const articleResult = useAtomValue(helpCenterArticleAtom(args));
-
-  if (!enabled) {
-    return <HelpCenterUnavailable />;
-  }
 
   return Result.builder(articleResult)
     .onInitial(() => (

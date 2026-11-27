@@ -1,4 +1,3 @@
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import {
   Sidebar,
   SidebarContent,
@@ -177,24 +176,17 @@ const settingsItems = [
       },
     ],
   },
-  // A group whose flag is off is not rendered at all, rather than rendered
-  // empty: the sidebar sections are static data, and the filter runs over it
-  // below.
-  ...(isFeatureEnabled("HELP_CENTER")
-    ? [
-        {
-          group: "Help center",
-          subItems: [
-            {
-              label: "Privacy",
-              icon: Shield01Icon,
-              permission: "site.update" as const,
-              to: "/$organizationId/settings/help-center-privacy" as const,
-            },
-          ],
-        },
-      ]
-    : []),
+  {
+    group: "Help center",
+    subItems: [
+      {
+        label: "Privacy",
+        icon: Shield01Icon,
+        permission: "site.update" as const,
+        to: "/$organizationId/settings/help-center-privacy" as const,
+      },
+    ],
+  },
 ];
 
 export function SettingsSidebar({
