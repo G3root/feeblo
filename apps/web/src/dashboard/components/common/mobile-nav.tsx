@@ -1,7 +1,6 @@
 import { Button, buttonVariants } from "@feeblo/ui/button";
 import { useSidebar } from "@feeblo/ui/sidebar";
 import { cn } from "@feeblo/ui/utils";
-import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import {
   BookOpen01Icon,
   LayoutThreeColumnIcon,
@@ -45,11 +44,6 @@ const mobileNavItems = [
 
 export function MobileNav() {
   const organizationId = useOrganizationId();
-  const helpCenterEnabled = useFeatureFlag("HELP_CENTER");
-
-  const items = helpCenterEnabled
-    ? mobileNavItems
-    : mobileNavItems.filter((item) => item.segment !== "help-center");
 
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
@@ -58,7 +52,7 @@ export function MobileNav() {
   const { toggleSidebar } = useSidebar();
   const occupied = useMobileBottomSlotOccupied();
 
-  const activeIndex = items.findIndex((item) =>
+  const activeIndex = mobileNavItems.findIndex((item) =>
     pathname.startsWith(`/${organizationId}/${item.segment}`)
   );
 
@@ -107,7 +101,7 @@ export function MobileNav() {
               "translateX(calc(var(--active-item) * (100% + 0.25rem)))",
           }}
         />
-        {items.map((item) => {
+        {mobileNavItems.map((item) => {
           const isActive = pathname.startsWith(
             `/${organizationId}/${item.segment}`
           );

@@ -4,7 +4,6 @@ import * as Option from "effect/Option";
 
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterArticleRepository } from "../help-center-article/repository";
-import { helpCenterFeatureGate } from "../help-center/flag";
 import * as Policy from "../policy";
 import * as RateLimit from "../rate-limit";
 import {
@@ -101,8 +100,7 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
           Policy.withPublicPolicy(
             sitePolicy.canViewHelpCenter(args.organizationId)
           ),
-          withRemapDbErrors("HelpCenterArticleFeedback", "select"),
-          Policy.withPublicPolicy(helpCenterFeatureGate)
+          withRemapDbErrors("HelpCenterArticleFeedback", "select")
         ),
 
       SetHelpCenterArticleFeedback: (args: THelpCenterArticleFeedbackCast) =>
@@ -127,8 +125,7 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
           Policy.withPublicPolicy(
             sitePolicy.canViewHelpCenter(args.organizationId)
           ),
-          withRemapDbErrors("HelpCenterArticleFeedback", "upsert"),
-          Policy.withPublicPolicy(helpCenterFeatureGate)
+          withRemapDbErrors("HelpCenterArticleFeedback", "upsert")
         ),
 
       ListHelpCenterArticleFeedback: (args: THelpCenterArticleFeedbackList) =>
@@ -144,8 +141,7 @@ export const HelpCenterArticleFeedbackRpcHandlersEffect = Effect.gen(
                 )
               )
             ),
-            withRemapDbErrors("HelpCenterArticleFeedback", "select"),
-            Policy.withPublicPolicy(helpCenterFeatureGate)
+            withRemapDbErrors("HelpCenterArticleFeedback", "select")
           ),
     };
   }

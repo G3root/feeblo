@@ -1,5 +1,4 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Button } from "@feeblo/ui/button";
@@ -83,7 +82,6 @@ export function HelpCenterArticlePage({
 }) {
   const site = useSite();
   const organizationId = site.organizationId;
-  const enabled = isFeatureEnabled("HELP_CENTER");
 
   // Memoized because `Atom.family` keys on identity: a fresh literal per render
   // would be a fresh atom — and a fetch — per render.
@@ -140,17 +138,6 @@ export function HelpCenterArticlePage({
   useViewBeacon({ articleId: activeArticle?.id, organizationId });
 
   useLandingHash(article?.id);
-
-  if (!enabled) {
-    return (
-      <Empty className="py-16">
-        <EmptyHeader>
-          <EmptyTitle>Not found</EmptyTitle>
-          <EmptyDescription>This page is not available.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
 
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-8 sm:px-6 md:grid-cols-[15rem_minmax(0,1fr)] lg:px-8 xl:grid-cols-[15rem_minmax(0,1fr)_13rem] print:grid-cols-1">
@@ -703,7 +690,7 @@ function useViewBeacon({
   );
 
   useEffect(() => {
-    if (!isFeatureEnabled("HELP_CENTER") || articleId === undefined) {
+    if (articleId === undefined) {
       return;
     }
 

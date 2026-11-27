@@ -22,7 +22,6 @@ import {
 } from "@feeblo/ui/sidebar";
 import { SkeletonLoader, SkeletonWrapper } from "@feeblo/ui/skeleton-loader";
 import { boardIconName } from "@feeblo/web-shared/icons/defaults";
-import { FeatureFlagGuard } from "@feeblo/web-shared/use-feature-flag";
 import {
   anyPolicy,
   hasPermission,
@@ -155,25 +154,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 )}
               />
             </SidebarMenuItem>
-            <FeatureFlagGuard flag="HELP_CENTER">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={pathname.startsWith(
-                    `/${organizationId}/help-center`
-                  )}
-                  render={(props) => (
-                    <Link
-                      {...props}
-                      params={{ organizationId }}
-                      to="/$organizationId/help-center"
-                    >
-                      <HugeiconsIcon icon={BookOpen01Icon} />
-                      <span>Help center</span>
-                    </Link>
-                  )}
-                />
-              </SidebarMenuItem>
-            </FeatureFlagGuard>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname.startsWith(`/${organizationId}/help-center`)}
+                render={(props) => (
+                  <Link
+                    {...props}
+                    params={{ organizationId }}
+                    to="/$organizationId/help-center"
+                  >
+                    <HugeiconsIcon icon={BookOpen01Icon} />
+                    <span>Help center</span>
+                  </Link>
+                )}
+              />
+            </SidebarMenuItem>
             <RoadmapNav pathname={pathname} />
             <SidebarMenuItem>
               <SidebarMenuButton

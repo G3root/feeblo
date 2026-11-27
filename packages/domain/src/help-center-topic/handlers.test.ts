@@ -12,7 +12,6 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 import { EntitlementPolicy } from "../entitlement/policies";
-import { HelpCenterEnabled } from "../help-center/flag";
 import { CurrentSession, type Session } from "../session-middleware";
 import { SitePolicy } from "../site/policies";
 import { SiteRepository } from "../site/repository";
@@ -135,14 +134,11 @@ describe("HelpCenterTopicRpcHandlers", () => {
     SitePolicy.layer
   ).pipe(Layer.provide(Entitlements), Layer.provide(Repositories));
 
-  // The flag is on for these suites: they exercise the feature, and a separate
-  // case below proves the gate refuses when it is off.
   const TestLayer = Layer.mergeAll(
     Repositories,
     Entitlements,
     Policies,
-    Database.PgliteDatabaseLive,
-    Layer.succeed(HelpCenterEnabled, true)
+    Database.PgliteDatabaseLive
   );
 
   layer(TestLayer)("handlers", (it) => {
@@ -494,27 +490,6 @@ describe("HelpCenterTopicRpcHandlers", () => {
             "Published",
           ]);
         })
-    );
-
-    it.effect("refuses every operation while the flag is off", () =>
-      Effect.gen(function* () {
-        const handlers = yield* HelpCenterTopicRpcHandlersEffect;
-        const fixture = yield* makeFixture();
-
-        const error = yield* Effect.flip(
-          handlers
-            .ListHelpCenterTopics({ organizationId: fixture.organizationId })
-            .pipe(
-              Effect.provideService(CurrentSession, makeSession(fixture)),
-              // The suite's layer turns the flag on; this asks the same
-              // operation with it off, which is what a deployment that has not
-              // launched the feature answers.
-              Effect.provideService(HelpCenterEnabled, false)
-            )
-        );
-
-        expect(error._tag).toBe("PolicyDenied");
-      })
     );
   });
 });

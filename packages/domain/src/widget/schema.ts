@@ -198,10 +198,10 @@ export type TWidgetHelpCenterArticle = S.Schema.Type<
 /**
  * The widget's help center read.
  *
- * `enabled` answers the same three questions the deflection's does — the
- * deployment flag, the workspace's portal visibility, and whether anything is
- * published — so a widget configured with the Help module can hide its tab
- * instead of showing an empty surface it will never fill.
+ * `enabled` answers the same two questions the deflection's does — the
+ * workspace's portal visibility, and whether anything is published — so a
+ * widget configured with the Help module can hide its tab instead of showing
+ * an empty surface it will never fill.
  */
 export const WidgetHelpCenter = S.Struct({
   articles: S.Array(WidgetHelpCenterArticle),

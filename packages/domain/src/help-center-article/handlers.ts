@@ -14,7 +14,6 @@ import {
 } from "../asset/service";
 import { EntitlementPolicy } from "../entitlement/policies";
 import { HelpCenterTopicRepository } from "../help-center-topic/repository";
-import { helpCenterFeatureGate } from "../help-center/flag";
 import * as Policy from "../policy";
 import { PostEmbeddingService } from "../post/embedding-service";
 import * as RateLimit from "../rate-limit";
@@ -152,8 +151,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         .findMany(args)
         .pipe(
           Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
-          withRemapDbErrors("HelpCenterArticle", "select"),
-          Policy.withPublicPolicy(helpCenterFeatureGate)
+          withRemapDbErrors("HelpCenterArticle", "select")
         ),
 
     ListHelpCenterArticlesPublic: (args: THelpCenterArticleListPublic) =>
@@ -165,16 +163,14 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPublicPolicy(
           sitePolicy.canViewHelpCenter(args.organizationId)
         ),
-        withRemapDbErrors("HelpCenterArticle", "select"),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        withRemapDbErrors("HelpCenterArticle", "select")
       ),
 
     GetHelpCenterArticle: (args: THelpCenterArticleGet) =>
       repository.findById(args).pipe(
         Effect.filterOrFail((found) => found !== undefined, notFound),
         Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
-        withRemapDbErrors("HelpCenterArticle", "select"),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        withRemapDbErrors("HelpCenterArticle", "select")
       ),
 
     GetHelpCenterArticlePublic: (args: THelpCenterArticleGetPublic) =>
@@ -187,8 +183,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPublicPolicy(
           sitePolicy.canViewHelpCenter(args.organizationId)
         ),
-        withRemapDbErrors("HelpCenterArticle", "select"),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        withRemapDbErrors("HelpCenterArticle", "select")
       ),
 
     CreateHelpCenterArticle: (args: THelpCenterArticleCreate) =>
@@ -274,8 +269,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
             new HelpCenterArticleSlugTakenError({
               slug: args.slug ?? args.title,
             }),
-        }),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        })
       ),
 
     UpdateHelpCenterArticle: (args: THelpCenterArticleUpdate) =>
@@ -386,8 +380,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           entity: "HelpCenterArticle",
           onUniqueViolation: () =>
             new HelpCenterArticleSlugTakenError({ slug: args.slug }),
-        }),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        })
       ),
 
     DeleteHelpCenterArticle: (args: THelpCenterArticleDelete) =>
@@ -397,8 +390,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
           action: "delete",
           entity: "HelpCenterArticle",
           onUniqueViolation: () => new FailedToDeleteHelpCenterArticleError(),
-        }),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        })
       ),
 
     /**
@@ -429,8 +421,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         // Last, as in every public read: the policy's own site lookup can fail
         // with a driver error, so the remap has to run after it to leave one
         // failure vocabulary on the channel.
-        withRemapDbErrors("HelpCenterArticleView", "upsert"),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        withRemapDbErrors("HelpCenterArticleView", "upsert")
       ),
 
     /**
@@ -448,8 +439,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         query: args.query,
       }).pipe(
         Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
-        withRemapDbErrors("HelpCenterArticle", "select"),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        withRemapDbErrors("HelpCenterArticle", "select")
       ),
 
     /**
@@ -505,8 +495,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         Policy.withPublicPolicy(
           sitePolicy.canViewHelpCenter(args.organizationId)
         ),
-        withRemapDbErrors("HelpCenterArticle", "select"),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        withRemapDbErrors("HelpCenterArticle", "select")
       ),
 
     /**
@@ -538,8 +527,7 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
         return { ...result, range: args.range, since };
       }).pipe(
         Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
-        withRemapDbErrors("HelpCenterArticleAnalytics", "select"),
-        Policy.withPublicPolicy(helpCenterFeatureGate)
+        withRemapDbErrors("HelpCenterArticleAnalytics", "select")
       ),
   };
 });

@@ -21,7 +21,6 @@ import {
 import { Skeleton } from "@feeblo/ui/skeleton";
 import { toggleVariants } from "@feeblo/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@feeblo/ui/toggle-group";
-import { useFeatureFlag } from "@feeblo/web-shared/use-feature-flag";
 import { ChartLineData01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
@@ -132,8 +131,6 @@ export function InsightsPage({
   readonly range: TInsightsRange;
   readonly tab: InsightsTab;
 }) {
-  const helpCenterEnabled = useFeatureFlag("HELP_CENTER");
-
   return (
     <div className="mx-auto w-full">
       <InsightsToolbar
@@ -143,7 +140,7 @@ export function InsightsPage({
         tab={tab}
       />
       <div className="space-y-3 p-3">
-        {tab === "feedback" || !helpCenterEnabled ? (
+        {tab === "feedback" ? (
           <FeedbackInsights
             organizationId={organizationId}
             range={range}
@@ -181,8 +178,6 @@ function InsightsToolbar({
   readonly range: TInsightsRange;
   readonly tab: InsightsTab;
 }) {
-  const helpCenterEnabled = useFeatureFlag("HELP_CENTER");
-
   return (
     <div className="flex flex-wrap items-center gap-3 p-3">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -196,18 +191,16 @@ function InsightsToolbar({
         >
           Feedback
         </Link>
-        {helpCenterEnabled ? (
-          <Link
-            activeOptions={{ exact: true }}
-            activeProps={{ "data-pressed": "true" }}
-            className={toggleVariants({ size: "sm", variant: "outline" })}
-            params={{ organizationId }}
-            search={{ range }}
-            to="/$organizationId/insights/help-center"
-          >
-            Help center
-          </Link>
-        ) : null}
+        <Link
+          activeOptions={{ exact: true }}
+          activeProps={{ "data-pressed": "true" }}
+          className={toggleVariants({ size: "sm", variant: "outline" })}
+          params={{ organizationId }}
+          search={{ range }}
+          to="/$organizationId/insights/help-center"
+        >
+          Help center
+        </Link>
       </div>
 
       <InsightsRangeToggle

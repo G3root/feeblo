@@ -1,5 +1,4 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { THelpCenterArticleSearchResult } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Badge } from "@feeblo/ui/badge";
@@ -70,7 +69,6 @@ const EMPTY: ReadonlyArray<never> = [];
 export function HelpCenterPage() {
   const site = useSite();
   const organizationId = site.organizationId;
-  const enabled = isFeatureEnabled("HELP_CENTER");
 
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
@@ -92,7 +90,10 @@ export function HelpCenterPage() {
     [articles, topics]
   );
 
-  if (!enabled) {
+  // The server rejects a hidden help center before this page loads. Keep the
+  // same answer here so a stale provider or a client transition cannot render
+  // an empty help center that the workspace does not serve.
+  if (site.helpCenterVisibility !== "PUBLIC") {
     return (
       <Empty className="py-16">
         <EmptyHeader>
