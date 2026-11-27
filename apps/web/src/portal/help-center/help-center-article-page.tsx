@@ -3,7 +3,6 @@ import { isFeatureEnabled } from "@feeblo/domain/feature-flags";
 import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Button } from "@feeblo/ui/button";
-import { CopyButton } from "@feeblo/ui/copy-button";
 import {
   Empty,
   EmptyDescription,
@@ -43,6 +42,10 @@ import {
   type HelpCenterNavSection,
   readingMinutes,
 } from "./content";
+import {
+  HelpCenterArticleActions,
+  HelpCenterArticleActionsDisclosure,
+} from "./help-center-article-actions";
 import { HelpCenterBreadcrumbs, HelpCenterNav } from "./help-center-nav";
 import { HelpCenterRailSearch } from "./help-center-rail-search";
 import {
@@ -150,8 +153,8 @@ export function HelpCenterArticlePage({
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-8 sm:px-6 md:grid-cols-[15rem_minmax(0,1fr)] lg:px-8 xl:grid-cols-[15rem_minmax(0,1fr)_13rem]">
-      <aside className="hidden md:block">
+    <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-8 sm:px-6 md:grid-cols-[15rem_minmax(0,1fr)] lg:px-8 xl:grid-cols-[15rem_minmax(0,1fr)_13rem] print:grid-cols-1">
+      <aside className="hidden md:block print:hidden">
         <div className="sticky top-6 flex max-h-[calc(100dvh-9rem)] flex-col gap-6 overflow-y-auto pb-6">
           <HelpCenterRailSearch organizationId={organizationId} />
           <HelpCenterNav
@@ -189,9 +192,15 @@ export function HelpCenterArticlePage({
           .exhaustive()}
       </article>
 
-      <aside className="hidden xl:block">
+      <aside className="hidden xl:block print:hidden">
         <div className="sticky top-6 flex flex-col gap-8">
           {headings.length === 0 ? null : <HelpCenterToc headings={headings} />}
+          {article === undefined ? null : (
+            <HelpCenterArticleActions
+              article={article}
+              className="border-border/70 border-t pt-4"
+            />
+          )}
           <StillStuck />
         </div>
       </aside>
@@ -239,23 +248,23 @@ function ArticleBody({
       <ArticleHeader article={article} section={section} />
 
       {/* The outline rail appears at `xl`; below that the same headings fold
-          into a disclosure, so no screen is left without a way to jump. */}
-      <div className="mt-5 xl:hidden">
-        <HelpCenterOutlineDisclosure headings={headings} />
+          into a disclosure, so no screen is left without a way to jump. The
+          actions ride in the same disclosure, the way Blume puts them under
+          its table of contents; an article with no outline gets its own. */}
+      <div className="mt-5 xl:hidden print:hidden">
+        <HelpCenterOutlineDisclosure
+          footer={<HelpCenterArticleActions article={article} />}
+          headings={headings}
+        />
+        {headings.length < 2 ? (
+          <HelpCenterArticleActionsDisclosure
+            article={article}
+            className="mt-3"
+          />
+        ) : null}
       </div>
 
-      <div className="mt-5 flex justify-end">
-        <CopyButton
-          onCopy={() => article.content}
-          successMessage="Markdown copied"
-          type="button"
-          variant="ghost"
-        >
-          Copy as Markdown
-        </CopyButton>
-      </div>
-
-      <div className="border-border/70 mt-1 border-t pt-6">
+      <div className="border-border/70 mt-5 border-t pt-6">
         <MarkdownContent content={article.content} headingAnchors />
       </div>
 
@@ -280,7 +289,7 @@ function ArticleBody({
       {previous === undefined && next === undefined ? null : (
         <nav
           aria-label="More in this section"
-          className="mt-10 grid gap-x-10 gap-y-4 sm:grid-cols-2"
+          className="mt-10 grid gap-x-10 gap-y-4 sm:grid-cols-2 print:hidden"
         >
           {previous === undefined ? null : (
             <SiblingLink article={previous} direction="previous" />
@@ -291,7 +300,7 @@ function ArticleBody({
         </nav>
       )}
 
-      <div className="mt-10 xl:hidden">
+      <div className="mt-10 xl:hidden print:hidden">
         <StillStuck />
       </div>
     </>
@@ -498,7 +507,7 @@ function VerdictSection({
   const total = vote.counts.helpful + vote.counts.notHelpful;
 
   return (
-    <section className="border-border/70 mt-10 border-t pt-6">
+    <section className="border-border/70 mt-10 border-t pt-6 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium">Was this helpful?</p>
         <div className="flex items-center gap-2">

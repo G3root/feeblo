@@ -2,7 +2,7 @@ import { cn } from "@feeblo/ui/utils";
 import type { MarkdownHeading } from "@feeblo/utils/markdown";
 import { ChevronDownIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 /**
  * How far from the top of the viewport a heading counts as the one being read.
@@ -188,9 +188,11 @@ export function HelpCenterToc({
  */
 export function HelpCenterOutlineDisclosure({
   headings,
+  footer,
   className,
 }: {
   readonly headings: ReadonlyArray<MarkdownHeading>;
+  readonly footer?: ReactNode;
   readonly className?: string;
 }) {
   if (headings.length < 2) {
@@ -233,6 +235,9 @@ export function HelpCenterOutlineDisclosure({
           </li>
         ))}
       </ul>
+      {footer === undefined ? null : (
+        <div className="border-border/70 border-t p-2">{footer}</div>
+      )}
     </details>
   );
 }

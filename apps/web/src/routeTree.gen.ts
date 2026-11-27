@@ -32,6 +32,7 @@ import { Route as OauthSelectWorkspaceRouteImport } from "./routes/oauth/select-
 import { Route as SIndexRouteImport } from "./routes/s/index"
 import { Route as SSplatRouteImport } from "./routes/s/$"
 import { Route as SLlmsDottxtRouteImport } from "./routes/s/llms[.]txt"
+import { Route as SMcpRouteImport } from "./routes/s/mcp"
 import { Route as SRobotsDottxtRouteImport } from "./routes/s/robots[.]txt"
 import { Route as SSitemapDotxmlRouteImport } from "./routes/s/sitemap[.]xml"
 import { Route as TelemetrySignalRouteImport } from "./routes/telemetry/$signal"
@@ -87,6 +88,7 @@ import { Route as DashboardOrganizationIdSettingsDataIndexRouteImport } from "./
 import { Route as DashboardOrganizationIdSettingsIntegrationsIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/integrations/index"
 import { Route as DashboardOrganizationIdSettingsWebhooksIndexRouteImport } from "./routes/_dashboard/$organizationId/settings/webhooks/index"
 import { Route as DashboardOrganizationIdSettingsWebhooksConnectionIdRouteImport } from "./routes/_dashboard/$organizationId/settings/webhooks/$connectionId"
+import { Route as SHelpArticlesRawChar123articleSlugChar125DotmdRouteImport } from "./routes/s/help/articles/raw/{$articleSlug}[.]md"
 import { Route as DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/index"
 import { Route as DashboardOrganizationIdDashboardLayoutBoardBoardSlugActiveRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/active"
 import { Route as DashboardOrganizationIdDashboardLayoutBoardBoardSlugBacklogRouteImport } from "./routes/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/backlog"
@@ -214,6 +216,11 @@ const SSplatRoute = SSplatRouteImport.update({
 const SLlmsDottxtRoute = SLlmsDottxtRouteImport.update({
   id: "/llms.txt",
   path: "/llms.txt",
+  getParentRoute: () => SRouteRoute,
+} as any)
+const SMcpRoute = SMcpRouteImport.update({
+  id: "/mcp",
+  path: "/mcp",
   getParentRoute: () => SRouteRoute,
 } as any)
 const SRobotsDottxtRoute = SRobotsDottxtRouteImport.update({
@@ -533,6 +540,12 @@ const DashboardOrganizationIdSettingsWebhooksConnectionIdRoute =
     path: "/webhooks/$connectionId",
     getParentRoute: () => DashboardOrganizationIdSettingsRoute,
   } as any)
+const SHelpArticlesRawChar123articleSlugChar125DotmdRoute =
+  SHelpArticlesRawChar123articleSlugChar125DotmdRouteImport.update({
+    id: "/help/articles/raw/{$articleSlug}.md",
+    path: "/help/articles/raw/{$articleSlug}.md",
+    getParentRoute: () => SRouteRoute,
+  } as any)
 const DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRoute =
   DashboardOrganizationIdDashboardLayoutBoardBoardSlugIndexRouteImport.update({
     id: "/board/$boardSlug/",
@@ -652,6 +665,7 @@ export interface FileRoutesByFullPath {
   "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
+  "/s/mcp": typeof SMcpRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/telemetry/$signal": typeof TelemetrySignalRoute
@@ -696,6 +710,7 @@ export interface FileRoutesByFullPath {
   "/$organizationId/my-feedback/assigned": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute
   "/$organizationId/roadmap/$slug": typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute
   "/$organizationId/settings/webhooks/$connectionId": typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
+  "/s/help/articles/raw/{$articleSlug}.md": typeof SHelpArticlesRawChar123articleSlugChar125DotmdRoute
   "/$organizationId/changelog/": typeof DashboardOrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/company/": typeof DashboardOrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/contact/": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
@@ -743,6 +758,7 @@ export interface FileRoutesByTo {
   "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
+  "/s/mcp": typeof SMcpRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/telemetry/$signal": typeof TelemetrySignalRoute
@@ -785,6 +801,7 @@ export interface FileRoutesByTo {
   "/$organizationId/my-feedback/assigned": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute
   "/$organizationId/roadmap/$slug": typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute
   "/$organizationId/settings/webhooks/$connectionId": typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
+  "/s/help/articles/raw/{$articleSlug}.md": typeof SHelpArticlesRawChar123articleSlugChar125DotmdRoute
   "/$organizationId/changelog": typeof DashboardOrganizationIdDashboardLayoutChangelogIndexRoute
   "/$organizationId/company": typeof DashboardOrganizationIdDashboardLayoutCompanyIndexRoute
   "/$organizationId/contact": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
@@ -835,6 +852,7 @@ export interface FileRoutesById {
   "/oauth/select-workspace": typeof OauthSelectWorkspaceRoute
   "/s/$": typeof SSplatRoute
   "/s/llms.txt": typeof SLlmsDottxtRoute
+  "/s/mcp": typeof SMcpRoute
   "/s/robots.txt": typeof SRobotsDottxtRoute
   "/s/sitemap.xml": typeof SSitemapDotxmlRoute
   "/telemetry/$signal": typeof TelemetrySignalRoute
@@ -880,6 +898,7 @@ export interface FileRoutesById {
   "/_dashboard/$organizationId/_dashboard-layout/my-feedback/assigned": typeof DashboardOrganizationIdDashboardLayoutMyFeedbackAssignedRoute
   "/_dashboard/$organizationId/_dashboard-layout/roadmap/$slug": typeof DashboardOrganizationIdDashboardLayoutRoadmapSlugRoute
   "/_dashboard/$organizationId/settings/webhooks/$connectionId": typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRoute
+  "/s/help/articles/raw/{$articleSlug}.md": typeof SHelpArticlesRawChar123articleSlugChar125DotmdRoute
   "/_dashboard/$organizationId/_dashboard-layout/changelog/": typeof DashboardOrganizationIdDashboardLayoutChangelogIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/company/": typeof DashboardOrganizationIdDashboardLayoutCompanyIndexRoute
   "/_dashboard/$organizationId/_dashboard-layout/contact/": typeof DashboardOrganizationIdDashboardLayoutContactIndexRoute
@@ -930,6 +949,7 @@ export interface FileRouteTypes {
     | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
+    | "/s/mcp"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/telemetry/$signal"
@@ -974,6 +994,7 @@ export interface FileRouteTypes {
     | "/$organizationId/my-feedback/assigned"
     | "/$organizationId/roadmap/$slug"
     | "/$organizationId/settings/webhooks/$connectionId"
+    | "/s/help/articles/raw/{$articleSlug}.md"
     | "/$organizationId/changelog/"
     | "/$organizationId/company/"
     | "/$organizationId/contact/"
@@ -1021,6 +1042,7 @@ export interface FileRouteTypes {
     | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
+    | "/s/mcp"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/telemetry/$signal"
@@ -1063,6 +1085,7 @@ export interface FileRouteTypes {
     | "/$organizationId/my-feedback/assigned"
     | "/$organizationId/roadmap/$slug"
     | "/$organizationId/settings/webhooks/$connectionId"
+    | "/s/help/articles/raw/{$articleSlug}.md"
     | "/$organizationId/changelog"
     | "/$organizationId/company"
     | "/$organizationId/contact"
@@ -1112,6 +1135,7 @@ export interface FileRouteTypes {
     | "/oauth/select-workspace"
     | "/s/$"
     | "/s/llms.txt"
+    | "/s/mcp"
     | "/s/robots.txt"
     | "/s/sitemap.xml"
     | "/telemetry/$signal"
@@ -1157,6 +1181,7 @@ export interface FileRouteTypes {
     | "/_dashboard/$organizationId/_dashboard-layout/my-feedback/assigned"
     | "/_dashboard/$organizationId/_dashboard-layout/roadmap/$slug"
     | "/_dashboard/$organizationId/settings/webhooks/$connectionId"
+    | "/s/help/articles/raw/{$articleSlug}.md"
     | "/_dashboard/$organizationId/_dashboard-layout/changelog/"
     | "/_dashboard/$organizationId/_dashboard-layout/company/"
     | "/_dashboard/$organizationId/_dashboard-layout/contact/"
@@ -1360,6 +1385,13 @@ declare module "@tanstack/react-router" {
       path: "/llms.txt"
       fullPath: "/s/llms.txt"
       preLoaderRoute: typeof SLlmsDottxtRouteImport
+      parentRoute: typeof SRouteRoute
+    }
+    "/s/mcp": {
+      id: "/s/mcp"
+      path: "/mcp"
+      fullPath: "/s/mcp"
+      preLoaderRoute: typeof SMcpRouteImport
       parentRoute: typeof SRouteRoute
     }
     "/s/robots.txt": {
@@ -1747,6 +1779,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DashboardOrganizationIdSettingsWebhooksConnectionIdRouteImport
       parentRoute: typeof DashboardOrganizationIdSettingsRoute
     }
+    "/s/help/articles/raw/{$articleSlug}.md": {
+      id: "/s/help/articles/raw/{$articleSlug}.md"
+      path: "/help/articles/raw/{$articleSlug}.md"
+      fullPath: "/s/help/articles/raw/{$articleSlug}.md"
+      preLoaderRoute: typeof SHelpArticlesRawChar123articleSlugChar125DotmdRouteImport
+      parentRoute: typeof SRouteRoute
+    }
     "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/": {
       id: "/_dashboard/$organizationId/_dashboard-layout/board/$boardSlug/"
       path: "/board/$boardSlug"
@@ -1851,6 +1890,7 @@ declare module "@tanstack/react-router" {
 interface SRouteRouteChildren {
   SSplatRoute: typeof SSplatRoute
   SLlmsDottxtRoute: typeof SLlmsDottxtRoute
+  SMcpRoute: typeof SMcpRoute
   SRobotsDottxtRoute: typeof SRobotsDottxtRoute
   SSitemapDotxmlRoute: typeof SSitemapDotxmlRoute
   SIndexRoute: typeof SIndexRoute
@@ -1863,11 +1903,13 @@ interface SRouteRouteChildren {
   SHelpIndexRoute: typeof SHelpIndexRoute
   SRoadmapIndexRoute: typeof SRoadmapIndexRoute
   SHelpArticlesArticleSlugRoute: typeof SHelpArticlesArticleSlugRoute
+  SHelpArticlesRawChar123articleSlugChar125DotmdRoute: typeof SHelpArticlesRawChar123articleSlugChar125DotmdRoute
 }
 
 const SRouteRouteChildren: SRouteRouteChildren = {
   SSplatRoute: SSplatRoute,
   SLlmsDottxtRoute: SLlmsDottxtRoute,
+  SMcpRoute: SMcpRoute,
   SRobotsDottxtRoute: SRobotsDottxtRoute,
   SSitemapDotxmlRoute: SSitemapDotxmlRoute,
   SIndexRoute: SIndexRoute,
@@ -1880,6 +1922,8 @@ const SRouteRouteChildren: SRouteRouteChildren = {
   SHelpIndexRoute: SHelpIndexRoute,
   SRoadmapIndexRoute: SRoadmapIndexRoute,
   SHelpArticlesArticleSlugRoute: SHelpArticlesArticleSlugRoute,
+  SHelpArticlesRawChar123articleSlugChar125DotmdRoute:
+    SHelpArticlesRawChar123articleSlugChar125DotmdRoute,
 }
 
 const SRouteRouteWithChildren =

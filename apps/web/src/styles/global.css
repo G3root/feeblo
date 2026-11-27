@@ -155,3 +155,30 @@ html[data-auth="exchanging"] [data-auth-slot="account"] {
     box-shadow: 0 1px 2px #0000000d;
   }
 }
+
+/*
+ * Printing a board page.
+ *
+ * The board shell is a viewport-fixed column with its own scroll container
+ * (`h-dvh` + `overflow-hidden`/`overflow-y-auto`), so a browser printing the
+ * document would otherwise clip the article to the visible screen. These rules
+ * let the document grow to its content and drop the chrome; the article page
+ * marks its own rails and interactive blocks with `print:hidden`. An action
+ * menu is an open portal outside the shell when `window.print()` runs from one
+ * of its items, so the menu positioner is hidden too.
+ */
+@media print {
+  [data-board-shell] {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  [data-board-scroll] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  [data-board-chrome],
+  [data-slot="menu-positioner"] {
+    display: none !important;
+  }
+}
