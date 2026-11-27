@@ -21,6 +21,12 @@ const changelogDetailPathPattern = /^\/changelog\/([^/]+)$/;
 const helpArticlePathPattern = /^\/help\/articles\/([^/]+)$/;
 
 /**
+ * `/help`, the help center index, with or without the trailing slash and with
+ * the internal `/s` prefix the board router also accepts.
+ */
+const helpCenterIndexPathPattern = /^(?:\/s)?\/help\/?$/;
+
+/**
  * The public board's server-resolved page metadata.
  *
  * The board itself is a client-rendered SPA (its own TanStack Router), but
@@ -80,13 +86,24 @@ type DetailContent =
  * or hidden entity is a hard 404, and any other RPC failure means the
  * content backend is unavailable.
  */
-async function resolvePageContent(
+export async function resolvePageContent(
   publicPath: string,
   site: TSite
 ): Promise<DetailContent> {
   const postMatch = postDetailPathPattern.exec(publicPath);
   const changelogMatch = changelogDetailPathPattern.exec(publicPath);
   const helpArticleMatch = helpArticlePathPattern.exec(publicPath);
+
+  // The help center index has no detail read to fail, so it would otherwise
+  // fall through to the generic success below and render an empty page for a
+  // workspace that hides its documentation. Reject it here, before a hidden
+  // site can return a 200 for a page it does not serve.
+  if (
+    helpCenterIndexPathPattern.test(publicPath) &&
+    site.helpCenterVisibility !== "PUBLIC"
+  ) {
+    return { kind: "not-found" };
+  }
 
   if (!postMatch && !changelogMatch && !helpArticleMatch) {
     return { kind: "found", post: null, changelog: null, helpArticle: null };

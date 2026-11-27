@@ -90,6 +90,20 @@ export function HelpCenterPage() {
     [articles, topics]
   );
 
+  // The server rejects a hidden help center before this page loads. Keep the
+  // same answer here so a stale provider or a client transition cannot render
+  // an empty help center that the workspace does not serve.
+  if (site.helpCenterVisibility !== "PUBLIC") {
+    return (
+      <Empty className="py-16">
+        <EmptyHeader>
+          <EmptyTitle>Not found</EmptyTitle>
+          <EmptyDescription>This page is not available.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
   if (Result.isInitial(topicsResult) || Result.isInitial(articlesResult)) {
     return (
       <div className="mx-auto w-full max-w-3xl space-y-4 py-8">
