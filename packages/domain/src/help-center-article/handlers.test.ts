@@ -1349,6 +1349,135 @@ describe("HelpCenterArticleRpcHandlers", () => {
       })
     );
 
+    it.effect("windows the dashboard list without repeating a row", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+
+        for (const title of ["First", "Second", "Third"]) {
+          yield* create(fixture, yield* HelpCenterArticleId.generate, title);
+        }
+
+        const read = (offset: number) =>
+          handlers
+            .ListHelpCenterArticles({
+              limit: 2,
+              offset,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+        const first = yield* read(0);
+        const second = yield* read(2);
+
+        expect(first).toHaveLength(2);
+        expect(second).toHaveLength(1);
+
+        // The order ends in the article id, so the two pages cannot overlap:
+        // every created article appears exactly once across them.
+        const ids = [...first, ...second].map((article) => article.id);
+
+        expect(new Set(ids).size).toBe(3);
+      })
+    );
+
+    it.effect("orders a list by the sort it was asked for", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const now = yield* DateTime.nowAsDate;
+
+        const earlier = DateTime.toDateUtc(
+          DateTime.makeUnsafe(now.getTime() - 60_000)
+        );
+
+        const pinnedId = yield* HelpCenterArticleId.generate;
+        const newerId = yield* HelpCenterArticleId.generate;
+
+        yield* db.insert(schema.helpCenterArticleTable).values([
+          {
+            id: pinnedId,
+            organizationId: fixture.organizationId,
+            topicId: fixture.topicId,
+            slug: "pinned",
+            title: "Pinned",
+            content: "Body",
+            excerpt: "Body",
+            status: "published",
+            publishedAt: earlier,
+            position: 0,
+            createdAt: earlier,
+            updatedAt: earlier,
+          },
+          {
+            id: newerId,
+            organizationId: fixture.organizationId,
+            topicId: fixture.topicId,
+            slug: "newer",
+            title: "Newer",
+            content: "Body",
+            excerpt: "Body",
+            status: "published",
+            publishedAt: now,
+            position: null,
+            createdAt: earlier,
+            updatedAt: now,
+          },
+        ]);
+
+        const reading = yield* handlers
+          .ListHelpCenterArticles({
+            organizationId: fixture.organizationId,
+            sort: "reading",
+          })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        const updated = yield* handlers
+          .ListHelpCenterArticles({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, session));
+
+        // The dashboard's default is "what an editor touched last", not the
+        // public reading order, so the two disagree here on purpose.
+        expect(reading.map((article) => article.slug)).toStrictEqual([
+          "pinned",
+          "newer",
+        ]);
+        expect(updated.map((article) => article.slug)).toStrictEqual([
+          "newer",
+          "pinned",
+        ]);
+      })
+    );
+
+    it.effect("answers whether the help center has anything to read", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+
+        const empty = yield* handlers.GetHelpCenterAvailabilityPublic({
+          organizationId: fixture.organizationId,
+        });
+
+        expect(empty.hasArticles).toBe(false);
+
+        yield* create(
+          fixture,
+          yield* HelpCenterArticleId.generate,
+          "Readable",
+          "readable"
+        );
+
+        const readable = yield* handlers.GetHelpCenterAvailabilityPublic({
+          organizationId: fixture.organizationId,
+        });
+
+        expect(readable.hasArticles).toBe(true);
+      })
+    );
+
     it.effect("counts a view once per beacon id", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleRpcHandlersEffect;

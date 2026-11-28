@@ -57,6 +57,7 @@ import {
   type THelpCenterArticleSearchPublic,
   type THelpCenterArticleUpdate,
   type THelpCenterArticleViewRecord,
+  type THelpCenterAvailabilityGetPublic,
 } from "./schema";
 import { normalizeArticleWrite } from "./write";
 
@@ -158,6 +159,28 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
       repository.findManyPublic(args).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "ListHelpCenterArticlesPublic",
+          level: "read",
+        }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewHelpCenter(args.organizationId)
+        ),
+        withRemapDbErrors("HelpCenterArticle", "select")
+      ),
+
+    /**
+     * One existence read behind the same gate as the list.
+     *
+     * The board's navbar hides the Help tab when nothing is readable, which is
+     * the widget's own rule (`ListHelpCenterArticlesPublic`'s `enabled`). This
+     * answers with the repository's check rather than filtering a list on the
+     * client: a workspace with one archived tombstone is not empty, and that is
+     * a decision about what "readable" means that only the repository makes.
+     */
+    GetHelpCenterAvailabilityPublic: (args: THelpCenterAvailabilityGetPublic) =>
+      repository.hasReadableByOrganizationId(args).pipe(
+        Effect.map((hasArticles) => ({ hasArticles })),
+        RateLimit.withPublicRpcRateLimit({
+          name: "GetHelpCenterAvailabilityPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(

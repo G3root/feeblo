@@ -11,8 +11,23 @@ import { useSite } from "../../providers/site-provider";
 import { LocaleSwitcher } from "./locale-switcher";
 import { UserMenu } from "./user-menu";
 
-export function Navbar() {
+export function Navbar({
+  hasHelpCenterArticles,
+}: {
+  /**
+   * Whether the help center has a page to open.
+   *
+   * The site's visibility switch alone is not enough: a public help center the
+   * workspace has not written anything into would get a tab that opens "No
+   * documentation yet". The embedded widget already hides its Help tab on the
+   * same condition, so the two surfaces agree about what exists.
+   */
+  hasHelpCenterArticles: boolean;
+}) {
   const site = useSite();
+
+  const showHelpTab =
+    site.helpCenterVisibility === "PUBLIC" && hasHelpCenterArticles;
 
   return (
     <header
@@ -46,7 +61,7 @@ export function Navbar() {
                   label={m.strong_loved_flamingo()}
                 />
               ) : null}
-              {site.helpCenterVisibility === "PUBLIC" ? (
+              {showHelpTab ? (
                 <NavTab href={boardPaths.help} label={m.arable_plane_felix()} />
               ) : null}
             </nav>
@@ -71,7 +86,7 @@ export function Navbar() {
               label={m.strong_loved_flamingo()}
             />
           ) : null}
-          {site.helpCenterVisibility === "PUBLIC" ? (
+          {showHelpTab ? (
             <NavTab href={boardPaths.help} label={m.arable_plane_felix()} />
           ) : null}
         </nav>

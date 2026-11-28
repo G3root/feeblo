@@ -31,11 +31,17 @@ import {
   Plus,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { and, eq, useLiveQuery } from "@tanstack/react-db";
+import {
+  and,
+  eq,
+  useLiveInfiniteQuery,
+  useLiveQuery,
+} from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { m } from "@/paraglide/messages.js";
+import { HELP_CENTER_SECTION_ARTICLE_PAGE_SIZE } from "~/lib/collections";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { HelpCenterArticleListView } from "./help-center-article-list-view";
@@ -101,14 +107,8 @@ export function HelpCenterSectionPage({
         .orderBy(({ topic }) => topic.name, "asc"),
   });
 
-  const articlesQuery = useLiveQuery({
-    queryKey: [
-      "help-center-section-articles",
-      topicArticles.id,
-      organizationId,
-      topicId,
-    ],
-    query: (q) =>
+  const articlesQuery = useLiveInfiniteQuery(
+    (q) =>
       q
         .from({ article: topicArticles })
         .where(({ article }) =>
@@ -117,8 +117,21 @@ export function HelpCenterSectionPage({
             eq(article.topicId, topicId)
           )
         )
-        .orderBy(({ article }) => article.updatedAt, "desc"),
-  });
+        // The order the collection's `sort: "updated"` asks the server for. A
+        // window cut from one order and rendered in another would show rows the
+        // page after it also shows.
+        .orderBy(({ article }) => article.updatedAt, "desc")
+        .orderBy(({ article }) => article.id, "asc"),
+    {
+      pageSize: HELP_CENTER_SECTION_ARTICLE_PAGE_SIZE,
+      queryKey: [
+        "help-center-section-articles",
+        topicArticles.id,
+        organizationId,
+        topicId,
+      ],
+    }
+  );
 
   const topics = topicsQuery.data ?? [];
 
@@ -363,10 +376,24 @@ export function HelpCenterSectionPage({
             ) : null}
           </Empty>
         ) : (
-          <HelpCenterArticleListView
-            articles={articles}
-            organizationId={organizationId}
-          />
+          <>
+            <HelpCenterArticleListView
+              articles={articles}
+              organizationId={organizationId}
+            />
+            {articlesQuery.hasNextPage ? (
+              <div className="flex justify-center p-3">
+                <Button
+                  disabled={articlesQuery.isFetchingNextPage}
+                  onClick={() => void articlesQuery.fetchNextPage()}
+                  type="button"
+                  variant="outline"
+                >
+                  Load more
+                </Button>
+              </div>
+            ) : null}
+          </>
         )}
       </SkeletonLoader>
 

@@ -167,12 +167,19 @@ export async function preloadHelpCenter(): Promise<void> {
   await dashboardCollections.helpCenterTopicCollection.preload();
 }
 
-/** One section: its own row plus the articles it lists. */
-export async function preloadHelpCenterSection(topicId: string): Promise<void> {
-  await Promise.all([
-    dashboardCollections.helpCenterTopicCollection.preload(),
-    dashboardCollections.helpCenterTopicArticleCollection(topicId).preload(),
-  ]);
+/**
+ * One section: its own row, which the header renders.
+ *
+ * The articles are deliberately not preloaded. The section page reads them
+ * through an on-demand collection, whose only load is the window the page's
+ * live query subscribes to — preloading the collection starts no load at all
+ * (on-demand collections have no full-source read), and forcing one would ask
+ * the server for every article in the section, which is the read the window
+ * exists to avoid. The first page therefore arrives after hydration, in the
+ * list's own skeleton, rather than with the server-rendered document.
+ */
+export async function preloadHelpCenterSection(): Promise<void> {
+  await dashboardCollections.helpCenterTopicCollection.preload();
 }
 
 /** The help center editor: the topic it can be moved into. */
