@@ -4,6 +4,8 @@ import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 
+import { m } from "@/paraglide/messages.js";
+
 /**
  * The shapes the portal's help center navigation works on.
  *
@@ -85,7 +87,7 @@ export function buildHelpCenterSections({
       icon: null,
       isTopic: false,
       key: UNLISTED_SECTION_KEY,
-      name: "More articles",
+      name: m.same_quaint_polecat_coax(),
     });
   }
 

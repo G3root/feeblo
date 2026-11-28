@@ -4,6 +4,8 @@ import { ChevronDownIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
+
 /**
  * How far from the top of the viewport a heading counts as the one being read.
  *
@@ -144,8 +146,10 @@ export function HelpCenterToc({
   const top = Math.min(...headings.map((heading) => heading.level));
 
   return (
-    <nav aria-label="On this page" className={className}>
-      <p className="mb-3 text-xs font-medium">On this page</p>
+    <nav aria-label={m.quaint_silly_crocodile_cuddle()} className={className}>
+      <p className="mb-3 text-xs font-medium">
+        {m.quaint_silly_crocodile_cuddle()}
+      </p>
       <ul className="border-border/70 flex flex-col border-s">
         {headings.map((heading) => {
           const isActive = heading.id === active;
@@ -209,7 +213,7 @@ export function HelpCenterOutlineDisclosure({
       )}
     >
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
-        On this page
+        {m.quaint_silly_crocodile_cuddle()}
         <HugeiconsIcon
           aria-hidden="true"
           className="text-muted-foreground size-4 transition-transform"

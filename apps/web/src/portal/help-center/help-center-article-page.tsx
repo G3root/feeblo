@@ -311,7 +311,7 @@ function ArticleBody({
 
       {previous === undefined && next === undefined ? null : (
         <nav
-          aria-label="More in this section"
+          aria-label={m.true_loose_racoon_dust()}
           className="mt-10 grid gap-x-10 gap-y-4 sm:grid-cols-2 print:hidden"
         >
           {previous === undefined ? null : (
@@ -413,16 +413,29 @@ function ArticleHeader({
               {article.authorName}
             </span>
           )}
-          <span>Updated {formatHelpDate(article.updatedAt)}</span>
-          <span>{readingMinutes(article.content)} min read</span>
+          <span>
+            {m.lucky_weird_cat_renew({
+              date: formatHelpDate(article.updatedAt),
+            })}
+          </span>
+          <span>
+            {m.arable_major_cockroach_rest({
+              count: readingMinutes(article.content),
+            })}
+          </span>
           <span className="tabular-nums">
-            {article.viewCount.toLocaleString()}{" "}
-            {article.viewCount === 1 ? "view" : "views"}
+            {article.viewCount === 1
+              ? m.equal_seemly_wolf_yell({
+                  count: article.viewCount.toLocaleString(),
+                })
+              : m.civil_fancy_fox_dance({
+                  count: article.viewCount.toLocaleString(),
+                })}
           </span>
         </div>
         {article.isArchived ? (
           <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
-            This article describes behaviour that is no longer current.
+            {m.suave_less_giraffe_clasp()}
           </p>
         ) : null}
       </header>
@@ -473,7 +486,7 @@ function SiblingLink({
             icon={ArrowLeft02Icon}
           />
         )}
-        {isNext ? "Next" : "Previous"}
+        {isNext ? m.sad_tasty_stingray_spark() : m.honest_quick_polecat_sew()}
         {isNext ? (
           <HugeiconsIcon
             aria-hidden="true"
@@ -499,10 +512,9 @@ function SiblingLink({
 function StillStuck() {
   return (
     <div className="rounded-xl border p-4">
-      <p className="text-sm font-medium">Still stuck?</p>
+      <p className="text-sm font-medium">{m.sweet_mad_liger_slurp()}</p>
       <p className="text-muted-foreground mt-1 text-[13px] leading-5">
-        Post the question on the board. The team answers there, and everyone who
-        needs the same answer can follow it.
+        {m.quaint_cuddly_worm_explore()}
       </p>
       <Button
         className="mt-3 w-full"
@@ -510,7 +522,7 @@ function StillStuck() {
         size="sm"
         variant="outline"
       >
-        Ask on the board
+        {m.gray_next_flea_flip()}
         <HugeiconsIcon aria-hidden="true" icon={ArrowRight01Icon} />
       </Button>
     </div>
@@ -532,7 +544,7 @@ function VerdictSection({
   return (
     <section className="border-border/70 mt-10 border-t pt-6 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-medium">Was this helpful?</p>
+        <p className="text-sm font-medium">{m.simple_clean_dingo_succeed()}</p>
         {vote.failed ? (
           <div className="flex items-center gap-2">
             <p className="text-muted-foreground text-sm">
@@ -580,7 +592,7 @@ function VerdictSection({
             type="button"
             variant="outline"
           >
-            Send feedback
+            {m.red_direct_loris_spark()}
           </Button>
         </div>
       ) : null}
@@ -588,8 +600,11 @@ function VerdictSection({
       {!vote.ready ? null : (
         <p className="text-muted-foreground mt-3 text-xs tabular-nums">
           {total === 0
-            ? "No votes yet."
-            : `${vote.counts.helpful} of ${total} readers found this helpful.`}
+            ? m.sound_elegant_beetle_lend()
+            : m.mellow_mean_gibbon_nourish({
+                helpful: vote.counts.helpful,
+                total,
+              })}
         </p>
       )}
     </section>
@@ -608,7 +623,7 @@ function HelpfulVoteButton(props: VoteButtonProps) {
   return (
     <VoteButton {...props}>
       <HugeiconsIcon icon={ThumbsUpIcon} />
-      Yes
+      {m.tangy_strong_hamster_animate()}
     </VoteButton>
   );
 }
@@ -617,7 +632,7 @@ function NotHelpfulVoteButton(props: VoteButtonProps) {
   return (
     <VoteButton {...props}>
       <HugeiconsIcon icon={ThumbsDownIcon} />
-      No
+      {m.silly_tidy_giraffe_grasp()}
     </VoteButton>
   );
 }
