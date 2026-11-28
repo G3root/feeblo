@@ -1,0 +1,135 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0fb0b956-a3f6-4381-ad59-81c312049893",
+  "prevIds": [
+    "2a152b1a-bf45-4024-a1cd-4305627f1b89"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_feedback"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_feedback.help_center_article_feedback_ADsJS0oJx292_fkey",
+        "n|fk|public.help_center_article_feedback.help_center_article_feedback_ADsJS0oJx292_fkey",
+        "e|fk|public.help_center_article_feedback.help_center_article_feedback_ADsJS0oJx292_fkey",
+        "n|con|public.help_center_article_feedback.help_center_article_feedback_ADsJS0oJx292_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_feedback",
+        "n|sch|public",
+        "e|col|public.help_center_article_feedback.article_id"
+      ]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "help_center_article_daily"
+      ],
+      "writes": [
+        "s|fk|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey",
+        "n|fk|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey",
+        "e|fk|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey",
+        "n|con|public.help_center_article_daily.help_center_article_daily_pgDlPfJgnRiS_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_daily",
+        "n|sch|public",
+        "e|col|public.help_center_article_daily.article_id"
+      ]
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_article",
+        "help_center_article_embedding_hnsw_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_article_embedding_hnsw_idx",
+        "n|idx|public.help_center_article_embedding_hnsw_idx",
+        "e|idx|public.help_center_article_embedding_hnsw_idx",
+        "n|rel|public.help_center_article_embedding_hnsw_idx"
+      ],
+      "reads": [
+        "e|tbl|public.help_center_article",
+        "n|sch|public"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_article_view_event",
+        "help_center_article_view_event_articleId_occurredAt_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_article_view_event_articleId_occurredAt_idx",
+        "n|idx|public.help_center_article_view_event_articleId_occurredAt_idx",
+        "e|idx|public.help_center_article_view_event_articleId_occurredAt_idx",
+        "n|rel|public.help_center_article_view_event_articleId_occurredAt_idx"
+      ],
+      "reads": [
+        "e|tbl|public.help_center_article_view_event",
+        "n|sch|public",
+        "e|col|public.help_center_article_view_event.article_id",
+        "e|col|public.help_center_article_view_event.occurred_at"
+      ],
+      "sharedWrites": []
+    },
+    {
+      "statementType": "drop_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_search_daily",
+        "help_center_search_daily_organizationId_day_searches_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_search_daily_organizationId_day_searches_idx",
+        "n|idx|public.help_center_search_daily_organizationId_day_searches_idx",
+        "e|idx|public.help_center_search_daily_organizationId_day_searches_idx",
+        "n|rel|public.help_center_search_daily_organizationId_day_searches_idx"
+      ],
+      "reads": [
+        "e|tbl|public.help_center_search_daily",
+        "n|sch|public",
+        "e|col|public.help_center_search_daily.organization_id",
+        "e|col|public.help_center_search_daily.day"
+      ],
+      "sharedWrites": []
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"help_center_article_embedding_hnsw_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"help_center_article_view_event_articleId_occurredAt_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"help_center_search_daily_organizationId_day_searches_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"help_center_article_feedback\",\"help_center_article_feedback_ADsJS0oJx292_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"help_center_article_daily\",\"help_center_article_daily_pgDlPfJgnRiS_fkey\"]"
+    }
+  ]
+}

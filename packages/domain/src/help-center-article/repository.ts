@@ -165,11 +165,22 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
   /** The dashboard's list: every article in the workspace, whatever its state. */
-  const findMany = ({ organizationId }: { organizationId: string }) =>
+  const findMany = ({
+    organizationId,
+    topicId,
+  }: {
+    organizationId: string;
+    topicId?: string | undefined;
+  }) =>
     db
       .select({ ...articleColumns, ...countColumns })
       .from(article)
-      .where(eq(article.organizationId, organizationId))
+      .where(
+        and(
+          eq(article.organizationId, organizationId),
+          topicId === undefined ? undefined : eq(article.topicId, topicId)
+        )
+      )
       .orderBy(asc(article.topicId), ...articleOrder);
 
   /**
@@ -199,7 +210,6 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         publishedAt: article.publishedAt,
         updatedAt: article.updatedAt,
         isArchived: sql<boolean>`${article.status} = 'archived'`,
-        ...countColumns,
       })
       .from(article)
       .innerJoin(topic, eq(topic.id, article.topicId))
@@ -257,7 +267,9 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         // the documentation, not the internal member id.
         authorName: schema.userTable.name,
         isArchived: sql<boolean>`${article.status} = 'archived'`,
-        ...countColumns,
+        // The page shows how often it was read. The verdict tallies are a
+        // dashboard number and cost two aggregate subqueries here for nothing.
+        viewCount: viewCountColumn,
       })
       .from(article)
       .innerJoin(topic, eq(topic.id, article.topicId))
@@ -289,6 +301,27 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
       .from(article)
       .where(eq(article.organizationId, organizationId))
       .pipe(Effect.map((rows) => rows[0]?.count ?? 0));
+
+  /**
+   * Whether the workspace has an article a reader could open.
+   *
+   * One row, for the widget's deflection latch: the composer asks this on every
+   * settle of the title, and `findManyPublic` would send the whole list back to
+   * answer a yes/no question. `readableWhere` is the same filter the public
+   * reads use, so this cannot disagree with the list the widget's Help tab
+   * renders.
+   */
+  const hasReadableByOrganizationId = ({
+    organizationId,
+  }: {
+    organizationId: string;
+  }) =>
+    db
+      .select({ id: article.id })
+      .from(article)
+      .where(and(eq(article.organizationId, organizationId), readableWhere))
+      .limit(1)
+      .pipe(Effect.map((rows) => rows.length > 0));
 
   /**
    * Ranked full-text search.
@@ -363,10 +396,13 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
    * are re-embedded, which is the honest behaviour — the alternative is
    * silently mixing two geometries.
    *
-   * No ANN index is used here on purpose. `help_center_article` is bounded by
-   * the plan's article ceiling, so a sequential distance scan over one
-   * workspace is a few hundred rows; the HNSW index that exists for the column
-   * is there for a corpus that grows past that assumption.
+   * The column is deliberately unindexed, and this read is why. It filters on
+   * `organization_id`, `status` and `embedding_model` before ordering by
+   * distance, which is not the shape an ANN index serves: the planner reads
+   * one workspace's rows and sorts them. `help_center_article` is bounded by
+   * the plan's article ceiling, so that is a few hundred rows. A future index
+   * has to be keyed the way this query filters rather than as a plain ANN
+   * index — see the `embedding` column's comment in `@feeblo/db`.
    */
   const searchByVector = ({
     organizationId,
@@ -481,6 +517,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     organizationId,
     topicId,
     position,
+    creatorMemberId,
     now,
     write,
     coverImage,
@@ -489,6 +526,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     organizationId: string;
     topicId: string;
     position: number | null;
+    creatorMemberId: string | null;
     now: Date;
     write: NormalizedHelpCenterArticleWrite;
     coverImage: string | null;
@@ -500,6 +538,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         organizationId,
         topicId,
         position,
+        creatorMemberId,
         slug: write.slug,
         title: write.title,
         content: write.content,
@@ -514,12 +553,15 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
 
   /**
    * Replace an article's writable fields, but only while it is still in
-   * `expectedStatus`.
+   * `expectedStatus` and, when the caller named one, still stamped with
+   * `expectedUpdatedAt`.
    *
    * The status travels in the `WHERE` clause rather than being read and
    * trusted: two editors can have the same draft open, and the one who saves
-   * second must not silently undo the other's publication. An update that
-   * matched nothing reports that, and the caller answers a conflict.
+   * second must not silently undo the other's publication. The timestamp does
+   * the same job for two edits inside one status, which a status guard cannot
+   * see. An update that matched nothing reports that, and the caller answers
+   * a conflict.
    */
   const update = ({
     id,
@@ -527,6 +569,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     topicId,
     position,
     expectedStatus,
+    expectedUpdatedAt,
     now,
     write,
     coverImage,
@@ -536,6 +579,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     topicId: string;
     position: number | null;
     expectedStatus: THelpCenterArticleState;
+    expectedUpdatedAt: Date | undefined;
     now: Date;
     write: NormalizedHelpCenterArticleWrite;
     coverImage: string | null;
@@ -561,7 +605,12 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         coverImage,
         status: write.status,
         publishedAt: write.publishedAt,
-        updatedAt: now,
+        // The timestamp is the same concurrency token the `WHERE` below
+        // compares, so an accepted write has to move it. Two saves inside one
+        // millisecond would otherwise leave it equal and let a stale editor
+        // through; the case makes it strictly monotonic even when the clock
+        // does not.
+        updatedAt: sql`case when ${article.updatedAt} >= ${now} then ${article.updatedAt} + interval '1 millisecond' else ${now} end`,
         // A vector describes the text it was generated from. Clearing it here,
         // in the same statement that changes the text, closes the window in
         // which a search could match words the article no longer has; the
@@ -577,7 +626,12 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
         and(
           eq(article.id, id),
           eq(article.organizationId, organizationId),
-          eq(article.status, expectedStatus)
+          eq(article.status, expectedStatus),
+          // Omitted by a caller that never loaded the row: the status guard is
+          // then the only concurrency guarantee it asked for.
+          expectedUpdatedAt === undefined
+            ? undefined
+            : eq(article.updatedAt, expectedUpdatedAt)
         )
       )
       .returning({ id: article.id })
@@ -881,6 +935,7 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
     findBySlugPublic,
     findStateById,
     countByOrganizationId,
+    hasReadableByOrganizationId,
     create,
     update,
     remove,

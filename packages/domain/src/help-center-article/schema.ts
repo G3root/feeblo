@@ -51,11 +51,14 @@ const ArticlePosition = S.NullOr(
 );
 
 /**
- * The derived counters every article read carries.
+ * The derived counters the dashboard's article rows carry.
  *
  * `viewCount` is all time and comes from the counter table; the two verdict
- * counts are aggregated from the feedback rows. They are the same three numbers
- * on both surfaces because they answer the same questions.
+ * counts are aggregated from the feedback rows. The dashboard list and detail
+ * carry all three because both render them. The public detail keeps only
+ * `viewCount` (the page shows how often it was read), and the public list
+ * carries none: those reads are hot, and a counter no public surface renders
+ * is three aggregate subqueries per row for nothing.
  */
 export const HelpCenterArticleCounts = S.Struct({
   viewCount: S.Finite,
@@ -107,6 +110,9 @@ export type THelpCenterArticle = S.Schema.Type<typeof HelpCenterArticle>;
  *
  * `isArchived` is a boolean rather than the raw status: a reader needs "this
  * page is out of date", not the workspace's internal vocabulary.
+ *
+ * Only `viewCount` travels: the page shows how often it was read, while the
+ * verdict tallies are a dashboard number the feedback panel reads on its own.
  */
 export const HelpCenterArticlePublic = S.Struct({
   id: S.String,
@@ -122,14 +128,20 @@ export const HelpCenterArticlePublic = S.Struct({
   authorName: S.NullOr(S.String),
   coverImage: S.NullOr(S.String),
   isArchived: S.Boolean,
-  ...HelpCenterArticleCounts.fields,
+  viewCount: S.Finite,
 });
 
 export type THelpCenterArticlePublic = S.Schema.Type<
   typeof HelpCenterArticlePublic
 >;
 
-/** The portal's list row. */
+/**
+ * The portal's list row.
+ *
+ * No counters at all: a list renders a title, a summary and where the page
+ * lives. Reading three aggregates per row to avoid rendering them would cost
+ * the list the most expensive part of its query.
+ */
 export const HelpCenterArticlePublicSummary = S.Struct({
   id: S.String,
   slug: S.String,
@@ -141,15 +153,23 @@ export const HelpCenterArticlePublicSummary = S.Struct({
   publishedAt: S.NullOr(S.DateFromString),
   updatedAt: S.DateFromString,
   isArchived: S.Boolean,
-  ...HelpCenterArticleCounts.fields,
 });
 
 export type THelpCenterArticlePublicSummary = S.Schema.Type<
   typeof HelpCenterArticlePublicSummary
 >;
 
+/**
+ * The dashboard's article list, optionally scoped to one section.
+ *
+ * The scope is server-side rather than a client filter: a workspace-wide list
+ * spends three counter subqueries on every article it returns, and a section
+ * page only ever renders one section's rows. Omitting `topicId` keeps the
+ * workspace-wide read for the plan-usage meter.
+ */
 export const HelpCenterArticleList = S.Struct({
   organizationId: WorkspaceId.schema,
+  topicId: S.optional(HelpCenterTopicId.schema),
 });
 
 export type THelpCenterArticleList = S.Schema.Type<
@@ -191,6 +211,12 @@ export type THelpCenterArticleGetPublic = S.Schema.Type<
 const SearchQuery = S.Trim.pipe(
   S.check(S.isMaxLength(HELP_CENTER_SEARCH_MAX_QUERY_LENGTH))
 );
+
+/**
+ * Re-exported so a search input's `maxLength` and this schema's ceiling are
+ * the same number rather than two that can drift.
+ */
+export { HELP_CENTER_SEARCH_MAX_QUERY_LENGTH };
 
 /**
  * How many hits a search may return.
@@ -417,6 +443,15 @@ export const HelpCenterArticleUpdate = S.Struct({
    * happened in between.
    */
   expectedStatus: S.optional(HelpCenterArticleState),
+  /**
+   * The `updatedAt` the editor loaded.
+   *
+   * When present the write is constrained to rows whose timestamp still
+   * matches, so a save that raced a colleague's edit — in the same status as
+   * well as across a status move — is a conflict rather than an overwrite.
+   * Optional for callers that are not saving a previously loaded article.
+   */
+  expectedUpdatedAt: S.optional(S.DateFromString),
   publishedAt: publishedAtWithDefault,
   position: positionWithDefault,
 });

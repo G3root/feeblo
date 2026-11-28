@@ -146,74 +146,95 @@ export const listWidgetUpdates = Effect.fn("Widget.listUpdates")(function* ({
  * summary. A suggestion beside a feedback form is only worth showing if it
  * names the thing being asked about; a body match on a passing mention would be
  * a worse suggestion than none.
+ *
+ * A workspace whose corpus is empty answers `enabled: false` too. The composer
+ * asks this on every settle of the title, so the emptiness is one existence
+ * read before the search, not a list read per keystroke; and answering it here
+ * is what stops a public workspace with no documentation from searching for a
+ * match it can never return.
  */
-const findWidgetHelpArticles = Effect.fn("Widget.helpArticles")(function* ({
-  organizationId,
-  query,
-}: {
-  organizationId: string;
-  query: string;
-}) {
-  const siteRepository = yield* SiteRepository;
-
-  const site = yield* siteRepository
-    .findByOrganizationId({ organizationId })
-    .pipe(Effect.map(Option.getOrUndefined));
-
-  if (site === undefined || site.helpCenterVisibility !== "PUBLIC") {
-    return { articles: [], enabled: false };
-  }
-
-  const repository = yield* HelpCenterArticleRepository;
-  const config = yield* PortalUrlConfig;
-
-  // The same program the dashboard and portal run, built without an embedder:
-  // the deflection is strict and a strict search never reaches the semantic
-  // pass, so a deployment with no API key still answers it. Going through the
-  // program rather than straight to the repository is what keeps "strict"
-  // meaning one thing across the three surfaces.
-  const search = makeHelpCenterSearch({
-    embeddings: Option.none(),
-    lexical: repository.search,
-    semantic: repository.searchByVector,
-  });
-
-  const hits = yield* search({
-    includeUnreadable: false,
-    limit: 3,
+export const findWidgetHelpArticles = Effect.fn("Widget.helpArticles")(
+  function* ({
     organizationId,
     query,
-    strict: true,
-  });
+  }: {
+    organizationId: string;
+    query: string;
+  }) {
+    const siteRepository = yield* SiteRepository;
 
-  // Counted, because "the widget offered documentation and the reader posted
-  // anyway" and "the widget found nothing" are the two facts that say whether
-  // the deflection is working. A failed counter never fails the suggestion.
-  const now = yield* DateTime.now;
+    const site = yield* siteRepository
+      .findByOrganizationId({ organizationId })
+      .pipe(Effect.map(Option.getOrUndefined));
 
-  yield* repository
-    .recordSearch({ found: hits.length > 0, now, organizationId, query })
-    .pipe(
-      Effect.tapCause((cause) =>
-        Effect.logWarning("Failed to record a widget help center search", cause)
-      ),
-      Effect.ignoreCause
-    );
+    if (site === undefined || site.helpCenterVisibility !== "PUBLIC") {
+      return { articles: [], enabled: false };
+    }
 
-  const portalUrl = buildPublicSiteUrl(site, config.rootDomain);
+    // The readable set is the lifecycle's, not "published" alone: an archived
+    // article is a tombstone the portal and the widget still serve, so a corpus
+    // that holds only tombstones is not empty and `findManyPublic` would return
+    // those rows. The repository owns the query so this check and the list
+    // cannot disagree about what readable means.
+    const repository = yield* HelpCenterArticleRepository;
 
-  return {
-    articles: hits.map((hit) => ({
-      excerpt: hit.excerpt,
-      id: hit.id,
-      title: hit.title,
-      // Absolute, because the iframe is embedded on the customer's own origin:
-      // a relative link would resolve against the host page.
-      url: `${portalUrl}/s/help/articles/${encodeURIComponent(hit.slug)}`,
-    })),
-    enabled: true,
-  };
-});
+    if (!(yield* repository.hasReadableByOrganizationId({ organizationId }))) {
+      return { articles: [], enabled: false };
+    }
+
+    const config = yield* PortalUrlConfig;
+
+    // The same program the dashboard and portal run, built without an embedder:
+    // the deflection is strict and a strict search never reaches the semantic
+    // pass, so a deployment with no API key still answers it. Going through the
+    // program rather than straight to the repository is what keeps "strict"
+    // meaning one thing across the three surfaces.
+    const search = makeHelpCenterSearch({
+      embeddings: Option.none(),
+      lexical: repository.search,
+      semantic: repository.searchByVector,
+    });
+
+    const hits = yield* search({
+      includeUnreadable: false,
+      limit: 3,
+      organizationId,
+      query,
+      strict: true,
+    });
+
+    // Counted, because "the widget offered documentation and the reader posted
+    // anyway" and "the widget found nothing" are the two facts that say whether
+    // the deflection is working. A failed counter never fails the suggestion.
+    const now = yield* DateTime.now;
+
+    yield* repository
+      .recordSearch({ found: hits.length > 0, now, organizationId, query })
+      .pipe(
+        Effect.tapCause((cause) =>
+          Effect.logWarning(
+            "Failed to record a widget help center search",
+            cause
+          )
+        ),
+        Effect.ignoreCause
+      );
+
+    const portalUrl = buildPublicSiteUrl(site, config.rootDomain);
+
+    return {
+      articles: hits.map((hit) => ({
+        excerpt: hit.excerpt,
+        id: hit.id,
+        title: hit.title,
+        // Absolute, because the iframe is embedded on the customer's own origin:
+        // a relative link would resolve against the host page.
+        url: `${portalUrl}/s/help/articles/${encodeURIComponent(hit.slug)}`,
+      })),
+      enabled: true,
+    };
+  }
+);
 
 /**
  * Whether the widget may read this workspace's help center.

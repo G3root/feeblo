@@ -36,21 +36,43 @@ type HelpSection = {
  *
  * `findManyPublic` already orders by the section's position, so the sections are
  * the distinct topic ids in first-seen order and each one's articles are the
- * rows that share it. No accumulator and no grouping by hand: this is a
- * projection of an order the server already decided.
+ * rows that share it. A single `Map` pass does both halves without depending on
+ * `Map.groupBy` (ES2024) in an iframe that runs on a customer's browser: a new
+ * key is inserted in first-seen order and every later row for that topic is
+ * appended. A set of ids followed by a `filter` per id would read the whole
+ * list once per section to answer a question the pass already answered.
  */
 function groupBySection(
   articles: WidgetHelpCenter["articles"]
 ): readonly HelpSection[] {
-  const topicIds = [...new Set(articles.map((article) => article.topicId))];
+  const sections = articles.reduce<Map<string, MutableHelpSection>>(
+    (byTopic, article) => {
+      const section = byTopic.get(article.topicId);
 
-  return topicIds.map((topicId) => ({
-    articles: articles.filter((article) => article.topicId === topicId),
-    name:
-      articles.find((article) => article.topicId === topicId)?.topicName ?? "",
-    topicId,
-  }));
+      if (section === undefined) {
+        byTopic.set(article.topicId, {
+          articles: [article],
+          name: article.topicName,
+          topicId: article.topicId,
+        });
+      } else {
+        section.articles.push(article);
+      }
+
+      return byTopic;
+    },
+    new Map()
+  );
+
+  return [...sections.values()];
 }
+
+/** The accumulator `groupBySection` builds before it returns a `HelpSection`. */
+type MutableHelpSection = {
+  readonly articles: Array<WidgetHelpCenter["articles"][number]>;
+  readonly name: string;
+  readonly topicId: string;
+};
 
 function HelpListScreen() {
   const helpCenter = createAsync(() => fetchHelpCenter());

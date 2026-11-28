@@ -13,9 +13,11 @@ import {
 import { useAppForm } from "@feeblo/ui/hooks/form";
 import { IconPickerField } from "@feeblo/ui/icon-picker";
 import { DEFAULT_HELP_CENTER_TOPIC_ICON } from "@feeblo/web-shared/icons/defaults";
-import { parseRpcError } from "@feeblo/web-shared/rpc-error";
+import { isRpcErrorTag, parseRpcError } from "@feeblo/web-shared/rpc-error";
+import * as Predicate from "effect/Predicate";
 import { useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import {
@@ -87,12 +89,10 @@ export function CreateHelpCenterTopicDialog({
 export function EditHelpCenterTopicDialog({
   onOpenChange,
   open,
-  organizationId,
   topic,
 }: {
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  organizationId: string;
   topic: {
     description: string | null;
     icon: string | null;
@@ -104,7 +104,7 @@ export function EditHelpCenterTopicDialog({
 
   return (
     <TopicDialogFrame
-      description="Renaming a section keeps its articles; the URL follows the new name."
+      description={m.bold_wild_martin_zoom()}
       onOpenChange={onOpenChange}
       open={open}
       title="Edit section"
@@ -126,6 +126,17 @@ export function EditHelpCenterTopicDialog({
     </TopicDialogFrame>
   );
 }
+
+/**
+ * The two topic conflicts carry a slug or a count rather than a message, so the
+ * generic parser cannot explain them. A slug collision is the one an editor can
+ * fix in this dialog; everything else keeps the shared allowlist's copy.
+ */
+const topicWriteErrorMessage = (cause: unknown): string =>
+  isRpcErrorTag(cause, "HelpCenterTopicSlugTakenError") ||
+  Predicate.isTagged(cause, "HelpCenterTopicSlugTakenError")
+    ? m.tame_mean_quail_buy()
+    : parseRpcError(cause).message;
 
 function TopicDialogFrame({
   children,
@@ -183,7 +194,7 @@ function TopicFields({
       try {
         await onSubmit(value);
       } catch (cause) {
-        setSubmitError(parseRpcError(cause).message);
+        setSubmitError(topicWriteErrorMessage(cause));
       }
     },
   });

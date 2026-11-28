@@ -16,6 +16,7 @@ import {
 
 const ALL = [
   "loading",
+  "failed",
   "asking",
   "promptReason",
   "answeredHelpful",
@@ -52,7 +53,7 @@ describe("help center vote machine", () => {
     expect(state.view.verdict).toBeNull();
   });
 
-  it("declares exactly the five states", () => {
+  it("declares exactly the six states", () => {
     expect(Object.keys(helpCenterVoteMachine.states).sort()).toStrictEqual(
       [...ALL].sort()
     );
@@ -147,5 +148,59 @@ describe("help center vote machine", () => {
     );
 
     expect(state.matches("promptReason")).toBe(true);
+  });
+
+  it("shows nothing as chosen when the tally fails", () => {
+    const state = run({ type: "TALLY_FAILED" });
+
+    expect(state.matches("failed")).toBe(true);
+    expect(state.view.failed).toBe(true);
+    expect(state.view.ready).toBe(false);
+    expect(state.view.verdict).toBeNull();
+  });
+
+  it("retries from failed into loading, then adopts the retried tally", () => {
+    const retrying = run({ type: "TALLY_FAILED" }, { type: "RETRY" });
+
+    expect(retrying.matches("loading")).toBe(true);
+    expect(retrying.view.failed).toBe(false);
+    expect(retrying.view.ready).toBe(false);
+
+    const helpful = run(
+      { type: "TALLY_FAILED" },
+      { type: "RETRY" },
+      { type: "LOADED_HELPFUL" }
+    );
+
+    expect(helpful.matches("answeredHelpful")).toBe(true);
+    expect(helpful.view.failed).toBe(false);
+    expect(helpful.view.ready).toBe(true);
+    expect(helpful.view.verdict).toBe(true);
+  });
+
+  it("adopts a loaded tally that arrives without a retry", () => {
+    const asking = run({ type: "TALLY_FAILED" }, { type: "LOADED_NONE" });
+
+    const unhelpful = run(
+      { type: "TALLY_FAILED" },
+      { type: "LOADED_UNHELPFUL" }
+    );
+
+    expect(asking.matches("asking")).toBe(true);
+    expect(asking.view.ready).toBe(true);
+    expect(asking.view.verdict).toBeNull();
+    expect(unhelpful.matches("answeredUnhelpful")).toBe(true);
+    expect(unhelpful.view.verdict).toBe(false);
+  });
+
+  it("ignores TALLY_FAILED once a verdict is known", () => {
+    const asking = run({ type: "LOADED_NONE" }, { type: "TALLY_FAILED" });
+
+    const answered = run({ type: "LOADED_HELPFUL" }, { type: "TALLY_FAILED" });
+
+    expect(asking.matches("asking")).toBe(true);
+    expect(asking.view.failed).toBe(false);
+    expect(answered.matches("answeredHelpful")).toBe(true);
+    expect(answered.view.verdict).toBe(true);
   });
 });

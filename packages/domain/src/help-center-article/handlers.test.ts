@@ -8,6 +8,7 @@ import {
   SiteId,
   WorkspaceId,
 } from "@feeblo/id";
+import type { Role } from "@feeblo/permissions";
 import { eq } from "drizzle-orm";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -38,7 +39,16 @@ describe("HelpCenterArticleRpcHandlers", () => {
     userId: string;
   };
 
-  const makeSession = (fixture: Fixture, isMember = true): Session => ({
+  /**
+   * The session a request runs as.
+   *
+   * The role is a parameter because the help center is manager-owned: the
+   * permission tests have to ask the same handler as a contributor.
+   */
+  const makeSession = (
+    fixture: Fixture,
+    role: Role | null = "owner"
+  ): Session => ({
     user: {
       id: fixture.userId,
       email: "user@example.com",
@@ -47,15 +57,16 @@ describe("HelpCenterArticleRpcHandlers", () => {
     },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
-    memberships: isMember
-      ? [
-          {
-            membershipId: fixture.membershipId,
-            organizationId: fixture.organizationId,
-            role: "owner",
-          },
-        ]
-      : [],
+    memberships:
+      role === null
+        ? []
+        : [
+            {
+              membershipId: fixture.membershipId,
+              organizationId: fixture.organizationId,
+              role,
+            },
+          ],
   });
 
   const makeFixture = () =>
@@ -261,6 +272,37 @@ describe("HelpCenterArticleRpcHandlers", () => {
         expect(article.viewCount).toBe(0);
         expect(article.helpfulCount).toBe(0);
       })
+    );
+
+    it.effect(
+      "records the member who wrote the article and names them publicly",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const session = makeSession(fixture);
+          const id = yield* HelpCenterArticleId.generate;
+
+          yield* create(fixture, id, "Attributed", "attributed");
+
+          const row = yield* handlers
+            .GetHelpCenterArticle({
+              organizationId: fixture.organizationId,
+              id,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+          expect(row.creatorMemberId).toBe(fixture.membershipId);
+
+          // The public page joins the member to the user, so a reader sees the
+          // author's name — never the internal member id.
+          const article = yield* handlers.GetHelpCenterArticlePublic({
+            organizationId: fixture.organizationId,
+            slug: "attributed",
+          });
+
+          expect(article.authorName).toBe("Test User");
+        })
     );
 
     it.effect("promotes temporary media and stores the permanent URLs", () =>
@@ -589,6 +631,136 @@ describe("HelpCenterArticleRpcHandlers", () => {
         })
     );
 
+    it.effect("refuses a same-status update from a stale editor", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const session = makeSession(fixture);
+        const id = yield* HelpCenterArticleId.generate;
+
+        yield* create(fixture, id, "Contended", "contended");
+
+        const [loaded] = yield* db
+          .select({ updatedAt: schema.helpCenterArticleTable.updatedAt })
+          .from(schema.helpCenterArticleTable)
+          .where(eq(schema.helpCenterArticleTable.id, id));
+
+        if (loaded === undefined) {
+          return yield* Effect.die(new Error("fixture article missing"));
+        }
+
+        // A colleague's save landed after this editor loaded the row. The
+        // status is unchanged, so only the timestamp can tell the two saves
+        // apart — which is exactly the conflict this guard adds.
+        const later = DateTime.toDateUtc(
+          DateTime.add({ minutes: 1 })(
+            DateTime.fromDateUnsafe(loaded.updatedAt)
+          )
+        );
+
+        yield* db
+          .update(schema.helpCenterArticleTable)
+          .set({ updatedAt: later })
+          .where(eq(schema.helpCenterArticleTable.id, id));
+
+        const update = (expectedUpdatedAt: Date | undefined) =>
+          handlers
+            .UpdateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
+              content: "Body",
+              expectedStatus: "published",
+              expectedUpdatedAt,
+              id,
+              organizationId: fixture.organizationId,
+              position: null,
+              publishedAt: null,
+              slug: "contended",
+              status: "published",
+              title: "Contended",
+              topicId: fixture.topicId,
+            })
+            .pipe(Effect.provideService(CurrentSession, session));
+
+        const error = yield* Effect.flip(update(loaded.updatedAt));
+
+        expect(error._tag).toBe("HelpCenterArticleChangedError");
+
+        // The timestamp the row carries now is what a refreshed editor would
+        // send, and it is accepted.
+        yield* update(later);
+
+        // A caller that never tracked the timestamp keeps the status guard
+        // alone, which is the weaker contract it asked for.
+        yield* update(undefined);
+      })
+    );
+
+    it.effect(
+      "moves updatedAt forward when a save shares its millisecond",
+      () =>
+        Effect.gen(function* () {
+          const repository = yield* HelpCenterArticleRepository;
+          const db = yield* currentDb;
+          const fixture = yield* makeFixture();
+          const id = yield* HelpCenterArticleId.generate;
+          const table = schema.helpCenterArticleTable;
+
+          yield* create(fixture, id, "Monotonic", "monotonic");
+
+          const [loaded] = yield* db
+            .select({
+              content: table.content,
+              coverImage: table.coverImage,
+              excerpt: table.excerpt,
+              position: table.position,
+              publishedAt: table.publishedAt,
+              slug: table.slug,
+              status: table.status,
+              title: table.title,
+              topicId: table.topicId,
+              updatedAt: table.updatedAt,
+            })
+            .from(table)
+            .where(eq(table.id, id));
+
+          if (loaded === undefined) {
+            return yield* Effect.die(new Error("fixture article missing"));
+          }
+
+          // The clock did not advance: without a monotonic write the second
+          // editor's expectedUpdatedAt would still match the row.
+          yield* repository.update({
+            coverImage: loaded.coverImage,
+            expectedStatus: loaded.status,
+            expectedUpdatedAt: loaded.updatedAt,
+            id,
+            now: loaded.updatedAt,
+            organizationId: fixture.organizationId,
+            position: loaded.position,
+            topicId: loaded.topicId,
+            write: {
+              content: loaded.content,
+              excerpt: loaded.excerpt,
+              publishedAt: loaded.publishedAt,
+              slug: loaded.slug,
+              status: loaded.status,
+              title: loaded.title,
+            },
+          });
+
+          const [after] = yield* db
+            .select({ updatedAt: table.updatedAt })
+            .from(table)
+            .where(eq(table.id, id));
+
+          expect(after?.updatedAt.getTime()).toBeGreaterThan(
+            loaded.updatedAt.getTime()
+          );
+        })
+    );
+
     it.effect("records and prunes the images an update references", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleRpcHandlersEffect;
@@ -818,6 +990,100 @@ describe("HelpCenterArticleRpcHandlers", () => {
       })
     );
 
+    it.effect(
+      "lets a manager create, edit and publish, and refuses a contributor",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const manager = makeSession(fixture, "manager");
+          const contributor = makeSession(fixture, "contributor");
+          const id = yield* HelpCenterArticleId.generate;
+
+          const input = {
+            assetIds: [],
+            coverImage: null,
+            id,
+            organizationId: fixture.organizationId,
+            topicId: fixture.topicId,
+            title: "Manager documentation",
+            slug: "manager-documentation",
+            content: "Body",
+            status: "draft" as const,
+            publishedAt: null,
+            position: null,
+          };
+
+          yield* handlers
+            .CreateHelpCenterArticle(input)
+            .pipe(Effect.provideService(CurrentSession, manager));
+
+          // Publishing is an update that crosses into `published`, so the
+          // manager needs `publish` there as well as on a create.
+          yield* handlers
+            .UpdateHelpCenterArticle({
+              ...input,
+              expectedStatus: "draft",
+              status: "published",
+            })
+            .pipe(Effect.provideService(CurrentSession, manager));
+
+          const createDenied = yield* Effect.flip(
+            handlers
+              .CreateHelpCenterArticle({
+                ...input,
+                id: yield* HelpCenterArticleId.generate,
+                slug: "contributor-documentation",
+              })
+              .pipe(Effect.provideService(CurrentSession, contributor))
+          );
+
+          expect(createDenied._tag).toBe("PolicyDenied");
+
+          const updateDenied = yield* Effect.flip(
+            handlers
+              .UpdateHelpCenterArticle({
+                ...input,
+                expectedStatus: "published",
+                status: "published",
+                title: "Contributor edit",
+              })
+              .pipe(Effect.provideService(CurrentSession, contributor))
+          );
+
+          expect(updateDenied._tag).toBe("PolicyDenied");
+        })
+    );
+
+    it.effect("refuses to create an article already archived", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+
+        const error = yield* Effect.flip(
+          handlers
+            .CreateHelpCenterArticle({
+              assetIds: [],
+              coverImage: null,
+              id: yield* HelpCenterArticleId.generate,
+              organizationId: fixture.organizationId,
+              topicId: fixture.topicId,
+              title: "Retired before it shipped",
+              slug: undefined,
+              content: "Body",
+              // An article is archived through the lifecycle: it has to be
+              // published first, so there is a page to withdraw.
+              status: "archived",
+              publishedAt: null,
+              position: null,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+
+        expect(error._tag).toBe("BadRequestError");
+      })
+    );
+
     it.effect("keeps the original publication date on a republish", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleRpcHandlersEffect;
@@ -967,6 +1233,122 @@ describe("HelpCenterArticleRpcHandlers", () => {
         })
     );
 
+    it.effect(
+      "serves no counters on the public list and only views on the page",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const id = yield* HelpCenterArticleId.generate;
+
+          yield* create(fixture, id, "Projected", "projected");
+
+          yield* handlers.AddHelpCenterArticleView({
+            organizationId: fixture.organizationId,
+            articleId: id,
+            id: beaconId(21),
+          });
+
+          const [summary] = yield* handlers.ListHelpCenterArticlesPublic({
+            organizationId: fixture.organizationId,
+          });
+
+          if (summary === undefined) {
+            return yield* Effect.die(new Error("expected one article"));
+          }
+
+          // A list row carries what a list renders. The three aggregates are
+          // the most expensive part of the read and nothing in a list shows
+          // them.
+          expect(summary).toStrictEqual({
+            excerpt: expect.any(String),
+            id,
+            isArchived: false,
+            publishedAt: expect.anything(),
+            slug: "projected",
+            title: "Projected",
+            topicId: fixture.topicId,
+            topicName: "Getting started",
+            topicSlug: "getting-started",
+            updatedAt: expect.anything(),
+          });
+
+          const article = yield* handlers.GetHelpCenterArticlePublic({
+            organizationId: fixture.organizationId,
+            slug: "projected",
+          });
+
+          // The page shows how often it was read; the verdict tallies belong
+          // to the dashboard's feedback panel.
+          expect(article.viewCount).toBe(1);
+          expect(article).not.toHaveProperty("helpfulCount");
+          expect(article).not.toHaveProperty("notHelpfulCount");
+        })
+    );
+
+    it.effect("scopes the dashboard list to one section", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect;
+        const db = yield* currentDb;
+        const fixture = yield* makeFixture();
+        const now = yield* DateTime.nowAsDate;
+        const secondTopicId = yield* HelpCenterTopicId.generate;
+
+        yield* db.insert(schema.helpCenterTopicTable).values({
+          id: secondTopicId,
+          organizationId: fixture.organizationId,
+          name: "Billing",
+          slug: "billing",
+          description: null,
+          icon: null,
+          position: 1,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        yield* db.insert(schema.helpCenterArticleTable).values({
+          id: yield* HelpCenterArticleId.generate,
+          organizationId: fixture.organizationId,
+          topicId: secondTopicId,
+          slug: "second-section",
+          title: "Second section",
+          content: "Body",
+          excerpt: "Body",
+          status: "published",
+          publishedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        yield* create(
+          fixture,
+          yield* HelpCenterArticleId.generate,
+          "First section",
+          "first-section"
+        );
+
+        const scoped = yield* handlers
+          .ListHelpCenterArticles({
+            organizationId: fixture.organizationId,
+            topicId: secondTopicId,
+          })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        expect(scoped.map((article) => article.slug)).toStrictEqual([
+          "second-section",
+        ]);
+
+        const all = yield* handlers
+          .ListHelpCenterArticles({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        expect(all.map((article) => article.slug).sort()).toStrictEqual([
+          "first-section",
+          "second-section",
+        ]);
+      })
+    );
+
     it.effect("counts a view once per beacon id", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleRpcHandlersEffect;
@@ -1041,6 +1423,30 @@ describe("HelpCenterArticleRpcHandlers", () => {
           .pipe(Effect.provideService(CurrentSession, session));
 
         expect(article.viewCount).toBe(0);
+      })
+    );
+
+    it.effect("answers a failed beacon as not accepted", () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture();
+        const repository = yield* HelpCenterArticleRepository;
+
+        const handlers = yield* HelpCenterArticleRpcHandlersEffect.pipe(
+          Effect.provideService(HelpCenterArticleRepository, {
+            ...repository,
+            // A defect rather than a typed failure: neither is the reader's
+            // problem, so both answer the same shape.
+            recordView: () => Effect.die("the counter table is unavailable"),
+          })
+        );
+
+        const result = yield* handlers.AddHelpCenterArticleView({
+          organizationId: fixture.organizationId,
+          articleId: yield* HelpCenterArticleId.generate,
+          id: beaconId(31),
+        });
+
+        expect(result.accepted).toBe(false);
       })
     );
 

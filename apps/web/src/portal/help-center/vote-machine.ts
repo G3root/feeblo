@@ -32,16 +32,6 @@ import { setup } from "xstate";
  * and React Query's `isError`, not a state here.
  */
 
-type VoteContext = {
-  /**
-   * What the reader has typed about an unhelpful verdict.
-   *
-   * Context of the branch that owns it. `answeredHelpful` cannot carry one,
-   * which is the invariant the old boolean could not express.
-   */
-  readonly reason: string;
-};
-
 const ContextSchema = Schema.toStandardSchemaV1(
   Schema.Struct({ reason: Schema.String })
 );
@@ -69,9 +59,11 @@ export const helpCenterVoteMachine = setup({
       LOADED_HELPFUL: eventSchema("LOADED_HELPFUL"),
       LOADED_NONE: eventSchema("LOADED_NONE"),
       LOADED_UNHELPFUL: eventSchema("LOADED_UNHELPFUL"),
+      RETRY: eventSchema("RETRY"),
       SETTLED_HELPFUL: eventSchema("SETTLED_HELPFUL"),
       SETTLED_UNHELPFUL: eventSchema("SETTLED_UNHELPFUL"),
       SET_REASON: SetReasonEventSchema,
+      TALLY_FAILED: eventSchema("TALLY_FAILED"),
     },
   },
 }).createMachine({
@@ -90,6 +82,28 @@ export const helpCenterVoteMachine = setup({
         // theirs to record, so the settle is accepted here rather than dropped.
         SETTLED_HELPFUL: { target: "answeredHelpful" },
         SETTLED_UNHELPFUL: { target: "promptReason" },
+        TALLY_FAILED: { target: "failed" },
+      },
+    },
+    /**
+     * The tally could not be read.
+     *
+     * Not the same as "no verdict": the buttons cannot be drawn from an answer
+     * that never arrived, and pressing one would cast blind. The reader gets a
+     * retry instead, and a late-arriving loaded tally — a refresh that succeeds
+     * without the button being pressed — is still adopted, because the server's
+     * answer is the state this machine was only guessing at.
+     *
+     * `TALLY_FAILED` is a no-op here so a repeated failed refresh cannot loop
+     * the machine back into `loading` and hide the row while it is still down.
+     */
+    failed: {
+      on: {
+        LOADED_HELPFUL: { target: "answeredHelpful" },
+        LOADED_NONE: { target: "asking" },
+        LOADED_UNHELPFUL: { target: "answeredUnhelpful" },
+        RETRY: { target: "loading" },
+        TALLY_FAILED: {},
       },
     },
     asking: {
@@ -151,8 +165,13 @@ export type HelpCenterVoteView = {
   readonly verdict: boolean | null;
   readonly reasonOpen: boolean;
   readonly reason: string;
-  /** False while the tally is still loading, so nothing is drawn as chosen. */
+  /**
+   * False while the tally is loading or failed, so nothing is drawn as chosen
+   * from an answer the widget does not have.
+   */
   readonly ready: boolean;
+  /** True when the tally could not be read; the buttons are replaced by retry. */
+  readonly failed: boolean;
 };
 
 export const toHelpCenterVoteView = (
@@ -167,9 +186,10 @@ export const toHelpCenterVoteView = (
       : null;
 
   return {
+    failed: snapshot.matches("failed"),
     reason: snapshot.context.reason,
     reasonOpen,
-    ready: !snapshot.matches("loading"),
+    ready: !snapshot.matches("loading") && !snapshot.matches("failed"),
     verdict,
   };
 };

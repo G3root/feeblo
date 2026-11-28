@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { HELP_CENTER_SEARCH_MAX_QUERY_LENGTH } from "@feeblo/domain/help-center-article/schema";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
   InputGroup,
@@ -49,6 +50,7 @@ export function HelpCenterRailSearch({
         </InputGroupAddon>
         <DebouncedInputGroupInput
           aria-label="Search the help center"
+          maxLength={HELP_CENTER_SEARCH_MAX_QUERY_LENGTH}
           onChange={setQuery}
           placeholder="Search documentation"
           type="search"

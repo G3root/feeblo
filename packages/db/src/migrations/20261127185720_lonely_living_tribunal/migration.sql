@@ -1,0 +1,1 @@
+CREATE INDEX "help_center_article_view_event_articleId_idx" ON "help_center_article_view_event" ("article_id");

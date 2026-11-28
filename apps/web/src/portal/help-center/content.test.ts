@@ -1,3 +1,4 @@
+import * as Cause from "effect/Cause";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +6,7 @@ import {
   findHelpCenterArticleBySlug,
   findHelpCenterSiblings,
   formatHelpDate,
+  isHelpCenterArticleNotFound,
   readingMinutes,
   UNLISTED_SECTION_KEY,
 } from "./content";
@@ -18,8 +20,7 @@ const article = (id: string, topicId: string, slug = id) => ({
   topicId,
 });
 
-const topic = (id: string, articleCount = 1) => ({
-  articleCount,
+const topic = (id: string) => ({
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   description: null,
   icon: null,
@@ -69,7 +70,7 @@ describe("buildHelpCenterSections", () => {
   it("renders the topic rows from the topic read, not from the articles", () => {
     const sections = buildHelpCenterSections({
       articles: [],
-      topics: [topic("t1", 3)],
+      topics: [topic("t1")],
     });
 
     expect(sections[0]?.articles).toEqual([]);
@@ -98,7 +99,7 @@ describe("findHelpCenterSiblings", () => {
       article("d", "t1"),
       article("c", "t2"),
     ],
-    topics: [topic("t1", 3), topic("t2")],
+    topics: [topic("t1"), topic("t2")],
   });
 
   it("names the section an article sits in", () => {
@@ -166,5 +167,30 @@ describe("formatHelpDate", () => {
 
     expect(formatHelpDate(value)).toBe(formatHelpDate(value.toISOString()));
     expect(formatHelpDate(value)).toContain("2026");
+  });
+});
+
+describe("isHelpCenterArticleNotFound", () => {
+  it("reads the tagged error out of the failure cause", () => {
+    expect(
+      isHelpCenterArticleNotFound(
+        Cause.fail({
+          _tag: "NotFoundError",
+          message: "The article does not exist.",
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("does not treat another typed failure as missing", () => {
+    expect(
+      isHelpCenterArticleNotFound(
+        Cause.fail({ _tag: "PolicyDenied", reason: "Hidden help center" })
+      )
+    ).toBe(false);
+  });
+
+  it("does not treat a defect as missing", () => {
+    expect(isHelpCenterArticleNotFound(Cause.die("database down"))).toBe(false);
   });
 });

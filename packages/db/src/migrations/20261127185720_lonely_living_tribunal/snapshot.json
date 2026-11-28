@@ -1,0 +1,57 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "1f482577-949a-4b51-b8f2-fff275f0f4de",
+  "prevIds": [
+    "0fb0b956-a3f6-4381-ad59-81c312049893"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "help_center_article_view_event",
+        "help_center_article_view_event_articleId_idx"
+      ],
+      "writes": [
+        "s|idx|public.help_center_article_view_event_articleId_idx",
+        "n|idx|public.help_center_article_view_event_articleId_idx",
+        "e|idx|public.help_center_article_view_event_articleId_idx",
+        "n|rel|public.help_center_article_view_event_articleId_idx"
+      ],
+      "reads": [
+        "n|tbl|public.help_center_article_view_event",
+        "n|sch|public",
+        "n|col|public.help_center_article_view_event.article_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "help_center_article_view_event",
+        "name": "help_center_article_view_event_articleId_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "article_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

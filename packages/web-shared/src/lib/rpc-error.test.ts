@@ -89,6 +89,16 @@ describe("parseRpcError", () => {
 
     expect(parsed.message).toBe("no room");
   });
+
+  it("reads a decoded tagged failure that is not wrapped in RpcError", () => {
+    const parsed = parseRpcError({
+      _tag: "NotFoundError",
+      message: "The article does not exist.",
+    });
+
+    expect(parsed.kind).toBe("rpc");
+    expect(parsed.message).toBe("The article does not exist.");
+  });
 });
 
 describe("isRpcErrorTag", () => {

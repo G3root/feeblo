@@ -8,8 +8,12 @@ import * as Policy from "../policy";
  * Who may shape the help center.
  *
  * Both resources are manager-owned content, like the changelog they sit beside
- * on the portal: `helpCenterTopics.*` for the sections and
- * `helpCenterArticles.*` for the pages. Reading is not gated here — the portal
+ * on the portal: `helpCenterTopics.create/update/delete` for the sections and
+ * `helpCenterArticles.create/update/publish/delete` for the pages. Each gate
+ * names its own action rather than the resource wildcard — the manager role
+ * still reaches all of them through `helpCenterTopics.*`, because
+ * `canPermission` treats the wildcard as covering every action — but a
+ * narrower role grant stays expressible. Reading is not gated here — the portal
  * surface asks `SitePolicy.canViewHelpCenter`, and the dashboard asks for
  * membership.
  *
@@ -28,13 +32,13 @@ const makeHelpCenterTopicPolicy = () => {
   const canUpdate = (organizationId: string) =>
     Policy.all(
       Policy.hasMembership(organizationId),
-      Policy.canPermission(organizationId, "helpCenterTopics.*")
+      Policy.canPermission(organizationId, "helpCenterTopics.update")
     );
 
   const canDelete = (organizationId: string) =>
     Policy.all(
       Policy.hasMembership(organizationId),
-      Policy.canPermission(organizationId, "helpCenterTopics.*")
+      Policy.canPermission(organizationId, "helpCenterTopics.delete")
     );
 
   /**

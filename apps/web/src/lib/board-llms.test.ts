@@ -1,5 +1,6 @@
 import type { TBoard } from "@feeblo/domain/board/schema";
 import type { TChangelog } from "@feeblo/domain/changelog/schema";
+import type { THelpCenterArticlePublicSummary } from "@feeblo/domain/help-center-article/schema";
 import type { TPostListItem } from "@feeblo/domain/post/schema";
 import type { TRoadmap } from "@feeblo/domain/roadmap/schema";
 import type { TSite } from "@feeblo/domain/site/schema";
@@ -96,6 +97,27 @@ const changelog = (overrides: Partial<TChangelog> = {}): TChangelog => ({
   ...overrides,
 });
 
+/**
+ * The public list row carries no counters, so this fixture has none: the index
+ * renders a title, a section and a URL, and anything else would be a field the
+ * renderer reads for nothing.
+ */
+const helpArticle = (
+  overrides: Partial<THelpCenterArticlePublicSummary> = {}
+): THelpCenterArticlePublicSummary => ({
+  excerpt: "Feeblo is a customer feedback platform.",
+  id: "article_1",
+  isArchived: false,
+  publishedAt: date("2026-01-01T00:00:00.000Z"),
+  slug: "what-is-feeblo",
+  title: "What is Feeblo?",
+  topicId: "topic_1",
+  topicName: "Getting started",
+  topicSlug: "getting-started",
+  updatedAt: date("2026-07-28T00:00:00.000Z"),
+  ...overrides,
+});
+
 const content = (overrides: Partial<BoardContent> = {}): BoardContent => ({
   boards: [board()],
   helpArticles: [],
@@ -152,16 +174,35 @@ describe("renderBoardLlmsTxt", () => {
     expect(output.indexOf("[New]")).toBeLessThan(output.indexOf("[Old]"));
   });
 
-  it("omits a hidden roadmap and changelog even when content is supplied", () => {
+  it("omits a hidden roadmap, changelog and help center even when content is supplied", () => {
     const output = renderBoardLlmsTxt(
-      site({ roadmapVisibility: "HIDDEN", changelogVisibility: "HIDDEN" }),
+      site({
+        roadmapVisibility: "HIDDEN",
+        changelogVisibility: "HIDDEN",
+        helpCenterVisibility: "HIDDEN",
+      }),
       "https://acme.example.test",
-      content()
+      content({ helpArticles: [helpArticle()] })
     );
 
     expect(output).not.toContain("## Roadmap");
     expect(output).not.toContain("## Changelog");
+    expect(output).not.toContain("## Help center");
+    expect(output).not.toContain("/help/articles/what-is-feeblo");
     expect(output).not.toContain("changelog/rss.xml");
+  });
+
+  it("lists published help articles from the public summary projection", () => {
+    const output = renderBoardLlmsTxt(
+      site(),
+      "https://acme.example.test",
+      content({ helpArticles: [helpArticle()] })
+    );
+
+    expect(output).toContain("## Help center");
+    expect(output).toContain(
+      "- [What is Feeblo?](https://acme.example.test/help/articles/what-is-feeblo): Feeblo is a customer feedback platform."
+    );
   });
 
   it("omits the platform link when the site hides Feeblo branding", () => {

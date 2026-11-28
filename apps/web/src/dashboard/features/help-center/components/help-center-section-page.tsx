@@ -35,10 +35,14 @@ import { and, eq, useLiveQuery } from "@tanstack/react-db";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { useDashboardCollections } from "~/providers/dashboard-collections-provider";
 
 import { HelpCenterArticleListView } from "./help-center-article-list-view";
-import { HelpCenterArticleUsage } from "./help-center-article-usage";
+import {
+  HelpCenterArticleUsage,
+  useHelpCenterArticleAllowance,
+} from "./help-center-article-usage";
 import { EditHelpCenterTopicDialog } from "./help-center-topic-dialog";
 import { HelpCenterTopicIcon } from "./help-center-topic-icon";
 
@@ -56,8 +60,11 @@ export function HelpCenterSectionPage({
   organizationId: string;
   topicId: string;
 }) {
-  const { helpCenterArticleCollection, helpCenterTopicCollection } =
-    useDashboardCollections();
+  const collections = useDashboardCollections();
+
+  const { helpCenterTopicCollection } = collections;
+
+  const topicArticles = collections.helpCenterTopicArticleCollection(topicId);
 
   const navigate = useNavigate();
 
@@ -97,13 +104,13 @@ export function HelpCenterSectionPage({
   const articlesQuery = useLiveQuery({
     queryKey: [
       "help-center-section-articles",
-      helpCenterArticleCollection.id,
+      topicArticles.id,
       organizationId,
       topicId,
     ],
     query: (q) =>
       q
-        .from({ article: helpCenterArticleCollection })
+        .from({ article: topicArticles })
         .where(({ article }) =>
           and(
             eq(article.organizationId, organizationId),
@@ -127,6 +134,8 @@ export function HelpCenterSectionPage({
     (total, row) => total + row.articleCount,
     0
   );
+
+  const { atLimit } = useHelpCenterArticleAllowance(articleTotal);
 
   const confirmDeleteSection = async () => {
     if (topic === undefined) {
@@ -245,22 +254,35 @@ export function HelpCenterSectionPage({
           <HelpCenterArticleUsage used={articleTotal} />
           {canManage ? (
             <>
-              <Button
-                className="max-md:hidden"
-                render={(props) => (
-                  <Link
-                    {...props}
-                    params={{ organizationId, topicId }}
-                    to="/$organizationId/help-center/$topicId/new"
-                  />
-                )}
-                type="button"
-                variant="brand"
-              >
-                <HugeiconsIcon icon={Plus} />
-                New article
-              </Button>
+              {atLimit ? (
+                <Button
+                  className="max-md:hidden"
+                  disabled
+                  type="button"
+                  variant="brand"
+                >
+                  <HugeiconsIcon icon={Plus} />
+                  New article
+                </Button>
+              ) : (
+                <Button
+                  className="max-md:hidden"
+                  render={(props) => (
+                    <Link
+                      {...props}
+                      params={{ organizationId, topicId }}
+                      to="/$organizationId/help-center/$topicId/new"
+                    />
+                  )}
+                  type="button"
+                  variant="brand"
+                >
+                  <HugeiconsIcon icon={Plus} />
+                  New article
+                </Button>
+              )}
               <FloatingActionButton
+                disabled={atLimit}
                 icon={<HugeiconsIcon icon={Plus} />}
                 onClick={() =>
                   void navigate({
@@ -319,18 +341,24 @@ export function HelpCenterSectionPage({
             </EmptyHeader>
             {canManage ? (
               <EmptyContent>
-                <Button
-                  render={(props) => (
-                    <Link
-                      {...props}
-                      params={{ organizationId, topicId }}
-                      to="/$organizationId/help-center/$topicId/new"
-                    >
-                      Create the first article
-                    </Link>
-                  )}
-                  type="button"
-                />
+                {atLimit ? (
+                  <p className="text-muted-foreground text-sm">
+                    {m.calm_good_turtle_foster()}
+                  </p>
+                ) : (
+                  <Button
+                    render={(props) => (
+                      <Link
+                        {...props}
+                        params={{ organizationId, topicId }}
+                        to="/$organizationId/help-center/$topicId/new"
+                      >
+                        Create the first article
+                      </Link>
+                    )}
+                    type="button"
+                  />
+                )}
               </EmptyContent>
             ) : null}
           </Empty>
@@ -348,7 +376,6 @@ export function HelpCenterSectionPage({
         key={topic.id}
         onOpenChange={setEditOpen}
         open={editOpen}
-        organizationId={organizationId}
         topic={topic}
       />
       <ConfirmDialog

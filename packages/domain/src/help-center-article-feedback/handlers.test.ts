@@ -54,9 +54,9 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
       : [],
   });
 
-  /** A stable, UUID-shaped id per fixture, so the vote key is never shared. */
-  const visitorIdFor = (fixture: Fixture) =>
-    `00000000-0000-4000-8000-${fixture.organizationId.slice(-12).padStart(12, "0")}`;
+  /** A stable, UUID-shaped id per fixture and voter slot, so keys never clash. */
+  const visitorIdFor = (fixture: Fixture, slot = 0) =>
+    `00000000-0000-4000-8000-${`${fixture.organizationId.slice(-9)}${slot}`.padStart(12, "0")}`;
 
   const makeFixture = () =>
     Effect.gen(function* () {
@@ -158,14 +158,33 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
   );
 
   /** The stored verdict rows for one article. */
-  const countRows = (articleId: string) =>
+  const readVerdicts = (articleId: string) =>
     Effect.gen(function* () {
       const db = yield* currentDb;
 
       return yield* db
-        .select({ id: schema.helpCenterArticleFeedbackTable.id })
+        .select({
+          userId: schema.helpCenterArticleFeedbackTable.userId,
+          visitorId: schema.helpCenterArticleFeedbackTable.visitorId,
+          helpful: schema.helpCenterArticleFeedbackTable.helpful,
+          reason: schema.helpCenterArticleFeedbackTable.reason,
+        })
         .from(schema.helpCenterArticleFeedbackTable)
         .where(eq(schema.helpCenterArticleFeedbackTable.articleId, articleId));
+    });
+
+  /** The day's verdict bucket for one article. */
+  const readDaily = (articleId: string) =>
+    Effect.gen(function* () {
+      const db = yield* currentDb;
+
+      return yield* db
+        .select({
+          helpful: schema.helpCenterArticleDailyTable.helpfulVerdicts,
+          unhelpful: schema.helpCenterArticleDailyTable.unhelpfulVerdicts,
+        })
+        .from(schema.helpCenterArticleDailyTable)
+        .where(eq(schema.helpCenterArticleDailyTable.articleId, articleId));
     });
 
   layer(TestLayer)("handlers", (it) => {
@@ -197,7 +216,7 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
         expect(second.helpfulCount).toBe(1);
         expect(second.notHelpfulCount).toBe(0);
 
-        const rows = yield* countRows(fixture.articleId);
+        const rows = yield* readVerdicts(fixture.articleId);
         expect(rows).toHaveLength(1);
       })
     );
@@ -232,7 +251,7 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
         expect(flipped.notHelpfulCount).toBe(1);
         expect(flipped.mine).toBe(false);
 
-        const rows = yield* countRows(fixture.articleId);
+        const rows = yield* readVerdicts(fixture.articleId);
         expect(rows).toHaveLength(1);
       })
     );
@@ -240,7 +259,6 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
     it.effect("counts each verdict on the day it was cast", () =>
       Effect.gen(function* () {
         const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
-        const db = yield* currentDb;
         const fixture = yield* makeFixture();
         const visitorId = visitorIdFor(fixture);
 
@@ -258,21 +276,105 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
         yield* cast(true);
         yield* cast(false);
 
-        const rows = yield* db
-          .select({
-            helpful: schema.helpCenterArticleDailyTable.helpfulVerdicts,
-            unhelpful: schema.helpCenterArticleDailyTable.unhelpfulVerdicts,
-          })
-          .from(schema.helpCenterArticleDailyTable)
-          .where(
-            eq(schema.helpCenterArticleDailyTable.articleId, fixture.articleId)
-          );
+        const rows = yield* readDaily(fixture.articleId);
 
         // A flip is a second verdict cast, not a correction of the first: the
         // bucket counts judgments made, which is what "was this helpful"
         // measures. The standing distribution is the feedback table itself.
         expect(rows).toStrictEqual([{ helpful: 1, unhelpful: 1 }]);
       })
+    );
+
+    it.effect("counts a repeated helpful verdict only once", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const visitorId = visitorIdFor(fixture);
+
+        const cast = () =>
+          handlers
+            .SetHelpCenterArticleFeedback({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              helpful: true,
+              reason: null,
+              visitorId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+        yield* cast();
+        yield* cast();
+
+        // Pressing Yes twice is one opinion. Counting requests instead of
+        // judgments would inflate today's bucket by a double-click.
+        const rows = yield* readDaily(fixture.articleId);
+        expect(rows).toStrictEqual([{ helpful: 1, unhelpful: 0 }]);
+      })
+    );
+
+    it.effect("serializes overlapping identical casts", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const visitorId = visitorIdFor(fixture);
+
+        const cast = () =>
+          handlers
+            .SetHelpCenterArticleFeedback({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              helpful: true,
+              reason: null,
+              visitorId,
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+        // Two tabs can submit before either reads the other's row. The article
+        // lock serializes the read and the write, so the second cast sees the
+        // first verdict and does not move the daily bucket again.
+        yield* Effect.all([cast(), cast()], { concurrency: "unbounded" });
+
+        const rows = yield* readDaily(fixture.articleId);
+        expect(rows).toStrictEqual([{ helpful: 1, unhelpful: 0 }]);
+
+        const verdicts = yield* readVerdicts(fixture.articleId);
+        expect(verdicts).toHaveLength(1);
+      })
+    );
+
+    it.effect(
+      "records a reason sent after a no vote without counting a second verdict",
+      () =>
+        Effect.gen(function* () {
+          const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+          const fixture = yield* makeFixture();
+          const visitorId = visitorIdFor(fixture);
+
+          const cast = (reason: string | null) =>
+            handlers
+              .SetHelpCenterArticleFeedback({
+                organizationId: fixture.organizationId,
+                articleId: fixture.articleId,
+                helpful: false,
+                reason,
+                visitorId,
+              })
+              .pipe(
+                Effect.provideService(OptionalCurrentSession, Option.none())
+              );
+
+          yield* cast(null);
+          yield* cast("The screenshots are out of date.");
+
+          const rows = yield* readVerdicts(fixture.articleId);
+
+          expect(rows).toHaveLength(1);
+          expect(rows[0]?.reason).toBe("The screenshots are out of date.");
+          // The second request carried the same verdict with a reason; it is
+          // the same judgment, so the day's unhelpful bucket stays at one.
+          const daily = yield* readDaily(fixture.articleId);
+          expect(daily).toStrictEqual([{ helpful: 0, unhelpful: 1 }]);
+        })
     );
 
     it.effect("clears the reason when the verdict flips back to helpful", () =>
@@ -323,33 +425,118 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
       })
     );
 
+    it.effect("migrates an anonymous verdict to the account row", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const visitorId = visitorIdFor(fixture);
+
+        // An anonymous No, then the same person signs in and presses Yes. The
+        // account row supersedes the browser-keyed one; keeping both would
+        // count one reader twice and make the tally contradict the one verdict
+        // the reader remembers casting.
+        yield* handlers
+          .SetHelpCenterArticleFeedback({
+            organizationId: fixture.organizationId,
+            articleId: fixture.articleId,
+            helpful: false,
+            reason: "Missing a step.",
+            visitorId,
+          })
+          .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+        const signedIn = yield* handlers
+          .SetHelpCenterArticleFeedback({
+            organizationId: fixture.organizationId,
+            articleId: fixture.articleId,
+            helpful: true,
+            reason: null,
+            visitorId,
+          })
+          .pipe(
+            Effect.provideService(
+              OptionalCurrentSession,
+              Option.some(makeSession(fixture))
+            )
+          );
+
+        expect(signedIn.mine).toBe(true);
+        expect(signedIn.helpfulCount).toBe(1);
+        expect(signedIn.notHelpfulCount).toBe(0);
+
+        const rows = yield* readVerdicts(fixture.articleId);
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+          userId: fixture.userId,
+          visitorId: null,
+          helpful: true,
+          reason: null,
+        });
+
+        // The anonymous No and the signed-in Yes are two judgments, so the day
+        // buckets one of each: the migration deletes a row, not a judgment.
+        const daily = yield* readDaily(fixture.articleId);
+        expect(daily).toStrictEqual([{ helpful: 1, unhelpful: 1 }]);
+      })
+    );
+
+    it.effect("does not count the sign-in migration as a second verdict", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const visitorId = visitorIdFor(fixture);
+
+        const cast = () =>
+          handlers.SetHelpCenterArticleFeedback({
+            organizationId: fixture.organizationId,
+            articleId: fixture.articleId,
+            helpful: true,
+            reason: null,
+            visitorId,
+          });
+
+        yield* cast().pipe(
+          Effect.provideService(OptionalCurrentSession, Option.none())
+        );
+        yield* cast().pipe(
+          Effect.provideService(
+            OptionalCurrentSession,
+            Option.some(makeSession(fixture))
+          )
+        );
+
+        // Same verdict on both sides of signing in: the repository reads the
+        // anonymous row as the previous verdict, so the migration must not add
+        // a second helpful judgment to today's bucket.
+        const daily = yield* readDaily(fixture.articleId);
+        expect(daily).toStrictEqual([{ helpful: 1, unhelpful: 0 }]);
+      })
+    );
+
     it.effect(
-      "keys a signed-in verdict to the account, not the visitor id",
+      "shows a signed-in reader the verdict they cast anonymously",
       () =>
         Effect.gen(function* () {
           const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
           const fixture = yield* makeFixture();
           const visitorId = visitorIdFor(fixture);
 
-          // An anonymous vote first, then the same person signs in and votes
-          // again: the account verdict is a second row because it is a different
-          // identity facet, and the account one is what the reader sees.
           yield* handlers
             .SetHelpCenterArticleFeedback({
               organizationId: fixture.organizationId,
               articleId: fixture.articleId,
               helpful: false,
-              reason: null,
+              reason: "Missing a step.",
               visitorId,
             })
             .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
 
-          const signedIn = yield* handlers
-            .SetHelpCenterArticleFeedback({
+          // Reading before the signed-in vote falls back to the browser-keyed
+          // row, so signing in does not appear to erase the vote.
+          const read = yield* handlers
+            .GetHelpCenterArticleFeedbackPublic({
               organizationId: fixture.organizationId,
               articleId: fixture.articleId,
-              helpful: true,
-              reason: null,
               visitorId,
             })
             .pipe(
@@ -359,8 +546,12 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
               )
             );
 
-          expect(signedIn.mine).toBe(true);
-          expect(signedIn.helpfulCount).toBe(1);
+          expect(read.mine).toBe(false);
+          expect(read.helpfulCount).toBe(0);
+          expect(read.notHelpfulCount).toBe(1);
+          // Views belong to the article payload; a verdict read must not restate
+          // a number it cannot change.
+          expect(read).not.toHaveProperty("viewCount");
         })
     );
 
@@ -458,6 +649,52 @@ describe("HelpCenterArticleFeedbackRpcHandlers", () => {
         );
 
         expect(error._tag).toBe("PolicyDenied");
+      })
+    );
+
+    it.effect("filters the dashboard list to reasoned unhelpful verdicts", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterArticleFeedbackRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+
+        const cast = (helpful: boolean, reason: string | null, slot: number) =>
+          handlers
+            .SetHelpCenterArticleFeedback({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              helpful,
+              reason,
+              visitorId: visitorIdFor(fixture, slot),
+            })
+            .pipe(Effect.provideService(OptionalCurrentSession, Option.none()));
+
+        yield* cast(true, null, 0);
+        yield* cast(false, null, 1);
+        yield* cast(false, "The screenshots are out of date.", 2);
+
+        const list = (args: { reasonsOnly?: boolean; limit?: number }) =>
+          handlers
+            .ListHelpCenterArticleFeedback({
+              organizationId: fixture.organizationId,
+              articleId: fixture.articleId,
+              ...args,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)));
+
+        // The unfiltered list keeps its shape: every verdict, newest first,
+        // bounded by the default limit rather than by the reason filter.
+        const everything = yield* list({});
+        expect(everything).toHaveLength(3);
+
+        // The reason panel is unhelpful verdicts that left text: a helpful
+        // verdict cannot carry a reason, and a bare No has nothing to act on.
+        const reasons = yield* list({ reasonsOnly: true });
+        expect(reasons).toHaveLength(1);
+        expect(reasons[0]?.helpful).toBe(false);
+        expect(reasons[0]?.reason).toBe("The screenshots are out of date.");
+
+        const bounded = yield* list({ limit: 1 });
+        expect(bounded).toHaveLength(1);
       })
     );
   });

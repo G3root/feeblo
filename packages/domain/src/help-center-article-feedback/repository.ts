@@ -1,18 +1,19 @@
-import { currentDb, schema } from "@feeblo/db";
+import { currentDb, schema, transaction } from "@feeblo/db";
 import { HelpCenterArticleFeedbackId } from "@feeblo/id";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
-import type { THelpCenterArticleFeedbackPublic } from "./schema";
+import {
+  HELP_CENTER_ARTICLE_FEEDBACK_LIST_DEFAULT_LIMIT,
+  type THelpCenterArticleFeedbackPublic,
+} from "./schema";
 
 const feedback = schema.helpCenterArticleFeedbackTable;
 
 const article = schema.helpCenterArticleTable;
-
-const viewTotal = schema.helpCenterArticleViewTotalTable;
 
 const daily = schema.helpCenterArticleDailyTable;
 
@@ -45,33 +46,16 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
         Effect.map((rows) => rows[0] ?? { helpfulCount: 0, notHelpfulCount: 0 })
       );
 
-  const viewCountFor = ({
-    organizationId,
-    articleId,
-  }: {
-    organizationId: string;
-    articleId: string;
-  }) =>
-    db
-      .select({ views: viewTotal.views })
-      .from(viewTotal)
-      .innerJoin(article, eq(article.id, viewTotal.articleId))
-      .where(
-        and(
-          eq(article.organizationId, organizationId),
-          eq(viewTotal.articleId, articleId)
-        )
-      )
-      .limit(1)
-      .pipe(Effect.map((rows) => rows[0]?.views ?? 0));
-
   /**
    * The reader's own verdict.
    *
-   * Two identity facets, never both: the query asks for the signed-in row when
-   * there is one, and for the browser-keyed row otherwise. A signed-in reader
-   * who also carries a visitor id keeps the account row, so signing in does not
-   * appear to lose a vote they already cast.
+   * Two identity facets: the account row when there is one, and the
+   * browser-keyed row as the fallback. A signed-in reader who also carries a
+   * visitor id answers with the account verdict when it exists and with the
+   * anonymous one otherwise, so signing in mid-vote does not appear to lose the
+   * vote they already cast. The account row sorts first, which is the whole
+   * rule; the fallback row is only the answer when there is no account row for
+   * this article.
    */
   const findMine = ({
     organizationId,
@@ -93,9 +77,17 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
           eq(feedback.articleId, articleId),
           userId === null
             ? eq(feedback.visitorId, visitorId ?? "")
-            : eq(feedback.userId, userId)
+            : visitorId === null
+              ? eq(feedback.userId, userId)
+              : or(
+                  eq(feedback.userId, userId),
+                  eq(feedback.visitorId, visitorId)
+                )
         )
       )
+      // Booleans sort false before true, so `desc` here puts the account row
+      // ahead of the anonymous fallback.
+      .orderBy(desc(sql`${feedback.userId} is not null`))
       .limit(1)
       .pipe(Effect.map((rows) => rows[0]?.helpful ?? null));
 
@@ -111,16 +103,15 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
     visitorId: string | null;
   }) =>
     Effect.gen(function* () {
-      const [counts, viewCount, mine] = yield* Effect.all(
+      const [counts, mine] = yield* Effect.all(
         [
           countsFor({ organizationId, articleId }),
-          viewCountFor({ organizationId, articleId }),
           findMine({ organizationId, articleId, userId, visitorId }),
         ],
         { concurrency: "unbounded" }
       );
 
-      return { viewCount, ...counts, mine };
+      return { ...counts, mine };
     });
 
   /**
@@ -135,6 +126,12 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
    * what keeps the two counts summing to one verdict per reader. Flipping to
    * helpful clears `reason`, because a reason explains the unhelpful vote it
    * was written for.
+   *
+   * A signed-in reader can arrive carrying the browser id that voted before
+   * they signed in. The account row is the verdict from then on, and the
+   * anonymous row is deleted in the same transaction — otherwise the same
+   * person would be counted twice, and the reader would see one count that
+   * contradicts the one verdict they remember casting.
    */
   const cast = ({
     organizationId,
@@ -159,86 +156,147 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
       // service an Effect program reads like `Clock`.
       const id = yield* HelpCenterArticleFeedbackId.generate;
 
-      const conflict =
-        userId === null
-          ? {
-              target: [feedback.articleId, feedback.visitorId],
-              targetWhere: sql`${feedback.visitorId} is not null`,
-            }
-          : {
-              target: [feedback.articleId, feedback.userId],
-              targetWhere: sql`${feedback.userId} is not null`,
-            };
+      const previous = yield* transaction(
+        Effect.gen(function* () {
+          // Serialize overlapping casts for one article. Without this lock two
+          // requests can both read the old verdict before either commits and
+          // both increment the daily bucket; the unique index only keeps the
+          // standing row single. The lock is released when the transaction
+          // ends, and the daily write stays outside it.
+          yield* db
+            .select({ id: article.id })
+            .from(article)
+            .where(
+              and(
+                eq(article.id, articleId),
+                eq(article.organizationId, organizationId)
+              )
+            )
+            .for("update");
 
-      yield* db
-        .insert(feedback)
-        .values({
-          id,
-          organizationId,
-          articleId,
-          userId,
-          visitorId,
-          helpful,
-          reason: helpful ? null : reason,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: conflict.target,
-          targetWhere: conflict.targetWhere,
-          set: {
-            helpful,
-            reason: helpful ? null : reason,
-            updatedAt: now,
-          },
-        })
-        .pipe(Effect.asVoid);
+          // The effective verdict before this cast: the account row when the
+          // reader is signed in, the anonymous row as the fallback. Read before
+          // the upsert, so the daily bucket can tell a new judgment from a
+          // repeated one.
+          const previous = yield* findMine({
+            organizationId,
+            articleId,
+            userId,
+            visitorId,
+          });
 
-      // The day's bucket, which counts verdicts *cast* rather than the standing
-      // distribution: a flip adds one to today and leaves the earlier day's
-      // count alone. Deliberately not part of the verdict's own write path — a
-      // counter that could fail would be a vote the reader cannot cast, so a
-      // failed bucket is logged and the verdict stands.
-      yield* db
-        .insert(daily)
-        .values({
-          articleId,
-          day: DateTime.formatIsoDateUtc(DateTime.fromDateUnsafe(now)),
-          helpfulVerdicts: helpful ? 1 : 0,
-          organizationId,
-          unhelpfulVerdicts: helpful ? 0 : 1,
-          views: 0,
+          const conflict =
+            userId === null
+              ? {
+                  target: [feedback.articleId, feedback.visitorId],
+                  targetWhere: sql`${feedback.visitorId} is not null`,
+                }
+              : {
+                  target: [feedback.articleId, feedback.userId],
+                  targetWhere: sql`${feedback.userId} is not null`,
+                };
+
+          yield* db
+            .insert(feedback)
+            .values({
+              id,
+              organizationId,
+              articleId,
+              userId,
+              // The row's facet: a signed-in reader is keyed to the account,
+              // whatever `visitorId` the request carried.
+              visitorId: userId === null ? visitorId : null,
+              helpful,
+              reason: helpful ? null : reason,
+              createdAt: now,
+              updatedAt: now,
+            })
+            .onConflictDoUpdate({
+              target: conflict.target,
+              targetWhere: conflict.targetWhere,
+              set: {
+                helpful,
+                reason: helpful ? null : reason,
+                updatedAt: now,
+              },
+            })
+            .pipe(Effect.asVoid);
+
+          if (userId !== null && visitorId !== null) {
+            yield* db
+              .delete(feedback)
+              .where(
+                and(
+                  eq(feedback.organizationId, organizationId),
+                  eq(feedback.articleId, articleId),
+                  eq(feedback.visitorId, visitorId)
+                )
+              )
+              .pipe(Effect.asVoid);
+          }
+
+          return previous;
         })
-        .onConflictDoUpdate({
-          target: [daily.articleId, daily.day],
-          set: {
-            helpfulVerdicts: sql`${daily.helpfulVerdicts} + ${helpful ? 1 : 0}`,
-            unhelpfulVerdicts: sql`${daily.unhelpfulVerdicts} + ${helpful ? 0 : 1}`,
-          },
-        })
-        .pipe(
-          Effect.tapCause((cause) =>
-            Effect.logWarning("Failed to record a help center verdict", cause)
-          ),
-          Effect.asVoid,
-          Effect.ignoreCause
-        );
+      );
+
+      // The day's bucket counts verdicts *cast*, not the standing distribution:
+      // a flip adds one to today and leaves the earlier day's count alone. A
+      // repeated verdict is not a new judgment — pressing No again to send a
+      // reason is the same opinion — so the bucket only moves on a change.
+      // Deliberately outside the verdict's own transaction: a counter that could
+      // fail would be a vote the reader cannot cast, so a failed bucket is
+      // logged and the verdict stands.
+      if (previous === null || previous !== helpful) {
+        yield* db
+          .insert(daily)
+          .values({
+            articleId,
+            day: DateTime.formatIsoDateUtc(DateTime.fromDateUnsafe(now)),
+            helpfulVerdicts: helpful ? 1 : 0,
+            organizationId,
+            unhelpfulVerdicts: helpful ? 0 : 1,
+            views: 0,
+          })
+          .onConflictDoUpdate({
+            target: [daily.articleId, daily.day],
+            set: {
+              helpfulVerdicts: sql`${daily.helpfulVerdicts} + ${helpful ? 1 : 0}`,
+              unhelpfulVerdicts: sql`${daily.unhelpfulVerdicts} + ${helpful ? 0 : 1}`,
+            },
+          })
+          .pipe(
+            Effect.tapCause((cause) =>
+              Effect.logWarning("Failed to record a help center verdict", cause)
+            ),
+            Effect.asVoid,
+            Effect.ignoreCause
+          );
+      }
     });
 
   /**
    * The dashboard's verdict list, newest first.
    *
-   * `reason` is only present on unhelpful votes, so the dashboard's "what was
-   * missing" panel filters client-side rather than needing a second query.
+   * `reason` is only present on unhelpful votes, so the "what was missing"
+   * panel asks for `reasonsOnly` rather than filtering client-side: the filter
+   * is the partial index the table already declares for this query. The list is
+   * bounded by `limit` in both shapes, because a verdict history is a page of
+   * recent evidence, not an export.
    */
   const list = ({
     organizationId,
     articleId,
+    limit,
+    reasonsOnly,
   }: {
     organizationId: string;
     articleId?: string | undefined;
-  }) =>
-    db
+    limit?: number | undefined;
+    reasonsOnly?: boolean | undefined;
+  }) => {
+    const reasons = reasonsOnly ?? false;
+
+    return db
       .select({
         id: feedback.id,
         articleId: feedback.articleId,
@@ -256,24 +314,16 @@ const makeHelpCenterArticleFeedbackRepository = Effect.gen(function* () {
           eq(feedback.organizationId, organizationId),
           articleId === undefined
             ? undefined
-            : eq(feedback.articleId, articleId)
+            : eq(feedback.articleId, articleId),
+          reasons ? eq(feedback.helpful, false) : undefined,
+          reasons ? isNotNull(feedback.reason) : undefined
         )
       )
-      .orderBy(desc(feedback.createdAt));
+      .orderBy(desc(feedback.createdAt))
+      .limit(limit ?? HELP_CENTER_ARTICLE_FEEDBACK_LIST_DEFAULT_LIMIT);
+  };
 
-  /** How many verdicts the workspace holds, for the dashboard's empty state. */
-  const countByOrganizationId = ({
-    organizationId,
-  }: {
-    organizationId: string;
-  }) =>
-    db
-      .select({ count: count() })
-      .from(feedback)
-      .where(eq(feedback.organizationId, organizationId))
-      .pipe(Effect.map((rows) => rows[0]?.count ?? 0));
-
-  return { tally, cast, list, countByOrganizationId };
+  return { tally, cast, list };
 });
 
 export class HelpCenterArticleFeedbackRepository extends Context.Service<HelpCenterArticleFeedbackRepository>()(

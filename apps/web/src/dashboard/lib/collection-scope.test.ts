@@ -169,9 +169,10 @@ describe("collections module invariants", () => {
 
   it("finds every collection descriptor", () => {
     // A tripwire, not a target: a new descriptor must land on purpose and pass
-    // the two keying invariants below. `savedViewCollection` made it 34, and
-    // the help center's topic and article collections made it 36.
-    expect(blocks.length).toBe(36);
+    // the two keying invariants below. `savedViewCollection` made it 34, the
+    // help center's topic and article collections made it 36, and the
+    // topic-scoped section list made it 37.
+    expect(blocks.length).toBe(37);
   });
 
   it("keys every route-slug-scoped collection by slug", () => {

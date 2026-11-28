@@ -1,11 +1,15 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import type { THelpCenterArticleSearchResult } from "@feeblo/domain/help-center-article/schema";
+import {
+  HELP_CENTER_SEARCH_MAX_QUERY_LENGTH,
+  type THelpCenterArticleSearchResult,
+} from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import { DebouncedInputGroupInput } from "@feeblo/ui/debounced-input";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
@@ -23,6 +27,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useMemo, useState } from "react";
+
+import { m } from "@/paraglide/messages.js";
 
 import {
   helpCenterArticlesPublicAtom,
@@ -79,6 +85,17 @@ export function HelpCenterPage() {
     helpCenterArticlesPublicAtom(organizationId)
   );
 
+  const refreshTopics = useAtomRefresh(
+    helpCenterTopicsPublicAtom(organizationId)
+  );
+
+  const refreshArticles = useAtomRefresh(
+    helpCenterArticlesPublicAtom(organizationId)
+  );
+
+  const listsFailed =
+    Result.isFailure(topicsResult) || Result.isFailure(articlesResult);
+
   const topics = Result.getOrElse(topicsResult, () => EMPTY);
   const articles = Result.getOrElse(articlesResult, () => EMPTY);
 
@@ -132,6 +149,7 @@ export function HelpCenterPage() {
           </InputGroupAddon>
           <DebouncedInputGroupInput
             aria-label="Search the help center"
+            maxLength={HELP_CENTER_SEARCH_MAX_QUERY_LENGTH}
             onChange={setQuery}
             placeholder="Search documentation"
             type="search"
@@ -146,23 +164,84 @@ export function HelpCenterPage() {
           organizationId={organizationId}
           query={trimmedQuery}
         />
-      ) : sections.length === 0 ? (
-        <Empty className="py-16">
-          <EmptyHeader>
-            <EmptyTitle>No documentation yet</EmptyTitle>
-            <EmptyDescription>
-              Nothing has been published to the help center.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
       ) : (
-        <div className="mt-8 space-y-6">
-          {sections.map((section) => (
-            <HelpCenterSection key={section.key} section={section} />
-          ))}
-        </div>
+        <HelpCenterSectionsList
+          failed={listsFailed}
+          onRetry={() => {
+            refreshTopics();
+            refreshArticles();
+          }}
+          sections={sections}
+        />
       )}
     </div>
+  );
+}
+
+/**
+ * The list under the search box: the sections, the empty state, or the failure
+ * state.
+ *
+ * A component because the page already forks on whether there is a query, and
+ * a second fork in the same JSX expression would nest one ternary inside
+ * another inside another. The search stays available when the list reads fail:
+ * it is a different operation, and a reader who cannot browse can still ask.
+ */
+function HelpCenterSectionsList({
+  failed,
+  onRetry,
+  sections,
+}: {
+  failed: boolean;
+  onRetry: () => void;
+  sections: ReadonlyArray<HelpCenterNavSection>;
+}) {
+  if (failed) {
+    return <HelpCenterUnavailable onRetry={onRetry} />;
+  }
+
+  if (sections.length === 0) {
+    return (
+      <Empty className="py-16">
+        <EmptyHeader>
+          <EmptyTitle>No documentation yet</EmptyTitle>
+          <EmptyDescription>
+            Nothing has been published to the help center.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+
+  return (
+    <div className="mt-8 space-y-6">
+      {sections.map((section) => (
+        <HelpCenterSection key={section.key} section={section} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The index when the two list reads could not be loaded.
+ *
+ * Both are refreshed together because the page renders their intersection: a
+ * topic list without its articles is not a smaller help center, and retrying
+ * only one would leave the other half missing.
+ */
+function HelpCenterUnavailable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Empty className="py-16">
+      <EmptyHeader>
+        <EmptyTitle>{m.alert_drab_kudu_zip()}</EmptyTitle>
+        <EmptyDescription>{m.misty_vexed_cod_learn()}</EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onRetry} size="sm" type="button" variant="outline">
+          {m.even_seemly_bear()}
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }
 

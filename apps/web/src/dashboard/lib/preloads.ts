@@ -168,19 +168,16 @@ export async function preloadHelpCenter(): Promise<void> {
 }
 
 /** One section: its own row plus the articles it lists. */
-export async function preloadHelpCenterSection(): Promise<void> {
+export async function preloadHelpCenterSection(topicId: string): Promise<void> {
   await Promise.all([
     dashboardCollections.helpCenterTopicCollection.preload(),
-    dashboardCollections.helpCenterArticleCollection.preload(),
+    dashboardCollections.helpCenterTopicArticleCollection(topicId).preload(),
   ]);
 }
 
-/** The help center editor: the article plus the topic it can be moved into. */
+/** The help center editor: the topic it can be moved into. */
 export async function preloadHelpCenterEditor(): Promise<void> {
-  await Promise.all([
-    dashboardCollections.helpCenterArticleCollection.preload(),
-    dashboardCollections.helpCenterTopicCollection.preload(),
-  ]);
+  await dashboardCollections.helpCenterTopicCollection.preload();
 }
 
 /** Contacts and companies share this: the CRM lists render both sides. */

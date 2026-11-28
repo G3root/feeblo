@@ -1,5 +1,8 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { THelpCenterArticleSearchHit } from "@feeblo/domain/help-center-article/schema";
+import {
+  HELP_CENTER_SEARCH_MAX_QUERY_LENGTH,
+  type THelpCenterArticleSearchHit,
+} from "@feeblo/domain/help-center-article/schema";
 import { Badge } from "@feeblo/ui/badge";
 import { Button } from "@feeblo/ui/button";
 import {
@@ -146,7 +149,10 @@ function HelpCenterSearchDialog({
           onValueChange={setInput}
           value={input}
         >
-          <CommandInput placeholder="Search articles..." />
+          <CommandInput
+            maxLength={HELP_CENTER_SEARCH_MAX_QUERY_LENGTH}
+            placeholder="Search articles..."
+          />
           <CommandPanel>
             <CommandEmpty>{emptyMessage(result, query)}</CommandEmpty>
             <CommandList>

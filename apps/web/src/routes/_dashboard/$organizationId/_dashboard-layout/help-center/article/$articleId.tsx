@@ -1,15 +1,19 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
+import { Button } from "@feeblo/ui/button";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
 } from "@feeblo/ui/empty";
 import { Skeleton } from "@feeblo/ui/skeleton";
+import { parseRpcError } from "@feeblo/web-shared/rpc-error";
 import { createFileRoute } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useMemo } from "react";
 
+import { m } from "@/paraglide/messages.js";
 import { EditorLayout } from "~/components/editor-layout";
 import {
   helpCenterArticleAtom,
@@ -48,7 +52,9 @@ function RouteComponent() {
     [articleId, organizationId]
   );
 
-  const articleResult = useAtomValue(helpCenterArticleAtom(args));
+  const atom = helpCenterArticleAtom(args);
+  const articleResult = useAtomValue(atom);
+  const refresh = useAtomRefresh(atom);
 
   return Result.builder(articleResult)
     .onInitial(() => (
@@ -65,16 +71,26 @@ function RouteComponent() {
       </EditorLayout>
     ))
     .onFailure((error) => (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>Article unavailable</EmptyTitle>
-          <EmptyDescription>
-            {error instanceof Error
-              ? error.message
-              : "There was a problem loading this article."}
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <EditorLayout>
+        <EditorLayout.Main>
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>Article unavailable</EmptyTitle>
+              {/* The atom carries the RPC's own failure, which is a decoded
+                  tagged object rather than an `Error`; `instanceof` would take
+                  the fallback for every real one. */}
+              <EmptyDescription>
+                {parseRpcError(error).message}
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={refresh} type="button" variant="outline">
+                {m.even_seemly_bear()}
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </EditorLayout.Main>
+      </EditorLayout>
     ))
     .onSuccess((article) => (
       <HelpCenterArticleEditor

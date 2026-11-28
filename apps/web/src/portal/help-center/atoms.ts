@@ -28,6 +28,18 @@ export const helpCenterPublicReactivityKeys = (organizationId: string) => ({
   helpCenterPublic: [organizationId],
 });
 
+/**
+ * What invalidates one reader's verdict on one workspace.
+ *
+ * Separate from the reads above because a vote changes two counts and nothing
+ * else: refreshing the topics, the list, the article detail and every search
+ * cache for one press would be four caches spent on a number the reader can
+ * already see.
+ */
+export const helpCenterFeedbackReactivityKeys = (organizationId: string) => ({
+  helpCenterFeedback: [organizationId],
+});
+
 export const helpCenterTopicsPublicAtom = Atom.family(
   (organizationId: string) =>
     DashboardClient.query(
@@ -124,7 +136,7 @@ export const helpCenterArticleFeedbackAtom = Atom.family(
         organizationId: args.organizationId,
         visitorId: args.visitorId,
       },
-      { reactivityKeys: helpCenterPublicReactivityKeys(args.organizationId) }
+      { reactivityKeys: helpCenterFeedbackReactivityKeys(args.organizationId) }
     ).pipe(Atom.setIdleTTL("5 minutes"))
 );
 

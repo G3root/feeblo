@@ -1,9 +1,10 @@
-import { useAtomSet, useAtomValue } from "@effect/atom-react";
+import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import type { THelpCenterArticlePublic } from "@feeblo/domain/help-center-article/schema";
 import { useSite } from "@feeblo/public-feature-board/providers/site-provider";
 import { Button } from "@feeblo/ui/button";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
@@ -25,6 +26,8 @@ import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
+
 import {
   addHelpCenterArticleViewAtom,
   helpCenterArticlePublicAtom,
@@ -37,6 +40,7 @@ import {
   findHelpCenterArticleBySlug,
   findHelpCenterSiblings,
   formatHelpDate,
+  isHelpCenterArticleNotFound,
   type HelpCenterNavArticle,
   type HelpCenterNavSection,
   readingMinutes,
@@ -90,7 +94,12 @@ export function HelpCenterArticlePage({
     [organizationId, articleSlug]
   );
 
-  const articleResult = useAtomValue(helpCenterArticlePublicAtom(articleArgs));
+  const articleAtom = helpCenterArticlePublicAtom(articleArgs);
+
+  const articleResult = useAtomValue(articleAtom);
+
+  const refreshArticle = useAtomRefresh(articleAtom);
+
   const topicsResult = useAtomValue(helpCenterTopicsPublicAtom(organizationId));
 
   const articlesResult = useAtomValue(
@@ -155,16 +164,43 @@ export function HelpCenterArticlePage({
       <article className="min-w-0">
         {Result.builder(articleResult)
           .onInitial(() => <ArticleSkeleton />)
-          .onFailure(() => (
-            <Empty className="py-16">
-              <EmptyHeader>
-                <EmptyTitle>Article not found</EmptyTitle>
-                <EmptyDescription>
-                  It may have been removed, or the link is out of date.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ))
+          // `onFailure` hands the whole failure cause, not the typed error it
+          // wraps. Pull the first declared failure out before matching the tag;
+          // otherwise every cause looks like an unavailable article and a
+          // removed page loses its not-found state.
+          .onFailure((cause) => {
+            const notFound = isHelpCenterArticleNotFound(cause);
+
+            return notFound ? (
+              <Empty className="py-16">
+                <EmptyHeader>
+                  <EmptyTitle>{m.sea_topical_ocelot_love()}</EmptyTitle>
+                  <EmptyDescription>
+                    {m.giant_fancy_bobcat_mix()}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <Empty className="py-16">
+                <EmptyHeader>
+                  <EmptyTitle>{m.zany_tidy_giraffe_race()}</EmptyTitle>
+                  <EmptyDescription>
+                    {m.lofty_happy_eagle_evoke()}
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <Button
+                    onClick={refreshArticle}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {m.even_seemly_bear()}
+                  </Button>
+                </EmptyContent>
+              </Empty>
+            );
+          })
           .onSuccess((loaded) => (
             <ArticleBody
               article={loaded}
@@ -497,26 +533,43 @@ function VerdictSection({
     <section className="border-border/70 mt-10 border-t pt-6 print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-medium">Was this helpful?</p>
-        <div className="flex items-center gap-2">
-          <HelpfulVoteButton
-            active={vote.verdict === true}
-            disabled={vote.isPending || !vote.ready}
-            onClick={vote.markHelpful}
-          />
-          <NotHelpfulVoteButton
-            active={vote.verdict === false}
-            disabled={vote.isPending || !vote.ready}
-            onClick={vote.markUnhelpful}
-          />
-        </div>
+        {vote.failed ? (
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground text-sm">
+              {m.mean_flaky_guppy()}
+            </p>
+            <Button
+              onClick={vote.retry}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {m.even_seemly_bear()}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <HelpfulVoteButton
+              active={vote.verdict === true}
+              disabled={vote.isPending || !vote.ready}
+              onClick={vote.markHelpful}
+            />
+            <NotHelpfulVoteButton
+              active={vote.verdict === false}
+              disabled={vote.isPending || !vote.ready}
+              onClick={vote.markUnhelpful}
+            />
+          </div>
+        )}
       </div>
 
       {vote.reasonOpen ? (
         <div className="mt-3 space-y-2">
           <Textarea
+            aria-label={m.stale_grand_beaver_arrive()}
             maxLength={2000}
             onChange={(event) => vote.setReason(event.target.value)}
-            placeholder="What was missing? (optional)"
+            placeholder={m.stale_grand_beaver_arrive()}
             rows={3}
             value={vote.reason}
           />

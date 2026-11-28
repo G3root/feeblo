@@ -30,7 +30,10 @@ describe("HelpCenterTopicRpcHandlers", () => {
   /** A section id is branded, so a fixture holds the brand and not a string. */
   type TopicId = LegidOf<"HelpCenterTopicId">;
 
-  const makeSession = (fixture: Fixture, isMember = true): Session => ({
+  const makeSession = (
+    fixture: Fixture,
+    role: Session["memberships"][number]["role"] | false = "owner"
+  ): Session => ({
     user: {
       id: fixture.userId,
       email: "user@example.com",
@@ -39,12 +42,12 @@ describe("HelpCenterTopicRpcHandlers", () => {
     },
     session: { userId: fixture.userId, token: "test-token" },
     organizations: [{ id: fixture.organizationId }],
-    memberships: isMember
+    memberships: role
       ? [
           {
             membershipId: fixture.membershipId,
             organizationId: fixture.organizationId,
-            role: "owner",
+            role,
           },
         ]
       : [],
@@ -451,6 +454,97 @@ describe("HelpCenterTopicRpcHandlers", () => {
       })
     );
 
+    it.effect("rejects every topic write from a contributor", () =>
+      Effect.gen(function* () {
+        const handlers = yield* HelpCenterTopicRpcHandlersEffect;
+        const fixture = yield* makeFixture();
+        const owner = makeSession(fixture);
+        const contributor = makeSession(fixture, "contributor");
+        const topicId = yield* HelpCenterTopicId.generate;
+        const newTopicId = yield* HelpCenterTopicId.generate;
+
+        // The contributor is a member, so each refusal has to come from the
+        // `helpCenterTopics.*` grants rather than from `hasMembership`.
+        yield* handlers
+          .CreateHelpCenterTopic({
+            id: topicId,
+            organizationId: fixture.organizationId,
+            name: "Getting started",
+            slug: undefined,
+            description: null,
+            icon: null,
+            position: undefined,
+          })
+          .pipe(Effect.provideService(CurrentSession, owner));
+
+        const createError = yield* Effect.flip(
+          handlers
+            .CreateHelpCenterTopic({
+              id: newTopicId,
+              organizationId: fixture.organizationId,
+              name: "Another",
+              slug: undefined,
+              description: null,
+              icon: null,
+              position: undefined,
+            })
+            .pipe(Effect.provideService(CurrentSession, contributor))
+        );
+
+        const updateError = yield* Effect.flip(
+          handlers
+            .UpdateHelpCenterTopic({
+              id: topicId,
+              organizationId: fixture.organizationId,
+              name: "Renamed",
+              slug: "getting-started",
+              description: null,
+              icon: null,
+            })
+            .pipe(Effect.provideService(CurrentSession, contributor))
+        );
+
+        const deleteError = yield* Effect.flip(
+          handlers
+            .DeleteHelpCenterTopic({
+              id: topicId,
+              organizationId: fixture.organizationId,
+            })
+            .pipe(Effect.provideService(CurrentSession, contributor))
+        );
+
+        const reorderError = yield* Effect.flip(
+          handlers
+            .ReorderHelpCenterTopics({
+              organizationId: fixture.organizationId,
+              topicIds: [topicId],
+            })
+            .pipe(Effect.provideService(CurrentSession, contributor))
+        );
+
+        expect([
+          createError._tag,
+          updateError._tag,
+          deleteError._tag,
+          reorderError._tag,
+        ]).toStrictEqual([
+          "PolicyDenied",
+          "PolicyDenied",
+          "PolicyDenied",
+          "PolicyDenied",
+        ]);
+
+        // Nothing was written by any of the four refusals.
+        const topics = yield* handlers
+          .ListHelpCenterTopics({ organizationId: fixture.organizationId })
+          .pipe(Effect.provideService(CurrentSession, owner));
+
+        expect(topics.map((topic) => [topic.name, topic.slug])).toStrictEqual([
+          ["Getting started", "getting-started"],
+        ]);
+      })
+    );
+
     it.effect(
       "does not list a section with no published article publicly",
       () =>
@@ -489,6 +583,9 @@ describe("HelpCenterTopicRpcHandlers", () => {
           expect(topics.map((topic) => topic.name)).toStrictEqual([
             "Published",
           ]);
+          // The portal renders no count, so the public projection does not
+          // carry one — `findManyPublished` no longer computes it.
+          expect(topics[0]).not.toHaveProperty("articleCount");
         })
     );
   });

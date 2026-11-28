@@ -38,10 +38,8 @@ const article = (
   content: "Feeblo is a customer feedback platform.\n\n## The board\n\n...",
   coverImage: null,
   excerpt: "Feeblo is a customer feedback platform.",
-  helpfulCount: 0,
   id: "article_1",
   isArchived: false,
-  notHelpfulCount: 0,
   publishedAt: new Date("2026-01-01T00:00:00.000Z"),
   slug: "what-is-feeblo",
   title: "What is Feeblo?",
@@ -57,10 +55,8 @@ const summary = (
   overrides: Partial<THelpCenterArticlePublicSummary> = {}
 ): THelpCenterArticlePublicSummary => ({
   excerpt: "Feeblo is a customer feedback platform.",
-  helpfulCount: 0,
   id: "article_1",
   isArchived: false,
-  notHelpfulCount: 0,
   publishedAt: new Date("2026-01-01T00:00:00.000Z"),
   slug: "what-is-feeblo",
   title: "What is Feeblo?",
@@ -68,7 +64,6 @@ const summary = (
   topicName: "Getting started",
   topicSlug: "getting-started",
   updatedAt: new Date("2026-07-28T00:00:00.000Z"),
-  viewCount: 0,
   ...overrides,
 });
 
