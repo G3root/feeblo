@@ -788,10 +788,16 @@ export function helpCenterTopicArticleCollection(
 
         const window = ctx.meta?.loadSubsetOptions;
 
-        // The list operation filters by workspace and optionally one section;
-        // the section's live query keeps its predicate as a second guard, but
-        // the rows never leave the server. The workspace-wide collection stays
-        // for the plan-usage meter.
+        // The page windows every read, and the operation refuses a
+        // section-scoped list without one: a demand that named no window would
+        // ask the server for the whole section, which is the read this
+        // collection exists to avoid. It fails there rather than quietly
+        // returning a page a windowless demander would take as complete.
+        //
+        // The list operation filters by workspace and section on the server;
+        // the live query keeps its predicate as a second guard. The
+        // workspace-wide collection stays for the plan-usage meter, which is
+        // the one caller allowed to read without a window.
         const data = await fetchRpc(
           (rpc) =>
             rpc.ListHelpCenterArticles({

@@ -1329,6 +1329,7 @@ describe("HelpCenterArticleRpcHandlers", () => {
 
         const scoped = yield* handlers
           .ListHelpCenterArticles({
+            limit: 10,
             organizationId: fixture.organizationId,
             topicId: secondTopicId,
           })
@@ -1337,6 +1338,20 @@ describe("HelpCenterArticleRpcHandlers", () => {
         expect(scoped.map((article) => article.slug)).toStrictEqual([
           "second-section",
         ]);
+
+        // A section without a window is the read pagination removes, so the
+        // operation refuses it rather than returning the whole section. The
+        // workspace-wide read stays unbounded for the plan-usage meter.
+        const windowless = yield* Effect.flip(
+          handlers
+            .ListHelpCenterArticles({
+              organizationId: fixture.organizationId,
+              topicId: secondTopicId,
+            })
+            .pipe(Effect.provideService(CurrentSession, makeSession(fixture)))
+        );
+
+        expect(windowless._tag).toBe("BadRequestError");
 
         const all = yield* handlers
           .ListHelpCenterArticles({ organizationId: fixture.organizationId })

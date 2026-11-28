@@ -148,12 +148,27 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
 
   return {
     ListHelpCenterArticles: (args: THelpCenterArticleList) =>
-      repository
-        .findMany(args)
-        .pipe(
-          Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
-          withRemapDbErrors("HelpCenterArticle", "select")
-        ),
+      Effect.gen(function* () {
+        // A section-scoped read has to name its window.
+        //
+        // The dashboard's unbounded read is the plan-usage meter, which asks for
+        // the workspace and needs every row. A section that arrived whole is
+        // the read pagination exists to remove, so an accidental windowless
+        // section read is refused here instead of spending three counter
+        // subqueries per article to answer a list that only renders a page.
+        if (args.topicId !== undefined && args.limit === undefined) {
+          return yield* new BadRequestError({
+            message: "A section-scoped article list requires a limit.",
+          });
+        }
+
+        return yield* repository
+          .findMany(args)
+          .pipe(
+            Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
+            withRemapDbErrors("HelpCenterArticle", "select")
+          );
+      }),
 
     ListHelpCenterArticlesPublic: (args: THelpCenterArticleListPublic) =>
       repository.findManyPublic(args).pipe(

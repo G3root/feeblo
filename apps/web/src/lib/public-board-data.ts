@@ -212,12 +212,25 @@ export async function resolvePageContent(
 }
 
 /**
+ * How long the Help tab's existence read may add to a board document.
+ *
+ * The navbar draws the tab before the page settles, so this read is a
+ * decoration on a document that already has its own work to do: a slow or hung
+ * answer must not hold the response past the board's latency budget. It runs
+ * beside `resolvePageContent`, which is why the deadline is generous relative
+ * to a single indexed lookup.
+ */
+const HELP_CENTER_AVAILABILITY_TIMEOUT_MS = 1500;
+
+/**
  * Whether the board's Help tab has a page behind it.
  *
  * One existence read, asked only when the help center is public at all (the tab
- * is not drawn otherwise). A failure answers `true`: the flag is cosmetic, and
- * hiding a working help center because one boolean could not be read is worse
- * than showing a tab whose page can explain itself.
+ * is not drawn otherwise). The read carries its own deadline and abort signal,
+ * so a hung request is cancelled rather than awaited. A failure answers
+ * `true`: the flag is cosmetic, and hiding a working help center because one
+ * boolean could not be read is worse than showing a tab whose page can explain
+ * itself.
  */
 async function resolveHasHelpCenterArticles(site: TSite): Promise<boolean> {
   if (site.helpCenterVisibility !== "PUBLIC") {
@@ -225,10 +238,12 @@ async function resolveHasHelpCenterArticles(site: TSite): Promise<boolean> {
   }
 
   try {
-    const availability = await fetchRpcServer((rpc) =>
-      rpc.GetHelpCenterAvailabilityPublic({
-        organizationId: site.organizationId,
-      })
+    const availability = await fetchRpcServer(
+      (rpc) =>
+        rpc.GetHelpCenterAvailabilityPublic({
+          organizationId: site.organizationId,
+        }),
+      { signal: AbortSignal.timeout(HELP_CENTER_AVAILABILITY_TIMEOUT_MS) }
     );
 
     return availability.hasArticles;

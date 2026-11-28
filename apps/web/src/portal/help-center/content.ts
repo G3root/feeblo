@@ -183,21 +183,48 @@ export function readingMinutes(content: string): number {
 }
 
 /**
- * One formatter for every date on the page.
+ * The date style the page shows.
  *
- * `toLocaleDateString()` with an options object builds a fresh
- * `Intl.DateTimeFormat` per call, and an article page renders a date at least
- * once. Hoisted so the work happens once per module load rather than once per
- * render.
+ * The locale is not this module's to choose: the page renders in the reader's
+ * Paraglide locale, and a formatter created without one falls back to the host's
+ * default (`en-US` on a server, the browser's language on the client), which
+ * would print a different month and order than the copy around it.
  */
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
+const DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
   day: "numeric",
   month: "short",
   year: "numeric",
-});
+};
 
-export function formatHelpDate(value: Date | string): string {
-  return DATE_FORMAT.format(value instanceof Date ? value : new Date(value));
+/**
+ * One formatter per locale, built on first use.
+ *
+ * `toLocaleDateString()` with an options object, and a formatter created per
+ * call, both rebuild the `Intl.DateTimeFormat`; an article page formats a date
+ * at least once per render. The map keeps one per locale — across a locale
+ * switch the reader gets a second formatter, not a new one per render — and the
+ * number of locales is bounded by the catalog.
+ */
+const DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
+
+const dateFormatFor = (locale: string): Intl.DateTimeFormat => {
+  const existing = DATE_FORMATS.get(locale);
+
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const created = new Intl.DateTimeFormat(locale, DATE_FORMAT_OPTIONS);
+
+  DATE_FORMATS.set(locale, created);
+
+  return created;
+};
+
+export function formatHelpDate(value: Date | string, locale: string): string {
+  return dateFormatFor(locale).format(
+    value instanceof Date ? value : new Date(value)
+  );
 }
 
 /**

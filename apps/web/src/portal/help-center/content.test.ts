@@ -165,8 +165,20 @@ describe("formatHelpDate", () => {
   it("renders one date for both a Date and an ISO string", () => {
     const value = new Date("2026-03-04T00:00:00.000Z");
 
-    expect(formatHelpDate(value)).toBe(formatHelpDate(value.toISOString()));
-    expect(formatHelpDate(value)).toContain("2026");
+    expect(formatHelpDate(value, "en")).toBe(
+      formatHelpDate(value.toISOString(), "en")
+    );
+    expect(formatHelpDate(value, "en")).toContain("2026");
+  });
+
+  it("formats in the locale it is given", () => {
+    const value = new Date("2026-03-04T00:00:00.000Z");
+
+    // The month name is the part a reader sees translated; the day and year
+    // are digits in every catalog.
+    expect(formatHelpDate(value, "de")).toMatch(/März|M\./);
+    expect(formatHelpDate(value, "fr")).toMatch(/mars/);
+    expect(formatHelpDate(value, "en")).toMatch(/Mar/);
   });
 });
 

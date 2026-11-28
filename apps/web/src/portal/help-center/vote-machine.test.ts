@@ -208,6 +208,18 @@ describe("help center vote machine", () => {
     expect(state.view.counts).toStrictEqual({ helpful: 5, notHelpful: 0 });
   });
 
+  it("adopts a repeated yes without leaving the verdict", () => {
+    const state = run(
+      { tally: tally(true, { helpful: 5 }), type: "LOADED_HELPFUL" },
+      // Someone else voted between the read and the second press.
+      { tally: tally(true, { helpful: 9 }), type: "SETTLED_HELPFUL" }
+    );
+
+    expect(state.matches("answeredHelpful")).toBe(true);
+    expect(state.view.verdict).toBe(true);
+    expect(state.view.counts).toStrictEqual({ helpful: 9, notHelpful: 0 });
+  });
+
   it("shows nothing as chosen when the tally fails", () => {
     const state = run({ type: "TALLY_FAILED" });
 

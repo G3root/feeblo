@@ -27,6 +27,7 @@ import * as Result from "effect/reactivity/AsyncResult";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { m } from "@/paraglide/messages.js";
+import { getLocale } from "@/paraglide/runtime.js";
 
 import {
   addHelpCenterArticleViewAtom,
@@ -415,7 +416,7 @@ function ArticleHeader({
           )}
           <span>
             {m.lucky_weird_cat_renew({
-              date: formatHelpDate(article.updatedAt),
+              date: formatHelpDate(article.updatedAt, getLocale()),
             })}
           </span>
           <span>

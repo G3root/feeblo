@@ -195,7 +195,8 @@ export type THelpCenterArticleListSort = S.Schema.Type<
  * `limit` and `offset` are the page a section page asks for, and omitting them
  * keeps the unbounded read the usage meter needs. They are optional rather than
  * defaulted here because the two callers want opposite things: a meter counts
- * every article, a list renders one window of them.
+ * every article, a list renders one window of them. The handler refuses a
+ * `topicId` without a `limit`, so a section cannot be read whole by accident.
  */
 export const HelpCenterArticleList = S.Struct({
   organizationId: WorkspaceId.schema,

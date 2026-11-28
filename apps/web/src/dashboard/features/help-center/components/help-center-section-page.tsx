@@ -382,14 +382,24 @@ export function HelpCenterSectionPage({
               organizationId={organizationId}
             />
             {articlesQuery.hasNextPage ? (
-              <div className="flex justify-center p-3">
+              <div className="flex flex-col items-center gap-2 p-3">
+                {/* A failed page load leaves the rows already on screen: the
+                    load is additive, so the list stays and the control below
+                    becomes the retry. */}
+                {articlesQuery.isSyncError ? (
+                  <p className="text-muted-foreground text-sm">
+                    {m.trite_aloof_lemming_prosper()}
+                  </p>
+                ) : null}
                 <Button
                   disabled={articlesQuery.isFetchingNextPage}
                   onClick={() => void articlesQuery.fetchNextPage()}
                   type="button"
                   variant="outline"
                 >
-                  Load more
+                  {articlesQuery.isSyncError
+                    ? m.even_seemly_bear()
+                    : m.yummy_just_barbel_dial()}
                 </Button>
               </div>
             ) : null}

@@ -188,6 +188,11 @@ export const helpCenterVoteMachine = setup({
     },
     answeredHelpful: {
       on: {
+        // A second Yes is a write like any other: it returns the counts as they
+        // are now, so the state stays put and only the numbers move. Without
+        // this the counts would stay frozen on the first read — nothing else
+        // updates them, because the invalidated read is only adopted once.
+        SETTLED_HELPFUL: tallyTo("answeredHelpful"),
         SETTLED_UNHELPFUL: tallyTo("promptReason"),
       },
     },
