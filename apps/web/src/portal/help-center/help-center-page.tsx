@@ -114,8 +114,8 @@ export function HelpCenterPage() {
     return (
       <Empty className="py-16">
         <EmptyHeader>
-          <EmptyTitle>Not found</EmptyTitle>
-          <EmptyDescription>This page is not available.</EmptyDescription>
+          <EmptyTitle>{m.white_civil_bee_mix()}</EmptyTitle>
+          <EmptyDescription>{m.happy_lower_rabbit_tickle()}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -134,9 +134,11 @@ export function HelpCenterPage() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Help center</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {m.maroon_close_panda_approve()}
+        </h1>
         <p className="text-muted-foreground text-sm">
-          Guides and answers for {site.name}.
+          {m.stout_smart_cod_build({ site: site.name })}
         </p>
       </header>
 
@@ -148,10 +150,10 @@ export function HelpCenterPage() {
             </InputGroupText>
           </InputGroupAddon>
           <DebouncedInputGroupInput
-            aria-label="Search the help center"
+            aria-label={m.that_fuzzy_maggot_roar()}
             maxLength={HELP_CENTER_SEARCH_MAX_QUERY_LENGTH}
             onChange={setQuery}
-            placeholder="Search documentation"
+            placeholder={m.tangy_smug_wolf_engage()}
             type="search"
             value={query}
             wait={250}
@@ -204,10 +206,8 @@ function HelpCenterSectionsList({
     return (
       <Empty className="py-16">
         <EmptyHeader>
-          <EmptyTitle>No documentation yet</EmptyTitle>
-          <EmptyDescription>
-            Nothing has been published to the help center.
-          </EmptyDescription>
+          <EmptyTitle>{m.legal_glad_cod_vent()}</EmptyTitle>
+          <EmptyDescription>{m.hour_dry_dove_swim()}</EmptyDescription>
         </EmptyHeader>
       </Empty>
     );
@@ -300,7 +300,7 @@ function ArticleRow({ article }: { article: ArticleRowItem }) {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">{article.title}</span>
             {article.isArchived ? (
-              <Badge variant="outline">Out of date</Badge>
+              <Badge variant="outline">{m.good_red_flamingo_aid()}</Badge>
             ) : null}
           </div>
           {article.excerpt.length === 0 ? null : (
@@ -351,10 +351,10 @@ function HelpCenterSearchResults({
     return (
       <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border px-4 py-3">
         <p className="text-muted-foreground text-sm">
-          Search could not be loaded.
+          {m.spare_bland_tuna_slurp()}
         </p>
         <Button onClick={refresh} size="sm" type="button" variant="outline">
-          Retry
+          {m.even_seemly_bear()}
         </Button>
       </div>
     );
@@ -366,10 +366,9 @@ function HelpCenterSearchResults({
     return (
       <Empty className="py-16">
         <EmptyHeader>
-          <EmptyTitle>No matching articles</EmptyTitle>
+          <EmptyTitle>{m.great_big_chicken_mop()}</EmptyTitle>
           <EmptyDescription>
-            Nothing in this help center matches “{query}”. Try a different
-            search, or share the question with the team.
+            {m.small_left_nils_sew({ query })}
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -379,7 +378,9 @@ function HelpCenterSearchResults({
   return (
     <div className="mt-6">
       <p className="text-muted-foreground text-xs">
-        {hits.length === 1 ? "1 article" : `${hits.length} articles`}
+        {hits.length === 1
+          ? m.happy_only_martin_wish({ count: hits.length })
+          : m.last_aware_gibbon_blink({ count: hits.length })}
       </p>
       <ul className="mt-2 divide-y rounded-lg border">
         {hits.map((hit) => (

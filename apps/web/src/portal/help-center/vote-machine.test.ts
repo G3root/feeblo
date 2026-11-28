@@ -5,6 +5,7 @@ import {
   helpCenterVoteMachine,
   toHelpCenterVoteView,
   toVoteLoadedEvent,
+  type HelpCenterTally,
 } from "./vote-machine";
 
 /**
@@ -12,6 +13,10 @@ import {
  * this reader looking at" unrepresentable as a combination, so these tests walk
  * the graph rather than the widget: which states are reachable, what a settle
  * clears, and what `CLOSE_REASON` returns to.
+ *
+ * The tally is context, so the tests also pin *which* answer is drawn: the
+ * event's own tally replaces whatever came before, and a read that lands after
+ * a verdict is dropped rather than undoing the press.
  */
 
 const ALL = [
@@ -22,6 +27,15 @@ const ALL = [
   "answeredHelpful",
   "answeredUnhelpful",
 ];
+
+const tally = (
+  mine: boolean | null,
+  counts: { helpful?: number; notHelpful?: number } = {}
+): HelpCenterTally => ({
+  helpfulCount: counts.helpful ?? 0,
+  mine,
+  notHelpfulCount: counts.notHelpful ?? 0,
+});
 
 /** Drive a fresh actor through `events` and hand back its paused snapshot. */
 const run = (
@@ -51,6 +65,7 @@ describe("help center vote machine", () => {
     expect(state.matches("loading")).toBe(true);
     expect(state.view.ready).toBe(false);
     expect(state.view.verdict).toBeNull();
+    expect(state.view.counts).toStrictEqual({ helpful: 0, notHelpful: 0 });
   });
 
   it("declares exactly the six states", () => {
@@ -64,20 +79,34 @@ describe("help center vote machine", () => {
     expect(toVoteLoadedEvent(true)).toBe("LOADED_HELPFUL");
     expect(toVoteLoadedEvent(false)).toBe("LOADED_UNHELPFUL");
 
-    expect(run({ type: "LOADED_NONE" }).view).toMatchObject({
-      ready: true,
-      verdict: null,
+    expect(run({ tally: tally(null), type: "LOADED_NONE" }).view).toMatchObject(
+      {
+        ready: true,
+        verdict: null,
+      }
+    );
+    expect(
+      run({ tally: tally(true), type: "LOADED_HELPFUL" }).view
+    ).toMatchObject({ verdict: true });
+    expect(
+      run({ tally: tally(false), type: "LOADED_UNHELPFUL" }).view
+    ).toMatchObject({ verdict: false });
+  });
+
+  it("draws the counts the read carried", () => {
+    const state = run({
+      tally: tally(null, { helpful: 12, notHelpful: 3 }),
+      type: "LOADED_NONE",
     });
-    expect(run({ type: "LOADED_HELPFUL" }).view).toMatchObject({
-      verdict: true,
-    });
-    expect(run({ type: "LOADED_UNHELPFUL" }).view).toMatchObject({
-      verdict: false,
-    });
+
+    expect(state.view.counts).toStrictEqual({ helpful: 12, notHelpful: 3 });
   });
 
   it("opens the reason box as an unhelpful verdict, not as an overlay", () => {
-    const state = run({ type: "LOADED_NONE" }, { type: "SETTLED_UNHELPFUL" });
+    const state = run(
+      { tally: tally(null), type: "LOADED_NONE" },
+      { tally: tally(false, { notHelpful: 1 }), type: "SETTLED_UNHELPFUL" }
+    );
 
     expect(state.matches("promptReason")).toBe(true);
     // The old shape had `showReason: true` and `verdict: null`; here the prompt
@@ -88,8 +117,8 @@ describe("help center vote machine", () => {
 
   it("returns from the prompt to the unhelpful verdict, never to asking", () => {
     const state = run(
-      { type: "LOADED_NONE" },
-      { type: "SETTLED_UNHELPFUL" },
+      { tally: tally(null), type: "LOADED_NONE" },
+      { tally: tally(false), type: "SETTLED_UNHELPFUL" },
       { type: "CLOSE_REASON" }
     );
 
@@ -99,10 +128,10 @@ describe("help center vote machine", () => {
 
   it("clears the reason when the reader flips to helpful", () => {
     const state = run(
-      { type: "LOADED_NONE" },
-      { type: "SETTLED_UNHELPFUL" },
+      { tally: tally(null), type: "LOADED_NONE" },
+      { tally: tally(false), type: "SETTLED_UNHELPFUL" },
       { type: "SET_REASON", value: "The screenshots are stale." },
-      { type: "SETTLED_HELPFUL" }
+      { tally: tally(true), type: "SETTLED_HELPFUL" }
     );
 
     expect(state.matches("answeredHelpful")).toBe(true);
@@ -114,10 +143,10 @@ describe("help center vote machine", () => {
 
   it("clears the reason once an unhelpful verdict is submitted", () => {
     const state = run(
-      { type: "LOADED_NONE" },
-      { type: "SETTLED_UNHELPFUL" },
+      { tally: tally(null), type: "LOADED_NONE" },
+      { tally: tally(false), type: "SETTLED_UNHELPFUL" },
       { type: "SET_REASON", value: "Missing a step." },
-      { type: "SETTLED_UNHELPFUL" }
+      { tally: tally(false, { notHelpful: 1 }), type: "SETTLED_UNHELPFUL" }
     );
 
     expect(state.matches("answeredUnhelpful")).toBe(true);
@@ -126,8 +155,8 @@ describe("help center vote machine", () => {
 
   it("lets a helpful reader change their mind to unhelpful", () => {
     const state = run(
-      { type: "LOADED_HELPFUL" },
-      { type: "SETTLED_UNHELPFUL" }
+      { tally: tally(true), type: "LOADED_HELPFUL" },
+      { tally: tally(false), type: "SETTLED_UNHELPFUL" }
     );
 
     // Pressing No from a helpful verdict opens the box, because the reader has
@@ -136,18 +165,59 @@ describe("help center vote machine", () => {
   });
 
   it("accepts a verdict cast before the tally arrives", () => {
-    const state = run({ type: "SETTLED_HELPFUL" });
+    const state = run({
+      tally: tally(true, { helpful: 1 }),
+      type: "SETTLED_HELPFUL",
+    });
 
     expect(state.matches("answeredHelpful")).toBe(true);
   });
 
   it("reopens the box when a reader presses No again", () => {
     const state = run(
-      { type: "LOADED_UNHELPFUL" },
-      { type: "SETTLED_UNHELPFUL" }
+      { tally: tally(false), type: "LOADED_UNHELPFUL" },
+      { tally: tally(false), type: "SETTLED_UNHELPFUL" }
     );
 
     expect(state.matches("promptReason")).toBe(true);
+  });
+
+  /**
+   * The reason the tally is context and not a `useState` in the hook: the two
+   * events that carry one have different owners, and the settle is the newer.
+   */
+  it("draws the settle's tally without waiting for a read", () => {
+    const state = run(
+      { tally: tally(null, { helpful: 4 }), type: "LOADED_NONE" },
+      { tally: tally(true, { helpful: 5 }), type: "SETTLED_HELPFUL" }
+    );
+
+    expect(state.view.counts).toStrictEqual({ helpful: 5, notHelpful: 0 });
+  });
+
+  it("ignores a read that lands after the verdict", () => {
+    const state = run(
+      { tally: tally(null, { helpful: 4 }), type: "LOADED_NONE" },
+      { tally: tally(true, { helpful: 5 }), type: "SETTLED_HELPFUL" },
+      // The in-flight read was sent before the vote; adopting it now would
+      // show the count the press already moved past.
+      { tally: tally(null, { helpful: 4 }), type: "LOADED_NONE" }
+    );
+
+    expect(state.matches("answeredHelpful")).toBe(true);
+    expect(state.view.counts).toStrictEqual({ helpful: 5, notHelpful: 0 });
+  });
+
+  it("adopts a repeated yes without leaving the verdict", () => {
+    const state = run(
+      { tally: tally(true, { helpful: 5 }), type: "LOADED_HELPFUL" },
+      // Someone else voted between the read and the second press.
+      { tally: tally(true, { helpful: 9 }), type: "SETTLED_HELPFUL" }
+    );
+
+    expect(state.matches("answeredHelpful")).toBe(true);
+    expect(state.view.verdict).toBe(true);
+    expect(state.view.counts).toStrictEqual({ helpful: 9, notHelpful: 0 });
   });
 
   it("shows nothing as chosen when the tally fails", () => {
@@ -169,7 +239,7 @@ describe("help center vote machine", () => {
     const helpful = run(
       { type: "TALLY_FAILED" },
       { type: "RETRY" },
-      { type: "LOADED_HELPFUL" }
+      { tally: tally(true), type: "LOADED_HELPFUL" }
     );
 
     expect(helpful.matches("answeredHelpful")).toBe(true);
@@ -179,11 +249,14 @@ describe("help center vote machine", () => {
   });
 
   it("adopts a loaded tally that arrives without a retry", () => {
-    const asking = run({ type: "TALLY_FAILED" }, { type: "LOADED_NONE" });
+    const asking = run(
+      { type: "TALLY_FAILED" },
+      { tally: tally(null), type: "LOADED_NONE" }
+    );
 
     const unhelpful = run(
       { type: "TALLY_FAILED" },
-      { type: "LOADED_UNHELPFUL" }
+      { tally: tally(false), type: "LOADED_UNHELPFUL" }
     );
 
     expect(asking.matches("asking")).toBe(true);
@@ -194,9 +267,15 @@ describe("help center vote machine", () => {
   });
 
   it("ignores TALLY_FAILED once a verdict is known", () => {
-    const asking = run({ type: "LOADED_NONE" }, { type: "TALLY_FAILED" });
+    const asking = run(
+      { tally: tally(null), type: "LOADED_NONE" },
+      { type: "TALLY_FAILED" }
+    );
 
-    const answered = run({ type: "LOADED_HELPFUL" }, { type: "TALLY_FAILED" });
+    const answered = run(
+      { tally: tally(true), type: "LOADED_HELPFUL" },
+      { type: "TALLY_FAILED" }
+    );
 
     expect(asking.matches("asking")).toBe(true);
     expect(asking.view.failed).toBe(false);

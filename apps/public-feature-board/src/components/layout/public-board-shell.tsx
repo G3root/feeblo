@@ -22,7 +22,20 @@ import { useSite } from "../../providers/site-provider";
 import { Navbar } from "../common/navbar";
 import { PoweredByTag } from "./powered-by-tag";
 
-export function PublicBoardShell({ children }: { children: ReactNode }) {
+export function PublicBoardShell({
+  children,
+  hasHelpCenterArticles,
+}: {
+  children: ReactNode;
+  /**
+   * Whether the board has help articles to open.
+   *
+   * Passed in rather than read here because it is a server-resolved fact about
+   * the workspace, like the site row: the shell renders the chrome for every
+   * board page and must not spend a request of its own on a tab.
+   */
+  hasHelpCenterArticles: boolean;
+}) {
   const site = useSite();
   const authDialogStore = useAuthDialogContext();
   const publicCollections = usePublicCollections();
@@ -107,7 +120,7 @@ export function PublicBoardShell({ children }: { children: ReactNode }) {
           className="bg-background text-foreground flex h-dvh flex-col overflow-hidden"
           data-board-shell=""
         >
-          <Navbar />
+          <Navbar hasHelpCenterArticles={hasHelpCenterArticles} />
           <main className="min-h-0 flex-1 overflow-y-auto" data-board-scroll="">
             {children}
           </main>

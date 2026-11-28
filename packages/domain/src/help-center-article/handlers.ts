@@ -57,6 +57,7 @@ import {
   type THelpCenterArticleSearchPublic,
   type THelpCenterArticleUpdate,
   type THelpCenterArticleViewRecord,
+  type THelpCenterAvailabilityGetPublic,
 } from "./schema";
 import { normalizeArticleWrite } from "./write";
 
@@ -147,17 +148,54 @@ export const HelpCenterArticleRpcHandlersEffect = Effect.gen(function* () {
 
   return {
     ListHelpCenterArticles: (args: THelpCenterArticleList) =>
-      repository
-        .findMany(args)
-        .pipe(
-          Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
-          withRemapDbErrors("HelpCenterArticle", "select")
-        ),
+      Effect.gen(function* () {
+        // A section-scoped read has to name its window.
+        //
+        // The dashboard's unbounded read is the plan-usage meter, which asks for
+        // the workspace and needs every row. A section that arrived whole is
+        // the read pagination exists to remove, so an accidental windowless
+        // section read is refused here instead of spending three counter
+        // subqueries per article to answer a list that only renders a page.
+        if (args.topicId !== undefined && args.limit === undefined) {
+          return yield* new BadRequestError({
+            message: "A section-scoped article list requires a limit.",
+          });
+        }
+
+        return yield* repository
+          .findMany(args)
+          .pipe(
+            Policy.withPolicy(articlePolicy.canRead(args.organizationId)),
+            withRemapDbErrors("HelpCenterArticle", "select")
+          );
+      }),
 
     ListHelpCenterArticlesPublic: (args: THelpCenterArticleListPublic) =>
       repository.findManyPublic(args).pipe(
         RateLimit.withPublicRpcRateLimit({
           name: "ListHelpCenterArticlesPublic",
+          level: "read",
+        }),
+        Policy.withPublicPolicy(
+          sitePolicy.canViewHelpCenter(args.organizationId)
+        ),
+        withRemapDbErrors("HelpCenterArticle", "select")
+      ),
+
+    /**
+     * One existence read behind the same gate as the list.
+     *
+     * The board's navbar hides the Help tab when nothing is readable, which is
+     * the widget's own rule (`ListHelpCenterArticlesPublic`'s `enabled`). This
+     * answers with the repository's check rather than filtering a list on the
+     * client: a workspace with one archived tombstone is not empty, and that is
+     * a decision about what "readable" means that only the repository makes.
+     */
+    GetHelpCenterAvailabilityPublic: (args: THelpCenterAvailabilityGetPublic) =>
+      repository.hasReadableByOrganizationId(args).pipe(
+        Effect.map((hasArticles) => ({ hasArticles })),
+        RateLimit.withPublicRpcRateLimit({
+          name: "GetHelpCenterAvailabilityPublic",
           level: "read",
         }),
         Policy.withPublicPolicy(

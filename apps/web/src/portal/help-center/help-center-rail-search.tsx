@@ -13,6 +13,8 @@ import { Link } from "@tanstack/react-router";
 import * as Result from "effect/reactivity/AsyncResult";
 import { useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
+
 import { helpCenterSearchPublicAtom } from "./atoms";
 
 /**
@@ -49,10 +51,10 @@ export function HelpCenterRailSearch({
           </InputGroupText>
         </InputGroupAddon>
         <DebouncedInputGroupInput
-          aria-label="Search the help center"
+          aria-label={m.that_fuzzy_maggot_roar()}
           maxLength={HELP_CENTER_SEARCH_MAX_QUERY_LENGTH}
           onChange={setQuery}
-          placeholder="Search documentation"
+          placeholder={m.tangy_smug_wolf_engage()}
           type="search"
           value={query}
           wait={250}
@@ -96,13 +98,13 @@ function RailSearchResults({
     ))
     .onFailure(() => (
       <p className="text-muted-foreground px-1 text-xs">
-        Search could not be loaded.
+        {m.spare_bland_tuna_slurp()}
       </p>
     ))
     .onSuccess((hits) =>
       hits.length === 0 ? (
         <p className="text-muted-foreground px-1 text-xs">
-          Nothing matches “{query}”.
+          {m.safe_proud_kestrel_advise({ query })}
         </p>
       ) : (
         <ul className="flex flex-col gap-0.5">

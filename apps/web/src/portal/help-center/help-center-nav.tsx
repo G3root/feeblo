@@ -19,6 +19,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { m } from "@/paraglide/messages.js";
+
 import type { HelpCenterNavArticle, HelpCenterNavSection } from "./content";
 
 /**
@@ -67,12 +69,12 @@ export function HelpCenterNav({
   }
 
   return (
-    <nav aria-label="Help center" className={className}>
+    <nav aria-label={m.maroon_close_panda_approve()} className={className}>
       <Link
         className="text-muted-foreground hover:text-foreground mb-2 flex items-center px-2 text-xs font-medium transition-colors"
         to="/s/help"
       >
-        All sections
+        {m.lazy_patient_midge_thrive()}
       </Link>
       <ul className="flex flex-col gap-0.5">
         {sections.map((section) => (
@@ -220,7 +222,7 @@ export function HelpCenterBreadcrumbs({ title }: { readonly title: string }) {
       <BreadcrumbList className="text-xs sm:text-xs">
         <BreadcrumbItem>
           <BreadcrumbLink render={<Link to="/s/help" />}>
-            Help center
+            {m.maroon_close_panda_approve()}
           </BreadcrumbLink>
         </BreadcrumbItem>
         <BreadcrumbSeparator />

@@ -40,6 +40,7 @@ import {
   helpCenterMcpServerId,
   renderHelpCenterArticleMarkdown,
 } from "@/lib/help-center-agent";
+import { m } from "@/paraglide/messages.js";
 
 /**
  * The article's actions, in the shape Blume gives a documentation page: a
@@ -98,9 +99,7 @@ const CHAT_PROVIDERS = [
 type MenuIcon = ComponentProps<typeof HugeiconsIcon>["icon"];
 
 const PROMPT = (markdownUrl: string, title: string) =>
-  encodeURIComponent(
-    `Read ${markdownUrl} so I can ask you questions about "${title}".`
-  );
+  encodeURIComponent(m.active_salty_termite_stop({ title, url: markdownUrl }));
 
 /** Cursor's documented install deeplink carries a base64 JSON config. */
 const cursorInstallUrl = (name: string, url: string) => {
@@ -145,8 +144,8 @@ const notifyCopied = (title: string) => {
 
 const notifyCopyFailed = () => {
   toastManager.add({
-    description: "Your browser did not allow the write.",
-    title: "Copy failed",
+    description: m.bald_level_koala_charm(),
+    title: m.lazy_lucky_puma_dig(),
     type: "error",
   });
 };
@@ -219,7 +218,7 @@ function useMarkdownCopy(article: THelpCenterArticlePublic) {
     try {
       await writeClipboard(article.content);
       setCopied(true);
-      notifyCopied("Markdown copied");
+      notifyCopied(m.formal_tame_carp_explore());
     } catch {
       notifyCopyFailed();
     }
@@ -284,7 +283,9 @@ function CopyRow({
         className="size-4 shrink-0"
         icon={copied ? Tick02Icon : Copy01Icon}
       />
-      <span className="flex-1">{copied ? "Copied" : "Copy as Markdown"}</span>
+      <span className="flex-1">
+        {copied ? m.least_sour_badger_quell() : m.less_true_ray_propel()}
+      </span>
     </button>
   );
 }
@@ -295,14 +296,14 @@ function ExportMenu({
   readonly article: THelpCenterArticlePublic;
 }) {
   return (
-    <MenuRow icon={Download01Icon} label="Export">
+    <MenuRow icon={Download01Icon} label={m.good_this_ladybug_quell()}>
       <MenuItem onClick={() => downloadMarkdown(article)}>
         <HugeiconsIcon icon={FileDownloadIcon} />
-        Download Markdown
+        {m.deft_drab_gull_win()}
       </MenuItem>
       <MenuItem onClick={() => window.print()}>
         <HugeiconsIcon icon={PrinterIcon} />
-        Print / Save as PDF
+        {m.grassy_pretty_blackbird_adore()}
       </MenuItem>
     </MenuRow>
   );
@@ -316,7 +317,7 @@ function ChatMenu({
   readonly title: string;
 }) {
   return (
-    <MenuRow icon={SparklesIcon} label="Open in chat">
+    <MenuRow icon={SparklesIcon} label={m.legal_best_wombat_endure()}>
       {CHAT_PROVIDERS.map((provider) => (
         <MenuItem
           key={provider.key}
@@ -338,18 +339,22 @@ function ChatMenu({
 
 function McpMenu({ mcpName }: { readonly mcpName: string }) {
   const copyCommand = (build: (url: string) => string) => {
-    void copyText(build(currentMcpUrl()), "Command copied");
+    void copyText(build(currentMcpUrl()), m.kind_maroon_chipmunk_strive());
   };
 
   return (
-    <MenuRow icon={McpServerIcon} label="Connect to MCP" width="w-64">
+    <MenuRow
+      icon={McpServerIcon}
+      label={m.jolly_brave_salmon_relish()}
+      width="w-64"
+    >
       <MenuItem
         onClick={() => {
-          void copyText(currentMcpUrl(), "MCP server URL copied");
+          void copyText(currentMcpUrl(), m.tangy_fit_haddock_revive());
         }}
       >
         <HugeiconsIcon icon={Link01Icon} />
-        Copy server URL
+        {m.long_moving_dog_fall()}
       </MenuItem>
       <MenuSeparator />
       <MenuItem
@@ -360,7 +365,7 @@ function McpMenu({ mcpName }: { readonly mcpName: string }) {
         }
       >
         <HugeiconsIcon icon={ClaudeIcon} />
-        Copy Claude Code command
+        {m.least_elegant_raven_achieve()}
       </MenuItem>
       <MenuItem
         onClick={() =>
@@ -368,7 +373,7 @@ function McpMenu({ mcpName }: { readonly mcpName: string }) {
         }
       >
         <HugeiconsIcon icon={TerminalIcon} />
-        Copy Codex command
+        {m.gaudy_bright_opossum_succeed()}
       </MenuItem>
       <MenuSeparator />
       <MenuItem
@@ -377,7 +382,7 @@ function McpMenu({ mcpName }: { readonly mcpName: string }) {
         }}
       >
         <HugeiconsIcon icon={Cursor01Icon} />
-        Add to Cursor
+        {m.fun_dry_dolphin_kick()}
         <HugeiconsIcon
           className="text-muted-foreground ms-auto size-3.5"
           icon={ArrowUpRight01Icon}
@@ -389,7 +394,7 @@ function McpMenu({ mcpName }: { readonly mcpName: string }) {
         }}
       >
         <HugeiconsIcon icon={CodeIcon} />
-        Add to VS Code
+        {m.maroon_yummy_pug_bask()}
         <HugeiconsIcon
           className="text-muted-foreground ms-auto size-3.5"
           icon={ArrowUpRight01Icon}
@@ -411,7 +416,7 @@ export function HelpCenterArticleActions({
 
   return (
     <nav
-      aria-label="Article actions"
+      aria-label={m.salty_muddy_martin_bump()}
       className={cn("flex flex-col", className)}
     >
       <CopyRow copied={copied} onCopy={() => void copyMarkdown()} />
@@ -444,7 +449,7 @@ export function HelpCenterArticleActionsDisclosure({
       )}
     >
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
-        Article actions
+        {m.salty_muddy_martin_bump()}
         <span className="text-muted-foreground flex size-4 items-center justify-center transition-transform group-open:rotate-180">
           <HugeiconsIcon
             aria-hidden="true"

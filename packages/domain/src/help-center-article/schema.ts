@@ -160,20 +160,87 @@ export type THelpCenterArticlePublicSummary = S.Schema.Type<
 >;
 
 /**
- * The dashboard's article list, optionally scoped to one section.
+ * The most rows one dashboard list request may ask for.
+ *
+ * It is a ceiling on a window, not a page size: a section page's window grows
+ * with every `Load more` (the live query asks for all loaded pages at once), so
+ * this is also where a very large section stops being browsable a page at a
+ * time. That section is documentation an editor should search, not scroll.
+ */
+export const HELP_CENTER_ARTICLE_LIST_MAX_LIMIT = 500;
+
+/**
+ * The orders a dashboard list can be read in.
+ *
+ * `reading` is the public pages' order — pinned first, then newest published —
+ * and `updated` is the one a section page shows, the article an editor touched
+ * last. Both end in the article id, so each is a total order: a window of one
+ * cannot repeat or skip a row. `updated` is the default because the dashboard is
+ * the only caller of this read.
+ */
+export const HelpCenterArticleListSort = S.Literals(["reading", "updated"]);
+
+export type THelpCenterArticleListSort = S.Schema.Type<
+  typeof HelpCenterArticleListSort
+>;
+
+/**
+ * The dashboard's article list, optionally scoped to one section and windowed.
  *
  * The scope is server-side rather than a client filter: a workspace-wide list
  * spends three counter subqueries on every article it returns, and a section
  * page only ever renders one section's rows. Omitting `topicId` keeps the
  * workspace-wide read for the plan-usage meter.
+ *
+ * `limit` and `offset` are the page a section page asks for, and omitting them
+ * keeps the unbounded read the usage meter needs. They are optional rather than
+ * defaulted here because the two callers want opposite things: a meter counts
+ * every article, a list renders one window of them. The handler refuses a
+ * `topicId` without a `limit`, so a section cannot be read whole by accident.
  */
 export const HelpCenterArticleList = S.Struct({
   organizationId: WorkspaceId.schema,
   topicId: S.optional(HelpCenterTopicId.schema),
+  limit: S.optional(
+    S.Int.pipe(
+      S.check(S.isGreaterThanOrEqualTo(1)),
+      S.check(S.isLessThanOrEqualTo(HELP_CENTER_ARTICLE_LIST_MAX_LIMIT))
+    )
+  ),
+  offset: S.optional(S.Int.pipe(S.check(S.isGreaterThanOrEqualTo(0)))),
+  sort: S.optional(HelpCenterArticleListSort),
 });
 
 export type THelpCenterArticleList = S.Schema.Type<
   typeof HelpCenterArticleList
+>;
+
+/**
+ * Whether a workspace's help center has anything a reader can open.
+ *
+ * The board's navbar asks this before drawing its Help tab: a public help
+ * center with nothing in it is a tab that opens "No documentation yet". One
+ * existence read answers it; the list would send a page of rows to answer a
+ * yes/no question.
+ */
+export const HelpCenterAvailabilityGetPublic = S.Struct({
+  organizationId: WorkspaceId.schema,
+});
+
+export type THelpCenterAvailabilityGetPublic = S.Schema.Type<
+  typeof HelpCenterAvailabilityGetPublic
+>;
+
+/**
+ * The answer, shaped as an object rather than a bare boolean so it can grow —
+ * a count, or which surfaces are served — without a new operation.
+ */
+export const HelpCenterAvailabilityPublic = S.Struct({
+  hasArticles: S.Boolean,
+});
+
+export type THelpCenterAvailabilityPublic = S.Schema.Type<
+  typeof HelpCenterAvailabilityPublic
 >;
 
 export const HelpCenterArticleListPublic = S.Struct({

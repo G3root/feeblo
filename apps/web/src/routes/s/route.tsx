@@ -539,7 +539,9 @@ function BoardLayout() {
                 toggle; global toasts surface persistence failures. */}
             <ToastProvider>
               <AnchoredToastProvider>
-                <PublicBoardShell>
+                <PublicBoardShell
+                  hasHelpCenterArticles={boardPage.hasHelpCenterArticles}
+                >
                   <Outlet />
                 </PublicBoardShell>
               </AnchoredToastProvider>

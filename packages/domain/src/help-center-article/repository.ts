@@ -22,6 +22,7 @@ import {
   HELP_CENTER_ARTICLE_STATES,
   isHelpCenterArticleReadable,
 } from "./machine";
+import type { THelpCenterArticleListSort } from "./schema";
 import {
   helpCenterSearchTerms,
   helpCenterSearchTsQuery,
@@ -102,12 +103,27 @@ const READABLE_STATES: readonly THelpCenterArticleState[] =
 /** An archived article is a tombstone, and only `published` is documentation. */
 const readableWhere = inArray(article.status, [...READABLE_STATES]);
 
-/** A pinned article first, then newest first; the order is total. */
+/**
+ * The reading order: a pinned article first, then newest first.
+ *
+ * The id is the last key so the order is total. A window of a non-total order
+ * can repeat a row (two articles with the same position, date and title) or skip
+ * one between two pages, which is a bug pagination makes visible.
+ */
 const articleOrder = [
   sql`${article.position} asc nulls last`,
   desc(article.publishedAt),
   asc(article.title),
+  asc(article.id),
 ] as const;
+
+/**
+ * The dashboard's order: what an editor touched last, first.
+ *
+ * `updatedAt` is not unique — a bulk import writes many rows in one second — so
+ * the id tiebreak is what makes the window deterministic.
+ */
+const updatedArticleOrder = [desc(article.updatedAt), asc(article.id)] as const;
 
 /**
  * The projection every search returns.
@@ -164,15 +180,26 @@ const titleExcerptVector = sql`to_tsvector('english'::regconfig, ${article.title
 const makeHelpCenterArticleRepository = Effect.gen(function* () {
   const db = yield* currentDb;
 
-  /** The dashboard's list: every article in the workspace, whatever its state. */
+  /**
+   * The dashboard's list: every article in the workspace, whatever its state.
+   *
+   * Optionally one section's, optionally one window of them — the usage meter
+   * and the section page are the same read with different scopes.
+   */
   const findMany = ({
     organizationId,
     topicId,
+    limit,
+    offset,
+    sort,
   }: {
     organizationId: string;
     topicId?: string | undefined;
-  }) =>
-    db
+    limit?: number | undefined;
+    offset?: number | undefined;
+    sort?: THelpCenterArticleListSort | undefined;
+  }) => {
+    const ordered = db
       .select({ ...articleColumns, ...countColumns })
       .from(article)
       .where(
@@ -181,7 +208,17 @@ const makeHelpCenterArticleRepository = Effect.gen(function* () {
           topicId === undefined ? undefined : eq(article.topicId, topicId)
         )
       )
-      .orderBy(asc(article.topicId), ...articleOrder);
+      .orderBy(
+        asc(article.topicId),
+        ...(sort === "reading" ? articleOrder : updatedArticleOrder)
+      );
+
+    // A caller that names no window wants the whole list: the plan-usage meter
+    // counts every article and cannot be handed a page.
+    const windowed = limit === undefined ? ordered : ordered.limit(limit);
+
+    return offset === undefined ? windowed : windowed.offset(offset);
+  };
 
   /**
    * The portal's list: readable articles, optionally under one topic.

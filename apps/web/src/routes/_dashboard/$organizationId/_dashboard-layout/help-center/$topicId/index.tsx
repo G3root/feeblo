@@ -7,8 +7,8 @@ export const Route = createFileRoute(
   "/_dashboard/$organizationId/_dashboard-layout/help-center/$topicId/"
 )({
   component: RouteComponent,
-  beforeLoad: async ({ params }) => {
-    await preloadHelpCenterSection(params.topicId);
+  beforeLoad: async () => {
+    await preloadHelpCenterSection();
 
     return null;
   },

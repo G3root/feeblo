@@ -25,6 +25,8 @@ import {
   HelpCenterArticleUpdate,
   HelpCenterArticleViewAccepted,
   HelpCenterArticleViewRecord,
+  HelpCenterAvailabilityGetPublic,
+  HelpCenterAvailabilityPublic,
 } from "./schema";
 
 /**
@@ -50,6 +52,21 @@ export class HelpCenterArticleRpcs extends RpcGroup.make(
   Rpc.make("ListHelpCenterArticlesPublic", {
     payload: HelpCenterArticleListPublic,
     success: Schema.Array(HelpCenterArticlePublicSummary),
+    error: Schema.Union([HelpCenterArticleServiceErrors, RateLimitErrors]),
+  })
+    .middleware(OptionalAuthMiddleware)
+    .middleware(PublicRpcRateLimitMiddleware),
+
+  /**
+   * Whether there is anything to read, for the board's Help tab.
+   *
+   * The same visibility gate as the public list, answered as a boolean instead
+   * of a page: the navbar only needs to know whether the tab would open onto an
+   * empty page, and asking for the list would spend a full read on that.
+   */
+  Rpc.make("GetHelpCenterAvailabilityPublic", {
+    payload: HelpCenterAvailabilityGetPublic,
+    success: HelpCenterAvailabilityPublic,
     error: Schema.Union([HelpCenterArticleServiceErrors, RateLimitErrors]),
   })
     .middleware(OptionalAuthMiddleware)

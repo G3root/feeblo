@@ -41,6 +41,15 @@ export type PublicBoardPage =
       readonly post: TPost | null;
       readonly changelog: TChangelog | null;
       readonly helpArticle: THelpCenterArticlePublic | null;
+      /**
+       * Whether the workspace has an article a reader can open.
+       *
+       * The navbar draws its Help tab from this: a public help center with
+       * nothing in it is a tab that opens "No documentation yet", which is the
+       * rule the embedded widget already follows. Resolved with the document so
+       * the tab cannot appear and then vanish on hydration.
+       */
+      readonly hasHelpCenterArticles: boolean;
       readonly canonicalUrl: string;
       readonly siteUrl: string;
       readonly ogImageUrl: string;
@@ -203,6 +212,47 @@ export async function resolvePageContent(
 }
 
 /**
+ * How long the Help tab's existence read may add to a board document.
+ *
+ * The navbar draws the tab before the page settles, so this read is a
+ * decoration on a document that already has its own work to do: a slow or hung
+ * answer must not hold the response past the board's latency budget. It runs
+ * beside `resolvePageContent`, which is why the deadline is generous relative
+ * to a single indexed lookup.
+ */
+const HELP_CENTER_AVAILABILITY_TIMEOUT_MS = 1500;
+
+/**
+ * Whether the board's Help tab has a page behind it.
+ *
+ * One existence read, asked only when the help center is public at all (the tab
+ * is not drawn otherwise). The read carries its own deadline and abort signal,
+ * so a hung request is cancelled rather than awaited. A failure answers
+ * `true`: the flag is cosmetic, and hiding a working help center because one
+ * boolean could not be read is worse than showing a tab whose page can explain
+ * itself.
+ */
+async function resolveHasHelpCenterArticles(site: TSite): Promise<boolean> {
+  if (site.helpCenterVisibility !== "PUBLIC") {
+    return false;
+  }
+
+  try {
+    const availability = await fetchRpcServer(
+      (rpc) =>
+        rpc.GetHelpCenterAvailabilityPublic({
+          organizationId: site.organizationId,
+        }),
+      { signal: AbortSignal.timeout(HELP_CENTER_AVAILABILITY_TIMEOUT_MS) }
+    );
+
+    return availability.hasArticles;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * The dashboard origin to send a lost visitor to.
  *
  * `APP_URL` is the deployment's canonical app host. The request's own origin is
@@ -265,7 +315,13 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
       return notFound(null, subdomain);
     }
 
-    const detail = await resolvePageContent(url.pathname, site);
+    // Resolved together: the tab's flag is a second, independent read, and
+    // stacking it behind the page's content would add a round trip to every
+    // board page for a boolean the navbar draws before the page settles.
+    const [detail, hasHelpCenterArticles] = await Promise.all([
+      resolvePageContent(url.pathname, site),
+      resolveHasHelpCenterArticles(site),
+    ]);
 
     if (detail.kind !== "found") {
       return detail.kind === "not-found"
@@ -288,6 +344,7 @@ export const getPublicBoardPage = createServerFn({ method: "GET" })
       post: detail.post,
       changelog: detail.changelog,
       helpArticle: detail.helpArticle,
+      hasHelpCenterArticles,
       canonicalUrl: new URL(url.pathname, url.origin).toString(),
       siteUrl: new URL("/", url.origin).toString(),
       ogImageUrl,

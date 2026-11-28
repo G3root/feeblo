@@ -1,7 +1,6 @@
 import * as Match from "effect/Match";
 import * as Schema from "effect/Schema";
 import { setup } from "xstate";
-
 /**
  * One reader's verdict on one article, as an XState machine.
  *
@@ -24,6 +23,14 @@ import { setup } from "xstate";
  * is open". The two cannot disagree, and `CLOSE_REASON` has exactly one
  * destination because the state it leaves is what says what to go back to.
  *
+ * The tally is context rather than a parallel `useState` because it has the same
+ * problem: the read and the write both answer with it, and one of them is
+ * newer. `SETTLED_*` carries the write's answer, `LOADED_*` carries the read's,
+ * and the transitions below say which wins — the write, in every state that
+ * accepts it, because a settle is the reader's own press and the read it
+ * replaces was already on screen. An event the state does not handle (a read
+ * that lands after a press) is dropped instead of overwriting the numbers.
+ *
  * The request is not an `invoke`, for the reason `provider-connect-machine.ts`
  * states: its failure has to be toasted where the error is known, so the hook
  * sends `SETTLED_*` after the mutation resolves. That also means these states
@@ -32,16 +39,51 @@ import { setup } from "xstate";
  * and React Query's `isError`, not a state here.
  */
 
+/** The verdict tallies and this reader's verdict, as the RPC returns them. */
+const TallySchema = Schema.Struct({
+  helpfulCount: Schema.Finite,
+  notHelpfulCount: Schema.Finite,
+  mine: Schema.NullOr(Schema.Boolean),
+});
+
+export type HelpCenterTally = Schema.Schema.Type<typeof TallySchema>;
+
 const ContextSchema = Schema.toStandardSchemaV1(
-  Schema.Struct({ reason: Schema.String })
+  Schema.Struct({
+    reason: Schema.String,
+    tally: Schema.NullOr(TallySchema),
+  })
 );
 
 const eventSchema = (type: string) =>
   Schema.toStandardSchemaV1(Schema.Struct({ type: Schema.Literal(type) }));
 
+/** An event that brings a tally: either the read's or the write's answer. */
+const tallyEventSchema = (type: string) =>
+  Schema.toStandardSchemaV1(
+    Schema.Struct({ tally: TallySchema, type: Schema.Literal(type) })
+  );
+
 const SetReasonEventSchema = Schema.toStandardSchemaV1(
   Schema.Struct({ type: Schema.Literal("SET_REASON"), value: Schema.String })
 );
+
+/** The part of a tally event this module reads. */
+type TallyEvent = { readonly tally: HelpCenterTally };
+
+/**
+ * A transition into `target` that also adopts the tally the event carries.
+ *
+ * Named because every move between the answered states has to do the same two
+ * things, and a transition that forgot the second would draw the new verdict
+ * beside the previous one's counts.
+ */
+const tallyTo = <Target extends string>(target: Target) => ({
+  context: ({ event }: { readonly event: TallyEvent }) => ({
+    tally: event.tally,
+  }),
+  target,
+});
 
 /** The verdict the server had stored when the tally arrived. */
 export const toVoteLoadedEvent = (mine: boolean | null) =>
@@ -56,18 +98,18 @@ export const helpCenterVoteMachine = setup({
     context: ContextSchema,
     events: {
       CLOSE_REASON: eventSchema("CLOSE_REASON"),
-      LOADED_HELPFUL: eventSchema("LOADED_HELPFUL"),
-      LOADED_NONE: eventSchema("LOADED_NONE"),
-      LOADED_UNHELPFUL: eventSchema("LOADED_UNHELPFUL"),
+      LOADED_HELPFUL: tallyEventSchema("LOADED_HELPFUL"),
+      LOADED_NONE: tallyEventSchema("LOADED_NONE"),
+      LOADED_UNHELPFUL: tallyEventSchema("LOADED_UNHELPFUL"),
       RETRY: eventSchema("RETRY"),
-      SETTLED_HELPFUL: eventSchema("SETTLED_HELPFUL"),
-      SETTLED_UNHELPFUL: eventSchema("SETTLED_UNHELPFUL"),
+      SETTLED_HELPFUL: tallyEventSchema("SETTLED_HELPFUL"),
+      SETTLED_UNHELPFUL: tallyEventSchema("SETTLED_UNHELPFUL"),
       SET_REASON: SetReasonEventSchema,
       TALLY_FAILED: eventSchema("TALLY_FAILED"),
     },
   },
 }).createMachine({
-  context: { reason: "" },
+  context: { reason: "", tally: null },
   id: "helpCenterVote",
   initial: "loading",
   states: {
@@ -75,13 +117,13 @@ export const helpCenterVoteMachine = setup({
     // either button as pressed would be a guess.
     loading: {
       on: {
-        LOADED_HELPFUL: { target: "answeredHelpful" },
-        LOADED_NONE: { target: "asking" },
-        LOADED_UNHELPFUL: { target: "answeredUnhelpful" },
+        LOADED_HELPFUL: tallyTo("answeredHelpful"),
+        LOADED_NONE: tallyTo("asking"),
+        LOADED_UNHELPFUL: tallyTo("answeredUnhelpful"),
         // A reader can click before the tally arrives. The verdict is still
         // theirs to record, so the settle is accepted here rather than dropped.
-        SETTLED_HELPFUL: { target: "answeredHelpful" },
-        SETTLED_UNHELPFUL: { target: "promptReason" },
+        SETTLED_HELPFUL: tallyTo("answeredHelpful"),
+        SETTLED_UNHELPFUL: tallyTo("promptReason"),
         TALLY_FAILED: { target: "failed" },
       },
     },
@@ -99,17 +141,17 @@ export const helpCenterVoteMachine = setup({
      */
     failed: {
       on: {
-        LOADED_HELPFUL: { target: "answeredHelpful" },
-        LOADED_NONE: { target: "asking" },
-        LOADED_UNHELPFUL: { target: "answeredUnhelpful" },
+        LOADED_HELPFUL: tallyTo("answeredHelpful"),
+        LOADED_NONE: tallyTo("asking"),
+        LOADED_UNHELPFUL: tallyTo("answeredUnhelpful"),
         RETRY: { target: "loading" },
         TALLY_FAILED: {},
       },
     },
     asking: {
       on: {
-        SETTLED_HELPFUL: { target: "answeredHelpful" },
-        SETTLED_UNHELPFUL: { target: "promptReason" },
+        SETTLED_HELPFUL: tallyTo("answeredHelpful"),
+        SETTLED_UNHELPFUL: tallyTo("promptReason"),
       },
     },
     /**
@@ -128,22 +170,36 @@ export const helpCenterVoteMachine = setup({
         SET_REASON: {
           context: ({ event }) => ({ reason: event.value }),
         },
-        SETTLED_HELPFUL: { context: { reason: "" }, target: "answeredHelpful" },
+        SETTLED_HELPFUL: {
+          context: ({ event }: { readonly event: TallyEvent }) => ({
+            reason: "",
+            tally: event.tally,
+          }),
+          target: "answeredHelpful",
+        },
         SETTLED_UNHELPFUL: {
-          context: { reason: "" },
+          context: ({ event }: { readonly event: TallyEvent }) => ({
+            reason: "",
+            tally: event.tally,
+          }),
           target: "answeredUnhelpful",
         },
       },
     },
     answeredHelpful: {
       on: {
-        SETTLED_UNHELPFUL: { target: "promptReason" },
+        // A second Yes is a write like any other: it returns the counts as they
+        // are now, so the state stays put and only the numbers move. Without
+        // this the counts would stay frozen on the first read — nothing else
+        // updates them, because the invalidated read is only adopted once.
+        SETTLED_HELPFUL: tallyTo("answeredHelpful"),
+        SETTLED_UNHELPFUL: tallyTo("promptReason"),
       },
     },
     answeredUnhelpful: {
       on: {
-        SETTLED_HELPFUL: { target: "answeredHelpful" },
-        SETTLED_UNHELPFUL: { target: "promptReason" },
+        SETTLED_HELPFUL: tallyTo("answeredHelpful"),
+        SETTLED_UNHELPFUL: tallyTo("promptReason"),
       },
     },
   },
@@ -155,7 +211,10 @@ export const helpCenterVoteMachine = setup({
  * `status` for its own subscribe helpers.
  */
 export type HelpCenterVoteSnapshot = {
-  readonly context: { readonly reason: string };
+  readonly context: {
+    readonly reason: string;
+    readonly tally: HelpCenterTally | null;
+  };
   readonly matches: (state: string) => boolean;
 };
 
@@ -172,6 +231,17 @@ export type HelpCenterVoteView = {
   readonly ready: boolean;
   /** True when the tally could not be read; the buttons are replaced by retry. */
   readonly failed: boolean;
+  /**
+   * The counts to draw beside the buttons.
+   *
+   * From the machine's context rather than a second read in the component: the
+   * read and the write both carry a tally, and which one is current is a state
+   * question the transitions above answer once.
+   */
+  readonly counts: {
+    readonly helpful: number;
+    readonly notHelpful: number;
+  };
 };
 
 export const toHelpCenterVoteView = (
@@ -186,6 +256,10 @@ export const toHelpCenterVoteView = (
       : null;
 
   return {
+    counts: {
+      helpful: snapshot.context.tally?.helpfulCount ?? 0,
+      notHelpful: snapshot.context.tally?.notHelpfulCount ?? 0,
+    },
     failed: snapshot.matches("failed"),
     reason: snapshot.context.reason,
     reasonOpen,

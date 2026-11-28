@@ -716,12 +716,27 @@ export function helpCenterArticlesQueryKey(
 }
 
 /**
+ * How many articles one section page loads at a time.
+ *
+ * The live query asks the server for one more than this — the peek row that
+ * says whether there is another page — and hides it. `Load more` widens the
+ * window rather than fetching after a cursor, so the request grows by this much
+ * per page; the list's own ceiling is what stops it.
+ */
+export const HELP_CENTER_SECTION_ARTICLE_PAGE_SIZE = 25;
+
+/**
  * The query key for one section's articles.
  *
  * The section page's collection and the editor's post-write invalidation both
  * name the same rows, so the key is derived here rather than spelled twice. A
  * drift between the two would leave the section page showing the article as it
  * was before the save.
+ *
+ * It is the section's prefix, not a page: the on-demand collection appends the
+ * `LoadSubsetOptions` it is asked for (the window and the filters) to this key,
+ * which is what gives each page its own cache entry while the editor can still
+ * invalidate every page of a section by its prefix.
  */
 export function helpCenterArticleTopicQueryKey(
   organizationId: string | undefined,
@@ -736,14 +751,19 @@ export function helpCenterArticleTopicQueryKey(
 }
 
 /**
- * One section's articles.
+ * One section's articles, one page at a time.
  *
  * A section page lists one topic, and the workspace-wide
  * `helpCenterArticleCollection` stays for `useWorkspaceUsage` only. Scoping the
  * collection by topic is what lets the editor invalidate exactly the lists a
  * write could have changed, including both lists when an article moves
- * sections. The operation filters by `topicId` on the server; the live query
- * keeps its predicate as a second guard.
+ * sections.
+ *
+ * `on-demand` because the page asks for a window: the live query passes its
+ * `offset`/`limit` down to `queryFn`, and the server returns that page in the
+ * order `sort: "updated"` names. The section page must order by the same two
+ * columns the repository sorts by, or a window would be cut from one order and
+ * rendered in another.
  */
 export function helpCenterTopicArticleCollection(
   scope: DashboardCollectionScope,
@@ -758,8 +778,7 @@ export function helpCenterTopicArticleCollection(
     queryCollectionOptions({
       id,
       queryClient: client.requireDependency<QueryClient>("queryClient"),
-      queryKey: () =>
-        helpCenterArticleTopicQueryKey(scope.organizationId, topicId),
+      queryKey: helpCenterArticleTopicQueryKey(scope.organizationId, topicId),
       queryFn: async (ctx) => {
         const organizationId = scope.organizationId;
 
@@ -767,18 +786,38 @@ export function helpCenterTopicArticleCollection(
           return [];
         }
 
-        // The list operation filters by workspace and optionally one section;
-        // the section's live query keeps its predicate as a second guard, but
-        // the rows never leave the server. The workspace-wide collection stays
-        // for the plan-usage meter.
+        const window = ctx.meta?.loadSubsetOptions;
+
+        // The page windows every read, and the operation refuses a
+        // section-scoped list without one: a demand that named no window would
+        // ask the server for the whole section, which is the read this
+        // collection exists to avoid. It fails there rather than quietly
+        // returning a page a windowless demander would take as complete.
+        //
+        // The list operation filters by workspace and section on the server;
+        // the live query keeps its predicate as a second guard. The
+        // workspace-wide collection stays for the plan-usage meter, which is
+        // the one caller allowed to read without a window.
         const data = await fetchRpc(
-          (rpc) => rpc.ListHelpCenterArticles({ organizationId, topicId }),
+          (rpc) =>
+            rpc.ListHelpCenterArticles({
+              organizationId,
+              sort: "updated",
+              topicId,
+              ...(window?.limit === undefined
+                ? undefined
+                : { limit: window.limit }),
+              ...(window?.offset === undefined
+                ? undefined
+                : { offset: window.offset }),
+            }),
           { signal: ctx.signal }
         );
 
         return [...data];
       },
       getKey: (item) => item.id,
+      syncMode: "on-demand",
     })
   );
 }
