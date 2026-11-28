@@ -13,15 +13,9 @@ import {
   helpCenterVoteMachine,
   toHelpCenterVoteView,
   toVoteLoadedEvent,
+  type HelpCenterTally,
   type HelpCenterVoteView,
 } from "./vote-machine";
-
-/** The part of the tally the widget reads. */
-type HelpCenterTally = {
-  readonly helpfulCount: number;
-  readonly mine: boolean | null;
-  readonly notHelpfulCount: number;
-};
 
 /** What the verdict widget needs from this hook. */
 export type HelpCenterVote = HelpCenterVoteView & {
@@ -36,20 +30,21 @@ export type HelpCenterVote = HelpCenterVoteView & {
   /** Refreshes the tally and leaves the failed state. */
   readonly retry: () => void;
   readonly isPending: boolean;
-  readonly counts: { readonly helpful: number; readonly notHelpful: number };
 };
 
 /**
  * The reader's verdict lifecycle, wired to the tally and the write.
  *
- * The graph lives in `vote-machine.ts`. This hook is the adapter: it reads the
- * tally from an atom, adopts it once per article, and sends the settle event
- * the write resolved to.
+ * The graph lives in `vote-machine.ts`, including which tally is current: the
+ * hook reads the tally from an atom, adopts it once per article, and sends the
+ * settle event — carrying the tally the write answered with — when the write
+ * resolves.
  *
  * The write carries the tally's reactivity keys, which is what replaced React
  * Query's `setQueryData`: the atom refreshes itself, so the widget never writes
  * a cache it does not own. The machine holds the reader's intent, so the button
- * state does not wait for a cache mutation to look right.
+ * state does not wait for a cache mutation to look right, and the settle's own
+ * tally means the counts do not either.
  */
 export function useHelpCenterVote({
   articleId,
@@ -77,7 +72,7 @@ export function useHelpCenterVote({
   const feedbackResult = useAtomValue(feedbackAtom);
   const refreshFeedback = useAtomRefresh(feedbackAtom);
 
-  const tally = Result.getOrElse(
+  const readTally = Result.getOrElse(
     feedbackResult,
     (): HelpCenterTally | null => null
   );
@@ -104,7 +99,7 @@ export function useHelpCenterVote({
       return;
     }
 
-    if (tally === null) {
+    if (readTally === null) {
       return;
     }
 
@@ -113,8 +108,8 @@ export function useHelpCenterVote({
     }
 
     adoptedFor.current = articleId;
-    send({ type: toVoteLoadedEvent(tally.mine) });
-  }, [articleId, feedbackResult, send, tally]);
+    send({ tally: readTally, type: toVoteLoadedEvent(readTally.mine) });
+  }, [articleId, feedbackResult, readTally, send]);
 
   const setFeedback = useAtomSet(setHelpCenterArticleFeedbackAtom, {
     mode: "promise",
@@ -142,11 +137,12 @@ export function useHelpCenterVote({
       },
       reactivityKeys: helpCenterFeedbackReactivityKeys(organizationId),
     })
-      .then(() =>
+      .then((settled) => {
         send({
+          tally: settled,
           type: helpful ? "SETTLED_HELPFUL" : "SETTLED_UNHELPFUL",
-        })
-      )
+        });
+      })
       .catch(() => {
         // The verdict is a count, not a document: a refused write leaves the
         // machine where it is and the reader can press again. A toast for this
@@ -155,14 +151,8 @@ export function useHelpCenterVote({
       .finally(() => setIsPending(false));
   };
 
-  const view = toHelpCenterVoteView(snapshot);
-
   return {
-    ...view,
-    counts: {
-      helpful: tally?.helpfulCount ?? 0,
-      notHelpful: tally?.notHelpfulCount ?? 0,
-    },
+    ...toHelpCenterVoteView(snapshot),
     isPending,
     markHelpful: () => cast(true),
     // One write per press. The machine decides what the settle means: from
